@@ -1,0 +1,70 @@
+{
+  "yaml.dump": {
+	  "inputs": [
+		{
+			"name": "data",
+			"kind": "required",
+			"purpose": "Data to be converted to YAML"
+		},
+		{
+			"name": "style",
+			"kind": "ordered",
+			"type": "choices={'block', 'flow', 'auto'}",
+			"purpose": "YAML style for sequences and mappings"
+		}
+	  ]
+  },
+  "yaml.dumpFile": {
+	  "inputs": [
+		{
+			"name": "data",
+			"kind": "required",
+			"purpose": "Data to be converted to YAML"
+		},
+		{
+			"name": "filePath",
+			"kind": "required",
+			"type": "string",
+			"purpose": "Path to new YAML file"
+		},
+		{
+			"name": "style",
+			"kind": "ordered",
+			"type": "choices={'block', 'flow', 'auto'}",
+			"purpose": "YAML style for sequences and mappings"
+		}
+	  ]
+  },
+  "yaml.load":{
+	  "inputs": [
+		{
+			"name": "s", 
+			"kind": "required", 
+			"type": "string",
+			"purpose": "String with YAML data"
+		},
+		{
+			"name": "ConvertToArray", 
+			"kind": "namevalue", 
+			"type": ["logical", "scalar"],
+			"purpose": "Try to convert sequences to non-cell arrays."
+		}
+	  ]
+  },
+  "yaml.loadFile": {
+	"inputs": [
+        {
+			"name": "filePath", 
+			"kind": "required", 
+			"type": ["file=*.yaml,*.yml,*.txt"], 
+			"purpose": "Path to YAML file"
+		},
+		{
+			"name": "ConvertToArray", 
+			"kind": "namevalue", 
+			"type": ["logical", "scalar"],
+			"purpose": "Try to convert sequences to non-cell arrays."
+		}
+    ]
+  }
+}

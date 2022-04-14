@@ -1,0 +1,51 @@
+# paths to where the data is stored and to the simnibs environment
+data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data
+simnibs_env_path: /project/3015999.02/andche_sandbox/simnibs/simnibs_env
+
+overwrite_files: ask # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+interactive: 1 # in interactive mode (1), the figures are shown and confirmation dialogs appear in non-interactive mode (0), no plots are shown and no confirmation dialogs (not fully implemented)
+simulation_medium: water_and_skull # select which medium setup to use, 'water' or 'water_and_skull'
+
+t1_path_template: sub-%1$03d_orig_T1w.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: sub-%1$03d_orig_T2w.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+
+# if the simulations are done for water only, set the grid size manually
+# select the desired simulation grid size (number of points per dimension)
+default_grid_size: 236
+
+# reference: ITRUST benchmarks (https://arxiv.org/abs/2202.04552)
+medium:
+  water_sound_speed: 1500 # [m/s], ITRUST benchmarks or waterSoundSpeed(temp_0)
+  water_density: 1000 # [kg/m^3], ITRUST benchmarks or waterDensity(temp_0)
+  skull_sound_speed: 2800 # [m/s], ITRUST benchmarks 
+  skull_density: 1850 # [kg/m^3], ITRUST benchmarks
+  alpha_power: 2 # this and the following parameters are taken from Judith's code 
+  water_alpha_coef_true: 0
+  water_alpha_power_true: 1
+  skull_alpha_coef_true: 4
+  skull_alpha_power_true: 1
+
+# select which k-Wave code to run
+#   MATLAB CPU code 'matlab_cpu'
+#   MATLAB GPU code 'matlab_gpu'
+#   C++ code (Interactive) 'cpp_interactive'
+#   C++ code (Non-Interactive) 'cpp_noninteractive'
+#   CUDA code 'cuda' (currently does not work at the Donders HPC, but 'matlab_gpu' works)
+
+code_type: matlab_gpu 
+
+run_simulations_with_qsub: 1 # the simulations will be submitted to the HPC cluster
+
+# select PML size, the default one for 3D is 10 (PML is the layer used in
+# kWaves to absorb waves reaching the end of the computational grid,
+# http://www.k-wave.org/documentation/example_na_controlling_the_pml.php)
+pml_size: 10
+
+temp_0: 37 #[deg C] initial temperature, currently not used
+
+# grid resolution (must be isotropic) 
+grid_step_mm: 0.5  # [mm]
+
+# optional affix for result files names
+results_filename_affix: ''
+

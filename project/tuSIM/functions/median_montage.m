@@ -1,0 +1,6 @@
+function median_montage(t1_image)
+    t1_center = round((size(t1_image)+1)/2);
+    im1 = mat2gray(squeeze(t1_image(t1_center(1),:,:)));
+    montage({im1,...
+        mat2gray(squeeze(t1_image(:,t1_center(2),:))),...
+        mat2gray(squeeze(t1_image(:,:,t1_center(3))))}, 'Size', [1 nan])
