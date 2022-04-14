@@ -29,10 +29,12 @@ end
 
 
 % example runnning several subjects for with 'example_pipeline_judith'
+% single session
 for subject_id = [1,4,12]
     example_pipeline_judith(subject_id)
 end
 
+% batch jobs
 for subject_id = [1, 4, 12]
 qsubfeval(@example_pipeline_judith, subject_id, 'timreq',  60*60*7,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
 end

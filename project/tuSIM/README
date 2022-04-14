@@ -1,1 +1,15 @@
-Use main_pipeline.m to set the parameters and start simulations.
+This is the in-progress package for ultrasonic simulations includig brain preproccesing, extracting data from Localite neuronavigation files, and more. 
+
+Current status: early work, poorly documented, seem to work. 
+
+The main function is single_subject_pipeline that takes the subject ID and parameter structure as an input. The parameters are taken from the config files in the configs directory, see the configs in this folder for the information on configurabble fields. 
+
+The examples folder contains some examples on how to run the pipeline. 
+
+Before using the package, you need to have some libraries on your path. Three small ones are included in the toolbox folder, but you also would need to have kwave installed. 
+
+*Processing steps*
+
+The main pipeline depends a bit on whether you set water or water_and_skull as a simulations medium. 
+More details to follow =)
+
