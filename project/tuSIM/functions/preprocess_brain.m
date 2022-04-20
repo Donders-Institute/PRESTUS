@@ -47,7 +47,7 @@ function [skull_mask, segmented_image_cropped, skull_edge, trans_pos_final, focu
     end
 
     [t1_with_trans_img, transducer_pars] = plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters);
-
+    imwrite(t1_with_trans_img, fullfile(parameters.data_path, sprintf('sub-%03d_t1_with_transducer_orig%s.png', subject_id, parameters.results_filename_affix)))
     %% SEGMENTATION
     disp('Starting segmentation...')
 
@@ -111,6 +111,7 @@ function [skull_mask, segmented_image_cropped, skull_edge, trans_pos_final, focu
 
     % plot images for comparison
     montage(cat(4, t1_slice*255, skin_skull_img*255, imfuse(mat2gray(t1_slice), skin_skull_img, 'blend')) ,'size',[1 NaN]);
+    export_fig(fullfile(parameters.data_path, sprintf('sub-%03d_t1_skin_skull%s.png', subject_id, parameters.results_filename_affix)), '-native')
 
     %% SMOOTH & CROP SKULL
     disp('Smoothing and cropping the skull...')
@@ -120,12 +121,14 @@ function [skull_mask, segmented_image_cropped, skull_edge, trans_pos_final, focu
 
         [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
             smooth_and_crop_skull(segmented_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
+        
         save(filename_cropped_smoothed_skull_data, 'skull_mask', 'skull_edge', 'segmented_image_cropped', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix')
     else 
         load(filename_cropped_smoothed_skull_data);
     end    
     parameters.grid_dims = new_grid_size;
-
+    imwrite(plot_t1_with_transducer(segmented_image_cropped, parameters.grid_step_mm, trans_pos_final, focus_pos_final, parameters),...
+        fullfile(parameters.data_path, sprintf('sub-%03d_segmented_brain_final%s.png', subject_id, parameters.results_filename_affix)))
 
     % check that the transformations can be correctly reversed
 

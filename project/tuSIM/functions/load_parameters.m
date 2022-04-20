@@ -15,5 +15,12 @@ function parameters = load_parameters(varargin)
     end
     parameters.grid_step_m = parameters.grid_step_mm/1e3; % [meters]
     parameters.default_grid_dims = repmat(parameters.default_grid_size, [1 3]);
-
+    if iscell(parameters.transducer.source_phase_rad)
+        for i = 1:length(parameters.transducer.source_phase_rad)
+            if ~isnumeric(parameters.transducer.source_phase_rad{i})
+                parameters.transducer.source_phase_rad{i}= eval(parameters.transducer.source_phase_rad{i});
+            end
+        end
+        parameters.transducer.source_phase_rad = cell2mat(parameters.transducer.source_phase_rad);
+    end
 end

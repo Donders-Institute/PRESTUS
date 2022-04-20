@@ -21,8 +21,8 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
 
     % restrict skull based on CSF 
     % expand CSF by a large amount
-
-    SE = strel('cube',40/voxel_size_mm);
+    
+    SE = strel('cube', parameters.csf_mask_expansion_factor/voxel_size_mm);
     csf_mask_expanded = imdilate(csf_mask, SE);
 
 %     imshow(plot_t1_with_transducer(segmented_image, segmented_hdr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters))

@@ -21,4 +21,7 @@ data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data/images_Judith
 
 t1_path_template: sub-%1$03d_ses-mri01_acq-t1*_T1w.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
 t2_path_template: sub-%1$03d_ses-mri01_acq-t2*_T2w.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
-localite_instr_file_template: example_transducer_Localite.xml  # path to the localite file that has the data about the instrument relative to data_path; could also be a template similar to t1 and t2 path (usually an xml file taken from subject/Sessions/Session_xxxx/InstrumentMarkers/ folder)
+localite_instr_file_template: sub-%03d_Instrument*.xml  # path to the localite file that has the data about the instrument relative to data_path; could also be a template similar to t1 and t2 path (usually an xml file taken from subject/Sessions/Session_xxxx/InstrumentMarkers/ folder)
+
+# expansion factor for the cerebro-spinal fluid brain mask; if the mask ends up too big, try reducing it (40 is the conservative default; the mask is dilated with csf_mask_expansion_factor/voxel_size_mm cubic kernel)
+csf_mask_expansion_factor: 40 

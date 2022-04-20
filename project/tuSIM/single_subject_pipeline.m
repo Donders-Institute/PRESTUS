@@ -1,4 +1,8 @@
 function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters)
+% subject_id must be a number
+% parameters is a structure (see load_parameters)
+
+fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
 % add subject_id to parameters to pass arguments to functions more easily
 parameters.subject_id = subject_id;
 
@@ -141,7 +145,7 @@ plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, after_e
 
 export_fig(output_plot, '-native')
 
-if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && strcmp(parameters.medium, 'water_and_skull')
+if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && strcmp(parameters.simulation_medium, 'water_and_skull')
     new_parameters = parameters;
     new_parameters.simulation_medium = 'water';
     new_parameters.default_grid_dims = new_parameters.grid_dims;
