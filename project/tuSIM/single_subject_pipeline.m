@@ -30,18 +30,31 @@ else
     % make sure that the grid dimensions are known
     assert(isfield(parameters, 'default_grid_dims'), 'The parameters structure should have the field grid_dims for the grid dimensions')
     parameters.grid_dims = parameters.default_grid_dims;
+    if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
+        parameters.grid_dims = squeeze(parameters.grid_dims);
+        parameters.n_sim_dims = length(parameters.grid_dims);
+        disp('One of the simulation grid dimensions is of length 1, assuming you want 2d simulations, dropping this dimension')
+    end
+        
+
     skull_mask = [];
     segmented_image_cropped = zeros(parameters.grid_dims);
     if ~isfield(parameters.transducer, 'pos_grid') || ~isfield(parameters, 'focus_pos_grid')
         disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
-        % note that the focus position matters only for the orientation of
-        % the transducer
-        trans_pos_final = round([parameters.grid_dims(2:3)/2 10]);
-        focus_pos_final = round([parameters.grid_dims(2:3)/2 10+(parameters.expected_focal_distance_mm)/parameters.grid_step_mm]);
+        % note that the focus position matters only for the orientation of the transducer
+    end
+    if ~isfield(parameters.transducer, 'pos_grid')
+        trans_pos_final = round([parameters.grid_dims(1:(parameters.n_sim_dims-1))/2 10]);
     else
         trans_pos_final = parameters.transducer.pos_grid;
-        focus_pos_final = parameters.focus_pos_grid;
     end
+    if ~isfield(parameters.transducer, 'focus_pos_grid') 
+        focus_pos_final = trans_pos_final;
+        focus_pos_final(parameters.n_sim_dims) = round(focus_pos_final(parameters.n_sim_dims) + parameters.expected_focal_distance_mm/parameters.grid_step_mm);
+    else
+        focus_pos_final = parameters.focus_pos_grid;    
+    end
+        
 end
 
 parameters.transducer.pos_grid = trans_pos_final;
@@ -93,7 +106,7 @@ if confirm_overwriting(filename_sensor_data, parameters)
 %         else 
         sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
 %         end
-        save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' )
+        save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
     end
 else
     load(filename_sensor_data, 'sensor_data')
@@ -110,16 +123,28 @@ Isppa_map = data_max.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1
 max_Isppa = max(Isppa_map(:));
 after_exit_plane_mask = ones(comp_grid_size);
 bowl_depth_grid = round((parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm);
-if trans_pos_final(3) > comp_grid_size(3)/2
-    after_exit_plane_mask(:,:,(trans_pos_final(3)-bowl_depth_grid):end) = 0;
+if parameters.n_sim_dims == 3
+    if trans_pos_final(3) > comp_grid_size(3)/2
+        after_exit_plane_mask(:,:,(trans_pos_final(parameters.n_sim_dims)-bowl_depth_grid):end) = 0;
+    else
+        after_exit_plane_mask(:,:,1:(trans_pos_final(parameters.n_sim_dims)+bowl_depth_grid)) = 0;
+    end
 else
-    after_exit_plane_mask(:,:,1:(trans_pos_final(3)+bowl_depth_grid)) = 0;
+    if trans_pos_final(2) > comp_grid_size(2)/2
+        after_exit_plane_mask(:,(trans_pos_final(parameters.n_sim_dims)-bowl_depth_grid):end) = 0;
+    else
+        after_exit_plane_mask(:,1:(trans_pos_final(parameters.n_sim_dims)+bowl_depth_grid)) = 0;
+    end
 end
 
 [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = masked_max_3d(Isppa_map, after_exit_plane_mask);
-max_isppa_eplane_pos = [Ix_eplane, Iy_eplane, Iz_eplane];
+if parameters.n_sim_dims==3
+    max_isppa_eplane_pos = [Ix_eplane, Iy_eplane, Iz_eplane];
+else 
+    max_isppa_eplane_pos = [Ix_eplane, Iy_eplane];
+end
 disp('Final transducer, expected focus, and max ISPPA positions')
-[trans_pos_final, focus_pos_final, max_isppa_eplane_pos']
+[trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
 real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm;
 
 if strcmp(parameters.simulation_medium, 'water_and_skull')
@@ -141,8 +166,11 @@ else
 
 end
 output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, after_exit_plane_mask, {'y', trans_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos)
-
+if parameters.n_sim_dims==3
+    plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, after_exit_plane_mask, {'y', trans_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos)
+else
+    plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, after_exit_plane_mask,  trans_pos_final, focus_pos_final, highlighted_pos)
+end
 export_fig(output_plot, '-native')
 
 if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && strcmp(parameters.simulation_medium, 'water_and_skull')

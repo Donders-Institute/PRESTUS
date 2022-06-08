@@ -49,8 +49,11 @@
    
    % debugging info for non-interactive simulations on the cluster
 
-   
-   sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
+   if parameters.n_sim_dims == 3
+       sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
+   else
+       sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
+   end
 
    % the code below is for preparing commands for non-interactive
    % processing in terminal

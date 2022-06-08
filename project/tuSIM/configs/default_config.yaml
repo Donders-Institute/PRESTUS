@@ -51,3 +51,6 @@ results_filename_affix: ''
 
 # expansion factor for the cerebro-spinal fluid brain mask; if the mask ends up too big, try reducing it (40 is the conservative default; the mask is dilated with csf_mask_expansion_factor/voxel_size_mm cubic kernel)
 csf_mask_expansion_factor: 40
+
+# use the kwaveArray class for simulations
+use_kWaveArray: 0

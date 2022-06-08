@@ -1,7 +1,7 @@
 function output_pressure_file = calibrate_in_water(extra_config, source_amp, source_phase_deg)
     
     % start from tusim/code folder
-    cd /home/visual/andche/STAFF_SCI/andche_sandbox/TUS_sims/tusim/code/
+    cd /project/3015999.02/andche_sandbox/orca-lab/project/tuSIM/
 
     % add paths
     addpath('functions')
