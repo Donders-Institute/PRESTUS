@@ -1,0 +1,46 @@
+data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data/tutorial
+t1_path_template: sub-%1$03d_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: sub-%1$03d_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+
+transducer: 
+  n_elements: 4 # number of elements in the transducer
+  Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]
+  Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
+  curv_radius_mm: 63.20 # radius of curvature of the bowl 
+  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
+  source_amp: 95000 # [Pa] 
+  source_phase_deg: [0.0, 355.3, 350.6, 341.1] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_freq_hz: 250e3 # [Hz] the central frequency
+  pos_grid: [72, 72, 11]
+
+expected_focal_distance_mm: 64.5 # [mm] distance to focal point expected based on the calibration (for the real transducer)
+
+medium:
+  skull:
+    alpha_coef_true: 2 
+  brain:
+    alpha_coef_true: 0.15 
+  skin:
+    alpha_coef_true: 0.1
+
+default_grid_dims: [144, 144, 216]
+
+thermal:
+  duty_cycle: 0.5 # share of the stimulation duration during which the stimulation is on
+  sim_time_steps: 0.1 # [s] simulation time steps during the stimulation period
+  temp_0: 37 #[deg C] initial temperature, currently not used
+  stim_duration: 0.6 # [s] stimulation duration within a trial
+  iti: 1.2 # interval between the trials, from the start of one trial to the start of another [s]
+  n_trials: 12 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
+
+grid_step_mm: 0.5
+
+use_kWaveArray: 0
+
+run_heating_sims: 0
+# optional affix for result files names
+results_filename_affix: '_0.5mm'
+
+
+skull_smooth_threshold: 0.15 # lower than the default threshold for skull cropping since otherwise there are gaps in the skull appearing
+

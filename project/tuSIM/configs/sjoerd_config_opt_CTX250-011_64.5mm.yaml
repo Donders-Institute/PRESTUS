@@ -1,0 +1,16 @@
+data_path: /home/visual/andche/STAFF_SCI/andche_sandbox/Sjoerd_MRI/
+t1_path_template: MRI/sub-%1$03d/ses-mri01/anat/*T1w.nii.gz
+t2_path_template: MRI/sub-%1$03d/ses-mri01/anat/*T2w.nii.gz
+
+transducer: 
+  n_elements: 4 # number of elements in the transducer
+  Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]
+  Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
+  curv_radius_mm: 63.20 # radius of curvature of the bowl 
+  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
+  source_amp: 142309 # [Pa] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_phase_deg: [0, 9.9454e-07, 354.4105, 271.8960] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_freq_hz: 250e3 # [Hz] the central frequency
+
+expected_focal_distance_mm: 75.5 # expected distance to the stimulation focus
+transducer_from_localite: 0 # should we load the transducer locations from the localite file(s) 
