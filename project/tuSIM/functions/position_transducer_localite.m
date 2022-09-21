@@ -52,6 +52,9 @@ focus_pos = round(mri_hdr.Transform.T' \ focus_pos_ras);
 
 trans_pos = trans_pos(1:3);
 focus_pos = focus_pos(1:3);
+disp('The transducer position is taken from the localite files, the expected focus position is set based on the expected focal distance')
+disp('The transducer position & the focus position:')
+[trans_pos focus_pos]
 
 % actual_focus = t+35.1*x; 
 

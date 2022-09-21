@@ -5,19 +5,18 @@ function example_pipeline_judith(subject_id)
     cd /project/3015999.02/andche_sandbox/orca-lab/project/tuSIM/
 
     % add paths
-    addpath('.');
+    
     addpath('functions')
-    addpath('toolboxes/kwave') % set your kwave path here
-    addpath('toolboxes/Colormaps') % set your path to Colormaps files here
-    addpath('toolboxes/export_fig') % set your path to export_fig files here
-    addpath('toolboxes/yaml') % set your path to yaml files here
-
+    addpath(genpath('toolboxes/'));
+    
     parameters = load_parameters('judith_config.yaml');
 
     parameters.simulation_medium = 'water_and_skull';
     parameters.overwrite_files = 'never';
     parameters.overwrite_simnibs = 0;
-    parameters.interactive = 1;
+    parameters.interactive = 0;
+    parameters.use_kWaveArray = 1;
+    parameters.results_filename_affix = '_kwave_array';
     if subject_id == 12
         parameters.csf_mask_expansion_factor = 15;
     end

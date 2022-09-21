@@ -1,5 +1,10 @@
-function transducer_pos = get_trans_pos_from_trigger_markers(trigger_markers_file, trigger_index, reference_to_transducer_distance )
-
+function [transducer_pos target_pos] = get_trans_pos_from_trigger_markers(trigger_markers_file, trigger_index, reference_to_transducer_distance, reference_to_target_distance )
+    arguments
+    trigger_markers_file
+    trigger_index
+    reference_to_transducer_distance
+    reference_to_target_distance = 0;
+    end
     xml = xml2struct(trigger_markers_file);
 
     % find i-th marker
@@ -22,4 +27,7 @@ function transducer_pos = get_trans_pos_from_trigger_markers(trigger_markers_fil
 
     transducer_pos = reference_pos + reference_to_transducer_distance*reference_center_to_head ;
     transducer_pos = transducer_pos(1:3);
+    
+    target_pos = reference_pos + reference_to_target_distance*reference_center_to_head ;
+    target_pos = target_pos(1:3);
 end

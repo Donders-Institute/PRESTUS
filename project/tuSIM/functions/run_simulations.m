@@ -48,7 +48,8 @@
    input_args_cell = zip_fields(input_args);
    
    % debugging info for non-interactive simulations on the cluster
-
+   medium = rmfield(medium,'thermal_conductivity');
+   medium = rmfield(medium,'specific_heat');
    if parameters.n_sim_dims == 3
        sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
    else

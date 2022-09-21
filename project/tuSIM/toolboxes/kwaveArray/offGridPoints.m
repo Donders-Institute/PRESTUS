@@ -185,10 +185,34 @@ switch kgrid.dim
     case 3
         mask = zeros(kgrid.Nx, kgrid.Ny, kgrid.Nz);
 end
-
+if strcmp(class(points),'gpuArray')
+mask = gpuArray(mask);
+end
 % display wait bar
 if display_wait_bar
     h = waitbar(0, 'Computing off-grid source mask...');
+end
+
+if bli_tolerance == 0
+    % evaluate a BLI centered on the point at all the grid nodes
+    switch bli_type
+        case 'sinc'
+            mask_t_x = sinc(pi_on_dx * (x_vec - points(1,:)) );
+            if kgrid.dim>1
+                mask_t_y = sinc(pi_on_dy * (y_vec - points(2,:)) );
+            end
+            if kgrid.dim>2
+                mask_t_z = sinc(pi_on_dz * (z_vec - points(3,:)) );
+            end
+        case 'exact'
+            mask_t_x = getDeltaBLI(kgrid.Nx, kgrid.dx, x_vec, points(1,:));
+            if kgrid.dim>1
+            mask_t_y = getDeltaBLI(kgrid.Ny, kgrid.dy, y_vec, points(2,:));
+            end
+            if kgrid.dim>2
+            mask_t_z = getDeltaBLI(kgrid.Nz, kgrid.dz, z_vec, points(3,:));
+            end
+    end
 end
 
 % add to the overall mask using contributions from each source point
@@ -210,45 +234,19 @@ for t = 1:num_points
                 
                 % evaluate a BLI centered on the point at all the grid nodes
                 % add contribution to overall source mask
-                switch bli_type
-                    case 'sinc'
-                        mask = mask + scale(t) .* sinc(pi_on_dx * (x_vec - point(1)) );
-                    case 'exact'
-                        mask = mask + scale(t) .* getDeltaBLI(kgrid.Nx, kgrid.dx, x_vec, point(1));
-                end
+                mask = mask + scale(t) .* mask_t_x(:,t);
+                
                 
             case 2
-        
-                % evaluate a BLI centered on the point at all the grid nodes
-                switch bli_type
-                    case 'sinc'
-                        mask_t_x = sinc(pi_on_dx * (x_vec - point(1)) );
-                        mask_t_y = sinc(pi_on_dy * (y_vec - point(2)) );
-                    case 'exact'
-                        mask_t_x = getDeltaBLI(kgrid.Nx, kgrid.dx, x_vec, point(1));
-                        mask_t_y = getDeltaBLI(kgrid.Ny, kgrid.dy, y_vec, point(2));
-                end
 
                 % add this contribution to the overall source mask
-                mask = mask + scale(t) .* (mask_t_x * mask_t_y.');
+                mask = mask + scale(t) .* (mask_t_x(:,t) * mask_t_y(:,t).');
                 
             case 3
                 
-                % evaluate a BLI centered on the point at all the grid nodes
-                switch bli_type
-                    case 'sinc'
-                        mask_t_x = sinc(pi_on_dx * (x_vec - point(1)) );
-                        mask_t_y = sinc(pi_on_dy * (y_vec - point(2)) );
-                        mask_t_z = sinc(pi_on_dz * (z_vec - point(3)) );
-                    case 'exact'
-                        mask_t_x = getDeltaBLI(kgrid.Nx, kgrid.dx, x_vec, point(1));
-                        mask_t_y = getDeltaBLI(kgrid.Ny, kgrid.dy, y_vec, point(2));
-                        mask_t_z = getDeltaBLI(kgrid.Nz, kgrid.dz, z_vec, point(3));
-                end
-                
                 % add this contribution to the overall source mask
                 mask = mask + scale(t) .* ...
-                    reshape(kron(mask_t_y * mask_t_z.', mask_t_x), [kgrid.Nx, kgrid.Ny, kgrid.Nz]);
+                    reshape(kron(mask_t_y(:,t) * mask_t_z(:,t).', mask_t_x(:,t)), [kgrid.Nx, kgrid.Ny, kgrid.Nz]);
         
         end
         

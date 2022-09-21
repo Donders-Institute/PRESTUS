@@ -22,9 +22,27 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         
         layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
         smoothed_segmented_img(layer_mask_smoothed~=0) = label_i;
-        
-        
     end
+    
+    %% remove gaps between skull & skin
+    if any(strcmp(labels,  'skull')) && any(strcmp(labels,  'skin'))
+        skin_i = find(strcmp(labels,  'skin'));
+        skull_i = find(strcmp(labels,  'skull'));
+        skin = smoothed_segmented_img==skin_i;
+        skull = smoothed_segmented_img==skull_i;
+        skin_skull = skin+skull;
+        skin_skull_filled = imfill(skin_skull);
+
+        [labeledImage, ~] = bwlabeln(~skin_skull);
+        blobMeasurements = regionprops(labeledImage, 'area');
+        allAreas = [blobMeasurements.Area];
+
+        [~, sortIndexes] = sort(allAreas, 'descend');
+        biggestBlob = ismember(labeledImage, sortIndexes(2));
+
+        smoothed_segmented_img((skin_skull_filled-skin_skull -  biggestBlob)>0) = skull_i;
+    end
+    
     imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     title('Original (left) and smoothed (right) segmented image')

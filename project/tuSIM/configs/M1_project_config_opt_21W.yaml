@@ -3,9 +3,9 @@ transducer:
   Elements_ID_mm: [0, 32.6644] # elements 1 & 2 inner diameter [mm]
   Elements_OD_mm: [32.1564, 45.4914] # element 1 & 2 outer diameter [mm]
   curv_radius_mm: 63.20 # radius from the focal point to the bowl outermost point
-  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
-  source_amp: 131420 # [Pa] (calibrated values at 20 W/cm^2 free-water Isppa)
-  source_phase_rad: [0, 1.1755] # [rad] (calibrated values at 20 W/cm^2 free-water Isppa)
+  dist_to_plane_mm: 56.87 # distance to the transducer plane from the geometric focus
+  source_amp: 122277 # [Pa] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_phase_rad: [0, 2.0381] # [rad] (calibrated values at 20 W/cm^2 free-water Isppa)
   source_freq_hz: 250e3  # [Hz]
 
 

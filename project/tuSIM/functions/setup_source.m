@@ -83,7 +83,7 @@ if parameters.use_kWaveArray == 0
 else
     disp('Setting up kWaveArray (might take a bit of time)');
     % create empty kWaveArray
-    karray = kWaveArray('BLITolerance', 0.05, 'UpsamplingRate', 10);
+    karray = kWaveArray('BLITolerance', 0.1, 'UpsamplingRate', 10, 'BLIType', 'sinc');
 
     % add bowl shaped element
     karray.addAnnularArray([kgrid.x_vec(trans_pos(1)) kgrid.y_vec(trans_pos(2)) kgrid.z_vec(trans_pos(3))], transducer_pars.curv_radius_mm*1e-3, [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm]*1e-3, [kgrid.x_vec(focus_pos(1)) kgrid.y_vec(focus_pos(2)) kgrid.z_vec(focus_pos(3))])
@@ -108,13 +108,20 @@ else
     distributed_source_signal = zeros(num_source_points, Nt);
     
     source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
-    
+    if canUseGPU
+        cw_signal = gpuArray(cw_signal);
+        distributed_source_signal = gpuArray(distributed_source_signal);
+    end
+
     % loop through the elements
     for ind = 1:transducer_pars.n_elements
 
         % get the offgrid source weights
         source_weights = squeeze(grid_weights_4d(ind,:,:,:));
         el_binary_mask = source_weights ~= 0;
+        if canUseGPU
+            source_weights = gpuArray(source_weights);
+        end
         % get indices of the non-zero points 
         element_mask_ind = find(el_binary_mask);
         % convert these to indices in the distributed source

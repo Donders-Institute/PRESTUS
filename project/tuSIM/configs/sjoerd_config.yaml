@@ -1,6 +1,6 @@
-data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data/images_Sjoerd
-t1_path_template: simulations_Andrey/sub-%1$03d/sub-%1$03d_ses-mri01_acq-t1mpragesagp20p9iso_run-1_T1w.nii.gz
-t2_path_template: simulations_Andrey/sub-%1$03d/sub-%1$03d_ses-mri01_acq-t2spacesagp20p9iso_run-1_T2w.nii.gz
+data_path: /home/visual/andche/STAFF_SCI/andche_sandbox/Sjoerd_MRI/
+t1_path_template: MRI/sub-%1$03d/ses-mri01/anat/.*T1w.nii.gz
+t2_path_template: MRI/sub-%1$03d/ses-mri01/anat/.*T2w.nii.gz
 
 transducer: 
   n_elements: 4 # number of elements in the transducer
@@ -14,4 +14,3 @@ transducer:
 
 expected_focal_distance_mm: 64.5 # expected distance to the stimulation focus
 transducer_from_localite: 0 # should we load the transducer locations from the localite file(s) 
-run_simulations_with_qsub: 1 # the simulations will be submitted to the HPC cluster

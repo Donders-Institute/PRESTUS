@@ -1,4 +1,4 @@
-function pipeline_sjoerd(subject_id, target_id )
+function pipeline_sjoerd(subject_id, target_id, parameters)
 
     % start from tusim/code folder
     cd /home/visual/andche/STAFF_SCI/andche_sandbox/TUS_sims/tusim/code/
@@ -9,15 +9,6 @@ function pipeline_sjoerd(subject_id, target_id )
     addpath('toolboxes/Colormaps') % set your path to Colormaps files here
     addpath('toolboxes/export_fig') % set your path to export_fig files here
     addpath('toolboxes/yaml') % set your path to yaml files here
-
-    % load config
-    parameters = load_parameters('sjoerd_config.yaml');
-
-    % overwrite some of the config settings
-    parameters.simulation_medium = 'water_and_skull';
-    parameters.interactive = 0;
-    parameters.overwrite_files = 'never';
-    parameters.run_simulations_with_qsub = 0;
     
     amygdala_pos_allsubj = readmatrix(fullfile(parameters.data_path, 'amygdala_coordinates.csv'));
 
@@ -36,10 +27,12 @@ function pipeline_sjoerd(subject_id, target_id )
 
     reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
     
-    left_trans_ras_pos = get_trans_pos_from_trigger_markers(fullfile(subj_folder, trig_mark_files(1).name), 10, reference_to_transducer_distance );
+    left_trans_ras_pos = get_trans_pos_from_trigger_markers(fullfile(subj_folder, trig_mark_files(1).name), 10, ...
+        reference_to_transducer_distance );
     left_trans_pos = ras_to_grid(left_trans_ras_pos, t1_header);
 
-    right_trans_ras_pos = get_trans_pos_from_trigger_markers(fullfile(subj_folder, trig_mark_files(2).name), 10, reference_to_transducer_distance );
+    right_trans_ras_pos = get_trans_pos_from_trigger_markers(fullfile(subj_folder, trig_mark_files(2).name), 10, ...
+        reference_to_transducer_distance );
     right_trans_pos = ras_to_grid(right_trans_ras_pos, t1_header);
 
     imshowpair(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), left_trans_pos, left_amygdala_pos, parameters), plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), right_trans_pos, right_amygdala_pos, parameters),'montage');
@@ -82,3 +75,4 @@ function pipeline_sjoerd(subject_id, target_id )
             output_pressure_file_water = single_subject_pipeline(subject_id, new_parameters);
         end
 end
+

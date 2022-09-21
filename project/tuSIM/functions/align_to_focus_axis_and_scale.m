@@ -1,4 +1,4 @@
-function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad] = ...
+function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     align_to_focus_axis_and_scale(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
 
     % What we need to do is to align the focal axis with the coordinate system.
@@ -72,8 +72,5 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     rotated_with_transducer_img = plot_t1_with_transducer(rotated_img, nii_header.PixelDimensions(1)/scale_factor, trans_pos_new, focus_pos_new, parameters);
 
     montage_img = imtile({orig_with_transducer_img, rotated_with_transducer_img}, 'GridSize', [1 nan], 'BackgroundColor', [0.5 0.5 0.5]);
-    if parameters.interactive
-        figure
-        imshow(montage_img)
-    end
+    
 end

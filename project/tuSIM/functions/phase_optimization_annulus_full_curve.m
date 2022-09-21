@@ -6,7 +6,7 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
       axial_position
       desired_intensity_curve
       plot_results = 0
-      opt_limits = [1, length(axial_position)]
+      opt_limits = [1, max(axial_position)]
       weights = 0
   end
   
@@ -21,19 +21,23 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
   [~, max_pos] = max(desired_intensity_curve);
   %actual_focal_dist_mm = axial_position(p_axial_oneil==max(p_axial_oneil));
   if weights == 0
-      weights = normpdf(axial_position, axial_position(max_pos)+0.5, 10);
+      [flhm_center, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
+      weights = normpdf(axial_position, axial_position(flhm_center_index)+0.5, axial_position(flhm_center_index)/3);
   end
   weights = weights/sum(weights);
-  if plot_results
-  figure
-  hold on
-  plot(axial_position,  i_axial_oneil )
-  plot(axial_position, desired_intensity_curve)
-  yyaxis right
-  plot(axial_position, weights);
-  hold off
-  end
   error_v = (i_axial_oneil - desired_intensity_curve).^2.*weights;
-  error_v = error_v(limit_ind);
+  error_v = error_v(limit_ind==1);
   error = mean(error_v);
+
+  if plot_results
+      figure
+      hold on
+      plot(axial_position,  i_axial_oneil )
+      plot(axial_position, desired_intensity_curve)
+      yyaxis right
+      plot(axial_position, weights);
+      hold off
+      legend(["fitted profile","real profile","cost function"])
+
+  end
 end

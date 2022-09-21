@@ -1,17 +1,19 @@
-function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, varargin)
-    if length(varargin)>0
-        slice_dim = varargin{1};
-        if length(varargin)>1
-            slice_ind = varargin{2};
-        else 
-            slice_ind = trans_pos_grid(slice_dim);
-        end
-    else
-        slice_dim = 2;
-        slice_ind = trans_pos_grid(2);
+function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, plot_options)
+    arguments
+        t1_image (:,:,:) double
+        voxel_size_mm (1,1) double
+        trans_pos_grid (1,3) double
+        focus_pos_grid (1,3) double
+        parameters struct
+        plot_options.slice_dim (1,1) double = 2
+        plot_options.slice_ind (1,1) double = 0
+
+    end
+    if isempty(plot_options.slice_ind) || plot_options.slice_ind == 0
+        plot_options.slice_ind = trans_pos_grid(plot_options.slice_dim);
     end
     
-    im_size = max(size(t1_image), trans_pos_grid');
+    im_size = max(size(t1_image), trans_pos_grid);
     if ~isequal(im_size, size(t1_image))
         t1_image = padarray(t1_image, im_size-size(t1_image),'post');
     end
@@ -20,7 +22,7 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
 
     % define cell array:
     slice_pointer = repmat({':'},1, 3);
-    slice_pointer{slice_dim} = slice_ind;
+    slice_pointer{plot_options.slice_dim} = plot_options.slice_ind;
     % comma-separated list to supply indices:
 
     t1_slice = double(t1_image(slice_pointer{:}));

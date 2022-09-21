@@ -927,10 +927,14 @@ classdef kWaveArray < handle
                 % remove integration points which are outside grid
                 integration_points = trimCartPoints(kgrid, integration_points);
                 
+                if 0
+                    integration_points = gpuArray(integration_points)
+                end
                 % calculate grid weights from BLIs centered on the integration points
                 grid_weights = offGridPoints(kgrid, integration_points, scale, ...
                     'BLITolerance', obj.bli_tolerance, ...
-                    'BLIType', obj.bli_type);
+                    'BLIType', obj.bli_type, 'WaitBar', false);
+                
                 
             end
             

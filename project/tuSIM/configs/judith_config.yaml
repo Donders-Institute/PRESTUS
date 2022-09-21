@@ -15,7 +15,6 @@ transducer_from_localite: 1 # transducer position is to be taken from the locali
 # distance from the reference used in the neuronavigation (could be the TMS
 # coil or the three-ball reference) and the transducer
 reference_transducer_distance_mm: 15
-run_simulations_with_qsub: 1 # the simulations will be submitted to the HPC cluster
 
 data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data/images_Judith
 

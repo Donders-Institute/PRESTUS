@@ -15,7 +15,7 @@ parameters.data_path = '/project/3015999.02/andche_sandbox/TUS_sims/tusim/data/i
 
 parameters.simulation_medium = 'water';
 parameters.interactive = 1;
-parameters.overwrite_files = 'never';
+parameters.overwrite_files = 'ask';
 subject_id = 999; % subject id here does not really matter as the calibrations are the same
 
 % we start with 2d simulations, using the existing config that already has
@@ -125,5 +125,11 @@ xlabel('Axial Position [mm]');
 ylabel('Pressure [kPa]');
 legend(["O'Neil" affixes_list] , 'interpreter', 'none');
 
-%imagesc(source_2d-squeeze(source_3d(71,:,:)))
+figure(2)
+export_fig(sprintf('%s/axial_pressure.png',parameters.data_path))
 
+figure(1)
+export_fig(sprintf('%s/2d_pressure.png',parameters.data_path), '-native')
+
+%% heating simulations
+load(sprintf('%s/sim_outputs/sub-999_water_results_%s.mat', parameters.data_path , '3d_kWaveArray'))
