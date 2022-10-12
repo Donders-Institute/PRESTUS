@@ -1,18 +1,21 @@
-
 clear
-cd /project/3015999.02/andche_sandbox/orca-lab/project/tuSIM/ % change path here
+
+% Change path to tuSIM folder
+cd /home/mrphys/kenvdzee/orca-lab/project/tuSIM
 
 % add paths
 addpath('functions')
 addpath(genpath('toolboxes')) 
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
+% Load config file and select output folder
+parameters = load_parameters('sjoerd_config_opt_CTX250-011_64.5mm.yaml');
+out_folder = parameters.data_path+'sim_outputs/';
 
-parameters = load_parameters('sjoerd_config_opt_CTX250-011_64.5mm.yaml')
+parameters.overwrite_files = 'always';
 
-out_folder = parameters.data_path+'/sim_outputs/';
-
-files = dir(parameters.data_path+'MRI');
+% Create list of files in datafolder (location can be changed in config file)
+files = dir(parameters.data_path);
 subject_list = [];
 for i = 1:length(files)
     fname = files(i).name;
@@ -21,18 +24,18 @@ for i = 1:length(files)
     end
 end
 
-parameters.medium = 'layered';
+% Select 'layered' when simulating the transmission in a skull
+parameters.simulation_medium = 'layered';
 reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
-subject_id = 1;
+subject_id = 003; % simply the start of the loop
 
-for subject_id = subject_list(subject_list>=7)
-
-subj_folder = fullfile(parameters.data_path, sprintf('%s/sub-%03d/', subject_id));
+for subject_id = subject_list(subject_list<=4)
+subj_folder = fullfile(parameters.data_path,sprintf('sub-%1$03d/', subject_id));
 filename_t1 = dir(sprintf(fullfile(parameters.data_path,parameters.t1_path_template), subject_id));
 t1_header = niftiinfo(fullfile(filename_t1.folder,filename_t1.name));
 t1_image = niftiread(fullfile(filename_t1.folder,filename_t1.name));
 
-trig_mark_files = dir(sprintf('%s/sub-%03d/Sessions/Session_*/TMSTrigger/TriggerMarkers_Coil0*.xml',parameters.data_path, subject_id));
+trig_mark_files = dir(sprintf('%s/sub-%03d/TriggerMarkers_Coil0*.xml',parameters.data_path, subject_id));
 
 % sort by datetime
 extract_dt = @(x) datetime(x.name(22:end-4),'InputFormat','yyyyMMddHHmmssSSS');
@@ -44,7 +47,7 @@ trig_mark_files = trig_mark_files(idx);
 left_trans_pos = ras_to_grid(left_trans_ras_pos, t1_header);
 left_amygdala_pos = ras_to_grid(left_amygdala_ras_pos, t1_header);
 
-trig_mark_files = dir(sprintf('%s/sub-%03d/Sessions/Session_*/TMSTrigger/TriggerMarkers_Coil1*.xml',parameters.data_path, subject_id));
+trig_mark_files = dir(sprintf('%s/sub-%03d/TriggerMarkers_Coil1*.xml',parameters.data_path, subject_id));
 
 % sort by datetime
 extract_dt = @(x) datetime(x.name(22:end-4),'InputFormat','yyyyMMddHHmmssSSS');
