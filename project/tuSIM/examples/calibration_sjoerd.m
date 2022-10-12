@@ -174,6 +174,7 @@ fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',axial_p
 
 % compute the approximate adjustment from simulated (on a grid) to analytic solution
 simulated_grid_adj_factor = max(pred_axial_pressure(:))/max(p_axial_oneil(:));
+
 %% Optimize for a given distance and pressure
 % So how to find the settings for the simulations that match the desired pressure 
 % and distance? It is easy to do, given that there is an analytic solution. For 

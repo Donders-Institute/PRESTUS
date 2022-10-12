@@ -26,18 +26,22 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
   end
   weights = weights/sum(weights);
   error_v = (i_axial_oneil - desired_intensity_curve).^2.*weights;
-  error_v = error_v(limit_ind==1);
+  error_v = error_v(limit_ind);
   error = mean(error_v);
 
   if plot_results
       figure
+      subplot(1,2,1)
       hold on
       plot(axial_position,  i_axial_oneil )
       plot(axial_position, desired_intensity_curve)
       yyaxis right
       plot(axial_position, weights);
       hold off
-      legend(["fitted profile","real profile","cost function"])
+      legend(["fitted profile","real profile","cost function","error"])
+      subplot(1,2,2)
+      plot(axial_position(limit_ind), error_v,'-o');
+      legend(["error"])
 
   end
 end

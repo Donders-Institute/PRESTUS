@@ -1,4 +1,4 @@
-function [kwaveDiffusion, time_status_seq] = run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters)
+function [thermal_diff_obj, time_status_seq, maxT,focal_planeT] = run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos)
 
 % =========================================================================
 % CALCULATE HEATING
@@ -18,8 +18,15 @@ source.Q = alpha_np .* p.^2 ./ (kwave_medium.density .* kwave_medium.sound_speed
 source.T0 = parameters.thermal.temp_0;
 
 % create kWaveDiffusion object
-kwaveDiffusion = kWaveDiffusion(kgrid, kwave_medium, source, sensor, 'PlotSim', boolean(parameters.interactive));
-kwaveDiffusion.T = gpuArray(kwaveDiffusion.T);
+if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.record_t_at_every_step 
+    sensor = [];
+end
+thermal_diff_obj = kWaveDiffusion(kgrid, kwave_medium, source, sensor, 'PlotSim', boolean(parameters.interactive));
+
+thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
+maxT = thermal_diff_obj.T;
+
+
 % % 
 % parameters.thermal.duty_cycle = 1; % share of the stimulation duration during which the stimulation is on
 % parameters.thermal.sim_time_steps = 0.1; % [s] simulation time steps during the stimulation period
@@ -55,8 +62,6 @@ post_stim_period = parameters.thermal.iti - parameters.thermal.stim_duration;
 post_stim_steps_n = post_stim_period / parameters.thermal.post_stim_time_step_dur;
 post_stim_steps_n = round_if_integer(post_stim_steps_n, 'Number of simulation steps must be integer');
 
-time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0});
-
 if  isfield(parameters.thermal,'equal_steps') && parameters.thermal.equal_steps == 0
     on_steps_dur = on_steps_n * parameters.thermal.sim_time_steps;
     off_steps_dur = off_steps_n * parameters.thermal.sim_time_steps;
@@ -67,6 +72,12 @@ else
     off_steps_dur = parameters.thermal.sim_time_steps;
 end
 
+time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
+
+total_timepoints = 1+parameters.thermal.n_trials*(on_off_repetitions*(1+double(off_steps_n>0))+1);
+cur_timepoint = 1;
+focal_planeT = gpuArray(zeros([size(maxT,[1,3]) total_timepoints]));
+focal_planeT(:,:,cur_timepoint) = squeeze(maxT(:,trans_pos(2),:));
 % loop over trials
 for trial_i = 1:parameters.thermal.n_trials
   fprintf('Trial %i\n', trial_i)
@@ -74,23 +85,43 @@ for trial_i = 1:parameters.thermal.n_trials
   for pulse_i = 1:on_off_repetitions
       fprintf('Pulse %i\n', pulse_i)
       % pulse on
-      kwaveDiffusion.Q = source.Q;
-      kwaveDiffusion.takeTimeStep(on_steps_n, on_steps_dur);
+      thermal_diff_obj.Q = source.Q;
+      thermal_diff_obj.takeTimeStep(on_steps_n, on_steps_dur);
       time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:on_steps_n)*on_steps_dur), ...
-                                                'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), 'status', "on")];
+                                                'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), 'status', "on",'recorded',0)];
+      curT = thermal_diff_obj.T;
+      cur_timepoint = cur_timepoint+1;
+      time_status_seq(end).recorded = 1;
+      focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
+      if any(maxT>curT,'all')
+          maxT = curT;
+      end
       % pulse off 
       if off_steps_n>0
-          kwaveDiffusion.Q = 0;
-          kwaveDiffusion.takeTimeStep(off_steps_n, off_steps_dur);
-          time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off")];
+          thermal_diff_obj.Q = 0;
+          thermal_diff_obj.takeTimeStep(off_steps_n, off_steps_dur);
+          time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off",'recorded',0)];
+          cur_timepoint = cur_timepoint+1;
+          time_status_seq(end).recorded = 1;
+          curT = thermal_diff_obj.T;
+
+          focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
+
       end
   end
   
   % post-stimulation period
   if post_stim_steps_n > 0 
-      kwaveDiffusion.Q = 0;
-      kwaveDiffusion.takeTimeStep(post_stim_steps_n, parameters.thermal.post_stim_time_step_dur);
-      time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:post_stim_steps_n)*parameters.thermal.post_stim_time_step_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:post_stim_steps_n)), 'status', "off")];
+      thermal_diff_obj.Q = 0;
+      thermal_diff_obj.takeTimeStep(post_stim_steps_n, parameters.thermal.post_stim_time_step_dur);
+      time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:post_stim_steps_n)*parameters.thermal.post_stim_time_step_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:post_stim_steps_n)), 'status', "off",'recorded',0)];
+      time_status_seq(end).recorded = 1;
+      cur_timepoint = cur_timepoint+1;
+      curT = thermal_diff_obj.T;
+
+      focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
+      
+
   end
 end
 

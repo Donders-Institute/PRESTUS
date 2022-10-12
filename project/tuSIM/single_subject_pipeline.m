@@ -171,23 +171,29 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
     real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm;
-
+    avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
+    avg_isppa_around_target = Isppa_map((focus_pos_final(1)-avg_radius):(focus_pos_final(1)+avg_radius),...
+        (focus_pos_final(2)-avg_radius):(focus_pos_final(2)+avg_radius),...
+        (focus_pos_final(3)-avg_radius):(focus_pos_final(3)+avg_radius));
+    avg_isppa_around_target = mean(avg_isppa_around_target(:));
+    
+    isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
 
         [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, segmented_image_cropped>0 & segmented_image_cropped<3);
         [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, segmented_image_cropped>0 & segmented_image_cropped<3);
-        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, segmented_image_cropped==3);
-        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, segmented_image_cropped==3);
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, segmented_image_cropped==3);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, segmented_image_cropped==3);
+        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, segmented_image_cropped==4);
+        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, segmented_image_cropped==4);
+        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, segmented_image_cropped==5);
+        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, segmented_image_cropped==5);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_brain, max_Isppa_skull, max_pressure_brain, max_pressure_skull, max_Isppa_skin, max_pressure_skin, Ix_brain, Iy_brain, Iz_brain), output_pressure_file);
+        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_brain, max_Isppa_skull, max_pressure_brain, max_pressure_skull, max_Isppa_skin, max_pressure_skin, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
     else
         max_Isppa = max(Isppa_map(:));
         highlighted_pos = max_isppa_eplane_pos;
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance), output_pressure_file);
+        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
     end
     output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     if parameters.n_sim_dims==3
@@ -238,15 +244,34 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             heating_window_dims(2,3) = parameters.grid_dims(3);
             sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
-            [kwaveDiffusion, time_status_seq]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters);
-            save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','-v7.3');
+            [kwaveDiffusion, time_status_seq, maxT, focal_planeT]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
+            save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','maxT','focal_planeT','-v7.3');
         else 
             load(filename_heating_data);
         end
         if isempty(medium_masks)
             medium_masks = zeros(parameters.grid_dims);
         end
-        plot_heating_sims(kwaveDiffusion, time_status_seq, parameters, heating_window_dims, medium_masks);
+        output_table = readtable(output_pressure_file);
+        output_table.maxT = gather(max(maxT, [], 'all'));
+
+        if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+            output_table.maxT_brain = gather(masked_max_3d(maxT, segmented_image_cropped>0 & segmented_image_cropped<3));
+            output_table.maxT_skull = gather(masked_max_3d(maxT, segmented_image_cropped==4));
+            output_table.maxT_skin = gather(masked_max_3d(maxT, segmented_image_cropped==5));
+        end
+        writetable(output_table, output_pressure_file);
+        [~, source_labels] = transducer_setup(parameters.transducer, trans_pos_final, focus_pos_final, ...
+                                                    size(segmented_image_cropped), t1_header.PixelDimensions(1));
+
+        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks);
+        
+        % plot max temperature
+        plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+        output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        export_fig(output_plot, '-native')
+        close;
+
     end
     
     

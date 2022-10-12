@@ -17,6 +17,9 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     % rotate in Y first
     % compute the axis angle
     angle_y_rad  = atan(focal_axis(1) / focal_axis(3)); 
+    if angle_y_rad < 0
+        angle_y_rad = angle_y_rad + pi;
+    end
     % create an affine matrix
     vox_transf_Y  = makehgtform('yrotate', -angle_y_rad); 
 

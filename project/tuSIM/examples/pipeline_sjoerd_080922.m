@@ -9,6 +9,7 @@ addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donde
 
 
 parameters = load_parameters('sjoerd_config_opt_CTX250-011_64.5mm.yaml')
+
 out_folder = parameters.data_path+'/sim_outputs/';
 
 files = dir(parameters.data_path+'MRI');
