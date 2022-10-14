@@ -1,6 +1,10 @@
-data_path: /home/visual/andche/STAFF_SCI/andche_sandbox/Sjoerd_MRI/
-t1_path_template: MRI/sub-%1$03d/ses-mri01/anat/*T1w.nii.gz
-t2_path_template: MRI/sub-%1$03d/ses-mri01/anat/*T2w.nii.gz
+# Location of stored data
+data_path: /home/mrphys/kenvdzee/Documents/Sjoerd_T1_T2/
+
+# Structure of subfolders containing T1 and T1 images
+## It is easier to store the subject data of each participant in an individual subfolder
+t1_path_template: sub-%1$03d/*T1w.nii.gz
+t2_path_template: sub-%1$03d/*T2w.nii.gz
 
 transducer: 
   n_elements: 4 # number of elements in the transducer
@@ -13,4 +17,4 @@ transducer:
   source_freq_hz: 250e3 # [Hz] the central frequency
 
 expected_focal_distance_mm: 75.5 # expected distance to the stimulation focus
-transducer_from_localite: 0 # should we load the transducer locations from the localite file(s) 
+transducer_from_localite: 0 # should we load the transducer locations from the localite file(s) (0 or 1)
