@@ -1,5 +1,5 @@
 # Location of stored data
-data_path: /home/mrphys/kenvdzee/Documents/Sjoerd_T1_T2/
+data_path: /project/3023001.06/Simulations/all_files_with_output/
 
 # Structure of subfolders containing T1 and T1 images
 ## It is easier to store the subject data of each participant in an individual subfolder

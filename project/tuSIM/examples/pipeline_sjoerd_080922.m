@@ -1,5 +1,10 @@
 clear
 
+% Delete if you have rights to add paths to Matlab
+cd /home/mrphys/kenvdzee/Documents/MATLAB/
+addpath(genpath('SimNIBS-3.2'))
+addpath(genpath('k-wave'))
+
 % Change path to tuSIM folder
 cd /home/mrphys/kenvdzee/orca-lab/project/tuSIM
 
@@ -27,7 +32,7 @@ end
 % Select 'layered' when simulating the transmission in a skull
 parameters.simulation_medium = 'layered';
 reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
-subject_id = 003; % simply the start of the loop
+%subject_id = 003; % simply the start of the loop
 
 for subject_id = subject_list(subject_list<=4)
 subj_folder = fullfile(parameters.data_path,sprintf('sub-%1$03d/', subject_id));

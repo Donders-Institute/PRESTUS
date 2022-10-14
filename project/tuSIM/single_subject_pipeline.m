@@ -1,27 +1,50 @@
 function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters)
-    % subject_id must be a number
-    % parameters is a structure (see load_parameters)
+    
+    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+    %                       Single subject pipeline                     %
+    %                                                                   %
+    % This serves as the main pipeline for simulating the sonication    %
+    % effects on the bone and neural tissue of individual subjects.     %
+    % In practice, neither this pipeline nor any of the functions in    %
+    % the functions folder need to be altered to run the simulations.   %
+    %                                                                   %
+    % Parameters are loaded in using a custom config file.              %
+    % The file 'default_config' contains all possible to-be altered     %
+    % parameters, but not all of them need to be used to succesfully    %
+    % run the pipeline.                                                 %
+    %                                                                   %
+    % Some notes:                                                       %
+    % - For now, the pipeline is only able to simulate one transducer   %
+    % at a time, meaning that the pipeline has to be run once for each  %
+    % transducer used in each subject.                                  %
+    % - Matlab 2019b must be used since k-wave was no longer maintained %
+    % from the release of Matlab 2020a onwards.                         %
+    % - 'subject_id' must be a number                                   %
+    % - parameters is a structure (see load_parameters)                 %
+    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
     
-    % if there are paths to be added, add them; this is mostly for batch runs
+    % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add')
        path(path, parameters.paths_to_add)
     end
 
-    % output directory
-
+    % Output directory, read from the configfile
     output_dir = fullfile(parameters.data_path, 'sim_outputs');
     if ~exist(output_dir, 'file' )
         mkdir(output_dir)
     end
     
-    % add subject_id and output_dir to parameters to pass arguments to functions more easily
+    % Add subject_id and output_dir to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     parameters.output_dir = output_dir;
     
+    % Creates an output file to which output is written at a later stage
     output_pressure_file = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
+    % Tries an alternative method to calculate the expected focal distance
+    % ifv none is entered into the config file
     if ~isfield(parameters, 'expected_focal_distance_mm')
         disp('Expected focal distance is not specified, trying to get it from positions on T1 grid')
         if ~isfield(parameters.transducer, 'pos_t1_grid') || ~isfield(parameters, 'focus_pos_t1_grid')
@@ -36,7 +59,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         focal_distance_t1 = norm(parameters.focus_pos_t1_grid - parameters.transducer.pos_t1_grid);
         parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm;
     end
-
+    
+    % Pre-processes the MRI data to segment the different forms of tissue
+    % and visualise the position of the transducer with some help from SimNIBS.
+    % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull')|| strcmp(parameters.simulation_medium, 'layered')
         [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
