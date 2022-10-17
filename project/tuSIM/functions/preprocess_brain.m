@@ -77,9 +77,9 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
     filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_masks_contr.nii.gz', subject_id));
 
-    % Start the segmentation, see 'run_headreco' for more documentation
+    % Starts the segmentation, see 'run_headreco' for more documentation
     if confirm_overwriting(filename_segmented_headreco, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented_headreco, 'file'))
-        % Double-check since segmentation takes a long time
+        % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
             run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path);
             disp('\nThe script will continue with other subjects in the meanwhile...')
@@ -99,6 +99,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
             filename_segmented_headreco, headreco_folder)
 
+    % Defines output file location and name
     filename_reoriented_scaled_data = fullfile(parameters.data_path, sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
