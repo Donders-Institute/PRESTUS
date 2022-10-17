@@ -15,12 +15,15 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     filename_t1 = fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id));
     filename_t2 = fullfile(parameters.data_path, sprintf(parameters.t2_path_template, subject_id));
     
+    % Imports the localite location data in case this is enabled in the
+    % config file
     files_to_check = ["filename_t1", "filename_t2"];
     if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
         localite_file = fullfile(parameters.data_path, sprintf(parameters.localite_instr_file_template, subject_id));
         files_to_check = [files_to_check, "localite_file"];
     end
-    % check if files exist
+
+    % Goes through 'files_to_check' to do exactly that
     for filename_var = files_to_check
         eval(sprintf('filename = %s;',  filename_var ))
         % if there is a wildcard in the string, use dir to find file
@@ -47,29 +50,36 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     t1_image = niftiread(filename_t1);
     t1_header= niftiinfo(filename_t1);
 
+    % Positions the transducer on original (unrotated) T1 
     if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
-        % position the transducer on original (unrotated) T1 
+        % Takes the localite's transducer location
         [trans_pos_grid, focus_pos_grid, ~, ~] = ...
             position_transducer_localite(localite_file, t1_header, parameters);
     else
+        % If the localite file is not used, it takes the transducer
+        % location from the config file
         trans_pos_grid = parameters.transducer.pos_t1_grid';
         focus_pos_grid = parameters.focus_pos_t1_grid';
     end
 
+    % Creates and exports an unprocessed T1 slice that is oriented 
+    % along the transducer's axis
     [t1_with_trans_img, transducer_pars] = plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters);
     imshow(t1_with_trans_img);
     title('T1 with transducer');
     export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_with_transducer_orig%s.png', subject_id, parameters.results_filename_affix)), '-native');
     close;
     
-    %% SEGMENTATION
+    %% SEGMENTATION using SimNIBS
     disp('Starting segmentation...')
 
+    % Defines the names for the output folder of the segmented data
     headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
     filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_masks_contr.nii.gz', subject_id));
 
+    % Start the segmentation, see 'run_headreco' for more documentation
     if confirm_overwriting(filename_segmented_headreco, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented_headreco, 'file'))
-        % double-check since segmentation takes a long time
+        % Double-check since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
             run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path);
             disp('\nThe script will continue with other subjects in the meanwhile...')

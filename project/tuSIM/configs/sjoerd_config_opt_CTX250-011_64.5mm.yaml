@@ -18,3 +18,5 @@ transducer:
 
 expected_focal_distance_mm: 75.5 # expected distance to the stimulation focus
 transducer_from_localite: 0 # should we load the transducer locations from the localite file(s) (0 or 1)
+
+HPC_cluster: 1 # is it run on the HPC cluster?

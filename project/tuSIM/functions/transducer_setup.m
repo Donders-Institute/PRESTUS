@@ -5,10 +5,10 @@ function [transducer_mask, source_label, transducer_pars] = transducer_setup(tra
 % in the computational grid, the geometric focus coordinates and the computational 
 % grid sizes. It also creates the label matrix that we can use to set the signal source.
 % 
-% transducer_pars is a structure with fields defining the transducer parameters
-% all types of transducers have n_elements as a parameter for the number of
-% transducer elements.The fields Elements_OD_mm and Elements_ID_mm define the outer and inner
-% diameters of the elements
+% 'transducer_pars' is a structure with fields defining the transducer parameters.
+% All types of transducers have n_elements as a parameter for the number of
+% transducer elements. The fields 'Elements_OD_mm' and 'Elements_ID_mm'
+% define the outer and inner diameters of the elements
 
 if ~isequal(size(focus_pos), size(trans_pos))
     error('Transducer and focus positions should be arrays of equal size')

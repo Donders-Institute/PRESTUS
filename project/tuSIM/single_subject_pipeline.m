@@ -19,7 +19,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % used in each subject.                                             %
     % - Matlab 2019b must be used since k-wave was no longer updated    %
     % for the release of Matlab 2020a onwards.                          %
-    % - 'subject_id' must be a number                                   %
+    % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see load_parameters)               %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
@@ -55,7 +55,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
 
-    % Output directory, read from the configfile
+    % Creates an output directory if non exists yet
     output_dir = fullfile(parameters.data_path, 'sim_outputs');
     if ~exist(output_dir, 'file' )
         mkdir(output_dir)
