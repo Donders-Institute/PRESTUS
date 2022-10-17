@@ -15,12 +15,15 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     filename_t1 = fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id));
     filename_t2 = fullfile(parameters.data_path, sprintf(parameters.t2_path_template, subject_id));
     
+    % Imports the localite location data in case this is enabled in the
+    % config file
     files_to_check = ["filename_t1", "filename_t2"];
     if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
         localite_file = fullfile(parameters.data_path, sprintf(parameters.localite_instr_file_template, subject_id));
         files_to_check = [files_to_check, "localite_file"];
     end
-    % check if files exist
+
+    % Goes through 'files_to_check' to do exactly that
     for filename_var = files_to_check
         eval(sprintf('filename = %s;',  filename_var ))
         % if there is a wildcard in the string, use dir to find file
@@ -47,31 +50,38 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     t1_image = niftiread(filename_t1);
     t1_header= niftiinfo(filename_t1);
 
+    % Positions the transducer on original (unrotated) T1 
     if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
-        % position the transducer on original (unrotated) T1 
+        % Takes the localite's transducer location
         [trans_pos_grid, focus_pos_grid, ~, ~] = ...
             position_transducer_localite(localite_file, t1_header, parameters);
     else
+        % If the localite file is not used, it takes the transducer
+        % location from the config file
         trans_pos_grid = parameters.transducer.pos_t1_grid';
         focus_pos_grid = parameters.focus_pos_t1_grid';
     end
 
+    % Creates and exports an unprocessed T1 slice that is oriented 
+    % along the transducer's axis
     [t1_with_trans_img, transducer_pars] = plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters);
     imshow(t1_with_trans_img);
     title('T1 with transducer');
     export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_with_transducer_orig%s.png', subject_id, parameters.results_filename_affix)), '-native');
     close;
     
-    %% SEGMENTATION
+    %% SEGMENTATION using SimNIBS
     disp('Starting segmentation...')
 
+    % Defines the names for the output folder of the segmented data
     headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
     filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_masks_contr.nii.gz', subject_id));
 
+    % Starts the segmentation, see 'run_headreco' for more documentation
     if confirm_overwriting(filename_segmented_headreco, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented_headreco, 'file'))
-        % double-check since segmentation takes a long time
+        % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
-            run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path);
+            run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path, parameters);
             disp('\nThe script will continue with other subjects in the meanwhile...')
             medium_masks = [];
             segmented_image_cropped = [];
@@ -85,18 +95,24 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     %% Rotate to match the stimulation trajectory
     disp('Rotating to match the focus axis...')
 
+    % If the headreco process was not succesfull, it will stop preprocessing
     assert(exist(filename_segmented_headreco,'file')>0, ...
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
             filename_segmented_headreco, headreco_folder)
 
+    % Defines output file location and name
     filename_reoriented_scaled_data = fullfile(parameters.data_path, sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
+    % Starts the process of rotating the segmented data
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
         segmented_img_orig = niftiread(filename_segmented_headreco);
         segmented_hdr_orig = niftiinfo(filename_segmented_headreco);
 
+        % Introduces a scaling factor based on the difference between the
+        % segmented file and the original T1 file
         scale_factor = segmented_hdr_orig.PixelDimensions(1)/parameters.grid_step_mm;
 
+        % The function to rotate and scale the segmented T1 to line up with the transducer's axis
         [segmented_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, segm_img_montage] = ...
             align_to_focus_axis_and_scale(segmented_img_orig, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
@@ -105,6 +121,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_segmented%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
+        % The function to rotate and scale the original T1 to line up with the transducer's axis
         [t1_img_rr, ~, ~, ~, ~, ~, ~, t1_rr_img_montage] = align_to_focus_axis_and_scale(t1_image, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
         imshow(t1_rr_img_montage)
@@ -115,12 +132,14 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
 
+        % Saves the output according to the naming convention set in the
+        % beginning of this section
         save(filename_reoriented_scaled_data, 'segmented_img_rr', 'trans_pos_upsampled_grid', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr');
     else 
         load(filename_reoriented_scaled_data);
     end
 
-    %% Plot the skin & skull from simnibs
+    %% Plot the skin & skull from SimNIBS
 
     % unsmoothed skull & skin masks
     skull_mask_unsmoothed = segmented_img_rr==4;
