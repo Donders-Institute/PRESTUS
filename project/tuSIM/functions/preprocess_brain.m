@@ -95,6 +95,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     %% Rotate to match the stimulation trajectory
     disp('Rotating to match the focus axis...')
 
+    % If the headreco process was not succesfull, it will stop preprocessing
     assert(exist(filename_segmented_headreco,'file')>0, ...
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
             filename_segmented_headreco, headreco_folder)
@@ -102,12 +103,16 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     % Defines output file location and name
     filename_reoriented_scaled_data = fullfile(parameters.data_path, sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
+    % Starts the process of rotating the segmented data
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
         segmented_img_orig = niftiread(filename_segmented_headreco);
         segmented_hdr_orig = niftiinfo(filename_segmented_headreco);
 
+        % Introduces a scaling factor based on the difference between the
+        % segmented file and the original T1 file
         scale_factor = segmented_hdr_orig.PixelDimensions(1)/parameters.grid_step_mm;
 
+        % The function to rotate and scale the segmented T1 to line up with the transducer's axis
         [segmented_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, segm_img_montage] = ...
             align_to_focus_axis_and_scale(segmented_img_orig, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
@@ -116,6 +121,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_segmented%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
+        % The function to rotate and scale the original T1 to line up with the transducer's axis
         [t1_img_rr, ~, ~, ~, ~, ~, ~, t1_rr_img_montage] = align_to_focus_axis_and_scale(t1_image, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
         imshow(t1_rr_img_montage)
@@ -126,12 +132,14 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
 
+        % Saves the output according to the naming convention set in the
+        % beginning of this section
         save(filename_reoriented_scaled_data, 'segmented_img_rr', 'trans_pos_upsampled_grid', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr');
     else 
         load(filename_reoriented_scaled_data);
     end
 
-    %% Plot the skin & skull from simnibs
+    %% Plot the skin & skull from SimNIBS
 
     % unsmoothed skull & skin masks
     skull_mask_unsmoothed = segmented_img_rr==4;

@@ -115,6 +115,9 @@ csf_mask_expansion_factor: 40
 # use the kwaveArray class for simulations
 use_kWaveArray: 0
 
+# Include when using the Donders HPC
+using_donders_hpc: 1
+
 skull_smooth_threshold: 0.35 # threshold for smoothing the skull mask (higher threshold means thinner mask, lower threshold means thicker mask)
 other_smooth_threshold: 0.5 # threshold for smoothing other masks (higher threshold means thinner mask, lower threshold means thicker mask)
 prime_factor_max_grid_expansion: 40 # how much the computational grid can be expanded in order to get lower prime numbers to (potentially) speed up computations

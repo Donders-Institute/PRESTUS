@@ -14,35 +14,34 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     % The transformation is done by two sequential rotations to align the focal
     % axis with the z axis. 
 
-    % rotate in Y first
-    % compute the axis angle
+    % Rotate in Y first
+    % Compute the axis angle
     angle_y_rad  = atan(focal_axis(1) / focal_axis(3)); 
     if angle_y_rad < 0
         angle_y_rad = angle_y_rad + pi;
     end
-    % create an affine matrix
+    % Create an affine matrix for Y
     vox_transf_Y  = makehgtform('yrotate', -angle_y_rad); 
 
-    % compute rotated axis
+    % Compute rotated axis
     focal_axis_new = vox_transf_Y*focal_axis;
 
-    % then rotate in X
+    % Then rotate in X
     angle_x_rad  = atan(focal_axis_new(2) / focal_axis_new(3)); 
-
-    % create another affine
+    % Create another affine matrix for X
     vox_transf_X  = makehgtform('xrotate', angle_x_rad);
 
-    % combine transformations
+    % Combine transformations
     rotation_matrix = vox_transf_X * vox_transf_Y;
 
-    % now the scaling
+    % Adjust according to the scaling factor
     scale_matrix = makehgtform('scale', scale_factor);
     
+    % Combine the scaling and rotation matrices
     rotation_and_scale_matrix = rotation_matrix*scale_matrix;
     
-    % the rotated image size would be different from original; here we find out
-    % the new dimensions
-
+    % The rotated image size would be different from original;
+    % here we find out the new dimensions
     TF = maketform('affine', rotation_and_scale_matrix');
     newdims = ceil(diff(findbounds(TF, [0 0 0; size(nii_image)])));
 
@@ -64,16 +63,19 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     rotated_img = tformarray(nii_image, TF, makeresampler('nearest', 'fill'), ...
         [1 2 3], [1 2 3], newdims, [], 0) ;
 
-    % and the new positions for the transducer and the focus can be computed
+    % And the new positions for the transducer and the focus can be computed
     out_mat = round(tformfwd([trans_pos_grid focus_pos_grid]', TF));
 
     trans_pos_new = out_mat(1,:)';
     focus_pos_new = out_mat(2,:)';
-    % some plots
+    
+    % Create plots of the original T1 image with the transducer in addition
+    % to the rotated T1 image
     orig_with_transducer_img = plot_t1_with_transducer(nii_image, nii_header.PixelDimensions(1), trans_pos_grid, ...
             focus_pos_grid, parameters);
     rotated_with_transducer_img = plot_t1_with_transducer(rotated_img, nii_header.PixelDimensions(1)/scale_factor, trans_pos_new, focus_pos_new, parameters);
 
+    % Present the two figures side-by-side
     montage_img = imtile({orig_with_transducer_img, rotated_with_transducer_img}, 'GridSize', [1 nan], 'BackgroundColor', [0.5 0.5 0.5]);
     
 end

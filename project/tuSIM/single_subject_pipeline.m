@@ -20,7 +20,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % - Matlab 2019b must be used since k-wave was no longer updated    %
     % for the release of Matlab 2020a onwards.                          %
     % - 'subject_id' must be a number.                                  %
-    % - 'parameters' is a structure (see load_parameters)               %
+    % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
