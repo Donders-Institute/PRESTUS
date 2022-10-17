@@ -11,6 +11,8 @@ subpaths_to_add: [/home/Documents/k-wave]
 overwrite_files: ask # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
 overwrite_simnibs: 0 # simnibs segmentation results are not overwritten, regardless of anything else, unless enabled here (by setting to 1)
 
+use_donders_hpc: 1 # if you are not using the Donders HPC, you would have to do some things by hand (currently it only affects SimNIBS segmentation)
+
 interactive: 1 # in interactive mode (1), the figures are shown and confirmation dialogs appear in non-interactive mode (0), no plots are shown and no confirmation dialogs (not fully implemented)
 simulation_medium: water_and_skull # select which medium setup to use: 'water', 'water_and_skull', 'brain', 'brain_and_skull' (the latter two assume "brain" parameters everywhere, also outside of brain), or 'layered'
 layer_labels:  # labels for layered simulation, assuming for now the SimNIBS masks indices; note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
