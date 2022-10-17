@@ -14,20 +14,45 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % run the pipeline.                                                 %
     %                                                                   %
     % Some notes:                                                       %
-    % - For now, the pipeline is only able to simulate one transducer   %
-    % at a time, meaning that the pipeline has to be run once for each  %
-    % transducer used in each subject.                                  %
-    % - Matlab 2019b must be used since k-wave was no longer maintained %
-    % from the release of Matlab 2020a onwards.                         %
+    % - The pipeline is only able to simulate one transducer at a time, %
+    % meaning that the pipeline has to be run once for each transducer  %
+    % used in each subject.                                             %
+    % - Matlab 2019b must be used since k-wave was no longer updated    %
+    % for the release of Matlab 2020a onwards.                          %
     % - 'subject_id' must be a number                                   %
-    % - parameters is a structure (see load_parameters)                 %
+    % - 'parameters' is a structure (see load_parameters)               %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
     
+    % Adds the paths to the 'functions' and 'toolboxes' folders
+    currentLoc = fileparts(mfilename("fullpath"));
+    functionsLoc = strcat(currentLoc,'functions');
+    toolboxesLoc = strcat(currentLoc,'toolboxes');
+    allPaths = regexp(path,pathsep,'Split');
+
+    if ~any(ismember(functionsLoc,allPaths))
+        addpath(functionsLoc);
+    else
+    end
+
+    if ~any(ismember(toolboxesLoc,allPaths))
+        addpath(genpath(toolboxesLoc));
+    else
+    end
+
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add')
-       path(path, parameters.paths_to_add)
+        for nPaths = length(parameters.paths_to_add)
+            addpath(parameters.paths_to_add(nPaths))
+        end
+    end
+
+    % If the path and subpaths need to be added, use this instead
+    if isfield(parameters,'subpaths_to_add')
+        for nPaths = length(parameters.paths_to_add)
+            addpath(genpath(parameters.paths_to_add(nPaths)))
+        end
     end
 
     % Output directory, read from the configfile
@@ -44,7 +69,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     output_pressure_file = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Tries an alternative method to calculate the expected focal distance
-    % ifv none is entered into the config file
+    % if none is entered into the config file
     if ~isfield(parameters, 'expected_focal_distance_mm')
         disp('Expected focal distance is not specified, trying to get it from positions on T1 grid')
         if ~isfield(parameters.transducer, 'pos_t1_grid') || ~isfield(parameters, 'focus_pos_t1_grid')

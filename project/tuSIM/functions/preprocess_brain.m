@@ -1,4 +1,14 @@
 function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id)
+       
+    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+    %                  Preprocessing of structural data                 %
+    %                                                                   %
+    % This funct %
+    %                                                                   %
+    % Some notes:                                                       %
+    %                 %
+    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
     %% CHECK INPUTS AND TRANSLATE PATTERNS
     disp('Checking inputs...')
     
