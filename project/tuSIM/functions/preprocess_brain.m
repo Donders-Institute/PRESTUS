@@ -3,10 +3,11 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Preprocessing of structural data                 %
     %                                                                   %
-    % This funct %
-    %                                                                   %
-    % Some notes:                                                       %
-    %                 %
+    % This function combines Matlab and SimNIBS to segment, realign and %
+    % crop the structural data for use in simulations.                  %
+    % This is done both to allow k-wave to use different simulation     %
+    % parameters for the skin, bone and neural tissue and to create     %
+    % figures that allows one to view the simulation results.           %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     %% CHECK INPUTS AND TRANSLATE PATTERNS
@@ -148,11 +149,13 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     skin_slice = squeeze(skin_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:));
     skull_slice = squeeze(skull_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:));
 
+    % Create a T1 slice for comparison to SimNIBS segmented data
     t1_slice =  repmat(mat2gray(squeeze(t1_img_rr(:,trans_pos_upsampled_grid(2),:))), [1 1 3]);
-    % skull is blue, skin is green
+    % Create a slice of segmented SimNIBS data
     skin_skull_img = cat(3, zeros(size(skull_slice)), skin_slice, skull_slice);
+    % Skull is blue, skin is green
 
-    % plot images for comparison
+    % Plot the different slices and an overlay for comparison
     montage(cat(4, t1_slice*255, skin_skull_img*255, imfuse(mat2gray(t1_slice), skin_skull_img, 'blend')) ,'size',[1 NaN]);
     title('T1 and SimNIBS skin (green) and skull (blue) masks');
     export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_skin_skull%s.png', subject_id, parameters.results_filename_affix)), '-native')
@@ -161,7 +164,12 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     %% SMOOTH & CROP SKULL
     disp('Smoothing and cropping the skull...')
 
+    % Defines output file location and name
     filename_cropped_smoothed_skull_data = fullfile(parameters.data_path, sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    
+    % Uses one of two functions to crop and smooth the skull based on
+    % a parameter set in the config file
+    % See each respected function for more documentation
     if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         if ~strcmp(parameters.simulation_medium, 'layered')
             [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
@@ -171,23 +179,30 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             smooth_and_crop_layered(segmented_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
         end
 
+        % Combines the matrix that defined the alignment with the transducer
+        % axis with the new matrix that defines the cropping of the skull
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
 
+        % Saves the output according to the naming convention set in the
+        % beginning of this section
         save(filename_cropped_smoothed_skull_data, 'medium_masks', 'skull_edge', 'segmented_image_cropped', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix','final_transformation_matrix','inv_final_transformation_matrix')
     else 
         load(filename_cropped_smoothed_skull_data);
     end    
     parameters.grid_dims = new_grid_size;
+
+    % Creates and saves a figure with the 
     imwrite(plot_t1_with_transducer(medium_masks, parameters.grid_step_mm, trans_pos_final, focus_pos_final, parameters),...
         fullfile(parameters.output_dir, sprintf('sub-%03d_%s_segmented_brain_final%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix)))
 
-    % check that the transformations can be correctly reversed
+    % Check that the transformations can be correctly reversed
     if ~exist('inv_final_transformation_matrix','var')
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
     end
 
+    % If the transformation cannot be correctly reversed this will be displayed
     backtransf_coordinates = round(tformfwd([trans_pos_final, focus_pos_final]', inv_final_transformation_matrix));
     if ~all(all(backtransf_coordinates ==[trans_pos_grid focus_pos_grid]'))
         disp('Backtransformed focus and transducer parameters differ from the original ones. Something went wrong (but note that small rounding errors could be possible.')
@@ -198,5 +213,4 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         exit()
     end
 
-    
 end
