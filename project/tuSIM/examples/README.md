@@ -9,4 +9,4 @@
 
 ## Some fixes for possible issues that may arise:
 - Issues that arise in the preprocessing_brain function can arise when the SimNIBS file has not been manually adjusted.
-	- To fix this, update SimNIBS to include our changes to the 'headreco' file.
+	- For now, fork Andrey's version of SimNIBS instead of the public one (https://github.com/achetverikov/simnibs.git).

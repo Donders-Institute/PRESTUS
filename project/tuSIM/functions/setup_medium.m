@@ -1,7 +1,9 @@
 function kwave_medium = setup_medium(parameters, medium_mask)
 
+    % Loads the medium settings from the config file
     medium = parameters.medium;
 
+    % Creates an empty grid according to the grid dimensions
     grid_of_ones = ones(parameters.grid_dims);
     
     if strcmp(parameters.simulation_medium, 'water') || strcmp(parameters.simulation_medium, 'water_and_skull') || strcmp(parameters.simulation_medium, 'layered') 
@@ -10,11 +12,11 @@ function kwave_medium = setup_medium(parameters, medium_mask)
         baseline_medium = medium.('brain');
     end
     
-    % sound_speed and density are 3D arrays determining the speed of sound and the medium density within the simulation grid
+    % Sound_speed and density are 3D arrays determining the speed of sound and the medium density within the simulation grid
     sound_speed = baseline_medium.sound_speed*grid_of_ones; 
     density = baseline_medium.density*grid_of_ones;    %waterDensity(temp_0) * ones(Nx,Ny,Nz);             % [kg/m^3]
 
-    % assume a homogeneous attenuation across the skull with 0.6 dB/MHz/cm in water and 7.4 dB/MHz/cm in the skull
+    % Assume a homogeneous attenuation across the skull with 0.6 dB/MHz/cm in water and 7.4 dB/MHz/cm in the skull
     alpha_0_true =  baseline_medium.alpha_0_true*grid_of_ones; %0.6 * ones(Nx,Ny,Nz);                            % [dB/MHz/cm] (Kremkau et al., 1981)
     alpha_power_true = baseline_medium.alpha_power_true*grid_of_ones;
 

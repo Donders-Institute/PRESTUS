@@ -95,8 +95,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             return;
         end
         parameters.grid_dims = size(medium_masks);
-    else
-        % make sure that the grid dimensions are known
+    else % In case simulations are not run in a skull of layered tissue,
+        % alternative grid dimensions are set up
         assert(isfield(parameters, 'default_grid_dims'), 'The parameters structure should have the field grid_dims for the grid dimensions')
         parameters.grid_dims = parameters.default_grid_dims;
         if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
@@ -105,6 +105,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             disp('One of the simulation grid dimensions is of length 1, assuming you want 2d simulations, dropping this dimension')
         end
 
+        % Checks whether the transducer location and orientation are set,
+        % and uses an arbitrary position if not
         medium_masks = [];
         segmented_image_cropped = zeros(parameters.grid_dims);
         if ~isfield(parameters.transducer, 'pos_grid') || ~isfield(parameters, 'focus_pos_grid')
@@ -125,15 +127,21 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     end
 
+    % If dimension 1 is bigger than 2, the matrices of the focus and
+    % transducer locations are transposed
     if size(trans_pos_final,1)>size(trans_pos_final, 2)
         focus_pos_final = focus_pos_final';
         trans_pos_final = trans_pos_final';
     end
     
+    % If a PML layer is used to absorb waves reaching the edge of the grid,
+    % this will check if there is enough room for a PML layer between the
+    % transducer and the edge of the grid
     assert(min(abs([0,0,0;parameters.grid_dims]-trans_pos_final ),[],'all') > parameters.pml_size, 'The minimal distance between the transducer and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
     assert(min(abs([0,0,0;parameters.grid_dims]-focus_pos_final ),[],'all') > parameters.pml_size, 'The minimal distance between the focus position and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
-        
-
+    
+    % Saves the new transducer and focus positions after all previous grid
+    % manipulations
     parameters.transducer.pos_grid = trans_pos_final;
     parameters.focus_pos_grid = focus_pos_final;
 

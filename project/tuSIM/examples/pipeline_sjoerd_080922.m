@@ -13,11 +13,12 @@ addpath('functions')
 addpath(genpath('toolboxes')) 
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
-% Load config file and select output folder
+% Load config file, localite naming file and select output folder
 parameters = load_parameters('sjoerd_config_opt_CTX250-011_64.5mm.yaml');
-out_folder = parameters.data_path+'sim_outputs/';
+readtable(parameters.data_path + 'localite_new_filenames.csv', 'Delimiter',',')
+out_folder_gen = parameters.data_path+'sim_outputs/';
 
-parameters.overwrite_files = 'never';
+parameters.overwrite_files = 'always';
 
 % Create list of files in datafolder (location can be changed in config file)
 files = dir(parameters.data_path);
@@ -38,12 +39,13 @@ reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - para
 for subject_id = subject_list(subject_list<=4)
 % Setting folder locations
 subj_folder = fullfile(parameters.data_path,sprintf('sub-%1$03d/', subject_id));
+out_folder = fullfile(out_folder_gen, sprintf('sub-%1$03d/', subject_id));
 filename_t1 = dir(sprintf(fullfile(parameters.data_path,parameters.t1_path_template), subject_id));
 t1_header = niftiinfo(fullfile(filename_t1.folder,filename_t1.name));
 t1_image = niftiread(fullfile(filename_t1.folder,filename_t1.name));
 
 % Left amygdala simulations
-trig_mark_files = dir(sprintf('%s/sub-%03d/TriggerMarkers_Coil0*.xml',parameters.data_path, subject_id));
+trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub-%03d_ses01_left.xml',parameters.data_path, subject_id, subject_id));
 
 % sort by datetime
 extract_dt = @(x) datetime(x.name(22:end-4),'InputFormat','yyyyMMddHHmmssSSS');
@@ -57,7 +59,7 @@ left_trans_pos = ras_to_grid(left_trans_ras_pos, t1_header);
 left_amygdala_pos = ras_to_grid(left_amygdala_ras_pos, t1_header);
 
 % Right amygdala simulations
-trig_mark_files = dir(sprintf('%s/sub-%03d/TriggerMarkers_Coil1*.xml',parameters.data_path, subject_id));
+trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub-%03d_ses01_right.xml',parameters.data_path, subject_id, subject_id));
 
 % sort by datetime
 extract_dt = @(x) datetime(x.name(22:end-4),'InputFormat','yyyyMMddHHmmssSSS');
