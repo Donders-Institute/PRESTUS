@@ -1,7 +1,7 @@
 function [min_dims, max_dims, grid_size] = get_crop_dims(image, margin)
     
-    % Creates a mask within the margins that defines the bone tissue that
-    % should be preserved.
+    % This ensures that the CSF mask is not expanded outside the
+    % bounds of the image dimensions
 
     I = find(image);
     [x,y,z]=ind2sub(size(image), I);

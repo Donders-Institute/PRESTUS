@@ -1,5 +1,6 @@
 # Location of stored data
 data_path: /project/3023001.06/Simulations/all_files_with_output/
+output_folder: 1 # Should each participants output be stored in a separate folder?
 
 # Structure of subfolders containing T1 and T1 images
 ## It is easier to store the subject data of each participant in an individual subfolder

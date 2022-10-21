@@ -73,11 +73,11 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_csf_mask%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     export_fig(output_plot, '-native')
 
-    % The margin around the csf where the bone tissue will be cropped.
-    crop_margin = parameters.pml_size+1; 
+    % The margin around the edge of the figure where the CSF will be cropped
+    crop_margin = parameters.pml_size+1;
     
-    % Here, the expanded CSF mask and skull mask are combined so that only
-    % the parts of the skull close to the brain remain
+    % get_crop_dims ensures that the CSF mask is not expanded outside the
+    % bounds of the image dimensions
     smoothed_segmented_img(~csf_mask_expanded) = 0;
     %imshow(squeeze(skull_mask_smoothed(trans_pos_upsampled_grid(1),:,:)))
     %montage({label2rgb(squeeze(segmented_img(trans_pos_upsampled_grid(1),:,:)),'jet','k'), label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:)),'jet','k'),label2rgb(squeeze(segmented_img(:,:,3)),'jet','k')},'Size',[1 3])

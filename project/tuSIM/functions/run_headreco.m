@@ -7,6 +7,9 @@ function run_headreco(data_path, subject_id, filename_t1, filename_t2, simnibs_e
         mkdir(log_dir)
     end
     
+    subj_id_string = sprintf('sub-%03d', subject_id);
+    headreco_call = sprintf('headreco all %s %s %s -d no-conform',subj_id_string, filename_t1, filename_t2);
+    
     % 4) submit headreco job
 	if (parameters.using_donders_hpc)
 		qsub_call = sprintf('qsub -l "nodes=1:ppn=1,mem=20Gb,walltime=12:00:00" -o %s -e %s -w %s', ...

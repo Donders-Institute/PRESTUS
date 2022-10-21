@@ -4,6 +4,9 @@
 data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data
 simnibs_env_path: /project/3015999.02/andche_sandbox/simnibs/simnibs_env
 
+# Should each participants output be stored in a separate folder?
+output_folder: 1 
+
 # What paths are supposed to be added (write the full path)
 paths_to_add: [example-1, example-2]
 subpaths_to_add: [/home/Documents/k-wave]

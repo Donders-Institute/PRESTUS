@@ -83,7 +83,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
             run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path, parameters);
-            disp('\nThe script will continue with other subjects in the meanwhile...')
+            fprintf('\nThe script will continue with other subjects in the meanwhile...\n')
             medium_masks = [];
             segmented_image_cropped = [];
             skull_edge = [];
