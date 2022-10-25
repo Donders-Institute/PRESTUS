@@ -91,6 +91,10 @@ thermal:
   n_trials: 12 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
   sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
+# additional thermal simulation parameters
+# post_stim_time_step_dur: 0.1 # post-stimulation (inter-trial) steps
+# equal_steps: 0 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
+# on_off_step_duration: 0.1 # duration of the on+off cycle (e.g., with a duty cycle of 0.3 and 0.01 s time steps for simulation, the whole on+off cycle will take 0.1 s)
 
 # select which k-Wave code to run
 #   MATLAB CPU code 'matlab_cpu'

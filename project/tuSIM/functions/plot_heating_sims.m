@@ -1,4 +1,7 @@
 function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos, brain_img)
+    
+    %% Plots the results of the heating simulations in a line graph
+
     arguments
         focal_planeT (:,:,:)
         time_status_seq
@@ -35,7 +38,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     export_fig(output_plot, '-native')
     close
 
-    %% create video of heating
+    %% Creates a video of heating effects over the course of the experiment
 
     color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
     brain_slice = mat2gray(squeeze(brain_img(:,parameters.transducer.pos_grid(2),:)));
