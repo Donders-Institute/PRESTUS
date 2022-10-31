@@ -27,8 +27,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
-    functionsLoc = strcat(currentLoc,'functions');
-    toolboxesLoc = strcat(currentLoc,'toolboxes');
+    functionsLoc = fullfile(currentLoc,'functions');
+    toolboxesLoc = fullfile(currentLoc,'toolboxes');
     allPaths = regexp(path,pathsep,'Split');
 
     if ~any(ismember(functionsLoc,allPaths))
@@ -55,6 +55,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
 
+    % Sanitize output file affix
+    
+    sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
+    if ~strcmp(sanitized_affix, parameters.results_filename_affix)
+        fprintf('The original `results_filename_affix` was sanitized, "%s" will be used instead of "%s"\n', sanitized_affix, parameters.results_filename_affix)
+        parameters.results_filename_affix = sanitized_affix;
+    end
+
     % Creates an output directory if non exists yet
     output_dir_parent = fullfile(parameters.data_path, 'sim_outputs/');
     if ~exist(output_dir_parent, 'file')
@@ -62,7 +70,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Create and use subfolders
-    if parameters.output_subfolder == 1
+    if isfield(parameters,'output_subfolder') && parameters.output_subfolder == 1
         output_subfolder_name = (sprintf('%ssub-%03d/', output_dir_parent, subject_id));
         if ~exist(output_subfolder_name, 'file' )
             mkdir(output_subfolder_name);
@@ -310,7 +318,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         isppa_hdr = t1_header;
         isppa_hdr.Datatype = 'single';
         
-        niftiwrite(isppa_map_backtransf, fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_orig_coord%s', subject_id, parameters.results_filename_affix)), isppa_hdr, 'Compressed', true)
+        niftiwrite(isppa_map_backtransf, fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_orig_coord%s',...
+            subject_id, parameters.results_filename_affix)), isppa_hdr, 'Compressed', true)
 
         % Creates a visual overlay of the transducer
         [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
