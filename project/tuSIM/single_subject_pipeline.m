@@ -281,7 +281,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, segmented_image_cropped>0 & segmented_image_cropped<3);
         half_max = Isppa_map >= max_Isppa_brain/2 & segmented_image_cropped>0 & segmented_image_cropped<3;
-        half_max_ISPPA_volume_brain = sum(half_max(:));
+        half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
 
         [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, segmented_image_cropped>0 & segmented_image_cropped<3);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, segmented_image_cropped==4);
