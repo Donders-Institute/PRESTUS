@@ -1,8 +1,9 @@
 clear
 
 % Delete if you have rights to add paths to Matlab
-cd /home/mrphys/kenvdzee/Documents/MATLAB/
+cd /home/mrphys/kenvdzee/Documents/
 addpath(genpath('SimNIBS-3.2'))
+cd /home/mrphys/kenvdzee/Documents/MATLAB/
 addpath(genpath('k-wave'))
 
 % Change path to tuSIM folder
@@ -33,7 +34,8 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-subject_list = [11, 14, 17, 18, 19]; % Temporary, selects subjects with complete files
+subject_list = [3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+%subject_list = 1;
 
 for subject_id = subject_list
 
@@ -42,15 +44,6 @@ for subject_id = subject_list
     filename_t1 = dir(sprintf(fullfile(parameters.data_path,parameters.t1_path_template), subject_id));
     t1_header = niftiinfo(fullfile(filename_t1.folder,filename_t1.name));
     t1_image = niftiread(fullfile(filename_t1.folder,filename_t1.name));
-    
-    %{
-    if parameters.output_folder == 1
-        mkdir(out_folder_gen, sprintf('sub-%1$03d/', subject_id));
-        out_folder = fullfile(out_folder_gen, sprintf('sub-%1$03d/', subject_id));
-    else
-        out_folder = out_folder_gen;
-    end
-    %}
     
     % Left transducer localite files
     trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
@@ -102,7 +95,9 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    single_subject_pipeline(subject_id, parameters)
+    %single_subject_pipeline(subject_id, parameters)
+    
+    qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
     
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);
@@ -117,6 +112,8 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    single_subject_pipeline(subject_id, parameters)
+    %single_subject_pipeline(subject_id, parameters)
+    
+    qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
 
 end

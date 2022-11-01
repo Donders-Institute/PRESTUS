@@ -36,7 +36,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
     coord_xml = xml.Children(4).Children(2).Children(2);
     coord_matrix = {coord_xml.Attributes.Value};
     
-    % first convert into array then reshape
+    % First convert into array then reshape
     coord_matrix = str2double(coord_matrix);
     coord_matrix = reshape(coord_matrix',[4,4])';
      
@@ -45,7 +45,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
     % right, starting at the center of the coil housing (calibrated ?hotspot?) at a right 
     % angle to the x axis.
     
-    % converting into 3D vectors
+    % Converting into 3D vectors
     reference_pos = coord_matrix(:,4); % Position of the reference
     reference_center_to_head = coord_matrix(:,1); % From the center of the coil towards head
     % y = coord_matrix(:,2); % From the center of the coil to the left coil handle

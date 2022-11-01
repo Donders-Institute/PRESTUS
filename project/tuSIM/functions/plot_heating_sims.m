@@ -43,7 +43,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
     brain_slice = mat2gray(squeeze(brain_img(:,parameters.transducer.pos_grid(2),:)));
 
-    output_video_name = fullfile(parameters.data_path,sprintf('sim_outputs/sub-%03d_%s_heating%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_video_name = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     v = VideoWriter(output_video_name,'Uncompressed AVI');
     v.FrameRate = 2; % frames per second
 
