@@ -8,8 +8,8 @@ simnibs_env_path: /project/3015999.02/andche_sandbox/simnibs/simnibs_env
 output_folder: 1 
 
 # What paths are supposed to be added (write the full path)
-paths_to_add: [example-1, example-2]
-subpaths_to_add: [/home/Documents/k-wave]
+paths_to_add: []
+subpaths_to_add: []
 
 overwrite_files: ask # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
 overwrite_simnibs: 0 # simnibs segmentation results are not overwritten, regardless of anything else, unless enabled here (by setting to 1)
