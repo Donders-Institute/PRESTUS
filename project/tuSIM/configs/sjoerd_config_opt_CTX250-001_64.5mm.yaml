@@ -14,7 +14,7 @@ transducer:
   Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
   curv_radius_mm: 63.20 # radius of curvature of the bowl 
   dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
-  source_amp: 235000 # [Pa] (calibrated values at 80 W/cm^2 free-water Isppa) (original is 142309 Pa for 30W/cm^2)
+  source_amp: 165000 # [Pa] (calibrated values at 80 W/cm^2 free-water Isppa) (original is 142309 Pa for 30W/cm^2)
   source_phase_deg: [0, 0, 358.0546, 272.2390] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
   source_freq_hz: 250e3 # [Hz] the central frequency
 

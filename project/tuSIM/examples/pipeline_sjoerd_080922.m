@@ -34,7 +34,7 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+subject_list = [3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
 %subject_list = 1;
 
 for subject_id = subject_list
