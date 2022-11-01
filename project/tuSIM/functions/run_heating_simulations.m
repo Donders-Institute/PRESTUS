@@ -7,6 +7,8 @@ function [thermal_diff_obj, time_status_seq, maxT,focal_planeT] = run_heating_si
 % effects, k-wave divides each duty cycle up into segments called   %
 % 'sim_time_steps' with the total of one duty cycle being           %
 % represented as the 'on_off_step_duration'.                        %
+% The stable state of the acoustic simulations (what is seen in the %
+% figures) is used as the input for the temperature simulations.    %
 %                                                                   %
 % Some notes:                                                       %
 % As can be seen in the explanations in lines 51 to 53, these two   %

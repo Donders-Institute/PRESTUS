@@ -27,6 +27,10 @@ layer_labels:  # labels for layered simulation, assuming for now the SimNIBS mas
 t1_path_template: sub-%1$03d_orig_T1w.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
 t2_path_template: sub-%1$03d_orig_T2w.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
 
+# Should the script position_transducer_localite be used?
+transducer_from_localite: 0
+reference_transducer_distance_mm: 15 # Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane
+
 # if the simulations are done for water only, set the grid size manually
 # select the desired simulation grid size (number of points per dimension)
 default_grid_size: 144
