@@ -1,10 +1,8 @@
 # The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
 
+#------------ This first segment of the config contains parameters mandatory for running a pipeline
 
-
-# This first segment of the config contains parameters mandatory for running a pipeline
-
-# Paths to the data location and SimNIBS environment
+# Paths to the data location and SimNIBS environment (please use full paths)
 data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data
 simnibs_env_path: /project/3015999.02/andche_sandbox/simnibs/simnibs_env
 
@@ -31,9 +29,7 @@ transducer:
 # Stimulation target on T1 grid (again, can be left out if importing location data)
 focus_pos_t1_grid: [128, 142, 75]
 
-
-
-# This second segment contains parameters that can be used based on the specific needs of the analysis
+#------------ This second segment contains parameters that can be used based on the specific needs of the analysis
 
 # Should output be ordered based on subject id?
 output_subfolder: 1
