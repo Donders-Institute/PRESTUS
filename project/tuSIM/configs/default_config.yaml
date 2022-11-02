@@ -29,6 +29,10 @@ transducer:
 # Stimulation target on T1 grid (again, can be left out if importing location data)
 focus_pos_t1_grid: [128, 142, 75]
 
+# Important to note: the alpha values in 'alpha_0_true' are currently set for 500KHz transducers
+# These should be adjusted to the values shown in their respected comments below in the medium parameters
+# We are still not entirely sure what alpha values best to use, so be critical of our and your choices
+
 #------------ This second segment contains parameters that can be used based on the specific needs of the analysis
 
 # Should output be ordered based on subject id?
@@ -89,21 +93,21 @@ medium:
   skull: # cortical bone
     sound_speed: 2800 # [m/s], ITRUST benchmarks 
     density: 1850 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 8 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power]
+    alpha_0_true: 8 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
     alpha_power_true: 1
     thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
   brain:
     sound_speed: 1546 # [m/s] Tissue Properties DB 
     density: 1046 # [kg/m^3], ITRUST benchmarks or waterDensity(temp_0)
-    alpha_0_true: 0.6 # ITRUST benchmarks 
+    alpha_0_true: 0.6 # ITRUST benchmarks (changed to 0.15 for 250KHz transducers)
     alpha_power_true: 1
     thermal_conductivity: 0.51 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 3630 # [J/kg/°C] Tissue Properties DB 
   skin:
     sound_speed: 1610 # [m/s], ITRUST benchmarks 
     density: 1090 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 0.4 # ITRUST benchmarks 
+    alpha_0_true: 0.4 # ITRUST benchmarks (changed to 0.1 for 250KHz transducers)
     alpha_power_true: 1
     thermal_conductivity: 0.37 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 3391 # [J/kg/°C] Tissue Properties DB
