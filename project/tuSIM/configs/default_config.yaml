@@ -30,8 +30,8 @@ transducer:
 focus_pos_t1_grid: [128, 142, 75]
 
 # Important to note: the alpha values in 'alpha_0_true' are currently set for 500KHz transducers
-# These should be adjusted to the values shown in their respected comments below in the medium parameters
-# We are still not entirely sure what alpha values best to use, so be critical of our and your choices
+# These should be adjusted to the values shown in their respected comments below the medium parameters
+# We are still not entirely sure what alpha values best to use, so be critical of our and your own choices
 
 #------------ This second segment contains parameters that can be used based on the specific needs of the analysis
 
