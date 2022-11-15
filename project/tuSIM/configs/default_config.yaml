@@ -1,5 +1,7 @@
 # The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
 
+# !!! Important !!! Do not edit this document. Instead, copy (at least) the first segment into your own config file.
+
 #------------ This first segment of the config contains parameters mandatory for running a pipeline
 
 # Paths to the data location and SimNIBS environment (please use full paths)
@@ -22,7 +24,7 @@ transducer:
   curv_radius_mm: 63.20 # Radius of curvature of the bowl 
   dist_to_plane_mm: 52.38 # Distance to the transducer plane from the geometric focus
   source_amp: 91590 # [Pa] 
-  source_phase_deg: [0.0, 13.2, 26.4, 52.8] # Source phase [deg] 
+  source_phase_deg: [0.0, 307.0, 262.0, 209.0] # [0.0, 13.2, 26.4, 52.8] # Source phase [deg] 
   source_freq_hz: 250e3 # [Hz] The central frequency
   pos_t1_grid: [128, 139, 15] # Position on T1 grid (can be left out if importing location data)
 
