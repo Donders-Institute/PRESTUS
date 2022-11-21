@@ -18,11 +18,11 @@ focus_pos_t1_grid: [128, 142, 75] # stimulation target on T1 grid
 
 medium:
   skull:
-    alpha_coef_true: 2 
+    alpha_0_true: 2 
   brain:
-    alpha_coef_true: 0.15 
+    alpha_0_true: 0.15 
   skin:
-    alpha_coef_true: 0.1
+    alpha_0_true: 0.1
 
 default_grid_dims: [144, 144, 256]
 
