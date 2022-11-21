@@ -42,16 +42,16 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs
-    if isfield(parameters,'paths_to_add')
+    if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
         for nPaths = length(parameters.paths_to_add)
             addpath(parameters.paths_to_add(nPaths))
         end
     end
 
     % If the path and subpaths need to be added, use this instead
-    if isfield(parameters,'subpaths_to_add')
-        for nPaths = length(parameters.paths_to_add)
-            addpath(genpath(parameters.paths_to_add(nPaths)))
+    if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
+        for nPaths = length(parameters.subpaths_to_add)
+            addpath(genpath(parameters.subpaths_to_add(nPaths)))
         end
     end
 
@@ -330,8 +330,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         % Plots the Isppa to fit the untransformed figure
         plot_isppa_over_image(isppa_map_backtransf, t1_image_orig, source_labels, ...
-            parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:)', ...
-            backtransf_coordinates(2,:)', backtransf_coordinates(3,:)', 0, t1_header.PixelDimensions(1));
+            parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
+            backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
         output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_isppa_orig%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
         export_fig(output_plot, '-native')
@@ -392,7 +392,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks);
         
         % Plots the maximum temperature in the segmented brain
-        plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+        if max(maxT(:)) < 38
+            temp_color_range = [37, 38];
+        else
+            temp_color_range = [37, max(maxT(:))];
+        end
+        plot_isppa_over_image(gather(maxT), segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         export_fig(output_plot, '-native')
         close;
