@@ -1,4 +1,4 @@
-function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_skull(segmented_img, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
+function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_skull(segmented_img, bone_img, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
     
     %% Smoothes the skull
     % Renames images from segmented_img to make script more readible
@@ -13,10 +13,15 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
     % Smoothes the skull, meaning that it removes the differentiation
     % between gray and white matter for the simulations.
     windowSize = 4;
-    kernel = ones(windowSize,windowSize,windowSize)/ windowSize ^ 3;
-    blurryImage = convn(double(skull_mask_unsmoothed), kernel, 'same');
-    skull_mask_smoothed = blurryImage > parameters.skull_smooth_threshold; % Rethreshold
+    skull_mask_smoothed = smooth_img(skull_mask_smoothed, windowSize, parameters.skull_smooth_threshold);
     
+    % add a boundary of the bone mask to fill in potential gaps
+    bone_img_smoothed = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
+    
+    bone_perimeter = bone_img_smoothed - imerode(bone_img_smoothed, strel('sphere',1));
+    skull_mask_smoothed = skull_mask_smoothed | bone_perimeter;
+
+
     % Shows the unsmoothed and smoothed image side-by-side
     imshowpair(mat2gray(squeeze(skull_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:))),...
         mat2gray(squeeze(skull_mask_smoothed(:,trans_pos_upsampled_grid(2),:))), 'montage');

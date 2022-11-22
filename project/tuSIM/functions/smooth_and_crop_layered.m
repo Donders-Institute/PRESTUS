@@ -1,4 +1,4 @@
-function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_layered(segmented_img, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
+function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_layered(segmented_img, bone_img,  voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
     
     %% split into layers of interest
     
@@ -6,9 +6,10 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     windowSize = 4;
     % Creates an empty grid the size of the segmented image
     smoothed_segmented_img = zeros(size(segmented_img));
+    labels = fieldnames(parameters.layer_labels);
     
     % Adds a smoothing threshold to bone and other non-water tissue.
-    labels = fieldnames(parameters.layer_labels);
+    
     for label_i = 1:length(labels)
         if strcmp(labels{label_i}, 'water')
            continue
@@ -25,13 +26,27 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         smoothed_segmented_img(layer_mask_smoothed~=0) = label_i;
     end
     
+    % fill gaps in the skull by using the boundary of a bone image
+    if any(strcmp(labels,  'skull')) 
+        skull_i = find(strcmp(labels,  'skull'));
+        skull = smoothed_segmented_img==skull_i;
+        smoothed_bone_img = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
+        bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('sphere',1));
+        new_skull = skull | bone_perimeter;
+        figure;
+        montage({squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, squeeze(bone_perimeter(:,focus_pos_upsampled_grid(2),:))*255, squeeze(new_skull(:,focus_pos_upsampled_grid(2),:))*255},gray, 'Size',[1 3])
+        smoothed_segmented_img(new_skull) = skull_i;
+    end
     %% remove gaps between skull & skin
     if any(strcmp(labels,  'skull')) && any(strcmp(labels,  'skin'))
         skin_i = find(strcmp(labels,  'skin'));
         skull_i = find(strcmp(labels,  'skull'));
+
         skin = smoothed_segmented_img==skin_i;
         skull = smoothed_segmented_img==skull_i;
+        
         skin_skull = skin+skull;
+        
         skin_skull_filled = imfill(skin_skull);
 
         [labeledImage, ~] = bwlabeln(~skin_skull);
@@ -141,14 +156,3 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
 
 end
 
-% Currently not in use
-function smoothed_img = smooth_img(unsmoothed_img, windowSize, threshold)
-    arguments
-       unsmoothed_img (:,:,:) double
-       windowSize (1,1) double = 4
-       threshold (1,1) double = 0.5       
-    end
-    kernel = ones(windowSize,windowSize,windowSize)/ windowSize ^ 3;
-    blurryImage = convn(double(unsmoothed_img), kernel, 'same');
-    smoothed_img = blurryImage > threshold; % Rethreshold
-end

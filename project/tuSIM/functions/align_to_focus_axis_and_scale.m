@@ -76,6 +76,6 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     rotated_with_transducer_img = plot_t1_with_transducer(rotated_img, nii_header.PixelDimensions(1)/scale_factor, trans_pos_new, focus_pos_new, parameters);
 
     % Present the two figures side-by-side
-    montage_img = imtile({orig_with_transducer_img, rotated_with_transducer_img}, 'GridSize', [1 nan], 'BackgroundColor', [0.5 0.5 0.5]);
+    montage_img = imtile({rotated_with_transducer_img, orig_with_transducer_img}, 'GridSize', [1 nan], 'BackgroundColor', [0.5 0.5 0.5]);
     
 end
