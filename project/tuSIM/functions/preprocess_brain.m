@@ -102,7 +102,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             filename_segmented_headreco, headreco_folder)
 
     % Defines output file location and name
-    filename_reoriented_scaled_data = fullfile(parameters.data_path, sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
+    filename_reoriented_scaled_data = fullfile(parameters.data_path, ...
+        sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
     % Starts the process of rotating the segmented data
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
