@@ -82,7 +82,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     end
     
     bg_slice = squeeze(bg_image(slice_x, slice_y, slice_z));
-    if ~isempty(options.segmented_img) && all(options.segmented_img == bg_image,'all')
+    if (~isempty(options.segmented_img) && all(options.segmented_img == bg_image,'all')) || (isinteger(bg_image) && max(bg_image(:))< 12)
         bg_slice = mat2gray(bg_slice);
         bg_min =  min(bg_slice(:));
         bg_max =  max(bg_slice(:));
@@ -100,7 +100,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
             %bg_slice(bg_slice>0) = rescale(bg_slice(bg_slice>0), 'InputMin', bg_min, 'InputMax', bg_max);
         else
             bg_min = min(bg_slice(:));
-            bg_max = min(bg_slice(:));
+            bg_max = max(bg_slice(:));
         end
 
         bg_slice = mat2gray(bg_slice, double([bg_min, bg_max]));
@@ -127,7 +127,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     end
         
     figure;
-    ax1 = axes;
+    ax1 = axes; % the background layer
     
     %bg_zeros = zeros(size(bg_slice));
     %bg_slice = (bg_slice-min(bg_slice(:)))/ max(bg_slice(:));
@@ -218,7 +218,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
            
     end
     ax2.Position = ax1.Position;
-    set(gcf,'color',ax1.Children.CData(1,1,:));
+    set(gcf,'color',ax1.Children(length(ax1.Children)).CData(1,1,:));
     
 
 end
