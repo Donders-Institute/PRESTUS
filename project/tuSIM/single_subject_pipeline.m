@@ -80,9 +80,15 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         output_dir = output_dir_parent;
     end
     
+    % save parameters to have a backlog
+    parameters_file = fullfile(output_dir,sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
+    save(parameters_file, 'parameters')
+    
     % Add subject_id and output_dir to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     parameters.output_dir = output_dir;
+    
+    
     
     % Creates an output file to which output is written at a later stage
     output_pressure_file = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
@@ -309,21 +315,25 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     export_fig(output_plot, '-native')
     close;
     
-    % Plots the Isppa on the original T1 figure for layered mediums only
+    % Plots the Isppa on the original T1 figure & in the MNI space for skull & layered mediums only
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
 
-        % Transforms the Isppa map to the original T1 figure dimensions and
-        % orientation
-        isppa_map_backtransf = tformarray(Isppa_map, inv_final_transformation_matrix, ...
-                                makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
+        isppa_orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_orig_coord%s.nii.gz',...
+            subject_id, parameters.results_filename_affix));
         
-        isppa_hdr = t1_header;
-        isppa_hdr.Datatype = 'single';
-        
-        niftiwrite(isppa_map_backtransf, fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_orig_coord%s',...
-            subject_id, parameters.results_filename_affix)), isppa_hdr, 'Compressed', true)
+        if confirm_overwriting(isppa_orig_file, parameters)
+            % Transforms the Isppa map to the original T1 figure dimensions and orientation
+            isppa_map_backtransf = tformarray(Isppa_map, inv_final_transformation_matrix, ...
+                                    makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
 
+            isppa_hdr = t1_header;
+            isppa_hdr.Datatype = 'single';
+
+            niftiwrite(isppa_map_backtransf, isppa_orig_file, isppa_hdr, 'Compressed', true)
+        else 
+            isppa_map_backtransf = niftiread(isppa_orig_file);
+        end
         % Creates a visual overlay of the transducer
         [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
                                                     size(t1_image_orig), t1_header.PixelDimensions(1));
@@ -336,6 +346,17 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         export_fig(output_plot, '-native')
         close;
+        
+        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+        
+        max_pressure_mni_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_pressure_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
+        isppa_map_mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
+        segmented_image_mni_file = fullfile(parameters.output_dir, sprintf('sub-%03d_segmented_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
+
+        isppa_map_mni = convert_final_to_MNI(Isppa_map, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', isppa_map_mni_file);
+        segmented_image_mni = convert_final_to_MNI(segmented_image_cropped, headreco_folder, inv_final_transformation_matrix,  parameters, 'nifti_filename', segmented_image_mni_file, 'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
+        max_pressure_mni = convert_final_to_MNI(data_max, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', max_pressure_mni_file);
+        
     end
 
     % Runs the heating simulation
@@ -397,10 +418,16 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         else
             temp_color_range = [37, max(maxT(:))];
         end
-        plot_isppa_over_image(gather(maxT), segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
+        maxT = gather(maxT);
+        plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         export_fig(output_plot, '-native')
         close;
+        
+        
+        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+        heating_data_mni_file = fullfile(parameters.output_dir,sprintf('sub-%03d_heating_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
+        convert_final_to_MNI(maxT, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', heating_data_mni_file);
 
     end
     
