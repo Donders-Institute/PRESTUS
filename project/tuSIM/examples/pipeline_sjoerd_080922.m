@@ -1,4 +1,4 @@
-clear
+clc, clear, close all
 
 % Delete if you have rights to add paths to Matlab
 cd /home/mrphys/kenvdzee/Documents/
@@ -14,13 +14,13 @@ addpath('functions')
 addpath(genpath('toolboxes')) 
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
-% Set config files
-config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
-config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
-overwrite_option = 'always';
+% Set config files and export location
+config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
+config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
+output_subfolder = 1
 
+overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
-out_folder_gen = parameters.data_path+'sim_outputs/';
 reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
 
 % Create list of files in datafolder (location can be changed in config file)
@@ -34,8 +34,12 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
-%subject_list = 1;
+%subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+%subject_list = [8,14]; % Thickest skulls
+%subject_list = [3, 17]; % Most permissable skulls
+subject_list = [8];
+
+correctly_named_transducers = [1, 5, 14];
 
 for subject_id = subject_list
 
@@ -46,10 +50,15 @@ for subject_id = subject_list
     t1_image = niftiread(fullfile(filename_t1.folder,filename_t1.name));
     
     % Left transducer localite files
-    trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
+    if ismember(subject_id, correctly_named_transducers)
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    else
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    end
     
     % sort by datetime
-    extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
     [~,idx] = sort([arrayfun(extract_dt,trig_mark_files)],'descend');
     trig_mark_files = trig_mark_files(idx);
     
@@ -60,10 +69,15 @@ for subject_id = subject_list
     left_amygdala_pos = ras_to_grid(left_amygdala_ras_pos, t1_header);
     
     % Right transducer localite file
-    trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
+    if ismember(subject_id, correctly_named_transducers)
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    else
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    end
     
     % sort by datetime
-    extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
     [~,idx] = sort([arrayfun(extract_dt,trig_mark_files)],'descend');
     trig_mark_files = trig_mark_files(idx);
     
@@ -76,7 +90,7 @@ for subject_id = subject_list
     % Generate plots with both transducers and targets separately
     imshowpair(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), left_trans_pos, left_amygdala_pos, parameters), plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), right_trans_pos, right_amygdala_pos, parameters),'montage');
     
-    % Index transducer locations for simulation selection
+    % Index transducer locations for simulation selection (and flip if necessary)
     transducers = [left_trans_pos right_trans_pos];
     targets = [left_amygdala_pos right_amygdala_pos];
     target_names = {'left_amygdala', 'right_amygdala'};
@@ -85,6 +99,7 @@ for subject_id = subject_list
     % Loading parameters
     parameters = load_parameters(config_left_transducer);
     parameters.overwrite_files = overwrite_option;
+    parameters.output_folder_name = output_subfolder;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
@@ -102,6 +117,7 @@ for subject_id = subject_list
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);
     parameters.overwrite_files = overwrite_option;
+    parameters.output_folder_name = output_subfolder;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
