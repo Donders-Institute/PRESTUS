@@ -56,28 +56,23 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Sanitize output file affix
-    
     sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
     if ~strcmp(sanitized_affix, parameters.results_filename_affix)
         fprintf('The original `results_filename_affix` was sanitized, "%s" will be used instead of "%s"\n', sanitized_affix, parameters.results_filename_affix)
         parameters.results_filename_affix = sanitized_affix;
     end
 
-    % Creates an output directory if non exists yet
-    output_dir_parent = fullfile(parameters.data_path, 'sim_outputs/');
-    if ~exist(output_dir_parent, 'file')
-        mkdir(output_dir_parent)
-    end
-
     % Create and use subfolders
     if isfield(parameters,'output_subfolder') && parameters.output_subfolder == 1
-        output_subfolder_name = (sprintf('%ssub-%03d/', output_dir_parent, subject_id));
-        if ~exist(output_subfolder_name, 'file' )
-            mkdir(output_subfolder_name);
+        output_dir = (sprintf('%ssub-%03d/', parameters.data_path, subject_id));
+        if ~exist(output_dir, 'file' )
+            mkdir(output_dir);
         end
-        output_dir = fullfile(output_subfolder_name);
     else
-        output_dir = output_dir_parent;
+        output_dir = fullfile(parameters.data_path, 'sim_outputs/');
+        if ~exist(output_dir, 'file')
+            mkdir(output_dir)
+        end
     end
     
     % save parameters to have a backlog
@@ -89,9 +84,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     parameters.output_dir = output_dir;
     
     
-    
+    %% Start of simulations
     % Creates an output file to which output is written at a later stage
-    output_pressure_file = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Tries an alternative method to calculate the expected focal distance
     % if none is entered into the config file
@@ -203,7 +198,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Saves the sensory data in a .mat file with the simulation figures
-    filename_sensor_data = fullfile(output_dir, sprintf('sub-%03d_%s_results%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    filename_sensor_data = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_results%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Run the acoustic simulations
     % See 'run_simulations' for more documentation
@@ -305,7 +300,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Plots the Isppa on the segmented figure
-    output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     if parameters.n_sim_dims==3
         plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
@@ -342,7 +337,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         plot_isppa_over_image(isppa_map_backtransf, t1_image_orig, source_labels, ...
             parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
             backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
-        output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_isppa_orig%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa_orig%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
         export_fig(output_plot, '-native')
         close;
@@ -362,7 +357,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % Runs the heating simulation
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
         % Creates an output file to which output is written at a later stage
-        filename_heating_data = fullfile(parameters.data_path,sprintf('sim_outputs/sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
         % Clear sensor mask
         sensor.mask = zeros(size(sensor.mask));
@@ -420,7 +415,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
         maxT = gather(maxT);
         plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
-        output_plot = fullfile(output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         export_fig(output_plot, '-native')
         close;
         

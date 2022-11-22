@@ -25,7 +25,7 @@ using_donders_hpc: 1 # are the simulations run on the HPC cluster?
 
 run_posthoc_water_sims: 1
 run_heating_sims: 0
-overwrite_simnibs: 0
+overwrite_simnibs: 1
 
 thermal:
   duty_cycle: 0.3 # share of the stimulation duration during which the stimulation is on

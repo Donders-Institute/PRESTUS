@@ -17,7 +17,7 @@ addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donde
 % Set config files and export location
 config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
 config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
-output_subfolder = 1
+output_location = '250KHz/40W per cm2/';
 
 overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
@@ -99,7 +99,7 @@ for subject_id = subject_list
     % Loading parameters
     parameters = load_parameters(config_left_transducer);
     parameters.overwrite_files = overwrite_option;
-    parameters.output_folder_name = output_subfolder;
+    parameters.output_location = output_location;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
@@ -117,7 +117,7 @@ for subject_id = subject_list
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);
     parameters.overwrite_files = overwrite_option;
-    parameters.output_folder_name = output_subfolder;
+    parameters.output_location = output_location;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
