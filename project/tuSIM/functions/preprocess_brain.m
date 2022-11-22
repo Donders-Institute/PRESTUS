@@ -76,7 +76,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
     % Defines the names for the output folder of the segmented data
     headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
-    filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_masks_contr.nii.gz', subject_id));
+    filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_final_contr.nii.gz', subject_id));
 
     % Starts the segmentation, see 'run_headreco' for more documentation
     if confirm_overwriting(filename_segmented_headreco, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented_headreco, 'file'))
@@ -102,7 +102,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             filename_segmented_headreco, headreco_folder)
 
     % Defines output file location and name
-    filename_reoriented_scaled_data = fullfile(parameters.data_path, ...
+    filename_reoriented_scaled_data = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
     % Starts the process of rotating the segmented data
@@ -116,10 +116,10 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
         % The function to rotate and scale the segmented T1 to line up with the transducer's axis
         [segmented_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, segm_img_montage] = ...
-            align_to_focus_axis_and_scale(segmented_img_orig, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
+            align_to_focus_axis_and_scale(segmented_img_orig, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
         imshow(segm_img_montage)
-        title('Original (left) and rotated (right) segmented T1');
+        title('Rotated (left) and original (right) segmented T1');
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_segmented%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
@@ -127,8 +127,19 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         [t1_img_rr, ~, ~, ~, ~, ~, ~, t1_rr_img_montage] = align_to_focus_axis_and_scale(t1_image, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
         figure;
         imshow(t1_rr_img_montage)
-        title('Original (left) and rotated (right) original T1');
+        title('Rotated (left) and original (right) original T1');
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
+        close;
+        
+        filename_bone_headreco = fullfile(headreco_folder, sprintf('bone.nii.gz', subject_id));
+
+        bone_img = niftiread(filename_bone_headreco);
+
+        [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
+        figure;
+        imshow(bone_img_montage)
+        title('Rotated (left) and original (right) original bone mask');
+%         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
@@ -166,7 +177,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     disp('Smoothing and cropping the skull...')
 
     % Defines output file location and name
-    filename_cropped_smoothed_skull_data = fullfile(parameters.data_path, sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    filename_cropped_smoothed_skull_data = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Uses one of two functions to crop and smooth the skull based on
     % a parameter set in the config file
@@ -174,10 +185,10 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         if ~strcmp(parameters.simulation_medium, 'layered')
             [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
-            smooth_and_crop_skull(segmented_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
+            smooth_and_crop_skull(segmented_img_rr, bone_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
         else
             [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
-            smooth_and_crop_layered(segmented_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
+            smooth_and_crop_layered(segmented_img_rr, bone_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
         end
 
         % Combines the matrix that defined the alignment with the transducer
