@@ -62,19 +62,27 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         parameters.results_filename_affix = sanitized_affix;
     end
 
-    % Create and use subfolders
-    if isfield(parameters,'output_subfolder') && parameters.output_subfolder == 1
-        output_dir = (sprintf('%ssub-%03d/', parameters.data_path, subject_id));
-        if ~exist(output_dir, 'file' )
+    % Set output directory
+    if isfield(parameters,'output_location') && startsWith(parameters.output_location, '/') || startsWith(parameters.output_location, '\')
+        output_dir = fullfile(parameters.output_location);
+    elseif isfield(parameters,'output_location')
+        output_dir = fullfile(parameters.data_path, parameters.output_location);
+    else
+        output_dir = fullfile(parameters.data_path, 'sim_outputs/');
+    end
+    
+    % Make subfolder (if enabled) and check if directory exists
+    if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
+        output_dir = sprintf('%ssub-%03d/', output_dir, subject_id);
+        if ~isfolder(output_dir)
             mkdir(output_dir);
         end
     else
-        output_dir = fullfile(parameters.data_path, 'sim_outputs/');
-        if ~exist(output_dir, 'file')
-            mkdir(output_dir)
+        if ~isfolder(output_dir)
+            mkdir(output_dir);
         end
     end
-    
+        
     % save parameters to have a backlog
     parameters_file = fullfile(output_dir,sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
     save(parameters_file, 'parameters')

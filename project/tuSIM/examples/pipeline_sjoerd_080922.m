@@ -1,4 +1,4 @@
-clc, clear, close all
+%clc, clear, close all
 
 % Delete if you have rights to add paths to Matlab
 cd /home/mrphys/kenvdzee/Documents/
@@ -15,9 +15,8 @@ addpath(genpath('toolboxes'))
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
 % Set config files and export location
-config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
-config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
-output_location = '250KHz/40W per cm2/';
+config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
+config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
 
 overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
@@ -34,10 +33,10 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-%subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
 %subject_list = [8,14]; % Thickest skulls
 %subject_list = [3, 17]; % Most permissable skulls
-subject_list = [8];
+%subject_list = [8];
 
 correctly_named_transducers = [1, 5, 14];
 
@@ -99,7 +98,6 @@ for subject_id = subject_list
     % Loading parameters
     parameters = load_parameters(config_left_transducer);
     parameters.overwrite_files = overwrite_option;
-    parameters.output_location = output_location;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
@@ -117,7 +115,6 @@ for subject_id = subject_list
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);
     parameters.overwrite_files = overwrite_option;
-    parameters.output_location = output_location;
     
     % Select 'layered' when simulating the transmission in a skull
     parameters.simulation_medium = 'layered';
