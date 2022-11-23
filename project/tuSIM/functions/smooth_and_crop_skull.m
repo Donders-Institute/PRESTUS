@@ -13,12 +13,12 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
     % Smoothes the skull, meaning that it removes the differentiation
     % between gray and white matter for the simulations.
     windowSize = 4;
-    skull_mask_smoothed = smooth_img(skull_mask_smoothed, windowSize, parameters.skull_smooth_threshold);
+    skull_mask_smoothed = smooth_img(skull_mask_unsmoothed, windowSize, parameters.skull_smooth_threshold);
     
     % add a boundary of the bone mask to fill in potential gaps
     bone_img_smoothed = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
     
-    bone_perimeter = bone_img_smoothed - imerode(bone_img_smoothed, strel('sphere',1));
+    bone_perimeter = bone_img_smoothed - imerode(bone_img_smoothed, strel('cube',3));
     skull_mask_smoothed = skull_mask_smoothed | bone_perimeter;
 
 

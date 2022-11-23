@@ -7,7 +7,6 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     % Creates an empty grid the size of the segmented image
     smoothed_segmented_img = zeros(size(segmented_img));
     labels = fieldnames(parameters.layer_labels);
-    
     % Adds a smoothing threshold to bone and other non-water tissue.
     
     for label_i = 1:length(labels)
@@ -31,7 +30,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         skull_i = find(strcmp(labels,  'skull'));
         skull = smoothed_segmented_img==skull_i;
         smoothed_bone_img = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
-        bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('sphere',1));
+        bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('cube',3));
         new_skull = skull | bone_perimeter;
         figure;
         montage({squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, squeeze(bone_perimeter(:,focus_pos_upsampled_grid(2),:))*255, squeeze(new_skull(:,focus_pos_upsampled_grid(2),:))*255},gray, 'Size',[1 3])
@@ -154,5 +153,10 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     title('Cropped, padded, & smoothed (left) and original (right) segmented mask')
     export_fig(output_plot, '-native')
 
+    skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
+    niftiwrite(uint8(smoothed_segmented_img==find(strcmp(labels,'skull'))), skull_mask_file ,'Compressed', 1);
+    segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
+    niftiwrite(uint8(smoothed_segmented_img), segmented_file  ,'Compressed', 1);
+    
 end
 

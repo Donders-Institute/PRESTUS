@@ -147,7 +147,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
         % Saves the output according to the naming convention set in the
         % beginning of this section
-        save(filename_reoriented_scaled_data, 'segmented_img_rr', 'trans_pos_upsampled_grid', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr');
+        save(filename_reoriented_scaled_data, 'segmented_img_rr', 'trans_pos_upsampled_grid', 'bone_img_rr', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr');
     else 
         load(filename_reoriented_scaled_data);
     end
