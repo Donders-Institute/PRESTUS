@@ -63,10 +63,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Set output directory
-    if isfield(parameters,'output_location') && startsWith(parameters.output_location, '/') || startsWith(parameters.output_location, '\')
-        output_dir = fullfile(parameters.output_location);
-    elseif isfield(parameters,'output_location')
-        output_dir = fullfile(parameters.data_path, parameters.output_location);
+    if isfield(parameters,'output_location')
+        javaFileObj = java.io.File(parameters.output_location); % check if the path is absolute
+        if javaFileObj.isAbsolute()
+            output_dir = fullfile(parameters.output_location);
+        else
+            output_dir = fullfile(parameters.data_path, parameters.output_location);
+        end
     else
         output_dir = fullfile(parameters.data_path, 'sim_outputs/');
     end
