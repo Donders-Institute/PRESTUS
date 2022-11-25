@@ -44,7 +44,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI(final
             img_mni = tformarray(final_img, final_to_mni_tform, ...
                         makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], mni_template_size, [], 0);
 
-            niftiwrite(img_mni, options.nifti_filename, 'Compressed', true);
+            niftiwrite(img_mni, regexprep(options.nifti_filename, '.nii.gz$', ''), 'Compressed', true);
         else
             img_mni = niftiread(options.nifti_filename);
         end
