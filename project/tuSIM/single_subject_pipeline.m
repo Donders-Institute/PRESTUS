@@ -55,44 +55,23 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
 
-    % Sanitize output file affix
-    sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
-    if ~strcmp(sanitized_affix, parameters.results_filename_affix)
-        fprintf('The original `results_filename_affix` was sanitized, "%s" will be used instead of "%s"\n', sanitized_affix, parameters.results_filename_affix)
-        parameters.results_filename_affix = sanitized_affix;
-    end
-
-    % Set output directory
-    if isfield(parameters,'output_location')
-        javaFileObj = java.io.File(parameters.output_location); % check if the path is absolute
-        if javaFileObj.isAbsolute()
-            output_dir = fullfile(parameters.output_location);
-        else
-            output_dir = fullfile(parameters.data_path, parameters.output_location);
-        end
-    else
-        output_dir = fullfile(parameters.data_path, 'sim_outputs/');
-    end
     
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        output_dir = sprintf('%ssub-%03d/', output_dir, subject_id);
-        if ~isfolder(output_dir)
-            mkdir(output_dir);
-        end
-    else
-        if ~isfolder(output_dir)
-            mkdir(output_dir);
-        end
+        parameters.output_dir = sprintf('%ssub-%03d/', parameters.output_dir, subject_id);
     end
-        
+    
+    if ~isfolder(parameters.output_dir)
+        mkdir(parameters.output_dir);
+    end        
+    
     % save parameters to have a backlog
-    parameters_file = fullfile(output_dir,sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
+    parameters_file = fullfile(parameters.output_dir, sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
     save(parameters_file, 'parameters')
     
     % Add subject_id and output_dir to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
-    parameters.output_dir = output_dir;
+    
     
     
     %% Start of simulations

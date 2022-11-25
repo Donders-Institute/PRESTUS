@@ -56,4 +56,24 @@ function parameters = load_parameters(varargin)
     if ~isfield(parameters,'default_grid_dims')
         parameters.default_grid_dims = repmat(parameters.default_grid_size, [1 parameters.n_sim_dims]);
     end
+    
+        % Sanitize output file affix
+    sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
+    if ~strcmp(sanitized_affix, parameters.results_filename_affix)
+        fprintf('The original `results_filename_affix` was sanitized, "%s" will be used instead of "%s"\n', sanitized_affix, parameters.results_filename_affix)
+        parameters.results_filename_affix = sanitized_affix;
+    end
+
+    % Set output directory
+    if isfield(parameters,'output_location')
+        javaFileObj = java.io.File(parameters.output_location); % check if the path is absolute
+        if javaFileObj.isAbsolute()
+            parameters.output_dir = fullfile(parameters.output_location);
+        else
+            parameters.output_dir = fullfile(parameters.data_path, parameters.output_location);
+        end
+    else
+        parameters.output_dir = fullfile(parameters.data_path, 'sim_outputs/');
+    end
+
 end
