@@ -8,6 +8,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI(final
         options.nifti_filename = ''
         options.nifti_data_type = 'single'
         options.BitsPerPixel = []
+        options.fill_value = 0
     end
 
     mni_header = niftiinfo(fullfile(headreco_folder, 'toMNI/T1fs_nu_12DOF_MNI.nii.gz'));
@@ -42,7 +43,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI(final
         img_mni_hdr.BitsPerPixel = options.BitsPerPixel;
         if confirm_overwriting(options.nifti_filename, parameters)
             img_mni = tformarray(final_img, final_to_mni_tform, ...
-                        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], mni_template_size, [], 0);
+                        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], mni_template_size, [], options.fill_value);
 
             niftiwrite(img_mni, regexprep(options.nifti_filename, '.nii.gz$', ''), 'Compressed', true);
         else
