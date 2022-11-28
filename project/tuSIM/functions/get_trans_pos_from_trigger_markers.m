@@ -1,4 +1,11 @@
 function [transducer_pos target_pos] = get_trans_pos_from_trigger_markers(trigger_markers_file, trigger_index, reference_to_transducer_distance, reference_to_target_distance )
+    
+    % Finds the position of the transducer and target based on the provided
+    % localite trigger marker files.
+    % Assumes that the center of the radius of the transducer is the target
+    %   Meaning that a mask should be loaded in separately to perform
+    %   calculations on simulation results in your actual target
+
     arguments
     trigger_markers_file
     trigger_index
