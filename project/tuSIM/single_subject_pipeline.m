@@ -412,7 +412,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         
         headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
         heating_data_mni_file = fullfile(parameters.output_dir,sprintf('sub-%03d_heating_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
-        convert_final_to_MNI(maxT, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', heating_data_mni_file);
+        convert_final_to_MNI(maxT, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', heating_data_mni_file, 'fill_value', parameters.thermal.temp_0);
 
     end
     
