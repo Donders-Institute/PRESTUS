@@ -89,6 +89,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             skull_edge = [];
             trans_pos_final = [];
             focus_pos_final = [];
+            final_transformation_matrix = [];
+            inv_final_transformation_matrix = [];
             return;
         end
     end
