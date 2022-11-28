@@ -22,6 +22,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         options.tick_labels = []
         options.segmented_img = []
         options.bg_range = []
+        options.overlay_segmented = 0
 
         
     end
@@ -82,6 +83,10 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     end
     
     bg_slice = squeeze(bg_image(slice_x, slice_y, slice_z));
+    if ~isempty(options.segmented_img)
+        segmented_slice = squeeze(options.segmented_img(slice_x, slice_y, slice_z));
+    end
+    
     if (~isempty(options.segmented_img) && all(options.segmented_img == bg_image,'all')) || (isinteger(bg_image) && max(bg_image(:))< 12)
         bg_slice = mat2gray(bg_slice);
         bg_min =  min(bg_slice(:));
@@ -92,9 +97,8 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
             bg_min = options.bg_range(1);
             bg_max = options.bg_range(2);
         elseif ~isempty(options.segmented_img)
-            segmented_img_slice = squeeze(options.segmented_img(slice_x, slice_y, slice_z));
             %bg_slice(segmented_img_slice==0) = 0;
-            bg_slice_brain = bg_slice(segmented_img_slice>0&segmented_img_slice<3);
+            bg_slice_brain = bg_slice(segmented_slice>0&segmented_slice<3);
             bg_min =  min(bg_slice_brain(:));
             bg_max =  max(bg_slice_brain(:));
             %bg_slice(bg_slice>0) = rescale(bg_slice(bg_slice>0), 'InputMin', bg_min, 'InputMax', bg_max);
@@ -105,7 +109,9 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
 
         bg_slice = mat2gray(bg_slice, double([bg_min, bg_max]));
     end
-    transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
+    if ~isempty(trans_pos)
+        transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
+    end
     %before_exit_plane_mask = ~squeeze(after_exit_plane_mask(slice_x, slice_y, slice_z));
     Isppa_map = gather(squeeze(Isppa_map(slice_x, slice_y, slice_z)));
     %Isppa_map(Isppa_map<=0.5) = 0;
@@ -121,8 +127,12 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         max_isppa_pos = round(R*double(max_isppa_pos'));
         Isppa_map = imrotate(Isppa_map, options.rotation);
         bg_slice = imrotate(bg_slice, options.rotation);
-        transducer_bowl = imrotate(transducer_bowl, options.rotation);
-        
+        if options.overlay_segmented
+            segmented_slice = imrotate(segmented_slice, options.rotation);
+        end
+        if ~isempty(trans_pos)
+            transducer_bowl = imrotate(transducer_bowl, options.rotation);
+        end
         
     end
         
@@ -173,9 +183,17 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
 
         plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
     end
+    
+    if options.overlay_segmented
+        ax3 = axes;
+        imagesc(ax3, segmented_slice,'alphadata', 0.3);
+        axis image;
+        axis off;
+
+    end
+    
     ax2 = axes;
-    
-    
+        
     if options.use_isppa_alpha
         isppa_alpha = rescale(Isppa_map, 'InputMin', options.isppa_threshold_low, 'InputMax', options.isppa_threshold_high);
     else
