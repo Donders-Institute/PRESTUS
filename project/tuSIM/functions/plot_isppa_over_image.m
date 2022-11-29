@@ -223,9 +223,9 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     ax1.TightInset;
     if options.show_colorbar
        C = colorbar(ax2);
-       C.Position(4) = ax1.Position(4)*0.95;
+       C.Position(4) = ax1.Position(4)*0.935;
        C.Position(2) = ax1.Position(2)+0.025;
-       C.Position(1) = ax1.Position(1)+ax1.Position(3);
+       C.Position(1) = ax1.Position(1)+ax1.Position(3)-0.03;
        C.Color = 'white';
        if ~isempty(options.ticks)
            C.Ticks = options.ticks;
@@ -237,6 +237,4 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     end
     ax2.Position = ax1.Position;
     set(gcf,'color',ax1.Children(length(ax1.Children)).CData(1,1,:));
-    
-
 end
