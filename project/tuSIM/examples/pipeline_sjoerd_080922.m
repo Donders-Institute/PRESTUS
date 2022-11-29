@@ -1,5 +1,3 @@
-%clc, clear, close all
-
 % Delete if you have rights to add paths to Matlab
 cd /home/mrphys/kenvdzee/Documents/
 addpath(genpath('SimNIBS-3.2'))
@@ -15,8 +13,10 @@ addpath(genpath('toolboxes'))
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
 % Set config files and export location
-config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
-config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
+%config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
+config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
+%config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
+config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
 
 overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
@@ -36,7 +36,6 @@ end
 subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
 %subject_list = [8,14]; % Thickest skulls
 %subject_list = [3, 17]; % Most permissable skulls
-%subject_list = [8];
 
 correctly_named_transducers = [1, 5, 14];
 
@@ -108,8 +107,6 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    %single_subject_pipeline(subject_id, parameters)
-    
     qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
     
     % Simulations for right amygdala
@@ -125,8 +122,6 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    %single_subject_pipeline(subject_id, parameters)
-    
     qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
 
 end
