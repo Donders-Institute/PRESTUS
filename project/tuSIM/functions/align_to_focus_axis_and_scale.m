@@ -1,5 +1,13 @@
 function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     align_to_focus_axis_and_scale(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
+    arguments
+        nii_image (:,:,:)
+        nii_header struct
+        trans_pos_grid (3,1)
+        focus_pos_grid (3,1)
+        scale_factor double
+        parameters struct
+    end
 
     % What we need to do is to align the focal axis with the coordinate system.
     % This is done by rotating the image so that the first two coordinates of
