@@ -1,9 +1,9 @@
-function error = phase_optimization_annulus(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
+function [error, ax1, ax2] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
   arguments
       phase
       parameters
       velocity
-      axial_position
+      axial_position % 0 is the transducer surface
       desired_intensity_curve
       plot_results = 0
       opt_limits = [1, max(axial_position)]
@@ -24,6 +24,7 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
       [flhm_center, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
       weights = normpdf(axial_position, axial_position(flhm_center_index)+0.5, axial_position(flhm_center_index)/3);
   end
+  
   weights = weights/sum(weights);
   error_v = (i_axial_oneil - desired_intensity_curve).^2.*weights;
   error_v = error_v(limit_ind);
@@ -31,7 +32,7 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
 
   if plot_results
       figure
-      subplot(1,2,1)
+      ax1 = subplot(1,2,1);
       hold on
       plot(axial_position,  i_axial_oneil )
       plot(axial_position, desired_intensity_curve)
@@ -39,7 +40,7 @@ function error = phase_optimization_annulus(phase, parameters, velocity, axial_p
       plot(axial_position, weights);
       hold off
       legend(["fitted profile","real profile","cost function","error"])
-      subplot(1,2,2)
+      ax2 = subplot(1,2,2);
       plot(axial_position(limit_ind), error_v,'-o');
       legend(["error"])
 
