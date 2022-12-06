@@ -10,9 +10,9 @@ arguments
     options.rotation = 90;
     options.plot_heating = 1
     options.outputs_suffix = ''
-    options.font_size = 64
     options.isppa_thresholds = []
     options.add_FWHM_boundary = 0
+    options.skip_missing = 0
 end
 
 assert(xor(options.plot_max_intensity,options.slice_to_plot), "You should indicate either the slice number to plot ('slice_to_plot') or ask for a max intensity plot ('plot_max_intensity')")
@@ -23,12 +23,13 @@ slice_labels = {'x','y','z'};
 bg_range_to_use = [];
 isppa_range_to_use = [5, 6];
 temp_range_to_use = [37, 37.5];    
-    
+
+full_subject_list = subject_list;
 % first pass: get background intensity at the target slice & isppa range
 % for the colorbar; also checks that the neccessary files exist
-for subject_i = 1:length(subject_list)
+for subject_i = 1:length(full_subject_list)
     
-    subject_id = subject_list(subject_i);
+    subject_id = full_subject_list(subject_i);
     if parameters.subject_subfolder
         results_prefix = sprintf('sub-%1$03d/sub-%1$03d', subject_id);
     else
@@ -49,11 +50,23 @@ for subject_i = 1:length(subject_list)
         heating_data_mni_file = fullfile(outputs_path,sprintf('%s_heating_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
         files_to_check{length(files_to_check)+1} = heating_data_mni_file;    
     end
-
+    all_files_exist = 1;
     for filename = files_to_check
-        assert(logical(exist(filename{:}, 'file')), sprintf('File does not exist: %s; quitting', filename{:}))
+        if ~exist(filename{:}, 'file')
+            if options.skip_missing
+                sprintf('File does not exist: %s; skipping this subject', filename{:})
+                subject_list(subject_i) = [];
+                all_files_exist = 0;
+                
+                break;
+            else
+                assert(logical(exist(filename{:}, 'file')), sprintf('File does not exist: %s; quitting', filename{:}))
+            end
+        end
     end
-
+    if ~all_files_exist 
+        continue;
+    end
     % get T1 in MNI space
     t1_mni = niftiread(t1_mni_file);
     t1_mni_hdr = niftiinfo(t1_mni_file);
@@ -236,40 +249,13 @@ end
 % combine individual images in a single image
 
 suffix_list = {sprintf('maxT_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix),...
-    sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)};
+    sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)
+    };
 
 for suffix_cell = suffix_list
     suffix = suffix_cell{:};
+    combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters);
     
-    if ~exist(sprintf('%stmp/', outputs_path),'dir')
-        mkdir(sprintf('%stmp/', outputs_path));
-    end
-    system(sprintf('cd "%stmp/"; rm *.png', outputs_path));
-    if parameters.subject_subfolder
-        orig_imsize = size(imread(fullfile(outputs_path, sprintf('sub-%03i/sub-%03i_%s.png', subject_list(1),subject_list(1), suffix))));
-        imarray = uint8(zeros(size(imread(fullfile(outputs_path, sprintf('sub-%03i/sub-%03i_%s.png', subject_list(end), subject_list(end), suffix))))));
-    else
-        orig_imsize = size(imread(fullfile(outputs_path, sprintf('sub-%03i_%s.png', subject_list(1),  suffix))));
-        imarray = uint8(zeros(size(imread(fullfile(outputs_path, sprintf('sub-%03i_%s.png', subject_list(end), suffix))))));
-    end
-
-    imarray = repmat(imarray, 1, 1, 1, length(subject_list));
-    for subject_i = 1:length(subject_list)
-        if parameters.subject_subfolder
-            old_name = fullfile(outputs_path, sprintf('sub-%03i/sub-%03i_%s.png', subject_list(subject_i), subject_list(subject_i), suffix));
-        else
-            old_name = fullfile(outputs_path, sprintf('sub-%03i_%s.png', subject_list(subject_i), suffix));
-        end
-        I = imread(old_name);
-        I = padarray(I, max([0 0 0; orig_imsize-size(I)],[], 1), I(1), 'pre');
-
-        I = insertText(I,[0 5],sprintf('P%02i',subject_list(subject_i)),'FontSize', options.font_size, 'BoxOpacity',0,'TextColor','white');
-        %imarray(1:size(I, 1), 1:size(I, 2), 1:size(I, 3), subject_i) = I;
-        new_name = sprintf('%stmp/%i.png', outputs_path, subject_list(subject_i));
-        imwrite(I, new_name);
-    end
-
-    system(sprintf('cd "%stmp/"; montage -background black -gravity south  -mode concatenate $(ls -1 *.png | sort -g)  ../all_%s.png', convertCharsToStrings(outputs_path), suffix));
 end
 
 fprintf('Completed, see final images in %s\n', convertCharsToStrings(outputs_path))
