@@ -1,5 +1,12 @@
 function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_layered(segmented_img, bone_img,  voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
-    
+    arguments
+        segmented_img (:,:,:)
+        bone_img (:,:,:)
+        voxel_size_mm double
+        trans_pos_upsampled_grid 
+        focus_pos_upsampled_grid
+        parameters struct
+    end
     %% split into layers of interest
     
     % Smoothing window size
@@ -134,8 +141,8 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
 
     % Moves the transducer and focus positions to the correct location in
     % the cropped grid
-    trans_pos_final = trans_pos_upsampled_grid-min_dims';
-    focus_pos_final = focus_pos_upsampled_grid-min_dims';
+    trans_pos_final = trans_pos_upsampled_grid-min_dims;
+    focus_pos_final = focus_pos_upsampled_grid-min_dims;
     
     % Creates a translation matrix for later reference
     translation_matrix = makehgtform('translate', -min_dims);
