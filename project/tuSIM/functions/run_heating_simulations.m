@@ -43,7 +43,7 @@ thermal_diff_obj = kWaveDiffusion(kgrid, kwave_medium, source, sensor, 'PlotSim'
 thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
 maxT = thermal_diff_obj.T;
 
-% Calculates the duration of a duty cycle in minutes
+% Calculates the duration of a duty cycle in seconds
 % If no on_off_step_duration is specified, a duty cycle must be
 if ~isfield(parameters.thermal,'on_off_step_duration')
     if parameters.thermal.duty_cycle > 0 && parameters.thermal.duty_cycle < 1
@@ -141,6 +141,8 @@ for trial_i = 1:parameters.thermal.n_trials
       focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
       
   end
+  
+  
 end
 
 end

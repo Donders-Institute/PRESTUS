@@ -1,5 +1,13 @@
 function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     align_to_focus_axis_and_scale(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
+    arguments
+        nii_image (:,:,:)
+        nii_header struct
+        trans_pos_grid (1, 3)
+        focus_pos_grid (1, 3)
+        scale_factor double
+        parameters struct
+    end
 
     % What we need to do is to align the focal axis with the coordinate system.
     % This is done by rotating the image so that the first two coordinates of
@@ -8,7 +16,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     % First we create the transformation (affine) matrix for the voxel array.
 
-    focal_axis = [focus_pos_grid - trans_pos_grid; 1];
+    focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
 
     % First, the transformation of matrix (3d voxel array) indices.
     % The transformation is done by two sequential rotations to align the focal
@@ -64,10 +72,10 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         [1 2 3], [1 2 3], newdims, [], 0) ;
 
     % And the new positions for the transducer and the focus can be computed
-    out_mat = round(tformfwd([trans_pos_grid focus_pos_grid]', TF));
+    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], TF));
 
-    trans_pos_new = out_mat(1,:)';
-    focus_pos_new = out_mat(2,:)';
+    trans_pos_new = out_mat(1,:);
+    focus_pos_new = out_mat(2,:);
     
     % Create plots of the original T1 image with the transducer in addition
     % to the rotated T1 image

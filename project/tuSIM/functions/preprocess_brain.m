@@ -62,6 +62,12 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         trans_pos_grid = parameters.transducer.pos_t1_grid';
         focus_pos_grid = parameters.focus_pos_t1_grid';
     end
+    
+    if size(trans_pos_grid,1)>size(trans_pos_grid, 2)
+        trans_pos_grid = trans_pos_grid';
+        focus_pos_grid = focus_pos_grid';
+    end
+
 
     % Creates and exports an unprocessed T1 slice that is oriented 
     % along the transducer's axis
@@ -89,6 +95,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             skull_edge = [];
             trans_pos_final = [];
             focus_pos_final = [];
+            final_transformation_matrix = [];
+            inv_final_transformation_matrix = [];
             return;
         end
     end
@@ -215,8 +223,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     end
 
     % If the transformation cannot be correctly reversed this will be displayed
-    backtransf_coordinates = round(tformfwd([trans_pos_final, focus_pos_final]', inv_final_transformation_matrix));
-    if ~all(all(backtransf_coordinates ==[trans_pos_grid focus_pos_grid]'))
+    backtransf_coordinates = round(tformfwd([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
+    if ~all(all(backtransf_coordinates ==[trans_pos_grid; focus_pos_grid]))
         disp('Backtransformed focus and transducer parameters differ from the original ones. Something went wrong (but note that small rounding errors could be possible.')
         disp('Original coordinates')
         disp([trans_pos_final, focus_pos_final]')

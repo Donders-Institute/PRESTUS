@@ -1,5 +1,7 @@
 clear
-% simnibs world coordinates
+%% This is the rough and poorly commented pipeline to get the optimal positions for transducers.
+% It assumes that you have already did the segmentation for your subjects in SimNIBS (can be done through the main pipeline)
+% The script uses gpuArray so run it on a CUDA-enabled machine. 
 % add paths
 addpath /project/3015999.02/andche_sandbox/simnibs/simnibs_env/lib/python3.7/site-packages/simnibs/matlab
 addpath('functions')
@@ -83,7 +85,7 @@ for subject_id = all_subjs
         % normal vector
         dist_gf_to_ep_mm = 0.5*sqrt(4*parameters.transducer.curv_radius_mm^2-max_od_mm^2);
 
-        norm_v =   (trans_pos-target)/norm(target-trans_pos);
+        norm_v = (trans_pos-target)/norm(target-trans_pos);
         geom_focus_pos = trans_pos - norm_v*(parameters.transducer.curv_radius_mm)/pixel_size;
         ex_plane_pos = geom_focus_pos+norm_v*dist_gf_to_ep_mm/pixel_size;
         max_od_grid = max(parameters.transducer.Elements_OD_mm)/pixel_size;
@@ -150,6 +152,7 @@ for subject_id = all_subjs
         outer_boundary(~inside_box) = 0;
         skin_boundary(~inside_box) = 0;
         imagesc(squeeze(skin_boundary(:,target(2),:)))
+
         % for each point, put the transducer there, oriented towards the focus, and compute the amount of
         % intersection and the average distance to the scalp
 
@@ -196,7 +199,7 @@ for subject_id = all_subjs
         tpos_pars = array2table(gather([close_enough_idx, shifted_trans_pos_coords, repmat(target,[length(close_enough_idx),1]), pdist2( shifted_trans_pos_coords, target), [prop_intersect; mean_dts; var_dts; mean_dist_skull; var_dist_skull]']),...
             'VariableNames',["idx","trans_x","trans_y","trans_z","targ_x","targ_y","targ_z","dist_to_target","prop_intersect","mean_dist_skin","var_dist_skin","mean_dist_skull", "var_dist_skull"]);
         writetable(tpos_pars, tpos_output_file, 'Delimiter',',')
-        continue
+        continue % comment this line for some extra plots of the "best" results 
 
         sort_var = var_dist_skull;
         sort_var(prop_intersect>0.1) = max(var_dist_skull)+100;
