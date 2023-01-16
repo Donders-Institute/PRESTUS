@@ -1,24 +1,29 @@
 %clc, clear, close all
 
 % Delete if you have rights to add paths to Matlab
-cd /home/mrphys/kenvdzee/Documents/
+%cd /home/mrphys/kenvdzee/Documents/
+cd /home/action/elecar/
 addpath(genpath('SimNIBS-3.2'))
-cd /home/mrphys/kenvdzee/Documents/MATLAB/
-addpath(genpath('k-wave'))
+%cd /home/mrphys/kenvdzee/Documents/MATLAB/
+cd /home/action/elecar/Documents/
+addpath(genpath('k-Wave'))
 
 % Change path to tuSIM folder
-cd /home/mrphys/kenvdzee/orca-lab/project/tuSIM
+%cd /home/mrphys/kenvdzee/orca-lab/project/tuSIM
+cd /home/action/elecar/orca-lab/project/tuSIM
 
 % add paths
 addpath('functions')
 addpath(genpath('toolboxes')) 
+%addpath /home/action/elecar/orca-lab/project/tuSIM/toolboxes
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
 % Set config files and export location
 config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
 config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
 
-overwrite_option = 'always';
+overwrite_option = 'always'; %change to never if i don't want to overwrite (if i have to stop the simulation
+%for example)
 parameters = load_parameters(config_left_transducer);
 reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
 
@@ -33,10 +38,10 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+%subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
 %subject_list = [8,14]; % Thickest skulls
 %subject_list = [3, 17]; % Most permissable skulls
-%subject_list = [8];
+subject_list = [8];
 
 correctly_named_transducers = [1, 5, 14];
 

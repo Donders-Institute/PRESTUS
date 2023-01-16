@@ -77,6 +77,8 @@ layer_labels:
   brain: [1, 2]
   skin: [5]
   skull: [4]
+  skull_cortical: [18] # check if these values are ok or they need to be the same of the value in the scan
+  skull_trabecular: [19]
 
 # These only need to be set manually if the simulations are done for water only
 # Select the desired simulation grid size (number of points per dimension)
@@ -113,6 +115,20 @@ medium:
     alpha_power_true: 1.2
     thermal_conductivity: 0.37 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 3391 # [J/kg/°C] Tissue Properties DB
+  skull_trabecular: # trabecular bone
+    sound_speed: 2300 # [m/s], ITRUST benchmarks 
+    density: 1700 # [kg/m^3], ITRUST benchmarks
+    alpha_0_true: 8 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
+    alpha_power_true: 1.2
+    thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
+    specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
+  skull_cortical: # cortical bone
+    sound_speed: 2800 # [m/s], ITRUST benchmarks 
+    density: 1850 # [kg/m^3], ITRUST benchmarks
+    alpha_0_true: 4 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
+    alpha_power_true: 1.2
+    thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
+    specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
 
 # The default frequency used to calculate the medium parameters above
 default_freq: 0.5e6 
