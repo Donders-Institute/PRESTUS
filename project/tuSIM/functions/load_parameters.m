@@ -57,7 +57,7 @@ function parameters = load_parameters(varargin)
         parameters.default_grid_dims = repmat(parameters.default_grid_size, [1 parameters.n_sim_dims]);
     end
     
-        % Sanitize output file affix
+    % Sanitize output file affix
     sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
     if ~strcmp(sanitized_affix, parameters.results_filename_affix)
         fprintf('The original `results_filename_affix` was sanitized, "%s" will be used instead of "%s"\n', sanitized_affix, parameters.results_filename_affix)

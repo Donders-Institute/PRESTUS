@@ -28,12 +28,20 @@ using_donders_hpc: 1 # are the simulations run on the HPC cluster?
 run_posthoc_water_sims: 1
 run_heating_sims: 1
 
+medium:
+  skull:
+    alpha_0_true: 8
+
 thermal:
-  duty_cycle: 0.3 # share of the stimulation duration during which the stimulation is on
-  on_off_step_duration: 0.1 # duration of the on+off cycle (e.g., with a duty cycle of 0.3 and 0.01 s time steps for simulation, the whole on+off cycle will take 0.1 s)
-  equal_steps: 1 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
+  duty_cycle: 0.3 # share of the stimulation duration during which the stimulation is on [0 to 1] (trial length = duty_cycle * stim_duration)
+  iti: 14 # [s] interval between the trials, from the start of one trial to the start of another
+  n_trials: 30 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
+  stim_duration: 1 # [s] stimulation duration within a trial
+  # Pulse repetition frequency is not used since the cooling effects between these cycles are limited
+
+  # These should only be changed if they don't meet the criteria described in "run_heating_simulations"
   sim_time_steps: 0.01 # [s] simulation time steps during the stimulation period
   post_stim_time_step_dur: 0.1 # post-stimulation (inter-trial) steps
-  stim_duration: 1 # [s] stimulation duration within a trial
-  iti: 9 # interval between the trials, from the start of one trial to the start of another [s]
-  n_trials: 6 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
+  on_off_step_duration: 0.1 # duration of the on+off cycle (e.g., with a duty cycle of 0.3 and 0.01 s time steps for simulation, the whole on+off cycle will take 0.1 s)
+  equal_steps: 0 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
+  
