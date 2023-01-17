@@ -2,7 +2,7 @@
 data_path: /project/3023001.06/Simulations/all_files_with_output/ #/home/mrphys/kenvdzee/Documents/Ernie_T1_T2
 simnibs_env_path: /home/mrphys/kenvdzee/SimNIBS-3.2/simnibs_env
 subject_subfolder: 1 # Should each participants output be stored in a separate folder?
-output_location: heating_skull/250KHz/
+output_location: /project/3023001.06/eleonora/
 
 # Structure of subfolders containing T1 and T1 images
 ## It is easier to store the subject data of each participant in an individual subfolder
