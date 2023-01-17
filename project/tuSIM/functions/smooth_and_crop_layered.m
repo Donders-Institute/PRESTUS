@@ -11,6 +11,8 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     
     % Smoothing window size
     windowSize = 4;
+    bone_img = bone_img_rr; %did I change it? i think so
+    segmented_img = segmented_img_rr; %did I change it? i think so
     % Creates an empty grid the size of the segmented image
     smoothed_segmented_img = zeros(size(segmented_img));
     labels = fieldnames(parameters.layer_labels);
@@ -34,8 +36,11 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     
     % fill gaps in the skull by using the boundary of a bone image
     if any(strcmp(labels,  'skull')) 
-        skull_i = find(strcmp(labels,  'skull'));
+        skull_i = find(strcmp(labels,  'skull')); %gives to skull_i the value 4 because it is the 4th one in labels
+        % because find finds the index of each non zero element --> where
+        % labels == 'skull'
         skull = smoothed_segmented_img==skull_i;
+        %skull is 1 when smoothed segm img == skull_i (=4) and it is 0 otherwise
         smoothed_bone_img = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
         bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('cube',3));
         new_skull = skull | bone_perimeter;
@@ -45,7 +50,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     end
     %% remove gaps between skull & skin
     if any(strcmp(labels,  'skull')) && any(strcmp(labels,  'skin'))
-        skin_i = find(strcmp(labels,  'skin'));
+        skin_i = find(strcmp(labels,  'skin')); % skin_i = 3 because skin is the 3rd elemnet in labels
         skull_i = find(strcmp(labels,  'skull'));
 
         skin = smoothed_segmented_img==skin_i;
@@ -163,7 +168,34 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
     niftiwrite(uint8(smoothed_segmented_img==find(strcmp(labels,'skull'))), skull_mask_file ,'Compressed', 1);
     segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
+    % fullfile creates a character vector containing the path of the file in the directory, so it creates the file
+    % sub-009_medium_masks_final in the directory parameters.output_dir
+    % (='/project/3023001.06/eleonora/sub-009/')
     niftiwrite(uint8(smoothed_segmented_img), segmented_file  ,'Compressed', 1);
+    % niftiwrite creates a file with the name segment_file (so
+    % sub-009_medium_masks_final in the specified directory) using the
+    % volume V uint8(smoothed_segmented_img)
+    % uint8( ) transforms the values of smoothed_segmented_img in type
+    % uint8 (8 bit = 1 byte unsigned integers)
+    
+    %% trilayer
+    
+    skull_mask = smoothed_segmented_img==find(strcmp(labels,'skull'));
+    %erosion on the skull mask
+    SE = strel("cube",6); %try 7 or similar to optimize
+    skull_mask_ero = imerode(skull_mask,SE);
+    %trilayer model of the skull with value 1 for 'cortical' bone and value 2
+    %for 'trabecular' bone
+    trilayer = skull_mask + skull_mask_ero;
+    trilayer_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_skull', parameters.subject_id));
+    niftiwrite(uint8(trilayer),trilayer_file,'Compressed',1);
+    %trilayer model of the whole head with value 5 for cortical bone and
+    %value 6 for trabecular bone (the values are according to the indeces
+    %of the labels)
+    smoothed_segmented_img = smoothed_segmented_img + trilayer;
+    trilayer_final_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_whole_head', parameters.subject_id));
+    niftiwrite(uint8(smoothed_segmented_img),trilayer_final_file,'Compressed',1);
+    
     
 end
 
