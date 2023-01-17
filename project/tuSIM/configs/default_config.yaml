@@ -189,4 +189,4 @@ code_type: matlab_gpu
 using_donders_hpc: 1
 
 # Segmentation software (current options are 'headreco' and 'charm')
-segmentation_software: charm
+segmentation_software: headreco
