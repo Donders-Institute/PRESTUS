@@ -6,7 +6,7 @@
 
 # Paths to the data location and SimNIBS environment (please use full paths)
 data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data
-simnibs_env_path: /project/3015999.02/andche_sandbox/simnibs/simnibs_env
+simnibs_bin_path: /home/visual/andche/SimNIBS/bin
 
 # Paths to T1 and T2 relative to data_path; all string substitutions will be done using subject_id
 t1_path_template: sub-%1$03d_orig_T1w.nii.gz 
@@ -171,3 +171,6 @@ code_type: matlab_gpu
 # Only use this if you are using the Donders HPC
 # If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation)
 using_donders_hpc: 1
+
+# Segmentation software (current options are 'headreco' and 'charm')
+segmentation_software: charm
