@@ -1,4 +1,4 @@
-function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
+function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1,*DATST,*TNOW1>
 %EXPORT_FIG  Exports figures in a publication-quality format
 %
 % Examples:
@@ -17,6 +17,7 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
 %   export_fig ... -p<val>
 %   export_fig ... -d<gs_option>
 %   export_fig ... -depsc
+%   export_fig ... -metadata <metaDataInfo>
 %   export_fig ... -<renderer>
 %   export_fig ... -<colorspace>
 %   export_fig ... -append
@@ -41,7 +42,7 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
 % bitmap file formats, and/or outputs a rasterized version to the workspace,
 % with the following properties:
 %   - Figure/axes reproduced as it appears on screen
-%   - Cropped borders (optional)
+%   - Cropped/padded borders (optional)
 %   - Embedded fonts (vector formats)
 %   - Improved line and grid line styles
 %   - Anti-aliased graphics (bitmap formats)
@@ -160,7 +161,6 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
 %             image (default), bitmap, emf, or pdf.
 %             Notes: Only -clipboard (or -clipboard:image, which is the same)
 %                    applies export_fig parameters such as cropping, padding etc.
-%                    Only the emf format supports -transparent background
 %             -clipboard:image  create a bitmap image using export_fig processing
 %             -clipboard:bitmap create a bitmap image as-is (no auto-cropping etc.)
 %             -clipboard:emf is vector format without auto-cropping; Windows-only
@@ -170,6 +170,10 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
 %   -depsc -  option to use EPS level-3 rather than the default level-2 print
 %             device. This solves some bugs with Matlab's default -depsc2 device
 %             such as discolored subplot lines on images (vector formats only).
+%   -metadata <metaDataInfo> - adds the specified meta-data information to the
+%             exported file (PDF format only). metaDataInfo must be either a struct
+%             or a cell array with pairs of values: {'fieldName',fieldValue, ...}.
+%             Common metadata fields: Title,Author,Creator,Producer,Subject,Keywords
 %   -update - option to download and install the latest version of export_fig
 %   -version - return the current export_fig version, without any figure export
 %   -nofontswap - option to avoid font swapping. Font swapping is automatically
@@ -346,6 +350,8 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
 % 16/03/22: (3.25) Fixed occasional empty files due to excessive cropping (issues #318, #350, #351)
 % 01/05/22: (3.26) Added -transparency option for TIFF files
 % 15/05/22: (3.27) Fixed EPS bounding box (issue #356)
+% 04/12/22: (3.28) Added -metadata option to add custom info to PDF files; fixed -clipboard export (transparent and gray-scale images; deployed apps; old Matlabs)
+% 03/01/23: (3.29) Use silent mode by default in deployed apps; suggest installing ghostscript/pdftops if required yet missing; fixed invalid chars in export filename; reuse existing figure toolbar if available
 %}
 
     if nargout
@@ -383,7 +389,7 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
     [fig, options] = parse_args(nargout, fig, argNames, varargin{:});
 
     % Check for newer version and exportgraphics/copygraphics compatibility
-    currentVersion = 3.27;
+    currentVersion = 3.29;
     if options.version  % export_fig's version requested - return it and bail out
         imageData = currentVersion;
         return
@@ -1269,11 +1275,19 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
                     import java.awt.datatransfer.DataFlavor %#ok<SIMPT>
 
                     % Get System Clipboard object (java.awt.Toolkit)
-                    cb = Toolkit.getDefaultToolkit.getSystemClipboard();
+                    cb = Toolkit.getDefaultToolkit.getSystemClipboard; % can't use () in ML6!
 
                     % Add java class (ImageSelection) to the path
                     if ~exist('ImageSelection', 'class')
-                        javaaddpath(fileparts(which(mfilename)), '-end');
+                        % Obtain the directory of the executable (or of the M-file if not deployed)
+                        %javaaddpath(fileparts(which(mfilename)), '-end');
+                        if isdeployed % Stand-alone mode
+                            [status, result] = system('path');  %#ok<ASGLU>
+                            MatLabFilePath = char(regexpi(result, 'Path=(.*?);', 'tokens', 'once'));
+                        else % MATLAB mode.
+                            MatLabFilePath = fileparts(mfilename('fullpath'));
+                        end
+                        javaaddpath(MatLabFilePath, '-end');
                     end
 
                     % Get image size
@@ -1296,7 +1310,11 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
                     imageData2 = cat(1, imageData2, alphaData2);
 
                     % Create image buffer
-                    imBuffer = BufferedImage(wd, ht, BufferedImage.TYPE_INT_RGB);
+                    % Note: contrary to print2array & screencapture, which convert
+                    % ^^^^  a Java screencaptured BufferedImage into RGBA and must
+                    %       use TYPE_INT_RGB for this, here we do the reverse and
+                    %       must use TYPE_INT_ARGB to preserve the alpha channel.
+                    imBuffer = BufferedImage(wd, ht, BufferedImage.TYPE_INT_ARGB);
                     imBuffer.setRGB(0, 0, wd, ht, typecast(imageData2(:), 'int32'), 0, wd);
 
                     % Create ImageSelection object from the image buffer
@@ -1390,18 +1408,20 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
                 fprintf(2, 'export_fig error. ');
             end
             fprintf(2, 'Please ensure:\n');
-            fprintf(2, ' * that the function you used (%s.m) version %s is from the expected location\n', mfilename('fullpath'), num2str(currentVersion));
-            paths = which(mfilename,'-all');
-            if iscell(paths) && numel(paths) > 1
-                fprintf(2, '    (you appear to have %s of export_fig installed)\n', hyperlink('matlab:which export_fig -all','multiple versions'));
-            end
+            %if ~isdeployed
+                fprintf(2, ' * that the function you used (%s.m) version %s is from the expected location\n', mfilename('fullpath'), num2str(currentVersion));
+                paths = which(mfilename,'-all');
+                if iscell(paths) && numel(paths) > 1
+                    fprintf(2, '    (you appear to have %s of export_fig installed)\n', hyperlink('matlab:which export_fig -all','multiple versions'));
+                end
+            %end
             if isNewerVersionAvailable
                 fprintf(2, ' * and that you are using the %s of export_fig (you are not: run %s to update it)\n', ...
                         hyperlink('https://github.com/altmany/export_fig/archive/master.zip','latest version'), ...
                         hyperlink('matlab:export_fig(''-update'')','export_fig(''-update'')'));
             end
             fprintf(2, ' * and that you did not made a mistake in export_fig''s %s\n', hyperlink('matlab:help export_fig','expected input arguments'));
-            if isvector(options)
+            if isvector(options)  % EPS/PDF require ghostscipt
                 if ismac
                     url = 'http://pages.uoregon.edu/koch';
                 else
@@ -1411,13 +1431,22 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
                 fprintf(2, ' * and that %s is properly installed in %s\n', ...
                         hyperlink(url,'ghostscript'), ...
                         hyperlink(['matlab:winopen(''' fileparts(fpath) ''')'], fpath));
+                if isempty(fpath)
+                    selectUtilityPath('Ghostscript',url,'Exporting to vector format (EPS, PDF etc.)');
+                    return
+                end
             end
-            try
+            try  % EPS require pdftops
                 if options.eps
+                    url = 'http://xpdfreader.com/download.html';
                     fpath = user_string('pdftops');
                     fprintf(2, ' * and that %s is properly installed in %s\n', ...
-                            hyperlink('http://xpdfreader.com/download.html','pdftops'), ...
+                            hyperlink(url,'pdftops'), ...
                             hyperlink(['matlab:winopen(''' fileparts(fpath) ''')'], fpath));
+                    if isempty(fpath)
+                        selectUtilityPath('pdftops',url,'Exporting to EPS format');
+                        return
+                    end
                 end
             catch
                 % ignore - probably an error in parse_args
@@ -1437,6 +1466,26 @@ function [imageData, alpha] = export_fig(varargin) %#ok<*STRCL1>
             fprintf(2, '\n');
         end
         rethrow(err)
+    end
+end
+
+function isOk = selectUtilityPath(utilName,url,msg)
+    isOk = false;
+    msg = [msg ' requires the ' utilName ' utility from ' url];
+    while ~isOk
+        answer = questdlg(msg,utilName,'Use local installation','Go to website','Cancel','Cancel');
+        drawnow; pause(0.01);  % avoid Matlab hang
+        switch strtok(char(answer))
+            case 'Go',  web(url,'-browser');
+            case 'Use'
+                filter = {'*.*','Executable files'};
+                title  = ['Specify the ' utilName ' executable'];
+                [fPath,fName,fExt] = uigetfile(filter,title);
+                if ~ischar(fPath), return, end
+                fName = fullfile(fPath,[fName,fExt]);
+                isOk = exist(fName,'file') && user_string('ghostscript',fName);
+            otherwise, return
+        end
     end
 end
 
@@ -1478,7 +1527,7 @@ function options = default_options()
         'invert_hardcopy', true, ...
         'format_options',  struct, ...
         'preserve_size',   false, ...
-        'silent',          false, ...
+        'silent',          isdeployed, ... %use silent mode by default in deployed
         'regexprep',       [], ...
         'toolbar',         false, ...
         'menubar',         false, ...
@@ -1615,6 +1664,19 @@ function [fig, options] = parse_args(nout, fig, argNames, varargin)
                         options.toolbar = true;
                     case 'menubar'
                         options.menubar = true;
+                    case 'metadata'
+                        % https://unix.stackexchange.com/questions/489230/where-is-metadata-for-pdf-files-can-i-insert-metadata-into-any-pdf-file
+                        % https://www.sejda.com/edit-pdf-metadata
+                        metadata = varargin{a+1};
+                        if isstruct(metadata)
+                            metadata = [fieldnames(metadata),struct2cell(metadata)]';
+                        elseif ~iscell(metadata) || ~ischar(metadata{1}) || mod(length(metadata),2)==1
+                            error('export_fig:BadOptionValue','export_fig metadata must be a struct or cell-array of name-value pairs');
+                        end
+                        metadata = cellfun(@num2str,metadata(:)','uniform',0);
+                        str = sprintf(' /%s (%s)', metadata{:});
+                        options.gs_options{end+1} = ['-c "[' str ' /DOCINFO pdfmark"'];
+                        skipNext = 1;
                     otherwise
                         try
                             wasError = false;
@@ -2132,6 +2194,7 @@ end
 function isNewerVersionAvailable = checkForNewerVersion(currentVersion)
     persistent lastCheckTime lastVersion
     isNewerVersionAvailable = false;
+    if isdeployed, return, end
     if nargin < 1 || isempty(lastCheckTime) || now - lastCheckTime > 1
         url = 'https://raw.githubusercontent.com/altmany/export_fig/master/export_fig.m';
         try
@@ -2484,8 +2547,11 @@ function addToolbarButton(hFig, options)
             error('export_fig:noFigure','not a valid GUI handle');
         end
     end
-    set(hFig,'ToolBar','figure');
-    hToolbar = findall(hFig, 'type','uitoolbar', '-depth',1);
+    hToolbar = findall(hFig,'tag','uitoolbar','-or','tag','FigureToolBar','-depth',1);
+    if isempty(hToolbar)
+        set(hFig,'ToolBar','figure');
+        hToolbar = findall(hFig,'tag','uitoolbar','-or','tag','FigureToolBar','-depth',1);
+    end
     if isempty(hToolbar)
         if ~options.silent
             warning('export_fig:noToolbar','cannot add toolbar button to the specified figure');
@@ -2549,6 +2615,7 @@ function addToolbarButton(hFig, options)
         try jButton.getComponentPeer.getComponent(1).setToolTipText(tooltip); catch, end
 
         defaultFname = get(hFig,'Name');
+        defaultFname = regexprep(defaultFname,{'[*?"<>|:/\\]'},'-');
         if isempty(defaultFname), defaultFname = 'figure'; end
         imFormats = {'pdf','eps','emf','svg','png','tif','jpg','bmp','gif'};
         for idx = 1 : numel(imFormats)
@@ -2599,6 +2666,7 @@ function addMenubarMenu(hFig, options)
     % Add the export_fig menu to the figure's menubar
     hMainMenu = uimenu(hFig, 'Text','E&xport', 'Tag','export_fig');
     defaultFname = get(hFig,'Name');
+    defaultFname = regexprep(defaultFname,{'[*?"<>|:/\\]'},'-');
     if isempty(defaultFname), defaultFname = 'figure'; end
     imFormats = {'pdf','eps','emf','svg','png','tif','jpg','bmp','gif'};
     for idx = 1 : numel(imFormats)
@@ -2633,6 +2701,7 @@ function interactiveExport(hObject, varargin)
 
     % Display a Save-as dialog to let the user select the export name & type
     defaultFname = get(hFig,'Name');
+    defaultFname = regexprep(defaultFname,{'[*?"<>|:/\\]'},'-');
     if isempty(defaultFname), defaultFname = 'figure'; end
     %formats = imformats;
     formats = {'pdf','eps','emf','svg','png','tif','jpg','bmp','gif', ...
