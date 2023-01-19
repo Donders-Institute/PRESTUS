@@ -1,4 +1,5 @@
-function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id)
+function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final,...
+    t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id)
        
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Preprocessing of structural data                 %
@@ -81,15 +82,18 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     disp('Starting segmentation...')
 
     % Defines the names for the output folder of the segmented data
-    headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
-    filename_segmented_headreco = fullfile(headreco_folder, sprintf('sub-%03d_final_contr.nii.gz', subject_id));
-
+    segmentation_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+    if strcmp(parameters.segmentation_software, 'charm')
+        filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
+    else 
+        filename_segmented = fullfile(segmentation_folder, sprintf('sub-%03d_final_contr.nii.gz', subject_id));
+    end
     % Starts the segmentation, see 'run_headreco' for more documentation
-    if confirm_overwriting(filename_segmented_headreco, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented_headreco, 'file'))
+    if confirm_overwriting(filename_segmented, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented, 'file'))
         % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
-            run_headreco(parameters.data_path, subject_id, filename_t1, filename_t2, parameters.simnibs_env_path, parameters);
-            fprintf('\nThe script will continue with other subjects in the meanwhile...\n')
+            run_segmentation(parameters.data_path, subject_id, filename_t1, filename_t2,  parameters);
+            %fprintf('\nThe script will continue with other subjects in the meanwhile...\n')
             medium_masks = [];
             segmented_image_cropped = [];
             skull_edge = [];
@@ -99,24 +103,28 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             inv_final_transformation_matrix = [];
             return;
         end
+    else
+        disp('Skipping, the file already exists, loading it instead.')
     end
 
     %% Rotate to match the stimulation trajectory
     disp('Rotating to match the focus axis...')
 
     % If the headreco process was not succesfull, it will stop preprocessing
-    assert(exist(filename_segmented_headreco,'file')>0, ...
+    assert(exist(filename_segmented,'file')>0, ...
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
-            filename_segmented_headreco, headreco_folder)
+            filename_segmented, segmentation_folder)
 
     % Defines output file location and name
     filename_reoriented_scaled_data = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_after_rotating_and_scaling%s.mat', subject_id, parameters.results_filename_affix));
 
     % Starts the process of rotating the segmented data
+    segmented_img_orig = niftiread(filename_segmented);
+    segmented_hdr_orig = niftiinfo(filename_segmented);
+
+    
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
-        segmented_img_orig = niftiread(filename_segmented_headreco);
-        segmented_hdr_orig = niftiinfo(filename_segmented_headreco);
 
         % Introduces a scaling factor based on the difference between the
         % segmented file and the original T1 file
@@ -139,17 +147,23 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
         
-        filename_bone_headreco = fullfile(headreco_folder, sprintf('bone.nii.gz', subject_id));
+        if strcmp(parameters.segmentation_software, 'charm') % create filled bone mask as charm doesn't make it itself
+            bone_img_rr = segmented_img_rr>0&(segmented_img_rr<=4|segmented_img_rr>=7);
+        else
+            filename_bone_headreco = fullfile(segmentation_folder, sprintf('bone.nii.gz', subject_id));
+    
+            bone_img = niftiread(filename_bone_headreco);
+    
+            [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
+            figure;
+            imshow(bone_img_montage)
+            title('Rotated (left) and original (right) original bone mask');
+    %         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
+            close;
 
-        bone_img = niftiread(filename_bone_headreco);
+        end
 
-        [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-        figure;
-        imshow(bone_img_montage)
-        title('Rotated (left) and original (right) original bone mask');
-%         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
-        close;
-
+        
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
 
@@ -157,13 +171,19 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         % beginning of this section
         save(filename_reoriented_scaled_data, 'segmented_img_rr', 'trans_pos_upsampled_grid', 'bone_img_rr', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr');
     else 
+        disp('Skipping, the file already exists, loading it instead.')
         load(filename_reoriented_scaled_data);
     end
 
     %% Plot the skin & skull from SimNIBS
 
     % unsmoothed skull & skin masks
-    skull_mask_unsmoothed = segmented_img_rr==4;
+    if strcmp(parameters.segmentation_software, 'charm') % create filled bone mask
+        skull_mask_unsmoothed = zeros(size(segmented_img_rr));
+        skull_mask_unsmoothed(segmented_img_rr==7|segmented_img_rr==8) = segmented_img_rr(segmented_img_rr==7|segmented_img_rr==8);
+    else
+        skull_mask_unsmoothed = segmented_img_rr==4;
+    end
     skin_mask_unsmoothed = segmented_img_rr==5;
 
     skin_slice = squeeze(skin_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:));
@@ -208,21 +228,23 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         % beginning of this section
         save(filename_cropped_smoothed_skull_data, 'medium_masks', 'skull_edge', 'segmented_image_cropped', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix','final_transformation_matrix','inv_final_transformation_matrix')
     else 
+        disp('Skipping, the file already exists, loading it instead.')
         load(filename_cropped_smoothed_skull_data);
     end    
     parameters.grid_dims = new_grid_size;
 
-    % Creates and saves a figure with the 
+    % Creates and saves a figure with the segmented brain
     imwrite(plot_t1_with_transducer(medium_masks, parameters.grid_step_mm, trans_pos_final, focus_pos_final, parameters),...
         fullfile(parameters.output_dir, sprintf('sub-%03d_%s_segmented_brain_final%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix)))
 
-    % Check that the transformations can be correctly reversed
+    % Check that the transformations are correct by inverting them and
+    % comparing to the original 
     if ~exist('inv_final_transformation_matrix','var')
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
     end
 
-    % If the transformation cannot be correctly reversed this will be displayed
+    % If the transformation cannot be correctly inverted, this will be displayed
     backtransf_coordinates = round(tformfwd([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
     if ~all(all(backtransf_coordinates ==[trans_pos_grid; focus_pos_grid]))
         disp('Backtransformed focus and transducer parameters differ from the original ones. Something went wrong (but note that small rounding errors could be possible.')
@@ -232,5 +254,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         disp(backtransf_coordinates)
         exit()
     end
+    output_plot_name = fullfile(parameters.output_dir, sprintf('sub-%03d_positioning%s.png', subject_id, parameters.results_filename_affix));
+    show_positioning_plots(segmented_img_orig, segmented_hdr_orig.PixelDimensions(1), trans_pos_grid, focus_pos_grid, ...
+        segmented_image_cropped, trans_pos_final, focus_pos_final, parameters, output_plot_filename = output_plot_name)
 
 end

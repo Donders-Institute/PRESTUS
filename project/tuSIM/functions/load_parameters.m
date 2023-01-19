@@ -13,6 +13,9 @@ function parameters = load_parameters(varargin)
             
         parameters = MergeStruct(parameters, extra_parameters);
     end
+
+    assert(parameters.interactive==0 || usejava('desktop'), 'Matlab should run in desktop mode if parameters.interactive is enabled in tuSIM config');
+
     if isfield(parameters, 'transducer')
         if ~isfield(parameters.transducer,'source_phase_rad')
             assert(isfield(parameters.transducer,'source_phase_deg'), 'Source phase should be set in transducer parameters as source_phase_rad or source_phase_deg')
@@ -56,7 +59,11 @@ function parameters = load_parameters(varargin)
     if ~isfield(parameters,'default_grid_dims')
         parameters.default_grid_dims = repmat(parameters.default_grid_size, [1 parameters.n_sim_dims]);
     end
-    
+    if parameters.run_heating_sims
+        check_thermal_parameters(parameters);
+    end
+    %% Output parameters checks
+
     % Sanitize output file affix
     sanitized_affix = regexprep(parameters.results_filename_affix,'[^a-zA-Z0-9_]','_');
     if ~strcmp(sanitized_affix, parameters.results_filename_affix)

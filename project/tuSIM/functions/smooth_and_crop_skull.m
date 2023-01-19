@@ -3,6 +3,8 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
     %% Smoothes the skull
     % Renames images from segmented_img to make script more readible
     % Unsmoothed skull & skin masks
+
+    
     skull_mask_unsmoothed = segmented_img==4;
     csf_mask = segmented_img==3;
     % csf stands for cerebrospinal fluid, we use it to crop the image along

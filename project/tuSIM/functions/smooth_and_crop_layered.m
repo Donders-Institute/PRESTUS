@@ -1,4 +1,6 @@
-function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, new_grid_dims, translation_matrix] = smooth_and_crop_layered(segmented_img, bone_img,  voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
+function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, min_dims, max_dims, ...
+    new_grid_dims, translation_matrix] = smooth_and_crop_layered(segmented_img, bone_img,  voxel_size_mm, ...
+    trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters)
     arguments
         segmented_img (:,:,:)
         bone_img (:,:,:)
@@ -11,8 +13,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     
     % Smoothing window size
     windowSize = 4;
-    bone_img = bone_img_rr; %did I change it? i think so
-    segmented_img = segmented_img_rr; %did I change it? i think so
+
     % Creates an empty grid the size of the segmented image
     smoothed_segmented_img = zeros(size(segmented_img));
     labels = fieldnames(parameters.layer_labels);
@@ -24,8 +25,11 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         end
         sim_nibs_layers = parameters.layer_labels.(labels{label_i});
         layer_mask = ismember(segmented_img, sim_nibs_layers);
-        if strcmp(labels{label_i}, 'skull')
+        if contains(labels{label_i}, 'skull')
             smooth_threshold = parameters.skull_smooth_threshold;    
+            if any(contains(labels,  'skull_cortical')) % two bone types are smoothed together later
+                continue
+            end
         else
             smooth_threshold = parameters.other_smooth_threshold;
         end
@@ -35,24 +39,49 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     end
     
     % fill gaps in the skull by using the boundary of a bone image
-    if any(strcmp(labels,  'skull')) 
-        skull_i = find(strcmp(labels,  'skull')); %gives to skull_i the value 4 because it is the 4th one in labels
-        % because find finds the index of each non zero element --> where
-        % labels == 'skull'
+
+    if any(contains(labels,  'skull_cortical'))  
+        skull_i = find(strcmp(labels,  'skull_cortical')); % gives to skull_i the index of skull_cortical in labels array
+
+        % combine all skull masks for smoothing
+        % 1) find all skull_layer ids
+        all_skull_ids = [];
+        for label_i = find(contains(labels,  'skull'))'
+            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
+        end
+        layer_mask = ismember(segmented_img, all_skull_ids);
+        smooth_threshold = parameters.skull_smooth_threshold;
+        layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
+        smoothed_segmented_img(layer_mask_smoothed~=0) = skull_i; % add it to image as cortical bone
+        trabecular_i = find(strcmp(labels,  'skull_trabecular'));
+        trabecular_mask = ismember(segmented_img, parameters.layer_labels.(labels{trabecular_i}));
+        trabecular_mask_smoothed = smooth_img(trabecular_mask, windowSize, smooth_threshold);
+        smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_i;
+
+    else
+        skull_i = find(strcmp(labels,  'skull')); % gives to skull_i the index of skull in labels array, because find finds the index of each non zero element --> where labels == 'skull'
+    end
+
+    imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    title('Original (left) and smoothed (right) segmented image')
+    export_fig(output_plot, '-native')
+
+    if any(contains(labels,  'skull'))        
         skull = smoothed_segmented_img==skull_i;
-        %skull is 1 when smoothed segm img == skull_i (=4) and it is 0 otherwise
+        % skull is 1 when smoothed segm img == skull_i (=4 by default in headreco) and it is 0 otherwise
         smoothed_bone_img = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
         bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('cube',3));
         new_skull = skull | bone_perimeter;
         figure;
-        montage({squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, squeeze(bone_perimeter(:,focus_pos_upsampled_grid(2),:))*255, squeeze(new_skull(:,focus_pos_upsampled_grid(2),:))*255},gray, 'Size',[1 3])
+        montage({squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, ...
+            squeeze(bone_perimeter(:,focus_pos_upsampled_grid(2),:))*255, squeeze(new_skull(:,focus_pos_upsampled_grid(2),:))*255},gray, 'Size',[1 3])
         smoothed_segmented_img(new_skull) = skull_i;
     end
     %% remove gaps between skull & skin
-    if any(strcmp(labels,  'skull')) && any(strcmp(labels,  'skin'))
-        skin_i = find(strcmp(labels,  'skin')); % skin_i = 3 because skin is the 3rd elemnet in labels
-        skull_i = find(strcmp(labels,  'skull'));
-
+    if any(contains(labels,  'skull')) && any(strcmp(labels,  'skin'))
+        skin_i = find(strcmp(labels,  'skin')); % skin_i = 3 because skin is the 3rd element in labels [by default]
+        
         skin = smoothed_segmented_img==skin_i;
         skull = smoothed_segmented_img==skull_i;
         
@@ -68,11 +97,14 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         biggestBlob = ismember(labeledImage, sortIndexes(2));
 
         smoothed_segmented_img((skin_skull_filled-skin_skull -  biggestBlob)>0) = skull_i;
+        if any(contains(labels,  'skull_cortical'))  
+        smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_i; % makes sure that the trabecular mask is not affected
+        end
     end
     
     % Shows the segmented figures before and after smoothing side-by-side
     imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_closing_gaps%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     title('Original (left) and smoothed (right) segmented image')
     export_fig(output_plot, '-native')
 
@@ -133,12 +165,12 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         smoothed_segmented_img = padarray(smoothed_segmented_img, pad_amount,0,'post');        
     end
 
-    % Crops the figure
+    % Crops the processed segmented image
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
-    skull_edge = edge3(smoothed_segmented_img==find(strcmp(labels,'skull')), 'approxcanny',0.1);
+    skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
 
-    % Crops the segmented figure
+    % Crops the original segmented image in the same wave as processed one
     segmented_image_cropped = segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
 
     % Saves the skull mask in the parameters structure as the new grid dimensions
@@ -166,7 +198,12 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     export_fig(output_plot, '-native')
 
     skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
-    niftiwrite(uint8(smoothed_segmented_img==find(strcmp(labels,'skull'))), skull_mask_file ,'Compressed', 1);
+    skull_mask = zeros(size(smoothed_segmented_img));
+    for layer_i = find(contains(labels,  'skull'))'
+        i = smoothed_segmented_img==layer_i; % which voxels contain skull
+        skull_mask(i) = smoothed_segmented_img(i);
+    end
+    niftiwrite(uint8(skull_mask), skull_mask_file ,'Compressed', 1);
     segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
     % fullfile creates a character vector containing the path of the file in the directory, so it creates the file
     % sub-009_medium_masks_final in the directory parameters.output_dir
@@ -180,21 +217,21 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     
     %% trilayer
     
-    skull_mask = smoothed_segmented_img==find(strcmp(labels,'skull'));
-    %erosion on the skull mask
-    SE = strel("cube",6); %try 7 or similar to optimize
-    skull_mask_ero = imerode(skull_mask,SE);
-    %trilayer model of the skull with value 1 for 'cortical' bone and value 2
-    %for 'trabecular' bone
-    trilayer = skull_mask + skull_mask_ero;
-    trilayer_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_skull', parameters.subject_id));
-    niftiwrite(uint8(trilayer),trilayer_file,'Compressed',1);
-    %trilayer model of the whole head with value 5 for cortical bone and
-    %value 6 for trabecular bone (the values are according to the indeces
-    %of the labels)
-    smoothed_segmented_img = smoothed_segmented_img + trilayer;
-    trilayer_final_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_whole_head', parameters.subject_id));
-    niftiwrite(uint8(smoothed_segmented_img),trilayer_final_file,'Compressed',1);
+%     skull_mask = smoothed_segmented_img==find(strcmp(labels,'skull'));
+%     %erosion on the skull mask
+%     SE = strel("cube",6); %try 7 or similar to optimize
+%     skull_mask_ero = imerode(skull_mask,SE);
+%     %trilayer model of the skull with value 1 for 'cortical' bone and value 2
+%     %for 'trabecular' bone
+%     trilayer = skull_mask + skull_mask_ero;
+%     trilayer_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_skull', parameters.subject_id));
+%     niftiwrite(uint8(trilayer),trilayer_file,'Compressed',1);
+%     %trilayer model of the whole head with value 5 for cortical bone and
+%     %value 6 for trabecular bone (the values are according to the indeces
+%     %of the labels)
+%     smoothed_segmented_img = smoothed_segmented_img + trilayer;
+%     trilayer_final_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_whole_head', parameters.subject_id));
+%     niftiwrite(uint8(smoothed_segmented_img),trilayer_final_file,'Compressed',1);
     
     
 end

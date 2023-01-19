@@ -12,10 +12,27 @@ simnibs_bin_path: /home/visual/andche/SimNIBS/bin
 t1_path_template: sub-%1$03d_orig_T1w.nii.gz 
 t2_path_template: sub-%1$03d_orig_T2w.nii.gz
 
-# select which medium setup to use: 'water', 'water_and_skull', 'layered', 'brain' or 'brain_and_skull'
-# (the latter two assume "brain" parameters everywhere, also outside of brain)
-simulation_medium: water_and_skull
+# select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+simulation_medium: layered
 
+# Labels for layered simulation, assuming for now the SimNIBS masks indices;
+# Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
+# This labeling scheme assumes the outputs of charm in SimNIBS
+layer_labels:  
+  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be water
+  brain: [1, 2]
+  skin: [5]
+  skull_cortical: [7] 
+  skull_trabecular: [8]
+# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
+
+# If you are using headreco, those are the labels you probably want. 
+# layer_labels:  
+#  water: [0, 6, 7, 8]
+#  brain: [1, 2]
+#  skin: [5]
+#  skull: [4]
+  
 # Parameters differ for each transducer and can be obtained from the manufacturer
 transducer:
   n_elements: 4 # Number of elements in the transducer
@@ -69,16 +86,6 @@ reference_transducer_distance_mm: 15 # (can only be used wit the function 'trans
 
 # Grid resolution (must be isotropic) 
 grid_step_mm: 0.5  # [mm]
-
-# Labels for layered simulation, assuming for now the SimNIBS masks indices;
-# Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
-layer_labels:  
-  water: [0, 6, 7, 8]
-  brain: [1, 2]
-  skin: [5]
-  skull: [4]
-  skull_cortical: [18] # check if these values are ok or they need to be the same of the value in the scan
-  skull_trabecular: [19]
 
 
 # These only need to be set manually if the simulations are done for water only
@@ -189,4 +196,8 @@ code_type: matlab_gpu
 using_donders_hpc: 1
 
 # Segmentation software (current options are 'headreco' and 'charm')
-segmentation_software: headreco
+segmentation_software: charm
+
+# An optional path to LD_LIBRARY used during SimNIBS installation
+# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
+ld_library_path: /opt/gcc/7.2.0/lib64

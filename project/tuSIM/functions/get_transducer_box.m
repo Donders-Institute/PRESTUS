@@ -2,7 +2,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
     arguments
         trans_pos (1, 2)
         focus_pos (1, 2)
-        grid_step (1,1)
+        grid_step (1,1) % grid step in mm
         parameters struct
         plot = 1
     end

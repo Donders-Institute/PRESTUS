@@ -7,7 +7,8 @@ addpath('functions')
 addpath(genpath('toolboxes')) 
 addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
 
-parameters = load_parameters('bob_config_opt_CTX250-011_64.5mm.yaml');
+%parameters = load_parameters('bob_config_opt_CTX250-011_64.5mm.yaml');
+parameters = load_parameters('_config_opt_CTX250-011_64.5mm.yaml');
 transducer_thickness = parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm; % from the transducer specifications
 
 %% load the real acoustic profile
@@ -117,8 +118,8 @@ good_positions = good_positions(good_positions.realistic_position == 2,:)
 good_positions.full_idx = strrep(good_positions.all,'_positioning_bob','')
 all_targets = fieldnames(mni_targets);
 all_subjs = [3,4,8,9,10];
-all_subjs = [4]
-all_targets = all_targets(4)
+%all_subjs = [4]
+%all_targets = all_targets(4)
 
 for subject_id = all_subjs
 
@@ -163,8 +164,9 @@ for subject_id = all_subjs
         end
         
         tppf_filtered.full_idx = arrayfun(@(i) sprintf('%03d_%s_%i',subject_id,target,tppf_filtered.idx(i)), 1:length(tppf_filtered.idx), 'UniformOutput', false)';
-        tppf_filtered = tppf_filtered(tppf_filtered.idx == 12592136,:)
+        %tppf_filtered = tppf_filtered(tppf_filtered.idx == 12592136,:)
         tppf_filtered = tppf_filtered(ismember(tppf_filtered.full_idx, good_positions.full_idx),:)
+        do_positioning_plots = 0;
 
         for cur_trans_pos_idx = 1:size(tppf_filtered,1)
             %fprintf('Transducer position: %i\n', cur_trans_pos_idx )
@@ -177,58 +179,59 @@ for subject_id = all_subjs
         parameters.expected_focal_distance_mm = best_trans_pos.dist_to_target*pixel_size;
         parameters.results_filename_affix = sprintf('_bob_%s_%i',target, best_trans_pos.idx);
 
-        output_plot = fullfile(output_dir,sprintf('sub-%03d_positioning%s.png', subject_id,  parameters.results_filename_affix));
-        % if exist(output_plot,'file')
-        %     continue
-        % end
-        
-        size_diff_trans_img = parameters.transducer.pos_t1_grid - size(segmented_img_orig);
-        size_diff_trans_img(size_diff_trans_img<0) = 0;
-        segmented_img_orig_new = segmented_img_orig;
-        
-        if any(size_diff_trans_img)
-            segmented_img_orig_new = padarray(segmented_img_orig, size_diff_trans_img,'post');
+        if do_positioning_plots
+            output_plot = fullfile(output_dir,sprintf('sub-%03d_positioning%s.png', subject_id,  parameters.results_filename_affix));
+            % if exist(output_plot,'file')
+            %     continue
+            % end
+
+            size_diff_trans_img = parameters.transducer.pos_t1_grid - size(segmented_img_orig);
+            size_diff_trans_img(size_diff_trans_img<0) = 0;
+            segmented_img_orig_new = segmented_img_orig;
+
+            if any(size_diff_trans_img)
+                segmented_img_orig_new = padarray(segmented_img_orig, size_diff_trans_img,'post');
+            end
+            coord_mesh_xyz = gpuArray(get_xyz_mesh(segmented_img_orig_new));
+
+            [rotated_img, trans_xyz, target_xyz, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
+                align_to_focus_axis_and_scale(segmented_img_orig_new, segmented_img_head, parameters.transducer.pos_t1_grid', parameters.focus_pos_t1_grid', 1, parameters);
+            %%
+
+            view_pos = [0,0];
+            slice_cap = [-1,0,0];
+            if parameters.transducer.pos_t1_grid(1) > size(segmented_img_orig_new,1)/2
+                view_pos = [-180, 0];
+                slice_cap = [1,0,0];
+            end
+
+            figure('Position', [200 200 1000 300]);
+
+            subplot(1,3,1)
+            show_3d_scalp(segmented_img_orig_new, parameters.focus_pos_t1_grid, parameters.transducer.pos_t1_grid, parameters, segmented_img_head.PixelDimensions(1), coord_mesh_xyz, [0 0 0], view_pos, 0)
+
+            subplot(1,3,2)
+            show_3d_scalp(segmented_img_orig_new, parameters.focus_pos_t1_grid, parameters.transducer.pos_t1_grid, parameters, pixel_size, coord_mesh_xyz, slice_cap, view_pos, 0)
+
+            TF = maketform('affine', transformation_matrix);
+
+            ax3 = subplot(1,3,3)
+
+            imagesc(squeeze(rotated_img(:,round(trans_xyz(2)),:)))
+            rectangle('Position',[target_xyz([3,1])' - 2, 4 4],...
+                      'Curvature',[0,0], 'EdgeColor','r',...
+                     'LineWidth',2,'LineStyle','-');
+
+            rectangle('Position',[trans_xyz([3,1])' - 2, 4 4],...
+                      'Curvature',[0,0], 'EdgeColor','b',...
+                     'LineWidth',2,'LineStyle','-');
+
+            line([trans_xyz(3) target_xyz(3)], [trans_xyz(1) target_xyz(1)], 'Color', 'white')
+            get_transducer_box(trans_xyz([1,3]), target_xyz([1,3]), segmented_img_head.PixelDimensions(1), parameters)
+            colormap(ax3, [0.3 0.3 0.3; lines(12)])
+
+            export_fig(output_plot, '-native')
         end
-        coord_mesh_xyz = gpuArray(get_xyz_mesh(segmented_img_orig_new));
-        
-        [rotated_img, trans_xyz, target_xyz, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
-            align_to_focus_axis_and_scale(segmented_img_orig_new, segmented_img_head, parameters.transducer.pos_t1_grid', parameters.focus_pos_t1_grid', 1, parameters);
-        %%
-
-        view_pos = [0,0];
-        slice_cap = [-1,0,0];
-        if parameters.transducer.pos_t1_grid(1) > size(segmented_img_orig_new,1)/2
-            view_pos = [-180, 0];
-            slice_cap = [1,0,0];
-        end
-            
-        figure('Position', [200 200 1000 300]);
-
-        subplot(1,3,1)
-        show_3d_scalp(segmented_img_orig_new, parameters.focus_pos_t1_grid, parameters.transducer.pos_t1_grid, parameters, segmented_img_head.PixelDimensions(1), coord_mesh_xyz, [0 0 0], view_pos, 0)
-
-        subplot(1,3,2)
-        show_3d_scalp(segmented_img_orig_new, parameters.focus_pos_t1_grid, parameters.transducer.pos_t1_grid, parameters, pixel_size, coord_mesh_xyz, slice_cap, view_pos, 0)
-
-        TF = maketform('affine', transformation_matrix);
-
-        ax3 = subplot(1,3,3)
-
-        imagesc(squeeze(rotated_img(:,round(trans_xyz(2)),:)))
-        rectangle('Position',[target_xyz([3,1])' - 2, 4 4],...
-                  'Curvature',[0,0], 'EdgeColor','r',...
-                 'LineWidth',2,'LineStyle','-');
-
-        rectangle('Position',[trans_xyz([3,1])' - 2, 4 4],...
-                  'Curvature',[0,0], 'EdgeColor','b',...
-                 'LineWidth',2,'LineStyle','-');
-
-        line([trans_xyz(3) target_xyz(3)], [trans_xyz(1) target_xyz(1)], 'Color', 'white')
-        get_transducer_box(trans_xyz([1,3]), target_xyz([1,3]), segmented_img_head.PixelDimensions(1), parameters)
-        colormap(ax3, [0.3 0.3 0.3; lines(12)])
-
-        export_fig(output_plot, '-native')
-        
         
         desired_intensity = 30;
         expected_focus = parameters.expected_focal_distance_mm;
@@ -274,7 +277,7 @@ for subject_id = all_subjs
         intensity_at_expected_focus = exp_acoustic_profile(closest_point_to_exp_focus,2);
         xline(expected_focus,'b--');
         xline(exp_acoustic_profile(max_x,1),'--','Color','#7E2F8E');
-        text(expected_focus+0.5, intensity_at_expected_focus+4, sprintf('Expected focus intensity %.2f [W/cm^2] at %.1f mm (%.1f mm from the exit plane)',intensity_at_expected_focus,expected_focus, parameters.expected_focal_distance_mm-transducer_thickness),"Color",'b');
+        text(expected_focus+0.5, intensity_at_expected_focus+4, sprintf('Expected focus intensity %.2f [W/cm^2] at %.1f mm (%.1f mm from the exit plane)',intensity_at_expected_focus,expected_focus, expected_focus_rel_to_exit_plane),"Color",'b');
         [max_intensity, max_x] = max(exp_acoustic_profile(:,2));
         text(exp_acoustic_profile(max_x,1)+0.5, max_intensity+1.5, sprintf('Max intensity %.2f [W/cm^2] at %.1f mm',max_intensity,exp_acoustic_profile(max_x,1)),"Color",'#7E2F8E');
         ylim([0,max(exp_acoustic_profile(:,2))+6])
@@ -298,6 +301,10 @@ for subject_id = all_subjs
         % get maximum pressure
         p_max = gather(sensor_data.p_max_all); % transform from GPU array to normal array
 
+        parameters.transducer.pos_t1_grid = round(table2array(best_trans_pos(1,["trans_x","trans_y","trans_z"])));
+        parameters.focus_pos_t1_grid = round(table2array(best_trans_pos(1,["targ_x","targ_y","targ_z"])));
+        parameters.expected_focal_distance_mm = best_trans_pos.dist_to_target*pixel_size;
+        parameters.results_filename_affix = sprintf('_bob_%s_%i',target, best_trans_pos.idx);
 
         %% 
         % Then, we can compare the simulated pressure along the focal axis and the pressure 
@@ -332,7 +339,8 @@ for subject_id = all_subjs
         xlabel('Axial Position [mm]');
         ylabel('Intensity [W/cm^2]');
         hold on
-        plot(axial_position_sim_grid-(parameters.transducer.pos_grid(3))*parameters.grid_step_mm, pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
+        plot(axial_position_sim_grid-(parameters.transducer.pos_grid(3))*parameters.grid_step_mm, ...
+            pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
         plot(exp_acoustic_profile(:,1),exp_acoustic_profile(:,2))
         hold off
         xline(parameters.expected_focal_distance_mm, '--');
@@ -387,23 +395,24 @@ for subject_id = all_subjs
             parameters.medium.water.density, (axial_position-0.5)*1e-3);
 
         figure('Position', [10 10 900 500]);
-        plot(axial_position, p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+        plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+        hold on
+        plot(exp_acoustic_profile(:,1),exp_acoustic_profile(:,2))
         xlabel('Axial Position [mm]');
         ylabel('Intensity [W/cm^2]');
-        hold on
-        plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
-        plot(exp_acoustic_profile(:,1),exp_acoustic_profile(:,2))
         hold off
         xline(parameters.expected_focal_distance_mm, '--');
         yline(desired_intensity, '--');
-        legend('Original', sprintf('Optimized to match the real profile'),'Real profile')
+        legend( sprintf('Optimized to match the real profile'),'Real profile')
         title('Pressure along the beam axis')
 
         fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',axial_position(p_axial_oneil_opt==max(p_axial_oneil_opt)))
         %fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', get_flhm_center_position(axial_position, p_axial_oneil_opt))
+        parameters.results_filename_affix = sprintf('_bob_%s_%i',target, best_trans_pos.idx);
 
         output_plot = fullfile(output_dir,sprintf('sub-%03d_fitted_acoustic_profile%s.png', subject_id,  parameters.results_filename_affix));
         export_fig(output_plot, '-native')
+        continue
 
 
         %% Double-check in the water
