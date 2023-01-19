@@ -11,7 +11,7 @@ function alpha_db_cm = get_alpha_coeff(medium, freq)
 %     alpha_db_m = 20 * log10(exp(1)) * alpha_np_m; % [db / MHz m]
 %     alpha_db_cm = alpha_db_m  / 100 % [db / MHz cm]
 %     
-    % assuming linear scaling from ITRUSST parameters
+%     assuming linear scaling from ITRUSST parameters
     medium = load_parameters().medium.(medium);
     alpha_db_cm = medium.alpha_0_true*((freq/1e6).^medium.alpha_power_true);   
 end

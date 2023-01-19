@@ -1,4 +1,4 @@
-function show_3d_scalp(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz, crop_at_target, view_angle, open_figure)
+function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz, crop_at_target, view_angle, open_figure)
 arguments
     segmented_img (:,:,:) 
     target_xyz (1,3)
@@ -65,8 +65,11 @@ end
 
 for_caps = segmented_img_to_plot;
 for_caps(for_caps>4) = 0;
-
-Ds = smooth3(gpuArray(double(segmented_img_to_plot>0)));
+if gpuDeviceCount > 0 
+    Ds = smooth3(gpuArray(double(segmented_img_to_plot>0)));
+else 
+    Ds = smooth3(double(segmented_img_to_plot>0));
+end
 skin_isosurface = isosurface(Ds,0.5);
 if open_figure
     figure
@@ -108,7 +111,7 @@ ylabel('Y')
 zlabel('Z')
 original_size = original_size([2,1,3]);
 if any(origin_shift)
-    axis(reshape([-origin_shift ; -origin_shift + original_size ], [1 6]))
+    axis(reshape([-origin_shift ; -origin_shift + original_size ], [1 6]));
 end
 if view_angle(1) < 0
     camlight right

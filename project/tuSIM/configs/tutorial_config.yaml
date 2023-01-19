@@ -1,7 +1,7 @@
-data_path: /home/mrphys/kenvdzee/Documents/Ernie_T1_T2
+data_path: /project/3015999.02/andche_sandbox/simnibs_examples/ernie/org # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
 
-t1_path_template: sub-%1$03d_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
-t2_path_template: sub-%1$03d_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
 
 transducer: 
   n_elements: 4 # number of elements in the transducer
@@ -26,13 +26,5 @@ thermal:
   iti: 1.2 # interval between the trials, from the start of one trial to the start of another [s]
   n_trials: 12 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
 
-grid_step_mm: 0.5
 
-use_kWaveArray: 0
-
-run_heating_sims: 1
-
-# optional affix for result files names
-
-skull_smooth_threshold: 0.15 # lower than the default threshold for skull cropping since otherwise there are gaps in the skull appearing
 

@@ -13,7 +13,9 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_by_time%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     % assuming that transducer and focus are aligned the z-axis
     % transducer_plane_final_temperature = squeeze(kwaveDiffusion.T(:, new_transducer_pos(2), :));
-    
+    if gpuDeviceCount==0
+        focal_planeT = gather(focal_planeT);
+    end
     focal_axis_temperature = squeeze(focal_planeT(trans_pos(1),:,:));
     
     figure
@@ -64,5 +66,6 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     end
 
     close(v);
+    close;
     
 end

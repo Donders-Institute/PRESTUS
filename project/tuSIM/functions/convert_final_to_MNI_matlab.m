@@ -1,4 +1,4 @@
-function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI(final_img, headreco_folder, inv_final_transformation_matrix, parameters, options)
+function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matlab(final_img, headreco_folder, inv_final_transformation_matrix, parameters, options)
     arguments
         final_img(:,:,:)
         headreco_folder string

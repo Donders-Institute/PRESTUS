@@ -17,8 +17,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % - The pipeline is only able to simulate one transducer at a time, %
     % meaning that the pipeline has to be run once for each transducer  %
     % used in each subject.                                             %
-    % - Matlab 2019b must be used since k-wave was no longer updated    %
-    % for the release of Matlab 2020a onwards.                          %
+    % - Matlab 2022b must be used                                       %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -72,6 +71,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % Add subject_id and output_dir to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     
+    %% Extra settings needed for better usability
+    warning('off','MATLAB:prnRenderer:opengl'); % suppress unneccessary warnings from export_fig when running without OpenGL
     
     
     %% Start of simulations
@@ -209,6 +210,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
         
     else
+        disp('Skipping, the file already exists, loading it instead.')
         load(filename_sensor_data, 'sensor_data')
     end
 
@@ -289,7 +291,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
     end
 
-    % Plots the Isppa on the segmented figure
+    % Plots the Isppa on the segmented image
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     if parameters.n_sim_dims==3
@@ -300,52 +302,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     export_fig(output_plot, '-native')
     close;
     
-    % Plots the Isppa on the original T1 figure & in the MNI space for skull & layered mediums only
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
-
-        isppa_orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_orig_coord%s.nii.gz',...
-            subject_id, parameters.results_filename_affix));
-        
-        if confirm_overwriting(isppa_orig_file, parameters)
-            % Transforms the Isppa map to the original T1 figure dimensions and orientation
-            isppa_map_backtransf = tformarray(Isppa_map, inv_final_transformation_matrix, ...
-                                    makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
-
-            isppa_hdr = t1_header;
-            isppa_hdr.Datatype = 'single';
-
-            niftiwrite(isppa_map_backtransf, isppa_orig_file, isppa_hdr, 'Compressed', true)
-        else 
-            isppa_map_backtransf = niftiread(isppa_orig_file);
-        end
-        % Creates a visual overlay of the transducer
-        [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
-                                                    size(t1_image_orig), t1_header.PixelDimensions(1));
-
-        % Plots the Isppa to fit the untransformed figure
-        plot_isppa_over_image(isppa_map_backtransf, t1_image_orig, source_labels, ...
-            parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
-            backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
-        output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa_orig%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-
-        export_fig(output_plot, '-native')
-        close;
-        
-        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
-        
-        max_pressure_mni_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_pressure_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
-        isppa_map_mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_isppa_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
-        segmented_image_mni_file = fullfile(parameters.output_dir, sprintf('sub-%03d_segmented_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
-
-        isppa_map_mni = convert_final_to_MNI(Isppa_map, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', isppa_map_mni_file);
-        segmented_image_mni = convert_final_to_MNI(segmented_image_cropped, headreco_folder, inv_final_transformation_matrix,  parameters, 'nifti_filename', segmented_image_mni_file, 'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
-        max_pressure_mni = convert_final_to_MNI(data_max, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', max_pressure_mni_file);
-        
-    end
 
     % Runs the heating simulation
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
+        disp('Running heating simulations')
         % Creates an output file to which output is written at a later stage
         filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
@@ -369,6 +329,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             [kwaveDiffusion, time_status_seq, maxT, focal_planeT]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
             save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','maxT','focal_planeT','-v7.3');
         else 
+            disp('Skipping, the file already exists, loading it instead.')
             load(filename_heating_data);
         end
 
@@ -379,8 +340,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         % Creates an output table for temperature readings
         output_table = readtable(output_pressure_file);
+        if gpuDeviceCount==0
+            maxT = gather(maxT);
+        end
         output_table.maxT = gather(max(maxT, [], 'all'));
-
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
@@ -403,17 +366,93 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         else
             temp_color_range = [37, max(maxT(:))];
         end
+
         maxT = gather(maxT);
         plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         export_fig(output_plot, '-native')
         close;
-        
-        
-        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
-        heating_data_mni_file = fullfile(parameters.output_dir,sprintf('sub-%03d_heating_MNI%s.nii.gz', subject_id, parameters.results_filename_affix));
-        convert_final_to_MNI(maxT, headreco_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', heating_data_mni_file, 'fill_value', parameters.thermal.temp_0);
+    end
 
+
+    % Plots the data on the original T1 image & in the MNI space for skull & layered mediums only
+    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+        backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
+
+        data_types = ["isppa","pressure","medium_masks"];
+        if  isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
+            data_types  = [data_types "heating"];
+        end
+        for data_type = data_types
+            orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                subject_id, data_type, parameters.results_filename_affix));
+            mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz', subject_id, data_type, parameters.results_filename_affix));
+
+
+            if strcmp(data_type, "isppa")
+                data = Isppa_map;
+            elseif strcmp(data_type, "pressure")
+                data = data_max;
+            elseif strcmp(data_type, "medium_masks")
+                data = medium_masks;
+            elseif strcmp(data_type, "heating")
+                data = maxT;
+            end
+            orig_file_with_ext = [orig_file '.nii.gz'];
+    
+            if confirm_overwriting(orig_file_with_ext, parameters)
+                % Transforms the data to original T1 image dimensions and orientation
+                orig_hdr = t1_header;
+
+                if strcmp(data_type, "medium_masks")
+                    data_backtransf = tformarray(uint8(data), inv_final_transformation_matrix, ...
+                                            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
+
+                    orig_hdr.Datatype = 'uint8';
+                    orig_hdr.BitsPerPixel = 8;
+                else
+                    data_backtransf = tformarray(data, inv_final_transformation_matrix, ...
+                                            makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
+                    
+                    orig_hdr = t1_header;
+                    orig_hdr.Datatype = 'single';
+                end
+                niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true)
+            else 
+                data_backtransf = niftiread(orig_file_with_ext );
+            end
+            if strcmp(data_type, "isppa")
+                % Creates a visual overlay of the transducer
+                [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
+                                                            size(t1_image_orig), t1_header.PixelDimensions(1));
+        
+                % Plots the Isppa over the untransformed image
+                plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
+                    parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
+                    backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
+        
+                output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_orig%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
+                export_fig(output_plot, '-native')
+                close;
+            end
+            m2m_folder= fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+            
+                
+            if ~confirm_overwriting(mni_file, parameters)
+                continue
+            end
+            if strcmp(parameters.segmentation_software, 'headreco')
+                
+                if strcmp(data_type, "medium_masks")
+                   convert_final_to_MNI(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file,  'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
+                else
+                   convert_final_to_MNI(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file);
+                end
+            elseif strcmp(parameters.segmentation_software, 'charm')
+                convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters);
+            end
+        
+        end
     end
     
     % Runs posthoc water simulations to check sonication parameters of the
@@ -426,5 +465,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         new_parameters.default_grid_dims = new_parameters.grid_dims;
         single_subject_pipeline(subject_id, new_parameters);
     end
+    disp('Pipeline finished successfully');
     
 end
