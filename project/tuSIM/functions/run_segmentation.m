@@ -16,7 +16,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     
     end
     if strcmp(parameters.segmentation_software, 'charm')
-        segment_call = sprintf('charm %s %s %s',subj_id_string, sprintf(parameters.t1_path_template, subject_id), sprintf(parameters.t1_path_template, subject_id));
+        segment_call = sprintf('charm %s %s %s',subj_id_string, sprintf(parameters.t1_path_template, subject_id), sprintf(parameters.t2_path_template, subject_id));
     else
         segment_call = sprintf('headreco all %s %s %s -d no-conform',subj_id_string, filename_t1, filename_t2);
     end
