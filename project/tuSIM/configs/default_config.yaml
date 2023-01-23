@@ -102,10 +102,10 @@ medium:
     alpha_power_true: 1.2
     thermal_conductivity: 0.60 # [W/m/°C] Tissue Properties DB
     specific_heat_capacity: 4178 # [J/kg/°C] Tissue Properties DB
-  skull: # trabecular bone 
+  skull: # cortical bone 
     sound_speed: 2800 # [m/s], ITRUST benchmarks 
     density: 1850 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 8 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
+    alpha_0_true: 4 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
     alpha_power_true: 1.2
     thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
