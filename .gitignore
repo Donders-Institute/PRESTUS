@@ -1,0 +1,83 @@
+#######################################
+# Ignore backup and fsl_sub log files #
+#######################################
+*~
+*.*~
+*sh.e*
+*sh.o*
+*.e[0-9][0-9][0-9][0-9]*
+*.o[0-9][0-9][0-9][0-9]*
+
+
+###################
+# Matlab specific #
+###################
+# Windows default autosave extension
+*.asv
+
+# OSX / *nix default autosave extension
+*.m~
+
+# Compiled MEX binaries (all platforms)
+*.mex*
+
+# Simulink Code Generation
+slprj/
+sccprj/
+
+# Session info
+octave-workspace
+
+# Simulink autosave extension
+*.autosave
+
+
+################
+# HCP specific #
+################
+# Ignore Eclipse Project files
+*.project
+*.buildpath
+*.pydevproject
+
+# Ignore gradient coefficients files. These are sometimes proprietary and
+# should not be checked in to a repository.
+*.grad
+
+
+#################
+# atom specific #
+#################
+.ftpconfig
+
+
+######################
+# OS generated files #
+######################
+CVS
+*.o
+*.pyc
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+.directory
+.Trash-*
+core.*
+
