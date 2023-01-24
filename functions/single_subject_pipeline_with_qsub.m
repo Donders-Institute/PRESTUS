@@ -1,4 +1,4 @@
-function start_pipeline_with_qsub(subject_id, parameters, timelimit, memorylimit)
+function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, memorylimit)
     arguments
         subject_id double
         parameters struct
