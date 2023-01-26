@@ -20,10 +20,10 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     end
 
     if strcmp(parameters.segmentation_software, 'charm')
-        segment_call = sprintf('charm %s %s %s --forceqform --forcerun',...
+        segment_call = sprintf('charm %s %s %s',...
             subj_id_string,filename_t1,filename_t2);
         if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
-            segment_call = [segment_call '--forceqform'];
+            segment_call = [segment_call ' --forceqform'];
         end
     else
         segment_call = sprintf('headreco all %s %s %s -d no-conform',...
