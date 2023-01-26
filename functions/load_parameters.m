@@ -91,7 +91,7 @@ function parameters = load_parameters(varargin)
      
     % set segmentation path to data_path if no specific seg_path is defined
     if ~isfield(parameters, 'seg_path') || parameters.seg_path == ""
-        parameters.seg_path = data_path;
+        parameters.seg_path = parameters.data_path;
     end
 
 end
