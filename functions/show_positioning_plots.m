@@ -1,4 +1,4 @@
-function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_orig, focus_pos_orig, segmented_img_final, trans_pos_final, focus_pos_final, parameters, options)
+function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_orig, focus_pos_orig, segmented_img_final, trans_pos_final, focus_pos_final, parameters, output_plot_filename)
     arguments
         segmented_img_orig (:,:,:) 
         t1_pixel_size (1,1)
@@ -8,7 +8,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
         trans_pos_final (1,3)
         focus_pos_final (1,3)
         parameters struct
-        options.output_plot_filename {mustBeText}
+        output_plot_filename {mustBeText}
     end
 
     view_pos = [0,0];
@@ -48,8 +48,8 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     get_transducer_box(trans_pos_final([1,3])', focus_pos_final([1,3])', parameters.grid_step_mm, parameters)
     colormap(ax3, [0.3 0.3 0.3; lines(12)])
 
-    if options.output_plot_filename ~= ""
-    export_fig(options.output_plot_filename, '-native');
+    if output_plot_filename ~= ""
+    export_fig(output_plot_filename, '-native');
     close;
     end
 end
