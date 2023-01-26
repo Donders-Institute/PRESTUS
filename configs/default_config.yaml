@@ -6,11 +6,34 @@
 
 # Paths to the data location and SimNIBS environment (please use full paths)
 data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data
-simnibs_bin_path: /home/visual/andche/SimNIBS/bin
 
 # Paths to T1 and T2 relative to data_path; all string substitutions will be done using subject_id
 t1_path_template: sub-%1$03d_orig_T1w.nii.gz 
 t2_path_template: sub-%1$03d_orig_T2w.nii.gz
+
+#--- SimNIBS-related parameters
+
+# Path to SimNIBS binaries
+simnibs_bin_path: /home/visual/andche/SimNIBS/bin
+
+# Only use this if you are using the Donders HPC. If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation).
+using_donders_hpc: 1
+
+# By default, SimNIBS segmentation results are not overwritten, unless enabled here
+overwrite_simnibs: 0
+
+# An optional path to LD_LIBRARY used during SimNIBS installation
+# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
+ld_library_path: /opt/gcc/7.2.0/lib64
+
+# If you encounter the error "The qform and sform of do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
+use_forceqform: 0
+
+# Segmentation software (current options are 'headreco' and 'charm')
+segmentation_software: charm
+
+
+#------------------------------------------
 
 # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
 simulation_medium: layered
@@ -63,9 +86,6 @@ results_filename_affix: ''
 # This allows you to add additional paths and subpaths while running the pipeline
 paths_to_add: []
 subpaths_to_add: []
-
-# By default, SimNIBS segmentation results are not overwritten, unless enabled here
-overwrite_simnibs: 0
 
 # Can allow to only run specific components of the pipeline
 run_source_setup: 1 # Should we set up acoustic source? useful to switch off to look at initial segmentation results only
@@ -191,13 +211,4 @@ prime_factor_max_grid_expansion: 40
 #   CUDA code 'cuda' (currently does not work at the Donders HPC, but 'matlab_gpu' works)
 code_type: matlab_gpu 
 
-# Only use this if you are using the Donders HPC
-# If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation)
-using_donders_hpc: 1
 
-# Segmentation software (current options are 'headreco' and 'charm')
-segmentation_software: charm
-
-# An optional path to LD_LIBRARY used during SimNIBS installation
-# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
-ld_library_path: /opt/gcc/7.2.0/lib64

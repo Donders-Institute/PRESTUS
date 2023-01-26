@@ -435,11 +435,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 export_fig(output_plot, '-native')
                 close;
             end
-            % set segmentation path to data_path if no specific seg_path is defined
-            if ~isfield(parameters, 'seg_path')
-                parameters.seg_path = data_path;
-            end
-
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
                 

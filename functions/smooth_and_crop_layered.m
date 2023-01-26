@@ -62,10 +62,10 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         skull_i = find(strcmp(labels,  'skull')); % gives to skull_i the index of skull in labels array, because find finds the index of each non zero element --> where labels == 'skull'
     end
 
-%     imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
-%     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-%     title('Original (left) and smoothed (right) segmented image')
-%     export_fig(output_plot, '-native')
+    imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    title('Original (left) and smoothed (right) segmented image')
+    export_fig(output_plot, '-native')
 
     if any(contains(labels,  'skull'))        
         skull = smoothed_segmented_img==skull_i;

@@ -82,5 +82,16 @@ function parameters = load_parameters(varargin)
     else
         parameters.output_dir = fullfile(parameters.data_path, 'sim_outputs/');
     end
+ 
+    if isfield(parameters, 'ld_library_path') && parameters.ld_library_path ~= ""
+        assert(exist(parameters.ld_library_path, 'dir'), 'The path in parameters.ld_library_path does not exist')
+    end
+    
+    assert(exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file'), sprintf('The path segmentation software (%s) does not exist at %s.', parameters.segmentation_software, parameters.simnibs_bin_path))
+     
+    % set segmentation path to data_path if no specific seg_path is defined
+    if ~isfield(parameters, 'seg_path') || parameters.seg_path == ""
+        parameters.seg_path = data_path;
+    end
 
 end
