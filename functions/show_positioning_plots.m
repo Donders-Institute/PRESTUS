@@ -47,6 +47,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     line([trans_pos_final(3) focus_pos_final(3)], [trans_pos_final(1) focus_pos_final(1)], 'Color', 'white')
     get_transducer_box(trans_pos_final([1,3])', focus_pos_final([1,3])', parameters.grid_step_mm, parameters)
     colormap(ax3, [0.3 0.3 0.3; lines(12)])
+
     if options.output_plot_filename ~= ""
     export_fig(options.output_plot_filename, '-native');
     close;

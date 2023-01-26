@@ -33,7 +33,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     kgrid.setTime(simulation_time_points, grid_time_step);
 
     % Create source (transducer with focuspoint)
-    parameters.kwave_source_filename  = fullfile(parameters.data_path, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_source_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     if confirm_overwriting(parameters.kwave_source_filename, parameters)
         [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos_final, focus_pos_final);
         save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
