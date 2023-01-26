@@ -57,7 +57,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        parameters.output_dir = sprintf('%ssub-%03d/', parameters.output_dir, subject_id);
+        parameters.output_dir = fullfile(parameters.output_dir, sprintf('sub-%03d', subject_id));
     end
     
     if ~isfolder(parameters.output_dir)
@@ -100,7 +100,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % and visualise the position of the transducer with some help from SimNIBS.
     % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull')|| strcmp(parameters.simulation_medium, 'layered')
-        [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
+        [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
+            focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
+            inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
             output_pressure_file = '';
             return;
@@ -176,8 +178,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     disp('Starting acoustic simulations...')
 
     % Pathname for the input and output files (used only for non-interactive computations)
-    parameters.kwave_input_filename  = fullfile(parameters.data_path, sprintf('sub-%03d_%s_input%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    parameters.kwave_output_filename = fullfile(parameters.data_path, sprintf('sub-%03d_%s_output%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_input_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_input%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_output_filename = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_output%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
     % Defines the edge of the simulation as the edge of the PML layer (see line 148)
     kwave_input_args = struct('PMLInside', true, ...
@@ -285,7 +287,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
         writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_brain, max_Isppa_skull, max_pressure_brain, max_pressure_skull, max_Isppa_skin, max_pressure_skin, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
-    else % If no layered tissue was selected, the max Isppa is highlithed on the plane and written in a table.
+    else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
         max_Isppa = max(Isppa_map(:)); %  Does this step need to be included? already done at line 225.
         highlighted_pos = max_isppa_eplane_pos;
         writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
@@ -301,7 +303,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
     export_fig(output_plot, '-native')
     close;
-    
 
     % Runs the heating simulation
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
@@ -374,7 +375,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         close;
     end
 
-
     % Plots the data on the original T1 image & in the MNI space for skull & layered mediums only
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
@@ -435,7 +435,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 export_fig(output_plot, '-native')
                 close;
             end
-            m2m_folder= fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+            % set segmentation path to data_path if no specific seg_path is defined
+            if ~isfield(parameters, 'seg_path')
+                parameters.seg_path = data_path;
+            end
+
+            m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
                 
             if ~confirm_overwriting(mni_file, parameters)

@@ -11,6 +11,11 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     % figures that allows one to view the simulation results.           %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
+    % set segmentation path to data_path if no specific seg_path is defined
+    if ~isfield(parameters, 'seg_path')
+        parameters.seg_path = data_path;
+    end
+
     %% CHECK INPUTS AND TRANSLATE PATTERNS
     disp('Checking inputs...')
     
@@ -82,7 +87,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     disp('Starting segmentation...')
 
     % Defines the names for the output folder of the segmented data
-    segmentation_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+    segmentation_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
     if strcmp(parameters.segmentation_software, 'charm')
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
     else 
@@ -123,7 +128,6 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     segmented_img_orig = niftiread(filename_segmented);
     segmented_hdr_orig = niftiinfo(filename_segmented);
 
-    
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
         % Introduces a scaling factor based on the difference between the
@@ -151,19 +155,15 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             bone_img_rr = segmented_img_rr>0&(segmented_img_rr<=4|segmented_img_rr>=7);
         else
             filename_bone_headreco = fullfile(segmentation_folder, sprintf('bone.nii.gz', subject_id));
-    
             bone_img = niftiread(filename_bone_headreco);
-    
             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
             figure;
             imshow(bone_img_montage)
             title('Rotated (left) and original (right) original bone mask');
     %         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
             close;
-
         end
 
-        
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
 
