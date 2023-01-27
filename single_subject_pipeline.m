@@ -398,7 +398,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             elseif strcmp(data_type, "heating")
                 data = maxT;
             end
-            orig_file_with_ext = [orig_file '.nii.gz'];
+            orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
             if confirm_overwriting(orig_file_with_ext, parameters)
                 % Transforms the data to original T1 image dimensions and orientation
