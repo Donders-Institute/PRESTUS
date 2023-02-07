@@ -43,14 +43,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
         for nPaths = length(parameters.paths_to_add)
-            addpath(parameters.paths_to_add(nPaths))
+            addpath(parameters.paths_to_add{nPaths})
         end
     end
 
     % If the path and subpaths need to be added, use this instead
     if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
         for nPaths = length(parameters.subpaths_to_add)
-            addpath(genpath(parameters.subpaths_to_add(nPaths)))
+            addpath(genpath(parameters.subpaths_to_add{nPaths}))
         end
     end
 
