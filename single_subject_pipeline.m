@@ -297,12 +297,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     if parameters.n_sim_dims==3
-        plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
     else
-        plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
-    export_fig(output_plot, '-native')
-    close;
+    export_fig(output_plot,h, '-native')
+    close(h);
 
     % Runs the heating simulation
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
@@ -369,10 +369,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
 
         maxT = gather(maxT);
-        plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-        export_fig(output_plot, '-native')
-        close;
+        export_fig(output_plot, h, '-native')
+        close(h);
     end
 
     % Plots the data on the original T1 image & in the MNI space for skull & layered mediums only
@@ -427,13 +427,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                             size(t1_image_orig), t1_header.PixelDimensions(1));
         
                 % Plots the Isppa over the untransformed image
-                plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
+                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
         
                 output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_orig%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
-                export_fig(output_plot, '-native')
-                close;
+                export_fig(output_plot, h, '-native')
+                close(h);
             end
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             

@@ -8,7 +8,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
         trans_pos_final (1,3)
         focus_pos_final (1,3)
         parameters struct
-        output_plot_filename {mustBeText}
+        output_plot_filename string
     end
 
     view_pos = [0,0];
@@ -21,7 +21,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     if gpuDeviceCount>0
         coord_mesh_xyz = gpuArray(coord_mesh_xyz);
     end
-    figure('Position', [200 200 1000 300]);
+    h = figure('Position', [200 200 1000 300]);
 
     subplot(1,3,1)
     show_3d_head(segmented_img_orig, focus_pos_orig, trans_pos_orig, parameters, ...
@@ -49,7 +49,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     colormap(ax3, [0.3 0.3 0.3; lines(12)])
 
     if output_plot_filename ~= ""
-    export_fig(output_plot_filename, '-native');
-    close;
+        export_fig(output_plot_filename, h, '-native');
+        close(h);
     end
 end
