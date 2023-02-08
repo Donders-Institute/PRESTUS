@@ -301,7 +301,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
         [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
-    export_fig(output_plot,h, '-native')
+    saveas(h, output_plot, 'png')
     close(h);
 
     % Runs the heating simulation

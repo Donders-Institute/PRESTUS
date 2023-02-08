@@ -18,7 +18,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     end
     focal_axis_temperature = squeeze(focal_planeT(trans_pos(1),:,:));
     
-    figure
+    h = figure
     plot([time_status_seq(find([time_status_seq.recorded]==1)).time], focal_axis_temperature(1:10:size(focal_axis_temperature, 1), :)'); % plot every 10th voxel
     
     colormap('lines')
@@ -37,8 +37,8 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
-    export_fig(output_plot, '-native')
-    close
+    saveas(h, output_plot, 'png')
+    close(h)
 
     %% Creates a video of heating effects over the course of the experiment
 
