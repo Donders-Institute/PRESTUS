@@ -463,6 +463,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         new_parameters.simulation_medium = 'water';
         new_parameters.run_heating_sims = 0;
         new_parameters.default_grid_dims = new_parameters.grid_dims;
+        % restore subject-specific path to original path if done earlier in this function
+        if isfield(new_parameters,'subject_subfolder') && new_parameters.subject_subfolder == 1
+            new_parameters.output_dir = fileparts(new_parameters.output_dir);
+        end
         single_subject_pipeline(subject_id, new_parameters);
     end
     disp('Pipeline finished successfully');
