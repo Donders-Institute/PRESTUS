@@ -271,16 +271,24 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % Reports the Isppa within the original stimulation target
     isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     
+    %Creates a skull mask
+    labels = fieldnames(parameters.layer_labels);
+    all_skull_ids = [];
+        for label_i = find(contains(labels,  'skull'))'
+            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
+        end
+    skull_mask = ismember(segmented_image_cropped,all_skull_ids); 
+    
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, segmented_image_cropped>0 & segmented_image_cropped<3);
         half_max = Isppa_map >= max_Isppa_brain/2 & segmented_image_cropped>0 & segmented_image_cropped<3;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
-
+        
         [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, segmented_image_cropped>0 & segmented_image_cropped<3);
-        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, segmented_image_cropped==4);
-        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, segmented_image_cropped==4);
+        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
+        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
         [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, segmented_image_cropped==5);
         [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, segmented_image_cropped==5);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
@@ -349,7 +357,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
             output_table.maxT_brain = gather(masked_max_3d(maxT, segmented_image_cropped>0 & segmented_image_cropped<3));
-            output_table.maxT_skull = gather(masked_max_3d(maxT, segmented_image_cropped==4));
+            %output_table.maxT_skull = gather(masked_max_3d(maxT, segmented_image_cropped==4));
+            output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
             output_table.maxT_skin = gather(masked_max_3d(maxT, segmented_image_cropped==5));
         end
         writetable(output_table, output_pressure_file);
