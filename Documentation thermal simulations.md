@@ -1,6 +1,9 @@
 # Tips on running the thermal simulations
 - The thermal simulations themselves are based on the output of the acoustic simulations.
 	- So running the thermal simulations without any acoustic output to base it on is not an option.
+- If you are using the 'single_subject_pipeline_with_qsub' function and the job gets aborted before finishing it might be running out of time.
+	- This can be mitigated by increasing the time allocated to the job and feeding it to the function.
+	- Define 'timelimit' in seconds (default is 4h) and feed it to the pipeline by including the 'timelimit' variable within the brackets.
 
 # Parameters explanation
 ## Parameters that have to be changed for each experiment
