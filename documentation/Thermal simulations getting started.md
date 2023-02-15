@@ -1,9 +1,19 @@
 # Tips on running the thermal simulations
 - The thermal simulations themselves are based on the output of the acoustic simulations.
 	- So running the thermal simulations without any acoustic output to base it on is not an option.
-- If you are using the 'single_subject_pipeline_with_qsub' function and the job gets aborted before finishing it might be running out of time.
-	- This can be mitigated by increasing the time allocated to the job and feeding it to the function.
-	- Define 'timelimit' in seconds (default is 4h) and feed it to the pipeline by including the 'timelimit' variable within the brackets.
+
+Before feeding in parameters for the heating simulations it is important to note that these simulations don't model the individual pulses and their pulse-repetition frequencies (PRF) but concatenate the pulses over a trail into one block of stimulation and one block without.
+
+# Example
+Let's take a PRF of 5Hz, a stim_duration of 1s, an iti of 15s, 30 trials and a duty_cycle of 30% (0.3).
+When running the stimulation, these are the pressure changes the transducer will produce.
+- 40ms of stimulation, 160ms without stimulation.
+- This cycle is repeated 5 times (5Hz) within your stim_duration of 1s
+- After this, no stimulation will be administered for 14s.
+- This cycle will be repeated 30 times.
+
+For the simulations, the number of pressure changes is reduced to limit the computational load.
+With these same parameters, PRESTUS combines the separate 40ms periods of stimulation into one block of 200ms of stimulation and one block of 800ms without stimulation per trial. This reduces the amount of blocks per trial from 10 to 2.
 
 # Parameters explanation
 ## Parameters that have to be changed for each experiment
