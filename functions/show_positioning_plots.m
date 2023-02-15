@@ -1,4 +1,4 @@
-function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_orig, focus_pos_orig, segmented_img_final, trans_pos_final, focus_pos_final, parameters, output_plot_filename)
+function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_orig, focus_pos_orig, segmented_img_final, trans_pos_final, focus_pos_final, parameters, new_grid_size, output_plot_filename)
     arguments
         segmented_img_orig (:,:,:) 
         t1_pixel_size (1,1)
@@ -8,12 +8,15 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
         trans_pos_final (1,3)
         focus_pos_final (1,3)
         parameters struct
+        new_grid_size (:,:,:)
         output_plot_filename {mustBeText}
     end
 
     view_pos = [0,0];
     slice_cap = [-1,0,0];
-    if parameters.transducer.pos_t1_grid(1) > size(segmented_img_final,1)/2
+    disp(trans_pos_final)
+    disp(new_grid_size)
+    if trans_pos_final(3) > new_grid_size(3)/2
         view_pos = [-180, 0];
         slice_cap = [1,0,0];
     end
