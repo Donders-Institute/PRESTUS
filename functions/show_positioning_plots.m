@@ -13,7 +13,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
 
     view_pos = [0,0];
     slice_cap = [-1,0,0];
-    if trans_pos_final(3) > disp(size(segmented_image_final(3)))/2
+    if trans_pos_final(3) > size(segmented_image_final(3))/2
         view_pos = [-180, 0];
         slice_cap = [1,0,0];
     end
