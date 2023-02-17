@@ -5,15 +5,17 @@
 Before feeding in parameters for the heating simulations it is important to note that these simulations don't model the individual pulses and their pulse-repetition frequencies (PRF) but concatenate the pulses over a trail into one block of stimulation and one block without.
 
 # Example
-Let's take a PRF of 5Hz, a stim_duration of 1s, an iti of 15s, 30 trials and a duty_cycle of 30% (0.3).
+Let's take a PRF of 5Hz, a stim_duration of 1s, an inter-train-interval (iti) of 15s, 30 trials and a duty_cycle of 30% (0.3).
 When running the stimulation, these are the pressure changes the transducer will produce.
-- 40ms of stimulation, 160ms without stimulation.
+- 60ms of stimulation, 140ms without stimulation.
 - This cycle is repeated 5 times (5Hz) within your stim_duration of 1s
 - After this, no stimulation will be administered for 14s.
 - This cycle will be repeated 30 times.
 
 For the simulations, the number of pressure changes is reduced to limit the computational load.
-With these same parameters, PRESTUS combines the separate 40ms periods of stimulation into one block of 200ms of stimulation and one block of 800ms without stimulation per trial. This reduces the amount of blocks per trial from 10 to 2.
+When 'equal_steps' is enabled, the amount of simulated steps is reduced according to the 'sim_time_steps' duration.
+    For example, when using a 'sim_time_steps' duration of 10ms, 6 steps of stimulation and 14 steps without stimulation are simulated 5 times for each stim_duration.
+When 'equal_steps' is off, every ms will be simulated as one step, increasing the computational load.
 
 # Parameters explanation
 ## Parameters that have to be changed for each experiment

@@ -1,7 +1,7 @@
 # How to design your own processing pipeline
 ## Packages to install (ensure the paths and subfolders are added in Matlab)
-- SimNIBS 4 or higher.
-- k-wave 1.4 or higher.
+- SimNIBS 4.
+- k-wave 1.4.
 
 ## Follow the tutorial (examples/tuSIM_intro_tutorial.mlx) which explains how:
 - The steps being taken by the wrapper.
