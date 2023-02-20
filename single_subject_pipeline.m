@@ -17,7 +17,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % - The pipeline is only able to simulate one transducer at a time, %
     % meaning that the pipeline has to be run once for each transducer  %
     % used in each subject.                                             %
-    % - Matlab 2022b must be used                                       %
+    % - At least Matlab 2022b, SimNIBS 4.0 and k-Wave 1.4 must be used  %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -40,6 +40,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
     end
 
+    % Versioncontrol
+    if verLessThan('matlab','9.13')
+        error('Matlab appears to be outdated. Please update before continuing.')
+    end
+
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
         for nPaths = length(parameters.paths_to_add)
@@ -57,18 +62,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        parameters.output_dir = fullfile(parameters.output_dir, sprintf('sub-%03d', subject_id));
+        parameters.output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+    else 
+        parameters.output_dir = parameters.temp_output_dir;
     end
     
     if ~isfolder(parameters.output_dir)
         mkdir(parameters.output_dir);
     end        
     
-    % save parameters to have a backlog
+    % Save parameters to have a backlog
     parameters_file = fullfile(parameters.output_dir, sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
     save(parameters_file, 'parameters')
     
-    % Add subject_id and output_dir to parameters to pass arguments to functions more easily
+    % Add subject_id to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     
     %% Extra settings needed for better usability
@@ -274,18 +281,19 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     %Creates a skull mask
     labels = fieldnames(parameters.layer_labels);
     all_skull_ids = [];
-        for label_i = find(contains(labels,  'skull'))'
+        for label_i = find(contains(labels, 'skull'))'
             all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
         end
-    skull_mask = ismember(segmented_image_cropped,all_skull_ids); 
-    
+    skull_mask = ismember(segmented_image_cropped,all_skull_ids);
+
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, segmented_image_cropped>0 & segmented_image_cropped<3);
         half_max = Isppa_map >= max_Isppa_brain/2 & segmented_image_cropped>0 & segmented_image_cropped<3;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
-        
+
+
         [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, segmented_image_cropped>0 & segmented_image_cropped<3);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
         [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
@@ -357,7 +365,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
             output_table.maxT_brain = gather(masked_max_3d(maxT, segmented_image_cropped>0 & segmented_image_cropped<3));
-            %output_table.maxT_skull = gather(masked_max_3d(maxT, segmented_image_cropped==4));
             output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
             output_table.maxT_skin = gather(masked_max_3d(maxT, segmented_image_cropped==5));
         end
