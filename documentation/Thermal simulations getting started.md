@@ -1,28 +1,32 @@
 # Tips on running the thermal simulations
 - The thermal simulations themselves are based on the output of the acoustic simulations.
-	- So running the thermal simulations without any acoustic output to base it on is not an option.
+- So running the thermal simulations without any acoustic output to base it on is not an option.
 
 Before feeding in parameters for the heating simulations it is important to note that these simulations don't model the individual pulses and their pulse-repetition frequencies (PRF) but concatenate the pulses over a trail into one block of stimulation and one block without.
 
 # Example
-Let's take a PRF of 5Hz, a stim_duration of 1s, an inter-train-interval (iti) of 15s, 30 trials and a duty_cycle of 30% (0.3).
-When running the stimulation, these are the pressure changes the transducer will produce.
-- 60ms of stimulation, 140ms without stimulation.
-- This cycle is repeated 5 times (5Hz) within your stim_duration of 1s
+
+Let's take a PRF of 5Hz, a stimulation duration (`stim_duration` in a configuration file) of 1s, an inter-trial-interval (ITI) of 15s (`iti`), 30 trials (`n_trials`) and a duty cycle of 30% (`duty_cycle`, 0.3).
+
+When running the actual stimulation, these are the parameters of the stimulation sequence the transducer will produce:
+- PRF frequency of 5Hz means that each pulse repetion period is 200 ms (1/5 of a second)
+- Within each pulse repetition period, the pulse parameters are determined by the duty cycle (0.3), the transduer will be 'on' for 60ms (0.3*200 ms) of stimulation, and 'off' for 140ms (0.7*200 ms) without stimulation.
+- Stimulation will occur 5 times (5 pulse repetition periods) within your stimuation duration of 1s.
 - After this, no stimulation will be administered for 14s.
 - This cycle will be repeated 30 times.
 
 For the simulations, the number of pressure changes is reduced to limit the computational load.
-When 'equal_steps' is enabled, the amount of simulated steps is reduced according to the 'sim_time_steps' duration.
-    For example, when using a 'sim_time_steps' duration of 10ms, 6 steps of stimulation and 14 steps without stimulation are simulated 5 times for each stim_duration.
-When 'equal_steps' is off, every ms will be simulated as one step, increasing the computational load.
+
+When 'equal_steps' is enabled, the amount of simulated steps is reduced according to the 'sim_time_steps' duration. For example, when using a 'sim_time_steps' duration of 10 ms, 6 steps of stimulation and 14 steps without stimulation are simulated 5 times for each stim_duration (20*5 = 100 steps).
+
+When 'equal_steps' is off, every on and off step will be simulated as one simulation step (2*5 = 10 steps), reducing the computational load.
 
 # Parameters explanation
 ## Parameters that have to be changed for each experiment
 - duty_cycle has to be a value between 0 and 1, and represents the percentage of time of the trial during which stimulation is administered.
 - iti is the inter-trial-interval given in seconds
 - n_trials is representative of the aboumt of trials that your experiment will use.
-	- Controls the amount of times the wrapper has to loop through the k-wave thermal simulation.
+- Controls the amount of times the wrapper has to loop through the k-wave thermal simulation.
 - stim_duration refers to the length of time in seconds in a trial during which stimulation is adminstered.
 
 ## Parameters that should be changed with caution
