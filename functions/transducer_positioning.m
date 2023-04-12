@@ -51,7 +51,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     % original target loop
 
     fprintf('Current target: %s\n', target_name)
-    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_subj%03i_%s.csv', subject_id, target_name));
+    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_sub-%03i_%s.csv', subject_id, target_name));
     
     % Get the subject-specific position of the specified MNI coordinate
     % Note: with SimNIBS 4, we have to use a fix that correctly calls
