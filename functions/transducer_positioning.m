@@ -51,10 +51,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     % original target loop
 
     fprintf('Current target: %s\n', target_name)
-    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_sub-%03i_%s.csv', subject_id, target_name));
-    if exist(tpos_output_file,'file')
-        %continue
-    end
+    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_subj%03i_%s.csv', subject_id, target_name));
     
     % Get the subject-specific position of the specified MNI coordinate
     % Note: with SimNIBS 4, we have to use a fix that correctly calls
@@ -75,17 +72,28 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     close(h);
     
     % get list of coordinates at expected focal distance of transducer
+    % increase distance until target is found in the axial plane (used for plotting)
 
-    parameters.expected_focal_distance_mm = 80;%73.5;
-    
-    [t1_x, t1_y, t1_z] = ndgrid(1:size(segmented_img_orig, 1),1:size(segmented_img_orig, 2),1:size(segmented_img_orig, 3));
-    grid_dist = sqrt((t1_x-target(1)).^2+(t1_y-target(2)).^2+(t1_z-target(3)).^2); % 3D euclidian distance
-    dist_sphere = abs(grid_dist-parameters.expected_focal_distance_mm/pixel_size)<0.5;
-    outer_sphere_3d = dist_sphere&segmented_img_orig==0;
+    % Note: This may be too restrictive depending on the application. This
+    % restricts the solution to assume a placement within a sphere that
+    % includes the skin boundary in the axial plane. This is only relevant
+    % if the original transducer focus is too short.
+        
+    if ~isfield(parameters, 'min_focal_distance_mm')
+        parameters.min_focal_distance_mm = parameters.expected_focal_distance_mm;
+    end
+    outer_sphere = [];
+    while numel(find(outer_sphere)) < 1
+        [t1_x, t1_y, t1_z] = ndgrid(1:size(segmented_img_orig, 1),1:size(segmented_img_orig, 2),1:size(segmented_img_orig, 3));
+        grid_dist = sqrt((t1_x-target(1)).^2+(t1_y-target(2)).^2+(t1_z-target(3)).^2); % 3D euclidian distance
+        dist_sphere = abs(grid_dist-parameters.min_focal_distance_mm/pixel_size)<0.5;
+        outer_sphere_3d = dist_sphere&segmented_img_orig==0;
 
-    segm_img_slice = ind2rgb(squeeze(segmented_img_orig(:,target(2),:)), viridis(max(segmented_img_orig(:))+1));
-    outer_sphere = squeeze(dist_sphere(:,target(2),:))&squeeze(segmented_img_orig(:,target(2),:))==0;
-    segm_img_slice(outer_sphere) = 1;
+        segm_img_slice = ind2rgb(squeeze(segmented_img_orig(:,target(2),:)), viridis(max(segmented_img_orig(:))+1));
+        outer_sphere = squeeze(dist_sphere(:,target(2),:))&squeeze(segmented_img_orig(:,target(2),:))==0;
+        segm_img_slice(outer_sphere) = 1;
+        parameters.min_focal_distance_mm = parameters.min_focal_distance_mm + 3; % expand search by 3 mm if necessary
+    end
 
     h = figure;
     colormap([0.3 0.3 0.3; lines(12)])
@@ -201,20 +209,24 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     csf_box = regionprops3(segmented_img_orig==3); 
     csf_box = csf_box.BoundingBox; % first 3 numbers are x,y,z of a corner, the other three are dimensions 
 
-    csf_box(1:3) = csf_box(1:3) - 35;
-    csf_box(4:6) = csf_box(4:6) + 70;
-    csf_box(1:3)
-    inside_box = zeros(size(segmented_img_orig));
-    inside_box((t1_x>csf_box(1))&(t1_x<(csf_box(1)+csf_box(4)))&...
-        (t1_y>csf_box(2))&(t1_y<(csf_box(2)+csf_box(5)))&...
-        (t1_z>csf_box(3))&(t1_z<(csf_box(3)+csf_box(6))))=1;
-    tmp = segmented_img_orig;
-    tmp(~inside_box) = 0;
-    %imagesc(squeeze(tmp(:,target(2),:)))
-
-    outer_boundary(~inside_box) = 0;
-    skin_boundary(~inside_box) = 0;
-    %imagesc(squeeze(skin_boundary(:,target(2),:)))
+    % The following likely has to be flipped for left targets, but I am not
+    % quite sure what this is trying to achieve in the first place. Maybe
+    % restrict the solution to a solution nearby?
+    
+%     csf_box(1:3) = csf_box(1:3) - 35;
+%     csf_box(4:6) = csf_box(4:6) + 70;
+%     csf_box(1:3)
+%     inside_box = zeros(size(segmented_img_orig));
+%     inside_box((t1_x>csf_box(1))&(t1_x<(csf_box(1)+csf_box(4)))&...
+%         (t1_y>csf_box(2))&(t1_y<(csf_box(2)+csf_box(5)))&...
+%         (t1_z>csf_box(3))&(t1_z<(csf_box(3)+csf_box(6))))=1;
+%     tmp = segmented_img_orig;
+%     tmp(~inside_box) = 0;
+%     %imagesc(squeeze(tmp(:,target(2),:)))
+% 
+%     outer_boundary(~inside_box) = 0;
+%     skin_boundary(~inside_box) = 0;
+%     %imagesc(squeeze(skin_boundary(:,target(2),:)))
 
     % for each point, put the transducer there, oriented towards the focus, and compute the amount of
     % intersection and the average distance to the scalp
