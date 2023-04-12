@@ -32,28 +32,36 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     if ~any(ismember(functionsLoc,allPaths))
         addpath(functionsLoc);
+        disp(['Adding ', functionsLoc]);
     else
     end
 
     if ~any(ismember(toolboxesLoc,allPaths))
         addpath(genpath(toolboxesLoc));
+        disp(['Adding ', toolboxesLoc, 'and subfolders']);
     else
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
-        for nPaths = length(parameters.paths_to_add)
+        for nPaths = 1:length(parameters.paths_to_add)
             addpath(parameters.paths_to_add{nPaths})
+            disp(['Adding ', parameters.paths_to_add{nPaths}]);
         end
     end
 
     % If the path and subpaths need to be added, use this instead
     if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
-        for nPaths = length(parameters.subpaths_to_add)
+        for nPaths = 1:length(parameters.subpaths_to_add)
             addpath(genpath(parameters.subpaths_to_add{nPaths}))
+            disp(['Adding ', parameters.subpaths_to_add{nPaths}, 'and subfolders']);
         end
     end
 
+    % test that kwave is added
+    if ~exist('makeBowl','file')
+        error('kwave not added');
+    end
     
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
