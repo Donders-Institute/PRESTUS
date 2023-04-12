@@ -23,8 +23,6 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = p
         options.segmented_img = []
         options.bg_range = []
         options.overlay_segmented = 0
-
-        
     end
     
     if any(focus_pos > size(bg_image))
@@ -203,7 +201,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = p
     
     imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
 
-    caxis(options.isppa_color_range)
+    clim(options.isppa_color_range)
     colormap(ax2, options.color_scale);
 
     ax2.Visible = 'off';
