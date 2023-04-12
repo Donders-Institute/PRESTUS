@@ -20,7 +20,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
 
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
-        for nPaths = length(parameters.paths_to_add)
+        for nPaths = 1:length(parameters.paths_to_add)
             addpath(parameters.paths_to_add{nPaths})
             disp(['Adding ', parameters.paths_to_add{nPaths}]);
         end
@@ -28,7 +28,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
 
     % If the path and subpaths need to be added, use this instead
     if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
-        for nPaths = length(parameters.subpaths_to_add)
+        for nPaths = 1:length(parameters.subpaths_to_add)
             addpath(genpath(parameters.subpaths_to_add{nPaths}))
             disp(['Adding ', parameters.subpaths_to_add{nPaths}, 'and subfolders']);
         end
@@ -51,7 +51,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     % original target loop
 
     fprintf('Current target: %s\n', target_name)
-    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_subj%03i_%s.csv', subject_id, target_name));
+    tpos_output_file = fullfile(parameters.output_dir, sprintf('tpars_sub-%03i_%s.csv', subject_id, target_name));
     if exist(tpos_output_file,'file')
         %continue
     end
@@ -71,7 +71,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
         rot90(squeeze(segmented_img_orig(:,im_center(2),:))),...
         squeeze(segmented_img_orig(:,:,im_center(3)))}, viridis(8), 'Size',[1 3])
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_segmentation.png', subject_id));
-    export_fig(output_plot,h, '-native')
+    saveas(h, output_plot, 'png')
     close(h);
     
     % get list of coordinates at expected focal distance of transducer
@@ -111,7 +111,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
 
     get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_bounds_%s.png', subject_id, target_name));
-    export_fig(output_plot,h, '-native')
+    saveas(h, output_plot, 'png')
     close(h);
 
     max_od_mm = max(parameters.transducer.Elements_OD_mm);
@@ -178,7 +178,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
 
     get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_bounds_scalp_%s.png', subject_id, target_name));
-    export_fig(output_plot,h, '-native')
+    saveas(h, output_plot, 'png')
     close(h);
 
     all_masks = segmented_img_orig>0;
@@ -449,5 +449,5 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
 
         get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_optimal_%s.png', subject_id, target_name));
-    export_fig(output_plot,h, '-native')
+    saveas(h, output_plot, 'png')
     close(h);
