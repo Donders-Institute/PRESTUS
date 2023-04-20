@@ -8,14 +8,12 @@ The examples folder contains some examples of how to run the pipeline, including
 
 # Requirements
 
-- MATLAB R2022b
-- SimNIBS 4
-- k-Wave 1.4 (should be installed in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
-- small toolboxes included in the repository
+- MATLAB R2022b (setup to work on the Donders HPC, but should work on a local PC as well)
+- [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4)
+- [k-Wave 1.4](http://www.k-wave.org/download.php) (should be installed in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
+- toolboxes included in this repository
 
-Tested on MATLAB 2022b, set up to work on Donders HPC (can work on a local PC as well). 
-
-Before using the package, you need to have some libraries on your path. Three small ones are included in the toolbox folder, but you also would need to have [k-Wave](http://www.k-wave.org/download.php) and SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) installed. **Please put k-Wave in the toolbox folder of PRESTUS or ensure that the paths to it are added on MATLAB startup if you are running PRESTUS on HPC**.
+**Please put k-Wave in the PRESTUS toolbox folder, or ensure that the path to it is available on MATLAB startup**.
 
 # How to run
 
