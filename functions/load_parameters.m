@@ -7,7 +7,7 @@ function parameters = load_parameters(varargin)
         parameters = MergeStruct(parameters, extra_parameters);
     end
 
-    assert(parameters.interactive==0 || usejava('desktop'), 'Matlab should run in desktop mode if parameters.interactive is enabled in tuSIM config');
+    assert(parameters.interactive==0 || usejava('desktop'), 'Matlab should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
 
     if isfield(parameters, 'transducer')
         if ~isfield(parameters.transducer,'source_phase_rad')
@@ -68,12 +68,12 @@ function parameters = load_parameters(varargin)
     if isfield(parameters,'output_location')
         javaFileObj = java.io.File(parameters.output_location); % check if the path is absolute
         if javaFileObj.isAbsolute()
-            parameters.output_dir = fullfile(parameters.output_location);
+            parameters.temp_output_dir = fullfile(parameters.output_location);
         else
-            parameters.output_dir = fullfile(parameters.data_path, parameters.output_location);
+            parameters.temp_output_dir = fullfile(parameters.data_path, parameters.output_location);
         end
     else
-        parameters.output_dir = fullfile(parameters.data_path, 'sim_outputs/');
+        parameters.temp_output_dir = fullfile(parameters.data_path, 'sim_outputs/');
     end
  
 %     if isfield(parameters, 'ld_library_path') && parameters.ld_library_path ~= ""

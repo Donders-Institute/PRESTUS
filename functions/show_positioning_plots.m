@@ -13,12 +13,13 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
 
     view_pos = [0,0];
     slice_cap = [-1,0,0];
-    if parameters.transducer.pos_t1_grid(1) > size(segmented_img_final,1)/2
+    if trans_pos_final(3) > size(segmented_img_final(3))/2
         view_pos = [-180, 0];
         slice_cap = [1,0,0];
     end
     coord_mesh_xyz = get_xyz_mesh(segmented_img_orig);
-    if gpuDeviceCount>0
+    
+    if gpuDeviceCount > 0
         coord_mesh_xyz = gpuArray(coord_mesh_xyz);
     end
     h = figure('Position', [200 200 1000 300]);
@@ -30,7 +31,6 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     subplot(1,3,2)
     show_3d_head(segmented_img_orig, focus_pos_orig, trans_pos_orig, parameters, ...
         t1_pixel_size, coord_mesh_xyz, slice_cap, view_pos, 0)
-
     
     ax3 = subplot(1,3,3);
     

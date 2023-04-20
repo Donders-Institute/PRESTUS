@@ -28,8 +28,8 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
     [path_to_pipeline, ~, ~] = fileparts(which('single_subject_pipeline'));
     
     subj_id_string = sprintf('sub-%03d', subject_id);
+    
     % save inputs in the temp file
-
     temp_data_path = tempname(log_dir);
     [tempdir,tempfile] = fileparts(temp_data_path);
     tempfile = [tempfile '.mat'];
@@ -45,7 +45,7 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
     matlab_cmd = sprintf('matlab -batch "%s"', temp_m_file_name);
 
     if ~isfield(parameters, 'qsub_job_prefix')
-        parameters.qsub_job_prefix = 'tusim';
+        parameters.qsub_job_prefix = 'PRESTUS';
     end
     job_name = [parameters.qsub_job_prefix '_' subj_id_string];
     qsub_call = sprintf('qsub -N %s -l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0,mem=%iGb,walltime=%i" -o %s -e %s -d %s', ...

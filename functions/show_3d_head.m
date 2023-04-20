@@ -94,11 +94,13 @@ hiso.SpecularColorReflectance = 0;
 hiso.SpecularExponent = 50;
 
 origin_shift = origin_shift([2,1,3]);
-orth_plane_3d_surf = isosurface(orth_plane_3d(1:2:end,1:2:end,1:2:end));
-orth_plane_3d_surf.vertices = orth_plane_3d_surf.vertices - origin_shift;
-patch(orth_plane_3d_surf,...
-   'FaceColor','blue',...
-   'EdgeColor','none');
+if crop_at_target == [0,0,0]
+    orth_plane_3d_surf = isosurface(orth_plane_3d(1:2:end,1:2:end,1:2:end));
+    orth_plane_3d_surf.vertices = orth_plane_3d_surf.vertices - origin_shift;
+    patch(orth_plane_3d_surf,...
+       'FaceColor','blue',...
+       'EdgeColor','none');
+end
 
 sphere_surf = isosurface(smooth3(sphere_3d(1:2:end,1:2:end,1:2:end)));
 sphere_surf.vertices = sphere_surf.vertices - origin_shift;
@@ -116,10 +118,10 @@ if any(origin_shift)
     axis(reshape([-origin_shift ; -origin_shift + original_size ], [1 6]));
 end
 if view_angle(1) < 0
-    camlight right
+    camlight('right')
     %l = lightangle(-45,30);
 else
-    camlight left
+    camlight('left')
     %l = lightangle(45,30);
 end
 
