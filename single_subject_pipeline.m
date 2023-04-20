@@ -369,6 +369,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Creates a line graph and a video of the heating effects
         plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks);
         
+        maxT = gather(maxT);
+
         % Plots the maximum temperature in the segmented brain
         if max(maxT(:)) < 38
             temp_color_range = [37, 38];
@@ -376,7 +378,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             temp_color_range = [37, max(maxT(:))];
         end
 
-        maxT = gather(maxT);
         [~,~,~,~,~,~,~,h]=plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         export_fig(output_plot, h, '-native')
