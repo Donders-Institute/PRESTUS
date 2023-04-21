@@ -174,7 +174,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     % neural tissue in skin (to correct for a bug in Charm)
     brain_ind = parameters.layer_labels.brain;
     new_brain_ind = ones(1, length(brain_ind));
-    results_mask_original = changem(smoothed_segmented_img, new_brain_ind, brain_ind);
+    results_mask_original = changem_vectorized(smoothed_segmented_img, new_brain_ind, brain_ind);
     results_mask_original(results_mask_original > max(brain_ind)) = 0;
     results_mask_original = logical(results_mask_original);
     results_mask_size = size(results_mask_original);

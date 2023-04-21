@@ -1,5 +1,6 @@
-function create_group_MNI_plots(subject_list, parameters, options)
+function create_group_MNI_plots(outputs_path, subject_list, parameters, options)
 arguments
+    outputs_path string 
     subject_list 
     parameters struct
     options.ROI_MNI_mask (:,:,:)
@@ -22,8 +23,7 @@ slice_labels = {'x','y','z'};
 
 bg_range_to_use = [];
 isppa_range_to_use = [5, 6];
-temp_range_to_use = [parameters.thermal.temp_0, parameters.thermal.temp_0 + 0.5];
-outputs_path = parameters.temp_output_dir;
+temp_range_to_use = [37, 37.5];    
 
 full_subject_list = subject_list;
 % first pass: get background intensity at the target slice & isppa range
@@ -44,13 +44,7 @@ for subject_i = 1:length(full_subject_list)
     max_pressure_mni_file = fullfile(outputs_path, sprintf('%s_final_pressure_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     output_pressure_file = fullfile(outputs_path,sprintf('%s_%s_isppa%s.csv', results_prefix, parameters.simulation_medium, parameters.results_filename_affix));
     
-    if strcmp(parameters.segmentation_software, 'charm')
-        t1_mni_file = fullfile(headreco_folder, 'toMNI', 'final_tissues_MNI.nii.gz');
-    elseif strcmp(parameters.segmentation_software, 'headreco')
-        t1_mni_file = fullfile(headreco_folder, 'toMNI', 'T1fs_nu_12DOF_MNI.nii.gz');
-    else
-        error('Define segmentation software');
-    end
+    t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     files_to_check = {t1_mni_file , segmented_image_mni_file, isppa_map_mni_file, max_pressure_mni_file, output_pressure_file};
     
     if options.plot_heating
@@ -78,40 +72,26 @@ for subject_i = 1:length(full_subject_list)
     t1_mni = niftiread(t1_mni_file);
     t1_mni_hdr = niftiinfo(t1_mni_file);
     
-    % apply mask on neural tissue
-    isppa_map_mni = niftiread(isppa_map_mni_file);
+    Isppa_map_mni = niftiread(isppa_map_mni_file);
     segmented_image_mni = niftiread(segmented_image_mni_file);
-    brain_ind = parameters.layer_labels.brain;
-    new_brain_ind = ones(1, length(brain_ind));
-    results_mask_original = changem(segmented_image_mni, new_brain_ind, brain_ind);
-    results_mask_original(results_mask_original > max(brain_ind)) = 0;
-    results_mask_original = logical(results_mask_original);
-    results_mask_size = size(results_mask_original);
-    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 20), (results_mask_size(2) + 20), (results_mask_size(3) + 20)]);
-    results_mask_overlay = results_mask_overlay(11:(end-10), 11:(end-10), 11:(end-10));
-    results_mask = results_mask_original.*results_mask_overlay;
-    changed_tissue_index = find(results_mask~=results_mask_original);
-    segmented_image_mni(changed_tissue_index) = parameters.layer_labels.skin;
-
-    isppa_map_mni = isppa_map_mni.*results_mask;
     brain_ind = find(strcmp(fieldnames(parameters.layer_labels), 'brain'));
-    segmented_mask = segmented_image_mni~=brain_ind;
-    isppa_map_mni(segmented_mask) = 0;
+    segmented_mask = segmented_image_mni~=brain_ind;%(segmented_image_mni ==0 | segmented_image_mni ==4 | segmented_image_mni == 5 | segmented_image_mni == 6);
+    Isppa_map_mni(segmented_mask) = 0; 
     max_pressure_map_mni = niftiread(max_pressure_mni_file);
-    max_pressure_map_mni = max_pressure_map_mni.*results_mask;
+    max_pressure_map_mni(segmented_mask) = 0; 
     max_pressure = max(max_pressure_map_mni,[],'all');
 
     if options.slice_to_plot
         slice_n = options.slice_to_plot;
     else
-        [~, I] = max(isppa_map_mni(:));
-        [Px, Py, Pz] = ind2sub(size(isppa_map_mni), I);
+        [~, I] = max(Isppa_map_mni(:));
+        [Px, Py, Pz] = ind2sub(size(Isppa_map_mni), I);
         max_focus_MNI_grid = [Px, Py, Pz];
         slice_n = max_focus_MNI_grid(strcmp(slice_labels,options.slice_label));
         disp(max_focus_MNI_grid)
     end
     t1_slice = get_slice_by_label(t1_mni, options.slice_label, slice_n);
-    isppa_slice = get_slice_by_label(isppa_map_mni, options.slice_label, slice_n);
+    isppa_slice = get_slice_by_label(Isppa_map_mni, options.slice_label, slice_n);
     max_pressure_slice = get_slice_by_label(max_pressure_map_mni, options.slice_label, slice_n);
     segmented_slice = get_slice_by_label(segmented_image_mni, options.slice_label, slice_n);
     bg_min = min(t1_slice,[],'all');
@@ -166,44 +146,25 @@ for subject_i = 1:length(subject_list)
     isppa_map_mni_file  = fullfile(outputs_path, sprintf('%s_final_isppa_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     segmented_image_mni_file = fullfile(outputs_path, sprintf('%s_final_medium_masks_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     max_pressure_mni_file = fullfile(outputs_path, sprintf('%s_final_pressure_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
-    if strcmp(parameters.segmentation_software, 'charm')
-        t1_mni_file = fullfile(headreco_folder, 'toMNI', 'final_tissues_MNI.nii.gz');
-    elseif strcmp(parameters.segmentation_software, 'headreco')
-        t1_mni_file = fullfile(headreco_folder, 'toMNI', 'T1fs_nu_12DOF_MNI.nii.gz');
-    else
-        error('Define segmentation software');
-    end
+    t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     output_pressure_file = fullfile(outputs_path,sprintf('%s_%s_isppa%s.csv', results_prefix, parameters.simulation_medium, parameters.results_filename_affix));
 
     % get T1 in MNI space
     t1_mni = niftiread(t1_mni_file);
     t1_mni_hdr = niftiinfo(t1_mni_file);
     
-    isppa_map_mni = niftiread(isppa_map_mni_file);
+    Isppa_map_mni = niftiread(isppa_map_mni_file);
     segmented_image_mni = niftiread(segmented_image_mni_file);
-    brain_ind = parameters.layer_labels.brain;
-    new_brain_ind = ones(1, length(brain_ind));
-    results_mask_original = changem(segmented_image_mni, new_brain_ind, brain_ind);
-    results_mask_original(results_mask_original > max(brain_ind)) = 0;
-    results_mask_original = logical(results_mask_original);
-    results_mask_size = size(results_mask_original);
-    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 20), (results_mask_size(2) + 20), (results_mask_size(3) + 20)]);
-    results_mask_overlay = results_mask_overlay(11:(end-10), 11:(end-10), 11:(end-10));
-    results_mask = results_mask_original.*results_mask_overlay;
-    changed_tissue_index = find(results_mask~=results_mask_original);
-    segmented_image_mni(changed_tissue_index) = parameters.layer_labels.skin;
-
-    isppa_map_mni = isppa_map_mni.*results_mask;
     brain_ind = find(strcmp(fieldnames(parameters.layer_labels), 'brain'));
     segmented_mask = segmented_image_mni~=brain_ind;
-    isppa_map_mni(segmented_mask) = 0;
+    Isppa_map_mni(segmented_mask) = 0; 
     max_pressure_map_mni = niftiread(max_pressure_mni_file);
-    max_pressure_map_mni = max_pressure_map_mni.*results_mask;
+    max_pressure_map_mni(segmented_mask) = 0; 
     max_pressure = max(max_pressure_map_mni,[],'all');
     
     if isempty(options.isppa_thresholds)
-        isppa_threshold_high = min(isppa_map_mni(max_pressure_map_mni>=max_pressure*0.5));
-        isppa_threshold_low = min(isppa_map_mni(max_pressure_map_mni>=max_pressure*0.4));
+        isppa_threshold_high = min(Isppa_map_mni(max_pressure_map_mni>=max_pressure*0.5));
+        isppa_threshold_low = min(Isppa_map_mni(max_pressure_map_mni>=max_pressure*0.4));
     else
         isppa_threshold_high = options.isppa_thresholds(2);
         isppa_threshold_low = options.isppa_thresholds(1);
@@ -217,8 +178,8 @@ for subject_i = 1:length(subject_list)
     if options.slice_to_plot
         slice_n = options.slice_to_plot;
     else
-        [~, I] = max(isppa_map_mni(:));
-        [Px, Py, Pz] = ind2sub(size(isppa_map_mni), I);
+        [~, I] = max(Isppa_map_mni(:));
+        [Px, Py, Pz] = ind2sub(size(Isppa_map_mni), I);
         max_focus_MNI_grid = [Px, Py, Pz];
         slice_n = max_focus_MNI_grid(strcmp(slice_labels,options.slice_label));
     end
@@ -238,7 +199,7 @@ for subject_i = 1:length(subject_list)
         
     if isfield(options,'ROI_MNI_mask')
         roi_size = sum(options.ROI_MNI_mask,'all');
-        avg_isppa_within_roi = mean((isppa_map_mni .* options.ROI_MNI_mask),'all');
+        avg_isppa_within_roi = mean(Isppa_map_mni(options.ROI_MNI_mask),'all');
         n_voxels_within_roi_above_thresh =  sum(options.ROI_MNI_mask & (max_pressure_map_mni >= max_pressure/2),'all');
         curTable.(sprintf('avg_isppa_within_roi%s', options.outputs_suffix)) = avg_isppa_within_roi;
         curTable.(sprintf('perc_voxels_within_roi%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/roi_size;
@@ -248,7 +209,7 @@ for subject_i = 1:length(subject_list)
         writetable(curTable, output_pressure_file);        
     end
  
-    plot_isppa_over_image(isppa_map_mni, t1_mni, zeros(size(t1_mni)), struct(), {options.slice_label, slice_n}, ...
+    plot_isppa_over_image(Isppa_map_mni, t1_mni, zeros(size(t1_mni)), struct(), {options.slice_label, slice_n}, ...
         uint8.empty([0 3]), uint8.empty([0 3]),...
         [0 0 0 ],'isppa_threshold_low',isppa_threshold_low,'isppa_threshold_high',isppa_threshold_high, 'show_rectangles', 0, 'isppa_color_range', isppa_range_to_use, ...
         'grid_step', t1_mni_hdr.PixelDimensions(1), 'overlay_segmented', 0, 'rotation', cur_rotation, 'show_colorbar', add_colorbar, 'use_isppa_alpha', 1, 'segmented_img', segmented_image_mni, 'bg_range', bg_range_to_use);
