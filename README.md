@@ -49,3 +49,7 @@ After that things are straightforward: k-Wave medium, source, grid, and sensor a
 In case of problems, a) look at the plots in the data folder, do they look fine? b) if the simulations use the cluster, look for error logs in `batch_job_logs` folder under your `data_path`; c) re-run the job locally to find errors. Sometimes there are errors related (I think) to differences in GPU versions on the cluster, so if the job fails during the simulations, you can either try to simply restart it or run it in an interactive GPU-enabled session (qsub -I with GPU, then load MATLAB/R2022b). If the grid is too big, the GPU might run into memory issues. In this case, adjust csf_mask_expansion_factor to reduce the grid size (but make sure that the whole skull fits in).
 
 Finally, if the simulations on the GPU run more than two hours, it is likely that something is wrong. Most likely, you forgot to switch interactive flag to zero and they are stuck because a confirmation is required from the user to start. 
+
+# License
+
+Released under GNU General Public License v3.0 (see LICENSE).
