@@ -1,4 +1,4 @@
-function [error, ax1, ax2] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
+function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
   arguments
       phase
       parameters
@@ -31,7 +31,7 @@ function [error, ax1, ax2] = phase_optimization_annulus_full_curve(phase, parame
   error = mean(error_v);
 
   if plot_results
-      figure
+      h = figure;
       ax1 = subplot(1,2,1);
       hold on
       plot(axial_position,  i_axial_oneil )
@@ -43,6 +43,5 @@ function [error, ax1, ax2] = phase_optimization_annulus_full_curve(phase, parame
       ax2 = subplot(1,2,2);
       plot(axial_position(limit_ind), error_v,'-o');
       legend(["error"])
-
   end
 end
