@@ -8,14 +8,12 @@ The examples folder contains some examples of how to run the pipeline, including
 
 # Requirements
 
-- MATLAB R2022b
-- SimNIBS 4
-- k-Wave 1.4 (should be installed in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
-- small toolboxes included in the repository
+- MATLAB R2022b (setup to work on the Donders HPC, but should work on a local PC as well)
+- [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4)
+- [k-Wave 1.4](http://www.k-wave.org/download.php) (should be installed in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
+- toolboxes included in this repository
 
-Tested on MATLAB 2022b, set up to work on Donders HPC (can work on a local PC as well). 
-
-Before using the package, you need to have some libraries on your path. Three small ones are included in the toolbox folder, but you also would need to have [k-Wave](http://www.k-wave.org/download.php) and SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) installed. **Please put k-Wave in the toolbox folder of PRESTUS or ensure that the paths to it are added on MATLAB startup if you are running PRESTUS on HPC**.
+**Please put k-Wave in the PRESTUS toolbox folder, or ensure that the path to it is available on MATLAB startup**.
 
 # How to run
 
@@ -51,3 +49,7 @@ After that things are straightforward: k-Wave medium, source, grid, and sensor a
 In case of problems, a) look at the plots in the data folder, do they look fine? b) if the simulations use the cluster, look for error logs in `batch_job_logs` folder under your `data_path`; c) re-run the job locally to find errors. Sometimes there are errors related (I think) to differences in GPU versions on the cluster, so if the job fails during the simulations, you can either try to simply restart it or run it in an interactive GPU-enabled session (qsub -I with GPU, then load MATLAB/R2022b). If the grid is too big, the GPU might run into memory issues. In this case, adjust csf_mask_expansion_factor to reduce the grid size (but make sure that the whole skull fits in).
 
 Finally, if the simulations on the GPU run more than two hours, it is likely that something is wrong. Most likely, you forgot to switch interactive flag to zero and they are stuck because a confirmation is required from the user to start. 
+
+# License
+
+Released under GNU General Public License v3.0 (see LICENSE).
