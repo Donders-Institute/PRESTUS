@@ -45,9 +45,10 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
 
         % combine all skull masks for smoothing
         % 1) find all skull_layer ids
+        layer_labels = parameters.layer_labels;
         all_skull_ids = [];
-        for label_i = find(contains(labels,  'skull'))'
-            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
+        for label_i = find(contains(labels, 'skull'))'
+            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
         end
         layer_mask = ismember(segmented_img, all_skull_ids);
         smooth_threshold = parameters.skull_smooth_threshold;
@@ -169,7 +170,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
     skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
-    
+    %{
     % Applies an expanded binary mask of neural tissue to remove abberant
     % neural tissue in skin (to correct for a bug in Charm)
     brain_ind = parameters.layer_labels.brain;
@@ -180,10 +181,13 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     results_mask_size = size(results_mask_original);
     results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 20), (results_mask_size(2) + 20), (results_mask_size(3) + 20)]);
     results_mask_overlay = results_mask_overlay(11:(end-10), 11:(end-10), 11:(end-10));
+    results_mask_original = results_mask_original.*results_mask_overlay;
+    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 10), (results_mask_size(2) + 10), (results_mask_size(3) + 10)]);
+    results_mask_overlay = results_mask_overlay(6:(end-5), 6:(end-5), 6:(end-5));
     results_mask = results_mask_original.*results_mask_overlay;
     changed_tissue_index = find(results_mask~=results_mask_original);
     smoothed_segmented_img(changed_tissue_index) = parameters.layer_labels.water(1);
-    
+    %}
     % Crops the original segmented image in the same way as processed one
     segmented_image_cropped = segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
 
