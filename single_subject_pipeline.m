@@ -115,8 +115,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             return;
         end
         parameters.grid_dims = size(medium_masks);
-    else % In case simulations are not run in a skull of layered tissue,
-        % alternative grid dimensions are set up
+    else % In case simulations are not run in a skull or layered tissue, alternative grid dimensions are set up
         assert(isfield(parameters, 'default_grid_dims'), 'The parameters structure should have the field grid_dims for the grid dimensions')
         parameters.grid_dims = parameters.default_grid_dims;
         if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
@@ -197,7 +196,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
        kwave_input_args.DisplayMask = skull_edge;
     end
 
-    % Saves the sensory data in a .mat file with the simulation figures
+    % Looks up sensor data for use in simulations
     filename_sensor_data = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_results%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Run the acoustic simulations
@@ -278,27 +277,28 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % Reports the Isppa within the original stimulation target
     isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     
-    %Creates a skull mask
+    % Creates a skull mask
+    layer_labels = parameters.layer_labels;
     labels = fieldnames(parameters.layer_labels);
     all_skull_ids = [];
         for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
+            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
         end
-    skull_mask = ismember(segmented_image_cropped,all_skull_ids);
+    skull_mask = ismember(medium_masks,all_skull_ids);
 
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, segmented_image_cropped>0 & segmented_image_cropped<3);
-        half_max = Isppa_map >= max_Isppa_brain/2 & segmented_image_cropped>0 & segmented_image_cropped<3;
+        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, medium_masks>0 & medium_masks<3);
+        half_max = Isppa_map >= max_Isppa_brain/2 & medium_masks>0 & medium_masks<3;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
 
 
-        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, segmented_image_cropped>0 & segmented_image_cropped<3);
+        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, medium_masks>0 & medium_masks<3);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
         [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, segmented_image_cropped==5);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, segmented_image_cropped==5);
+        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==5);
+        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==5);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
@@ -320,9 +320,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     export_fig(output_plot, '-native')
     close;
 
-    % Runs the heating simulation
+    %% RUN HEATING SIMULATIONS
+    % =========================================================================
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
-        disp('Running heating simulations')
+        disp('Starting heating simulations...')
         % Creates an output file to which output is written at a later stage
         filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
@@ -364,9 +365,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            output_table.maxT_brain = gather(masked_max_3d(maxT, segmented_image_cropped>0 & segmented_image_cropped<3));
+            output_table.maxT_brain = gather(masked_max_3d(maxT, medium_masks>0 & medium_masks<3));
             output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
-            output_table.maxT_skin = gather(masked_max_3d(maxT, segmented_image_cropped==5));
+            output_table.maxT_skin = gather(masked_max_3d(maxT, medium_masks==5));
         end
         writetable(output_table, output_pressure_file);
 
@@ -391,7 +392,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         close;
     end
 
-    % Plots the data on the original T1 image & in the MNI space for skull & layered mediums only
+    %% Plots the data on the original T1 image and in MNI space
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
 
@@ -471,8 +472,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
     
-    % Runs posthoc water simulations to check sonication parameters of the
-    % transducer in free water
+    %% Runs posthoc water simulations
+    % To check sonication parameters of the transducer in free water
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
         new_parameters = parameters;

@@ -1,29 +1,19 @@
 % Delete if you have rights to add paths to Matlab
-%cd /home/mrphys/kenvdzee/Documents/
-cd /home/action/elecar/
-addpath(genpath('SimNIBS-3.2'))
-%cd /home/mrphys/kenvdzee/Documents/MATLAB/
-cd /home/action/elecar/Documents/
-addpath(genpath('k-Wave'))
+cd /home/mrphys/kenvdzee/SimNIBS-4.0/
+addpath(genpath('simnibs_env'))
 
-% Change path to tuSIM folder
-%cd /home/mrphys/kenvdzee/orca-lab/project/tuSIM
-cd /home/action/elecar/orca-lab/project/tuSIM
-
-% add paths
+cd /home/mrphys/kenvdzee/Documents/PRESTUS/
 addpath('functions')
 addpath(genpath('toolboxes')) 
-%addpath /home/action/elecar/orca-lab/project/tuSIM/toolboxes
-addpath('/home/common/matlab/fieldtrip/qsub') % uncomment if you are using Donders HPC
+addpath('/home/common/matlab/fieldtrip/qsub')
 
 % Set config files and export location
-%config_left_transducer = 'sjoerd_config_opt_CTX250-011_64.5mm.yaml';
-config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
-%config_right_transducer = 'sjoerd_config_opt_CTX250-001_64.5mm.yaml';
-config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
+config_left_transducer = 'new_sjoerd_config_opt_CTX250-001_105_60.9mm.yaml';
+%config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
+config_right_transducer = 'new_sjoerd_config_opt_CTX250-001_105_60.9mm.yaml';
+%config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
 
-overwrite_option = 'always'; %change to never if i don't want to overwrite (if i have to stop the simulation
-%for example)
+overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
 reference_to_transducer_distance = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
 
@@ -38,12 +28,12 @@ for i = 1:length(files)
         subject_list = [subject_list str2num(fname(5:7))];
     end
 end
-%subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
+subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
 %subject_list = [8,14]; % Thickest skulls
 %subject_list = [3, 17]; % Most permissable skulls
-subject_list = [8];
+%subject_list = [8];
 
-correctly_named_transducers = [1, 5, 14];
+incorrectly_named_transducers = [1, 5, 14];
 
 for subject_id = subject_list
 
@@ -54,12 +44,12 @@ for subject_id = subject_list
     t1_image = niftiread(fullfile(filename_t1.folder,filename_t1.name));
     
     % Left transducer localite files
-    if ismember(subject_id, correctly_named_transducers)
-        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
-        extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
-    else
+    if ismember(subject_id, incorrectly_named_transducers)
         trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
         extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    else
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
     end
     
     % sort by datetime
@@ -73,12 +63,12 @@ for subject_id = subject_list
     left_amygdala_pos = ras_to_grid(left_amygdala_ras_pos, t1_header);
     
     % Right transducer localite file
-    if ismember(subject_id, correctly_named_transducers)
-        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
-        extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
-    else
+    if ismember(subject_id, incorrectly_named_transducers)
         trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_left*.xml',parameters.data_path, subject_id, subject_id));
         extract_dt = @(x) datetime(x.name(28:end-4),'InputFormat','yyyyMMddHHmmssSSS');
+    else
+        trig_mark_files = dir(sprintf('%ssub-%03d/localite_sub%03d_ses01_right*.xml',parameters.data_path, subject_id, subject_id));
+        extract_dt = @(x) datetime(x.name(29:end-4),'InputFormat','yyyyMMddHHmmssSSS');
     end
     
     % sort by datetime
@@ -113,8 +103,9 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
-    
+    single_subject_pipeline_with_qsub(subject_id, parameters);
+    %single_subject_pipeline(subject_id, parameters);
+
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);
     parameters.overwrite_files = overwrite_option;
@@ -128,6 +119,6 @@ for subject_id = subject_list
     parameters.focus_pos_t1_grid = targets(:,target_id)';
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
-    qsubfeval(@single_subject_pipeline_wrapper, subject_id, parameters, 'timreq',  60604,  'memreq',  50*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"');
+    single_subject_pipeline_with_qsub(subject_id, parameters);
 
 end

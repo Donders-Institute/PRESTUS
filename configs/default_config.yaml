@@ -14,7 +14,7 @@ t2_path_template: sub-%1$03d_orig_T2w.nii.gz
 #--- SimNIBS-related parameters
 
 # Path to SimNIBS binaries
-simnibs_bin_path: /home/visual/andche/SimNIBS/bin
+simnibs_bin_path: /home/mrphys/kenvdzee/SimNIBS-4.0/bin/
 
 # Only use this if you are using the Donders HPC. If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation).
 using_donders_hpc: 1
@@ -70,6 +70,11 @@ transducer:
 
 # Stimulation target on T1 grid [T1 grid space] (again, can be left out if importing location data)
 focus_pos_t1_grid: [128, 142, 75]
+
+# Expected focus distance of the transducer, measured from the exit-plane
+# (Should only be specified when importing location data or when using neither a skull or layered medium)
+# (Can be calculated by the pipeline when both the 'pos_t1_grid' and 'focus_pos_t1_grid' are known)
+expected_focal_distance_mm: 64.5
 
 # Important to note: the alpha values in 'alpha_0_true' are currently set for 500KHz transducers
 # These should be adjusted to the values shown in their respected comments below the medium parameters

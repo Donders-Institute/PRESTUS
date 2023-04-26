@@ -169,8 +169,22 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
     skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
-
-    % Crops the original segmented image in the same wave as processed one
+    
+    % Applies an expanded binary mask of neural tissue to remove abberant
+    % neural tissue in skin (to correct for a bug in Charm)
+    brain_ind = parameters.layer_labels.brain;
+    new_brain_ind = ones(1, length(brain_ind));
+    results_mask_original = changem_vectorized(smoothed_segmented_img, new_brain_ind, brain_ind);
+    results_mask_original(results_mask_original > max(brain_ind)) = 0;
+    results_mask_original = logical(results_mask_original);
+    results_mask_size = size(results_mask_original);
+    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 20), (results_mask_size(2) + 20), (results_mask_size(3) + 20)]);
+    results_mask_overlay = results_mask_overlay(11:(end-10), 11:(end-10), 11:(end-10));
+    results_mask = results_mask_original.*results_mask_overlay;
+    changed_tissue_index = find(results_mask~=results_mask_original);
+    smoothed_segmented_img(changed_tissue_index) = parameters.layer_labels.water(1);
+    
+    % Crops the original segmented image in the same way as processed one
     segmented_image_cropped = segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
 
     % Saves the skull mask in the parameters structure as the new grid dimensions
