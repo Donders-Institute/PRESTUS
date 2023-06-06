@@ -1,6 +1,5 @@
-function create_group_MNI_plots(outputs_path, subject_list, parameters, options)
+function create_group_MNI_plots(subject_list, parameters, options)
 arguments
-    outputs_path string 
     subject_list 
     parameters struct
     options.ROI_MNI_mask (:,:,:)
@@ -20,10 +19,10 @@ assert(xor(options.plot_max_intensity,options.slice_to_plot), "You should indica
 slice_labels = {'x','y','z'};
 
 
-
+outputs_path = parameters.temp_output_dir;
 bg_range_to_use = [];
 isppa_range_to_use = [5, 6];
-temp_range_to_use = [37, 37.5];    
+temp_range_to_use = [parameters.thermal.temp_0, parameters.thermal.temp_0 + 0.5];    
 
 full_subject_list = subject_list;
 % first pass: get background intensity at the target slice & isppa range
@@ -43,8 +42,12 @@ for subject_i = 1:length(full_subject_list)
     segmented_image_mni_file = fullfile(outputs_path, sprintf('%s_final_medium_masks_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     max_pressure_mni_file = fullfile(outputs_path, sprintf('%s_final_pressure_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     output_pressure_file = fullfile(outputs_path,sprintf('%s_%s_isppa%s.csv', results_prefix, parameters.simulation_medium, parameters.results_filename_affix));
+    if strcmp(parameters.segmentation_software, 'headreco')
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
+    else
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
+    end
     
-    t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     files_to_check = {t1_mni_file , segmented_image_mni_file, isppa_map_mni_file, max_pressure_mni_file, output_pressure_file};
     
     if options.plot_heating
@@ -146,8 +149,12 @@ for subject_i = 1:length(subject_list)
     isppa_map_mni_file  = fullfile(outputs_path, sprintf('%s_final_isppa_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     segmented_image_mni_file = fullfile(outputs_path, sprintf('%s_final_medium_masks_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
     max_pressure_mni_file = fullfile(outputs_path, sprintf('%s_final_pressure_MNI%s.nii.gz', results_prefix, parameters.results_filename_affix));
-    t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     output_pressure_file = fullfile(outputs_path,sprintf('%s_%s_isppa%s.csv', results_prefix, parameters.simulation_medium, parameters.results_filename_affix));
+    if strcmp(parameters.segmentation_software, 'headreco')
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
+    else
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
+    end
 
     % get T1 in MNI space
     t1_mni = niftiread(t1_mni_file);
@@ -191,6 +198,8 @@ for subject_i = 1:length(subject_list)
     end
 
     fwhm_size = sum(max_pressure_map_mni >= max_pressure/2,'all');
+    fwhm_mask(max_pressure_map_mni ~= 0) = 1;
+
     curTable = readtable(output_pressure_file);
     curTable.('fwhm_size_MNI_based_on_pressure') = fwhm_size;
 
@@ -199,8 +208,17 @@ for subject_i = 1:length(subject_list)
         
     if isfield(options,'ROI_MNI_mask')
         roi_size = sum(options.ROI_MNI_mask,'all');
-        avg_isppa_within_roi = mean(Isppa_map_mni(options.ROI_MNI_mask),'all');
+        avg_isppa_within_roi = mean(Isppa_map_mni(logical(options.ROI_MNI_mask)),'all');
+        if ~isequal((logical(options.ROI_MNI_mask.*fwhm_mask)), zeros(size(options.ROI_MNI_mask)))
+            avg_isppa_within_fwhm_and_roi_overlap = mean(Isppa_map_mni(logical(options.ROI_MNI_mask.*fwhm_mask)),'all');
+        else
+            avg_isppa_within_fwhm_and_roi_overlap = mean(avg_isppa_within_roi, 'all');
+        end
+        curTable.(sprintf('avg_isppa_within_fwhm_and_roi_overlap%s', options.outputs_suffix)) = avg_isppa_within_fwhm_and_roi_overlap;
         n_voxels_within_roi_above_thresh =  sum(options.ROI_MNI_mask & (max_pressure_map_mni >= max_pressure/2),'all');
+        props = regionprops(true(size(options.ROI_MNI_mask)), options.ROI_MNI_mask, 'WeightedCentroid');
+        dist_between_Isppa_and_center_of_ROI = norm(max_focus_MNI_grid - props.WeightedCentroid);
+        curTable.(sprintf('dist_between_Isppa_and_center_of_ROI%s', options.outputs_suffix)) = dist_between_Isppa_and_center_of_ROI;
         curTable.(sprintf('avg_isppa_within_roi%s', options.outputs_suffix)) = avg_isppa_within_roi;
         curTable.(sprintf('perc_voxels_within_roi%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/roi_size;
         curTable.(sprintf('perc_voxels_within_fwhm%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/fwhm_size;
@@ -251,10 +269,13 @@ for subject_i = 1:length(subject_list)
 end
 
 % combine individual images in a single image
-
-suffix_list = {sprintf('maxT_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix),...
-    sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)
-    };
+if options.plot_heating == 1
+    suffix_list = {sprintf('maxT_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix),...
+        sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)
+        };
+else
+    suffix_list = sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix);
+end
 
 for suffix_cell = suffix_list
     suffix = suffix_cell{:};
