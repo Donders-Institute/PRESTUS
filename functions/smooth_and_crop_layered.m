@@ -19,48 +19,78 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     labels = fieldnames(parameters.layer_labels);
     % Adds a smoothing threshold to bone and other non-water tissue.
     
+    layer_labels = parameters.layer_labels;
+
+    % labels to be determined
+    default_value = -1; % default label value so in mask non found values can be distinguished
+    water_label = default_value;
+    brain_label = default_value;
+    skin_label = default_value;
+    cortical_label = default_value;
+    trabecular_label = default_value;
+    all_skull_labels = default_value; % combine all skull masks for smoothing
     for label_i = 1:length(labels)
+        sim_nibs_layers = layer_labels.(labels{label_i});
+        smooth_threshold = parameters.other_smooth_threshold;
+
         if strcmp(labels{label_i}, 'water')
-           continue
-        end
-        sim_nibs_layers = parameters.layer_labels.(labels{label_i});
-        layer_mask = ismember(segmented_img, sim_nibs_layers);
-        if contains(labels{label_i}, 'skull')
-            smooth_threshold = parameters.skull_smooth_threshold;    
-            if any(contains(labels,  'skull_cortical')) % two bone types are smoothed together later
-                continue
+            water_label = sim_nibs_layers;
+            continue
+        elseif strcmp(labels{label_i},  'brain')
+            brain_label = sim_nibs_layers;
+        elseif strcmp(labels{label_i},  'skin')
+            skin_label = sim_nibs_layers;
+        elseif contains(labels{label_i}, 'skull')
+            if strcmp(labels{label_i},  'skull_cortical')
+                cortical_label = sim_nibs_layers;
+                % if all_skull_labels is equal to default, remove default
+                % value
+                if all_skull_labels == default_value
+                    all_skull_labels = cortical_label;
+                else
+                    all_skull_labels = [all_skull_labels cortical_label];
+                end
+                continue % two bone types are smoothed together later
+            elseif strcmp(labels{label_i},  'skull_trabecular')
+                trabecular_label = sim_nibs_layers;
+                % if all_skull_labels is equal to default, remove default
+                % value
+                if all_skull_labels == default_value
+                    all_skull_labels = trabecular_label;
+                else
+                    all_skull_labels = [all_skull_labels trabecular_label];
+                end
+                continue % two bone types are smoothed together later
+            else
+                smooth_threshold = parameters.skull_smooth_threshold; % override smooth threshold
+                % if all_skull_labels is equal to default, remove default
+                % value
+                if all_skull_labels == default_value
+                    all_skull_labels = sim_nibs_layers;
+                else
+                    all_skull_labels = [all_skull_labels sim_nibs_layers];
+                end
             end
-        else
-            smooth_threshold = parameters.other_smooth_threshold;
         end
-        
-        layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
-        smoothed_segmented_img(layer_mask_smoothed~=0) = label_i;
+
+        % smooth mask per layer
+        for layer = sim_nibs_layers
+            layer_mask = ismember(segmented_img, layer); % determine mask
+            layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
+            smoothed_segmented_img(layer_mask_smoothed~=0) = layer;
+        end
     end
     
     % fill gaps in the skull by using the boundary of a bone image
-
     if any(contains(labels,  'skull_cortical'))  
-        skull_i = find(strcmp(labels,  'skull_cortical')); % gives to skull_i the index of skull_cortical in labels array
-
-        % combine all skull masks for smoothing
-        % 1) find all skull_layer ids
-        layer_labels = parameters.layer_labels;
-        all_skull_ids = [];
-        for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
-        end
-        layer_mask = ismember(segmented_img, all_skull_ids);
+        layer_mask = ismember(segmented_img, all_skull_labels);
         smooth_threshold = parameters.skull_smooth_threshold;
         layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
-        smoothed_segmented_img(layer_mask_smoothed~=0) = skull_i; % add it to image as cortical bone
-        trabecular_i = find(strcmp(labels,  'skull_trabecular'));
-        trabecular_mask = ismember(segmented_img, parameters.layer_labels.(labels{trabecular_i}));
+        smoothed_segmented_img(layer_mask_smoothed~=0) = cortical_label; % add it to image as cortical bone
+        
+        trabecular_mask = ismember(segmented_img, trabecular_label);
         trabecular_mask_smoothed = smooth_img(trabecular_mask, windowSize, smooth_threshold);
-        smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_i;
-
-    else
-        skull_i = find(strcmp(labels,  'skull')); % gives to skull_i the index of skull in labels array, because find finds the index of each non zero element --> where labels == 'skull'
+        smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_label; % add it to image as trabecular bone
     end
 
     imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
@@ -68,23 +98,28 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     title('Original (left) and smoothed (right) segmented image')
     export_fig(output_plot, '-native')
 
-    if any(contains(labels,  'skull'))        
-        skull = smoothed_segmented_img==skull_i;
-        % skull is 1 when smoothed segm img == skull_i (=4 by default in headreco) and it is 0 otherwise
+    if any(contains(labels,  'skull'))    
+        % get skull mask (trabecular and cortical)
+        skull = ismember(smoothed_segmented_img, all_skull_labels);
+
+        % skull is 1 when smoothed segm img == all_skull_labels (=4 by default in headreco, =7,8 by default in charm) and it is 0 otherwise
         smoothed_bone_img = smooth_img(bone_img, windowSize, parameters.skull_smooth_threshold);
         bone_perimeter = smoothed_bone_img - imerode(smoothed_bone_img, strel('cube',3));
         new_skull = skull | bone_perimeter;
         figure;
         montage({squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, ...
             squeeze(bone_perimeter(:,focus_pos_upsampled_grid(2),:))*255, squeeze(new_skull(:,focus_pos_upsampled_grid(2),:))*255},gray, 'Size',[1 3])
-        smoothed_segmented_img(new_skull) = skull_i;
+        
+        smoothed_segmented_img(new_skull) = cortical_label;
     end
     %% remove gaps between skull & skin
     if any(contains(labels,  'skull')) && any(strcmp(labels,  'skin'))
-        skin_i = find(strcmp(labels,  'skin')); % skin_i = 3 because skin is the 3rd element in labels [by default]
-        
-        skin = smoothed_segmented_img==skin_i;
-        skull = smoothed_segmented_img==skull_i;
+
+        % get skin mask
+        skin = ismember(smoothed_segmented_img, skin_label);
+
+        % get skull mask (trabecular and cortical)
+        skull = ismember(smoothed_segmented_img, all_skull_labels);
         
         skin_skull = skin+skull;
         
@@ -97,9 +132,12 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         [~, sortIndexes] = sort(allAreas, 'descend');
         biggestBlob = ismember(labeledImage, sortIndexes(2));
 
-        smoothed_segmented_img((skin_skull_filled-skin_skull -  biggestBlob)>0) = skull_i;
-        if any(contains(labels,  'skull_cortical'))  
-        smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_i; % makes sure that the trabecular mask is not affected
+        smoothed_segmented_img((skin_skull_filled-skin_skull -  biggestBlob)>0) = cortical_label;
+
+        if any(contains(labels,  'skull_cortical'))
+            layer_mask = ismember(segmented_img, trabecular_label);
+            trabecular_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
+            smoothed_segmented_img(trabecular_mask_smoothed~=0) = trabecular_label; % makes sure that the trabecular mask is not affected
         end
     end
     
@@ -169,7 +207,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     % Crops the processed segmented image
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
-    skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
+    skull_edge = edge3(ismember(smoothed_segmented_img, all_skull_labels), 'approxcanny',0.1);
     %{
     % Applies an expanded binary mask of neural tissue to remove abberant
     % neural tissue in skin (to correct for a bug in Charm)
@@ -253,4 +291,3 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     
     
 end
-
