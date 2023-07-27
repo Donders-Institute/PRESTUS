@@ -281,24 +281,35 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     layer_labels = parameters.layer_labels;
     labels = fieldnames(parameters.layer_labels);
     all_skull_ids = [];
-        for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
+    all_brain_ids = [];
+    all_skin_ids = [];
+    for i = range(1:size(labels))
+        if contains(labels(i), 'skull')
+            all_skull_ids = [all_skull_ids layer_labels.(labels{i})];
+        elseif contains(labels(i), 'brain')
+            all_brain_ids = [all_brain_ids layer_labels.(labels{i})];
+        elseif contains(labels(i), 'skin')
+            all_skin_ids = [all_skin_ids layer_labels.(labels{i})];
         end
+    end
+
+    % Create masks of different regions
     skull_mask = ismember(medium_masks,all_skull_ids);
+    brain_mask = ismember(medium_masks,all_brain_ids);
+    skin_mask = ismember(medium_masks,all_skin_ids);
 
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, medium_masks>0 & medium_masks<3);
-        half_max = Isppa_map >= max_Isppa_brain/2 & medium_masks>0 & medium_masks<3;
+        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, brain_mask);
+        half_max = Isppa_map >= max_Isppa_brain/2 & brain_mask;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
 
-
-        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, medium_masks>0 & medium_masks<3);
+        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, brain_mask);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
         [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==5);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==5);
+        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, skin_mask);
+        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, skin_mask);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
@@ -317,7 +328,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
         plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
-    export_fig(output_plot, '-native')
+    export_fig(output_plot, '-native');
     close;
 
     %% RUN HEATING SIMULATIONS
@@ -365,9 +376,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            output_table.maxT_brain = gather(masked_max_3d(maxT, medium_masks>0 & medium_masks<3));
+            output_table.maxT_brain = gather(masked_max_3d(maxT, brain_mask));
             output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
-            output_table.maxT_skin = gather(masked_max_3d(maxT, medium_masks==5));
+            output_table.maxT_skin = gather(masked_max_3d(maxT, skin_mask));
         end
         writetable(output_table, output_pressure_file);
 
