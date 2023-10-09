@@ -286,10 +286,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     
     % Creates a skull mask
+    layer_labels = parameters.layer_labels;
     labels = fieldnames(parameters.layer_labels);
     all_skull_ids = [];
         for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
+            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
         end
     skull_mask = ismember(medium_masks,all_skull_ids);
 
