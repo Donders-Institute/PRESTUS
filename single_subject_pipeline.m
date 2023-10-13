@@ -32,11 +32,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     if ~any(ismember(functionsLoc,allPaths))
         addpath(functionsLoc);
+        disp(['Adding ', functionsLoc]);
     else
     end
 
     if ~any(ismember(toolboxesLoc,allPaths))
         addpath(genpath(toolboxesLoc));
+        disp(['Adding ', toolboxesLoc, 'and subfolders']);
     else
     end
 
@@ -47,18 +49,24 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
-        for nPaths = length(parameters.paths_to_add)
-            addpath(parameters.paths_to_add(nPaths))
+        for nPaths = 1:length(parameters.paths_to_add)
+            addpath(parameters.paths_to_add{nPaths})
+            disp(['Adding ', parameters.paths_to_add{nPaths}]);
         end
     end
 
     % If the path and subpaths need to be added, use this instead
     if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
-        for nPaths = length(parameters.subpaths_to_add)
-            addpath(genpath(parameters.subpaths_to_add(nPaths)))
+        for nPaths = 1:length(parameters.subpaths_to_add)
+            addpath(genpath(parameters.subpaths_to_add{nPaths}))
+            disp(['Adding ', parameters.subpaths_to_add{nPaths}, 'and subfolders']);
         end
     end
 
+    % test that kwave is added
+    if ~exist('makeBowl','file')
+        error('kwave not added');
+    end
     
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
@@ -313,12 +321,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     if parameters.n_sim_dims==3
-        plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
     else
-        plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
-    export_fig(output_plot, '-native')
-    close;
+    saveas(h, output_plot, 'png')
+    close(h);
 
     %% RUN HEATING SIMULATIONS
     % =========================================================================
@@ -378,6 +386,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Creates a line graph and a video of the heating effects
         plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks);
         
+        maxT = gather(maxT);
+
         % Plots the maximum temperature in the segmented brain
         if max(maxT(:)) < 38
             temp_color_range = [37, 38];
@@ -385,11 +395,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             temp_color_range = [37, max(maxT(:))];
         end
 
-        maxT = gather(maxT);
-        plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-        export_fig(output_plot, '-native')
-        close;
+        export_fig(output_plot, h, '-native')
+        close(h);
     end
 
     %% Plots the data on the original T1 image and in MNI space
@@ -444,13 +453,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                             size(t1_image_orig), t1_header.PixelDimensions(1));
         
                 % Plots the Isppa over the untransformed image
-                plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
+                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
         
                 output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_orig%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
-                export_fig(output_plot, '-native')
-                close;
+                export_fig(output_plot, h, '-native')
+                close(h);
             end
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
@@ -480,6 +489,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         new_parameters.simulation_medium = 'water';
         new_parameters.run_heating_sims = 0;
         new_parameters.default_grid_dims = new_parameters.grid_dims;
+        % restore subject-specific path to original path if done earlier in this function
+        if isfield(new_parameters,'subject_subfolder') && new_parameters.subject_subfolder == 1
+            new_parameters.output_dir = fileparts(new_parameters.output_dir);
+        end
         single_subject_pipeline(subject_id, new_parameters);
     end
     disp('Pipeline finished successfully');

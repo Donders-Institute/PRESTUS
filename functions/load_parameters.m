@@ -3,14 +3,7 @@ function parameters = load_parameters(varargin)
     
     if nargin == 1
         extra_config_file = varargin{1};
-        extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true);
-        %assert(extra_parameters.transducer.source_freq_hz == parameters.default_freq || isfield(extra_parameters,'medium'), 'The transducer frequency does not match the frequency used for the medium parameters in the default config file. Provide medium parameters in your config.')
-        
-%         if (extra_parameters.transducer.source_freq_hz ~= parameters.default_freq) && ~isfield(extra_parameters,'medium')
-%             warning('The transducer frequency does not match the frequency used for the medium parameters in the default config file. Recalculating aMake sure that the medium parameters in your config file account for the correct frequency.')
-%             
-%         end
-            
+        extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true);         
         parameters = MergeStruct(parameters, extra_parameters);
     end
 
@@ -87,8 +80,10 @@ function parameters = load_parameters(varargin)
         assert(exist(parameters.ld_library_path, 'dir'), 'The path in parameters.ld_library_path does not exist')
     end
     
-    assert(exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file'), sprintf('The path segmentation software (%s) does not exist at %s.', parameters.segmentation_software, parameters.simnibs_bin_path))
-     
+    if isfield(parameters, 'simnibs_bin_path') && parameters.simnibs_bin_path ~= ""
+        assert(exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file'), sprintf('The path segmentation software (%s) does not exist at %s.', parameters.segmentation_software, parameters.simnibs_bin_path))
+    end
+    
     % set segmentation path to data_path if no specific seg_path is defined
     if ~isfield(parameters, 'seg_path') || parameters.seg_path == ""
         parameters.seg_path = parameters.data_path;
