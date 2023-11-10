@@ -52,6 +52,17 @@ In case of problems, a) look at the plots in the data folder, do they look fine?
 
 Finally, if the simulations on the GPU run more than two hours, it is likely that something is wrong. Most likely, you forgot to switch interactive flag to zero and they are stuck because a confirmation is required from the user to start. 
 
+# Authorship
+
+The initial version was developed by Andrey Chetverikov (website: http://andreychetverikov.org, GitLab: @A.Chetverikov, GitHub: https://github.com/achetverikov).
+
+# Contributors
+
+- Kenneth van der Zee (GitLab: @kenneth.vanderzee, GitHub: https://github.com/KTZ228)
+- Julian Kosciessa (GitLab: @julian-kosciessa, GitHub: https://github.com/jkosciessa)
+- Matthias Ekman (GitLab: @m.ekman, GitHub: https://github.com/mekman)
+- Eleonora Carpino (GitLab: @eleonora.carpino, GitHub: https://github.com/eleonoracarpino)
+
 # License
 
 Released under GNU General Public License v3.0 (see LICENSE).
