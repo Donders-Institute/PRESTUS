@@ -1,5 +1,3 @@
-**NOTE: This repository is now archived, the development continues at https://gitlab.socsci.ru.nl/fus-initiative/PRESTUS**
-
 This is a set of functions for ultrasonic simulations including brain preprocessing, extracting data from Localite neuronavigation files, and more. 
 
 The examples folder contains some examples of how to run the pipeline, including a tutorial.
