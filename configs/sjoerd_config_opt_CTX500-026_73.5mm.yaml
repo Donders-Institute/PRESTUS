@@ -1,8 +1,7 @@
 # Location of stored data
-data_path: /project/3023001.06/Simulations/all_files_with_output/
-simnibs_env_path: /home/mrphys/kenvdzee/SimNIBS-3.2/simnibs_env
+data_path: /project/3023001.06/Simulations/data_for_prestus/
 subject_subfolder: 1 # Should each participants output be stored in a separate folder?
-output_location: heating_skull/500KHz/
+output_location: heating_skull/500KHz/  #see 250 to change it
 
 # Structure of subfolders containing T1 and T1 images
 ## It is easier to store the subject data of each participant in an individual subfolder

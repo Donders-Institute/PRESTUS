@@ -8,21 +8,22 @@ display('Checking thermal parameters...');
 % Calculates the duration of a duty cycle in seconds
 % If no on_off_step_duration is specified, a duty cycle must be
 if ~isfield(parameters.thermal,'on_off_step_duration')
-    % The following makes no sense to me, as sim_time_steps is an internal computation metric that is uninformative about stimulation.
-    warning("Please specify the on_off_step_duration!")
-    % if parameters.thermal.duty_cycle > 0 && parameters.thermal.duty_cycle < 1
-    %     on_off_step_duration = parameters.thermal.sim_time_steps/min([parameters.thermal.duty_cycle 1-parameters.thermal.duty_cycle ]); % one on+off cycle duration
-    % else
-    %     on_off_step_duration = parameters.thermal.sim_time_steps;
-    % end
+    if parameters.thermal.duty_cycle > 0 && parameters.thermal.duty_cycle < 1
+        on_off_step_duration = parameters.thermal.sim_time_steps/min([parameters.thermal.duty_cycle 1-parameters.thermal.duty_cycle ]); % one on+off cycle duration
+    else
+        on_off_step_duration = parameters.thermal.sim_time_steps;
+    end
 else 
     on_off_step_duration = parameters.thermal.on_off_step_duration;
 end
+
+
 
 % Amount of steps to be simulated
 on_off_repetitions = parameters.thermal.stim_duration/on_off_step_duration;
 
 fprintf('Duration of 1 repetition of the on+off cycle: %.3f s; repeated for %.2f times.\n', on_off_step_duration, on_off_repetitions)
+
 
 % Shows a arguments that must be met for k-wave to accept the parameters of
 % 'on_off_step_duration' and 'sim_time_step'
@@ -62,9 +63,8 @@ if  isfield(parameters.thermal,'equal_steps') && parameters.thermal.equal_steps 
     off_steps_dur = on_off_step_duration*(1-parameters.thermal.duty_cycle);
     on_steps_n  = 1;
     off_steps_n = 1;
-    fprintf('Time steps allowed to be unequal. 1 on+off cycle contains %.3f on steps and %.3f off steps assuming equal steps of %.3f s each.\n', on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
-    % This description is confusing, as the number of steps is coupled to
-    % the duration, NOT the equal step size.
+    fprintf('Time steps allowed to be unequal. 1 on+off cycle contains %.2f on steps and %.2f off steps assuming equal steps of %.2f s each.\n', on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
+
 else
     on_steps_dur = parameters.thermal.sim_time_steps;
     off_steps_dur = parameters.thermal.sim_time_steps;
