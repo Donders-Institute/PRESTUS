@@ -78,34 +78,30 @@ colormap(gray(80))
 % skin_isosurface.vertices = skin_isosurface.vertices - origin_shift;
 hiso = patch(skin_isosurface,...
    'FaceColor',[1,.75,.65],...
-   'EdgeColor','none',...
-   'facealpha',0.8);
+   'EdgeColor','none');
 isonormals(Ds,hiso);
 
 end_slices = isocaps(for_caps*10,4);
 % end_slices.vertices = end_slices.vertices - origin_shift;
 hcap = patch(end_slices,...
    'FaceColor','interp',...
-   'EdgeColor','none',...
-   'facealpha',0.8);
+   'EdgeColor','none');
 lighting gouraud
 hcap.AmbientStrength = 0.6;
 hiso.SpecularColorReflectance = 0;
 hiso.SpecularExponent = 50;
 
 origin_shift = origin_shift([2,1,3]);
-if crop_at_target == [0,0,0]
-    orth_plane_3d_surf = isosurface(orth_plane_3d(1:2:end,1:2:end,1:2:end));
-    orth_plane_3d_surf.vertices = orth_plane_3d_surf.vertices - origin_shift;
-    patch(orth_plane_3d_surf,...
-       'FaceColor','blue',...
-       'EdgeColor','none');
-end
+orth_plane_3d_surf = isosurface(orth_plane_3d(1:2:end,1:2:end,1:2:end));
+orth_plane_3d_surf.vertices = orth_plane_3d_surf.vertices - origin_shift;
+patch(orth_plane_3d_surf,...
+   'FaceColor','blue',...
+   'EdgeColor','none');
 
 sphere_surf = isosurface(smooth3(sphere_3d(1:2:end,1:2:end,1:2:end)));
 sphere_surf.vertices = sphere_surf.vertices - origin_shift;
 
-patch(sphere_surf,'FaceColor','red','EdgeColor','red','facealpha',0.8)
+patch(sphere_surf,'FaceColor','red','EdgeColor','red')
 
 if ~isempty(view_angle)
     view(view_angle)
@@ -118,10 +114,10 @@ if any(origin_shift)
     axis(reshape([-origin_shift ; -origin_shift + original_size ], [1 6]));
 end
 if view_angle(1) < 0
-    camlight('right')
+    camlight right
     %l = lightangle(-45,30);
 else
-    camlight('left')
+    camlight left
     %l = lightangle(45,30);
 end
 
