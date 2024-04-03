@@ -8,15 +8,11 @@ function [thermal_diff_obj, time_status_seq, maxT,focal_planeT] = run_heating_si
 % 'sim_time_steps' with the total of one duty cycle being           %
 % represented as the 'on_off_step_duration'.                        %
 % The stable state of the acoustic simulations (what is seen in the %
-% figures) is used as the input for the temperature simulations.    %
+% figures and nifti files) is used as the input for the temperature %
+% simulations.                                                      %
 %                                                                   %
-% Some notes:                                                       %
-% As can be seen in the explanations in lines 51 to 53, these two   %
-% values can be any value between 0 and 1 but they have to meet the %
-% following constraints:                                            %
-% on_off_step_duration * duty_cycle / stim_time_steps = integer     %
-% on_off_step_duration * (1-duty_cycle) / stim_time_steps = integer %
-% cycle_duration / onf_off_step_duration = integer                  %
+% For a detailed explanation on how to correctly configure your     %
+% thermal parameters, see thermal simulations getting started.      %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 % Convert the absorption coefficient to nepers/m

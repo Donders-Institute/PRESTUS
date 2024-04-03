@@ -75,7 +75,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     [t1_with_trans_img, transducer_pars] = plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters);
     imshow(t1_with_trans_img);
     title('T1 with transducer');
-    export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_with_transducer_orig%s.png', subject_id, parameters.results_filename_affix)), '-native');
+    export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_with_transducer_before_smoothing_and_cropping%s.png', subject_id, parameters.results_filename_affix)), '-native');
     close;
     
     %% SEGMENTATION using SimNIBS
@@ -89,7 +89,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     else 
         filename_segmented = fullfile(segmentation_folder, sprintf('sub-%03d_final_contr.nii.gz', subject_id));
     end
-    % Starts the segmentation, see 'run_headreco' for more documentation
+    % Starts the segmentation, see 'run_segmentation' for more documentation
     if confirm_overwriting(filename_segmented, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented, 'file'))
         % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
@@ -136,7 +136,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         figure;
         imshow(segm_img_montage)
         title('Rotated (left) and original (right) segmented T1');
-        export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_segmented%s.png', subject_id, parameters.results_filename_affix)),'-native');
+        export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_segmented_after_rotating_and_scaling%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
         % The function to rotate and scale the original T1 to line up with the transducer's axis
@@ -144,7 +144,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         figure;
         imshow(t1_rr_img_montage)
         title('Rotated (left) and original (right) original T1');
-        export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
+        export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_after_rotating_and_scaling%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
         
         if strcmp(parameters.segmentation_software, 'charm') % create filled bone mask as charm doesn't make it itself
@@ -196,7 +196,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     % Plot the different slices and an overlay for comparison
     montage(cat(4, t1_slice*255, skin_skull_img*255, imfuse(mat2gray(t1_slice), skin_skull_img, 'blend')) ,'size',[1 NaN]);
     title('T1 and SimNIBS skin (green) and skull (blue) masks');
-    export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_skin_skull%s.png', subject_id, parameters.results_filename_affix)), '-native')
+    export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_skin_skull_mask%s.png', subject_id, parameters.results_filename_affix)), '-native')
     close;
     
     %% SMOOTH & CROP SKULL
@@ -252,7 +252,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         disp(backtransf_coordinates)
         exit()
     end
-    output_plot_filename = fullfile(parameters.output_dir, sprintf('sub-%03d_positioning%s.png', subject_id, parameters.results_filename_affix));
+    output_plot_filename = fullfile(parameters.output_dir, sprintf('sub-%03d_positioning_preview%s.png', subject_id, parameters.results_filename_affix));
     show_positioning_plots(...
         segmented_img_orig,...
         segmented_hdr_orig.PixelDimensions(1), ...

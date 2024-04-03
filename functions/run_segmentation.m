@@ -19,10 +19,24 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     end
 
     if strcmp(parameters.segmentation_software, 'charm')
+        % Check if the last file produced in the charm pipeline exists. If
+        % other files are missing Charm will produce the '--forcerun has to 
+        % be set' error. Setting 'overwrite_simnibs' to 1 will resolve this.
+        result_simnibs = sprintf('%sm2m_sub-%03d/final_tissues.nii.gz', parameters.seg_path, subject_id);
+        if ~exist(result_simnibs, 'file')
+            parameters.overwrite_simnibs = 1;
+        end
+        
         segment_call = sprintf('charm %s %s %s',...
             subj_id_string,filename_t1,filename_t2);
+        if isfield(parameters, 'overwrite_simnibs') && parameters.overwrite_simnibs == 1
+            segment_call = [segment_call ' --forcerun'];
+        end
         if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
             segment_call = [segment_call ' --forceqform'];
+        end
+        if isfield(parameters, 'charm_debug') && parameters.charm_debug == 1
+            segment_call = [segment_call ' --debug'];
         end
     else
         segment_call = sprintf('headreco all %s %s %s -d no-conform',...

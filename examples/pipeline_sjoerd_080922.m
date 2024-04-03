@@ -1,17 +1,22 @@
 % Delete if you have rights to add paths to Matlab
-cd /home/mrphys/kenvdzee/SimNIBS-4.0/
+cd /home/affneu/kenvdzee/SimNIBS-4.0/
 addpath(genpath('simnibs_env'))
 
-cd /home/mrphys/kenvdzee/Documents/PRESTUS/
+cd /home/affneu/kenvdzee/Documents/PRESTUS/
 addpath('functions')
 addpath(genpath('toolboxes')) 
 addpath('/home/common/matlab/fieldtrip/qsub')
 
+run_500KHz = 0;
+
 % Set config files and export location
-config_left_transducer = 'new_sjoerd_config_opt_CTX250-001_105_60.9mm.yaml';
-%config_left_transducer = 'sjoerd_config_opt_CTX500-024_72.6mm.yaml';
-config_right_transducer = 'new_sjoerd_config_opt_CTX250-001_105_60.9mm.yaml';
-%config_right_transducer = 'sjoerd_config_opt_CTX500-026_73.5mm.yaml';
+if run_500KHz == 0
+    config_left_transducer = 'sjoerd_config_opt_CTX250-001_203_60.9mm.yaml';
+    config_right_transducer = 'sjoerd_config_opt_CTX250-026_105_61.5mm.yaml';
+else
+    config_left_transducer = 'sjoerd_config_opt_CTX500-024_203_77.3mm.yaml';
+    config_right_transducer = 'sjoerd_config_opt_CTX500-026_105_79.6mm.yaml';
+end
 
 overwrite_option = 'always';
 parameters = load_parameters(config_left_transducer);
@@ -29,9 +34,6 @@ for i = 1:length(files)
     end
 end
 subject_list = [1,3,4,5,8,9,10,14,17,18,19]; % Temporary, selects subjects with complete files
-%subject_list = [8,14]; % Thickest skulls
-%subject_list = [3, 17]; % Most permissable skulls
-%subject_list = [8];
 
 incorrectly_named_transducers = [1, 5, 14];
 
@@ -104,7 +106,6 @@ for subject_id = subject_list
     parameters.results_filename_affix = sprintf('_target_%s', target_names{target_id});
     parameters.interactive = 0;
     single_subject_pipeline_with_qsub(subject_id, parameters);
-    %single_subject_pipeline(subject_id, parameters);
 
     % Simulations for right amygdala
     parameters = load_parameters(config_right_transducer);

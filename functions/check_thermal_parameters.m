@@ -3,7 +3,7 @@ arguments
     parameters struct
 end
 
-display('Checking thermal parameters...');
+disp('Checking thermal parameters...');
 
 % Calculates the duration of a duty cycle in seconds
 % If no on_off_step_duration is specified, a duty cycle must be
@@ -13,7 +13,7 @@ if ~isfield(parameters.thermal,'on_off_step_duration')
     else
         on_off_step_duration = parameters.thermal.sim_time_steps;
     end
-else 
+else
     on_off_step_duration = parameters.thermal.on_off_step_duration;
 end
 
@@ -25,7 +25,7 @@ on_off_repetitions = parameters.thermal.stim_duration/on_off_step_duration;
 fprintf('Duration of 1 repetition of the on+off cycle: %.3f s; repeated for %.2f times.\n', on_off_step_duration, on_off_repetitions)
 
 
-% Shows a arguments that must be met for k-wave to accept the parameters of
+% Shows an argument that must be met for k-wave to accept the parameters of
 % 'on_off_step_duration' and 'sim_time_step'
 on_off_repetitions = round_if_integer(on_off_repetitions, sprintf('The total stimulation duration (%.3f s) should be divisible by the on+off cycle duration (%.3f s)\n',parameters.thermal.stim_duration, on_off_step_duration));
 
@@ -48,8 +48,12 @@ else
     post_stim_time_step_dur = parameters.thermal.post_stim_time_step_dur;
 end
 
-% Defines the number of post stimulation steps
-post_stim_period = parameters.thermal.iti - parameters.thermal.stim_duration;
+% Defines the number of post stimulation steps, sets the post_stim_period to 0 if a continuous protocol is used
+if isfield(parameters.thermal,'continuous_protocol') && parameters.thermal.continuous_protocol == 1
+    post_stim_period = 0;
+else
+    post_stim_period = parameters.thermal.iti - parameters.thermal.stim_duration;
+end
 post_stim_steps_n = post_stim_period / post_stim_time_step_dur;
 
 fprintf('Post-stimulation off period is %.2f s, consists of %.2f simulation steps, each taking %.2f s.\n', post_stim_period, post_stim_steps_n, post_stim_time_step_dur)
