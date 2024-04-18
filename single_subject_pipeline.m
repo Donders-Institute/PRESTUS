@@ -77,7 +77,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     if ~isfolder(parameters.output_dir)
         mkdir(parameters.output_dir);
-    end        
+    end
+    if ~isfolder(parameters.seg_path)
+        mkdir(parameters.seg_path);
+    end
     
     % Save parameters to have a backlog
     parameters_file = fullfile(parameters.output_dir, sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
@@ -92,7 +95,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     %% Start of simulations
     % Creates an output file to which output is written at a later stage
-    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Tries an alternative method to calculate the expected focal distance
     % if none is entered into the config file
@@ -235,11 +238,15 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     % What is the highest pressure level for every gridpoint
     data_max = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
+    max_pressure = max(data_max(:));
 
     % Calculates the Isppa for every gridpoint
-    Isppa_map = data_max.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4; 
+    Isppa_map = data_max.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
     % Calculates the max Isppa
     max_Isppa = max(Isppa_map(:));
+
+    % Calculates the Mechanical Index for every gridpoint
+    MI_map = (data_max/10^6)/sqrt((parameters.transducer.source_freq_hz/10^6));
 
     % Creates the foundation for a mask before the exit plane to calculate max values outside of it
     comp_grid_size = size(sensor_data.p_max_all);
@@ -285,13 +292,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % Reports the Isppa within the original stimulation target
     isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     
-    % Creates a skull mask
-    layer_labels = parameters.layer_labels;
+    % Creates a logical skull mask and register skull_ids
     labels = fieldnames(parameters.layer_labels);
-    all_skull_ids = [];
-        for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
-        end
+    skull_i = find(strcmp(labels,  'skull_cortical'));
+    trabecular_i = find(strcmp(labels,  'skull_trabecular'));
+    all_skull_ids = [skull_i, trabecular_i];
     skull_mask = ismember(medium_masks,all_skull_ids);
 
     % Overwrites the max Isppa by dividing it up into the max Isppa for
@@ -301,20 +306,22 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         half_max = Isppa_map >= max_Isppa_brain/2 & medium_masks>0 & medium_masks<3;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
 
-
         [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, medium_masks>0 & medium_masks<3);
+        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(MI_map, medium_masks>0 & medium_masks<3);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
         [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
+        [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(MI_map, skull_mask);
         [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==5);
         [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==5);
+        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(MI_map, medium_masks==5);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_brain, max_Isppa_skull, max_pressure_brain, max_pressure_skull, max_Isppa_skin, max_pressure_skin, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
+        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
     else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
         max_Isppa = max(Isppa_map(:)); %  Does this step need to be included? already done at line 225.
         highlighted_pos = max_isppa_eplane_pos;
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
+        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
     end
 
     % Plots the Isppa on the segmented image
@@ -412,8 +419,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         for data_type = data_types
             orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
                 subject_id, data_type, parameters.results_filename_affix));
-            mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz', subject_id, data_type, parameters.results_filename_affix));
-
+            mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz',...
+                subject_id, data_type, parameters.results_filename_affix));
 
             if strcmp(data_type, "isppa")
                 data = Isppa_map;
@@ -445,7 +452,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 end
                 niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true)
             else 
-                data_backtransf = niftiread(orig_file_with_ext );
+                data_backtransf = niftiread(orig_file_with_ext);
             end
             if strcmp(data_type, "isppa")
                 % Creates a visual overlay of the transducer
@@ -456,10 +463,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 [~,~,~,~,~,~,~,h]=plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
-        
-                output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_orig%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
-                export_fig(output_plot, h, '-native')
-                close(h);
+                output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_t1_before_smoothing_and_cropping%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
+                export_fig(output_plot, '-native')
+                close;
             end
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
@@ -470,14 +476,24 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             if strcmp(parameters.segmentation_software, 'headreco')
                 
                 if strcmp(data_type, "medium_masks")
-                   convert_final_to_MNI(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file,  'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
+                   convert_final_to_MNI_matlab(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file,  'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
                 else
-                   convert_final_to_MNI(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file);
+                   convert_final_to_MNI_matlab(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file);
                 end
             elseif strcmp(parameters.segmentation_software, 'charm')
-                convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters);
+                convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters, 'interpolation_order', 0);
             end
         
+        end
+        
+        % Since charm does not transform the T1 into MNI space, one is manually created here
+        if strcmp(parameters.segmentation_software, 'charm')
+            path_to_input_img = fullfile(m2m_folder,'T1.nii.gz');
+            path_to_output_img = fullfile(m2m_folder,'toMNI/T1_to_MNI_post-hoc.nii.gz');
+
+            if ~exist(path_to_output_img,'file')
+                convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters)
+            end
         end
     end
     

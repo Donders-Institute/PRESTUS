@@ -5,6 +5,11 @@ function parameters = load_parameters(varargin)
         extra_config_file = varargin{1};
         extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true);         
         parameters = MergeStruct(parameters, extra_parameters);
+    elseif nargin == 2
+        extra_config_file = varargin{1};
+        extra_config_location = varargin{2};
+        extra_parameters = yaml.loadFile(fullfile(extra_config_location,extra_config_file), "ConvertToArray", true);
+        parameters = MergeStruct(parameters, extra_parameters);
     end
 
     assert(parameters.interactive==0 || usejava('desktop'), 'Matlab should run in desktop mode if parameters.interactive is enabled in PRESTUS config');

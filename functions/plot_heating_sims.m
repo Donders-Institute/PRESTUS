@@ -10,7 +10,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         brain_img (:,:,:) double
     end
     %new_transducer_pos = parameters.transducer.pos_grid - heating_window_dims(1,:) + 1;
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_by_time%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_by_time_linegraph%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     % assuming that transducer and focus are aligned the z-axis
     % transducer_plane_final_temperature = squeeze(kwaveDiffusion.T(:, new_transducer_pos(2), :));
     if gpuDeviceCount==0
@@ -45,7 +45,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
     brain_slice = mat2gray(squeeze(brain_img(:,parameters.transducer.pos_grid(2),:)));
 
-    output_video_name = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_video_name = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_animation%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     v = VideoWriter(output_video_name,'Uncompressed AVI');
     v.FrameRate = 2; % frames per second
 
