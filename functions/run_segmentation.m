@@ -20,7 +20,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
 
     if strcmp(parameters.segmentation_software, 'charm')
         segment_call = sprintf('charm %s %s %s',...
-            subj_id_string,filename_t1,filename_t2);
+            subj_id_string, filename_t1, filename_t2);
         if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
             segment_call = [segment_call ' --forceqform'];
         end

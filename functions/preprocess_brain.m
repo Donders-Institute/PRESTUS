@@ -95,7 +95,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     if confirm_overwriting(filename_segmented, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented, 'file'))
         % Asks for confirmation since segmentation takes a long time
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
-            run_segmentation(parameters.data_path, subject_id, filename_t1, filename_t2,  parameters);
+            run_segmentation(parameters.data_path, subject_id, filename_t1, filename_t2, parameters);
             %fprintf('\nThe script will continue with other subjects in the meanwhile...\n')
             medium_masks = [];
             segmented_image_cropped = [];
