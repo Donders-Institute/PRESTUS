@@ -17,7 +17,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % - The pipeline is only able to simulate one transducer at a time, %
     % meaning that the pipeline has to be run once for each transducer  %
     % used in each subject.                                             %
-    % - Matlab 2022b must be used                                       %
+    % - At least Matlab 2022b, SimNIBS 4.0 and k-Wave 1.4 must be used  %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -32,32 +32,47 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     if ~any(ismember(functionsLoc,allPaths))
         addpath(functionsLoc);
+        disp(['Adding ', functionsLoc]);
     else
     end
 
     if ~any(ismember(toolboxesLoc,allPaths))
         addpath(genpath(toolboxesLoc));
+        disp(['Adding ', toolboxesLoc, 'and subfolders']);
     else
+    end
+
+    % Versioncontrol
+    if verLessThan('matlab','9.13')
+        error('Matlab appears to be outdated. Please update before continuing.')
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
-        for nPaths = length(parameters.paths_to_add)
-            addpath(parameters.paths_to_add(nPaths))
+        for nPaths = 1:length(parameters.paths_to_add)
+            addpath(parameters.paths_to_add{nPaths})
+            disp(['Adding ', parameters.paths_to_add{nPaths}]);
         end
     end
 
     % If the path and subpaths need to be added, use this instead
     if isfield(parameters,'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
-        for nPaths = length(parameters.subpaths_to_add)
-            addpath(genpath(parameters.subpaths_to_add(nPaths)))
+        for nPaths = 1:length(parameters.subpaths_to_add)
+            addpath(genpath(parameters.subpaths_to_add{nPaths}))
+            disp(['Adding ', parameters.subpaths_to_add{nPaths}, 'and subfolders']);
         end
     end
-
     
+    % test that kwave is added
+    if ~exist('makeBowl','file')
+        error('kwave not added');
+    end
+
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        parameters.output_dir = fullfile(parameters.output_dir, sprintf('sub-%03d', subject_id));
+        parameters.output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+    else 
+        parameters.output_dir = parameters.temp_output_dir;
     end
     
     if ~isfolder(parameters.output_dir)
@@ -67,11 +82,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         mkdir(parameters.seg_path);
     end
     
-    % save parameters to have a backlog
+    % Save parameters to have a backlog
     parameters_file = fullfile(parameters.output_dir, sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
     save(parameters_file, 'parameters')
     
-    % Add subject_id and output_dir to parameters to pass arguments to functions more easily
+    % Add subject_id to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     
     %% Extra settings needed for better usability
@@ -118,8 +133,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
         parameters.grid_dims = size(medium_masks);
         
-    else % In case simulations are not run in a skull of layered tissue,
-        % alternative grid dimensions are set up
+    else % In case simulations are not run in a skull of layered tissue, alternative grid dimensions are set up
         assert(isfield(parameters, 'default_grid_dims'), 'The parameters structure should have the field grid_dims for the grid dimensions')
         parameters.grid_dims = parameters.default_grid_dims;
         if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
@@ -131,7 +145,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Checks whether the transducer location and orientation are set,
         % and uses an arbitrary position if not
         medium_masks = [];
-        medium_masks = zeros(parameters.grid_dims);
+        segmented_image_cropped = zeros(parameters.grid_dims);
         if ~isfield(parameters.transducer, 'pos_grid') || ~isfield(parameters, 'focus_pos_grid')
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
@@ -205,27 +219,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         kwave_input_args.DisplayMask = skull_edge;
     end
 
-    % Saves the sensory data in a .mat file with the simulation figures
+    % Looks up sensor data for use in simulations
     filename_sensor_data = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_results%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Run the acoustic simulations
     % See 'run_simulations' for more documentation
     if parameters.run_acoustic_sims && confirm_overwriting(filename_sensor_data, parameters) && (parameters.interactive == 0 || confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
-    %         if isfield(parameters,'run_simulations_with_qsub') && parameters.run_simulations_with_qsub == 1
-    %             % remember current folder to later go back
-    %             current_dir = cd;
-    %             cd(fullfile(parameters.data_path,'batch_job_logs'))
-    %             parameters.interactive = 0;
-    %             parameters.paths_to_add = path;
-    %             qsubfeval(@run_simulations, kgrid, kwave_medium, source, sensor, kwave_input_args, parameters, 'timreq',  60*60*7,  'memreq',  20*(1024^3),  'options', '-l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0"', 'rerunable', 'yes');
-    %             disp('Simulations job submitted to the cluster, stopping for now. Re-run the pipeline when the job finishes to do post-processing.')
-    %             cd(current_dir);
-    %             return;
-    %         else 
-            sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
-    %         end
-            save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
-        
+        sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
+        save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
     else
         disp('Skipping, the file already exists, loading it instead.')
         load(filename_sensor_data, 'sensor_data')
@@ -335,19 +336,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     if parameters.n_sim_dims==3
         if parameters.usepseudoCT == 1
-            plot_isppa_over_image(Isppa_map, medium_masks, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, medium_masks, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
         else    
-            plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
         end
     else
-        plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
-    export_fig(output_plot, '-native')
-    close;
+    saveas(h, output_plot, 'png')
+    close(h);
 
-    % Runs the heating simulation
+    %% RUN HEATING SIMULATIONS
+    % =========================================================================
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
-        disp('Running heating simulations')
+        disp('Starting heating simulations...')
         % Creates an output file to which output is written at a later stage
         filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
@@ -377,9 +379,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
 
         % Sets up an empty medium mask if non is specified
-%         if isempty(medium_masks)
-%             medium_masks = zeros(parameters.grid_dims);
-%         end
+        if isempty(medium_masks)
+            medium_masks = zeros(parameters.grid_dims);
+        end
 
         % Creates an output table for temperature readings
         output_table = readtable(output_pressure_file);
@@ -405,26 +407,25 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         % Creates a visual overlay of the transducer
         [~, source_labels] = transducer_setup(parameters.transducer, trans_pos_final, focus_pos_final, ...
-                                                    size(medium_masks), t1_header.PixelDimensions(1));
-
+                                                    size(segmented_image_cropped), t1_header.PixelDimensions(1));
         % Creates a line graph and a video of the heating effects
         plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, CEM43);
-        
+                
         % Plots the maximum temperature in the segmented brain
+        maxT = gather(maxT);
         if max(maxT(:)) < 38
             temp_color_range = [37, 38];
         else
             temp_color_range = [37, max(maxT(:))];
         end
 
-        maxT = gather(maxT);
-        plot_isppa_over_image(maxT, medium_masks, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
         output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-        export_fig(output_plot, '-native')
-        close;
+        export_fig(output_plot, h, '-native')
+        close(h);
     end
 
-    % Plots the data on the original T1 image & in the MNI space for skull & layered mediums only
+    %% Plots the data on the original T1 image and in MNI space
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
 
@@ -476,7 +477,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                             size(t1_image_orig), t1_header.PixelDimensions(1));
         
                 % Plots the Isppa over the untransformed image
-                plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
+                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
                 output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_t1_before_smoothing_and_cropping%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
@@ -513,17 +514,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
     
-   % Runs posthoc water simulations to check sonication parameters of the
-    % transducer in free water
+    %% Runs posthoc water simulations
+    % To check sonication parameters of the transducer in free water
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
         new_parameters = parameters;
         new_parameters.simulation_medium = 'water';
         new_parameters.run_heating_sims = 0;
         new_parameters.default_grid_dims = new_parameters.grid_dims;
+        % restore subject-specific path to original path if done earlier in this function
+        if isfield(new_parameters,'subject_subfolder') && new_parameters.subject_subfolder == 1
+            new_parameters.output_dir = fileparts(new_parameters.output_dir);
+        end
         single_subject_pipeline(subject_id, new_parameters);
     end
 
     disp('Pipeline finished successfully');
-    
 end

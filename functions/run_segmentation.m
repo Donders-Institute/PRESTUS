@@ -7,7 +7,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
 
     % 1) make logs directory if does not exist
     
-    log_dir = fullfile(parameters.seg_path, 'batch_job_logs');
+    log_dir = fullfile(parameters.temp_output_dir, 'batch_job_logs');
     if ~isfolder(log_dir)
         mkdir(log_dir)
     end
@@ -53,7 +53,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
         end
     end
     
-
+    % if not running on the donders_hpc, the job won't continue until the segmentation is completed manually
 	if (parameters.using_donders_hpc)
   	qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
       ['simnibs-', subj_id_string], ...
