@@ -61,11 +61,14 @@ for trial_i = 1:parameters.thermal.n_trials
   fprintf('Trial %i\n', trial_i)
 
     is_break_period = 0;
-    for i = 1:length(parameters.start_break_trials)
-        if trial_i >= parameters.start_break_trials(i) && trial_i <= parameters.stop_break_trials(i)
-            is_break_period = 1;
+    if isfield(parameters, 'start_break_trials')
+        for i = 1:length(parameters.start_break_trials)
+            if trial_i >= parameters.start_break_trials(i) && trial_i <= parameters.stop_break_trials(i)
+                is_break_period = 1;
+            end
         end
     end
+    
   % Calculate the heat accumulation within a trial
   for pulse_i = 1:on_off_repetitions
       fprintf('Pulse %i\n', pulse_i)
