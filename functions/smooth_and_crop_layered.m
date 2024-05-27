@@ -63,11 +63,13 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         skull_i = find(strcmp(labels,  'skull')); % gives to skull_i the index of skull in labels array, because find finds the index of each non zero element --> where labels == 'skull'
     end
 
+    smoothed_segmented_img_with_gaps = smoothed_segmented_img;
     imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    title('Original (left) and smoothed (right) segmented image')
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_smoothing_changes%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    title('Original (left) and smoothed (right) segmented images')
     export_fig(output_plot, '-native')
 
+    % Increases the perimeter of the skull
     if any(contains(labels,  'skull'))        
         skull = smoothed_segmented_img==skull_i;
         % skull is 1 when smoothed segm img == skull_i (=4 by default in headreco) and it is 0 otherwise
@@ -103,10 +105,10 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
         end
     end
     
-    % Shows the segmented figures before and after smoothing side-by-side
-    imshowpair(label2rgb(squeeze(segmented_img(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_before_after_closing_gaps%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    title('Original (left) and smoothed (right) segmented image')
+    % Shows the segmented figures before and after closing the gaps side-by-side
+    imshowpair(label2rgb(squeeze(smoothed_segmented_img_with_gaps(:,trans_pos_upsampled_grid(2),:))), label2rgb(squeeze(smoothed_segmented_img(:,trans_pos_upsampled_grid(2),:))), 'montage')
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_segmented_img_closing_gaps_changes%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    title('Smoothed (left) and closed off (right) segmented images')
     export_fig(output_plot, '-native')
 
     csf_mask = segmented_img==3;
@@ -170,24 +172,7 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
     skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
-    %{
-    % Applies an expanded binary mask of neural tissue to remove abberant
-    % neural tissue in skin (to correct for a bug in Charm)
-    brain_ind = parameters.layer_labels.brain;
-    new_brain_ind = ones(1, length(brain_ind));
-    results_mask_original = changem_vectorized(smoothed_segmented_img, new_brain_ind, brain_ind);
-    results_mask_original(results_mask_original > max(brain_ind)) = 0;
-    results_mask_original = logical(results_mask_original);
-    results_mask_size = size(results_mask_original);
-    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 20), (results_mask_size(2) + 20), (results_mask_size(3) + 20)]);
-    results_mask_overlay = results_mask_overlay(11:(end-10), 11:(end-10), 11:(end-10));
-    results_mask_original = results_mask_original.*results_mask_overlay;
-    results_mask_overlay = imresize3(results_mask_original, [(results_mask_size(1) + 10), (results_mask_size(2) + 10), (results_mask_size(3) + 10)]);
-    results_mask_overlay = results_mask_overlay(6:(end-5), 6:(end-5), 6:(end-5));
-    results_mask = results_mask_original.*results_mask_overlay;
-    changed_tissue_index = find(results_mask~=results_mask_original);
-    smoothed_segmented_img(changed_tissue_index) = parameters.layer_labels.water(1);
-    %}
+
     % Crops the original segmented image in the same way as processed one
     segmented_image_cropped = segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
 
@@ -211,18 +196,18 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     imshowpair(plot_t1_with_transducer(smoothed_segmented_img, voxel_size_mm, trans_pos_final, focus_pos_final, parameters),...
         plot_t1_with_transducer(segmented_img, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters),...
     'montage')
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_final%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_smoothing_and_cropping_changes%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     title('Cropped, padded, & smoothed (left) and original (right) segmented mask')
     export_fig(output_plot, '-native')
 
-    skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
+    skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_after_smoothing_and_cropping', parameters.subject_id));
     skull_mask = zeros(size(smoothed_segmented_img));
     for layer_i = find(contains(labels,  'skull'))'
         i = smoothed_segmented_img==layer_i; % which voxels contain skull
         skull_mask(i) = smoothed_segmented_img(i);
     end
     niftiwrite(uint8(skull_mask), skull_mask_file ,'Compressed', 1);
-    segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
+    segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_after_smoothing_and_cropping', parameters.subject_id));
     % fullfile creates a character vector containing the path of the file in the directory, so it creates the file
     % sub-009_medium_masks_final in the directory parameters.output_dir
     % (='/project/3023001.06/eleonora/sub-009/')

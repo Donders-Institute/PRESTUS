@@ -1,17 +1,19 @@
-data_path: /project/3015999.02/andche_sandbox/simnibs_examples/ernie/org # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+data_path: /home/affneu/kenvdzee/Documents/Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+simnibs_bin_path: /home/affneu/kenvdzee/SimNIBS-4.0/bin/
 
-t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
-t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+t1_path_template: sub-001_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: sub-001_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
 
 transducer: 
-  n_elements: 4 # number of elements in the transducer
-  Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]
-  Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
-  curv_radius_mm: 63.20 # radius of curvature of the bowl 
-  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
-  source_amp: 91590 # [Pa]
-  source_phase_deg: [0, 0, 0, 274] # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
-  source_freq_hz: 250e3 # [Hz] the central frequency
+  n_elements: 10 # number of elements in the transducer
+  Elements_ID_mm: [10, 22.3, 30, 36.3, 41.7, 46.5, 51, 55.1, 58.9, 62.5]
+  Elements_OD_mm: [21.3, 29.1, 35.3, 40.7, 45.6, 50, 54.1, 58, 61.6, 65]
+  curv_radius_mm: 75 # radius of curvature of the bowl 
+  dist_to_plane_mm: 67.5 # distance to the transducer plane from the geometric focus
+  source_amp: 183573 # [Pa]
+  source_phase_deg: [0, 360, 17, 39, 43, 29, 68, 23, 150, 26] # source phase [deg]
+  pos_t1_grid: [210, 184, 117]
+  source_freq_hz: 300e3 # [Hz] the central frequency
   pos_t1_grid: [128, 139, 15] # position on T1 grid 
 
 focus_pos_t1_grid: [128, 142, 75] # stimulation target on T1 grid

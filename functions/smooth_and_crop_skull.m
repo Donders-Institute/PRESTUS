@@ -28,8 +28,8 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
     imshowpair(mat2gray(squeeze(skull_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:))),...
         mat2gray(squeeze(skull_mask_smoothed(:,trans_pos_upsampled_grid(2),:))), 'montage');
     
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_before_after_smoothing%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    title('Original (left) and smoothed (right) skull mask')
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_smoothing_changes%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    title('Original (left) and smoothed (right) skull masks')
     export_fig(output_plot, '-native')
 
     % This creates a transducer overlay for use in a figure
@@ -115,7 +115,7 @@ function [skull_mask, skull_edge, segmented_image_cropped, trans_pos_final, focu
     imshowpair(plot_t1_with_transducer(skull_mask, voxel_size_mm, trans_pos_final, focus_pos_final, parameters),...
         plot_t1_with_transducer(skull_mask_unsmoothed, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters),...
     'montage')
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_final%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_smoothing_and_cropping_changes%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     title('Cropped, padded, & smoothed (left) and original (right) skull mask')
     export_fig(output_plot, '-native')
 

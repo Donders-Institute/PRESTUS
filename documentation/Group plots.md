@@ -3,7 +3,7 @@
 - This will ensure that all figures will use the same scale
 - Allows one to add a ROI MNI mask to visualise targeting accuracy
 - Adds additional columns to each csv with information about intensity in the ROI mask, percentage of fwhm voxels within ROI etc.
-- When using structural MRI's, it also allows to normalise the brightness so the average brightness of the individual T1's is reduced.
+- When using structural MRI's, it also allows one to normalise the brightness so the discrepancy in average brightness between individual T1's is reduced.
 
 ## Necessary input:
 - subject_list: list of all subjects that you want to include in the figures.
@@ -17,12 +17,14 @@
 - Load it into the function under the option 'ROI_MNI_mask'
 
 ## Optional parameters:
-    options.ROI_MNI_mask (:,:,:)
-    options.slice_label = 'y'
-    options.rotation = 90;
-    options.plot_heating = 1
-    options.outputs_suffix = ''
-    options.isppa_thresholds = []
-    options.add_FWHM_boundary = 0
-    options.add_ROI_boundary = 1
-    options.skip_missing = 0
+    options.ROI_MNI_mask (:,:,:) # Loads in a 3d matrix of your ROI mask (in MNI space)
+    options.slice_label = 'y' # Selects the axis along which your slice is made
+    options.rotation = 90;  # Rotates your structural background figure
+    options.plot_heating = 1 # Binary option to enable or disable heating plots
+    options.outputs_suffix = '' # Allows you to add a string at the end of the name of your output to say, differentiate between plots of maximum intensity and a given slice
+    options.isppa_thresholds = [] # Manually set the Ipa range that is to be plotted
+    options.add_FWHM_boundary = 0 # Binary option to add a dotted boundary around the FWHM of intensity
+    options.add_ROI_boundary = 1 # Binary option to add a red boundary around your ROI mask
+    options.skip_missing = 0 # Binary option to skip subjects with missing files
+    options.brightness_correction = 0 # Binary option to normalise the brightness between structural T1's
+    options.average_target_brightness = 100 # Average targetted brightness, only used when brightness correction is enabled

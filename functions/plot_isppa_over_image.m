@@ -234,5 +234,9 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = p
            
     end
     ax2.Position = ax1.Position;
-    set(gcf,'color',ax1.Children(length(ax1.Children)).CData(1,1,:));
+    ax2_colour = ax1.Children(length(ax1.Children)).CData(1,1,:);
+    if any(ax2_colour > 1)
+        ax2_colour = zeros(size(ax2_colour));
+    end
+    set(gcf,'color',ax2_colour);
 end
