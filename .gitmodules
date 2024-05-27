@@ -7,3 +7,6 @@
 [submodule "toolboxes/k-wave"]
 	path = toolboxes/k-wave
 	url = https://github.com/ucl-bug/k-wave.git
+[submodule "toolboxes/FEX-minimize"]
+	path = toolboxes/FEX-minimize
+	url = https://github.com/rodyo/FEX-minimize.git
