@@ -45,10 +45,9 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
 
         % combine all skull masks for smoothing
         % 1) find all skull_layer ids
-        layer_labels = parameters.layer_labels;
         all_skull_ids = [];
-        for label_i = find(contains(labels, 'skull'))'
-            all_skull_ids = [all_skull_ids layer_labels.(labels{label_i})];
+        for label_i = find(contains(labels,  'skull'))'
+            all_skull_ids = [all_skull_ids parameters.layer_labels.(labels{label_i})];
         end
         layer_mask = ismember(segmented_img, all_skull_ids);
         smooth_threshold = parameters.skull_smooth_threshold;
@@ -171,6 +170,9 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     % Crops the processed segmented image
     smoothed_segmented_img = smoothed_segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
     % Creates a mask around the edge of the figure to define the edge of the skull
+    %if usepseudoCT == 1
+        %skull_edge = %edge of the skull from the pseudoCT;
+    %else
     skull_edge = edge3(smoothed_segmented_img==skull_i, 'approxcanny',0.1);
 
     % Crops the original segmented image in the same way as processed one

@@ -86,15 +86,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         rgbImage(cur_temp <=37.01) = nan;
         imshowpair(gray_img_brain, rgbImage, 'blend')
         %set(h, 'AlphaData', 0.2)
-        try
-            title(sprintf('Timepoint: %i, time: %.2f s, max temperature: %.2f C, transducer: %s', ...
-                k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 10)
-        catch
-            warning("Some parameter is out of bounds")
-            disp(['k:', num2str(k)]);
-            disp(['dim focal plane (3):', num2str(size(focal_planeT,3))]);
-            disp(['dim tss_recorded:', num2str(size(tss_recorded) )]);
-        end
+        title(sprintf('Timepoint: %i, time: %.2f s, max temperature: %.2f C, transducer: %s', k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 10)
         frame = getframe(gcf);
         writeVideo(v,frame);
     end

@@ -17,6 +17,8 @@ else
     on_off_step_duration = parameters.thermal.on_off_step_duration;
 end
 
+
+
 % Amount of steps to be simulated
 on_off_repetitions = parameters.thermal.stim_duration/on_off_step_duration;
 
@@ -64,9 +66,8 @@ if  isfield(parameters.thermal,'equal_steps') && parameters.thermal.equal_steps 
     off_steps_dur = on_off_step_duration*(1-parameters.thermal.duty_cycle);
     on_steps_n  = 1;
     off_steps_n = 1;
-    fprintf('Time steps allowed to be unequal. 1 on+off cycle contains %.3f on steps and %.3f off steps assuming equal steps of %.3f s each.\n', on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
-    % This description is confusing, as the number of steps is coupled to
-    % the duration, NOT the equal step size.
+    fprintf('Time steps allowed to be unequal. 1 on+off cycle contains %.2f on steps and %.2f off steps assuming equal steps of %.2f s each.\n', on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
+
 else
     on_steps_dur = parameters.thermal.sim_time_steps;
     off_steps_dur = parameters.thermal.sim_time_steps;
