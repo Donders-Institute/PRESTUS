@@ -4,3 +4,6 @@
 [submodule "toolboxes/xml2struct"]
 	path = toolboxes/xml2struct
 	url = https://github.com/joe-of-all-trades/xml2struct
+[submodule "toolboxes/k-wave"]
+	path = toolboxes/k-wave
+	url = https://github.com/ucl-bug/k-wave.git
