@@ -1,4 +1,4 @@
-function [thermal_diff_obj, time_status_seq, maxT,focal_planeT] = run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos)
+function [thermal_diff_obj, time_status_seq, maxT,focal_planeT, maxCEM43, CEM43] = run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos)
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 %                    Runs the heating simulations                   %
@@ -43,6 +43,10 @@ thermal_diff_obj = kWaveDiffusion(kgrid, kwave_medium, source, sensor, 'PlotSim'
 thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
 maxT = thermal_diff_obj.T;
 
+% new field for cem43 (replicate above)
+thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
+maxCEM43 = thermal_diff_obj.cem43;
+
 [~, on_off_repetitions, on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, post_stim_steps_n, post_stim_time_step_dur] = check_thermal_parameters(parameters);
 
 time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
@@ -50,57 +54,79 @@ time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded'
 % Set up some last parameters for simulation
 total_timepoints = 1+parameters.thermal.n_trials*(on_off_repetitions*(1+double(off_steps_n>0))+1);
 cur_timepoint = 1;
-focal_planeT = gpuArray(zeros([size(maxT,[1,3]) total_timepoints]));
+focal_planeT = gpuArray(NaN([size(maxT,[1,3]) total_timepoints]));
 focal_planeT(:,:,cur_timepoint) = squeeze(maxT(:,trans_pos(2),:));
+
+CEM43 = gpuArray(NaN([size(maxT,[1,3]),total_timepoints]));
+CEM43(:,:,cur_timepoint) = squeeze(maxCEM43(:,trans_pos(2),:));
 
 % Loop over trials, so that the heat can accumulate
 for trial_i = 1:parameters.thermal.n_trials
   fprintf('Trial %i\n', trial_i)
+
+    is_break_period = 0;
+    for i = 1:length(parameters.start_break_trials)
+        if trial_i >= parameters.start_break_trials(i) && trial_i <= parameters.stop_break_trials(i)
+            is_break_period = 1;
+        end
+    end
   % Calculate the heat accumulation within a trial
   for pulse_i = 1:on_off_repetitions
       fprintf('Pulse %i\n', pulse_i)
-      
-      % Pulse on
-      thermal_diff_obj.Q = source.Q;
+
+      if is_break_period == 0
+          thermal_diff_obj.Q = source.Q;
+      else
+          thermal_diff_obj.Q(:,:,:) = 0;   
+          disp('Break active');
+      end
+
       thermal_diff_obj.takeTimeStep(on_steps_n, on_steps_dur);
       time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:on_steps_n)*on_steps_dur), ...
                                                 'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), 'status', "on",'recorded',0)];
       curT = thermal_diff_obj.T;
+      curCEM43 = thermal_diff_obj.cem43;
       cur_timepoint = cur_timepoint+1;
       time_status_seq(end).recorded = 1;
-      focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
+      focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+      CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+
+      % JQK: shouldn't this comparison be the other way around?
       if any(maxT>curT,'all')
           maxT = curT;
       end
-      
+
+      if any(maxCEM43>curCEM43, 'all')
+          maxCEM43 = curCEM43;
+      end
+
       % Pulse off 
       if off_steps_n>0
-          thermal_diff_obj.Q = 0;
+          thermal_diff_obj.Q(:,:,:) = 0;
           thermal_diff_obj.takeTimeStep(off_steps_n, off_steps_dur);
           time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off",'recorded',0)];
           cur_timepoint = cur_timepoint+1;
           time_status_seq(end).recorded = 1;
           curT = thermal_diff_obj.T;
+          curCEM43 = thermal_diff_obj.cem43;
 
-          focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
-
+          focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+          CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
       end
   end
   
-  % Post-stimulation period
-  if post_stim_steps_n > 0 
-      thermal_diff_obj.Q = 0;
-      thermal_diff_obj.takeTimeStep(post_stim_steps_n, post_stim_time_step_dur);
-      time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:post_stim_steps_n)*parameters.thermal.post_stim_time_step_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:post_stim_steps_n)), 'status', "off",'recorded',0)];
-      time_status_seq(end).recorded = 1;
-      cur_timepoint = cur_timepoint+1;
-      curT = thermal_diff_obj.T;
-
-      focal_planeT(:,:,cur_timepoint) = cat(3, squeeze(curT(:,trans_pos(2),:)));
-      
-  end
-  
-  
 end
+% Post-stimulation period
+if post_stim_steps_n > 0 
+  thermal_diff_obj.Q = 0;
+  thermal_diff_obj.takeTimeStep(post_stim_steps_n, post_stim_time_step_dur);
+  time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off",'recorded',0)];
+  time_status_seq(end).recorded = 1;
+  cur_timepoint = cur_timepoint+1;
+  curT = thermal_diff_obj.T;
+  curCEM43 = thermal_diff_obj.cem43;
+  focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+  CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+                end
 
 end

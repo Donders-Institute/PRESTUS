@@ -352,8 +352,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
             % For more documentation, see 'run_heating_simulations'
-            [kwaveDiffusion, time_status_seq, maxT, focal_planeT]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
-            save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','maxT','focal_planeT','-v7.3');
+            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, CEM43]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
+            save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','CEM43','-v7.3');
+
         else 
             disp('Skipping, the file already exists, loading it instead.')
             load(filename_heating_data);
@@ -368,8 +369,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         output_table = readtable(output_pressure_file);
         if gpuDeviceCount==0
             maxT = gather(maxT);
+            maxCEM43 = gather(maxCEM43);
         end
         output_table.maxT = gather(max(maxT, [], 'all'));
+        output_table.maxCEM43 = gather(max(maxCEM43, [], 'all'));
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
@@ -384,7 +387,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                     size(segmented_image_cropped), t1_header.PixelDimensions(1));
 
         % Creates a line graph and a video of the heating effects
-        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks);
+        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, CEM43);
         
         maxT = gather(maxT);
 
