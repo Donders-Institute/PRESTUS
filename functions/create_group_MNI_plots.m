@@ -48,7 +48,7 @@ for subject_i = 1:length(full_subject_list)
     if strcmp(parameters.segmentation_software, 'headreco')
         t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     else
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1_to_MNI_post-hoc.nii.gz');
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
     end
     files_to_check = {t1_mni_file , segmented_image_mni_file, isppa_map_mni_file, max_pressure_mni_file, output_pressure_file};
     
@@ -166,7 +166,7 @@ for subject_i = 1:length(subject_list)
     if strcmp(parameters.segmentation_software, 'headreco')
         t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     else
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1_to_MNI_post-hoc.nii.gz');
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
     end
 
     % get T1 in MNI space
