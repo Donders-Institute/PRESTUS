@@ -9,7 +9,7 @@
 - Finally, the segmented data is translated to a matrix of acoustic properties by k-wave, after which the same program conducts the simulations.
 
 ## Run the single_subject_pipeline
-- The only things the pipeline needs is a subject id (a number consisting of no more than 3 digits) and a set of parameters presented in a config file (placed in the 'configs' folder).
+- The only things the pipeline needs is a subject id (a number consisting of no more than 3 digits) and a set of parameters presented in a config file (placed in the 'configs' folder) and imported using 'load_parameters.m'.
 - The different parameters that can be used are found in the 'default_config.yaml'.
     - It should be noted that the default config should not be altered. Instead, when you want to change a parameter copy that parameter to your own config file and change it there.
 
