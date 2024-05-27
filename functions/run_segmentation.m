@@ -18,15 +18,28 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
         parameters.segmentation_software = 'charm';
     end
 
-    if strcmp(parameters.segmentation_software, 'charm')
-        segment_call = sprintf('charm %s %s %s',...
-            subj_id_string, filename_t1, filename_t2);
-        if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
-            segment_call = [segment_call ' --forceqform'];
+    if ~isempty(filename_t2) % use T2w image when provided
+        if strcmp(parameters.segmentation_software, 'charm')
+            segment_call = sprintf('charm %s %s %s',...
+                subj_id_string, filename_t1, filename_t2);
+            if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
+                segment_call = [segment_call ' --forceqform'];
+            end
+        else
+            segment_call = sprintf('headreco all %s %s %s -d no-conform',...
+                subj_id_string, filename_t1, filename_t2);
         end
-    else
-        segment_call = sprintf('headreco all %s %s %s -d no-conform',...
-            subj_id_string, filename_t1, filename_t2);
+    else % if no T2w image is specified, continue with T1w only
+        if strcmp(parameters.segmentation_software, 'charm')
+            segment_call = sprintf('charm %s %s',...
+                subj_id_string, filename_t1);
+            if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
+                segment_call = [segment_call ' --forceqform'];
+            end
+        else
+            segment_call = sprintf('headreco all %s %s -d no-conform',...
+                subj_id_string, filename_t1);
+        end
     end
     
     % if not running on the donders_hpc, the job won't continue until the segmentation is completed manually
