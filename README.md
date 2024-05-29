@@ -8,16 +8,17 @@ The examples folder contains some examples of how to run the pipeline, including
 
 # Requirements
 
-- MATLAB R2022b
-- SimNIBS 4
-- k-Wave 1.4 (should be cloned in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
-- toolboxes included as submodules in the repository
+- MATLAB (R2022b)
+- [SimNIBS 4](https://github.com/simnibs/simnibs)
+- toolboxes included as submodules if this repository is cloned (must be added on MATLAB startup)
+    - [k-Wave (1.4)](https://github.com/ucl-bug/k-wave.git)
+    - [export_fig](https://github.com/altmany/export_fig)
+    - [FEX-minimize](https://github.com/rodyo/FEX-minimize.git)
+    - [xml2struct](https://github.com/joe-of-all-trades/xml2struct)
 
 Tested on MATLAB 2022b, set up to work on Donders HPC (can work on a local PC as well). 
 
-Before using the package, you need to have some libraries on your path. Major dependencies are included as submodules in the toolbox folder.
-
-If you clone this repository, you can retrieve the submodules as follows:
+Before using the package, you need to have some libraries on your path. Major dependencies are included as submodules in the toolbox folder. If you clone this repository, you can retrieve the submodules as follows:
 ```
 git clone --recurse-submodules https://github.com/Donders-Institute/PRESTUS.git
 ```
@@ -29,7 +30,11 @@ git submodule init
 git submodule update
 ```
 
-You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) installed. **Please ensure that the paths to k-Wave are added on MATLAB startup if you are running PRESTUS on HPC**.
+You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4).
+
+*Note: If you do not clone this repository, you must manually download and add the toolboxes specified above.*
+
+**Please ensure that subtoolbox paths are added on MATLAB startup if you are running PRESTUS on HPC**.
 
 # How to run
 
