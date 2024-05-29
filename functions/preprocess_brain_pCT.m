@@ -119,10 +119,6 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
     % Defines output file location and name
     filename_reoriented_scaled_data = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_after_rotating_and_scaling%s_pCT.mat', subject_id, parameters.results_filename_affix));
-
-    % Starts the process of rotating the segmented data
-    %segmented_img_orig = niftiread(filename_segmented);
-    %segmented_hdr_orig = niftiinfo(filename_segmented);
     
     % Load pseudoCT
     filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
@@ -139,15 +135,6 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
         % Introduces a scaling factor based on the difference between the
         % segmented file and the original T1 file
         scale_factor = tissues_mask_header.PixelDimensions(1)/parameters.grid_step_mm;
-
-        % The function to rotate and scale the segmented T1 to line up with the transducer's axis
-%         [segmented_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, segm_img_montage] = ...
-%             align_to_focus_axis_and_scale(segmented_img_orig, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-%         figure;
-%         imshow(segm_img_montage)
-%         title('Rotated (left) and original (right) segmented T1');
-%         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_segmented%s.png', subject_id, parameters.results_filename_affix)),'-native');
-%         close;
 
         % The function to rotate and scale the original T1 to line up with the transducer's axis
         [t1_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, t1_rr_img_montage] = align_to_focus_axis_and_scale(t1_image, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
@@ -173,26 +160,8 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_tissues_mask%s.png', subject_id, parameters.results_filename_affix)),'-native');
         close;
 
-%         if strcmp(parameters.segmentation_software, 'charm') % create filled bone mask as charm doesn't make it itself
-%             bone_img_rr = segmented_img_rr>0&(segmented_img_rr<=4|segmented_img_rr>=7);
-%         else
-%             filename_bone_headreco = fullfile(segmentation_folder, sprintf('bone.nii.gz', subject_id));
-% 
-%             bone_img = niftiread(filename_bone_headreco);
-% 
-%             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-%             figure;
-%             imshow(bone_img_montage)
-%             title('Rotated (left) and original (right) original bone mask');
-%     %         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', subject_id, parameters.results_filename_affix)),'-native');
-%             close;
-%         end
-
         assert(isequal(size(trans_pos_upsampled_grid,1:2),size(focus_pos_upsampled_grid, 1:2)),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
-
-        %focus_pos_pCT = focus_pos_upsampled_grid;
-        %trans_pos_pCT = trans_pos_upsampled_grid;
 
         % Saves the output according to the naming convention set in the
         % beginning of this section
