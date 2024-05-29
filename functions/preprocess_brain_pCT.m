@@ -125,17 +125,15 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
     %segmented_hdr_orig = niftiinfo(filename_segmented);
     
     % Load pseudoCT
-    filename_pseudoCT = fullfile('/project/3023001.06/eleonora/new_segmentations/m2m_sub-022/pseudoCT.nii.gz');
-    %filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
+    filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
     pseudoCT_image = niftiread(filename_pseudoCT);
     pseudoCT_header = niftiinfo(filename_pseudoCT);
 
-    %Load pseudoCT tissues mask
-    filename_tissues_mask = fullfile('/project/3023001.06/eleonora/new_segmentations/m2m_sub-022/tissues_mask.nii.gz');
+    % Load pseudoCT tissues mask
+    filename_tissues_mask = fullfile(segmentation_folder, 'tissues_mask.nii.gz');
     tissues_mask_image = niftiread(filename_tissues_mask);
     tissues_mask_header = niftiinfo(filename_tissues_mask);
     
-
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
         % Introduces a scaling factor based on the difference between the
@@ -199,8 +197,6 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
         % Saves the output according to the naming convention set in the
         % beginning of this section
         save(filename_reoriented_scaled_data, 'mask_img_rr', 'trans_pos_upsampled_grid', 'focus_pos_upsampled_grid', 'scale_rotate_recenter_matrix', 'rotation_matrix', 't1_img_rr', 'pCT_img_rr');
-        
-
     else 
         disp('Skipping, the file already exists, loading it instead.')
         load(filename_reoriented_scaled_data);
