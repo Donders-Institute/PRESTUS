@@ -78,16 +78,14 @@ colormap(gray(80))
 % skin_isosurface.vertices = skin_isosurface.vertices - origin_shift;
 hiso = patch(skin_isosurface,...
    'FaceColor',[1,.75,.65],...
-   'EdgeColor','none',...
-   'facealpha',0.8);
+   'EdgeColor','none');
 isonormals(Ds,hiso);
 
 end_slices = isocaps(for_caps*10,4);
 % end_slices.vertices = end_slices.vertices - origin_shift;
 hcap = patch(end_slices,...
    'FaceColor','interp',...
-   'EdgeColor','none',...
-   'facealpha',0.8);
+   'EdgeColor','none');
 lighting gouraud
 hcap.AmbientStrength = 0.6;
 hiso.SpecularColorReflectance = 0;
@@ -105,7 +103,7 @@ end
 sphere_surf = isosurface(smooth3(sphere_3d(1:2:end,1:2:end,1:2:end)));
 sphere_surf.vertices = sphere_surf.vertices - origin_shift;
 
-patch(sphere_surf,'FaceColor','red','EdgeColor','red','facealpha',0.8)
+patch(sphere_surf,'FaceColor','red','EdgeColor','red')
 
 if ~isempty(view_angle)
     view(view_angle)
