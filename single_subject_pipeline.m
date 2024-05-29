@@ -114,6 +114,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm;
     end
     
+    % if there is no specification of usepseudoCT, go for default of 0
+    if ~isfield(parameters, 'usepseudoCT')
+        parameters.usepseudoCT = 0;
+    end
+
     % Pre-processes the MRI data to segment the different forms of tissue
     % and visualise the position of the transducer with some help from SimNIBS.
     % For more documentation, see the 'preprocess_brain' function.
