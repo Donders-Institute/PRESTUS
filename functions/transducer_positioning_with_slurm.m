@@ -47,9 +47,9 @@ function transducer_positioning_with_slurm(subject_id, parameters, pn, target_na
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
     fprintf(fid, '#SBATCH --partition=gpu\n');
-    fprintf(fid, '#SBATCH --gpus=nvidia_a100-sxm4-40gb:2\n');
+    %fprintf(fid, '#SBATCH --gpus=nvidia_a100-sxm4-40gb:2\n');
     %fprintf(fid, '#SBATCH --gpus=nvidia_rtx_a6000:1\n');
-    %fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    fprintf(fid, '#SBATCH --gres=gpu:1\n');
     %fprintf(fid, '#SBATCH --constraint="cudacap>=8.0"\n');
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', timelimit);
@@ -65,8 +65,6 @@ function transducer_positioning_with_slurm(subject_id, parameters, pn, target_na
 
     % Execute the full command
     full_cmd = sprintf('cd %s; %s', log_dir, sbatch_call);
-    system(full_cmd);
-
 	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
 	[res, out] = system(full_cmd);
     
