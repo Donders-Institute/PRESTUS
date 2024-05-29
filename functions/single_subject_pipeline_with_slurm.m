@@ -2,7 +2,7 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
     arguments
         subject_id double
         parameters struct
-        timelimit string = "04:00:00" % time limit for a job in seconds (1 hours by default)
+        timelimit string = "04:00:00" % time limit for a job in seconds (4 hours by default)
         memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
     end
     if parameters.interactive
@@ -61,7 +61,7 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
     %fprintf(fid, '#SBATCH --gres=gpu:1\n');
     %fprintf(fid, '#SBATCH --constraint="cudacap>=8.0"\n');
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
-    fprintf(fid, '#SBATCH --time=%i\n', timelimit);
+    fprintf(fid, '#SBATCH --time=%s\n', timelimit);
     fprintf(fid, '#SBATCH --output=%s\n', sprintf('%s_slurm_output_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --error=%s\n', sprintf('%s_slurm_error_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
