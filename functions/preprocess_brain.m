@@ -133,7 +133,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         % The function to rotate and scale the segmented T1 to line up with the transducer's axis
         [segmented_img_rr, trans_pos_upsampled_grid, focus_pos_upsampled_grid, scale_rotate_recenter_matrix, rotation_matrix, ~, ~, segm_img_montage] = ...
             align_to_focus_axis_and_scale(segmented_img_orig, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-        figure;
+        h = figure;
         imshow(segm_img_montage)
         title('Rotated (left) and original (right) segmented T1');
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_segmented_after_rotating_and_scaling%s.png', subject_id, parameters.results_filename_affix)),'-native');
@@ -141,7 +141,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
         % The function to rotate and scale the original T1 to line up with the transducer's axis
         [t1_img_rr, ~, ~, ~, ~, ~, ~, t1_rr_img_montage] = align_to_focus_axis_and_scale(t1_image, t1_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-        figure;
+        h = figure;
         imshow(t1_rr_img_montage)
         title('Rotated (left) and original (right) original T1');
         export_fig(fullfile(parameters.output_dir, sprintf('sub-%03d_t1_after_rotating_and_scaling%s.png', subject_id, parameters.results_filename_affix)),'-native');
@@ -155,7 +155,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             bone_img = niftiread(filename_bone_headreco);
 
             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = align_to_focus_axis_and_scale(bone_img, segmented_hdr_orig, trans_pos_grid, focus_pos_grid, scale_factor, parameters);
-            figure;
+            h = figure;
             imshow(bone_img_montage)
             title('Rotated (left) and original (right) original bone mask');
             plotname = fullfile(parameters.output_dir, sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', ...

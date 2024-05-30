@@ -1,9 +1,9 @@
-function [res_image, transducer_pars] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, after_exit_plane_mask, trans_pos, focus_pos, max_isppa_pos)
+function [res_image, transducer_pars, h] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, after_exit_plane_mask, trans_pos, focus_pos, max_isppa_pos)
     bg_slice = mat2gray(bg_image);
     transducer_bowl = mat2gray(transducer_bowl);
     before_exit_plane_mask = ~after_exit_plane_mask;
 
-    figure;
+    h = figure;
     ax1 = axes;
     imagesc(bg_slice+transducer_bowl+0.2*before_exit_plane_mask);
     colormap(ax1,'gray');

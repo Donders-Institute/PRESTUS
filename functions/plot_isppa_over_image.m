@@ -1,4 +1,4 @@
-function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
+function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
     arguments
         Isppa_map (:,:,:)
         bg_image (:,:,:)
@@ -134,7 +134,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         
     end
         
-    figure;
+    h = figure;
     ax1 = axes; % the background layer
     
     %bg_zeros = zeros(size(bg_slice));
@@ -201,7 +201,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     
     imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
 
-    caxis(options.isppa_color_range)
+    clim(options.isppa_color_range)
     colormap(ax2, options.color_scale);
 
     ax2.Visible = 'off';

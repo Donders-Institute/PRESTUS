@@ -11,11 +11,22 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
     end
     assert(matches(parameters.overwrite_files,["always","never"]), "When running jobs with qsub, it is not possible to create dialog windows to ask for a confirmation when a file already exists. Set parameters.overwrite_files to 'always' or 'never'");
 
-    log_dir = fullfile(parameters.temp_output_dir, 'batch_job_logs');
+    % Make subfolder (if enabled) and check if directory exists
+    % This ensures that log files are saved in the subject subdirectory
+    if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
+        output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+    else
+        output_dir = fullfile(parameters.temp_output_dir);
+    end
+    
+    if ~isfolder(output_dir)
+        mkdir(output_dir);
+    end    
+
+    log_dir = fullfile(output_dir, 'batch_job_logs');
     if ~exist(log_dir, 'dir' )
         mkdir(log_dir)
     end
-    
 
     [path_to_pipeline, ~, ~] = fileparts(which('single_subject_pipeline'));
     
@@ -27,7 +38,6 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
     tempfile = [tempfile '.mat'];
     temp_data_path = [temp_data_path '.mat'];
     save(temp_data_path, "subject_id", "parameters");
-
 
     temp_m_file = tempname(log_dir);
     fid = fopen([temp_m_file '.m'], 'w+');
