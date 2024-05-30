@@ -42,11 +42,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
     end
 
-    % Versioncontrol
-    if verLessThan('matlab','9.13')
-        error('Matlab appears to be outdated. Please update before continuing.')
-    end
-
     % If there are paths to be added, add them; this is mostly for batch runs
     if isfield(parameters,'paths_to_add') && ~isempty(parameters.paths_to_add)
         for nPaths = 1:length(parameters.paths_to_add)
@@ -78,7 +73,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if ~isfolder(parameters.output_dir)
         mkdir(parameters.output_dir);
     end
-    if ~isfolder(parameters.seg_path)
+    if isfield(parameters,'seg_path') && ~isfolder(parameters.seg_path)
         mkdir(parameters.seg_path);
     end
     
