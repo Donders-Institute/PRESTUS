@@ -24,6 +24,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
     
+    % output info about current version (recorded in log)
+    [~,git_hash_string] = system('git rev-parse HEAD');
+    disp(['PRESTUS version:', git_hash_string]);
+
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
     functionsLoc = fullfile(currentLoc,'functions');
