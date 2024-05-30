@@ -10,6 +10,20 @@ The examples folder contains some examples of how to run the pipeline, including
 
 When working on the DCCN cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
 
+Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed atomatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path*. Now you can start matlab R2022b.
+
+If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
+
+```
+cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
+```
+
+*this will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions.
+
+## Outside the DCC/N
+
+Download and install these tools:
+
 - MATLAB (R2022b)
 - [SimNIBS 4](https://github.com/simnibs/simnibs)
 - toolboxes included as submodules if this repository is cloned (must be added on MATLAB startup)
@@ -31,24 +45,9 @@ cd PRESTUS
 git submodule init
 git submodule update
 ```
-
 You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4).
 
 *Note: If you do not clone this repository, you must manually download and add the toolboxes specified above.*
-
-**Please ensure that subtoolbox paths are added on MATLAB startup if you are running PRESTUS on HPC**.
-
-# How to run
-
-*this will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions.
-
-## Outside the DCC/N
-
-Download and install these tools:
-
-- [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4)
-- [k-Wave 1.4](http://www.k-wave.org/download.php) (should be installed in the 'toolbox' folder of PRESTUS or be added automatically on MATLAB startup if you use HPC)
-- toolboxes included in this repository
 
 Example data: We are currently working on a solution to make the example dataset available for users outside the DCCN.
 
