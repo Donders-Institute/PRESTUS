@@ -124,7 +124,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull')|| strcmp(parameters.simulation_medium, 'layered')
         if parameters.usepseudoCT == 1
-            [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, ...
+            [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
             focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
             inv_final_transformation_matrix] = preprocess_brain_pCT(parameters, subject_id);
         else
@@ -193,7 +193,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     disp('Setting up kwave medium...')
 
     if parameters.usepseudoCT == 1
-        kwave_medium = setup_medium_pCT(parameters, medium_masks, pseudoCT_cropped);
+        kwave_medium = setup_medium_pCT(parameters, medium_masks, segmented_image_cropped);
     else
         kwave_medium = setup_medium(parameters, medium_masks);
     end
@@ -400,7 +400,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
             output_table.maxT_brain = gather(masked_max_3d(maxT, medium_masks>0 & medium_masks<3));
-            %output_table.maxT_skull = gather(masked_max_3d(maxT, segmented_image_cropped==4));
             output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
             if parameters.usepseudoCT == 1
                 output_table.maxT_skin = gather(masked_max_3d(maxT, medium_masks==3));

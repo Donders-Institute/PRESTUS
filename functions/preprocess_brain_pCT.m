@@ -1,4 +1,4 @@
-function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos_final,...
+function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, focus_pos_final,...
     t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preprocess_brain_pCT(parameters, subject_id)
        
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -208,7 +208,7 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
             [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
             smooth_and_crop_skull(segmented_img_rr, bone_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
         else
-            [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
+            [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ~, ~, new_grid_size, crop_translation_matrix] = ...
             smooth_and_crop_layered_pseudoCT(mask_img_rr, pCT_img_rr, parameters.grid_step_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters);
         end
 
@@ -219,7 +219,7 @@ function [medium_masks, pseudoCT_cropped, skull_edge, trans_pos_final, focus_pos
 
         % Saves the output according to the naming convention set in the
         % beginning of this section
-        save(filename_cropped_smoothed_skull_data, 'medium_masks', 'pseudoCT_cropped', 'skull_edge', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix','final_transformation_matrix','inv_final_transformation_matrix')
+        save(filename_cropped_smoothed_skull_data, 'medium_masks', 'segmented_image_cropped', 'skull_edge', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix','final_transformation_matrix','inv_final_transformation_matrix')
         
     else 
         disp('Skipping, the file already exists, loading it instead.')

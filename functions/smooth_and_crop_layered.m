@@ -220,24 +220,5 @@ function [smoothed_segmented_img, skull_edge, segmented_image_cropped, trans_pos
     % uint8( ) transforms the values of smoothed_segmented_img in type
     % uint8 (8 bit = 1 byte unsigned integers)
     
-    %% trilayer
-    
-%     skull_mask = smoothed_segmented_img==find(strcmp(labels,'skull'));
-%     %erosion on the skull mask
-%     SE = strel("cube",6); %try 7 or similar to optimize
-%     skull_mask_ero = imerode(skull_mask,SE);
-%     %trilayer model of the skull with value 1 for 'cortical' bone and value 2
-%     %for 'trabecular' bone
-%     trilayer = skull_mask + skull_mask_ero;
-%     trilayer_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_skull', parameters.subject_id));
-%     niftiwrite(uint8(trilayer),trilayer_file,'Compressed',1);
-%     %trilayer model of the whole head with value 5 for cortical bone and
-%     %value 6 for trabecular bone (the values are according to the indeces
-%     %of the labels)
-%     smoothed_segmented_img = smoothed_segmented_img + trilayer;
-%     trilayer_final_file = fullfile(parameters.output_dir, sprintf('sub-%03d_trilayer_whole_head', parameters.subject_id));
-%     niftiwrite(uint8(smoothed_segmented_img),trilayer_final_file,'Compressed',1);
-    
-    
 end
 
