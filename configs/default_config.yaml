@@ -49,7 +49,7 @@ subject_subfolder: 1
 results_filename_affix: ''
 
 # This allows you to add additional paths and subpaths while running the pipeline
-paths_to_add: []
+paths_to_add: [] # specify as /path1 ; /path2; ...
 subpaths_to_add: []
 
 # Can allow to only run specific components of the pipeline

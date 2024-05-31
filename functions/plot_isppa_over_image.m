@@ -201,7 +201,11 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = p
     
     imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
 
-    clim(options.isppa_color_range)
+    if exist("clim")==2 % renamed in R2022a
+        clim(options.isppa_color_range);
+    elseif exist("caxis")==2
+        caxis(options.isppa_color_range);
+    end
     colormap(ax2, options.color_scale);
 
     ax2.Visible = 'off';
