@@ -18,15 +18,15 @@ simnibs_bin_path: /home/affneu/kenvdzee/SimNIBS-4.0/bin/
 simulation_medium: layered
  
 # Parameters differ for each transducer and can be obtained from the manufacturer
-transducer:
-  n_elements: 4 # Number of elements in the transducer
-  Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324] # Inner diameter of each element
-  Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008] # Outer diameter of each element
-  curv_radius_mm: 63.20 # Radius of curvature of the bowl 
-  dist_to_plane_mm: 52.38 # Distance to the transducer plane from the geometric focus
-  source_amp: 91590 # [Pa] 
-  source_phase_deg: [0.0, 13.2, 26.4, 52.8] # Source phase [deg] 
-  source_freq_hz: 250e3 # [Hz] The central frequency
+transducer: 
+  n_elements: 4 # number of elements in the transducer
+  Elements_ID_mm: [0, 31.6988, 44.2688, 53.6688]
+  Elements_OD_mm: [31.14, 43.71, 53.11, 60.83]
+  curv_radius_mm: 62.94 # radius of curvature of the bowl 
+  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
+  source_amp: 72850 # [Pa] (need to be calibrated for specific transducer)
+  source_phase_deg: [0.0, 245.4, 130.8, 16.2] # source phase [deg] (need to be calibrated for specific transducer)
+  source_freq_hz: 500e3 # [Hz] the central frequency  
   pos_t1_grid: [128, 139, 15] # Position on T1 grid [T1 grid space] (can be left out if importing location data)
 
   # Important to note: the alpha values in `alpha_0_true` below are currently set for 500KHz transducers.
@@ -142,48 +142,49 @@ charm_debug: 0
 
 # Important to note: the alpha values in `alpha_0_true` are currently set for 500KHz transducers
 # These should be adjusted to the values shown in their respected comments next to the medium parameters
+# For 250 kHz, alpha_power_true = 1.2, and alpha_0_true (in skull*) = 53.2
 # We are still not entirely sure what alpha values best to use, so be critical of our and your own choices
 medium:
   water:
     sound_speed: 1500 # [m/s] ITRUST benchmarks 
     density: 994 # [kg/m^3] Tissue Properties DB or waterDensity(37) function in kWave
     alpha_0_true: 0  # from ITRUST benchmarks at 500 kHz (assumes no absorption in water, so no heating )
-    alpha_power_true: 2   #1.2
+    alpha_power_true: 2
     thermal_conductivity: 0.60 # [W/m/°C] Tissue Properties DB
     specific_heat_capacity: 4178 # [J/kg/°C] Tissue Properties DB
   skull: # cortical bone 
     sound_speed: 2800 # [m/s], ITRUST benchmarks 
     density: 1850 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 53.2 #4 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
-    alpha_power_true: 2 #1.2
+    alpha_0_true: 26.6 # alpha_0 in alpha = alpha_0*frequency^alpha_power | = 13.3/(freq in MhZ) [Brad Treebly]
+    alpha_power_true: 2
     thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
   brain:
     sound_speed: 1546 # [m/s] Tissue Properties DB 
     density: 1046 # [kg/m^3], ITRUST benchmarks or waterDensity(temp_0)
     alpha_0_true: 0.6 # ITRUST benchmarks (changed to 0.15 for 250KHz transducers)
-    alpha_power_true: 2  #1.2
+    alpha_power_true: 2
     thermal_conductivity: 0.51 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 3630 # [J/kg/°C] Tissue Properties DB 
   skin:
     sound_speed: 1610 # [m/s], ITRUST benchmarks 
     density: 1090 # [kg/m^3], ITRUST benchmarks
     alpha_0_true: 0.4 # ITRUST benchmarks (changed to 0.1 for 250KHz transducers)
-    alpha_power_true: 2   #1.2
+    alpha_power_true: 2
     thermal_conductivity: 0.37 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 3391 # [J/kg/°C] Tissue Properties DB
   skull_trabecular: # trabecular bone
     sound_speed: 2300 # [m/s], ITRUST benchmarks 
     density: 1700 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 53.2 #8 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
-    alpha_power_true: 2 #1.2
+    alpha_0_true: 26.6 # alpha_0 in alpha = alpha_0*frequency^alpha_power | = 13.3/(freq in MhZ) [Brad Treebly]
+    alpha_power_true: 2
     thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
   skull_cortical: # cortical bone
     sound_speed: 2800 # [m/s], ITRUST benchmarks 
     density: 1850 # [kg/m^3], ITRUST benchmarks
-    alpha_0_true: 53.2 #4 # ITRUST benchmarks [this is alpha_0 in alpha = alpha_0*frequency^alpha_power] (changed to 2 for 250KHz transducers)
-    alpha_power_true: 2 #1.2
+    alpha_0_true: 26.6 # alpha_0 in alpha = alpha_0*frequency^alpha_power | = 13.3/(freq in MhZ) [Brad Treebly]
+    alpha_power_true: 2
     thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
     specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
 
