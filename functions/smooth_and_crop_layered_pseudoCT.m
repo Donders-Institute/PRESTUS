@@ -15,7 +15,11 @@ function [tissues_mask_img_cropped, skull_edge, segmented_image_cropped, trans_p
    
     labels = fieldnames(parameters.layer_labels);
     
-    csf_mask = segmented_img==6; % make this dynamic? why is this not included in layer_labels
+    if any(strcmp(labels, 'csf'))
+        csf_mask = segmented_img==find(strcmp(labels, 'csf'));
+    else
+        csf_mask = segmented_img==6;
+    end
         
     % Creates a transducer for overlay in a figure
     transducer_bowl = transducer_setup(parameters.transducer, trans_pos_upsampled_grid, focus_pos_upsampled_grid, ...
@@ -70,9 +74,9 @@ function [tissues_mask_img_cropped, skull_edge, segmented_image_cropped, trans_p
 
     % Crops the processed segmented image
     tissues_mask_img_cropped = segmented_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3)); % Crop image
-    % Creates a mask around the edge of the figure to define the edge of the skull
     
-    skull_i = (tissues_mask_img_cropped == 4) | (tissues_mask_img_cropped == 5);
+    % Creates a mask around the edge of the figure to define the edge of the skull
+    skull_i = ismember(tissues_mask_img_cropped, find(strcmp(labels, 'skull_cortical') | strcmp(labels, 'skull_trabecular')));
     skull_edge = edge3(tissues_mask_img_cropped==skull_i, 'approxcanny',0.1);
     
     % Crops the original pseudoCT image in the same wave as the processed tissues mask one
@@ -99,18 +103,20 @@ function [tissues_mask_img_cropped, skull_edge, segmented_image_cropped, trans_p
         plot_t1_with_transducer(segmented_img, voxel_size_mm, trans_pos_upsampled_grid, focus_pos_upsampled_grid, parameters),...
     'montage')
     output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_skull_final_pCT%s.png', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    title('Cropped (left) and original (right) segmented mask')
+    title('Cropped (left) and original (right) tissue mask')
     export_fig(output_plot, '-native')
 
     skull_mask_file = fullfile(parameters.output_dir, sprintf('sub-%03d_skull_mask_final_pCT', parameters.subject_id));
-    skull_mask = zeros(size(segmented_img));
+    skull_mask = zeros(size(segmented_image_cropped));
     for layer_i = find(contains(labels,  'skull'))'
-        i = segmented_img==layer_i; % which voxels contain skull
-        skull_mask(i) = segmented_img(i);
+        i = segmented_image_cropped==layer_i; % which voxels contain skull
+        skull_mask(i) = segmented_image_cropped(i);
     end
     niftiwrite(uint8(skull_mask), skull_mask_file ,'Compressed', 1);
+   
     segmented_file = fullfile(parameters.output_dir, sprintf('sub-%03d_medium_masks_final_pCT', parameters.subject_id));
-    niftiwrite(uint8(segmented_img), segmented_file  ,'Compressed', 1);
+    niftiwrite(uint8(tissues_mask_img_cropped), segmented_file  ,'Compressed', 1);
+
     % niftiwrite creates a file with the name segment_file (so
     % sub-009_medium_masks_final in the specified directory) using the
     % volume V uint8(smoothed_segmented_img)

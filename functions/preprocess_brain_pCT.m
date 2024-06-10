@@ -173,11 +173,16 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
     %% Plot the skin & skull from SimNIBS
 
+    labels = fieldnames(parameters.layer_labels);
+    
+    skullidx = find(strcmp(labels, 'skull_cortical') | strcmp(labels, 'skull_trabecular'));
+
     % unsmoothed skull & skin masks
     % create filled bone mask
     skull_mask_unsmoothed = zeros(size(mask_img_rr));
-    skull_mask_unsmoothed(mask_img_rr==4|mask_img_rr==5) = mask_img_rr(mask_img_rr==4|mask_img_rr==5);
-    skin_mask_unsmoothed = mask_img_rr==3;
+    skull_mask_unsmoothed(ismember(mask_img_rr,skullidx)) = ...
+        mask_img_rr(ismember(mask_img_rr,skullidx));
+    skin_mask_unsmoothed = mask_img_rr==find(strcmp(labels, 'skin'));
 
     skin_slice = squeeze(skin_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:));
     skull_slice = squeeze(skull_mask_unsmoothed(:,trans_pos_upsampled_grid(2),:));
