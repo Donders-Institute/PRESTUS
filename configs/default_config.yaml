@@ -142,7 +142,7 @@ charm_debug: 0
 
 # Important to note: the alpha values in `alpha_0_true` are currently set for 500KHz transducers
 # These should be adjusted to the values shown in their respected comments next to the medium parameters
-# For 250 kHz, alpha_power_true = 1.2, and alpha_0_true (in skull*) = 53.2
+# For 250 kHz, alpha_power_true may be 1.2 [CHECK!], and alpha_0_true (in skull*) = 53.2
 # We are still not entirely sure what alpha values best to use, so be critical of our and your own choices
 medium:
   water:
