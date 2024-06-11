@@ -102,13 +102,14 @@ default_grid_dims: [144, 144, 256]
 # Labels for layered simulation, assuming for now the SimNIBS masks indices;
 # Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
 # This labeling scheme assumes the outputs of charm in SimNIBS
-layer_labels:  
+# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
+
+layer_labels:
   water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be water
   brain: [1, 2]
   skin: [5]
   skull_cortical: [7] 
   skull_trabecular: [8]
-# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
 
 # If you are using headreco, those are the labels you probably want. 
 # layer_labels:  
@@ -116,6 +117,11 @@ layer_labels:
 #  brain: [1, 2]
 #  skin: [5]
 #  skull: [4]
+
+# It is safer if we additionally include labels for segmentations, otherwise hardcoded values will be used
+seg_labels:
+  csf: [3]
+  bonemask: [1,2,3,4,7,8,9]
 
 # Only use this if you are using the Donders HPC. If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation).
 using_donders_hpc: 1

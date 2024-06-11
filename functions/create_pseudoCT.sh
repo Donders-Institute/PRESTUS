@@ -109,9 +109,9 @@ function create_pseudoCT()
 
         # Final tissues mask
         fslmaths final_tissues_dil -thr 1 -uthr 2 -bin -mul 2 brain_mask
-        fslmaths final_tissues_dil -thr 10 -uthr 10 -bin -add final_tissues_skin_dil -add outer_head -bin -mul 3 skin_mask
-        fslmaths final_tissues_skull_dil -bin -mul 4 skull_mask
-        fslmaths final_tissues_dil -thr 3 -uthr 3 -bin -mul 6 csf_mask
+        fslmaths final_tissues_dil -thr 10 -uthr 10 -bin -add final_tissues_skin_dil -add outer_head -bin -mul 5 skin_mask
+        fslmaths final_tissues_skull_dil -bin -mul 7 skull_mask
+        fslmaths final_tissues_dil -thr 3 -uthr 3 -bin -mul 3 csf_mask
         fslmaths brain_mask -add skin_mask -add skull_mask -add csf_mask tissues_mask
 
         # Move the files obtained during the process in a sub-folder. 

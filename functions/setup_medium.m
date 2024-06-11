@@ -1,4 +1,4 @@
-function kwave_medium = setup_medium(parameters, medium_mask)
+function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                         Setup k-wave medium                       %
@@ -11,6 +11,7 @@ function kwave_medium = setup_medium(parameters, medium_mask)
     %                                                                   %
     % Some notes:                                                       %
     % - The alpha value can be tweaked at the end of this script.       %
+    % - pseudoCT_cropped is an optional input when using pseudoCTs      %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Loads the medium settings from the config file
@@ -50,25 +51,82 @@ function kwave_medium = setup_medium(parameters, medium_mask)
             if strcmp(label_name, 'water')
                continue % Loops to next label since the baseline medium is set to water anyways
             end
-            % Sets the parameters in the shape of the mask
-            thermal_conductivity(medium_mask==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
-            specific_heat(medium_mask==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
+            if parameters.usepseudoCT == 1 && (strcmp(label_name, 'skull_cortical') || strcmp(label_name, 'skull_trabecular'))
+                % Finds maximum and minumum values
+                HU_min = min(pseudoCT_cropped,[],'all');
+                HU_max = max(pseudoCT_cropped,[],'all');
+                thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                
+                specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;
 
-            sound_speed(medium_mask==label_i) = medium.(label_name).sound_speed; 
-            density(medium_mask==label_i) = medium.(label_name).density;
-            alpha_0_true(medium_mask==label_i) =  medium.(label_name).alpha_power_true; 
-            alpha_power_true(medium_mask==label_i) = medium.(label_name).alpha_power_true;
+                % Offset of 1000 for CT values to use housfield2density
+                % function
+                pseudoCT_cropped(medium_masks==label_i) = pseudoCT_cropped(medium_masks==label_i) + 1000;
+                % Ensure there are no negative values
+                pseudoCT_cropped(medium_masks==label_i) = max(pseudoCT_cropped(medium_masks==label_i),1);
+                % Apply the function
+                density(medium_masks==label_i) = hounsfield2density(pseudoCT_cropped(medium_masks==label_i));
+                % Ensure there are no negative values
+                density = max(density,1);
+                
+                sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
+                alpha_0_true(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000 -HU_min)./(HU_max-HU_min)].^0.5;
+                % added -1000 to compensate for the previous +1000
+                %4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min
+                alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
+            else
+                % Sets the parameters in the shape of the mask
+                thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
+                specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
+
+                sound_speed(medium_masks==label_i) = medium.(label_name).sound_speed; 
+                density(medium_masks==label_i) = medium.(label_name).density;
+                alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_power_true; 
+                alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
+            end
         end
-    elseif ~isempty(medium_mask) % Use the medium_mask if one is specified and the simulation_medium is not layered
-        % Sets the parameters in the shape of the medium_mask
-        thermal_conductivity(medium_mask) = medium.skull.thermal_conductivity;                                     % [W/(m.K)]
-        specific_heat(medium_mask) = medium.skull.specific_heat_capacity;                                          % [J/(kg.K)]
-
-        sound_speed(medium_mask) = medium.skull.sound_speed; 
-        density(medium_mask) = medium.skull.density;
-        alpha_0_true(medium_mask) =  medium.skull.alpha_power_true; 
-        alpha_power_true(medium_mask) = medium.skull.alpha_power_true;
+    elseif ~isempty(medium_masks) % Use the medium_masks if one is specified and the simulation_medium is not layered
+        % Sets the parameters in the shape of the medium_masks
+        % identify tissue ids
+        if isfield(parameters, 'layer_labels')
+            labels = fieldnames(parameters.layer_labels);
+            i_skull = find(contains(labels,  'skull')); i_skull = i_skull(1);
+            % i_brain = find(contains(labels,  'brain'));
+        else
+            % warning("Trying to infer tissue labels; please check...")
+            masklabels = unique(medium_masks);
+            masklabels(masklabels==0) = [];
+            % warning("Assuming brain layer is specified before skull...")
+            i_skull = masklabels(1);
+            % i_brain = masklabels(1);
+        end
+        if contains(parameters.simulation_medium, 'skull')
+            thermal_conductivity(medium_masks==i_skull) = medium.skull.thermal_conductivity;                                     % [W/(m.K)]
+            specific_heat(medium_masks==i_skull) = medium.skull.specific_heat_capacity;                                          % [J/(kg.K)]
+            sound_speed(medium_masks==i_skull) = medium.skull.sound_speed; 
+            density(medium_masks==i_skull) = medium.skull.density;
+            alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_power_true; 
+            alpha_power_true(medium_masks==i_skull) = medium.skull.alpha_power_true;
+        end
+        % if contains(parameters.simulation_medium, 'brain')
+        %     thermal_conductivity(medium_masks==i_brain) = medium.brain.thermal_conductivity;                                     % [W/(m.K)]
+        %     specific_heat(medium_masks==i_brain) = medium.brain.specific_heat_capacity;                                          % [J/(kg.K)]
+        %     sound_speed(medium_masks==i_brain) = medium.brain.sound_speed; 
+        %     density(medium_masks==i_brain) = medium.brain.density;
+        %     alpha_0_true(medium_masks==i_brain) =  medium.brain.alpha_power_true; 
+        %     alpha_power_true(medium_masks==i_brain) = medium.brain.alpha_power_true;
+        % end
     end
+    
+    % save images for debugging
+    if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
+    filename_density = fullfile(parameters.output_dir, 'debug', sprintf('density'));
+    niftiwrite(density, filename_density, 'Compressed',true);
+    filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('sound_speed'));
+    niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
+    filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true'));
+    niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+    filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true'));
+    niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
     
     % Account for actual absorption behaviour in k-Wave, which varies when high
     % absorption is used (see https://doi.org/10.1121/1.4894790).
@@ -76,11 +134,17 @@ function kwave_medium = setup_medium(parameters, medium_mask)
     % 'alpha_coeff' is tweaked so any alpha_power could be used, 
     % as long as the alpha_0_true and alpa_power_true are correct for a
     % given frequency.
-    % Here, I use 2.
+
     alpha_power_fixed = 2;
     
-    alpha_coeff = fitPowerLawParamsMulti(alpha_0_true, alpha_power_true, sound_speed, parameters.transducer.source_freq_hz, alpha_power_fixed );
-
+    alpha_coeff = fitPowerLawParamsMulti(alpha_0_true, alpha_power_true, sound_speed, parameters.transducer.source_freq_hz, alpha_power_fixed);
+    
+    % save images for debugging
+    filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true_fit'));
+    niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+    filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true_fit'));
+    niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+    
     % Outputs the medium as a structure
     kwave_medium = struct('sound_speed', sound_speed, ...
                           'density', density, ...

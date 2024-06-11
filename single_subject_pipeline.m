@@ -118,15 +118,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % and visualise the position of the transducer with some help from SimNIBS.
     % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull')|| strcmp(parameters.simulation_medium, 'layered')
-        if parameters.usepseudoCT == 1
-            [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
-            focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
-            inv_final_transformation_matrix] = preprocess_brain_pCT(parameters, subject_id);
-        else
-            [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
-            focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
-            inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
-        end
+        [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
+        focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
+        inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
             output_pressure_file = '';
             return;
@@ -188,7 +182,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     disp('Setting up kwave medium...')
 
     if parameters.usepseudoCT == 1
-        kwave_medium = setup_medium_pCT(parameters, medium_masks, segmented_image_cropped);
+        kwave_medium = setup_medium(parameters, medium_masks, segmented_image_cropped);
     else
         kwave_medium = setup_medium(parameters, medium_masks);
     end
@@ -207,8 +201,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     disp('Starting acoustic simulations...')
 
     % Pathname for the input and output files (used only for non-interactive computations)
-    parameters.kwave_input_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_input%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    parameters.kwave_output_filename = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_output%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_input_filename  = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_input%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_output_filename = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_output%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
     % Defines the edge of the simulation as the edge of the PML layer (see line 148)
     kwave_input_args = struct('PMLInside', true, ...
@@ -220,7 +216,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Looks up sensor data for use in simulations
-    filename_sensor_data = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_results%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    filename_sensor_data = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_results%s.mat', ...
+        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Run the acoustic simulations
     % See 'run_simulations' for more documentation
@@ -294,33 +292,30 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     % Creates a logical skull mask and register skull_ids
     labels = fieldnames(parameters.layer_labels);
-    skull_i = find(strcmp(labels,  'skull_cortical'));
-    trabecular_i = find(strcmp(labels,  'skull_trabecular'));
+    skull_i = find(strcmp(labels, 'skull_cortical'));
+    trabecular_i = find(strcmp(labels, 'skull_trabecular'));
     all_skull_ids = [skull_i, trabecular_i];
     skull_mask = ismember(medium_masks,all_skull_ids);
+    brain_i = find(strcmp(labels, 'brain'));
+    brain_mask = ismember(medium_masks,brain_i);
+    skin_i = find(strcmp(labels, 'skin'));
+    skin_mask = ismember(medium_masks,brain_i);
     
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, medium_masks>0 & medium_masks<3);
-        half_max = Isppa_map >= max_Isppa_brain/2 & medium_masks>0 & medium_masks<3;
+        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, brain_mask);
+        half_max = Isppa_map >= max_Isppa_brain/2 & brain_mask;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
 
-        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, medium_masks>0 & medium_masks<3);
-        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(MI_map, medium_masks>0 & medium_masks<3);
+        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, brain_mask);
+        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(MI_map, brain_mask);
         [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
         [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
         [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(MI_map, skull_mask);
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==5);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==5);
-        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(MI_map, medium_masks==5);
-        if parameters.usepseudoCT == 1
-            [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==3);
-            [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==3);
-        else
-            [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, medium_masks==5);
-            [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, medium_masks==5);
-        end
+        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, skin_mask);
+        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, skin_mask);
+        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(MI_map, skin_mask);
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
@@ -332,17 +327,16 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Plots the Isppa on the segmented image
-    output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_isppa%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
-    if parameters.n_sim_dims==3
-        if parameters.usepseudoCT == 1
-            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, medium_masks, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
-        else    
-            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
-        end
+    if parameters.n_sim_dims==3  
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+            Isppa_map, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
     else
         [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
+    output_plot = fullfile(parameters.output_dir,...
+        sprintf('sub-%03d_%s_isppa%s.png', ...
+        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     saveas(h, output_plot, 'png')
     close(h);
 
@@ -370,8 +364,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
             % For more documentation, see 'run_heating_simulations'
-            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, CEM43]= run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
-            save(filename_heating_data, 'kwaveDiffusion','time_status_seq','heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','CEM43','-v7.3');
+            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, CEM43]= ...
+                run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
+            save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
+                'heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','CEM43','-v7.3');
 
         else 
             disp('Skipping, the file already exists, loading it instead.')
@@ -394,13 +390,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            output_table.maxT_brain = gather(masked_max_3d(maxT, medium_masks>0 & medium_masks<3));
+            output_table.maxT_brain = gather(masked_max_3d(maxT, brain_mask));
             output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
-            if parameters.usepseudoCT == 1
-                output_table.maxT_skin = gather(masked_max_3d(maxT, medium_masks==3));
-            else
-                output_table.maxT_skin = gather(masked_max_3d(maxT, medium_masks==5));
-            end
+            output_table.maxT_skin = gather(masked_max_3d(maxT, skin_mask));
         end
         writetable(output_table, output_pressure_file);
 
@@ -418,9 +410,16 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             temp_color_range = [37, max(maxT(:))];
         end
 
-        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(maxT, segmented_image_cropped, source_labels, parameters, {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos, 'isppa_color_range', temp_color_range );
-        output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_maxT%s.png', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-        export_fig(output_plot, h, '-native')
+        % plot ISPPA superimposed on segmentation
+        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+            maxT, segmented_image_cropped, source_labels, parameters, ...
+            {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, ...
+            highlighted_pos, 'isppa_color_range', temp_color_range );
+        
+        output_plot_filename = fullfile(parameters.output_dir,...
+            sprintf('sub-%03d_%s_maxT%s.png',...
+            subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        saveas(h, output_plot_filename, 'png')
         close(h);
     end
 
@@ -479,12 +478,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), 'show_rectangles', 0, 'grid_step', t1_header.PixelDimensions(1));
         
-                output_plot = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_%s_t1_before_smoothing_and_cropping%s.png', subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
-                export_fig(output_plot, '-native')
-                close;
+                output_plot_filename = fullfile(parameters.output_dir,...
+                    sprintf('sub-%03d_%s_%s_t1_before_smoothing_and_cropping%s.png', ...
+                    subject_id, parameters.simulation_medium, data_type, parameters.results_filename_affix));
+                saveas(h, output_plot_filename, 'png')
+                close(h);
             end
-            m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
+            m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
                 
             if ~confirm_overwriting(mni_file, parameters)
                 continue

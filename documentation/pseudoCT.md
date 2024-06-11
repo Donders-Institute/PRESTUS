@@ -1,6 +1,10 @@
-# INSTRUCTIONS for creating a pseudoCT from UTE scans
+# PseudoCT
 
-create_pseudoCT.sh creates a pseudoCT starting from a T1w and a PETRA UTE image. 
+PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. This is currently only implemented for layered setups.
+
+### INSTRUCTIONS for creating a pseudoCT from UTE scans
+
+```create_pseudoCT.sh``` creates a pseudoCT and an associated mask file starting from a T1w and a PETRA UTE image. 
 
 To run the code you will need to install:
 - SimNIBS
