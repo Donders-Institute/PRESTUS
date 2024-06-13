@@ -1,4 +1,4 @@
-function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
+function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
     arguments
         Isppa_map (:,:,:)
         bg_image (:,:,:)
@@ -22,9 +22,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         options.tick_labels = []
         options.segmented_img = []
         options.bg_range = []
-        options.overlay_segmented = 0
-
-        
+        options.overlay_segmented = 0  
     end
     
     if any(focus_pos > size(bg_image))
@@ -136,7 +134,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         
     end
         
-    figure;
+    h = figure;
     ax1 = axes; % the background layer
     
     %bg_zeros = zeros(size(bg_slice));
@@ -203,7 +201,11 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     
     imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
 
-    caxis(options.isppa_color_range)
+    if exist("clim")==2 % renamed in R2022a
+        clim(options.isppa_color_range);
+    elseif exist("caxis")==2
+        caxis(options.isppa_color_range);
+    end
     colormap(ax2, options.color_scale);
 
     ax2.Visible = 'off';

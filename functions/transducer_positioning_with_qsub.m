@@ -49,14 +49,10 @@ function transducer_positioning_with_qsub(subject_id, parameters, pn, target_nam
 		sprintf('%s_qsub_pipeline_error_$timestamp.log', subj_id_string),...
 		log_dir);
 
-
 	full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo ''%s'' | %s',  log_dir, matlab_cmd, qsub_call);
-	
-	%fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
-    fprintf('Submitted the job to the cluster.\nSee logs in %s in case there are errors. \n', log_dir)
+
+	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
 	[res, out] = system(full_cmd);
     
     fprintf('Job name: %s; job ID: %s', job_name, out)
-	
-
 end

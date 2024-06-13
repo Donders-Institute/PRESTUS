@@ -8,7 +8,7 @@ On the first run, it is recommended to start the scripts on a local computing no
 
 # Processing steps
 
-The main pipeline depends a bit on whether you set `water` or `layered` as the simulations medium. 
+The main pipeline depends on whether you set `water` or `layered` as the simulations medium. 
 
 The first big part is to get the transducer and the focus positions and a segmentated head image if needed.
 
@@ -27,3 +27,11 @@ The simulation grid dimensions are taken from the parameter structure. The trans
 
 After that things are straightforward: k-Wave medium, source, grid, and sensor are set up and the simulations are started. When they are completed, the maximum ISPPA map is computed and the maximum pressure and intensity points are estimated for different masks. The heating simulations can be enabled by setting `run_heating_simulations` to 1. If `run_posthoc_water_simulations` is set in parameters, then after the layered simulations, the same simulation parameters are used to run the simulations for water only.
 
+## Supported simulation setups
+
+- `layered`: the simulation medium varies in terms of water, brain, skin and skull, with potential subdivision into cortical bone (`skull_cortical`) and trabecular bone (`skull_trabecular`)
+- `layered`+`pseudoCT`: acoustic properties of bone are based on pseudo-Hounsfield units
+- `water`: homogeneous water medium
+- `brain`: homogeneous brain medium
+- `water_and_skull`: homogeneous water medium + skull
+- `brain_and_skull`: homogeneous water medium + brain; note that brain medium is also assumed outside the skull

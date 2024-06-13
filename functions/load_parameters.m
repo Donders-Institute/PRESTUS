@@ -4,13 +4,6 @@ function parameters = load_parameters(varargin)
     if nargin == 1
         extra_config_file = varargin{1};
         extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true);
-        %assert(extra_parameters.transducer.source_freq_hz == parameters.default_freq || isfield(extra_parameters,'medium'), 'The transducer frequency does not match the frequency used for the medium parameters in the default config file. Provide medium parameters in your config.')
-        
-%         if (extra_parameters.transducer.source_freq_hz ~= parameters.default_freq) && ~isfield(extra_parameters,'medium')
-%             warning('The transducer frequency does not match the frequency used for the medium parameters in the default config file. Recalculating aMake sure that the medium parameters in your config file account for the correct frequency.')
-%             
-%         end
-            
         parameters = MergeStruct(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};
@@ -89,14 +82,39 @@ function parameters = load_parameters(varargin)
     end
  
     if isfield(parameters, 'ld_library_path') && parameters.ld_library_path ~= ""
-        assert(exist(parameters.ld_library_path, 'dir'), 'The path in parameters.ld_library_path does not exist')
+        if ~exist(parameters.ld_library_path, 'dir')
+            assert(all(confirmation_dlg('The path in parameters.ld_library_path does not exist, do you want to continue?','Yes','No')), 'Exiting');
+        end
     end
-    
-    assert(exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file'), sprintf('The path segmentation software (%s) does not exist at %s.', parameters.segmentation_software, parameters.simnibs_bin_path))
-     
+
+    if isfield(parameters, 'simnibs_bin_path') && parameters.simnibs_bin_path ~= ""
+        if ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file')
+            assert(all(confirmation_dlg([sprintf('The path segmentation software (%s) does not exist at %s.', ...
+                parameters.segmentation_software, parameters.simnibs_bin_path)...
+                ', do you want to continue?'],'Yes','No')), 'Exiting');
+        end
+    end
+         
     % set segmentation path to data_path if no specific seg_path is defined
     if ~isfield(parameters, 'seg_path') || parameters.seg_path == ""
         parameters.seg_path = parameters.data_path;
+    end
+    
+    % turn additional paths into separate cell strings
+    if isfield(parameters, 'paths_to_add')
+        if ~isempty(parameters.paths_to_add)
+            parameters.paths_to_add = cellstr(strsplit(parameters.paths_to_add, ';'));
+        end
+    end
+    if isfield(parameters, 'subpaths_to_add')
+        if ~isempty(parameters.subpaths_to_add)
+            parameters.subpaths_to_add = cellstr(strsplit(parameters.subpaths_to_add, ';'));
+        end
+    end
+    
+    % MATLAB version check
+    if verLessThan('matlab','9.13')
+       assert(all(confirmation_dlg('Matlab appears to be outdated. Please update before continuing. Do you want to continue?','Yes','No')), 'Exiting');
     end
 
 end
