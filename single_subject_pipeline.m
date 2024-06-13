@@ -78,7 +78,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
     
     % Save parameters to have a backlog
-    parameters_file = fullfile(parameters.output_dir, sprintf('sub-%03d_parameters_%s.mat', subject_id, datestr(now,'dd_mm_yyyy_HHMMSS_FFF')));
+    parameters_file = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_parameters%s_%s.mat', ...
+        subject_id, parameters.results_filename_affix, datestr(now,'ddmmyy_HHMM')));
     save(parameters_file, 'parameters')
     
     % Add subject_id to parameters to pass arguments to functions more easily
