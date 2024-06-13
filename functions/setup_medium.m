@@ -116,18 +116,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
         %     alpha_power_true(medium_masks==i_brain) = medium.brain.alpha_power_true;
         % end
     end
-    
-    % save images for debugging
-    if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
-    filename_density = fullfile(parameters.output_dir, 'debug', sprintf('density'));
-    niftiwrite(density, filename_density, 'Compressed',true);
-    filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('sound_speed'));
-    niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
-    filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true'));
-    niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
-    filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true'));
-    niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
-    
+
     % Account for actual absorption behaviour in k-Wave, which varies when high
     % absorption is used (see https://doi.org/10.1121/1.4894790).
 
@@ -136,14 +125,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     % given frequency.
 
     alpha_power_fixed = 2;
-    
     alpha_coeff = fitPowerLawParamsMulti(alpha_0_true, alpha_power_true, sound_speed, parameters.transducer.source_freq_hz, alpha_power_fixed);
-    
-    % save images for debugging
-    filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true_fit'));
-    niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
-    filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true_fit'));
-    niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
     
     % Outputs the medium as a structure
     kwave_medium = struct('sound_speed', sound_speed, ...
@@ -152,5 +134,22 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                           'alpha_power', alpha_power_fixed , ...
                           'thermal_conductivity', thermal_conductivity,...
                           'specific_heat', specific_heat);
+                          
+    % save images for debugging
+    if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
+        if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
+        filename_density = fullfile(parameters.output_dir, 'debug', sprintf('density'));
+        niftiwrite(density, filename_density, 'Compressed',true);
+        filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('sound_speed'));
+        niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
+        filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true'));
+        niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+        filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true'));
+        niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+        filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true_fit'));
+        niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+        filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true_fit'));
+        niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+    end
 
 end
