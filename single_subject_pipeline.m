@@ -388,7 +388,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             maxCEM43 = gather(maxCEM43);
         end
         output_table.maxT = gather(max(maxT, [], 'all'));
-        output_table.maxCEM43 = gather(max(maxCEM43, [], 'all'));
+        output_table.maxCEM43 = gather(max(CEM43, [], 'all'));
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
