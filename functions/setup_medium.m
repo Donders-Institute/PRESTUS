@@ -80,7 +80,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
 
                 sound_speed(medium_masks==label_i) = medium.(label_name).sound_speed; 
                 density(medium_masks==label_i) = medium.(label_name).density;
-                alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_power_true; 
+                alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_0_true; 
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
             end
         end
@@ -104,7 +104,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
             specific_heat(medium_masks==i_skull) = medium.skull.specific_heat_capacity;                                          % [J/(kg.K)]
             sound_speed(medium_masks==i_skull) = medium.skull.sound_speed; 
             density(medium_masks==i_skull) = medium.skull.density;
-            alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_power_true; 
+            alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_0_true; 
             alpha_power_true(medium_masks==i_skull) = medium.skull.alpha_power_true;
         end
         % if contains(parameters.simulation_medium, 'brain')
@@ -150,6 +150,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
         niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
         filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true_fit'));
         niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+        filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('alpha_coeff'));
+        niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
     end
 
 end
