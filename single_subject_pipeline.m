@@ -301,7 +301,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     brain_i = find(strcmp(labels, 'brain'));
     brain_mask = ismember(medium_masks,brain_i);
     skin_i = find(strcmp(labels, 'skin'));
-    skin_mask = ismember(medium_masks,brain_i);
+    skin_mask = ismember(medium_masks,skin_i);
     
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
