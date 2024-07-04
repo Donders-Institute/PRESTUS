@@ -60,8 +60,8 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
             medium_masks(layer_mask_smoothed~=0) = label_i;
         end
         % fill gaps in the skull by using the boundary of a bone image
-        if any(contains(labels,  'skull_cortical'))  
-            skull_i = find(strcmp(labels,  'skull_cortical')); % gives to skull_i the index of skull_cortical in labels array
+        if any(contains(labels, 'skull_cortical'))  
+            skull_i = find(strcmp(labels, 'skull_cortical')); % gives to skull_i the index of skull_cortical in labels array
             % combine all skull masks for smoothing
             layer_mask = ismember(segmented_img, getidx(parameters.layer_labels, 'skull'));
             smooth_threshold = parameters.skull_smooth_threshold;
@@ -123,8 +123,14 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
             biggestBlob = ismember(labeledImage, sortIndexes(2));
 
             medium_masks((skin_skull_filled-skin_skull - biggestBlob)>0) = skull_i;
-            if any(contains(labels,  'skull_cortical'))  
-            medium_masks(trabecular_mask_smoothed~=0) = trabecular_i; % makes sure that the trabecular mask is not affected
+            if any(contains(labels, 'skull_cortical'))  
+                medium_masks(trabecular_mask_smoothed~=0) = trabecular_i; % makes sure that the trabecular mask is not affected
+            end
+            % make sure that eyes are not labeled as bone
+            if isfield(parameters.seg_labels, 'eye')
+                eye_i = parameters.seg_labels.eye;
+                eye = segmented_img==eye_i;
+                medium_masks(eye~=0) = 0; % default to water
             end
         end
 
