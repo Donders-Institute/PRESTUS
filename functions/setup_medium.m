@@ -29,10 +29,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     
     % 'sound_speed' and 'density' are 3D arrays determining the speed of sound and the medium density within the simulation grid
     sound_speed = baseline_medium.sound_speed*grid_of_ones; 
-    density = baseline_medium.density*grid_of_ones;    %waterDensity(temp_0) * ones(Nx,Ny,Nz);                     % [kg/m^3]
-
-    % Assume a homogeneous attenuation across the skull of 0.6 dB/MHz/cm in water and 7.4 dB/MHz/cm in the skull
-    alpha_0_true =  baseline_medium.alpha_0_true*grid_of_ones; %0.6 * ones(Nx,Ny,Nz);                              % [dB/MHz/cm] (Kremkau et al., 1981)
+    density = baseline_medium.density*grid_of_ones;
+    alpha_0_true = baseline_medium.alpha_0_true*grid_of_ones;
     alpha_power_true = baseline_medium.alpha_power_true*grid_of_ones;
 
     % 'thermal conductivity' and 'specific_heat' are constants that define
@@ -59,7 +57,6 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;
 
                 % Offset of 1000 for CT values to use housfield2density
-                % function
                 pseudoCT_cropped(medium_masks==label_i) = pseudoCT_cropped(medium_masks==label_i) + 1000;
                 % Ensure there are no negative values
                 pseudoCT_cropped(medium_masks==label_i) = max(pseudoCT_cropped(medium_masks==label_i),1);
@@ -67,17 +64,18 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 density(medium_masks==label_i) = hounsfield2density(pseudoCT_cropped(medium_masks==label_i));
                 % Ensure there are no negative values
                 density = max(density,1);
-                
                 sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
-                alpha_0_true(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000 -HU_min)./(HU_max-HU_min)].^0.5;
-                % added -1000 to compensate for the previous +1000
-                %4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min
+                alpha_pseudoCT(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000 -HU_min)./(HU_max-HU_min)].^0.5;
+                % -1000 to compensate for the previous +1000
+                % 4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min [Yakuub et al., 2023, BrainStim]
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
+                % convert attenuation alpha into prefactor alpha0
+                alpha_0_true(medium_masks==label_i) = alpha_pseudoCT(medium_masks==label_i)./(0.5^medium.(label_name).alpha_power_true);
+                % 0.5 = 500kHz here [check whether this needs to be adjusted if another central frequency is used]
             else
                 % Sets the parameters in the shape of the mask
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
-
                 sound_speed(medium_masks==label_i) = medium.(label_name).sound_speed; 
                 density(medium_masks==label_i) = medium.(label_name).density;
                 alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_0_true; 
@@ -116,8 +114,15 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     % as long as the alpha_0_true and alpa_power_true are correct for a
     % given frequency.
 
-    alpha_power_fixed = 2;
-    alpha_coeff = fitPowerLawParamsMulti(alpha_0_true, alpha_power_true, sound_speed, parameters.transducer.source_freq_hz, alpha_power_fixed, true);
+    alpha_power_fixed = .2;
+
+    alpha_coeff = fitPowerLawParamsMulti(...
+        alpha_0_true, ...
+        alpha_power_true, ...
+        sound_speed, ...
+        parameters.transducer.source_freq_hz, ...
+        alpha_power_fixed, ...
+        false);
     
     % Outputs the medium as a structure
     kwave_medium = struct('sound_speed', sound_speed, ...
@@ -126,20 +131,19 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                           'alpha_power', alpha_power_fixed, ...
                           'thermal_conductivity', thermal_conductivity,...
                           'specific_heat', specific_heat);
-                          
+    
     % save images for debugging
     if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
         if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
-        filename_density = fullfile(parameters.output_dir, 'debug', sprintf('density'));
-        niftiwrite(density, filename_density, 'Compressed',true);
-        filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('sound_speed'));
-        niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
-        filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_0_true_fit'));
-        niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
-        filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('alpha_power_true_fit'));
-        niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
-        filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('alpha_coeff'));
-        niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
+        % filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
+        % niftiwrite(density, filename_density, 'Compressed',true);
+        % filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('matrix_sound_speed'));
+        % niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
+        % filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_0_true'));
+        % niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+        % filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_power'));
+        % niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+        % filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
+        % niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
     end
-
 end

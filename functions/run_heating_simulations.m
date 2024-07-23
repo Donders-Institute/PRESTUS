@@ -15,18 +15,13 @@ function [thermal_diff_obj, time_status_seq, maxT,focal_planeT, maxCEM43, CEM43]
 % thermal parameters, see thermal simulations getting started.      %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
-% Convert the absorption coefficient to nepers/m
+% Convert the absorption coefficients to nepers/m (!)
 alpha_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power) * ...
     (2 * pi * parameters.transducer.source_freq_hz).^kwave_medium.alpha_power;
 
-% % Extract the pressure amplitude at each position
-% p = extractAmpPhase(sensor_data.p_max_all, 1/kgrid.dt, parameters.transducer.source_freq_hz);
-% 
-% % Reshape the data, and calculate the volume rate of heat deposition
-% p = reshape(p, kgrid.Nx, kgrid.Ny);
-
-p = sensor_data.p_max_all;
-source.Q = alpha_np .* p.^2 ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system
+% Get the maximum pressure (in Pa) and calculate Q, the volume rate of heat deposition
+p = gather(sensor_data.p_max_all);
+source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system
 source.T0 = parameters.thermal.temp_0; % Initial temperature distribution
 
 % create kWaveDiffusion object
@@ -47,7 +42,7 @@ maxCEM43 = thermal_diff_obj.cem43;
 
 time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
 
-% Set up some last parameters for simulation
+% Set final parameters for simulation
 total_timepoints = 1+parameters.thermal.n_trials*(on_off_repetitions*(1+double(off_steps_n>0))+1);
 cur_timepoint = 1;
 focal_planeT = gpuArray(NaN([size(maxT,[1,3]) total_timepoints]));
@@ -62,8 +57,8 @@ for trial_i = 1:parameters.thermal.n_trials
 
     is_break_period = 0;
     if isfield(parameters, 'start_break_trials')
-        for i = 1:length(parameters.start_break_trials)
-            if trial_i >= parameters.start_break_trials(i) && trial_i <= parameters.stop_break_trials(i)
+        for i_break = 1:length(parameters.start_break_trials)
+            if trial_i >= parameters.start_break_trials(i_break) && trial_i <= parameters.stop_break_trials(i_break)
                 is_break_period = 1;
             end
         end
@@ -75,57 +70,64 @@ for trial_i = 1:parameters.thermal.n_trials
 
       if is_break_period == 0
           thermal_diff_obj.Q = source.Q;
+          tmp_status = 'on';
       else
-          thermal_diff_obj.Q(:,:,:) = 0;   
+          thermal_diff_obj.Q(:,:,:) = 0;
+          tmp_status = 'off';
           disp('Break active');
       end
 
       thermal_diff_obj.takeTimeStep(on_steps_n, on_steps_dur);
-      time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:on_steps_n)*on_steps_dur), ...
-                                                'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), 'status', "on",'recorded',0)];
+      
+      time_status_seq = [time_status_seq, ...
+          struct('time', num2cell(max([time_status_seq(:).time]) + (1:on_steps_n)*on_steps_dur), ...
+                 'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), ...
+                 'status', tmp_status,...
+                 'recorded',1)];
       curT = thermal_diff_obj.T;
       curCEM43 = thermal_diff_obj.cem43;
       cur_timepoint = cur_timepoint+1;
-      time_status_seq(end).recorded = 1;
       focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
       CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
 
-      % JQK: shouldn't this comparison be the other way around?
-      if any(maxT>curT,'all')
-          maxT = curT;
-      end
-
-      if any(maxCEM43>curCEM43, 'all')
-          maxCEM43 = curCEM43;
-      end
+      % update maxT and maxCEM43 where applicable
+      maxT(curT>maxT) = curT(curT>maxT);
+      maxCEM43(curCEM43>maxCEM43) = curCEM43(curCEM43>maxCEM43);
 
       % Pulse off 
       if off_steps_n>0
           thermal_diff_obj.Q(:,:,:) = 0;
           thermal_diff_obj.takeTimeStep(off_steps_n, off_steps_dur);
-          time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off",'recorded',0)];
+          time_status_seq = [time_status_seq,...
+              struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), ...
+              'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)),...
+              'status', "off",...
+              'recorded',1)];
           cur_timepoint = cur_timepoint+1;
-          time_status_seq(end).recorded = 1;
           curT = thermal_diff_obj.T;
           curCEM43 = thermal_diff_obj.cem43;
-
-          focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
-          CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+          focal_planeT(:,:,cur_timepoint) = ...
+              squeeze(curT(:,trans_pos(2),:));
+          CEM43(:,:,cur_timepoint) = ...
+              squeeze(curCEM43(:,trans_pos(2),:));
       end
   end
-  
 end
+
 % Post-stimulation period
 if post_stim_steps_n > 0 
-  thermal_diff_obj.Q = 0;
+  thermal_diff_obj.Q(:,:,:) = 0;
   thermal_diff_obj.takeTimeStep(post_stim_steps_n, post_stim_time_step_dur);
-  time_status_seq = [time_status_seq struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), 'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), 'status', "off",'recorded',0)];
-  time_status_seq(end).recorded = 1;
+  time_status_seq = [time_status_seq struct(...
+      'time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), ...
+      'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), ...
+      'status', "off",...
+      'recorded',1)];
   cur_timepoint = cur_timepoint+1;
   curT = thermal_diff_obj.T;
   curCEM43 = thermal_diff_obj.cem43;
   focal_planeT(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
   CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
-                end
+end
 
 end

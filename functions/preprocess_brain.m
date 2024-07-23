@@ -84,10 +84,6 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     close(h);
     
     %% SEGMENTATION using SimNIBS
-    
-    if parameters.usepseudoCT == 1
-        warning("SimNibs integration not supported when requesting pseudoCT. Please make sure you have run SimNibs and have created a pseudoCT.")
-    end
 
     disp('Starting segmentation...')
 
@@ -102,6 +98,9 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     % Starts the segmentation, see 'run_segmentation' for more documentation
     if confirm_overwriting(filename_segmented, parameters) && (~isfield( parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented, 'file'))
         % Asks for confirmation since segmentation takes a long time
+        if parameters.usepseudoCT == 1
+            warning("SimNibs integration not supported when requesting pseudoCT. Please make sure you have run SimNibs and have created a pseudoCT.")
+        end
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time, are you sure?', 'Yes', 'No')
             run_segmentation(parameters.data_path, subject_id, filename_t1, filename_t2, parameters);
             %fprintf('\nThe script will continue with other subjects in the meanwhile...\n')
