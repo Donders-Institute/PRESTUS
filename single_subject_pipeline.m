@@ -227,6 +227,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if parameters.run_source_setup
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final);
+        % check stability
+        disp('Check stability...')
+        dt_stability_limit = checkStability(kgrid, kwave_medium);
+        if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
+            grid_time_step = dt_stability_limit;
+            [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step);
+        end
     end
 
     %% RUN ACOUSTIC SIMULATION
