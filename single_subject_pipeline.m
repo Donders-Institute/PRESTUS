@@ -98,7 +98,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     %% Start of simulations
     % Creates an output file to which output is written at a later stage
-    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
+        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Tries an alternative method to calculate the expected focal distance
     % if none is entered into the config file
@@ -196,24 +197,23 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
     % save medium images for debugging
     if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
-        if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
                 
         orig_hdr = t1_header; % header is based on original T1w (always present)
         orig_hdr.Datatype = 'single';
 
-        filename_density = fullfile(parameters.output_dir, 'debug', sprintf('density'));
+        filename_density = fullfile(parameters.debug_dir, sprintf('density'));
         density = single(tformarray(kwave_medium.density, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
         niftiwrite(density, filename_density, orig_hdr, 'Compressed',true);
         clear filename_density density;
         
-        filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('sound_speed'));
+        filename_sound_speed = fullfile(parameters.debug_dir, sprintf('sound_speed'));
         sound_speed = single(tformarray(kwave_medium.sound_speed, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
         niftiwrite(sound_speed, filename_sound_speed, orig_hdr, 'Compressed',true);
         clear filename_sound_speed sound_speed;
         
-        filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('alpha_coeff'));
+        filename_alpha_coeff = fullfile(parameters.debug_dir, sprintf('alpha_coeff'));
         alpha_coeff = single(tformarray(kwave_medium.alpha_coeff, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
         niftiwrite(alpha_coeff, filename_alpha_coeff, orig_hdr, 'Compressed',true);
@@ -392,7 +392,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             % Set sensor along the focal axis 
             heating_window_dims = ones(2,3);
             for i = 1:2
-                heating_window_dims(:,i) = [max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i)), min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i))];
+                heating_window_dims(:,i) = [...
+                    max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i)), ...
+                    min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i))];
             end
 
             % Sets up a window to perform simulations in
@@ -418,21 +420,19 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         % Creates an output table for temperature readings
         output_table = readtable(output_pressure_file);
-        if gpuDeviceCount==0
-            maxT = gather(maxT);
-            maxCEM43 = gather(maxCEM43);
-        end
-        output_table.maxT = gather(max(maxT, [], 'all'));
-        output_table.maxCEM43 = gather(max(CEM43, [], 'all'));
+        
+        % convert GPU data 
+        maxT = gather(maxT);
+        CEM43 = gather(CEM43);
+
+        output_table.maxT = max(maxT, [], 'all');
+        output_table.maxCEM43 = max(CEM43, [], 'all');
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            output_table.maxT_brain = gather(masked_max_3d(maxT, brain_mask));
-            output_table.maxT_skull = gather(masked_max_3d(maxT, skull_mask)); 
-            output_table.maxT_skin = gather(masked_max_3d(maxT, skin_mask));
-            % output_table.maxCEM43_brain = gather(masked_max_3d(CEM43, brain_mask));
-            % output_table.maxCEM43_skull = gather(masked_max_3d(CEM43, skull_mask)); 
-            % output_table.maxCEM43_skin = gather(masked_max_3d(CEM43, skin_mask));
+            output_table.maxT_brain = masked_max_3d(maxT, brain_mask);
+            output_table.maxT_skull = masked_max_3d(maxT, skull_mask); 
+            output_table.maxT_skin = masked_max_3d(maxT, skin_mask);
         end
         writetable(output_table, output_pressure_file);
 
@@ -443,11 +443,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, CEM43);
                 
         % Plots the maximum temperature in the segmented brain
-        maxT = gather(maxT);
-        if max(maxT(:)) < 38
+        if output_table.maxT < 38
             temp_color_range = [37, 38];
         else
-            temp_color_range = [37, max(maxT(:))];
+            temp_color_range = [37, output_table.maxT];
         end
 
         % plot ISPPA superimposed on segmentation
@@ -467,7 +466,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
 
-        data_types = ["isppa","MI", "pressure","medium_masks"];
+        data_types = ["isppa","MI","pressure","medium_masks"];
         if  isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
             data_types  = [data_types "heating"];
         end
@@ -478,15 +477,15 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 subject_id, data_type, parameters.results_filename_affix));
 
             if strcmp(data_type, "isppa")
-                data = Isppa_map;
+                data = single(Isppa_map);
             elseif strcmp(data_type, "MI")
-                data = MI_map;
+                data = single(MI_map);
             elseif strcmp(data_type, "pressure")
-                data = data_max;
+                data = single(data_max);
             elseif strcmp(data_type, "medium_masks")
                 data = medium_masks;
             elseif strcmp(data_type, "heating")
-                data = maxT;
+                data = single(maxT);
             end
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
@@ -548,7 +547,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % Since charm does not transform the T1 into MNI space, one is manually created here
         if strcmp(parameters.segmentation_software, 'charm')
             path_to_input_img = fullfile(m2m_folder,'T1.nii.gz');
-            path_to_output_img = fullfile(m2m_folder,'toMNI/T1_to_MNI_post-hoc.nii.gz');
+            path_to_output_img = fullfile(m2m_folder,'toMNI','T1_to_MNI_post-hoc.nii.gz');
 
             if ~exist(path_to_output_img,'file')
                 convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters)
