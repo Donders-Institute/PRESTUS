@@ -48,7 +48,6 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
     slice_x = 1:size(Isppa_map,1);
     slice_y = 1:size(Isppa_map,2);
     slice_z = 1:size(Isppa_map,3);
-
    
     if slice{1} == 'x'
         slice_x = slice{2};
@@ -137,16 +136,12 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
         
     h = figure;
     ax1 = axes; % the background layer
-    
-    %bg_zeros = zeros(size(bg_slice));
-    %bg_slice = (bg_slice-min(bg_slice(:)))/ max(bg_slice(:));
     bg_img = cat(3, bg_slice, bg_slice, bg_slice);
     overlay_color = [0,0.2,0.7];
     bg_ones = ones(size(bg_img));
     overlay_weight = 0.2;
     overlay_img  = reshape(overlay_color, 1, 1,3).*bg_ones;
     image(bg_img+overlay_weight*overlay_img);
-    %colormap(ax1,'gray');
     axis image;
     axis off;
     
