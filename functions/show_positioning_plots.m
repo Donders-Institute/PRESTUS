@@ -11,11 +11,11 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
         output_plot string
     end
 
-    view_pos = [0,0];
-    slice_cap = [-1,0,0];
+    view_pos = [-180, 0];
+    slice_cap = [1,0,0];
     if trans_pos_final(3) > size(segmented_img_final,3)/2
-        view_pos = [-180, 0];
-        slice_cap = [1,0,0];
+        view_pos = [0,0];
+        slice_cap = [-1,0,0];
     end
     coord_mesh_xyz = get_xyz_mesh(segmented_img_orig);
     if gpuDeviceCount>0
