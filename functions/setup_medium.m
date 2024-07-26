@@ -114,7 +114,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     % as long as the alpha_0_true and alpa_power_true are correct for a
     % given frequency.
 
-    alpha_power_fixed = .2;
+    alpha_power_fixed = 2;
 
     alpha_coeff = fitPowerLawParamsMulti(...
         alpha_0_true, ...
