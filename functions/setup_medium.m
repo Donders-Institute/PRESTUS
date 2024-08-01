@@ -56,7 +56,7 @@ function kwave_medium = setup_medium(parameters, medium_mask)
 
             sound_speed(medium_mask==label_i) = medium.(label_name).sound_speed; 
             density(medium_mask==label_i) = medium.(label_name).density;
-            alpha_0_true(medium_mask==label_i) =  medium.(label_name).alpha_power_true; 
+            alpha_0_true(medium_mask==label_i) =  medium.(label_name).alpha_0_true; 
             alpha_power_true(medium_mask==label_i) = medium.(label_name).alpha_power_true;
         end
     elseif ~isempty(medium_mask) % Use the medium_mask if one is specified and the simulation_medium is not layered
@@ -66,7 +66,7 @@ function kwave_medium = setup_medium(parameters, medium_mask)
 
         sound_speed(medium_mask) = medium.skull.sound_speed; 
         density(medium_mask) = medium.skull.density;
-        alpha_0_true(medium_mask) =  medium.skull.alpha_power_true; 
+        alpha_0_true(medium_mask) =  medium.skull.alpha_0_true; 
         alpha_power_true(medium_mask) = medium.skull.alpha_power_true;
     end
     

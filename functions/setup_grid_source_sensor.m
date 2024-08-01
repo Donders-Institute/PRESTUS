@@ -1,4 +1,4 @@
-function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final)
+function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
     
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Set up the transducer and sensor                 %
@@ -17,13 +17,21 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
         kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
                       parameters.grid_dims(2), parameters.grid_step_m);
     end
-        
-	% Calculate the time step using an integer number of points per period
-    points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);      % points per wavelength
-    cfl = 0.3;                                                                                                      % CFL number (kwave default)
-    points_per_period = ceil(points_per_wavelength / cfl);                                                          % points per period
+    
     wave_period   = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
-    grid_time_step = (wave_period / points_per_period)/2;                                                           % time step [s]
+
+    % Check the number of input arguments
+    % As a default the time step is based on the default CFL number of 0.3.
+    % If grid_time_step is given, it means that the transducer and sensor
+    % has to be set up again with a smaller time step due to simulation
+    % instability.
+    if nargin < 5
+        % Calculate the time step using an integer number of points per period
+        points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);      % points per wavelength
+        cfl = 0.3;                                                                                                      % CFL number (kwave default)
+        points_per_period = ceil(points_per_wavelength / cfl);                                                          % points per period
+        grid_time_step = (wave_period / points_per_period)/2;                                                           % time step [s]  
+     end
 
     % Calculate the number of time steps to reach steady state
     t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / max_sound_speed;                           % [s]
@@ -31,6 +39,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
 
     % Create the time array
     kgrid.setTime(simulation_time_points, grid_time_step);
+    
 
     % Create source (transducer with focuspoint)
     parameters.kwave_source_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));

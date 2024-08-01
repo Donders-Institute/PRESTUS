@@ -188,6 +188,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if parameters.run_source_setup
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final);
+
+        % If estimated time step is smaller than the time step based on
+        % default CFL, the estimated time step is used to redefine
+        % transducer and sensor. Note: the estimated time step doesn't 
+        % guarantee a stable simulation. If Nan numbers are acquired as
+        % a result, you may want to try a time step smaller than the
+        % estimated time step.
+        disp('Check simulation stability...')
+        dt_stability_limit = checkStability(kgrid, kwave_medium);
+        if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
+            disp('Adapt time step for simulation stability...')
+            grid_time_step = dt_stability_limit;
+            [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step);
+        end
     end
 
     %% RUN ACOUSTIC SIMULATION
