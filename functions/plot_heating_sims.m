@@ -80,7 +80,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         max(focal_CEM(:, 1:size(time_status_seq,2)),[],1)); 
     colormap('lines')
     xlabel('Time [s]');
-    ylabel(sprintf('CEM43 for %iW', parameters.desired_intensity));
+    ylabel(sprintf('CEM43'));
 
     y_range = ylim();
     hold on;
