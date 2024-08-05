@@ -48,12 +48,14 @@ end
 % Defines the number of post stimulation steps, sets the post_stim_period to 0 if a continuous protocol is used
 if isfield(parameters.thermal,'continuous_protocol') && parameters.thermal.continuous_protocol == 1
     post_stim_period = 0;
+    post_stim_steps_n = 0;
 else
     post_stim_period = parameters.thermal.iti - parameters.thermal.stim_duration;
+    post_stim_steps_n = post_stim_period / post_stim_time_step_dur;
 end
-post_stim_steps_n = post_stim_period / post_stim_time_step_dur;
 
-fprintf('Post-stimulation off period is %.2f s, consists of %.2f simulation steps, each taking %.2f s.\n', post_stim_period, post_stim_steps_n, post_stim_time_step_dur)
+fprintf('Post-stimulation off period is %.2f s, consists of %.0f simulation steps, each taking %.2f s.\n', ...
+    post_stim_period, post_stim_steps_n, post_stim_time_step_dur)
 
 post_stim_steps_n = round_if_integer(post_stim_steps_n, 'Number of simulation steps must be integer');
 
@@ -62,14 +64,15 @@ post_stim_steps_n = round_if_integer(post_stim_steps_n, 'Number of simulation st
 if  isfield(parameters.thermal,'equal_steps') && parameters.thermal.equal_steps == 0
     on_steps_dur = on_off_step_duration*parameters.thermal.duty_cycle;
     off_steps_dur = on_off_step_duration*(1-parameters.thermal.duty_cycle);
-    on_steps_n  = 1;
+    on_steps_n = 1;
     off_steps_n = 1;
-    fprintf('Time steps allowed to be unequal. 1 on+off cycle contains %.3f on steps and %.3f off steps assuming equal steps of %.3f s each.\n', on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
-    % This description is confusing, as the number of steps is coupled to
-    % the duration, NOT the equal step size.
+    fprintf('Each cycle = 1 on and 1 off step with durations of %.3f s & %.3f s respectively.\n', ...
+        on_steps_dur, off_steps_dur)
 else
     on_steps_dur = parameters.thermal.sim_time_steps;
     off_steps_dur = parameters.thermal.sim_time_steps;
+    fprintf('Each cycle = %.0f on  and %.0f off steps assuming equal steps of %.3f s each.\n', ...
+        on_steps_n, off_steps_n, parameters.thermal.sim_time_steps)
 end
 
 end

@@ -194,6 +194,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
         kwave_medium = setup_medium(parameters, medium_masks);
     end
+
+    % split temp_0 from kwave_medium (due to kwave checks)
+    temp_0 = kwave_medium.temp_0;
+    kwave_medium = rmfield(kwave_medium, 'temp_0');
     
     % save medium images for debugging
     if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
@@ -409,6 +413,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             heating_window_dims(2,3) = parameters.grid_dims(3);
             sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
+            % add starting temperature
+            kwave_medium.temp_0 = temp_0;
+
             % For more documentation, see 'run_heating_simulations'
             [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, CEM43]= ...
                 run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
@@ -441,6 +448,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             output_table.maxT_brain = masked_max_3d(maxT, brain_mask);
             output_table.maxT_skull = masked_max_3d(maxT, skull_mask); 
             output_table.maxT_skin = masked_max_3d(maxT, skin_mask);
+            output_table.riseT_brain = masked_max_3d(maxT, brain_mask)-parameters.medium.brain.temp_0;
+            output_table.riseT_skull = masked_max_3d(maxT, skull_mask)-parameters.medium.skull.temp_0; 
+            output_table.riseT_skin = masked_max_3d(maxT, skin_mask)-parameters.medium.skin.temp_0;
         end
         writetable(output_table, output_pressure_file);
 

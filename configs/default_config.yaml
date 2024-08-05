@@ -122,7 +122,7 @@ medium:
     alpha_0_true: 1.2 # ITRUSST benchmarks
     alpha_power_true: 2
     thermal_conductivity: 0.51 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 3630 # [J/kg/°C] Tissue Properties DB 
+    specific_heat_capacity: 3630 # [J/kg/°C] Tissue Properties DB
   skin:
     sound_speed: 1610 # [m/s], ITRUSST benchmarks 
     density: 1090 # [kg/m^3], ITRUSST benchmarks
@@ -163,7 +163,13 @@ thermal:
   equal_steps: 0 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
   
   # Optional parameters:
-  temp_0: 37 #[deg C] initial temperature, currently not used
+  temp_0: #[deg C] initial temperature
+    water: 37
+    skull: 36
+    brain: 37
+    skin: 35
+    skull_trabecular: 37
+    skull_cortical: 36
   sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
  

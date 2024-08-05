@@ -22,7 +22,10 @@ alpha_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power) * ...
 % Get the maximum pressure (in Pa) and calculate Q, the volume rate of heat deposition
 p = gather(sensor_data.p_max_all);
 source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system
-source.T0 = parameters.thermal.temp_0; % Initial temperature distribution
+source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
+
+% split temp_0 off from kWave_medium
+kwave_medium = rmfield(kwave_medium, 'temp_0');
 
 % create kWaveDiffusion object
 if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.record_t_at_every_step 
@@ -38,7 +41,8 @@ maxT = thermal_diff_obj.T;
 thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
 maxCEM43 = thermal_diff_obj.cem43;
 
-[~, on_off_repetitions, on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, post_stim_steps_n, post_stim_time_step_dur] = check_thermal_parameters(parameters);
+[~, on_off_repetitions, on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, post_stim_steps_n, post_stim_time_step_dur] = ...
+    check_thermal_parameters(parameters);
 
 time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
 

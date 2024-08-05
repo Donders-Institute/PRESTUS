@@ -22,9 +22,11 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     
     % Fills this grid with a baseline medium
     if strcmp(parameters.simulation_medium, 'water') || strcmp(parameters.simulation_medium, 'water_and_skull') || strcmp(parameters.simulation_medium, 'layered') 
-        baseline_medium = medium.('water');
+        baseline_medium_name = 'water';
+        baseline_medium = medium.(baseline_medium_name);
     elseif strcmp(parameters.simulation_medium, 'brain') || strcmp(parameters.simulation_medium, 'brain_and_skull')
-        baseline_medium = medium.('brain');
+        baseline_medium_name = 'brain';
+        baseline_medium = medium.(baseline_medium_name);
     end
     
     % 'sound_speed' and 'density' are 3D arrays determining the speed of sound and the medium density within the simulation grid
@@ -38,7 +40,12 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     % the temperature within a givven mass of the tissue.
     thermal_conductivity = baseline_medium.thermal_conductivity * grid_of_ones;                                    % [W/(m.K)]
     specific_heat = baseline_medium.specific_heat_capacity * grid_of_ones;                                         % [J/(kg.K)]
-    
+    if isfield(parameters.thermal.temp_0, baseline_medium_name)
+        temp_0 = parameters.thermal.temp_0.(baseline_medium_name) * grid_of_ones;                                  % [degC]
+    else % if a global temp0 is indicated
+        temp_0 = parameters.thermal.temp_0 * grid_of_ones;
+    end
+
     % Changes the values of the acoustic and thermal properties in the
     % baseline_medium in the shape of the labelled mask
     if strcmp(parameters.simulation_medium, 'layered')
@@ -55,7 +62,6 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 HU_max = max(pseudoCT_cropped,[],'all');
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;
-
                 % Offset of 1000 for CT values to use housfield2density
                 pseudoCT_cropped(medium_masks==label_i) = pseudoCT_cropped(medium_masks==label_i) + 1000;
                 % Ensure there are no negative values
@@ -72,6 +78,9 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 % convert attenuation alpha into prefactor alpha0
                 alpha_0_true(medium_masks==label_i) = alpha_pseudoCT(medium_masks==label_i)./(0.5^medium.(label_name).alpha_power_true);
                 % 0.5 = 500kHz here [check whether this needs to be adjusted if another central frequency is used]
+                if isfield(parameters.thermal.temp_0, label_name)
+                    temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                                     % [degC]
+                end
             else
                 % Sets the parameters in the shape of the mask
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
@@ -80,6 +89,9 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 density(medium_masks==label_i) = medium.(label_name).density;
                 alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_0_true; 
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
+                if isfield(parameters.thermal.temp_0, label_name)
+                    temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                                     % [degC]
+                end
             end
         end
     elseif ~isempty(medium_masks) % Use the medium_masks if one is specified and the simulation_medium is not layered
@@ -104,6 +116,9 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
             density(medium_masks==i_skull) = medium.skull.density;
             alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_0_true; 
             alpha_power_true(medium_masks==i_skull) = medium.skull.alpha_power_true;
+            if isfield(parameters.thermal.temp_0, 'skull')
+                temp_0(medium_masks==i_skull) = parameters.thermal.temp_0.skull;                                                          % [degC]
+            end
         end
     end
 
@@ -130,7 +145,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                           'alpha_coeff', alpha_coeff,...
                           'alpha_power', alpha_power_fixed, ...
                           'thermal_conductivity', thermal_conductivity,...
-                          'specific_heat', specific_heat);
+                          'specific_heat', specific_heat,...
+                          'temp_0', temp_0);
     
     % save images for debugging
     if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
