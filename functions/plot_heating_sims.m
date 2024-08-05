@@ -31,7 +31,6 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
-
     y_range = ylim();
     hold on;
     for i = 2:(length(time_status_seq)-1)
@@ -44,8 +43,8 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
-    saveas(h, output_plot, 'png')
-    close(h)
+    saveas(h, output_plot, 'png');
+    close(h);
 
     %% plot temperature rise
 
@@ -55,7 +54,6 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
-
     y_range = ylim();
     hold on;
     for i = 2:(length(time_status_seq)-1)
@@ -68,8 +66,8 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
-    saveas(h, output_plot_rise, 'png')
-    close(h)
+    saveas(h, output_plot_rise, 'png');
+    close(h);
     
     %% plot CEM43
 
@@ -94,8 +92,8 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
-    saveas(g, output_plotCEM, 'png')
-    close(g)
+    saveas(g, output_plotCEM, 'png');
+    close(g);
 
     %% Create a video of heating effects over the course of the experiment (request by default)
 
