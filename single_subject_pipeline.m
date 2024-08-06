@@ -417,15 +417,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             kwave_medium.temp_0 = temp_0;
 
             % For more documentation, see 'run_heating_simulations'
-            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, CEM43]= ...
+            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, focal_planeCEM43]= ...
                 run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
             
             save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
-                'heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','CEM43','-v7.3');
+                'heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','focal_planeCEM43','-v7.3');
 
         else 
             disp('Skipping, the file already exists, loading it instead.')
             load(filename_heating_data);
+        end
+
+        % variable may have been saved under a different name in the past (backcomp)
+        if exist('CEM43')
+            focal_planeCEM43=CEM43;
         end
 
         % Sets up an empty medium mask if non is specified
@@ -438,7 +443,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         
         % convert GPU data 
         maxT = gather(maxT);
-        CEM43 = gather(CEM43);
+        CEM43 = gather(maxCEM43);
 
         output_table.maxT = max(maxT, [], 'all');
         output_table.maxCEM43 = max(CEM43, [], 'all');
@@ -448,9 +453,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             output_table.maxT_brain = masked_max_3d(maxT, brain_mask);
             output_table.maxT_skull = masked_max_3d(maxT, skull_mask); 
             output_table.maxT_skin = masked_max_3d(maxT, skin_mask);
-            output_table.riseT_brain = masked_max_3d(maxT, brain_mask)-parameters.medium.brain.temp_0;
-            output_table.riseT_skull = masked_max_3d(maxT, skull_mask)-parameters.medium.skull.temp_0; 
-            output_table.riseT_skin = masked_max_3d(maxT, skin_mask)-parameters.medium.skin.temp_0;
+            output_table.riseT_brain = masked_max_3d(maxT, brain_mask)-parameters.thermal.temp_0.brain;
+            output_table.riseT_skull = masked_max_3d(maxT, skull_mask)-parameters.thermal.temp_0.skull; 
+            output_table.riseT_skin = masked_max_3d(maxT, skin_mask)-parameters.thermal.temp_0.skin;
+            output_table.CEM43_brain = masked_max_3d(CEM43, brain_mask);
+            output_table.CEM43_skull = masked_max_3d(CEM43, skull_mask); 
+            output_table.CEM43_skin = masked_max_3d(CEM43, skin_mask);
         end
         writetable(output_table, output_pressure_file);
 
@@ -458,7 +466,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         [~, source_labels] = transducer_setup(parameters.transducer, trans_pos_final, focus_pos_final, ...
                                                     size(segmented_image_cropped), t1_header.PixelDimensions(1));
         % Creates a line graph and a video of the heating effects
-        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, CEM43);
+        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, focal_planeCEM43);
                 
         % Plots the maximum temperature in the segmented brain
         if output_table.maxT < 38
@@ -486,7 +494,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         data_types = ["isppa","MI","pressure","medium_masks"];
         if  isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
-            data_types  = [data_types "heating"];
+            data_types  = [data_types, "heating", "heatrise", "CEM43"];
         end
         for data_type = data_types
             orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
@@ -504,6 +512,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 data = medium_masks;
             elseif strcmp(data_type, "heating")
                 data = single(maxT);
+            elseif strcmp(data_type, "heatrise")
+                data = single(maxT-temp_0);
+            elseif strcmp(data_type, "CEM43")
+                data = single(CEM43);
             end
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
