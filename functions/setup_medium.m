@@ -68,8 +68,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 pseudoCT_cropped(medium_masks==label_i) = max(pseudoCT_cropped(medium_masks==label_i),1);
                 % Apply the function
                 density(medium_masks==label_i) = hounsfield2density(pseudoCT_cropped(medium_masks==label_i));
-                % Ensure there are no negative values, if so replace with 1
-                density(medium_masks==label_i) = max(density(medium_masks==label_i),1);
+                % if density estimate is below the density of water, replace with water
+                density(medium_masks==label_i) = max(density(medium_masks==label_i),medium.water.density);
                 sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
                 % fix minimum sound speed to water estimate
                 sound_speed(medium_masks==label_i) = max(sound_speed(medium_masks==label_i),medium.water.sound_speed);
