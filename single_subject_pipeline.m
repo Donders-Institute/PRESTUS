@@ -108,10 +108,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         if ~isfield(parameters.transducer, 'pos_t1_grid') || ~isfield(parameters, 'focus_pos_t1_grid')
             error('Either the transducer position or the focus position on T1 grid are not specified, cannot compute the expected focal distance')
         end
-        filename_t1 = fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id));
-        if ~isfile(filename_t1)
+        filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
+        if isempty(filename_t1)
             error('File does not exist: \r\n%s', filename_t1);
         end
+        % select first match in case multiple are found
+        filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name);
         t1_info = niftiinfo(filename_t1);
         t1_grid_step_mm = t1_info.PixelDimensions(1);
         focal_distance_t1 = norm(parameters.focus_pos_t1_grid - parameters.transducer.pos_t1_grid);
