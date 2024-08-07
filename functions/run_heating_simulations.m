@@ -102,8 +102,8 @@ for trial_i = 1:parameters.thermal.n_trials
       CEM43(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
 
       % update maxT and maxCEM43 where applicable
-      maxT(curT>maxT) = curT(curT>maxT);
-      maxCEM43(curCEM43>maxCEM43) = curCEM43(curCEM43>maxCEM43);
+      maxT = max(maxT, curT);
+      maxCEM43 = max(maxCEM43, curCEM43);
 
       % Pulse off 
       if off_steps_n>0
