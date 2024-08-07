@@ -1,4 +1,4 @@
-function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
+function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                         Setup k-wave medium                       %
@@ -10,8 +10,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
     % different kinds of tissue (see 'layered').                        %
     %                                                                   %
     % Some notes:                                                       %
-    % - The alpha value can be tweaked at the end of this script.       %
-    % - pseudoCT_cropped is an optional input when using pseudoCTs      %
+    % - The alpha value is converted at the end of this script.         %
+    % - pseudoCT is an optional input when using pseudoCTs              %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Loads the medium settings from the config file
@@ -57,32 +57,88 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                continue % Loops to next label since the baseline medium is set to water anyways
             end
             if parameters.usepseudoCT == 1 && (strcmp(label_name, 'skull_cortical') || strcmp(label_name, 'skull_trabecular'))
-                % Finds maximum and minumum values
-                HU_min = min(pseudoCT_cropped,[],'all');
-                HU_max = max(pseudoCT_cropped,[],'all');
-                thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                
-                specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;
-                % Offset of 1000 for CT values to use housfield2density
-                pseudoCT_cropped(medium_masks==label_i) = pseudoCT_cropped(medium_masks==label_i) + 1000;
-                % Ensure there are no negative values, if so replace with 1
-                pseudoCT_cropped(medium_masks==label_i) = max(pseudoCT_cropped(medium_masks==label_i),1);
-                % Apply the function
-                density(medium_masks==label_i) = hounsfield2density(pseudoCT_cropped(medium_masks==label_i));
-                % if density estimate is below the density of water, replace with water
-                density(medium_masks==label_i) = max(density(medium_masks==label_i),medium.water.density);
-                sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
-                % fix minimum sound speed to water estimate
-                sound_speed(medium_masks==label_i) = max(sound_speed(medium_masks==label_i),medium.water.sound_speed);
-                alpha_pseudoCT(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000-HU_min)./(HU_max-HU_min)].^0.5;
-                % -1000 to compensate for the previous +1000
-                % 4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min [alpha range at 500 kHz: Yakuub et al., 2023, BrainStim]
-                alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
-                % convert attenuation alpha into prefactor alpha0
-                alpha_0_true(medium_masks==label_i) = alpha_pseudoCT(medium_masks==label_i)./(0.5^medium.(label_name).alpha_power_true);
-                % 0.5 = 500kHz here [check whether this needs to be adjusted if another central frequency is used]
+                skull_idx = find(medium_masks==label_i);
+                thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;                
+                specific_heat(skull_idx) = medium.(label_name).specific_heat_capacity;
                 if isfield(parameters.thermal.temp_0, label_name)
-                    temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                                     % [degC]
+                    temp_0(skull_idx) = parameters.thermal.temp_0.(label_name);
                 end
+
+                % define default pCT-to-tissue conversion variant
+                if isfield(parameters, "pseudoCT_variant")
+                    pCT_variant = parameters.pseudoCT_variant;
+                else
+                    pCT_variant = "carpino";
+                end
+
+                switch pCT_variant
+                    case 'carpino'
+
+                        alpha_min   = 4;
+                        alpha_max   = 8.7;
+                        offset_HU   = 1000;
+
+                        % Finds maximum and minimum values
+                        HU_min = min(pseudoCT(:));
+                        HU_max = max(pseudoCT(:));
+
+                        % Preprocess CT values
+                        % Offset CT values to use housfield2density
+                        pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
+                        % replace negative values with 1 [JQK: regularize via minimum a la Yaakub?]
+                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),1);
+                                        
+                        % estimate density
+                        density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
+                        % regularize minimum density to water density
+                        density(skull_idx) = max(density(skull_idx),medium.water.density);
+                                        
+                        % estimate sound speed
+                        sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
+                        % regularize minimum sound speed to water
+                        sound_speed(skull_idx) = max(sound_speed(skull_idx),medium.water.sound_speed);
+                                        
+                        % remove initial offset
+                        pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
+
+                    case 'yaakub'
+                        % see https://github.com/sitiny/BRIC_TUS_Simulation_Tools/blob/main/tussim_skull_3D.m
+
+                        c_min         = 1500;     % sound speed [m/s]
+                        c_max         = 3100;     % max. speed of sound in skull (F. A. Duck, 2013.) [m/s]
+                        rho_min       = 1000;     % density [kg/m^3]
+                        rho_max       = 1900;     % max. skull density [kg/m3]
+                        alpha_min     = 4;        % Aubry, J.-F. et al., 2022 (cortical bone; α (dB/cm at 500 kHz))
+                        alpha_max     = 8.7;      % Fry 1978 at 0.5MHz: 1 Np/cm (8.7 dB/cm)
+                        HU_min 	      = 300;	  % minimum HU considered as skull
+                        HU_max 	      = 2000;	  % maximum skull HU for regularization
+
+                        % if observed max HU  is lower than threshold, set HU_max to actual max
+                        HU_max = max(max(pseudoCT(skull_idx),[],'all'), HU_max)
+
+                        % truncate CT HU (see Marsac et al., 2017)
+                        % do not use pCT-based properties for presumed non-skull tissue
+                        skull_idx(pseudoCT(skull_idx) < HU_min) = [];
+                        % regularize upper HU to HU_max
+                        pseudoCT(pseudoCT > HU_max) = HU_max;
+
+                        % estimate density from CT HU based on Marsac et al., 2017 & Bancel et al., 2021
+                        density(skull_idx) = rho_min + (rho_max - rho_min) * ...
+                            (pseudoCT(skull_idx) - 0) / (HU_max - 0);
+
+                        % estimate sound speed
+                        sound_speed(skull_idx) = c_min + (c_max - c_min) * ...
+                            (medium.density - rho_min) / (rho_max - rho_min);
+                end
+
+                % estimate attenuation coefficients
+                alpha_pseudoCT(skull_idx) = alpha_min + (alpha_max - alpha_min) * ...
+                    (1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;
+                alpha_power_true(skull_idx) = medium.(label_name).alpha_power_true;
+                % convert alpha at 500 kHz into prefactor alpha0 (dB/Mhz/cm) according to specified alpha_power_true
+                % (definition of lower and upper attenuation bounds is derived from 500kHz)
+                alpha_0_true(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power_true);
+                clear skull_idx
             else
                 % Sets the parameters in the shape of the mask
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
@@ -92,7 +148,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_0_true; 
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
                 if isfield(parameters.thermal.temp_0, label_name)
-                    temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                                     % [degC]
+                    temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                             % [degC]
                 end
             end
         end
@@ -112,14 +168,14 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
             % i_brain = masklabels(1);
         end
         if contains(parameters.simulation_medium, 'skull')
-            thermal_conductivity(medium_masks==i_skull) = medium.skull.thermal_conductivity;                                     % [W/(m.K)]
-            specific_heat(medium_masks==i_skull) = medium.skull.specific_heat_capacity;                                          % [J/(kg.K)]
+            thermal_conductivity(medium_masks==i_skull) = medium.skull.thermal_conductivity;
+            specific_heat(medium_masks==i_skull) = medium.skull.specific_heat_capacity;
             sound_speed(medium_masks==i_skull) = medium.skull.sound_speed; 
             density(medium_masks==i_skull) = medium.skull.density;
             alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_0_true; 
             alpha_power_true(medium_masks==i_skull) = medium.skull.alpha_power_true;
             if isfield(parameters.thermal.temp_0, 'skull')
-                temp_0(medium_masks==i_skull) = parameters.thermal.temp_0.skull;                                                          % [degC]
+                temp_0(medium_masks==i_skull) = parameters.thermal.temp_0.skull;
             end
         end
     end
