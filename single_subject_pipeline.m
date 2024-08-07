@@ -237,7 +237,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         disp('Check stability...')
         dt_stability_limit = checkStability(kgrid, kwave_medium);
         if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
-            grid_time_step = dt_stability_limit/100; % use a 1% of the limit (which are only aan approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
+            grid_time_step = dt_stability_limit/10; % use a 10% of the limit (which is only an approximation in heterogenous media: http://www.k-wave.org/documentation/checkStability.php)
             [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step);
         end
     end
