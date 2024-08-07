@@ -71,9 +71,11 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 % Ensure there are no negative values, if so replace with 1
                 density(medium_masks==label_i) = max(density(medium_masks==label_i),1);
                 sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
-                alpha_pseudoCT(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000 -HU_min)./(HU_max-HU_min)].^0.5;
+                % fix minimum sound speed to water estimate
+                sound_speed(medium_masks==label_i) = max(sound_speed(medium_masks==label_i),medium.water.sound_speed);
+                alpha_pseudoCT(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000-HU_min)./(HU_max-HU_min)].^0.5;
                 % -1000 to compensate for the previous +1000
-                % 4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min [Yakuub et al., 2023, BrainStim]
+                % 4.7 = 8.7 - 4 = alpha_bone_max-alpha_bone_min [alpha range at 500 kHz: Yakuub et al., 2023, BrainStim]
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
                 % convert attenuation alpha into prefactor alpha0
                 alpha_0_true(medium_masks==label_i) = alpha_pseudoCT(medium_masks==label_i)./(0.5^medium.(label_name).alpha_power_true);
