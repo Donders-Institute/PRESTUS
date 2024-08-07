@@ -64,12 +64,12 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT_cropped)
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;
                 % Offset of 1000 for CT values to use housfield2density
                 pseudoCT_cropped(medium_masks==label_i) = pseudoCT_cropped(medium_masks==label_i) + 1000;
-                % Ensure there are no negative values
+                % Ensure there are no negative values, if so replace with 1
                 pseudoCT_cropped(medium_masks==label_i) = max(pseudoCT_cropped(medium_masks==label_i),1);
                 % Apply the function
                 density(medium_masks==label_i) = hounsfield2density(pseudoCT_cropped(medium_masks==label_i));
-                % Ensure there are no negative values
-                density = max(density,1);
+                % Ensure there are no negative values, if so replace with 1
+                density(medium_masks==label_i) = max(density(medium_masks==label_i),1);
                 sound_speed(medium_masks==label_i) = 1.33.*density(medium_masks==label_i) + 167; 
                 alpha_pseudoCT(medium_masks==label_i) = 4+4.7.*[1-(pseudoCT_cropped(medium_masks==label_i)-1000 -HU_min)./(HU_max-HU_min)].^0.5;
                 % -1000 to compensate for the previous +1000
