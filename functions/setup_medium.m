@@ -120,7 +120,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         % do not use pCT-based properties for presumed non-skull tissue
                         skull_idx(pseudoCT(skull_idx) < HU_min) = [];
                         % regularize upper HU to HU_max
-                        pseudoCT(pseudoCT > HU_max) = HU_max;
+                        idx_HUtoohigh = pseudoCT(skull_idx) > HU_max;
+                        pseudoCT(skull_idx(idx_HUtoohigh)) = HU_max;
 
                         % estimate density from CT HU based on Marsac et al., 2017 & Bancel et al., 2021
                         % note: the original code hard-codes HU_min as 0, which may have been an error
