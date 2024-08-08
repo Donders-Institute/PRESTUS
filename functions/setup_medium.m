@@ -113,8 +113,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         HU_min 	      = 300;	  % minimum HU considered as skull
                         HU_max 	      = 2000;	  % maximum skull HU for regularization
 
-                        % if observed max HU  is lower than threshold, set HU_max to actual max
-                        HU_max = max(max(pseudoCT(skull_idx),[],'all'), HU_max);
+                        % if observed max HU is lower than threshold, set HU_max to actual max
+                        HU_max = min(max(pseudoCT(skull_idx),[],'all'), HU_max);
 
                         % truncate CT HU (see Marsac et al., 2017)
                         % do not use pCT-based properties for presumed non-skull tissue
