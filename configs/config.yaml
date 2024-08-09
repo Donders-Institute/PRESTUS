@@ -1,0 +1,209 @@
+gen: {charac_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles, axial_prof_name: Axial_profiles_,
+  prestus_virt_path: \\ru.nl\WrkGrp\FUS_Researchers\PRESTUS virtual parameters, prestus_virt_name: PRESTUS_virtual_}
+trans:
+  CTX_250_001:
+    serial: CTX_250_001
+    name: NeuroFUS 4 ch. CTX_250_001
+    manufact: Sonic Concepts
+    n_elem: 4.0
+    min_foc: 14.2
+    max_foc: 60.9
+    prestus:
+      transducer:
+        n_elements: 4.0
+        Elements_ID_mm: [0.0, 32.9184, 46.1264, 56.0324]
+        Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 52.38
+        source_freq_hz: 250.0
+  CTX_250_009:
+    serial: CTX_250_009
+    name: NeuroFUS 2 ch. CTX_250_009
+    manufact: Sonic Concepts
+    n_elem: 2.0
+    min_foc: 15.9
+    max_foc: 46.0
+    prestus:
+      transducer:
+        n_elements: 2.0
+        Elements_ID_mm: [0.0, 6.5764, 13.1529, 19.7293, 26.3058, 32.6136, 35.2535,
+          37.8935, 40.5334, 43.1734]
+        Elements_OD_mm: [5.7744, 12.3509, 18.9273, 25.5038, 32.0802, 34.9316, 37.5716,
+          40.2115, 42.8515, 45.4914]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 56.87
+        source_freq_hz: 250.0
+  CTX_250_014:
+    serial: CTX_250_014
+    name: NeuroFUS 2 ch. CTX_250_014
+    manufact: Sonic Concepts
+    n_elem: 2.0
+    min_foc: 12.6
+    max_foc: 44.1
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [0.0, 6.5764, 13.1529, 19.7293, 26.3058, 32.6136, 35.2535,
+          37.8935, 40.5334, 43.1734]
+        Elements_OD_mm: [5.7744, 12.3509, 18.9273, 25.5038, 32.0802, 34.9316, 37.5716,
+          40.2115, 42.8515, 45.4914]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 56.87
+        source_freq_hz: 250.0
+  CTX_250_026:
+    serial: CTX_250_026
+    name: NeuroFUS 4 ch. CTX_250_026
+    manufact: Sonic Concepts
+    n_elem: 4.0
+    min_foc: 22.2
+    max_foc: 61.5
+    prestus:
+      transducer:
+        n_elements: 4.0
+        Elements_ID_mm: [0.0, 32.9184, 46.1264, 56.0324]
+        Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 52.38
+        source_freq_hz: 250.0
+  CTX_500_006:
+    serial: CTX_500_006
+    name: NeuroFUS 2 ch. CTX_500_006
+    manufact: Sonic Concepts
+    n_elem: 2.0
+    min_foc: 33.2
+    max_foc: 79.4
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [0.0, 4.59969, 9.19937, 13.7991, 18.3987, 22.9984, 27.5981,
+          32.1978, 36.7975, 41.3972]
+        Elements_OD_mm: [4.09423, 8.69391, 13.2936, 17.8933, 22.493, 27.0927, 31.6923,
+          36.292, 40.8917, 45.4914]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 56.87
+        source_freq_hz: 500.0
+  CTX_500_026:
+    serial: CTX_500_026
+    name: NeuroFUS 4 ch. CTX_500_026
+    manufact: Sonic Concepts
+    n_elem: 4.0
+    min_foc: 39.6
+    max_foc: 79.6
+    prestus:
+      transducer:
+        n_elements: 4.0
+        Elements_ID_mm: [0.0, 33.02, 46.228, 56.0832]
+        Elements_OD_mm: [32.512, 45.7708, 55.626, 64.008]
+        curv_radius_mm: 63.2
+        dist_to_plane_mm: 52.38
+        source_freq_hz: 500.0
+  IS_PCD15287_01001:
+    serial: IS_PCD15287_01001
+    name: Imasonic  10 ch. IS_PCD15287_01001
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 0.0
+    max_foc: 200.0
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.3, 30.0, 36.3, 41.7, 46.5, 51.0, 55.1, 58.9, 62.5]
+        Elements_OD_mm: [21.3, 29.1, 35.3, 40.7, 45.6, 50.0, 54.1, 58.0, 61.6, 65.0]
+        curv_radius_mm: 75.0
+        dist_to_plane_mm: 65.3
+        source_freq_hz: 300.0
+  IS_PCD15287_01002:
+    serial: IS_PCD15287_01002
+    name: Imasonic  10 ch. IS_PCD15287_01002
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 0.0
+    max_foc: 200.0
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.3, 30.0, 36.3, 41.7, 46.5, 51.0, 55.1, 58.9, 62.5]
+        Elements_OD_mm: [21.3, 29.1, 35.3, 40.7, 45.6, 50.0, 54.1, 58.0, 61.6, 65.0]
+        curv_radius_mm: 75.0
+        dist_to_plane_mm: 65.3
+        source_freq_hz: 300.0
+  IS_PCD15473_01001:
+    serial: IS_PCD15473_01001
+    name: Imasonic  10 ch. IS_PCD15473_01001
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 0.0
+    max_foc: 200.0
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+        Elements_OD_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+        curv_radius_mm: 100.0
+        dist_to_plane_mm: 92.7
+        source_freq_hz: 300.0
+  IS_PCD15473_01002:
+    serial: IS_PCD15473_01002
+    name: Imasonic  10 ch. IS_PCD15473_01002
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 0.0
+    max_foc: 200.0
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+        Elements_OD_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+        curv_radius_mm: 100.0
+        dist_to_plane_mm: 92.7
+        source_freq_hz: 300.0
+ds:
+  SC_203_035: {serial: SC_203_035, name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO junior
+      SC_203_035, manufact: Sonic Concepts, available_ch: 4.0}
+  SC_105_010: {serial: SC_105_010, name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO senior
+      SC_105_010, manufact: Sonic Concepts, available_ch: 4.0}
+  IGT_128_ch_comb_10_ch: {serial: IGT_128_ch_comb_10_ch, name: IGT  128 ch. - 10 ch.,
+    manufact: IGT, available_ch: 128.0}
+  IGT_32_ch_comb_10_ch: {serial: IGT_32_ch_comb_10_ch, name: IGT  32 ch. - 10 ch.,
+    manufact: IGT, available_ch: 32.0}
+combos:
+  CTX_250_001_SC_203_035: {tran_serial: CTX_250_001, ds_serial: SC_203_035, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_009_SC_203_035: {tran_serial: CTX_250_009, ds_serial: SC_203_035, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_014_SC_203_035: {tran_serial: CTX_250_014, ds_serial: SC_203_035, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_026_SC_203_035: {tran_serial: CTX_250_026, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  CTX_500_006_SC_203_035: {tran_serial: CTX_500_006, ds_serial: SC_203_035, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_500_026_SC_203_035: {tran_serial: CTX_500_026, ds_serial: SC_203_035, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_001_SC_105_010: {tran_serial: CTX_250_001, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_CTX-250-001~TPO-105-010.xlsx}
+  CTX_250_009_SC_105_010: {tran_serial: CTX_250_009, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_014_SC_105_010: {tran_serial: CTX_250_014, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_250_026_SC_105_010: {tran_serial: CTX_250_026, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_500_006_SC_105_010: {tran_serial: CTX_500_006, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  CTX_500_026_SC_105_010: {tran_serial: CTX_500_026, ds_serial: SC_105_010, char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial
+      profiles\Axial_profiles_}
+  IS_PCD15287_01001_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15287_01001, ds_serial: IGT_128_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15287_01002_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15287_01002, ds_serial: IGT_128_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15473_01001_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_128_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15473_01002_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_128_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15287_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01001, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15287_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01002, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15473_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
+  IS_PCD15473_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: \\ru.nl\WrkGrp\FUS_Researchers\Axial profiles\Axial_profiles_}
