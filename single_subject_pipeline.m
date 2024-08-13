@@ -210,19 +210,25 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         filename_density = fullfile(parameters.debug_dir, sprintf('density'));
         density = single(tformarray(kwave_medium.density, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        niftiwrite(density, filename_density, orig_hdr, 'Compressed',true);
+        if ~isfile(filename_density)
+            niftiwrite(density, filename_density, orig_hdr, 'Compressed',true);
+        end
         clear filename_density density;
         
         filename_sound_speed = fullfile(parameters.debug_dir, sprintf('sound_speed'));
         sound_speed = single(tformarray(kwave_medium.sound_speed, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        niftiwrite(sound_speed, filename_sound_speed, orig_hdr, 'Compressed',true);
+        if ~isfile(sound_speed)
+            niftiwrite(sound_speed, filename_sound_speed, orig_hdr, 'Compressed',true);
+        end
         clear filename_sound_speed sound_speed;
         
         filename_alpha_coeff = fullfile(parameters.debug_dir, sprintf('alpha_coeff'));
         alpha_coeff = single(tformarray(kwave_medium.alpha_coeff, inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        niftiwrite(alpha_coeff, filename_alpha_coeff, orig_hdr, 'Compressed',true);
+        if ~isfile(alpha_coeff)
+            niftiwrite(alpha_coeff, filename_alpha_coeff, orig_hdr, 'Compressed',true);
+        end
         clear filename_alpha_coeff alpha_coeff;
     end    
 
