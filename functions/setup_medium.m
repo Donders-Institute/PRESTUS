@@ -77,6 +77,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         alpha_min   = 4;
                         alpha_max   = 8.7;
                         offset_HU   = 1000;
+                        c_max       = 3100;     % max. speed of sound in skull (F. A. Duck, 2013.) [m/s]
+                        rho_max     = 2100;     % max. density in skull [kg/m3]
 
                         % Finds maximum and minimum values
                         HU_min = min(pseudoCT(:));
@@ -86,17 +88,22 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         % Offset CT values to use housfield2density
                         pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
                         % replace negative values with 1 [JQK: regularize via minimum a la Yaakub?]
+                        % note: this does not account for the offset, but perhaps this is desired
                         pseudoCT(skull_idx) = max(pseudoCT(skull_idx),1);
                                         
                         % estimate density
                         density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
                         % regularize minimum density to water density
                         density(skull_idx) = max(density(skull_idx),medium.water.density);
+                        % regularize maximum density to rho_max
+                        density(skull_idx) = min(density(skull_idx),rho_max);
                                         
                         % estimate sound speed
                         sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
                         % regularize minimum sound speed to water
                         sound_speed(skull_idx) = max(sound_speed(skull_idx),medium.water.sound_speed);
+                        % regularize maximum sound speed to c_max
+                        sound_speed(skull_idx) = min(sound_speed(skull_idx),c_max);
                                         
                         % remove initial offset
                         pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
