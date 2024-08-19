@@ -22,6 +22,7 @@ w = 2*pi*parameters.transducer.source_freq_hz;
 % convert absorption to Nepers/((rad/s)^y m)
 a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power);
 alpha_np = a0_np.*w.^kwave_medium.alpha_power;
+clear w a0_np;
 
 % alternative simplified conversion dB to Nepers
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (parameters.transducer.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
@@ -30,6 +31,7 @@ alpha_np = a0_np.*w.^kwave_medium.alpha_power;
 p = gather(abs(sensor_data.p_max_all));
 source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system (W/m3)
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
+clear alpha_np p;
 
 % split temp_0 off from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');

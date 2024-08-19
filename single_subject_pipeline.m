@@ -96,6 +96,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     %% Extra settings needed for better usability
     warning('off','MATLAB:prnRenderer:opengl'); % suppress unneccessary warnings from export_fig when running without OpenGL
     
+    % output GPU information (if requested)
+    if strcmp(parameters.code_type, 'cuda') || strcmp(parameters.code_type, 'matlab_gpu')
+        gpuDevice()
+    end
+
     %% Start of simulations
     % Creates an output file to which output is written at a later stage
     output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
@@ -117,7 +122,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         t1_info = niftiinfo(filename_t1);
         t1_grid_step_mm = t1_info.PixelDimensions(1);
         focal_distance_t1 = norm(parameters.focus_pos_t1_grid - parameters.transducer.pos_t1_grid);
-        parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm;
+        parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm; 
+        clear filename_t1 t1_info focal_distance_t1 t1_grid_step_mm;
     end
     
     % if there is no specification of usepseudoCT, go for default of 0
@@ -428,6 +434,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, focal_planeCEM43]= ...
                 run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
             
+            % apply gather in case variables are GPU arrays
+            maxT = gather(maxT);
+            focal_planeT = gather(focal_planeT);
+            maxCEM43 = gather(maxCEM43);
+            focal_planeCEM43 = gather(focal_planeCEM43);
+
             save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
                 'heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','focal_planeCEM43','-v7.3');
 
