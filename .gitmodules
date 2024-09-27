@@ -1,0 +1,12 @@
+[submodule "toolboxes/export_fig"]
+	path = toolboxes/export_fig
+	url = https://github.com/altmany/export_fig
+[submodule "toolboxes/xml2struct"]
+	path = toolboxes/xml2struct
+	url = https://github.com/joe-of-all-trades/xml2struct
+[submodule "toolboxes/k-wave"]
+	path = toolboxes/k-wave
+	url = https://github.com/ucl-bug/k-wave.git
+[submodule "toolboxes/FEX-minimize"]
+	path = toolboxes/FEX-minimize
+	url = https://github.com/rodyo/FEX-minimize.git

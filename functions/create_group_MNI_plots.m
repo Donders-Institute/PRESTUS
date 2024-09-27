@@ -20,11 +20,17 @@ end
 assert(xor(options.plot_max_intensity,options.slice_to_plot), "You should indicate either the slice number to plot ('slice_to_plot') or ask for a max intensity plot ('plot_max_intensity')")
 slice_labels = {'x','y','z'};
 
-
 outputs_path = parameters.temp_output_dir;
 bg_range_to_use = [];
 isppa_range_to_use = [5, 6];
-temp_range_to_use = [parameters.thermal.temp_0, parameters.thermal.temp_0 + 0.5];    
+% Note: with tissue-specific heating values, the plotting may not work as intended?
+if isstruct(parameters.thermal.temp_0)
+    temp_range_to_use = [parameters.thermal.temp_0.skin, parameters.thermal.temp_0.water + 0.5];
+    temp_0_min = parameters.thermal.temp_0.skin;
+else
+    temp_range_to_use = [parameters.thermal.temp_0, parameters.thermal.temp_0 + 0.5];
+    temp_0_min = parameters.thermal.temp_0;
+end
 
 full_subject_list = subject_list;
 % first pass: get background intensity at the target slice & isppa range
@@ -52,7 +58,7 @@ for subject_i = 1:length(full_subject_list)
     if strcmp(parameters.segmentation_software, 'headreco')
         t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     else
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1_to_MNI_post-hoc.nii.gz');
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
     end
     files_to_check = {t1_mni_file , segmented_image_mni_file, isppa_map_mni_file, max_pressure_mni_file, output_pressure_file};
     
@@ -65,7 +71,7 @@ for subject_i = 1:length(full_subject_list)
         if ~exist(filename{:}, 'file')
             if options.skip_missing
                 sprintf('File does not exist: %s; skipping this subject', filename{:})
-                subject_list(subject_i) = [];
+                subject_list(subject_i) = NaN;
                 all_files_exist = 0;
                 
                 break;
@@ -136,7 +142,7 @@ for subject_i = 1:length(full_subject_list)
         new_water_ind = zeros(1, length(water_ind));
         heating_mask = logical(changem_vectorized(segmented_image_mni, new_water_ind, water_ind));
         maxT_mni = maxT_mni.*heating_mask;
-        maxT_mni(maxT_mni==0) = parameters.thermal.temp_0;
+        maxT_mni(maxT_mni==0) = temp_0_min;
 
         maxT_slice = get_slice_by_label(maxT_mni, options.slice_label, slice_n);
         
@@ -148,6 +154,8 @@ for subject_i = 1:length(full_subject_list)
     end
 end
 
+% remove unavailable subjects
+subject_list(isnan(subject_list)) = [];
 
 % second pass, doing the actual images
 for subject_i = 1:length(subject_list)
@@ -173,7 +181,7 @@ for subject_i = 1:length(subject_list)
     if strcmp(parameters.segmentation_software, 'headreco')
         t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
     else
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1_to_MNI_post-hoc.nii.gz');
+        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
     end
 
     % get T1 in MNI space
@@ -221,7 +229,7 @@ for subject_i = 1:length(subject_list)
         new_water_ind = zeros(1, length(water_ind));
         heating_mask = logical(changem_vectorized(segmented_image_mni, new_water_ind, water_ind));
         maxT_mni = maxT_mni.*heating_mask;
-        maxT_mni(maxT_mni==0) = parameters.thermal.temp_0;
+        maxT_mni(maxT_mni==0) = temp_0_min;
     end
 
     if options.slice_to_plot

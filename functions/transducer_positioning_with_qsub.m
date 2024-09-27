@@ -42,21 +42,17 @@ function transducer_positioning_with_qsub(subject_id, parameters, pn, target_nam
         parameters.qsub_job_prefix = 'tusim_tp';
     end
     job_name = [parameters.qsub_job_prefix '_' subj_id_string];
-    qsub_call = sprintf('qsub -N %s -l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0,mem=%iGb,walltime=%i" -o %s -e %s -d %s', ...
+    qsub_call = sprintf('qsub -N %s -l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=8.0,mem=%iGb,walltime=%i" -o %s -e %s -d %s', ...
         job_name,...
         memorylimit, timelimit, ...
 		sprintf('%s_qsub_pipeline_output_$timestamp.log', subj_id_string),...
 		sprintf('%s_qsub_pipeline_error_$timestamp.log', subj_id_string),...
 		log_dir);
 
-
 	full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo ''%s'' | %s',  log_dir, matlab_cmd, qsub_call);
-	
-	%fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
-    fprintf('Submitted the job to the cluster.\nSee logs in %s in case there are errors. \n', log_dir)
+
+	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
 	[res, out] = system(full_cmd);
     
     fprintf('Job name: %s; job ID: %s', job_name, out)
-	
-
 end
