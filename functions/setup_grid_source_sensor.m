@@ -1,4 +1,4 @@
-function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final)
+function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
     
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Set up the transducer and sensor                 %
@@ -21,6 +21,10 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     wave_period   = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
     
     % Check the number of input arguments
+    % As a default the time step is based on the default CFL number of 0.3.
+    % If grid_time_step is given, it means that the transducer and sensor
+    % has to be set up again with a smaller time step due to simulation
+    % instability.
     if nargin < 5
         % Calculate the time step using an integer number of points per period
         points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);      % points per wavelength
