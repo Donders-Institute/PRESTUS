@@ -71,18 +71,17 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
     % Creates and exports an unprocessed T1 slice that is oriented 
     % along the transducer's axis
-    [t1_with_trans_img, ~] = plot_t1_with_transducer(...
-        t1_image, round(t1_header.PixelDimensions(1),2), trans_pos_grid, focus_pos_grid, parameters);
-    
     h = figure;
-    imshow(rot90(t1_with_trans_img));
+    imshowpair(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters), ...
+        plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters, 'slice_dim', 1),'montage');
+   
     title('T1 with transducer');
     output_plot_filename = fullfile(parameters.debug_dir, ...
         sprintf('sub-%03d_t1_with_transducer_before_smoothing_and_cropping%s.png', ...
         subject_id, parameters.results_filename_affix));
     saveas(h, output_plot_filename, 'png')
-    close(h); clear t1_with_trans_img;
-    
+    close(h);
+
     %% SEGMENTATION using SimNIBS
 
     disp('Starting segmentation...')
@@ -111,7 +110,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             focus_pos_final = [];
             final_transformation_matrix = [];
             inv_final_transformation_matrix = [];
-            return;
+			return;
         end
     else
         disp('Skipping, the file already exists, loading it instead.')
