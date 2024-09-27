@@ -1,0 +1,263 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>SETOPTIMOPTIONS</title><meta name="generator" content="MATLAB 7.11"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-03-13"><meta name="DC.source" content="setoptimoptions__doc.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000; 
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in 
+wide windows. */ 
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+} 
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>SETOPTIMOPTIONS</h1><!--introduction--><p>Optimization options for minimize</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Usage</a></li><li><a href="#2">Used options</a></li><li><a href="#5">See also</a></li></ul></div><h2>Usage<a name="1"></a></h2><p><tt>options = setoptimoptions('param1',value1, 'param2',value2, ...)</tt></p><p>The relevant parameter value pairs are defined below.</p><h2>Used options<a name="2"></a></h2><p>Options used by <tt>minimize()</tt> are:</p><p><b>Same as in <a href="matlab:doc('optimset')">optimset</a></b>:</p><p><tt>TolFun</tt>, <tt>TolX</tt>, <tt>OutputFcn</tt>, <tt>PlotFcn</tt>, <tt>MaxIter</tt>, <tt>MaxFunEvals</tt>, <tt>Display</tt>.</p><p><b>Specific to <a href="matlab:doc('minimize')">minimize</a></b>:</p><pre>     - 'TolCon'
+         Tolerance used on any constraint. This means that minimize()
+         considers the constraints are only violated when they exceed
+         this amount of violation; otherwise, the constraints are
+         considered met. Defaults to 1e-8.</pre><pre>     - 'GradObj'
+         Specifies whether the objcetive function returns gradient
+         information as its second output argument. Valid values are
+         'on' and 'off' (the default). In case this option is set to
+         'off', gradient information is computed via finite
+         differences.</pre><pre>     - 'GradConstr'
+         Specifies whether the non-linear constraint function returns
+         Jacobian information as its third and fourth output arguments.
+         Valid values are 'on' and 'off' (the default). In case this
+         option is 'off', Jacobian information is computed via finite
+         differences.</pre><pre>     - 'FinDiffType'
+         Type of finite differences to use. Valid values are 'forward'
+         (the default), 'backward', and 'central'. Central differences
+         provide the best accuracy, but require twice as many function
+         evaluations.</pre><pre>     - 'DiffMaxChange'
+         Maximum change in the objective/constraint function to use when
+         computing gradient/Jacobian information with finite
+         differences. Defaults to 1e-1.</pre><pre>     - 'DiffMinChange'
+         Minimum change in the objective/constraint function to use when
+         computing gradient/Jacobian information with finite
+         differences. Defaults to 1e-8.</pre><pre>     - 'AlwaysHonorConstraints'
+         By default, minimize() will assume the objective (and
+         constraint) function(s) can be evaluated at ANY point in
+         RN-space; the initial estimate does not have to lie in the
+         feasible region, and intermediate solutions are also allowed
+         to step outside this area. this is equal to setting this option
+         to 'none'.</pre><pre>         If the objective function cannot be evaluated outside the
+         feasible region, set this argument to 'bounds' (bound
+         constraints will never be broken) or 'all' (also the linear
+         constraints will never be broken). Note that the non-linear
+         constraints will remain satisfied within options.TolCon.</pre><pre>         When using 'Bounds' or 'All', the initial estimate [x0]
+         MUST be feasible. If it is not feasible, an error is produced
+         before the objective function is ever evaluated.</pre><pre>     - 'Algorithm'
+         By default, this is set to MATLAB's own derivative-free
+         Nelder-Mead algorithm, implemented in fminsearch. minimize()
+         supports another algotithm, fminlbfgs: a limited-memory,
+         Broyden/Fletcher/Goldfarb/Shanno optimizer. Use this algorithm
+         when your objective function has many free variables, e.g., [x]
+         is large.</pre><pre>     - 'popsize'
+         Used by the global optimization routine. This is the number of
+         randomized initial values to use, and thus the number of times
+         to repeat the call to minimize(). Defaults to 20&times; the number of
+         elements in [x0].</pre><p>Specific to <a href="matlab:doc('fminlbfgs')">fminlbfgs</a>:</p><pre>     - 'GoalsExactAchieve'
+         If set to 0, a line search method is used which uses a few
+         function calls to do a good line search. When set to 1 a normal
+         line search method with Wolfe conditions is used (default).</pre><pre>     - 'HessUpdate'
+         If set to 'bfgs', Broyden/Fletcher/Goldfarb/Shanno
+         optimization is used (default), when the number of unknowns is
+         larger than 3000 the function will switch to Limited-memory BFGS,
+         or if you set it to 'lbfgs'. When set to 'steepdesc', steepest
+         decent optimization is used.</pre><pre>     - 'StoreN'
+         Number of itterations used to approximate the Hessian,
+         in L-BFGS, 20 is default. A lower value may work better with
+         non smooth functions, because than the Hessian is only valid for
+         a specific position. A higher value is recommend with quadratic
+         equations.</pre><pre>     - 'rho'
+         Wolfe condition on gradient (c1 on wikipedia), default 0.01.</pre><pre>     - 'sigma'
+         Wolfe condition on gradient (c2 on wikipedia), default 0.9.</pre><pre>     - 'tau1'
+         Bracket expansion if stepsize becomes larger, default 3.</pre><pre>     - 'tau2'
+         Left bracket reduction used in section phase, default 0.1.</pre><pre>     - 'tau3'
+         Right bracket reduction used in section phase, default 0.5.</pre><h2>See also<a name="5"></a></h2><p><a href="matlab:doc('optimset')">optimset</a>, <a href="matlab:doc('optimget')">optimget</a>.</p><p class="footer"><br>
+      Published with MATLAB&reg; 7.11<br></p></div><!--
+##### SOURCE BEGIN #####
+%% SETOPTIMOPTIONS                   
+%
+% Optimization options for minimize
+
+%% Usage
+%
+% |options = setoptimoptions('param1',value1, 'param2',value2, ...)|
+%
+% The relevant parameter value pairs are defined below.
+
+%% Used options
+%
+% Options used by |minimize()| are: 
+%
+% *Same as in <matlab:doc('optimset') optimset>*: 
+%
+% |TolFun|, |TolX|, |OutputFcn|, |PlotFcn|, |MaxIter|, |MaxFunEvals|, |Display|.
+
+%%
+% *Specific to <matlab:doc('minimize') minimize>*: 
+%
+%       - 'TolCon'       
+%           Tolerance used on any constraint. This means that minimize()
+%           considers the constraints are only violated when they exceed
+%           this amount of violation; otherwise, the constraints are
+%           considered met. Defaults to 1e-8.
+%           
+%       - 'GradObj'     
+%           Specifies whether the objcetive function returns gradient
+%           information as its second output argument. Valid values are
+%           'on' and 'off' (the default). In case this option is set to 
+%           'off', gradient information is computed via finite 
+%           differences.
+%     
+%       - 'GradConstr'  
+%           Specifies whether the non-linear constraint function returns 
+%           Jacobian information as its third and fourth output arguments. 
+%           Valid values are 'on' and 'off' (the default). In case this
+%           option is 'off', Jacobian information is computed via finite
+%           differences.
+%
+%       - 'FinDiffType'  
+%           Type of finite differences to use. Valid values are 'forward'
+%           (the default), 'backward', and 'central'. Central differences
+%           provide the best accuracy, but require twice as many function
+%           evaluations.
+%
+%       - 'DiffMaxChange' 
+%           Maximum change in the objective/constraint function to use when
+%           computing gradient/Jacobian information with finite
+%           differences. Defaults to 1e-1.
+%
+%       - 'DiffMinChange'  
+%           Minimum change in the objective/constraint function to use when
+%           computing gradient/Jacobian information with finite
+%           differences. Defaults to 1e-8.
+%
+%       - 'AlwaysHonorConstraints'
+%           By default, minimize() will assume the objective (and  
+%           constraint) function(s) can be evaluated at ANY point in 
+%           RN-space; the initial estimate does not have to lie in the 
+%           feasible region, and intermediate solutions are also allowed 
+%           to step outside this area. this is equal to setting this option 
+%           to 'none'. 
+%
+%           If the objective function cannot be evaluated outside the
+%           feasible region, set this argument to 'bounds' (bound 
+%           constraints will never be broken) or 'all' (also the linear 
+%           constraints will never be broken). Note that the non-linear 
+%           constraints will remain satisfied within options.TolCon. 
+%       
+%           When using 'Bounds' or 'All', the initial estimate [x0]
+%           MUST be feasible. If it is not feasible, an error is produced
+%           before the objective function is ever evaluated. 
+%
+%       - 'Algorithm'
+%           By default, this is set to MATLAB's own derivative-free 
+%           Nelder-Mead algorithm, implemented in fminsearch. minimize() 
+%           supports another algotithm, fminlbfgs: a limited-memory,
+%           Broyden/Fletcher/Goldfarb/Shanno optimizer. Use this algorithm
+%           when your objective function has many free variables, e.g., [x]
+%           is large.
+%
+%       - 'popsize'
+%           Used by the global optimization routine. This is the number of
+%           randomized initial values to use, and thus the number of times
+%           to repeat the call to minimize(). Defaults to 20× the number of
+%           elements in [x0].
+
+%%
+% Specific to <matlab:doc('fminlbfgs') fminlbfgs>:
+%
+%       - 'GoalsExactAchieve'
+%           If set to 0, a line search method is used which uses a few
+%           function calls to do a good line search. When set to 1 a normal
+%           line search method with Wolfe conditions is used (default).
+%
+%       - 'HessUpdate'
+%           If set to 'bfgs', Broyden/Fletcher/Goldfarb/Shanno
+%           optimization is used (default), when the number of unknowns is 
+%           larger than 3000 the function will switch to Limited-memory BFGS,
+%           or if you set it to 'lbfgs'. When set to 'steepdesc', steepest
+%           decent optimization is used.
+%
+%       - 'StoreN' 
+%           Number of itterations used to approximate the Hessian,
+%           in L-BFGS, 20 is default. A lower value may work better with
+%           non smooth functions, because than the Hessian is only valid for
+%           a specific position. A higher value is recommend with quadratic 
+%           equations.
+%
+%       - 'rho'   
+%           Wolfe condition on gradient (c1 on wikipedia), default 0.01.
+%
+%       - 'sigma'  
+%           Wolfe condition on gradient (c2 on wikipedia), default 0.9.
+%
+%       - 'tau1' 
+%           Bracket expansion if stepsize becomes larger, default 3.
+%
+%       - 'tau2'
+%           Left bracket reduction used in section phase, default 0.1.
+%
+%       - 'tau3'   
+%           Right bracket reduction used in section phase, default 0.5.
+
+%% See also 
+%
+% <matlab:doc('optimset') optimset>, <matlab:doc('optimget') optimget>.
+
+##### SOURCE END #####
+--></body></html>

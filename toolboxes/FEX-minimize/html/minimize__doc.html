@@ -1,0 +1,362 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Minimize</title><meta name="generator" content="MATLAB 7.11"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-03-13"><meta name="DC.source" content="minimize__doc.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000;
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in
+wide windows. */
+p,h1,h2,div.content div {
+  max-width: 600px;
+  /* Hack for IE6 */
+  width: auto !important; width: 600px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+}
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body><div class="content"><h1>Minimize</h1><!--introduction--><p>Solve constrained optimization problems, globally or locally.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Equation</a></li><li><a href="#2">Syntax</a></li><li><a href="#3">Input arguments</a></li><li><a href="#9">Output arguments</a></li><li><a href="#13">Examples</a></li><li><a href="#20">Notes</a></li><li><a href="#21">See also</a></li></ul></div><h2>Equation<a name="1"></a></h2><p>Finds the minimum of a problem specified by</p><p><img vspace="5" hspace="5" src="equation.png" alt=""> </p>
+</pre><h2>Syntax<a name="2"></a></h2><pre>  sol = minimize(func, x0)
+  sol = minimize(..., x0, A, b)
+  sol = minimize(..., b, Aeq, beq)
+  sol = minimize(..., beq, lb, ub)
+  sol = minimize(..., ub, nonlcon)
+  sol = minimize(..., nonlcon, options)</pre><pre>  [sol, fval] = minimize(func, ...)
+  [sol, fval, exitflag] = minimize(func, ...)
+  [sol, fval, exitflag, output] = minimize(func, ...)
+  [sol, fval, exitflag, output, grad] = minimize(func, ...)
+  [sol, fval, exitflag, output, gradient, hessian] = minimize(func, ...)</pre><h2>Input arguments<a name="3"></a></h2><p><b><tt>fun</tt></b>, <b><tt>x0</tt></b></p><p>The objective function and initial value; see <a href="matlab:doc('fminsearch')">fminsearch</a>.</p><p>Leave the initial value <tt>x0</tt> empty to optimize the objective function globally.</p><p><b><tt>A</tt></b>, <b><tt>b</tt></b>   (optional)</p><p>Linear inequality constraint array and right hand side vector. This linear constraint forces the solution vector <img src="minimize__doc_eq60671.png" alt="$\mathbf{x}$"> to satisfy</p><p><img src="minimize__doc_eq13712.png" alt="$A\mathbf{x} <= b$"></p><p>Note that in case <tt>x</tt> is a matrix (this is true when <tt>x0</tt> is a matrix), the argument <tt>b</tt> must have corresponding size <tt>size(A,1) &times; size(x0,2)</tt>, since the same equation is used to evaluate this constraint.</p><p><b><tt>Aeq</tt></b>, <b><tt>beq</tt></b>   (optional)</p><p>Linear equality constraint array and right hand side vector. This linear constraint forces the solution vector <img src="minimize__doc_eq60671.png" alt="$\mathbf{x}$"> to satisfy</p><p><img src="minimize__doc_eq19492.png" alt="$A_{\mathrm{eq}}\mathbf{x} = b_{\mathrm{eq}}$"></p><p>Note that in case <tt>x</tt> is a matrix (this is true when <tt>x0</tt> is a matrix), the argument <tt>beq</tt> must have corresponding size <tt>size(Aeq,1) &times; size(x0,2)</tt>, since the same equation is used to evaluate this constraint.</p><p><b><tt>lb</tt></b>, <b><tt>ub</tt></b>   (optional)</p><p>lower/upper bound vector or array. Both must have the same size as <tt>x0</tt>.</p><p>If no lower bounds exist for one of the variables, then supply <tt>-inf</tt> for that variable. Similarly, if no upper bounds exist, supply <tt>+inf</tt>. If no bounds exist at all, then <tt>lb</tt> and/or <tt>ub</tt> may be left empty.</p><p>Variables may be fixed in value by setting the corresponding lower and upper bounds to exactly the same value.</p><p><b><tt>nonlcon</tt></b>   (optional)</p><p>function handle to general nonlinear constraints, inequality and/or equality constraints.</p><p><tt>nonlcon</tt> must return two vectors, <tt>c</tt> and <tt>ceq</tt>, containing the values for the nonlinear inequality constraints <tt>c</tt> and those for the nonlinear equality constraints <tt>ceq</tt> at <tt>x</tt>.</p><p>These constraints force the solution to satisfy</p><p><img src="minimize__doc_eq11949.png" alt="$c_{\mathrm{eq}}(\mathbf{x})  = 0$"></p><p><img src="minimize__doc_eq34702.png" alt="$c(\mathbf{x}) <= 0$"></p><p>where <tt>c(x)</tt> and <tt>ceq(x)</tt> are general non-linear functions of <tt>x</tt>.</p><p><b><tt>options</tt></b>  (optional)</p><p>an options structure created manually, or with <a href="matlab:doc('setoptimoptions')">setoptimoptions</a>.</p><h2>Output arguments<a name="9"></a></h2><p><b><tt>sol</tt></b>, <b><tt>fval</tt></b></p><p>the solution vector and the corresponding function value,</p><pre class="codeinput">respectively.
+</pre><p><b><tt>exitflag</tt></b></p><p>(See also the help on <tt>fminsearch</tt>) A flag that specifies the reason the algorithm terminated. <tt>fminsearch</tt> uses the values:</p><pre>  1    fminsearch converged to a solution x
+  0    Max. # of function evaluations or iterations exceeded
+ -1    Algorithm was terminated by the output function.</pre><p>Since <tt>minimize()</tt> handles constrained problems, the following values were added:</p><pre>  2    Problem overconstrained by either [lb]/[ub] or
+       [Aeq]/[beq] - nothing done
+ -2    Problem is infeasible after the optimization (Some or
+       any of the constraints are violated at the final
+       solution).
+ -3    INF or NAN encountered during the optimization.</pre><p><b><tt>output</tt></b></p><p>(See also the help on <tt>fminsearch</tt>) A structure that contains additional details on the optimization. <tt>fminsearch</tt> returns</p><pre>  output.algorithm    Algorithm used
+  output.iterations   Number of iterations
+  output.message      Exit message</pre><p>In addition, <tt>minimize()</tt> returns</p><p>with non-empty <tt>nonlcon</tt> argument:</p><pre>  output.ObjfuncCount     Number of evaluations of the given
+                          objective function
+  output.ConstrfuncCount  Number of evaluations of the given
+                          non-linear constraint function</pre><p>With no or empty <tt>nonlcon</tt> argument:</p><pre> output.funcCount   Number of function evaluations</pre><p>For constrained problems, the following fields are also present:</p><pre>  output.constrviolation.lin_ineq
+  output.constrviolation.lin_eq
+  output.constrviolation.nonlin_ineq
+  output.constrviolation.nonlin_eq</pre><p>All these fields contain a <tt>M&times;2</tt>-cell array. The fist column contains a logical index to the constraints, which is true if the constraint was violated, false if it was satisfied. The second column contains the amount of constraint violation. This amount is equal to zero if the constraint was satisfied within <tt>options.TolCon</tt>.</p><h2>Examples<a name="13"></a></h2><pre class="codeinput">rosen = @(x) (1-x(1)).^2 + 105*(x(2)-x(1).^2).^2;
+</pre><p>Fully unconstrained problem</p><pre class="codeinput">minimize(rosen, [3 3])
+</pre><p>lower bound constrained</p><pre class="codeinput">minimize(rosen,[3 3], [],[], [],[], [2 2])
+</pre><p><img src="minimize__doc_eq12937.png" alt="$x(2)$"> fixed at <img src="minimize__doc_eq94776.png" alt="$3$"></p><pre class="codeinput">minimize(rosen,[3 3], [],[], [],[], [-inf 3],[inf 3])
+</pre><p>simple linear inequality: <img src="minimize__doc_eq61696.png" alt="$x(1) + x(2) <= 1$"></p><pre class="codeinput">minimize(rosen,[0; 0], [1 1], 1)
+</pre><p>nonlinear inequality: <img src="minimize__doc_eq71674.png" alt="$\sqrt(x(1)^2 + x(2)^2) <= 1$"> nonlinear equality  : <img src="minimize__doc_eq98188.png" alt="$x(1)^2 + x(2)^3 = 0.5$"></p><p>execute this m-file:</p><pre class="codeinput"><span class="keyword">function</span> test_optimize
+
+    rosen = @(x) (1-x(1)).^2 + 105*(x(2)-x(1).^2).^2;
+
+    options = setoptimoptions(<span class="string">'TolFun'</span>, 1e-8, <span class="string">'TolX'</span>, 1e-8);
+
+    minimize(rosen, [3 3], [],[],[],[],[],[],<span class="keyword">...</span>
+        @nonlcon, [], options)
+
+<span class="keyword">end</span>
+
+<span class="keyword">function</span> [c, ceq] = nonlcon(x)
+
+    c = norm(x) - 1;
+
+    ceq = x(1)^2 + x(2)^3 - 0.5;
+
+<span class="keyword">end</span>
+</pre><p>Of course, any combination of the above constraints is also possible.</p><h2>Notes<a name="20"></a></h2><div><ul><li> If <tt>options</tt> is supplied, then <tt>TolX</tt> will apply to the transformed  variables. All other <tt>fminsearch</tt> parameters should be unaffected.</li></ul></div><div><ul><li>Variables which are constrained by both a lower and an upper  bound will use a <tt>sin()</tt> transformation. Those constrained by  only a lower or an upper bound will use a quadratic  transformation, and unconstrained variables will be left alone.</li></ul></div><div><ul><li>Variables may be fixed by setting their respective bounds equal.   In this case, the problem will be reduced in size for <tt>fminsearch</tt>.</li></ul></div><div><ul><li> If your problem has an EXCLUSIVE (strict) bound constraints which  will not permit evaluation at the bound itself, then you must  provide a slightly offset bound. An example of this is a function  which contains the log of one of its parameters. If you constrain  the variable to have a lower bound of zero, then <tt>minimize()</tt> may  try to evaluate the function exactly at zero.</li></ul></div><h2>See also<a name="21"></a></h2><p><a href="matlab:doc('setoptimoptions')">setoptimoptions</a>, <a href="matlab:doc('fminsearch')">fminsearch</a>, <a href="matlab:doc('fminlbfgs')">fminlbfgs</a>.</p>
+</pre><p class="footer"><br>
+      Published with MATLAB&reg; 7.11<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Minimize
+% Solve constrained optimization problems, globally or locally.
+%
+%% Equation
+%
+% Finds the minimum of a problem specified by
+%
+% <<equation.png>>
+function minimize__doc
+%% Syntax
+%
+%    sol = minimize(func, x0)
+%    sol = minimize(..., x0, A, b)
+%    sol = minimize(..., b, Aeq, beq)
+%    sol = minimize(..., beq, lb, ub)
+%    sol = minimize(..., ub, nonlcon)
+%    sol = minimize(..., nonlcon, options)
+%
+%    [sol, fval] = minimize(func, ...)
+%    [sol, fval, exitflag] = minimize(func, ...)
+%    [sol, fval, exitflag, output] = minimize(func, ...)
+%    [sol, fval, exitflag, output, grad] = minimize(func, ...)
+%    [sol, fval, exitflag, output, gradient, hessian] = minimize(func, ...)
+%
+%
+
+%% Input arguments
+%
+% *|fun|*, *|x0|*
+%
+% The objective function and initial value; see <matlab:doc('fminsearch') fminsearch>.
+%
+% Leave the initial value |x0| empty to optimize the objective function
+% globally.
+
+%%
+% *|A|*, *|b|*   (optional)
+%
+% Linear inequality constraint array and right
+% hand side vector. This linear constraint forces the solution
+% vector $\mathbf{x}$ to satisfy
+%
+% $A\mathbf{x} <= b$
+%
+% Note that in case |x| is a matrix (this is true when |x0| is
+% a matrix), the argument |b| must have corresponding size
+% |size(A,1) × size(x0,2)|, since the same equation is used to
+% evaluate this constraint.
+
+%%
+% *|Aeq|*, *|beq|*   (optional)
+%
+% Linear equality constraint array and right hand side vector.
+% This linear constraint forces the solution vector $\mathbf{x}$ to satisfy
+%
+% $A_{\mathrm{eq}}\mathbf{x} = b_{\mathrm{eq}}$
+%
+% Note that in case |x| is a matrix (this is true when |x0| is
+% a matrix), the argument |beq| must have corresponding size
+% |size(Aeq,1) × size(x0,2)|, since the same equation is used to
+% evaluate this constraint.
+
+%%
+% *|lb|*, *|ub|*   (optional)
+%
+% lower/upper bound vector or array. Both must have the same size
+% as |x0|.
+%
+% If no lower bounds exist for one of the variables, then
+% supply |-inf| for that variable. Similarly, if no upper bounds
+% exist, supply |+inf|. If no bounds exist at all, then |lb| and/or
+% |ub| may be left empty.
+%
+% Variables may be fixed in value by setting the corresponding
+% lower and upper bounds to exactly the same value.
+
+%%
+% *|nonlcon|*   (optional)
+%
+% function handle to general nonlinear constraints, inequality and/or
+% equality constraints.
+%
+% |nonlcon| must return two vectors, |c| and |ceq|, containing the
+% values for the nonlinear inequality constraints |c| and
+% those for the nonlinear equality constraints |ceq| at |x|.
+%
+% These constraints force the solution to satisfy
+%
+% $c_{\mathrm{eq}}(\mathbf{x})  = 0$
+%
+% $c(\mathbf{x}) <= 0$
+%
+% where |c(x)| and |ceq(x)| are general non-linear functions of |x|.
+
+%%
+% *|options|*  (optional)
+%
+% an options structure created manually, or with
+% <matlab:doc('setoptimoptions') setoptimoptions>.
+
+
+%% Output arguments
+%
+% *|sol|*, *|fval|*
+%
+% the solution vector and the corresponding function value,
+respectively.
+
+%%
+% *|exitflag|*
+%
+% (See also the help on |fminsearch|) A flag that specifies the
+% reason the algorithm terminated. |fminsearch| uses the values:
+%
+%    1    fminsearch converged to a solution x
+%    0    Max. # of function evaluations or iterations exceeded
+%   -1    Algorithm was terminated by the output function.
+%
+% Since |minimize()| handles constrained problems, the following
+% values were added:
+%
+%    2    Problem overconstrained by either [lb]/[ub] or
+%         [Aeq]/[beq] - nothing done
+%   -2    Problem is infeasible after the optimization (Some or
+%         any of the constraints are violated at the final
+%         solution).
+%   -3    INF or NAN encountered during the optimization.
+
+%%
+% *|output|*
+%
+% (See also the help on |fminsearch|) A structure that contains
+% additional details on the optimization. |fminsearch| returns
+%
+%    output.algorithm    Algorithm used
+%    output.iterations   Number of iterations
+%    output.message      Exit message
+%
+% In addition, |minimize()| returns
+%
+% with non-empty |nonlcon| argument:
+%
+%    output.ObjfuncCount     Number of evaluations of the given
+%                            objective function
+%    output.ConstrfuncCount  Number of evaluations of the given
+%                            non-linear constraint function
+%
+% With no or empty |nonlcon| argument:
+%
+%   output.funcCount   Number of function evaluations
+%
+% For constrained problems, the following fields are also present:
+%
+%    output.constrviolation.lin_ineq
+%    output.constrviolation.lin_eq
+%    output.constrviolation.nonlin_ineq
+%    output.constrviolation.nonlin_eq
+%
+% All these fields contain a |M×2|-cell array. The fist column
+% contains a logical index to the constraints, which is true if the
+% constraint was violated, false if it was satisfied. The second
+% column contains the amount of constraint violation. This amount is
+% equal to zero if the constraint was satisfied within
+% |options.TolCon|.
+
+
+%% Examples
+%
+rosen = @(x) (1-x(1)).^2 + 105*(x(2)-x(1).^2).^2;
+
+%%
+% Fully unconstrained problem
+minimize(rosen, [3 3])
+
+%%
+% lower bound constrained
+
+minimize(rosen,[3 3], [],[], [],[], [2 2])
+
+%%
+% $x(2)$ fixed at $3$
+minimize(rosen,[3 3], [],[], [],[], [-inf 3],[inf 3])
+
+%%
+% simple linear inequality: $x(1) + x(2) <= 1$
+minimize(rosen,[0; 0], [1 1], 1)
+
+%%
+% nonlinear inequality: $\sqrt(x(1)^2 + x(2)^2) <= 1$
+% nonlinear equality  : $x(1)^2 + x(2)^3 = 0.5$
+%
+% execute this m-file:
+%
+function test_optimize
+
+    rosen = @(x) (1-x(1)).^2 + 105*(x(2)-x(1).^2).^2;
+
+    options = setoptimoptions('TolFun', 1e-8, 'TolX', 1e-8);
+
+    minimize(rosen, [3 3], [],[],[],[],[],[],...
+        @nonlcon, [], options)
+
+end
+
+function [c, ceq] = nonlcon(x)
+
+    c = norm(x) - 1;
+
+    ceq = x(1)^2 + x(2)^3 - 0.5;
+
+end
+
+%%
+% Of course, any combination of the above constraints is
+% also possible.
+
+
+%% Notes
+%
+% *  If |options| is supplied, then |TolX| will apply to the transformed
+%  variables. All other |fminsearch| parameters should be unaffected.
+%
+% * Variables which are constrained by both a lower and an upper
+%  bound will use a |sin()| transformation. Those constrained by
+%  only a lower or an upper bound will use a quadratic
+%  transformation, and unconstrained variables will be left alone.
+%
+% * Variables may be fixed by setting their respective bounds equal.
+%   In this case, the problem will be reduced in size for |fminsearch|.
+%
+% *  If your problem has an EXCLUSIVE (strict) bound constraints which
+%  will not permit evaluation at the bound itself, then you must
+%  provide a slightly offset bound. An example of this is a function
+%  which contains the log of one of its parameters. If you constrain
+%  the variable to have a lower bound of zero, then |minimize()| may
+%  try to evaluate the function exactly at zero.
+
+
+%% See also
+%
+% <matlab:doc('setoptimoptions') setoptimoptions>, <matlab:doc('fminsearch') fminsearch>, <matlab:doc('fminlbfgs') fminlbfgs>.
+
+end
+##### SOURCE END #####
+--></body></html>

@@ -1,0 +1,787 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>minimize_demo</title><meta name="generator" content="MATLAB 7.11"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-03-13"><meta name="DC.source" content="minimize_demo.m"><style type="text/css">
+
+body {
+  background-color: white;
+  margin:10px;
+}
+
+h1 {
+  color: #990000;
+  font-size: x-large;
+}
+
+h2 {
+  color: #990000;
+  font-size: medium;
+}
+
+
+/* Make the text shrink to fit narrow windows, but not stretch too far in
+wide windows. */
+p,h1,h2,div.content div {
+  max-width: 800px;
+  /* Hack for IE6 */
+  width: auto !important; width: 800px;
+}
+
+pre.codeinput {
+  background: #EEEEEE;
+  padding: 10px;
+}
+@media print {
+  pre.codeinput {word-wrap:break-word; width:100%;}
+}
+
+span.keyword {color: #0000FF}
+span.comment {color: #228B22}
+span.string {color: #A020F0}
+span.untermstring {color: #B20000}
+span.syscmd {color: #B28C00}
+
+pre.codeoutput {
+  color: #666666;
+  padding: 10px;
+}
+
+pre.error {
+  color: red;
+}
+
+p.footer {
+  text-align: right;
+  font-size: xx-small;
+  font-weight: lighter;
+  font-style: italic;
+  color: gray;
+}
+
+  </style></head><body>
+      <h1>Constrained function minimization with <tt>fminsearch</tt> and <tt>fminlbfgs</tt><a name="1"></a></h1>
+      <div class="content"><h2>Contents</h2><div><ul><li><a href="#1">Constrained function minimization with <tt>fminsearch</tt> and <tt>fminlbfgs</tt></a></li><li><a href="#3">Unconstrained optimization</a></li><li><a href="#6">Optimization with bound constraints</a></li><li><a href="#10">Linear constraints</a></li><li><a href="#12">Non-linear constraints</a></li><li><a href="#16">Global optimization</a></li><li><a href="#19">Different algorithm: <tt>fminlbfgs</tt></a></li><li><a href="#21">Supplying gradients to <tt>fminlbfgs</tt></a></li><li><a href="#23">See also</a></li></ul></div>
+</pre><h2>Unconstrained optimization<a name="3"></a></h2><p>first, define a test function:</p><pre class="codeinput">    clc, rosen = @(x) ( (1-x(1))^2 + 105*(x(2)-x(1)^2)^2 ) /1e4;
+</pre><p>This is the classical Rosenbrück function, which has a global minimum at <img src="minimize_demo_eq64600.png" alt="$f(x) = f([1, 1]) = 0$">. The function is relatively hard to minimize, because that minimum is located in a long narrow ``valley'':</p><pre class="codeinput">    k = 0; range = -5:0.05:5;
+    z = zeros(numel(range));
+    <span class="keyword">for</span> ii = range
+        m = 0; k = k + 1;
+        <span class="keyword">for</span> jj = range
+            m = m + 1;
+            z(k, m) = rosen([ii, jj]);
+        <span class="keyword">end</span>
+    <span class="keyword">end</span>
+    [y, x] = meshgrid(range, range);
+    S = surf(x, y, z, <span class="string">'linestyle'</span>, <span class="string">'none'</span>); view(-213, 38), axis <span class="string">tight</span>
+
+
+    shading <span class="string">interp</span>, material <span class="string">metal</span>, lighting <span class="string">gouraud</span>, colormap(<span class="string">'hot'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.8)
+</pre><img vspace="5" hspace="5" src="minimize_demo_01.png" alt=""> <p>Optimizing the fully unconstrained problem with <tt>minimize</tt> indeed finds the global minimum:</p><pre class="codeinput">    solution = minimize(rosen, [3 3])
+</pre><pre class="codeoutput">solution =
+    9.999779492786837e-001    9.999535409003786e-001
+</pre><h2>Optimization with bound constraints<a name="6"></a></h2><p>Imposing a lower bound on the variables gives</p><pre class="codeinput">    [solution, fval] = minimize(rosen, [3 3], [],[], [],[], [2 2])
+</pre><pre class="codeoutput">solution =
+    2.000000000528625e+000    3.999991976788512e+000
+fval =
+    1.000000007819864e-004
+</pre><p>in the figure, this looks like</p><pre class="codeinput">    zz = z;   zz(x &gt; 2 &amp; y &gt; 2) = inf;
+    ZZ = z;   ZZ(x &lt; 2 &amp; y &lt; 2) = inf;
+
+    figure, hold <span class="string">on</span>
+    S(1) = surf(x, y, zz, <span class="string">'linestyle'</span>, <span class="string">'none'</span>, <span class="string">'FaceAlpha'</span>, 0.2);
+    S(2) = surf(x, y, ZZ, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+    plot3(solution(1), solution(2), fval+0.5, <span class="string">'gx'</span>, <span class="keyword">...</span>
+        <span class="string">'MarkerSize'</span>, 20,<span class="keyword">...</span>
+        <span class="string">'linewidth'</span>, 5)
+
+    xlabel(<span class="string">'X(1)'</span>), ylabel(<span class="string">'X(2)'</span>)
+    view(-196, 38), grid <span class="string">on</span>, axis <span class="string">tight</span>
+
+    shading <span class="string">interp</span>, material <span class="string">metal</span>, lighting <span class="string">gouraud</span>, colormap(<span class="string">'hot'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.8);
+</pre><img vspace="5" hspace="5" src="minimize_demo_02.png" alt=""> <p>Similarly, imposing an upper bound yields</p><pre class="codeinput">    solution = minimize(rosen, [3 3], [],[], [],[], [],[0.5 0.5])
+
+    zz = z;   zz(x &lt; 0.5 &amp; y &lt; 0.5) = inf;
+    ZZ = z;   ZZ(x &gt; 0.5 &amp; y &gt; 0.5) = inf;
+
+    figure, hold <span class="string">on</span>
+    S(1) = surf(x, y, zz, <span class="string">'linestyle'</span>, <span class="string">'none'</span>, <span class="string">'FaceAlpha'</span>, 0.2);
+    S(2) = surf(x, y, ZZ, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+    plot3(solution(1), solution(2), fval+0.5, <span class="string">'gx'</span>, <span class="keyword">...</span>
+        <span class="string">'MarkerSize'</span>, 20,<span class="keyword">...</span>
+        <span class="string">'LineWidth'</span>, 5);
+
+    xlabel(<span class="string">'X(1)'</span>), ylabel(<span class="string">'X(2)'</span>)
+    view(201, 38), grid <span class="string">on</span>, axis <span class="string">tight</span>
+
+    shading <span class="string">interp</span>, material <span class="string">metal</span>, lighting <span class="string">gouraud</span>, colormap(<span class="string">'hot'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.8);
+</pre><pre class="codeoutput">solution =
+    4.999999984348473e-001    2.499977662682127e-001
+</pre><img vspace="5" hspace="5" src="minimize_demo_03.png" alt=""> <p>Minimize with <img src="minimize_demo_eq16434.png" alt="$x_2$"> fixed at 3. In this case, <tt>minimize</tt> simply removes the variable before <tt>fminsearch</tt> sees it, essentially reducing the dimensionality of the problem. This is particularly useful when the number of dimensions <i>N</i> becomes large.</p><pre class="codeinput">    minimize(rosen, [3 3], [],[], [],[], [-inf 3], [inf 3])
+</pre><pre class="codeoutput">ans =
+    1.731445312499997e+000    3.000000000000000e+000
+</pre><h2>Linear constraints<a name="10"></a></h2><p>You can use linear inequality or equality constraints. For example, with the constraints</p><p><img src="minimize_demo_eq75124.png" alt="$A*x \leq b$">, <br><img src="minimize_demo_eq17964.png" alt="$A_{eq}*x == b_{eq}$">,<br><br> with              A = [+2 +1],   b = -2  and     Aeq = [+1 -1], beq = -2</p><p><tt>minimize()</tt> finds the following result:</p><pre class="codeinput">    [solution, fval] = minimize(rosen, [3;3], [2 1],-2, [1 -1],-2)
+</pre><pre class="codeoutput">solution =
+   -1.333351464194111e+000
+    6.666487473804754e-001
+fval =
+    1.350896218141616e-002
+</pre><p>These constraints look like the following:</p><pre class="codeinput">    xinds = 2*x+y &lt;= -2;
+    zz = z;   zz( xinds ) = inf;
+    ZZ = z;   ZZ(~xinds ) = inf;
+
+    Ax = z;   Axinds = abs(2*x+y + 2) &lt; 1e-3;
+    [x1, sortinds] = sort(x(Axinds));
+    Ax = Ax(Axinds); Ax = Ax(sortinds);
+    y1 = y(Axinds); y1 = y1(sortinds);
+
+    Aeq = z;   Aeqinds = abs(x-y + 2) &lt; 1e-3;
+    [x2, sortinds] = sort(x(Aeqinds));
+    Aeq = Aeq(Aeqinds); Aeq = Aeq(sortinds);
+    y2 = y(Aeqinds); y2 = y2(sortinds);
+
+    figure, hold <span class="string">on</span>
+    l1 = line([x1(1:end-1)';x1(2:end)'],[y1(1:end-1)';y1(2:end)'],[Ax(1:end-1)';Ax(2:end)']);
+    l2 = line([x2(1:end-1)';x2(2:end)'],[y2(1:end-1).';y2(2:end)'],[Aeq(1:end-1).';Aeq(2:end)']);
+    S(1) = surf(x, y, zz, <span class="string">'linestyle'</span>, <span class="string">'none'</span>, <span class="string">'FaceAlpha'</span>, 0.2);
+    S(2) = surf(x, y, ZZ, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+    l3 = plot3(solution(1)+0.4, solution(2)+0.8, fval+0.5, <span class="string">'gx'</span>,<span class="keyword">...</span>
+        <span class="string">'MarkerSize'</span>, 20,<span class="keyword">...</span>
+        <span class="string">'LineWidth'</span>, 5);
+
+    set(l1, <span class="string">'color'</span>, <span class="string">'b'</span>, <span class="string">'linewidth'</span>, 2);
+    set(l2, <span class="string">'color'</span>, <span class="string">'k'</span>, <span class="string">'linewidth'</span>, 2);
+
+    view(150, 30), grid <span class="string">on</span>, axis <span class="string">tight</span>
+    xlabel(<span class="string">'X(1)'</span>, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>); ylabel(<span class="string">'X(2)'</span>, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>);
+    k = legend([l1(1); l2(1); l3],<span class="string">'inequality $$A\mathbf{x} \leq -2$$'</span>, <span class="keyword">...</span>
+        <span class="string">'equality $$A_{eq}\mathbf{x} = -2$$'</span>, <span class="string">'Solution'</span>);
+    set(k, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>, <span class="string">'location'</span>, <span class="string">'NorthWest'</span>);
+
+    shading <span class="string">interp</span>, material <span class="string">metal</span>, lighting <span class="string">phong</span>, colormap(<span class="string">'autumn'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.8);
+</pre><img vspace="5" hspace="5" src="minimize_demo_04.png" alt=""> <h2>Non-linear constraints<a name="12"></a></h2><p>Also general nonlinear constraints can be used. A simple example:</p><p>nonlinear inequality:</p><p><img src="minimize_demo_eq51809.png" alt="$$\sqrt{x_1^2 + x_2^2} \leq 2$$"></p><p>nonlinear equality  :</p><p><img src="minimize_demo_eq78519.png" alt="$$0.2x_1^2 + 0.4x_2^3 = 1$$"></p><pre class="codeinput">    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'TolFun'</span>, 1e-6, <span class="keyword">...</span>
+        <span class="string">'TolX'</span>  , 1e-6, <span class="keyword">...</span>
+        <span class="string">'MaxFunEvals'</span>, inf,<span class="keyword">...</span>
+        <span class="string">'MaxIter'</span>, 1e4);
+
+    [sol, fval, exitflag, output] = minimize(rosen, [-3; 3], [],[], [],[],<span class="keyword">...</span>
+        [],[], @nonlcon, options);
+</pre><p>Note that <tt>nonlcon</tt> is a subfunction, listed below.</p><p>These constraints look like the following:</p><pre class="codeinput">    zz = z;   zz(sqrt(x.^2 + y.^2) &lt;= 2)   = inf;
+    ZZ = z;   ZZ(sqrt(x.^2 + y.^2) &gt;= 2.2) = inf;
+    zZ = z;   zZ(x.^2 + y.^3 &gt;= 1.0 + 0.1) = inf;
+              zZ(x.^2 + y.^3 &lt;= 1.0 - 0.1) = inf;
+
+    xX = x(isfinite(zZ));  [xX, inds] = sort(xX);
+    yY = y(isfinite(zZ));  yY = yY(inds);
+    zZ = zZ(isfinite(zZ)); zZ = zZ(inds);
+
+    figure, hold <span class="string">on</span>
+    S(1) = surf(x, y, zz, <span class="string">'linestyle'</span>, <span class="string">'none'</span>, <span class="string">'FaceAlpha'</span>, 0.2);
+    S(2) = surf(x, y, ZZ, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+    L = line([xX(1:end-1)';xX(2:end)'],[yY(1:end-1)';yY(2:end)'],[zZ(1:end-1)';zZ(2:end)']);
+    l3 = plot3(sol(1)+0.4, sol(2)+0.5, fval+1, <span class="string">'gx'</span>, <span class="string">'MarkerSize'</span>, 20, <span class="string">'linewidth'</span>, 5);
+
+    set(L, <span class="string">'linewidth'</span>, 2, <span class="string">'color'</span>, <span class="string">'b'</span>);
+    view(150, 50), grid <span class="string">on</span>, axis <span class="string">tight</span>
+
+    k = legend([S(2); L(1); l3],<span class="string">'non-linear inequality $$c(x) &lt; 0$$'</span>, <span class="keyword">...</span>
+        <span class="string">'non-linear equality $$c_{eq}(x) = 0$$'</span>, <span class="string">'Solution'</span>);
+    set(k, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>, <span class="string">'location'</span>, <span class="string">'NorthWest'</span>);
+
+    shading <span class="string">interp</span>, material <span class="string">metal</span>, lighting <span class="string">phong</span>, colormap(<span class="string">'autumn'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.8);
+</pre><img vspace="5" hspace="5" src="minimize_demo_05.png" alt=""> <p>Note that the <tt>output</tt> structure contains a field <tt>constrviolation</tt>:</p><pre class="codeinput">    output
+</pre><pre class="codeoutput">output =
+         iterations: 2402
+          algorithm: 'Nelder-Mead simplex direct search'
+            message: [1x340 char]
+       ObjfuncCount: 4425
+    ConstrfuncCount: 4426
+    constrviolation: [1x1 struct]
+</pre><p>The contents of which shows that all constraints have been satisfied:</p><pre class="codeinput">    output.constrviolation
+    output.constrviolation.nonlin_eq{:}
+    output.constrviolation.nonlin_ineq{:}
+</pre><pre class="codeoutput">ans =
+      nonlin_eq: {2x1 cell}
+    nonlin_ineq: {2x1 cell}
+ans =
+     1
+ans =
+    1.290913642648661e-008
+ans =
+     0
+ans =
+     0
+</pre><h2>Global optimization<a name="16"></a></h2><p>This is the 2D sine-envelope-sine function. It has a single global minimum at [0,0], where the function assumes a value of 0. As you can imagine, it is hard to find this minimum when the initial estimates is not very close to the minimum already:</p><pre class="codeinput">    sinenvsin = @(x) 3*sum( (sin(sqrt(x(:).'*x(:))).^2 - 0.5)./(1 + 0.001*x(:).'*x(:)).^2 + 0.5, 1);
+
+    figure, hold <span class="string">on</span>
+    k = 0; range = -10:0.1:10;
+    z = zeros(numel(range));
+    <span class="keyword">for</span> ii = range
+        m = 0; k = k + 1;
+        <span class="keyword">for</span> jj = range
+            m = m + 1;
+            z(k,m) = sinenvsin([ii jj]);
+        <span class="keyword">end</span>
+    <span class="keyword">end</span>
+    [y, x] = meshgrid(range, range);
+    S = surf(x, y, z, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+
+    axis <span class="string">equal</span>, view(-148,24)
+
+    shading <span class="string">interp</span>, material <span class="string">shiny</span>, lighting <span class="string">phong</span> , colormap(<span class="string">'autumn'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.6);
+</pre><img vspace="5" hspace="5" src="minimize_demo_06.png" alt=""> <p><tt>minimize()</tt> provides rudimentary support for this type of problem. Omitting the initial value x0 will re-start <tt>minimize()</tt> several times at randomly chosen initial values in the interval [lb ub]:</p><pre class="codeinput">    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'popsize'</span>, 1e2, <span class="string">'maxfunevals'</span>, 1e4,  <span class="string">'maxiter'</span>, 1e2);
+
+    [sol,fval] = minimize(sinenvsin, [], [],[], [],[], -[5 5], +[5 5], [],options)
+</pre><pre class="codeoutput">sol =
+    8.819312347263519e-005    4.062807372839927e-005
+fval =
+    2.831428808081071e-008
+</pre><p>Naturally, these types of problems may also have constraints:</p><pre class="codeinput">    [solution,fval] = minimize(sinenvsin, [], [2 1],-2, [1 -1],-2,<span class="keyword">...</span>
+        -[5;5], +[5;5], [], options);
+
+    xinds = 2*x+y &lt;= -2;
+    zz = z;   zz( xinds ) = inf;
+    ZZ = z;   ZZ(~xinds ) = inf;
+
+    Ax = z;   Axinds = abs(2*x+y + 2) &lt; 1e-3;
+    [x1, sortinds] = sort(x(Axinds));
+    Ax = Ax(Axinds); Ax = Ax(sortinds);
+    y1 = y(Axinds); y1 = y1(sortinds);
+
+    Aeq = z;   Aeqinds = abs(x-y + 2) &lt; 1e-3;
+    [x2, sortinds] = sort(x(Aeqinds));
+    Aeq = Aeq(Aeqinds); Aeq = Aeq(sortinds);
+    y2 = y(Aeqinds); y2 = y2(sortinds);
+
+    figure, hold <span class="string">on</span>
+    S(1) = surf(x, y, zz, <span class="string">'linestyle'</span>, <span class="string">'none'</span>, <span class="string">'FaceAlpha'</span>, 0.2);
+    S(2) = surf(x, y, ZZ, <span class="string">'linestyle'</span>, <span class="string">'none'</span>);
+    l1 = line([x1(1:end-1)';x1(2:end)'],[y1(1:end-1)';y1(2:end)'],[Ax(1:end-1)';Ax(2:end)']);
+    l2 = line([x2(1:end-1)';x2(2:end)'],[y2(1:end-1).';y2(2:end)'],[Aeq(1:end-1).';Aeq(2:end)']);
+    l3 = plot3(solution(1)+0.5, solution(2)+2.8, fval+2, <span class="string">'gx'</span>, <span class="string">'MarkerSize'</span>, 20, <span class="string">'linewidth'</span>, 5);
+
+    xlabel(<span class="string">'X(1)'</span>, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>);
+    ylabel(<span class="string">'X(2)'</span>, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>);
+    set(l1, <span class="string">'color'</span>, <span class="string">'r'</span>, <span class="string">'linewidth'</span>, 2);
+    set(l2, <span class="string">'color'</span>, <span class="string">'k'</span>, <span class="string">'linewidth'</span>, 2);
+    view(150, 30), grid <span class="string">on</span>, axis <span class="string">tight</span>
+    k = legend([l1(1); l2(1); l3],<span class="string">'inequality $$A\mathbf{x} \leq -2$$'</span>, <span class="keyword">...</span>
+        <span class="string">'equality $$A_{eq}\mathbf{x} = -2$$'</span>, <span class="string">'Solution'</span>);
+    set(k, <span class="string">'interpreter'</span>, <span class="string">'LaTeX'</span>, <span class="string">'location'</span>, <span class="string">'NorthWest'</span>);
+    view(170,80);
+
+    shading <span class="string">interp</span>, material <span class="string">shiny</span>, lighting <span class="string">phong</span>, colormap(<span class="string">'autumn'</span>)
+    light(<span class="string">'style'</span>, <span class="string">'local'</span>, <span class="string">'position'</span>, [-3 0 5]);
+    set(S, <span class="string">'ambientstrength'</span>, 0.6);
+</pre><img vspace="5" hspace="5" src="minimize_demo_07.png" alt=""> <h2>Different algorithm: <tt>fminlbfgs</tt><a name="19"></a></h2><p><tt>minimize()</tt> also supports <tt>fminlbfgs</tt>, a limited-memory, Broyden/Fletcher/Goldfarb/Shanno optimizer, implemented by Dirk-Jan Kroon. Unlike <tt>fminsearch()</tt>, this algorithm uses gradient information to improve the overall optimization speed:</p><pre class="codeinput">    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'Algorithm'</span>, <span class="string">'fminsearch'</span>);
+    [solution, fval, exitflag, output] = minimize(<span class="keyword">...</span>
+        rosen, [-3 -18], [],[], [],[], [],[], [], options);
+
+    solution, fval
+    output.funcCount
+
+    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'Algorithm'</span>, <span class="string">'fminlbfgs'</span>);
+    [solution, fval, exitflag, output] = minimize(<span class="keyword">...</span>
+        rosen, [-3 -18], [],[], [],[], [],[], [], options);
+
+    solution, fval
+    output.funcCount
+</pre><pre class="codeoutput">solution =
+    1.000004532655050e+000    1.000006749626582e+000
+fval =
+    5.836059191618274e-014
+ans =
+   196
+solution =
+    1.000012840436605e+000    1.000017577323999e+000
+fval =
+    7.060245922779116e-013
+ans =
+   162
+</pre><p>As can be seen, <tt>fminlbfgs()</tt> indeed uses less funtion evaluations to come to a comparable answer.</p><p>The great advantage of this minimizer over <tt>fminsearch()</tt> is that <tt>fminlbfgs()</tt> can handle very large problems efficiently. For problems of higher dimensionality, <tt>fminsearch()</tt> has poor convergence properties compared to <tt>fminlbfgs()</tt>.</p><h2>Supplying gradients to <tt>fminlbfgs</tt><a name="21"></a></h2><p><tt>fminlbfgs()</tt> needs gradient information of both the objective and non-linear constraint functions. <tt>minimize()</tt> estimate this information numerically via finite differences, but this can be costly for larger problems. Therefore, <tt>minimize()</tt> can also accept gradient information computed by the objective funcion:</p><pre class="codeinput">    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'TolX'</span>, 1e-8,<span class="keyword">...</span>
+        <span class="string">'TolFun'</span>, 1e-8,<span class="keyword">...</span>
+        <span class="string">'FinDiffType'</span>, <span class="string">'central'</span>,<span class="keyword">...</span>
+        <span class="string">'MaxFunEvals'</span>, inf,<span class="keyword">...</span>
+        <span class="string">'MaxIter'</span>, 1e4,<span class="keyword">...</span>
+        <span class="string">'GoalsExactAchieve'</span>, 0,<span class="keyword">...</span>
+        <span class="string">'Algorithm'</span>, <span class="string">'fminlbfgs'</span>,<span class="keyword">...</span><span class="comment">  % This option specifies that your</span>
+        <span class="string">'GradObj'</span>  , <span class="string">'on'</span>);           <span class="comment">% objective function also provides</span>
+                                      <span class="comment">% gradient information as its second</span>
+                                      <span class="comment">% output argument</span>
+
+    [solution, fval, exitflag, output] = minimize(<span class="keyword">...</span>
+        @rosen_with_gradient, [-3 -3], [],[], [],[], [],[], @nonlcon, options);
+
+    solution, fval
+    output.ObjfuncCount
+    output.ConstrfuncCount
+</pre><p>In case of non-linearly constrained problems, also Jacobian information of the non-linear constraint function can be provided:</p><pre class="codeinput">    options = setoptimoptions(<span class="keyword">...</span>
+        <span class="string">'TolX'</span>, 1e-10,<span class="keyword">...</span>
+        <span class="string">'TolFun'</span>, 1e-10,<span class="keyword">...</span>
+        <span class="string">'MaxFunEvals'</span>, inf,<span class="keyword">...</span>
+        <span class="string">'MaxIter'</span>, 1e4,<span class="keyword">...</span>
+        <span class="string">'GoalsExactAchieve'</span>, 0,<span class="keyword">...</span>
+        <span class="string">'Algorithm'</span> , <span class="string">'fminlbfgs'</span>,<span class="keyword">...</span><span class="comment"> % This option specifies that your</span>
+        <span class="string">'GradObj'</span>   , <span class="string">'on'</span>,<span class="keyword">...</span><span class="comment">        % non-linear constraint function also</span>
+        <span class="string">'GradConstr'</span>, <span class="string">'on'</span>);          <span class="comment">% provides Jacobian information as its</span>
+                                      <span class="comment">% third and fourth output arguments</span>
+
+    [solution, fval, exitflag, output] = minimize(<span class="keyword">...</span>
+        @rosen_with_gradient, [-3 -3], [],[], [],[], [],[], @nonlcon_with_Jacobian, options);
+
+    solution, fval
+    output.ObjfuncCount
+    output.ConstrfuncCount
+</pre><pre class="codeoutput">solution =
+    4.575590956156075e-001    1.338147855799337e+000
+fval =
+    1.340811773195559e-002
+ans =
+   508
+ans =
+   509
+</pre><h2>See also<a name="23"></a></h2><p><a href="matlab:doc">setoptimoptions</a>, <a href="matlab:doc">fminlbfgs</a>.</p><pre class="codeinput"><span class="keyword">end</span>
+</pre><pre class="codeinput"><span class="keyword">function</span> [fVal, gVal] = rosen_with_gradient(x)
+    fVal = ( (1-x(1))^2 + 105*(x(2)-x(1)^2)^2 ) /1e4;
+    gVal = [ -2*(1-x(1)) - 4*105*x(1)*(x(2)-x(1)^2)
+             2*105*(x(2)-x(1)^2)
+             ]/1e4;
+<span class="keyword">end</span>
+
+<span class="keyword">function</span> [c, ceq] = nonlcon(x)
+    c   = x(1)^2 + x(2)^2 - 2;
+    ceq = 0.2*x(1)^2 + 0.4*x(2)^3 - 1;
+<span class="keyword">end</span>
+
+<span class="keyword">function</span> [c, ceq, c_Jac, ceq_Jac] = nonlcon_with_Jacobian(x)
+    c   = x(1)^2 + x(2)^2 - 2;
+    ceq = 0.2*x(1)^2 + 0.4*x(2)^3 - 1;
+
+    c_Jac   = 2*x;
+    ceq_Jac = [0.4*x(1); 1.2*x(2)^2];
+<span class="keyword">end</span>
+</pre><pre class="codeoutput">solution =
+    4.581537275933739e-001    1.337944382211403e+000
+fval =
+    1.339032847543977e-002
+ans =
+   420
+ans =
+   421
+</pre><p class="footer"><br>
+      Published with MATLAB&reg; 7.11<br></p></div><!--
+##### SOURCE BEGIN #####
+%% Constrained function minimization with |fminsearch| and |fminlbfgs|
+
+function minimize_demo
+
+    %% Unconstrained optimization
+    %
+    % first, define a test function:
+    clc, rosen = @(x) ( (1-x(1))^2 + 105*(x(2)-x(1)^2)^2 ) /1e4;
+
+    %%
+    % This is the classical Rosenbr\"uck function, which has a global minimum
+    % at $f(x) = f([1, 1]) = 0$. The function is relatively hard to minimize,
+    % because that minimum is located in a long narrow ``valley'':
+    k = 0; range = -5:0.05:5;
+    z = zeros(numel(range));
+    for ii = range
+        m = 0; k = k + 1;
+        for jj = range
+            m = m + 1;
+            z(k, m) = rosen([ii, jj]);
+        end
+    end
+    [y, x] = meshgrid(range, range);
+    S = surf(x, y, z, 'linestyle', 'none'); view(-213, 38), axis tight
+
+
+    shading interp, material metal, lighting gouraud, colormap('hot')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.8)
+
+    %%
+    % Optimizing the fully unconstrained problem with |minimize| indeed
+    % finds the global minimum:
+    solution = minimize(rosen, [3 3])
+
+
+    %% Optimization with bound constraints
+    %
+    % Imposing a lower bound on the variables gives
+    [solution, fval] = minimize(rosen, [3 3], [],[], [],[], [2 2])
+
+    %%
+    % in the figure, this looks like
+    zz = z;   zz(x > 2 & y > 2) = inf;
+    ZZ = z;   ZZ(x < 2 & y < 2) = inf;
+
+    figure, hold on
+    S(1) = surf(x, y, zz, 'linestyle', 'none', 'FaceAlpha', 0.2);
+    S(2) = surf(x, y, ZZ, 'linestyle', 'none');
+    plot3(solution(1), solution(2), fval+0.5, 'gx', ...
+        'MarkerSize', 20,...
+        'linewidth', 5)
+
+    xlabel('X(1)'), ylabel('X(2)')
+    view(-196, 38), grid on, axis tight
+
+    shading interp, material metal, lighting gouraud, colormap('hot')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.8);
+
+    %%
+    % Similarly, imposing an upper bound yields
+    solution = minimize(rosen, [3 3], [],[], [],[], [],[0.5 0.5])
+
+    zz = z;   zz(x < 0.5 & y < 0.5) = inf;
+    ZZ = z;   ZZ(x > 0.5 & y > 0.5) = inf;
+
+    figure, hold on
+    S(1) = surf(x, y, zz, 'linestyle', 'none', 'FaceAlpha', 0.2);
+    S(2) = surf(x, y, ZZ, 'linestyle', 'none');
+    plot3(solution(1), solution(2), fval+0.5, 'gx', ...
+        'MarkerSize', 20,...
+        'LineWidth', 5);
+
+    xlabel('X(1)'), ylabel('X(2)')
+    view(201, 38), grid on, axis tight
+
+    shading interp, material metal, lighting gouraud, colormap('hot')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.8);
+
+    %%
+    % Minimize with $x_2$ fixed at 3. In this case, |minimize| simply
+    % removes the variable before |fminsearch| sees it, essentially
+    % reducing the dimensionality of the problem. This is particularly
+    % useful when the number of dimensions _N_ becomes large.
+    minimize(rosen, [3 3], [],[], [],[], [-inf 3], [inf 3])
+
+
+    %% Linear constraints
+    %
+    % You can use linear inequality or equality constraints. For
+    % example, with the constraints
+    %
+    % $A*x \leq b$,              A = [+2 +1],   b = -2
+    % $A_{eq}*x == b_{eq}$,    Aeq = [+1 -1], beq = -2
+    %
+    % |minimize| finds the following result:
+    [solution, fval] = minimize(rosen, [3;3], [2 1],-2, [1 -1],-2)
+
+    %%
+    % these constraints look like the following:
+    xinds = 2*x+y <= -2;
+    zz = z;   zz( xinds ) = inf;
+    ZZ = z;   ZZ(~xinds ) = inf;
+
+    Ax = z;   Axinds = abs(2*x+y + 2) < 1e-3;
+    [x1, sortinds] = sort(x(Axinds));
+    Ax = Ax(Axinds); Ax = Ax(sortinds);
+    y1 = y(Axinds); y1 = y1(sortinds);
+
+    Aeq = z;   Aeqinds = abs(x-y + 2) < 1e-3;
+    [x2, sortinds] = sort(x(Aeqinds));
+    Aeq = Aeq(Aeqinds); Aeq = Aeq(sortinds);
+    y2 = y(Aeqinds); y2 = y2(sortinds);
+
+    figure, hold on
+    l1 = line([x1(1:end-1)';x1(2:end)'],[y1(1:end-1)';y1(2:end)'],[Ax(1:end-1)';Ax(2:end)']);
+    l2 = line([x2(1:end-1)';x2(2:end)'],[y2(1:end-1).';y2(2:end)'],[Aeq(1:end-1).';Aeq(2:end)']);
+    S(1) = surf(x, y, zz, 'linestyle', 'none', 'FaceAlpha', 0.2);
+    S(2) = surf(x, y, ZZ, 'linestyle', 'none');
+    l3 = plot3(solution(1)+0.4, solution(2)+0.8, fval+0.5, 'gx',...
+        'MarkerSize', 20,...
+        'LineWidth', 5);
+
+    set(l1, 'color', 'b', 'linewidth', 2);
+    set(l2, 'color', 'k', 'linewidth', 2);
+
+    view(150, 30), grid on, axis tight
+    xlabel('X(1)', 'interpreter', 'LaTeX'); ylabel('X(2)', 'interpreter', 'LaTeX');
+    k = legend([l1(1); l2(1); l3],'inequality $$A\mathbf{x} \leq -2$$', ...
+        'equality $$A_{eq}\mathbf{x} = -2$$', 'Solution');
+    set(k, 'interpreter', 'LaTeX', 'location', 'NorthWest');
+
+    shading interp, material metal, lighting phong, colormap('autumn')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.8);
+
+    %% Non-linear constraints
+    %
+    % Also general nonlinear constraints can be used. A simple example:
+    %
+    % nonlinear inequality:
+    %
+    % $$\sqrt{x_1^2 + x_2^2} \leq 2$$
+    %
+    % nonlinear equality  :
+    %
+    % $$0.2x_1^2 + 0.4x_2^3 = 1$$
+
+    options = setoptimoptions(...
+        'TolFun', 1e-6, ...
+        'TolX'  , 1e-6, ...
+        'MaxFunEvals', inf,...
+        'MaxIter', 1e4);
+
+    [sol, fval, exitflag, output] = minimize(rosen, [-3; 3], [],[], [],[],...
+        [],[], @nonlcon, options);
+
+    %%
+    % Note that |nonlcon| is a subfunction, listed below.
+    %
+    % These constraints look like the following:
+    zz = z;   zz(sqrt(x.^2 + y.^2) <= 2)   = inf;
+    ZZ = z;   ZZ(sqrt(x.^2 + y.^2) >= 2.2) = inf;
+    zZ = z;   zZ(x.^2 + y.^3 >= 1.0 + 0.1) = inf;
+              zZ(x.^2 + y.^3 <= 1.0 - 0.1) = inf;
+
+    xX = x(isfinite(zZ));  [xX, inds] = sort(xX);
+    yY = y(isfinite(zZ));  yY = yY(inds);
+    zZ = zZ(isfinite(zZ)); zZ = zZ(inds);
+
+    figure, hold on
+    S(1) = surf(x, y, zz, 'linestyle', 'none', 'FaceAlpha', 0.2);
+    S(2) = surf(x, y, ZZ, 'linestyle', 'none');
+    L = line([xX(1:end-1)';xX(2:end)'],[yY(1:end-1)';yY(2:end)'],[zZ(1:end-1)';zZ(2:end)']);
+    l3 = plot3(sol(1)+0.4, sol(2)+0.5, fval+1, 'gx', 'MarkerSize', 20, 'linewidth', 5);
+
+    set(L, 'linewidth', 2, 'color', 'b');
+    view(150, 50), grid on, axis tight
+
+    k = legend([S(2); L(1); l3],'non-linear inequality $$c(x) < 0$$', ...
+        'non-linear equality $$c_{eq}(x) = 0$$', 'Solution');
+    set(k, 'interpreter', 'LaTeX', 'location', 'NorthWest');
+
+    shading interp, material metal, lighting phong, colormap('autumn')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.8);
+
+
+    %%
+    % Note that the |output| structure contains a field |constrviolation|:
+    output
+
+    %%
+    % The contents of which shows that all constraints have been satisfied:
+    output.constrviolation
+    output.constrviolation.nonlin_eq{:}
+    output.constrviolation.nonlin_ineq{:}
+
+    %% Global optimization
+    %
+    % This is the 2D sine-envelope-sine function. It has a single global
+    % minimum at [0,0], where the function assumes a value of 0. As you can
+    % imagine, it is hard to find this minimum when the initial estimates
+    % is not very close to the minimum already:
+
+    sinenvsin = @(x) 3*sum( (sin(sqrt(x(:).'*x(:))).^2 - 0.5)./(1 + 0.001*x(:).'*x(:)).^2 + 0.5, 1);
+
+    figure, hold on
+    k = 0; range = -10:0.1:10;
+    z = zeros(numel(range));
+    for ii = range
+        m = 0; k = k + 1;
+        for jj = range
+            m = m + 1;
+            z(k,m) = sinenvsin([ii jj]);
+        end
+    end
+    [y, x] = meshgrid(range, range);
+    S = surf(x, y, z, 'linestyle', 'none');
+
+    axis equal, view(-148,24)
+
+    shading interp, material shiny, lighting phong , colormap('autumn')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.6);
+
+    %%
+    % |minimize()| provides rudimentary support for this type of problem.
+    % Omitting the initial value x0 will re-start |minimize()| several times
+    % at randomly chosen initial values in the interval [lb ub]:
+
+    options = setoptimoptions(...
+        'popsize', 1e2, 'maxfunevals', 1e4,  'maxiter', 1e2);
+
+    [sol,fval] = minimize(sinenvsin, [], [],[], [],[], -[5 5], +[5 5], [],options)
+
+    %%
+    % Naturally, these types of problems may also have constraints:
+
+    [solution,fval] = minimize(sinenvsin, [], [2 1],-2, [1 -1],-2,...
+        -[5;5], +[5;5], [], options);
+
+    xinds = 2*x+y <= -2;
+    zz = z;   zz( xinds ) = inf;
+    ZZ = z;   ZZ(~xinds ) = inf;
+
+    Ax = z;   Axinds = abs(2*x+y + 2) < 1e-3;
+    [x1, sortinds] = sort(x(Axinds));
+    Ax = Ax(Axinds); Ax = Ax(sortinds);
+    y1 = y(Axinds); y1 = y1(sortinds);
+
+    Aeq = z;   Aeqinds = abs(x-y + 2) < 1e-3;
+    [x2, sortinds] = sort(x(Aeqinds));
+    Aeq = Aeq(Aeqinds); Aeq = Aeq(sortinds);
+    y2 = y(Aeqinds); y2 = y2(sortinds);
+
+    figure, hold on
+    S(1) = surf(x, y, zz, 'linestyle', 'none', 'FaceAlpha', 0.2);
+    S(2) = surf(x, y, ZZ, 'linestyle', 'none');
+    l1 = line([x1(1:end-1)';x1(2:end)'],[y1(1:end-1)';y1(2:end)'],[Ax(1:end-1)';Ax(2:end)']);
+    l2 = line([x2(1:end-1)';x2(2:end)'],[y2(1:end-1).';y2(2:end)'],[Aeq(1:end-1).';Aeq(2:end)']);
+    l3 = plot3(solution(1)+0.5, solution(2)+2.8, fval+2, 'gx', 'MarkerSize', 20, 'linewidth', 5);
+
+    xlabel('X(1)', 'interpreter', 'LaTeX');
+    ylabel('X(2)', 'interpreter', 'LaTeX');
+    set(l1, 'color', 'r', 'linewidth', 2);
+    set(l2, 'color', 'k', 'linewidth', 2);
+    view(150, 30), grid on, axis tight
+    k = legend([l1(1); l2(1); l3],'inequality $$A\mathbf{x} \leq -2$$', ...
+        'equality $$A_{eq}\mathbf{x} = -2$$', 'Solution');
+    set(k, 'interpreter', 'LaTeX', 'location', 'NorthWest');
+    view(170,80);
+
+    shading interp, material shiny, lighting phong, colormap('autumn')
+    light('style', 'local', 'position', [-3 0 5]);
+    set(S, 'ambientstrength', 0.6);
+
+    %% Different algorithm: |fminlbfgs|
+    %
+    % |minimize()| also supports |fminlbfgs|, a limited-memory,
+    % Broyden/Fletcher/Goldfarb/Shanno optimizer, implemented by Dirk-Jan
+    % Kroon. Unlike |fminsearch()|, this algorithm uses gradient
+    % information to improve the overall optimization speed:
+
+    options = setoptimoptions(...
+        'Algorithm', 'fminsearch');
+    [solution, fval, exitflag, output] = minimize(...
+        rosen, [-3 -18], [],[], [],[], [],[], [], options);
+
+    solution, fval
+    output.funcCount
+
+    options = setoptimoptions(...
+        'Algorithm', 'fminlbfgs');
+    [solution, fval, exitflag, output] = minimize(...
+        rosen, [-3 -18], [],[], [],[], [],[], [], options);
+
+    solution, fval
+    output.funcCount
+
+    %%
+    % As can be seen, |fminlbfgs()| indeed uses less funtion evaluations to
+    % come to a comparable answer.
+    %
+    % The great advantage of this minimizer over |fminsearch()| is that
+    % |fminlbfgs()| can handle very large problems efficiently. For
+    % problems of higher dimensionality, |fminsearch()| has poor
+    % convergence properties compared to |fminlbfgs()|.
+
+    %% Supplying gradients to |fminlbfgs|
+    %
+    % |fminlbfgs()| needs gradient information of both the objective and
+    % non-linear constraint functions. |minimize()| estimate this
+    % information numerically via finite differences, but this can be
+    % costly for larger problems. Therefore, |minimize()| can also accept
+    % gradient information computed by the objective funcion:
+
+    options = setoptimoptions(...
+        'TolX', 1e-8,...
+        'TolFun', 1e-8,...
+        'FinDiffType', 'central',...
+        'MaxFunEvals', inf,...
+        'MaxIter', 1e4,...
+        'GoalsExactAchieve', 0,...
+        'Algorithm', 'fminlbfgs',...  % This option specifies that your
+        'GradObj'  , 'on');           % objective function also provides
+                                      % gradient information as its second
+                                      % output argument
+
+    [solution, fval, exitflag, output] = minimize(...
+        @rosen_with_gradient, [-3 -3], [],[], [],[], [],[], @nonlcon, options);
+
+    solution, fval
+    output.ObjfuncCount
+    output.ConstrfuncCount
+
+    %%
+    % In case of non-linearly constrained problems, also Jacobian
+    % information of the non-linear constraint function can be provided:
+
+    options = setoptimoptions(...
+        'TolX', 1e-10,...
+        'TolFun', 1e-10,...
+        'MaxFunEvals', inf,...
+        'MaxIter', 1e4,...
+        'GoalsExactAchieve', 0,...
+        'Algorithm' , 'fminlbfgs',... % This option specifies that your
+        'GradObj'   , 'on',...        % non-linear constraint function also
+        'GradConstr', 'on');          % provides Jacobian information as its
+                                      % third and fourth output arguments
+
+    [solution, fval, exitflag, output] = minimize(...
+        @rosen_with_gradient, [-3 -3], [],[], [],[], [],[], @nonlcon_with_Jacobian, options);
+
+    solution, fval
+    output.ObjfuncCount
+    output.ConstrfuncCount
+
+
+    %% See also
+    %
+    % <matlab:doc setoptimoptions>,
+    % <matlab:doc fminlbfgs>.
+
+end
+
+%%
+
+function [fVal, gVal] = rosen_with_gradient(x)
+    fVal = ( (1-x(1))^2 + 105*(x(2)-x(1)^2)^2 ) /1e4;
+    gVal = [ -2*(1-x(1)) - 4*105*x(1)*(x(2)-x(1)^2)
+             2*105*(x(2)-x(1)^2)
+             ]/1e4;
+end
+
+function [c, ceq] = nonlcon(x)
+    c   = x(1)^2 + x(2)^2 - 2;
+    ceq = 0.2*x(1)^2 + 0.4*x(2)^3 - 1;
+end
+
+function [c, ceq, c_Jac, ceq_Jac] = nonlcon_with_Jacobian(x)
+    c   = x(1)^2 + x(2)^2 - 2;
+    ceq = 0.2*x(1)^2 + 0.4*x(2)^3 - 1;
+
+    c_Jac   = 2*x;
+    ceq_Jac = [0.4*x(1); 1.2*x(2)^2];
+end
+
+
+##### SOURCE END #####
+--></body></html>

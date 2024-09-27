@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding="utf-8"?>
+<toc version="2.0">
+    
+    <tocitem target="minimize_product_page.html">Minimize
+        
+     <!-- 
+     Author : Rody Oldenhuis
+     e-mail : oldenhuis@gmail.com
+     
+     If you find this work useful, please consider a donation:
+     https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=6G3S5UYM7HJ3N
+     --> 
+                         
+        <!-- Function reference -->
+        <tocitem target="helpfuncbycat.html" 
+                 image="HelpIcon.FUNCTION">Function Reference
+                 
+            <!-- First category, with link to anchor in above page -->
+            <tocitem target="helpfuncbycat.html#1">Function minimization
+                <tocitem target="minimize__doc.html">minimize</tocitem>                 
+                <tocitem target="fminlbfgs__doc.html">fminlbfgs</tocitem>                                 
+            </tocitem>
+                        
+            <!-- Second category, with link to anchor in above page -->
+            <tocitem target="helpfuncbycat.html#2">Optimization options
+                <tocitem target="setoptimoptions__doc.html">setoptimoptions</tocitem>                
+             </tocitem>
+             
+        </tocitem>
+                
+        <!-- Demos -->
+        <tocitem target="minimize_demo/minimize_demo.html" 
+                 image="HelpIcon.DEMOS">Demos
+        </tocitem>
+        
+        <!-- Changelog -->
+        <tocitem target="minimize__changelog.html" 
+                 image="HelpIcon.RELEASE_NOTES">Change log
+        </tocitem>
+        
+        <!-- Link to FMINLBFGS -->
+        <tocitem target="http://www.mathworks.com/matlabcentral/fileexchange/23245-fminlbfgs-fast-limited-memory-optimizer" 
+                 image="$toolbox/matlab/icons/webicon.gif">
+                FMINLBFGS
+        </tocitem>
+        
+        <!-- PayPal donations  -->        
+        <tocitem target="http://bit.ly/1iDVdvM" 
+                 image="$toolbox/matlab/icons/webicon.gif">
+                Please consider a donation.                
+        </tocitem>
+         
+        
+    </tocitem>
+    
+</toc>

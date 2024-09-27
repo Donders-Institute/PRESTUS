@@ -6,6 +6,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     end
 
     % 1) make logs directory if does not exist
+    
     log_dir = fullfile(parameters.temp_output_dir, 'batch_job_logs');
     if ~isfolder(log_dir)
         mkdir(log_dir)
@@ -26,9 +27,13 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
         if ~exist(result_simnibs, 'file')
             parameters.overwrite_simnibs = 1;
         end
-        
-        segment_call = sprintf('charm %s %s %s',...
-            subj_id_string,filename_t1,filename_t2);
+        if ~isempty(filename_t2)
+            segment_call = sprintf('charm %s %s %s',...
+                subj_id_string,filename_t1,filename_t2);
+        else
+            segment_call = sprintf('charm %s %s',...
+                subj_id_string,filename_t1);
+        end
         if isfield(parameters, 'overwrite_simnibs') && parameters.overwrite_simnibs == 1
             segment_call = [segment_call ' --forcerun'];
         end
@@ -39,8 +44,13 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
             segment_call = [segment_call ' --debug'];
         end
     else
-        segment_call = sprintf('headreco all %s %s %s -d no-conform',...
-            subj_id_string, filename_t1, filename_t2);
+        if ~isempty(filename_t2)
+            segment_call = sprintf('headreco all %s %s %s -d no-conform',...
+                subj_id_string, filename_t1, filename_t2);
+        else
+            segment_call = sprintf('headreco all %s %s -d no-conform',...
+                subj_id_string, filename_t1);
+        end
     end
     
     % if not running on the donders_hpc, the job won't continue until the segmentation is completed manually
@@ -51,7 +61,8 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
       fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
           parameters.seg_path);
 		
-  	  % execute simnibs call in segmentation directory
+
+  	% execute simnibs call in segmentation directory
 		full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
 		
 	  % 3) submit segmentation job

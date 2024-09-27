@@ -11,12 +11,11 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
         options.fill_value = 0
     end
 
-    mni_header = niftiinfo(fullfile(headreco_folder, 'toMNI/T1fs_nu_12DOF_MNI.nii.gz'));
+    mni_header = niftiinfo(fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz'));
 
     if isempty(options.BitsPerPixel)
         options.BitsPerPixel = mni_header.BitsPerPixel;
     end
-
 
     t1_orig_hdr = niftiinfo(fullfile(headreco_folder, 'T1fs_conform.nii.gz'));
 
