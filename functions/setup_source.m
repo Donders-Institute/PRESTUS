@@ -144,4 +144,3 @@ else
     source.p = distributed_source_signal;
 end
 end
-

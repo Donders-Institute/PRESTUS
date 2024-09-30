@@ -6,6 +6,8 @@ function [transducer_pos target_pos] = get_trans_pos_from_trigger_markers(trigge
     %   Meaning that a mask should be loaded in separately to perform
     %   calculations on simulation results in your actual target
 
+    % requires https://github.com/joe-of-all-trades/xml2struct
+
     arguments
     trigger_markers_file
     trigger_index

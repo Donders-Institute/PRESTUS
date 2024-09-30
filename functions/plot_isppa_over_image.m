@@ -1,4 +1,5 @@
-function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
+function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = ...
+    plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
     arguments
         Isppa_map (:,:,:)
         bg_image (:,:,:)
@@ -22,9 +23,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         options.tick_labels = []
         options.segmented_img = []
         options.bg_range = []
-        options.overlay_segmented = 0
-
-        
+        options.overlay_segmented = 0  
     end
     
     if any(focus_pos > size(bg_image))
@@ -49,7 +48,6 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     slice_x = 1:size(Isppa_map,1);
     slice_y = 1:size(Isppa_map,2);
     slice_z = 1:size(Isppa_map,3);
-
    
     if slice{1} == 'x'
         slice_x = slice{2};
@@ -136,18 +134,14 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
         
     end
         
-    figure;
+    h = figure;
     ax1 = axes; % the background layer
-    
-    %bg_zeros = zeros(size(bg_slice));
-    %bg_slice = (bg_slice-min(bg_slice(:)))/ max(bg_slice(:));
     bg_img = cat(3, bg_slice, bg_slice, bg_slice);
     overlay_color = [0,0.2,0.7];
     bg_ones = ones(size(bg_img));
     overlay_weight = 0.2;
     overlay_img  = reshape(overlay_color, 1, 1,3).*bg_ones;
     image(bg_img+overlay_weight*overlay_img);
-    %colormap(ax1,'gray');
     axis image;
     axis off;
     
@@ -203,7 +197,11 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max] = plot
     
     imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
 
-    caxis(options.isppa_color_range)
+    if exist("clim")==2 % renamed in R2022a
+        clim(options.isppa_color_range);
+    elseif exist("caxis")==2
+        caxis(options.isppa_color_range);
+    end
     colormap(ax2, options.color_scale);
 
     ax2.Visible = 'off';

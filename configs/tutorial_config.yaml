@@ -1,5 +1,5 @@
-data_path: /home/affneu/kenvdzee/Documents/Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
-simnibs_bin_path: /home/affneu/kenvdzee/SimNIBS-4.0/bin/
+data_path: /home/.../Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
 
 t1_path_template: sub-001_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
 t2_path_template: sub-001_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
@@ -13,7 +13,7 @@ transducer:
   source_amp: 183573 # [Pa]
   source_phase_deg: [0, 360, 17, 39, 43, 29, 68, 23, 150, 26] # source phase [deg]
   pos_t1_grid: [210, 184, 117]
-  source_freq_hz: 300e3 # [Hz] the central frequency
+  source_freq_hz: 500e3 # [Hz] the central frequency | NOTE: This needs to correspond to the alpha0 in the medium setup
   pos_t1_grid: [128, 139, 15] # position on T1 grid 
 
 focus_pos_t1_grid: [128, 142, 75] # stimulation target on T1 grid
