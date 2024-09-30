@@ -1,0 +1,26 @@
+transducer: 
+  n_elements: 2 # number of elements in the transducer
+  Elements_ID_mm: [0, 32.6644] # elements 1 & 2 inner diameter [mm]
+  Elements_OD_mm: [32.1564, 45.4914] # element 1 & 2 outer diameter [mm]
+  curv_radius_mm: 63.20 # radius from the focal point to the bowl outermost point
+  dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
+  source_amp: [0.115e6, 0.115e6]  # [Pa] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_phase_rad: [0, -pi/2] # [rad] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_freq_hz: 500e3  # [Hz]
+
+expected_focal_distance_mm: 63.20 # expected distance to the stimulation focus
+transducer_from_localite: 1 # transducer position is to be taken from the localite file
+
+
+# distance from the reference used in the neuronavigation (could be the TMS
+# coil or the three-ball reference) and the transducer
+reference_transducer_distance_mm: 15
+
+data_path: /project/3015999.02/andche_sandbox/TUS_sims/tusim/data/images_Judith
+
+t1_path_template: sub-%1$03d_ses-mri01_acq-t1*_T1w.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: sub-%1$03d_ses-mri01_acq-t2*_T2w.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+localite_instr_file_template: sub-%03d_Instrument*.xml  # path to the localite file that has the data about the instrument relative to data_path; could also be a template similar to t1 and t2 path (usually an xml file taken from subject/Sessions/Session_xxxx/InstrumentMarkers/ folder)
+
+# expansion factor for the cerebro-spinal fluid brain mask; if the mask ends up too big, try reducing it (40 is the conservative default; the mask is dilated with csf_mask_expansion_factor/voxel_size_mm cubic kernel)
+csf_mask_expansion_factor: 40 

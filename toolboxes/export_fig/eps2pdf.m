@@ -1,4 +1,4 @@
-function eps2pdf(source, dest, crop, append, gray, quality, gs_options) %#ok<*RGXPI>
+function eps2pdf(source, dest, crop, append, gray, quality, gs_options)
 %EPS2PDF  Convert an eps file to pdf format using ghostscript
 %
 % Examples:
@@ -60,14 +60,9 @@ function eps2pdf(source, dest, crop, append, gray, quality, gs_options) %#ok<*RG
 % 20/01/20: Attempted fix for issue #285: unsupported patch transparency in some Ghostscript versions
 % 12/02/20: Improved fix for issue #285: add -dNOSAFER and -dALLOWPSTRANSPARENCY (thanks @linasstonys)
 % 26/08/21: Added GS version to error message; fixed some problems with PDF append (issue #339)
-% 20/02/23: Added GS fixes suggested by @scholnik (issues #285, #368)
 
     % Intialise the options string for ghostscript
-    downsampleOptions = ['-dDownsampleColorImages=false ' ...
-                         '-dDownsampleGrayImages=false '  ...
-                         '-dDownsampleMonoImages=false']; %issue #368
-    options = ['-q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress ' ...
-               downsampleOptions ' -sOutputFile="' dest '"'];
+    options = ['-q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -sOutputFile="' dest '"'];
 
     % Set crop option
     if nargin < 3 || crop
@@ -222,44 +217,15 @@ function eps2pdf(source, dest, crop, append, gray, quality, gs_options) %#ok<*RG
             end
         end
 
-        % Retry with updated or no quality options (may solve problems with GS 9.51+, issue #285)
+        % Retry without quality options (may solve problems with GS 9.51+, issue #285)
         if ~isempty(qualityOptions)
-            % First try replacing .setpdfwrite as suggested in ghostscript error (issue #285)
-            options = strrep(orig_options, '.setpdfwrite', '3000000 setvmthreshold');
-            if ~ghostscript(options) % hurray! (no error)
-                % No warning: there's no known drawback when this works so no need to inform the user
-                %warning('export_fig:GS:setpdfwrite','Successfully worked around deprecated .setpdfwrite')
-                return
-            end
-            % Well, we tried.  Fall back to no quality options.
             options = strrep(orig_options, qualityOptions, '');
-            if ~ghostscript(options) % hurray! (no error)
-                warning('export_fig:GS:quality','Export_fig quality option ignored - not supported by your Ghostscript version')
-                return
-            end
-            % Hmm, perhaps the problem is just with the downsampleOptions?
-            options = strrep(orig_options, downsampleOptions, '');
-            if ~ghostscript(options) % hurray! (no error)
-                warning('export_fig:GS:downsample','Export_fig quality option ignored - not supported by your Ghostscript version')
-                return
-            end
-            % Nope, last attempt: remove both downsampleOptions & qualityOptions
-            options = strrep(orig_options, qualityOptions, '');
-            options = strrep(options,   downsampleOptions, '');
             [status, message] = ghostscript(options);
             if ~status % hurray! (no error)
-                warning('export_fig:GS:quality2','Export_fig quality option ignored - not supported by your Ghostscript version')
-                return
-            end
-        else  % no quality options, the problem lies elsewhere...
-            % Hmm, perhaps the problem is just with the downsampleOptions?
-            options = strrep(orig_options, downsampleOptions, '');
-            if ~ghostscript(options) % hurray! (no error)
-                warning('export_fig:GS:downsample','Export_fig quality option ignored - not supported by your Ghostscript version')
+                warning('export_fig:GS:quality','Export_fig quality option is ignored - not supported by your Ghostscript version')
                 return
             end
         end
-        % Any other ideas, anyone?
 
         % Report error
         if isempty(message)
