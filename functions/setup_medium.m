@@ -72,7 +72,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 end
 
                 switch pCT_variant
-                    case 'carpino'
+                    case {'carpino', 'k-plan'}
 
                         alpha_min   = 4;
                         alpha_max   = 8.7;
@@ -147,6 +147,21 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 % convert alpha at 500 kHz into prefactor alpha0 (dB/Mhz/cm) according to specified alpha_power_true
                 % (definition of lower and upper attenuation bounds is derived from 500kHz)
                 alpha_0_true(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power_true);
+
+                % for k-plan, use fixed attenuation
+                if strcmp(pCT_variant, 'k-plan')
+                    kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+                    kPlan_alpha0 = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+                    % Note that we allow different values to be specified in the config.
+                    % If replication of k-Wave is the goal, the above values should be specified.
+                    if medium.(label_name).alpha_0_true ~= kPlan_alpha0 || ...
+                        medium.(label_name).alpha_power_true ~= kPlan_alpha
+                        warning('Specified attenuation varies from k-Plan setup.')
+                    end
+                    alpha_pseudoCT(skull_idx) = medium.(label_name).alpha_power_true;
+                    alpha_0_true(skull_idx) = medium.(label_name).alpha_0_true;
+                end
+
                 clear skull_idx
             else
                 % Sets the parameters in the shape of the mask

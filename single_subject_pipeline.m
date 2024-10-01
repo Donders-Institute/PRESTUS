@@ -420,7 +420,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         sensor.mask = zeros(size(sensor.mask));
         
         % Sets up parameters for the heating simulation and runs it
-        if confirm_overwriting(filename_heating_data, parameters) && (parameters.interactive == 0 || confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No')) 
+        if confirm_overwriting(filename_heating_data, parameters) && (parameters.interactive == 0 || ...
+            confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No')) 
             
             % Set sensor along the focal axis 
             heating_window_dims = ones(2,3);
@@ -436,6 +437,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
             % add starting temperature
             kwave_medium.temp_0 = temp_0;
+
+            % if k-plan pseudoCT setup is used, density and sound speed in bone are fixed for heating sims
+            % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+            if parameters.usepseudoCT ==1 && strcmp(parameters.pCT_variant, 'k-plan')
+                kwave_medium.density(medium_masks==skull_mask) = 1850;
+                kwave_medium.sound_speed(medium_masks==skull_mask) = ...
+                    1.33*kwave_medium.density(medium_masks==skull_mask)+167; 
+            end
 
             % For more documentation, see 'run_heating_simulations'
             [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, focal_planeCEM43]= ...
