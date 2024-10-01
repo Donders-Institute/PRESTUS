@@ -5,21 +5,43 @@ This is currently only implemented for layered setups.
 
 ### Creating a pseudoCT from UTE scans
 
-```create_pseudoCT.sh``` creates a pseudoCT and an associated mask file starting from a T1w and a PETRA UTE image. 
+1) Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2) as inputs. 
+    - You can either use the SimNIBS GUI or PRESTUS (**default**).
+2) Run in bash: `create_pseudoCT.sh`.
+    - create_pseudoCT.sh calls the MATLAB function find_soft_tissue_peak
 
-To run the code you will need to install:
+The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
+
+To run the code you will need to install (or load the following modules):
 - SimNIBS
 - FSL
 - ANTs
 
-How to make a pseudoCT:
+**Note: Example PETRA UTE parameters** (Carpino et al., 2023)
 
-1) run the SimNIBS segmentation using a T1 and a PETRA UTE scan (instead of T2) as inputs. 
-    - You can either use the SimNIBS GUI or PRESTUS (**default**).
-2) run in bash `create_pseudoCT.sh`
-    - create_pseudoCT.sh calls the MATLAB function find_soft_tissue_peak
+- TR: 3.32 ms
+- TE: 0.07 ms
+- voxel size: 0.8 mm3
+- 352 sagittal slices
+- flip angle: 2°
+- FoV: 294 mm
 
-The pseudoCT will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
+#### Conceptual overview
+
+The following steps are used to create the pseudoCT:
+
+- Threshold UTE image at 0
+- Bias field correction to remove inhomogeneity
+- (Identify soft tissue peak intensity value)
+- Normalization: Divide by soft tissue peak value, i.e., normalised UTE intensity = 1
+- Linear mapping: image intensities -> Hounsfield units (HU)
+    - Skull *(mask defined as SimNibs tissue layers 7+8)*: -2194 UTE + 2236
+        - This is motivated as follows (Carpino et al., 2023): *"The interface between cortical and trabecular bone, identified at 0.7 normalised UTE intensity, is mapped to 700 HU (Lim Fat et al., 2012)."*
+    - Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2016)
+    - Air: 1000 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
+- Thresholding/smoothing across various tissue masks
+    - Gaussian smoothing kernel (3x3x3 voxels) is applied at the skin-air and skull-air interfaces
+    - *currently not well documented*
 
 The following is an example script that you can use for a `create_pseudoCT.sh` call.
 
@@ -69,7 +91,7 @@ They are specified via `parameters.pseudoCT_variant`.
 
 - `yakuub` | Algorithm specified in Yaakub et al. (2023). <br>
 
-    For both variants, 𝛼 is bounded based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). We actually require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
+    - For both variants, 𝛼 is bounded based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
 
     *Reference:* Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023).
 
