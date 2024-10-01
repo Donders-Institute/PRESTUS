@@ -440,7 +440,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
             % if k-plan pseudoCT setup is used, density and sound speed in bone are fixed for heating sims
             % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-            if parameters.usepseudoCT ==1 && strcmp(parameters.pCT_variant, 'k-plan')
+            if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
                 kwave_medium.density(medium_masks==skull_mask) = 1850;
                 kwave_medium.sound_speed(medium_masks==skull_mask) = ...
                     1.33*kwave_medium.density(medium_masks==skull_mask)+167; 
