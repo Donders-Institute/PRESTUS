@@ -32,7 +32,11 @@ For more extensive documentation, see the [HCP wiki](https://hpc.dccn.nl/) (*int
 6. Start interactive job:
 `qsub -I -l 'nodes=1:gpus=1,feature=cuda,walltime=05:00:00,mem=24gb,reqattr=cudacap>=5.0'`
 
-7. start MATLAB: `matlab`
+7. Start MATLAB: 
+`module load matlab/R2022b`
+`matlab`
+
+    *Note*: PBS only supports CUDA 11.2, which is dropped starting in R2023, see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50)
 
 8. PRESTUS scripts: use `**_qsub*`
 9. in `terminal` check `qstat`
@@ -62,6 +66,12 @@ vncmanager - 2
     `srun --mem=8gb --time=01:00:00 --x11 -p interactive --pty bash -i`
     - 6b. **If you need a MATLAB GUI:**
     `srun --partition=gpu --gres=gpu:1 --mem=8G --time=01:00:00 --x11 --pty /bin/bash -i`
+
+7. Start MATLAB: 
+`module load matlab/R2024a`
+`matlab`
+
+    *Note*: SLURM supports CUDA 12.2, which is why recent MATLAB versions (at least up to R2024) should be supported, see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50)
 
 7. Start MATLAB: `matlab`
 
