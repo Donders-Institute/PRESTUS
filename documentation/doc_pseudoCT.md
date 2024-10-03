@@ -8,7 +8,7 @@ This is currently only implemented for layered setups.
 1) Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2) as inputs. 
     - You can either use the SimNIBS GUI or PRESTUS (**default**).
 2) Run in bash: `create_pseudoCT.sh`.
-    - create_pseudoCT.sh calls the MATLAB function find_soft_tissue_peak
+    - functions/create_pseudoCT.sh calls the MATLAB function find_soft_tissue_peak
 
 The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
 
@@ -74,10 +74,7 @@ create_pseudoCT "$subject_id" "$m2m_path" "${scriptpath}"
 
 see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43)
 
-To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`.
-The current code supports the following variants to use pCTs to inform skull tissue parameters.
-They are specified via `parameters.pseudoCT_variant`.
-Note that only the above described procedure to derive pCTs is supported.
+To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gi` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to inform skull tissue parameters. Note that this affects only the pCT-to-tissueproperty conversion, only the above described procedure to derive pCTs is currently supported.
 
 - `carpino` | (**default**) Algorithm described in Carpino et al. (2024). <br>
 
@@ -92,7 +89,7 @@ Note that only the above described procedure to derive pCTs is supported.
     - The k-Wave function hounsfield2density converts pseudo-HUs to density. Original pseudoCT values are initially shifted by 1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php). 
     - Resulting density values are regularized to a minimum of the specified water density, and a maximum density of 2100 kg/m3. 
     - The sound speed c is calculated from density 𝜌 using the linear relationship: c = 1.33𝜌 + 167. This is identical to the [k-Plan estimation](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#evaluating-plans). Note that due to the density regularization, sound speed is implicitly regularized.
-    - The absorption coefficient 𝛼 is derived from HU values according to formula (3) in Yaakub et al., with `α_bone_min` = 4 and `α_bone_max` = 8.7. For both `carpino` and `yakuub` variants, 𝛼 is bounded based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
+    - The absorption coefficient 𝛼 is derived from HU values according to formula (3) in Yaakub et al., with `α_bone_min` = 4 and `α_bone_max` = 8.7. For both `carpino` and `yakuub` variants, these 𝛼 bounds are based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We therefore estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
 
     *Reference:* Adapted from Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.
 
