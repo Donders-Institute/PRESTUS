@@ -93,7 +93,7 @@ To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT =
 
     *Reference:* Adapted from Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.
 
-- `yakuub` | Algorithm specified in Yaakub et al. (2023). <br>
+- `yaakub` | Algorithm specified in Yaakub et al. (2023). <br>
 
     ```
     ρ_skull = ρ_water + (ρ_bone − ρ_water) * (HU − HU_min) / (HU_max − HU_min) [Marsac et al., 2017]
@@ -106,7 +106,7 @@ To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT =
     - Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017).
     - Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).
 
-- `k-plan` | Algorithm described in Carpino et al. (2024) with more fixed skull tissue properties akin to k-Plan <br>
+- `k-plan` | Algorithm described in Carpino et al. (2024) with more fixed skull properties <br>
 
     ```
     ρ_skull = hounsfield2density(HU+1000)

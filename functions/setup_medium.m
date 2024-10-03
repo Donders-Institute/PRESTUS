@@ -141,6 +141,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         % estimate sound speed
                         sound_speed(skull_idx) = c_water + (c_skull - c_water) * ...
                             (density(skull_idx) - rho_water) / (rho_bone - rho_water);
+                    otherwise
+                        error("Specified pCT variant is not supported.")
                 end
 
                 % estimate attenuation coefficients
