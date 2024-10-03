@@ -75,30 +75,56 @@ create_pseudoCT "$subject_id" "$m2m_path" "${scriptpath}"
 see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43)
 
 To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`.
-The current code supports the following variants to use pCTs to inform tissue parameters.
+The current code supports the following variants to use pCTs to inform skull tissue parameters.
 They are specified via `parameters.pseudoCT_variant`.
+Note that only the above described procedure to derive pCTs is supported.
 
 - `carpino` | (**default**) Algorithm described in Carpino et al. (2024). <br>
 
     All subsequent steps are only applied inside the skull mask.
-    - The k-Wave function hounsfield2density converts pseudo-HUs to density. 
-    - Original pseudoCT values are initially shifted by 1000 and thresholded at 0 to exclude air voxels. 
-    - Resulting density values are regularized to a minimum of the specified water density [originally: 1]. 
-    - The sound speed c is calculated from density 𝜌 using the linear relationship: c = 1.33𝜌 + 167. This is identical to the [k-Plan estimation](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#evaluating-plans).
-    - The absorption coefficient 𝛼 is derived from HU values according to formula (3) in Yaakub et al; the offset of 1000 for pseudo-HUs is removed prior to entering the formula. 
+
+    ```
+    ρ_skull = hounsfield2density(HU+1000)
+    c_skull = 1.33 * ρ_skull + 167
+    α_skull = α_bone_min + (α_bone_max − α_bone_min) * (1 − (HU − HU_min) / (HU_max − HU_min))^0.5 [Mueller et al., 2017]
+    ```
+
+    - The k-Wave function hounsfield2density converts pseudo-HUs to density. Original pseudoCT values are initially shifted by 1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php). 
+    - Resulting density values are regularized to a minimum of the specified water density, and a maximum density of 2100 kg/m3. 
+    - The sound speed c is calculated from density 𝜌 using the linear relationship: c = 1.33𝜌 + 167. This is identical to the [k-Plan estimation](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#evaluating-plans). Note that due to the density regularization, sound speed is implicitly regularized.
+    - The absorption coefficient 𝛼 is derived from HU values according to formula (3) in Yaakub et al., with `α_bone_min` = 4 and `α_bone_max` = 8.7. For both `carpino` and `yakuub` variants, 𝛼 is bounded based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
 
     *Reference:* Adapted from Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.
 
 - `yakuub` | Algorithm specified in Yaakub et al. (2023). <br>
 
-    - For both variants, 𝛼 is bounded based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power_true```for the skull tissue. 
+    ```
+    ρ_skull = ρ_water + (ρ_bone − ρ_water) * (HU − HU_min) / (HU_max − HU_min) [Marsac et al., 2017]
+    c_skull = c_water + (c_bone − c_water) * (ρ_skull − ρ_water) / (ρ_bone − ρ_water) [Marsac et al., 2017]
+    α_skull = α_bone_min + (α_bone_max − α_bone_min) * (1 − (HU − HU_min) / (HU_max − HU_min))^0.5 [Mueller et al., 2017]
+    ```
 
-    *Reference:* Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023).
+    *References:* 
+    - Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023). 
+    - Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017).
+    - Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).
 
 - `k-plan` | Algorithm described in Carpino et al. (2024) with more fixed skull tissue properties akin to k-Plan <br>
 
-    k-Plan fixes the absorption coeff. to `13.3` and power law to `1`. To allow more flexibility, this variant reads in the alpha power values specified for the respective bone segmentation (`trabecular` or `cortical`) from the current config. To replicate k-Plan's setup, `alpha_0 = 13.3` and `alpha_power_true = 1` should be specified in the config for all bone segmentations.
+    ```
+    ρ_skull = hounsfield2density(HU+1000)
+    c_skull = 1.33 * ρ_skull + 167
+    α_skull = alpha_0
+    ```
+
+    k-Plan fixes the absorption coeff. to `13.3` and power law to `1`. To allow more flexibility, this variant reads in the alpha power values specified for the respective bone segmentation (`trabecular` or `cortical`) from the current config. To replicate k-Plan's setup, specify `alpha_0 = 13.3` and `alpha_power_true = 1` in the configuration of all bone segmentations.
     
-    Heating will use the acoustic simulation initially, and then overwrite bone density (= `1850`) and sound speed (= `1.33 x 1850 + 166.7`) prior to running the heating simulation.
+    Heating simulations will initially run the acoustic simulation as specified above, and then overwrite bone density (= `1850`) and sound speed (= `1.33 x 1850 + 166.7`) prior to starting the heating simulation.
+
+    ```
+    ρ_skull = 1850
+    c_skull = 1.33 * ρ_skull + 167
+    α_skull = alpha_0
+    ```
 
 
