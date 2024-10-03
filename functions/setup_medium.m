@@ -171,6 +171,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 
                 h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
                 subplot(4,1,1); histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
+                title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
                 subplot(4,1,2); histogram(density(skull_idx)); xlabel("Density [kg/m3]")
                 % add lines for the fixed parameters
                 xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
@@ -181,10 +182,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 subplot(4,1,4); histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
                 xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
                 xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
-                suptitle(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
                 output_plot = fullfile(parameters.output_dir, 'debug', ...
-                    sprintf('sub-%03d_pCT_histograms_%s.png', ...
-                    subject_id, parameters.pseudoCT_variant));
+                    sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
                 saveas(h, output_plot, 'png')
 
                 clear skull_idx
