@@ -77,19 +77,16 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         alpha_min   = 4;
                         alpha_max   = 8.7;
                         offset_HU   = 1000;
-                        c_max       = 3100;     % max. speed of sound in skull (F. A. Duck, 2013.) [m/s]
+%                         c_max       = 3100;     % max. speed of sound in skull (F. A. Duck, 2013.) [m/s]
                         rho_max     = 2100;     % max. density in skull [kg/m3]
-
-                        % Finds maximum and minimum values
-                        HU_min = min(pseudoCT(:));
-                        HU_max = max(pseudoCT(:));
 
                         % Preprocess CT values
                         % Offset CT values to use housfield2density
-                        pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
-                        % replace negative values with 1 [JQK: regularize via minimum a la Yaakub?]
-                        % note: this does not account for the offset, but perhaps this is desired
-                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),1);
+                        % (housfield2density assumes that softtissue peak = 1000)
+                        pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU - 1;
+                        % set a minimum of rescaled values at 300 (~ lung)
+                        % see http://www.k-wave.org/documentation/hounsfield2density.php
+                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),300);
                                         
                         % estimate density
                         density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
@@ -100,13 +97,19 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                                         
                         % estimate sound speed
                         sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
-                        % regularize minimum sound speed to water
-                        sound_speed(skull_idx) = max(sound_speed(skull_idx),medium.water.sound_speed);
-                        % regularize maximum sound speed to c_max
-                        sound_speed(skull_idx) = min(sound_speed(skull_idx),c_max);
+%                         % note: the following regularization should not be
+%                         % necessary as it is already constrained by density
+%                         % regularize minimum sound speed to water
+%                         sound_speed(skull_idx) = max(sound_speed(skull_idx),medium.water.sound_speed);
+%                         % regularize maximum sound speed to c_max
+%                         sound_speed(skull_idx) = min(sound_speed(skull_idx),c_max);
                                         
                         % remove initial offset
                         pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
+                        
+                        % Finds maximum and minimum values
+                        HU_min = min(pseudoCT(skull_idx));
+                        HU_max = max(pseudoCT(skull_idx));
 
                     case 'yaakub'
                         % see https://github.com/sitiny/BRIC_TUS_Simulation_Tools/blob/main/tussim_skull_3D.m
@@ -151,16 +154,36 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 % for k-plan, use fixed attenuation
                 if strcmp(pCT_variant, 'k-plan')
                     kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-                    kPlan_alpha0 = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+                    kPlan_alpha_power = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     % Note that we allow different values to be specified in the config.
                     % If replication of k-Wave is the goal, the above values should be specified.
-                    if medium.(label_name).alpha_0_true ~= kPlan_alpha0 || ...
-                        medium.(label_name).alpha_power_true ~= kPlan_alpha
+                    if medium.(label_name).alpha_0_true ~= kPlan_alpha || ...
+                        medium.(label_name).alpha_power_true ~= kPlan_alpha_power
                         warning('Specified attenuation varies from k-Plan setup.')
                     end
-                    alpha_pseudoCT(skull_idx) = medium.(label_name).alpha_power_true;
                     alpha_0_true(skull_idx) = medium.(label_name).alpha_0_true;
+                    alpha_power_true(skull_idx) = medium.(label_name).alpha_power_true;
                 end
+                
+                % save plots for debugging
+                
+                h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
+                subplot(4,1,1); histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
+                subplot(4,1,2); histogram(density(skull_idx)); xlabel("Density [kg/m3]")
+                % add lines for the fixed parameters
+                xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
+                xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
+                subplot(4,1,3); histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
+                xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
+                xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
+                subplot(4,1,4); histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
+                xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
+                xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
+                suptitle(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
+                output_plot = fullfile(parameters.output_dir, 'debug', ...
+                    sprintf('sub-%03d_pCT_histograms_%s.png', ...
+                    subject_id, parameters.pseudoCT_variant));
+                saveas(h, output_plot, 'png')
 
                 clear skull_idx
             else
