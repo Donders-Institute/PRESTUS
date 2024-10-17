@@ -55,23 +55,58 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     
     % if not running on the donders_hpc, the job won't continue until the segmentation is completed manually
 	if (parameters.using_donders_hpc)
-  	qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
-      ['simnibs-', subj_id_string], ...
-          fullfile(log_dir, sprintf('%s_qsub_segment_output_$timestamp.log', subj_id_string)),...
-      fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
-          parameters.seg_path);
-		
-
-  	% execute simnibs call in segmentation directory
-		full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
-		
-	  % 3) submit segmentation job
-		fprintf('Running segmentation with a command \n%s\n', full_cmd)
-		[res, out] = system(full_cmd);
-		display(res);
-		display(out);
-		
-		fprintf('Now wait for the job with the id listed above to finish')
+        if strcmp(parameters.submit_medium, 'qsub')
+  	        qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
+            ['simnibs-', subj_id_string], ...
+              fullfile(log_dir, sprintf('%s_qsub_segment_output_$timestamp.log', subj_id_string)),...
+            fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
+              parameters.seg_path);
+		    
+    
+  	        % execute simnibs call in segmentation directory
+		    full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
+		    
+	      % 3) submit segmentation job
+		    fprintf('Running segmentation with a command \n%s\n', full_cmd)
+		    [res, out] = system(full_cmd);
+		    display(res);
+		    display(out);
+		    
+		    fprintf('Now wait for the job with the id listed above to finish')
+        elseif strcmp(parameters.submit_medium, 'slurm')
+            % Create a temporary SLURM batch script file
+            temp_slurm_file = tempname(log_dir);
+            job_name = ['simnibs-', subj_id_string];
+            fid = fopen([temp_slurm_file '.sh'], 'w+');
+            fprintf(fid, '#!/bin/bash\n');
+            fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
+            fprintf(fid, '#SBATCH --nodes=1\n');
+            fprintf(fid, '#SBATCH --ntasks=1\n');
+            fprintf(fid, '#SBATCH --mem=20G\n');
+            fprintf(fid, '#SBATCH --time=24:00:00\n');
+            fprintf(fid, '#SBATCH --output=%s\n', fullfile(log_dir, sprintf('%s_slurm_segment_output_%%j.log', subj_id_string)));
+            fprintf(fid, '#SBATCH --error=%s\n', fullfile(log_dir, sprintf('%s_slurm_segment_error_%%j.log', subj_id_string)));
+            fprintf(fid, '#SBATCH --chdir=%s\n', parameters.seg_path);
+            
+            % Add environment setup and the segmentation command
+            fprintf(fid, 'export PATH=%s:$PATH\n', parameters.simnibs_bin_path);
+            fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.ld_library_path);
+            fprintf(fid, '%s\n', segment_call);
+            fclose(fid);
+        
+            % Create the full command to submit the batch script
+            sbatch_call = sprintf('sbatch %s.sh', temp_slurm_file);
+        
+            % 4) Submit segmentation job
+            fprintf('Running segmentation with a command \n%s\n', sbatch_call);
+            [res, out] = system(sbatch_call);
+            display(res);
+		    display(out);
+		    
+		    fprintf('Now wait for the job with the id listed above to finish')
+        else
+            error('Submission medium %s is an unknown option.', parameters.submit_medium);
+        end
     else
 	    fprintf('To get segmented head files, you need to run the segmentation software with a command: \n%s\n The script will stop for now, rerun it when the segmentation has finished.', segment_call)
 	end    
