@@ -3,7 +3,11 @@ function parameters = load_parameters(varargin)
     
     if nargin == 1
         extra_config_file = varargin{1};
-        extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true);
+        if isstruct(extra_config_file)
+            extra_parameters = extra_config_file;
+        else
+            extra_parameters = yaml.loadFile(fullfile('configs',extra_config_file), "ConvertToArray", true); 
+        end        
         parameters = MergeStruct(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};

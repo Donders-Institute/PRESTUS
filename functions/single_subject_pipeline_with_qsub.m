@@ -1,7 +1,8 @@
-function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, memorylimit)
+function single_subject_pipeline_with_qsub(subject_id, parameters, wait_for_job, timelimit, memorylimit)
     arguments
         subject_id double
         parameters struct
+        wait_for_job logical = false % boolean for waiting for job to finish before continuing the code
         timelimit (1,1) double = 60*60*4 % time limit for a job in seconds (4 hours by default)
         memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
     end
@@ -51,7 +52,7 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
         parameters.qsub_job_prefix = 'PRESTUS';
     end
     job_name = [parameters.qsub_job_prefix '_' subj_id_string];
-    qsub_call = sprintf('qsub -N %s -l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=5.0,mem=%iGb,walltime=%i" -o %s -e %s -d %s', ...
+    qsub_call = sprintf('qsub -N %s -l "nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=8.0,mem=%iGb,walltime=%i" -o %s -e %s -d %s', ...
          job_name,...
          memorylimit, timelimit, ...
 		sprintf('%s_qsub_pipeline_output_$timestamp.log', subj_id_string),...
@@ -61,7 +62,71 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, timelimit, me
 	full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo ''%s'' | %s',  log_dir, matlab_cmd, qsub_call);
 	
 	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
-	[res, out] = system(full_cmd);
+	[status, out] = system(full_cmd);
     
-    fprintf('Job name: %s; job ID: %s', job_name, out)
+    job_id = strtrim(out);
+    fprintf('Job name: %s; job ID: %s\n', job_name, job_id)
+
+    if status == 0
+        disp('Job submitted successfully');
+        
+        % Polling for job status
+        job_completed = true;
+        if wait_for_job
+            disp('User has chosen to wait until job is finished...');
+            job_completed = false;
+        end
+
+        while ~job_completed
+            check_cmd = sprintf('qstat -f %s | grep job_state', job_id);
+            [status, out] = system(check_cmd);
+            
+            if status == 0
+                % Extract the job state (e.g., "job_state = R")
+                % Split the output at the '=' and trim to get the job state
+                parts = strsplit(out, '=');
+                if numel(parts) == 2
+                    job_state = strtrim(parts{2});
+                
+                    if job_state == 'R'  % Running
+                        disp('Job is still running...');
+                        pause(30); % Pause for n seconds before checking again
+                    elseif job_state == 'Q'  % Queued
+                        disp('Job is still queued...');
+                        pause(30); % Pause for n seconds before checking again
+                    elseif job_state == 'C'  % Completed
+                        disp('Job completed successfully.');
+                        job_completed = true;
+                    else
+                        disp(['Job status: ', job_state]);
+                        pause(30); % Pause for n seconds before checking again% Pause for n seconds before checking again
+                        % Additional states: 'E' (exiting), 'H' (held), etc.
+                    end
+                else
+                    disp('Failed to parse job state.');
+                end
+            else
+                disp('Failed to check job status.');
+                disp(out);
+
+                % Handle case where job might have completed and dropped from qstat
+                check_cmd = sprintf('qstat %s', job_id);
+                [status, out] = system(check_cmd);
+                if status ~= 0
+                    disp('Job is no longer listed in qstat. Assuming it completed.');
+                    job_completed = true;
+                else
+                    break;
+                end
+            end
+        end
+        
+    else
+        disp('Command failed to submit the job.');
+        disp(out); % Display the error message
+    end
+
+    % Continue with MATLAB script
+    disp('Continuing with the MATLAB script...');
+
 end
