@@ -11,7 +11,7 @@ addpath('functions')
 addpath(genpath('toolboxes'))
 
 % Load configuration file
-equip_param = yaml.loadFile('configs/config.yaml', 'ConvertToArray', true);
+equip_param = yaml.loadFile('acoustic_profiling/config.yaml', 'ConvertToArray', true);
 
 % Get the available combinations from the configuration file
 available_combos = fieldnames(equip_param.combos);
@@ -27,12 +27,13 @@ disp(available_combos)
 data_path = '\\ru.nl\WrkGrp\FUS_Researchers\';
 submit_medium = 'slurm'; % run scripts via 'matlab' (debugging) or via a job using 'slurm' (recommended) or 'qsub'
 
-combinations = {'IS_PCD15287_01001_IGT_128_ch_comb_10_ch'};
-focal_depths = {[55, 60, 65, 70]}; % [mm], every [] will be performed for same index combination
-desired_intensities = {[36]}; % [W/cm2], every [] will be performed for same index combination and for each foci in same index focal depth set []
+combinations = {'CTX_250_001_SC_203_035', 'CTX_250_009_SC_203_035', 'CTX_250_014_SC_203_035', 'CTX_250_026_SC_203_035', 'CTX_500_006_SC_203_035', 'CTX_500_026_SC_203_035',
+    'CTX_250_001_SC_105_010', 'CTX_250_009_SC_105_010', 'CTX_250_014_SC_105_010', 'CTX_250_026_SC_105_010', 'CTX_500_006_SC_105_010', 'CTX_500_026_SC_105_010'};
+focal_depths = {[], [], [], [], [], []}; % [mm], every [] will be performed for same index combination
+desired_intensities = {[30, 60], [30, 60], [30, 60], [30, 60], [30, 60], [30, 60]}; % [W/cm2], every [] will be performed for same index combination and for each foci in same index focal depth set []
 
 % Set location for output
-sim_param.output_location = '/home/neuromod/marcorn/Documents/julians_prestus/acoustic_profiling/results/Kenneth/';
+sim_param.output_location = '/home/neuromod/marcorn/Documents/acoustic_profiling/output/';
 sim_param.data_path = sim_param.output_location;
 
 %% Determine virtual parameters for chosen input parameters
@@ -84,6 +85,12 @@ for i = 1:size(combinations, 2)
     [~, filename, ext] = fileparts(combo.char_data_path);
     equipment_name = erase(filename, equip_param.gen.axial_prof_name);
     prestus_virtual_path = fullfile(prestus_dir, strcat(equip_param.gen.prestus_virt_name, equipment_name, ext));
+
+    % If no focal depths are chosen, perform the simulations for all
+    % available focal depths
+    if size(focal_depths{i}, 2) == 0
+        focal_depths{i} = available_foci;
+    end
 
     % Perform acoustic profiling for every focal depth listed specifically for each equipment combination 
     for j = 1:size(focal_depths{i}, 2)
