@@ -5,6 +5,10 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
         timelimit string = "04:00:00" % time limit for a job in seconds (4 hours by default)
         memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
     end
+
+    % Save that this parameter set is using slurm for further branching
+    parameters.submit_medium = 'slurm';
+
     if parameters.interactive
         warning('Processing is set to interactive mode, this is not supported when running jobs with qsub, switching off interactive mode.')
         parameters.interactive = 0;

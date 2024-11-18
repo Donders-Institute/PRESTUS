@@ -10,7 +10,7 @@ The examples folder contains some examples of how to run the pipeline, including
 
 When working on the DCCN cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
 
-Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed atomatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path*. Now you can start matlab R2022b.
+Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path*. Now you can start matlab R2022b.
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
 
