@@ -290,10 +290,6 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     saveas(h, output_plot_filename, 'png')
     close(h);
 
-    % save medium mask
-    segmented_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
-    niftiwrite(uint8(medium_masks), segmented_file  ,'Compressed', 1);
-    
     % plot the smoothed and unsmoothed skull segmentation with transducer and focus locations
     h = figure;
     imshowpair(plot_t1_with_transducer(segmented_image_cropped, voxel_size_mm, trans_pos_final, focus_pos_final, parameters),...
@@ -306,8 +302,5 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     saveas(h, output_plot_filename, 'png')
     close(h);
     
-    % save skull mask/pseudoCT
-    skull_mask_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_skull_final', parameters.subject_id));
-    niftiwrite(uint8(segmented_image_cropped), skull_mask_file ,'Compressed', 1);
 end
 

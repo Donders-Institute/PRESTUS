@@ -185,6 +185,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 output_plot = fullfile(parameters.output_dir, 'debug', ...
                     sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
                 saveas(h, output_plot, 'png')
+                close(h);
 
                 clear skull_idx
             else
