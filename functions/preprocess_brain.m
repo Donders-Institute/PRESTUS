@@ -304,8 +304,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         skull_mask_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_skull_final', parameters.subject_id));
         plotdata = single(tformarray(uint8(segmented_image_cropped), inv_final_transformation_matrix, ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        if ~isfile(segmented_file)
-            niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
+        if ~isfile(skull_mask_file)
+            niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
         end
         clear skull_mask_file plotdata orig_hdr;
 
