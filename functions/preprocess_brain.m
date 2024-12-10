@@ -287,6 +287,28 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
 
+        % save medium mask
+        orig_hdr = t1_header; % header is based on original T1w (always present)
+        orig_hdr.Datatype = 'single';
+        segmented_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
+        plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
+            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+        if ~isfile(segmented_file)
+            niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
+        end
+        clear segmented_file plotdata orig_hdr;
+
+        % save skull mask/pseudoCT
+        orig_hdr = t1_header; % header is based on original T1w (always present)
+        orig_hdr.Datatype = 'single';
+        skull_mask_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_skull_final', parameters.subject_id));
+        plotdata = single(tformarray(uint8(segmented_image_cropped), inv_final_transformation_matrix, ...
+            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+        if ~isfile(skull_mask_file)
+            niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
+        end
+        clear skull_mask_file plotdata orig_hdr;
+
         % Saves the output according to the naming convention set in the
         % beginning of this section
         save(filename_cropped_smoothed_skull_data, 'medium_masks', 'skull_edge', 'segmented_image_cropped', 'trans_pos_final', 'focus_pos_final', 'new_grid_size', 'crop_translation_matrix','final_transformation_matrix','inv_final_transformation_matrix')
