@@ -406,6 +406,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     output_plot = fullfile(parameters.output_dir,...
         sprintf('sub-%03d_%s_isppa%s.png', ...
         subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    set(h, 'InvertHardcopy', 'off'); % keep original colours
     saveas(h, output_plot, 'png')
     close(h);
 
@@ -414,7 +415,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
         disp('Starting heating simulations...')
         % Creates an output file to which output is written at a later stage
-        filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', ...
+            subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
         % Clear sensor mask
         sensor.mask = zeros(size(sensor.mask));
