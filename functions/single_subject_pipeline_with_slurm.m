@@ -95,22 +95,23 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
             check_cmd = sprintf('sacct -j %i -o State --noheader | tail -n 1', job_id);
             [status, out] = system(check_cmd);
             
+            n_sec = 20; % Pause for n seconds before checking again
             if status == 0
                 % Extract the job state (e.g., "RUNNING", "PENDING", "COMPLETED")
                 job_state = strtrim(out);
                 
                 if strcmp(job_state, 'RUNNING') == true
                     disp('Job is still running...');
-                    pause(30); % Pause for n seconds before checking again
+                    pause(n_sec); % Pause for n seconds before checking again
                 elseif strcmp(job_state, 'PENDING') == true
                     disp('Job is still queued...');
-                    pause(30); % Pause for n seconds before checking again
+                    pause(n_sec); % Pause for n seconds before checking again
                 elseif strcmp(job_state, 'COMPLETED') == true
                     disp('Job completed successfully.');
                     job_completed = true;
                 else
                     disp(['Job status: ', job_state]);
-                    pause(30); % Pause for n seconds before checking again
+                    pause(n_sec); % Pause for n seconds before checking again
                     % Additional states: "FAILED", "CANCELLED", etc.
                 end
             else
