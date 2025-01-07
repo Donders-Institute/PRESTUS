@@ -406,6 +406,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     output_plot = fullfile(parameters.output_dir,...
         sprintf('sub-%03d_%s_isppa%s.png', ...
         subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    set(h, 'InvertHardcopy', 'off'); % keep original colours
     saveas(h, output_plot, 'png')
     close(h);
 
@@ -414,13 +415,15 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
         disp('Starting heating simulations...')
         % Creates an output file to which output is written at a later stage
-        filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', ...
+            subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         
         % Clear sensor mask
         sensor.mask = zeros(size(sensor.mask));
         
         % Sets up parameters for the heating simulation and runs it
-        if confirm_overwriting(filename_heating_data, parameters) && (parameters.interactive == 0 || confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No')) 
+        if confirm_overwriting(filename_heating_data, parameters) && (parameters.interactive == 0 || ...
+            confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No')) 
             
             % Set sensor along the focal axis 
             heating_window_dims = ones(2,3);
@@ -436,6 +439,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
             % add starting temperature
             kwave_medium.temp_0 = temp_0;
+
+            % if k-plan pseudoCT setup is used, density and sound speed in bone are fixed for heating sims
+            % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+            if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
+                kwave_medium.density(medium_masks==skull_mask) = 1850;
+                kwave_medium.sound_speed(medium_masks==skull_mask) = ...
+                    1.33*kwave_medium.density(medium_masks==skull_mask)+167; 
+            end
 
             % For more documentation, see 'run_heating_simulations'
             [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, focal_planeCEM43]= ...
