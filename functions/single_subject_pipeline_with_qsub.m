@@ -85,6 +85,7 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, wait_for_job,
             check_cmd = sprintf('qstat -f %s | grep job_state', job_id);
             [status, out] = system(check_cmd);
             
+            n_sec = 20; % Pause for n seconds before checking again
             if status == 0
                 % Extract the job state (e.g., "job_state = R")
                 % Split the output at the '=' and trim to get the job state
@@ -94,16 +95,16 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, wait_for_job,
                 
                     if job_state == 'R'  % Running
                         disp('Job is still running...');
-                        pause(30); % Pause for n seconds before checking again
+                        pause(n_sec); % Pause for n seconds before checking again
                     elseif job_state == 'Q'  % Queued
                         disp('Job is still queued...');
-                        pause(30); % Pause for n seconds before checking again
+                        pause(n_sec); % Pause for n seconds before checking again
                     elseif job_state == 'C'  % Completed
                         disp('Job completed successfully.');
                         job_completed = true;
                     else
                         disp(['Job status: ', job_state]);
-                        pause(30); % Pause for n seconds before checking again% Pause for n seconds before checking again
+                        pause(n_sec); % Pause for n seconds before checking again% Pause for n seconds before checking again
                         % Additional states: 'E' (exiting), 'H' (held), etc.
                     end
                 else
