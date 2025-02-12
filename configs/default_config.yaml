@@ -97,7 +97,7 @@ grid_step_mm: 0.5  # [mm]
 # These only need to be set manually if the simulations are done for water only
 # Select the desired simulation grid size (number of points per dimension)
 default_grid_size: 144
-default_grid_dims: [144, 144, 256]
+default_grid_dims: [144, 144, 400]
 
 # Medium properties, references: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
 # Note: defined at 500 kHz, use with abundant caution, see https://github.com/Donders-Institute/PRESTUS/issues/40!
