@@ -1,5 +1,5 @@
 # Troubleshooting
-This document will contain fixes to any known issues. If you manage to find and solve an issue not listed here, please add it with an elaborate explanation.
+This document contains fixes to known usage issues. If you find and solve an issue not listed here, please add it with an elaborate explanation. If you stumble upon an error in the working of the pipeline, or have suggestions for improvement, please [open an issue on GitHub](https://github.com/Donders-Institute/PRESTUS/issues).
 
 ## Simulation errors
 - An error occurs where the script can't find the `makeBowl.m` function.
