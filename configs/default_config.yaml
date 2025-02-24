@@ -209,5 +209,6 @@ using_donders_hpc: 1
 segmentation_software: charm
 
 # An optional path to LD_LIBRARY used during SimNIBS installation
-# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
-#ld_library_path: /opt/gcc/7.2.0/lib64
+# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
+#torque: ld_library_path: /opt/gcc/7.2.0/lib64
+#slurm: ld_library_path: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
