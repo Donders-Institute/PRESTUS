@@ -60,14 +60,27 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     fid = fopen([temp_slurm_file '.sh'], 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
-    fprintf(fid, '#SBATCH --partition=gpu\n');
+    if isfield(parameters, 'hcp_partition') && ~isempty(parameters.hcp_partition)
+        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hcp_partition);
+    else
+        fprintf(fid, '#SBATCH --partition=gpu\n');
+    end
+    if isfield(parameters, 'hcp_gpu') && ~isempty(parameters.hcp_gpu)
+        fprintf(fid, '#SBATCH --gres=%s\n', parameters.hcp_gpu);
+    else
+        fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    end
     fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
+        fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
+    end
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', timelimit);
     fprintf(fid, '#SBATCH --output=%s\n', sprintf('%s_slurm_output_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --error=%s\n', sprintf('%s_slurm_error_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
-    fprintf(fid, 'module load matlab\n');
+    fprintf(fid, 'nvidia-smi\n');
+    fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file_name);
     fclose(fid);
 

@@ -78,3 +78,44 @@ vncmanager - 2
 8. PRESTUS scripts: use `**_slurm*`
 
 9. in `terminal` check `squeue`; for migrating other commands see [this documentation](https://hpc.dccn.nl/docs/cluster_howto/compute_slurm.html#migrating-from-torque-pbs-to-slurm)
+
+### Note on GPUs
+
+TUS simulations are accelerated by GPUs, but requesting GPUs can lead to longer wait times as the current concurrent GPU limit per user is 4. To reduce wait times, it is possible to run acoustic simulations first (to confirm targeting) because these require less RAM) and then run thermal simulations with the final protocol. Avoid blanket simulations (e.g., circling through all participants with all permutations) especially for thermal simulations.
+
+Given that PRESTUS is a MATLAB toolbox, it currently only supports *Nvidia GPUs*. When Nvidia GPUs are digitally partitioned, there appears to be an issue with identifying the assigned GPU in MATLAB R2024+. For SLURM jobs, MATLAB R2023b is currently deployed by default.
+
+The following settings can be used to specify the HPC GPU setup.
+
+| Field                           | Default | Explanation                  |
+|-------------------------------|-------------|-----------------------------|
+| parameters.hcp_gpu                   | "gpu:1"       | Specific GPUs could be requested here (e.g.,```"nvidia_a100-sxm4-40gb:1"```, but this is not recommended. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types.|
+| parameters.hcp_partition                   | "gpu"       | The Donders HCP has a ```gpu40g``` partition that should be used for the majority of thermal simulations.  It consists of nodes with GPU with vRAM > 40 GB.|
+| parameters.hpc_reservation                   | ""       | By default do not use a reserved cue.|
+
+#### Benchmark data Nvidia GPUs
+
+Below are (potentially unrepresentative) benchmark data for different Nvidia GPUs. These simulations were run on a 256 by 216 by 192mm grid, with minor varitions depending on transducer placement. 
+
+**Acoustic Simulations**
+
+| GPU                           | Memory Used | Duration                  | Notes                          |
+|-------------------------------|-------------|-----------------------------|--------------------------------|
+| A100 80 GB                   | 12 GB       | 14 mins                     | Slightly smaller grid size     |
+| A100 80 GB (partitioned in 2x40GB) | 12 GB       | 25 mins                     |                                |
+| A100 40 GB                   | 12 GB       | 19 mins                     |                                |
+| A16 16 GB                    | 12 GB       | 145 mins                    |                                |
+| P100 16 GB                   | 12 GB       | 43 mins                     | Compiled, ~ L40s              |
+| L40S 47 GB                   | 14 GB       | 28 mins                     | Compiled                      |
+
+---
+
+**Heating Simulations**
+
+| GPU                           | Memory Used    | Duration                 | Notes                          |
+|-------------------------------|----------------|-----------------------------|--------------------------------|
+| A100 80 GB                   | ?? GB          | ~12s/trial (400 trials: ~90 mins) | Slightly smaller grid size     |
+| A100 40 GB                   | ?? GB          | ~17s/trial (400 trials: ~115 mins) |                                |
+| A16 16 GB                    | Out of RAM     | ???                         |                                |
+| P100 16 GB                   | Out of RAM     | ???                         |                                |
+| L40S 47 GB                   | ?? GB          | ~4s/trial (400 trials: ~45 mins)   |                                |
