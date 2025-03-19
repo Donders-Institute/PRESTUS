@@ -289,7 +289,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % See 'run_simulations' for more documentation
     if parameters.run_acoustic_sims && confirm_overwriting(filename_sensor_data, parameters) && (parameters.interactive == 0 || confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
         sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
-        save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
+        if isfield(parameters, 'savemat') && parameters.savemat==0
+            disp("Not saving acoustic output matrices ...")
+        else
+            save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
+        end
     else
         disp('Skipping, the file already exists, loading it instead.')
         load(filename_sensor_data, 'sensor_data')
@@ -299,16 +303,16 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     disp('Processing the results of acoustic simulations...')
 
     % What is the highest pressure level for every gridpoint
-    data_max = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
-    max_pressure = max(data_max(:));
+    acoustic_pressure = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
+    max_pressure = max(acoustic_pressure(:));
 
     % Calculates the Isppa for every gridpoint
-    Isppa_map = data_max.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
+    acoustic_isppa = acoustic_pressure.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
     % Calculates the max Isppa
-    max_Isppa = max(Isppa_map(:));
+    max_Isppa = max(acoustic_isppa(:));
 
     % Calculates the Mechanical Index for every gridpoint
-    MI_map = (data_max/10^6)/sqrt((parameters.transducer.source_freq_hz/10^6));
+    acoustic_MI = (acoustic_pressure/10^6)/sqrt((parameters.transducer.source_freq_hz/10^6));
 
     % Creates the foundation for a mask before the exit plane to calculate max values outside of it
     comp_grid_size = size(sensor_data.p_max_all);
@@ -330,7 +334,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % Calculates the X, Y and Z coordinates of the max. intensity
-    [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = masked_max_3d(Isppa_map, after_exit_plane_mask);
+    [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = masked_max_3d(acoustic_isppa, after_exit_plane_mask);
     
     % Combines these coordinates into a point of max. intensity in the grid
     if parameters.n_sim_dims==3
@@ -345,50 +349,50 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm;
     distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*parameters.grid_step_mm;
     avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
-    avg_isppa_around_target = Isppa_map(...
+    avg_isppa_around_target = acoustic_isppa(...
         (focus_pos_final(1)-avg_radius):(focus_pos_final(1)+avg_radius),...
         (focus_pos_final(2)-avg_radius):(focus_pos_final(2)+avg_radius),...
         (focus_pos_final(3)-avg_radius):(focus_pos_final(3)+avg_radius));
     avg_isppa_around_target = mean(avg_isppa_around_target(:));
     
     % Reports the Isppa within the original stimulation target
-    isppa_at_target = Isppa_map(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
+    isppa_at_target = acoustic_isppa(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
     
     % Creates a logical skull mask and register skull_ids
     labels = fieldnames(parameters.layer_labels);
     skull_i = find(strcmp(labels, 'skull_cortical'));
     trabecular_i = find(strcmp(labels, 'skull_trabecular'));
     all_skull_ids = [skull_i, trabecular_i];
-    skull_mask = ismember(medium_masks,all_skull_ids);
+    mask_skull = ismember(medium_masks,all_skull_ids);
     brain_i = find(strcmp(labels, 'brain'));
-    brain_mask = ismember(medium_masks,brain_i);
+    mask_brain = ismember(medium_masks,brain_i);
     skin_i = find(strcmp(labels, 'skin'));
-    skin_mask = ismember(medium_masks,skin_i);
+    mask_skin = ismember(medium_masks,skin_i);
     
     % Overwrites the max Isppa by dividing it up into the max Isppa for
     % each layer in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(Isppa_map, brain_mask);
-        [min_Isppa_brain] = min(Isppa_map(brain_mask));
-        half_max = Isppa_map >= max_Isppa_brain/2 & brain_mask;
+        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(acoustic_isppa, mask_brain);
+        [min_Isppa_brain] = min(acoustic_isppa(mask_brain));
+        half_max = acoustic_isppa >= max_Isppa_brain/2 & mask_brain;
         half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
-        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(data_max, brain_mask);
-        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(MI_map, brain_mask);
+        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_pressure, mask_brain);
+        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_MI, mask_brain);
         
-        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(Isppa_map, skull_mask);
-        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(data_max, skull_mask);
-        [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(MI_map, skull_mask);
+        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(acoustic_isppa, mask_skull);
+        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_pressure, mask_skull);
+        [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_MI, mask_skull);
         
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(Isppa_map, skin_mask);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(data_max, skin_mask);
-        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(MI_map, skin_mask);
+        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(acoustic_isppa, mask_skin);
+        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_pressure, mask_skin);
+        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_MI, mask_skin);
 
         highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
         real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
 
         writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
     else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
-        max_Isppa = max(Isppa_map(:)); %  Does this step need to be included? already done at line 225.
+        max_Isppa = max(acoustic_isppa(:)); %  Does this step need to be included? already done at line 225.
         highlighted_pos = max_isppa_eplane_pos;
         writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
     end
@@ -398,10 +402,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     if parameters.n_sim_dims==3
         %options.isppa_color_range = [0.5, max_Isppa_brain];
         [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
-            Isppa_map, segmented_image_cropped, source_labels, parameters, ...
+            acoustic_isppa, segmented_image_cropped, source_labels, parameters, ...
             {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
     else
-        [~,~,h]=plot_isppa_over_image_2d(Isppa_map, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+        [~,~,h]=plot_isppa_over_image_2d(acoustic_isppa, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
     end
     output_plot = fullfile(parameters.output_dir,...
         sprintf('sub-%03d_%s_isppa%s.png', ...
@@ -443,32 +447,30 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             % if k-plan pseudoCT setup is used, density and sound speed in bone are fixed for heating sims
             % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
             if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
-                kwave_medium.density(medium_masks==skull_mask) = 1850;
-                kwave_medium.sound_speed(medium_masks==skull_mask) = ...
-                    1.33*kwave_medium.density(medium_masks==skull_mask)+167; 
+                kwave_medium.density(medium_masks==mask_skull) = 1850;
+                kwave_medium.sound_speed(medium_masks==mask_skull) = ...
+                    1.33*kwave_medium.density(medium_masks==mask_skull)+167; 
             end
 
             % For more documentation, see 'run_heating_simulations'
-            [kwaveDiffusion, time_status_seq, maxT, focal_planeT, maxCEM43, focal_planeCEM43]= ...
+            [kwaveDiffusion, time_status_seq, heating_maxT, heating_focal_planeT, heating_CEM43, focal_planeCEM43]= ...
                 run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
             
             % apply gather in case variables are GPU arrays
-            maxT = gather(maxT);
-            focal_planeT = gather(focal_planeT);
-            maxCEM43 = gather(maxCEM43);
+            heating_maxT = gather(heating_maxT);
+            heating_focal_planeT = gather(heating_focal_planeT);
+            heating_CEM43 = gather(heating_CEM43);
             focal_planeCEM43 = gather(focal_planeCEM43);
 
-            save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
-                'heating_window_dims','sensor','maxT','focal_planeT','maxCEM43','focal_planeCEM43','-v7.3');
-
+            if isfield(parameters, 'savemat') && parameters.savemat==1
+                disp("Not saving heating output matrices ...")
+            else
+                save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
+                    'heating_window_dims','sensor','heating_maxT','heating_focal_planeT','heating_CEM43','focal_planeCEM43','-v7.3');
+            end
         else 
             disp('Skipping, the file already exists, loading it instead.')
             load(filename_heating_data);
-        end
-
-        % variable may have been saved under a different name in the past (backcomp)
-        if exist('CEM43')
-            focal_planeCEM43=CEM43;
         end
 
         % Sets up an empty medium mask if non is specified
@@ -478,25 +480,21 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         % Creates an output table for temperature readings
         output_table = readtable(output_pressure_file);
-        
-        % convert GPU data 
-        maxT = gather(maxT);
-        CEM43 = gather(maxCEM43);
 
-        output_table.maxT = max(maxT, [], 'all');
-        output_table.maxCEM43 = max(CEM43, [], 'all');
+        output_table.maxT = max(heating_maxT, [], 'all');
+        output_table.maxCEM43 = max(heating_CEM43, [], 'all');
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
         if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            output_table.maxT_brain = masked_max_3d(maxT, brain_mask);
-            output_table.maxT_skull = masked_max_3d(maxT, skull_mask); 
-            output_table.maxT_skin = masked_max_3d(maxT, skin_mask);
-            output_table.riseT_brain = masked_max_3d(maxT, brain_mask)-parameters.thermal.temp_0.brain;
-            output_table.riseT_skull = masked_max_3d(maxT, skull_mask)-parameters.thermal.temp_0.skull; 
-            output_table.riseT_skin = masked_max_3d(maxT, skin_mask)-parameters.thermal.temp_0.skin;
-            output_table.CEM43_brain = masked_max_3d(CEM43, brain_mask);
-            output_table.CEM43_skull = masked_max_3d(CEM43, skull_mask); 
-            output_table.CEM43_skin = masked_max_3d(CEM43, skin_mask);
+            output_table.maxT_brain = masked_max_3d(heating_maxT, mask_brain);
+            output_table.maxT_skull = masked_max_3d(heating_maxT, mask_skull); 
+            output_table.maxT_skin = masked_max_3d(heating_maxT, mask_skin);
+            output_table.riseT_brain = masked_max_3d(heating_maxT, mask_brain)-parameters.thermal.temp_0.brain;
+            output_table.riseT_skull = masked_max_3d(heating_maxT, mask_skull)-parameters.thermal.temp_0.skull; 
+            output_table.riseT_skin = masked_max_3d(heating_maxT, mask_skin)-parameters.thermal.temp_0.skin;
+            output_table.CEM43_brain = masked_max_3d(heating_CEM43, mask_brain);
+            output_table.CEM43_skull = masked_max_3d(heating_CEM43, mask_skull); 
+            output_table.CEM43_skin = masked_max_3d(heating_CEM43, mask_skin);
         end
         writetable(output_table, output_pressure_file);
 
@@ -504,7 +502,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         [~, source_labels] = transducer_setup(parameters.transducer, trans_pos_final, focus_pos_final, ...
                                                     size(segmented_image_cropped), t1_header.PixelDimensions(1));
         % Creates a line graph and a video of the heating effects
-        plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, focal_planeCEM43);
+        plot_heating_sims(heating_focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, focal_planeCEM43);
                 
         % Plots the maximum temperature in the segmented brain
         if output_table.maxT < 38
@@ -513,9 +511,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             temp_color_range = [37, output_table.maxT];
         end
 
+        clear output_table;
+
         % plot ISPPA superimposed on segmentation
         [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
-            maxT, segmented_image_cropped, source_labels, parameters, ...
+            heating_maxT, segmented_image_cropped, source_labels, parameters, ...
             {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, ...
             highlighted_pos, 'isppa_color_range', temp_color_range );
         
@@ -541,19 +541,19 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 subject_id, data_type, parameters.results_filename_affix));
 
             if strcmp(data_type, "isppa")
-                data = single(Isppa_map);
+                data = single(acoustic_isppa);
             elseif strcmp(data_type, "MI")
-                data = single(MI_map);
+                data = single(acoustic_MI);
             elseif strcmp(data_type, "pressure")
-                data = single(data_max);
+                data = single(acoustic_pressure);
             elseif strcmp(data_type, "medium_masks")
                 data = medium_masks;
             elseif strcmp(data_type, "heating")
-                data = single(maxT);
+                data = single(heating_maxT);
             elseif strcmp(data_type, "heatrise")
-                data = single(maxT-temp_0);
+                data = single(heating_maxT-temp_0);
             elseif strcmp(data_type, "CEM43")
-                data = single(CEM43);
+                data = single(heating_CEM43);
             end
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
@@ -614,8 +614,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             elseif strcmp(parameters.segmentation_software, 'charm')
                 convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters, 'interpolation_order', 0);
             end
-        
         end
+
+        % cleanup to reduce RAM load
+        clear data acoustic_* heating_* mask_* temp_0
         
         % Since charm does not transform the T1 into MNI space, one is manually created here
         if strcmp(parameters.segmentation_software, 'charm')
