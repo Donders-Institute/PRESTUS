@@ -80,14 +80,21 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
 %                         c_max       = 3100;     % max. speed of sound in skull (F. A. Duck, 2013.) [m/s]
                         rho_max     = 2100;     % max. density in skull [kg/m3]
 
+                        % Finds maximum and minimum values
+%                         HU_min = min(pseudoCT(skull_idx));
+%                         HU_max = max(pseudoCT(skull_idx));
+
+                        HU_min = 300;	  % minimum HU considered as skull
+                        HU_max = 2000;	  % maximum skull HU for regularization
+
                         % Preprocess CT values
                         % Offset CT values to use housfield2density
-                        % (housfield2density assumes that softtissue peak = 1000)
-                        pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU - 1;
-                        % set a minimum of rescaled values at 300 (~ lung)
-                        % see http://www.k-wave.org/documentation/hounsfield2density.php
-                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),300);
-                                        
+                        %pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
+                        % replace negative values with HU_min
+                        % note: this does not account for the offset, but perhaps this is desired
+                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),HU_min);
+                        pseudoCT(skull_idx) = min(pseudoCT(skull_idx),HU_max);
+
                         % estimate density
                         density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
                         % regularize minimum density to water density
