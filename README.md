@@ -1,6 +1,8 @@
-# PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation package
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15095860.svg)](https://doi.org/10.5281/zenodo.15095860)
 
-PRESTUS provides a set of functions for ultrasonic simulations including brain preprocessing, extracting data from Localite neuronavigation files, and more. 
+# PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
+
+PRESTUS is an open-source toolbox that facilitates imaging-informed TUS simulations. PRESTUS provides an integrated solution for defining relevant tissue parameters based on personalized MR or CT images, and using them to run  acoustic and heating simulations (with HCP support), and summarizing outputs in standard template space. These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting.
 
 The examples folder contains some examples of how to run the pipeline, including a tutorial.
 
@@ -51,16 +53,19 @@ You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/buil
 
 Example data: We are currently working on a solution to make the example dataset available for users outside the DCCN.
 
-# Authorship
+# Reference
 
-The initial version was developed by Andrey Chetverikov (website: http://andreychetverikov.org, GitLab: @A.Chetverikov, GitHub: https://github.com/achetverikov).
+Chetverikov, A., Kosciessa, J. Q., van der Zee, K., & Verhagen, L. (2024). PRESTUS (0.3.0). Zenodo. https://doi.org/10.5281/zenodo.15095861
 
 # Contributors
 
-- Kenneth van der Zee (GitLab: @kenneth.vanderzee, GitHub: https://github.com/KTZ228)
-- Julian Kosciessa (GitLab: @julian-kosciessa, GitHub: https://github.com/jkosciessa)
-- Matthias Ekman (GitLab: @m.ekman, GitHub: https://github.com/mekman)
-- Eleonora Carpino (GitLab: @eleonora.carpino, GitHub: https://github.com/eleonoracarpino)
+- Andrey Chetverikov (@achetverikov)
+- Julian Kosciessa (@jkosciessa)
+- Kenneth van der Zee (@KTZ228)
+- Margely Cornelissen (@MaCuinea)
+- Matthias Ekman (@mekman)
+- Eleonora Carpino (@eleonoracarpino)
+- Martin Wimmers (@sirmrmarty)
 
 # License
 
