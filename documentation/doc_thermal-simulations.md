@@ -1,9 +1,8 @@
 # Tips on running the thermal simulations
 
-- The thermal simulations themselves are based on the output of the acoustic simulations.
-- So running the thermal simulations without any acoustic output to base it on is not an option.
+Thermal simulations themselves are dependent on the output of the acoustic simulations. As such, running thermal simulations without first running acoustic simulations is not an option.
 
-Before feeding in parameters for the heating simulations it is important to note that these simulations don't model the individual pulses and their pulse-repetition frequencies (PRF) but concatenate the pulses over a trail into one block of stimulation and one block without.
+**Note**: some of the setup options below may not be up to date.
 
 # Examples
 
@@ -11,9 +10,13 @@ Before feeding in parameters for the heating simulations it is important to note
 
 Let's take a pulse-repetition frequency of 5Hz, a stimulation duration (`stim_duration` in a config file) of 1s, an inter-trial-interval of 15s (`iti`), 30 trials (`n_trials`) and a duty cycle of 30% (`duty_cycle`, 0.3).
 
-When running the actual stimulation, these are the parameters of the stimulation sequence the transducer will produce: - A pulse-repetition frequency of 5Hz will result in 5 pulse repetition periods of 200ms (1s / 5Hz). - Within each pulse repetition period, the pulse parameters are determined by the duty cycle (0.3), the transducer will be 'on' for 60ms (0.3 \* 200ms) of stimulation, and 'off' for 140ms (0.7 \* 200ms) without stimulation. - Stimulation will occur 5 times (5 pulse repetition periods) within your stimulation duration of 1s. - After this, no stimulation will be administered for 14s. - This cycle will be repeated 30 times.
+When running the actual stimulation, these are the parameters of the stimulation sequence the transducer will produce: 
+- A pulse-repetition frequency of 5Hz will result in 5 pulse repetition periods of 200ms (1s / 5Hz). 
+- Within each pulse repetition period, the pulse parameters are determined by the duty cycle (0.3), the transducer will be 'on' for 60ms (0.3 \* 200ms) of stimulation, and 'off' for 140ms (0.7 \* 200ms) without stimulation. 
+- Stimulation will occur 5 times (5 pulse repetition periods) within your stimulation duration of 1s. - After this, no stimulation will be administered for 14s. 
+- This cycle will be repeated 30 times.
 
-For the simulations, the number of recorded temperature readings is reduced to limit the computational load. This in an area where a compromise in temporal resolution can be made since the difference between having 10 or 100 cooling periods in a second (for example) is negligible for our application. Since the temperature is already recorded during every `on_off_repetition` cycle, the duty cycle will not be taken into account as well. So instead, all pulse repetition periods within a `stim_duration` are combined into a 300ms period of stimulation (60ms \* 5Hz) and 700ms without stimulation (140ms \* 5Hz) within each trial. This is why the pulse-repetition frequency does not have to be included in the thermal parameters.
+It is important to note that these simulations don't model the individual pulses and their pulse-repetition frequencies (PRF) but concatenate the pulses over a trial into one block of stimulation and one block without. For the simulations, the number of recorded temperature readings is reduced to limit the computational load. This in an area where a compromise in temporal resolution can be made since the difference between having 10 or 100 cooling periods in a second (for example) is negligible for our application. Since the temperature is already recorded during every `on_off_repetition` cycle, the duty cycle will not be taken into account as well. So instead, all pulse repetition periods within a `stim_duration` are combined into a 300ms period of stimulation (60ms \* 5Hz) and 700ms without stimulation (140ms \* 5Hz) within each trial. This is why the pulse-repetition frequency does not have to be included in the thermal parameters.
 
 - `duty_cycle` = 0.3
 - `stim_duration` = 1
@@ -23,18 +26,31 @@ For the simulations, the number of recorded temperature readings is reduced to l
 
 ## Offline study
 
-For this, you would use a continuous stimulation protocol that should be simulated as a single trial. Let's say you want to simulate an offline protocol with a duty cycle of 30% (`duty_cycle`, 0.3) and a total stimulation duration of 120s (`stim_duration`). You would use the following parameters:
+For a continuous pulse protocol (e.g., commonly used to produce offline effects), the default option is to model each pulse train individually. 
 
-- `duty_cycle` = 0.3
-- `stim_duration` = 120
+**TO DO**: check parameters
+
+- `n_trials`: 400 # number of trials to simulate
+- `stim_duration`: 0.2 # [s] stimulation duration within a trial
+- `duty_cycle`: 0.2 # share of the stimulation duration 
+- `iti`: 0.2 # interval from the start of one trial to the start of another [s]
+- `on_off_step_duration`: 0.2 # duration of the on+off cycle
+- `stim_duration`: 0.2 # [s] stimulation duration within a trial  
+- `sim_time_steps`: 0.04 # [s] simulation time steps during the stimulation period
+- `post_stim_time_step_dur`: 0 # post-stimulation (inter-trial) steps
+- `equal_steps`: 0 # if 0, it is computed based on the sim_time_steps * n_steps
+- `continuous_protocol`: 1
+
+Note that you may also specify a version of your protocol that neglects the fine-grained heating dynamics between each pulse, as cooling effects during the off-cycle are limited. Here, you specify the protocol via a single virtual trial that assumes concatenated stim-on followed by concatenated stim-off. For example, for a protocol with a duty cycle of 20% (`duty_cycle`, 0.2) and a total stimulation duration of 80s (`stim_duration`), you can use the following parameters:
+
+- `duty_cycle` = 0.2
+- `stim_duration` = 80
 - `n_trials` = 1
 - `continuous_stimulation` = 1
 
-\*Again, the PRF is not taken into account since the cooling effects between these cycles are limited.
-
 # Parameters explained
 
-## Parameters that have to be changed for each experiment
+**Parameters that have to be changed for each experiment**
 
 - `duty_cycle` has to be a value between 0 and 1, and represents the percentage of time within a the trial during which stimulation is administered.
 - `iti` is the inter-trial-interval given in seconds. Should always be higher than the `stim_duration` since `iti - stim_duration = post_stim_period`
