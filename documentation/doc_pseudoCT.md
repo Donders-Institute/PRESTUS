@@ -1,14 +1,18 @@
 # PseudoCT
 
 PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. 
-This is currently only implemented for layered setups.
+This is currently only supported for layered setups.
+
+> [!WARNING]
+> (pseudo-)HU mapping is currently a beta feature in active development.
+
 
 ### Creating a pseudoCT from UTE scans
 
 1) Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2) as inputs. 
     - You can either use the SimNIBS GUI or PRESTUS (**default**).
 2) Run in bash: `create_pseudoCT.sh`.
-    - functions/create_pseudoCT.sh calls the MATLAB function find_soft_tissue_peak
+    - functions/create_pseudoCT.sh calls the MATLAB function pct_soft_tissue_peak
 
 The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
 
@@ -35,13 +39,22 @@ The following steps are used to create the pseudoCT:
 - (Identify soft tissue peak intensity value)
 - Normalization: Divide by soft tissue peak value, i.e., normalised UTE intensity = 1
 - Linear mapping: image intensities -> Hounsfield units (HU)
-    - Skull *(mask defined as SimNibs tissue layers 7+8)*: -2194 UTE + 2236
-        - This is motivated as follows (Carpino et al., 2023): *"The interface between cortical and trabecular bone, identified at 0.7 normalised UTE intensity, is mapped to 700 HU (Lim Fat et al., 2012)."*
-    - Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2016)
-    - Air: 1000 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
+    - Skull *(mask defined as SimNibs tissue layers 7+8)*: multiple mapping variants are available
+        - "miscouridou" | pHU = −2085 UTE + 2329
+        - "carpino" | pHU = -2194 UTE + 2236
+        - "wiesinger" | pHU = -2000 (UTE-1) + 42
+        - "treeby" | pHU = -2929.6 UTE + 3247.9
+        - "kosciessa" | individualized based on pHU_trabecular=300 and pHU_trabecular_cortical = 700
+    - Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
+    - Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
 - Thresholding/smoothing across various tissue masks
     - Gaussian smoothing kernel (3x3x3 voxels) is applied at the skin-air and skull-air interfaces
-    - *currently not well documented*
+
+*References*
+- Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).
+- Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).
+- Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).
+  
 
 The following is an example script that you can use for a `create_pseudoCT.sh` call.
 
