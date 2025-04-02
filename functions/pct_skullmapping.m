@@ -45,44 +45,83 @@ function pct_skullmapping(subject_id, base_path)
     y3 = y3./max(y3);
 
     %% Step 1: Find maxima of both histograms
+
+    % scale by CTE to highlight trabecular peak
     [pks1, locs1] = findpeaks(y1, x);
-    [pks2, locs2] = findpeaks(y2, x);
+    [pks2, locs2] = findpeaks(x.*y2, x);
     
     % Identify global maxima for each histogram
-    [maxPeak1, idxMax1] = max(pks1);
-    [maxPeak2, idxMax2] = max(pks2);
+    [~, idxMax1] = max(pks1);
+    [~, idxMax2] = max(pks2);
     
     xMax1 = locs1(idxMax1); % x-coordinate of max for y1
     xMax2 = locs2(idxMax2); % x-coordinate of max for y2
     
     disp(['Maxima of y1 at x = ', num2str(xMax1)]);
     disp(['Maxima of y2 at x = ', num2str(xMax2)]);
+
+    %% Step 2: Calculate FWQM for y1 (x1, cortical bone)
+
+    % Find peak value and quarter-maximum value for y1
+    [~, peakIdxY1] = max(y1);
+    peakValueY1 = y1(peakIdxY1);
+    halfMaxY1 = peakValueY1 / 4;
     
-    %% Step 2: Restrict range to [xMax1, xMax2]
+    % Find indices where y1 crosses half-maximum on both sides of the peak
+    leftIdxY1 = find(y1(1:peakIdxY1) < halfMaxY1, 1, 'last');
+    rightIdxY1 = find(y1(peakIdxY1:end) < halfMaxY1, 1, 'first') + peakIdxY1 - 1;
+    
+    % Interpolate to find exact crossing points
+    xLeftY1 = interp1(y1(leftIdxY1:leftIdxY1+1), x(leftIdxY1:leftIdxY1+1), halfMaxY1);
+    xRightY1 = interp1(y1(rightIdxY1-1:rightIdxY1), x(rightIdxY1-1:rightIdxY1), halfMaxY1);
+    
+    fwhmWidthY1 = xRightY1 - xLeftY1; % Calculate FWHM width
+    
+    disp(['FWHM width for y1: ', num2str(fwhmWidthY1)]);
+    disp(['Left crossing point (xLeft): ', num2str(xLeftY1)]);
+    disp(['Right crossing point (xRight): ', num2str(xRightY1)]);
+
+    %% Step 3: Find crossover point (x1) within restricted range
+
+    % Restrict range to [xMax1, xMax2]
     rangeIdx = (x >= xMax1 & x <= xMax2); % Logical index for restricted range
     xRestricted = x(rangeIdx);
     y1Restricted = y1(rangeIdx);
     y2Restricted = y2(rangeIdx);
-    
-    %% Step 3: Find crossover point (x1) within restricted range
+
     diffHistRestricted = y1Restricted - y2Restricted; % Difference between histograms
-    crossIdx = find(diffHistRestricted(1:end-1) .* diffHistRestricted(2:end) < 0); % Detect sign change
-    
+    % Define the window size for consecutive samples
+    windowSize = 5;
+    % Preallocate array for moving averages
+    movingAvgDiff = zeros(length(diffHistRestricted) - windowSize + 1, 1);
+    % Compute moving average of differences over the specified window size
+    for i = 1:length(movingAvgDiff)
+        movingAvgDiff(i) = mean(diffHistRestricted(i:i+windowSize-1));
+    end
+    % Find the index of the minimum absolute moving average difference
+    [minDiff, minIdx] = min(abs(movingAvgDiff));
+    % Adjust index to account for window size
+    crossIdx = minIdx + floor(windowSize / 2);
+
+    % Display results
+    fprintf('Min. difference: %.2f\n', minDiff);
+    fprintf('Crossover index: %d\n', crossIdx);
+
     % Check if crossIdx is empty
     if isempty(crossIdx)
         warning('No crossover point found within the restricted range. Choosing the midway point between tissue peaks. Visual inspection recommended.');
         xCross = round(mean([xMax1, xMax2]));
     else
-        xCross = interp1(diffHistRestricted(crossIdx:crossIdx+1), ...
-                     xRestricted(crossIdx:crossIdx+1), 0);
+        xCross = x(crossIdx + find(rangeIdx, 1, 'first')-1);
     end
     
     disp(['Crossover point (x1): ', num2str(xCross)]);
     
-    %% Step 3: Calculate FWHM for y2 (x2)
-    % Find peak value and quarter-maximum value for y2
-    [peakValueY2, peakIdxY2] = max(y2);
-    halfMaxY2 = peakValueY2 / 2;
+    %% Step 3: Calculate FWHM for y2 (x2, trabecular bone)
+    % Find peak value and half-maximum value for y2
+    [~, peakIdxY2] = max(y2);
+    peakValueY2 = y2(peakIdxY2);
+    halfMaxY2 = peakValueY2 / 4;
     
     % Find indices where y2 crosses half-maximum on both sides of the peak
     leftIdxY2 = find(y2(1:peakIdxY2) < halfMaxY2, 1, 'last');
@@ -99,22 +138,20 @@ function pct_skullmapping(subject_id, base_path)
     disp(['Right crossing point (xRight): ', num2str(xRightY2)]);
     
     %% Assemble points for fitting
+
+    % Define the three points
+    X = [xLeftY1, xCross, xRightY2]; % X-coordinates (cortical lower FWHM; crossover; trabecular higher FWQM)
+    Y = [1900, 700, 300];            % Y-coordinates
     
-    X_CROSSOVER = xCross;
-    X_FWQM = xRightY2;
+    % Solve for least squares fit using polyfit (degree 1 for linear fit)
+    coefficients = polyfit(X, Y, 1);
     
-    % assumptions about HU values at key points
-    Y_CROSSOVER = 700;
-    Y_FWQM = 300;
-    
-    % Calculate slope (m)
-    m = (Y_FWQM - Y_CROSSOVER) / (X_FWQM - X_CROSSOVER);
-    
-    % Calculate intercept (c)
-    c = Y_CROSSOVER - m * X_CROSSOVER;
+    % Extract slope (m) and intercept (b)
+    m = coefficients(1); % Slope
+    b = coefficients(2); % Intercept
     
     % Display the linear equation
-    disp(['Linear equation: y = ', num2str(m), ' * x + ', num2str(c)]);
+    disp(['Least Squares Linear Fit: y = ', num2str(m), ' * x + ', num2str(b)]);
     
     %% Visualize the histograms with key points
 
@@ -123,7 +160,7 @@ function pct_skullmapping(subject_id, base_path)
         xx = linspace(0,0.1,2000);
         yy = 0.*xx-1000;
         xx1 = linspace(0.1,1,8000);
-        pCT_kosciessa = m.*xx1+c;
+        pCT_kosciessa = m.*xx1+b;
         % Calculate alternative mappings
         pCT_miscouridou = -2085 * xx1 + 2329;
         pCT_carpino = -2194 * xx1 + 2236;
@@ -149,15 +186,16 @@ function pct_skullmapping(subject_id, base_path)
             {'kosciessa'; 'miscouridou'; 'carpino'; 'wiesinger'; 'treeby'}, ...
             'location', 'NorthEast', 'orientation', 'vertical')
         legend('boxoff')
-        title(['pCT = ', num2str(round(m)), ' UTE + ', num2str(round(c))])
+        title(['pCT = ', num2str(round(m)), ' UTE + ', num2str(round(b))])
     subplot(3,1,3)
         hold on;
         p1 = plot(x,y1, 'LineWidth', 2, 'Color', 'k');
         p2 = plot(x,y2, 'LineWidth', 2, 'Color', 'r');
         p3 = plot(x,y3, 'LineWidth', 2, 'Color', [.5 .5 .5]);
         % Plot vertical lines for crossover and FWQM points
-        plot([X_CROSSOVER X_CROSSOVER], [0 1], 'k:', 'LineWidth', 1);
-        plot([X_FWQM X_FWQM], [0 1], 'k:', 'LineWidth', 1);
+        plot([xLeftY1 xLeftY1], [0 1], 'k:', 'LineWidth', 1);
+        plot([xCross xCross], [0 1], 'k:', 'LineWidth', 1);
+        plot([xRightY2 xRightY2], [0 1], 'k:', 'LineWidth', 1);
         xlabel('UTE'); ylabel({'Counts';'(max-norm.)'})
         legend([p1, p2, p3], {'cortical'; 'trabecular'; 'air'}, 'location', 'NorthEast')
         legend('boxoff')
@@ -168,10 +206,10 @@ function pct_skullmapping(subject_id, base_path)
     %% Export values to text
     
     % saves coefficients in txt file in m2m folder
-    fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(c)]);
+    fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(b)]);
 
     txt_file = fopen(fullfile(subject_folder, 'pseudoCT', 'pCT_skull_mapping.txt'), 'w');
-    fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(c));
+    fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(b));
     fclose(txt_file);
 
     exit;
