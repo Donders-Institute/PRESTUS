@@ -162,15 +162,15 @@ function pct_skullmapping(subject_id, base_path)
         legend([p1, p2, p3], {'cortical'; 'trabecular'; 'air'}, 'location', 'NorthEast')
         legend('boxoff')
 
-    figureName = ['pCT_mapping_skull'];
-    saveas(h, fullfile(subject_folder, 'pseudoCT_backup', figureName), 'png');
+    figureName = ['pCT_skull_mapping'];
+    saveas(h, fullfile(subject_folder, 'pseudoCT', figureName), 'png');
     
     %% Export values to text
     
     % saves coefficients in txt file in m2m folder
     fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(c)]);
 
-    txt_file = fopen(fullfile(subject_folder, 'pct_skull_mapping.txt'), 'w');
+    txt_file = fopen(fullfile(subject_folder, 'pseudoCT', 'pCT_skull_mapping.txt'), 'w');
     fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(c));
     fclose(txt_file);
 

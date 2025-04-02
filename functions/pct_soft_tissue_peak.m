@@ -25,7 +25,7 @@ function pct_soft_tissue_peak(subject_id, base_path)
     histogram(-log(ute_corr), 'BinLimits', [-15, 0])
     xlabel('-log(UTE)');
     figureName = ['pCT_histogram'];
-    saveas(h, fullfile(subject_folder, 'pseudoCT_backup', figureName), 'png');
+    saveas(h, fullfile(subject_folder, 'pseudoCT', figureName), 'png');
     
     % Extract the value of the soft tissue peak from the histogram
     % distribution of the logarithm of the soft tissue intensity values
@@ -37,7 +37,7 @@ function pct_soft_tissue_peak(subject_id, base_path)
     % Saved soft tissue peak value in previously created txt file in m2m folder
     peak = exp(peak_value);
     fprintf('The soft tissue peak is at the intensity %.2f \n', peak);
-    txt_file = fopen(fullfile(subject_folder, 'soft_tissue_value.txt'), 'w');
+    txt_file = fopen(fullfile(subject_folder, 'pseudoCT', 'pCT_soft_tissue_value.txt'), 'w');
     fprintf(txt_file, '%.2f\n', peak);
     fclose(txt_file);
 
