@@ -14,13 +14,13 @@ function create_pseudoCT()
     local path_matlab="$3"   # Path to MATLAB executable (e.g., "/opt/matlab/R2022b/bin/matlab")
     local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default)]
     local debug=${5:-"1"}    # Save intermediate images [yes: "1" (default); no: "0"]
-
-    local path_script=$(dirname "$(realpath "$0")")   # Path to MATLAB functions
+    local path_script="${6:-$(dirname "$(realpath "$0")")}"   # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
 
     # Display subject ID and SimNIBS path
-    echo "Subject ID: $sub_id"
-    echo "M2M Path: $path_simnibs"
-    echo "MATLAB version: $path_matlab"
+    echo "ID: $sub_id"
+    echo "SimNIBS path: $path_simnibs"
+    echo "MATLAB binary: $path_matlab"
+    echo "Function path: $path_script"
 
     # The first step is to run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
     # and instead of the T2 we use a PETRA UTE scan, so that the UTE will be registered to the T1
