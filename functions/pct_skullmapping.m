@@ -25,14 +25,10 @@ function pct_skullmapping(subject_id, base_path)
     x = []; y1 = []; y2 = [];
     x = [0:0.01:1.5];
     y1 = hist(ute_cortical, x);
-    y1 = y1./max(y1);
     y2 = hist(ute_trabecular, x);
-    y2 = y2./max(y2);
-
     y3 = hist(ute_air, x);
-    y3 = y3./max(y3);
 
-    % For both distributions, interpolate values between 0.95 and 1.05 
+    % For skull distributions, interpolate values between 0.95 and 1.05 
     % (exclude potential soft tissue partial volumes)
 
     interpPoints = [0.90:0.01:1.1];
@@ -41,7 +37,13 @@ function pct_skullmapping(subject_id, base_path)
     y2(idx_interp) = NaN;
     y1(idx_interp) = interp1(x, y1, interpPoints, 'spline');
     y2(idx_interp) = interp1(x, y2, interpPoints, 'spline');
-    
+
+    % normalize to maximum
+
+    y1 = y1./max(y1);
+    y2 = y2./max(y2);
+    y3 = y3./max(y3);
+
     %% Step 1: Find maxima of both histograms
     [pks1, locs1] = findpeaks(y1, x);
     [pks2, locs2] = findpeaks(y2, x);
@@ -65,13 +67,20 @@ function pct_skullmapping(subject_id, base_path)
     %% Step 3: Find crossover point (x1) within restricted range
     diffHistRestricted = y1Restricted - y2Restricted; % Difference between histograms
     crossIdx = find(diffHistRestricted(1:end-1) .* diffHistRestricted(2:end) < 0); % Detect sign change
-    xCross = interp1(diffHistRestricted(crossIdx:crossIdx+1), ...
+    
+    % Check if crossIdx is empty
+    if isempty(crossIdx)
+        warning('No crossover point found within the restricted range. Choosing the midway point between tissue peaks. Visual inspection recommended.');
+        xCross = round(mean([xMax1, xMax2]));
+    else
+        xCross = interp1(diffHistRestricted(crossIdx:crossIdx+1), ...
                      xRestricted(crossIdx:crossIdx+1), 0);
+    end
     
     disp(['Crossover point (x1): ', num2str(xCross)]);
     
     %% Step 3: Calculate FWHM for y2 (x2)
-    % Find peak value and half-maximum value for y2
+    % Find peak value and quarter-maximum value for y2
     [peakValueY2, peakIdxY2] = max(y2);
     halfMaxY2 = peakValueY2 / 2;
     
@@ -158,9 +167,9 @@ function pct_skullmapping(subject_id, base_path)
     
     %% Export values to text
     
+    % saves coefficients in txt file in m2m folder
     fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(c)]);
 
-    % save coefficients in txt file in m2m folder
     txt_file = fopen(fullfile(subject_folder, 'pct_skull_mapping.txt'), 'w');
     fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(c));
     fclose(txt_file);
