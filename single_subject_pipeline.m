@@ -65,9 +65,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        parameters.output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+        parameters.output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
     else 
-        parameters.output_dir = parameters.temp_output_dir;
+        parameters.output_dir = parameters.sim_path;
     end
 
     % specify dedicated subfolder for debugging contents
@@ -239,19 +239,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end    
 
     %% SETUP SOURCE
+    % =========================================================================
     % For more documentation, see 'setup_grid_source_sensor'
-    disp('Setting up kwave source...')
 
     if parameters.run_source_setup
+        disp('Setting up kwave source...')
+
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final);
         % check stability
         % If estimated time step is smaller than the time step based on
         % default CFL, the estimated time step is used to redefine
         % transducer and sensor. Note: the estimated time step doesn't 
-        % guarantee a stable simulation. If Nan numbers are acquired as
-        % a result, you may want to try a time step smaller than the
-        % estimated time step.	  
+        % guarantee a stable simulation. If NaN numbers result, a smaller
+        % time step than estimated may be optimal.	  
         disp('Check stability...')
         dt_stability_limit = checkStability(kgrid, kwave_medium);
         if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
@@ -261,162 +262,199 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
 
-    %% RUN ACOUSTIC SIMULATION
+    %% ACOUSTIC SIMULATION
     % =========================================================================
-    disp('Starting acoustic simulations...')
+    % See 'run_simulations' for more documentation
 
-    % Pathname for the input and output files (used only for non-interactive computations)
-    parameters.kwave_input_filename  = fullfile(parameters.output_dir, ...
-        sprintf('sub-%03d_%s_input%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    parameters.kwave_output_filename = fullfile(parameters.output_dir, ...
-        sprintf('sub-%03d_%s_output%s.h5', subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-
-    % Defines the edge of the simulation as the edge of the PML layer (see line 148)
-    kwave_input_args = struct('PMLInside', true, ...
-        'PMLSize', parameters.pml_size, ...
-        'PlotPML', true);
-
-    if contains(parameters.simulation_medium, 'skull')|| strcmp(parameters.simulation_medium, 'layered')
-        kwave_input_args.DisplayMask = skull_edge;
-    end
-
-    % Looks up sensor data for use in simulations
     filename_sensor_data = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_%s_results%s.mat', ...
         subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
-    % Run the acoustic simulations
-    % See 'run_simulations' for more documentation
-    if parameters.run_acoustic_sims && confirm_overwriting(filename_sensor_data, parameters) && (parameters.interactive == 0 || confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
-        sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
+    parameters.acoustics_available = 0;
+    if parameters.run_acoustic_sims && ...
+            confirm_overwriting(filename_sensor_data, parameters) && ...
+            (parameters.interactive == 0 || ...
+            confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
+
+        disp('Starting acoustic simulations...')
+
+        % Pathname for the input and output files (used only for non-interactive computations)
+        parameters.kwave_input_filename  = fullfile(parameters.output_dir, ...
+            sprintf('sub-%03d_%s_input%s.h5', subject_id, ...
+            parameters.simulation_medium, parameters.results_filename_affix));
+        parameters.kwave_output_filename = fullfile(parameters.output_dir, ...
+            sprintf('sub-%03d_%s_output%s.h5', subject_id, ...
+            parameters.simulation_medium, parameters.results_filename_affix));
+
+        % Defines the edge of the simulation as the edge of the PML layer (see line 148)
+        kwave_input_args = struct('PMLInside', true, ...
+            'PMLSize', parameters.pml_size, ...
+            'PlotPML', true);
+
+        if contains(parameters.simulation_medium, 'skull')|| ...
+                strcmp(parameters.simulation_medium, 'layered')
+            kwave_input_args.DisplayMask = skull_edge;
+        end
+
+        if parameters.run_source_setup==0
+            error('Source setup not requested. Not able to proceed with acoustic simulation.')
+        end
+
+        sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, ...
+            kwave_input_args, parameters);
         if isfield(parameters, 'savemat') && parameters.savemat==0
             disp("Not saving acoustic output matrices ...")
         else
-            save(filename_sensor_data, 'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', 'kwave_input_args', 'parameters' ,'-v7.3')
+            save(filename_sensor_data, 'sensor_data', 'kgrid', ...
+                'kwave_medium', 'source', 'sensor', 'kwave_input_args', ...
+                'parameters' ,'-v7.3')
         end
-    else
+        parameters.acoustics_available = 1;
+    elseif exist(filename_sensor_data, 'file')
         disp('Skipping, the file already exists, loading it instead.')
         load(filename_sensor_data, 'sensor_data')
-    end
-
-    %% Process results
-    disp('Processing the results of acoustic simulations...')
-
-    % What is the highest pressure level for every gridpoint
-    acoustic_pressure = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
-    max_pressure = max(acoustic_pressure(:));
-
-    % Calculates the Isppa for every gridpoint
-    acoustic_isppa = acoustic_pressure.^2./(2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
-    % Calculates the max Isppa
-    max_Isppa = max(acoustic_isppa(:));
-
-    % Calculates the Mechanical Index for every gridpoint
-    acoustic_MI = (acoustic_pressure/10^6)/sqrt((parameters.transducer.source_freq_hz/10^6));
-
-    % Creates the foundation for a mask before the exit plane to calculate max values outside of it
-    comp_grid_size = size(sensor_data.p_max_all);
-    after_exit_plane_mask = ones(comp_grid_size);
-    bowl_depth_grid = round((parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm);
-    % Places the exit plane mask in the grid, adjusted to the amount of dimensions
-    if parameters.n_sim_dims == 3
-        if trans_pos_final(3) > comp_grid_size(3)/2
-            after_exit_plane_mask(:,:,(trans_pos_final(parameters.n_sim_dims)-bowl_depth_grid):end) = 0;
-        else
-            after_exit_plane_mask(:,:,1:(trans_pos_final(parameters.n_sim_dims)+bowl_depth_grid)) = 0;
-        end
+        parameters.acoustics_available = 1;
     else
-        if trans_pos_final(2) > comp_grid_size(2)/2
-            after_exit_plane_mask(:,(trans_pos_final(parameters.n_sim_dims)-bowl_depth_grid):end) = 0;
-        else
-            after_exit_plane_mask(:,1:(trans_pos_final(parameters.n_sim_dims)+bowl_depth_grid)) = 0;
-        end
+        parameters.acoustics_available = 0;
     end
 
-    % Calculates the X, Y and Z coordinates of the max. intensity
-    [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = masked_max_3d(acoustic_isppa, after_exit_plane_mask);
-    
-    % Combines these coordinates into a point of max. intensity in the grid
-    if parameters.n_sim_dims==3
-        max_isppa_eplane_pos = [Ix_eplane, Iy_eplane, Iz_eplane];
-    else 
-        max_isppa_eplane_pos = [Ix_eplane, Iy_eplane];
-    end
-    disp('Final transducer, expected focus, and max ISPPA positions')
-
-    % Calculates the average Isppa within a circle around the target
-    [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
-    real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm;
-    distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*parameters.grid_step_mm;
-    avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
-    avg_isppa_around_target = acoustic_isppa(...
-        (focus_pos_final(1)-avg_radius):(focus_pos_final(1)+avg_radius),...
-        (focus_pos_final(2)-avg_radius):(focus_pos_final(2)+avg_radius),...
-        (focus_pos_final(3)-avg_radius):(focus_pos_final(3)+avg_radius));
-    avg_isppa_around_target = mean(avg_isppa_around_target(:));
-    
-    % Reports the Isppa within the original stimulation target
-    isppa_at_target = acoustic_isppa(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
-    
-    % Creates a logical skull mask and register skull_ids
-    labels = fieldnames(parameters.layer_labels);
-    skull_i = find(strcmp(labels, 'skull_cortical'));
-    trabecular_i = find(strcmp(labels, 'skull_trabecular'));
-    all_skull_ids = [skull_i, trabecular_i];
-    mask_skull = ismember(medium_masks,all_skull_ids);
-    brain_i = find(strcmp(labels, 'brain'));
-    mask_brain = ismember(medium_masks,brain_i);
-    skin_i = find(strcmp(labels, 'skin'));
-    mask_skin = ismember(medium_masks,skin_i);
-    
-    % Overwrites the max Isppa by dividing it up into the max Isppa for
-    % each layer in case a layered simulation_medium was selected
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(acoustic_isppa, mask_brain);
-        [min_Isppa_brain] = min(acoustic_isppa(mask_brain));
-        half_max = acoustic_isppa >= max_Isppa_brain/2 & mask_brain;
-        half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
-        [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_pressure, mask_brain);
-        [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_MI, mask_brain);
-        
-        [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(acoustic_isppa, mask_skull);
-        [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_pressure, mask_skull);
-        [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_MI, mask_skull);
-        
-        [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(acoustic_isppa, mask_skin);
-        [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_pressure, mask_skin);
-        [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_MI, mask_skin);
-
-        highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
-        real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
-
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
-    else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
-        max_Isppa = max(acoustic_isppa(:)); %  Does this step need to be included? already done at line 225.
-        highlighted_pos = max_isppa_eplane_pos;
-        writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
-    end
-
-    % Plots the Isppa on the segmented image
-    
-    if parameters.n_sim_dims==3
-        %options.isppa_color_range = [0.5, max_Isppa_brain];
-        [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
-            acoustic_isppa, segmented_image_cropped, source_labels, parameters, ...
-            {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
-    else
-        [~,~,h]=plot_isppa_over_image_2d(acoustic_isppa, segmented_image_cropped, source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
-    end
-    output_plot = fullfile(parameters.output_dir,...
-        sprintf('sub-%03d_%s_isppa%s.png', ...
-        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    set(h, 'InvertHardcopy', 'off'); % keep original colours
-    saveas(h, output_plot, 'png')
-    close(h);
-
-    %% RUN HEATING SIMULATIONS
+    %% PROCESS ACOUSTIC RESULTS
     % =========================================================================
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
+
+    if parameters.acoustics_available == 1
+        disp('Processing the results of acoustic simulations...')
+    
+        % What is the highest pressure level for every gridpoint
+        acoustic_pressure = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
+        max_pressure = max(acoustic_pressure(:));
+    
+        % Calculates the Isppa for every gridpoint
+        acoustic_isppa = acoustic_pressure.^2./...
+            (2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
+        % Calculates the max Isppa
+        max_Isppa = max(acoustic_isppa(:));
+    
+        % Calculates the Mechanical Index for every gridpoint
+        acoustic_MI = (acoustic_pressure/10^6)/...
+            sqrt((parameters.transducer.source_freq_hz/10^6));
+    
+        % Creates the foundation for a mask before the exit plane to calculate max values outside of it
+        comp_grid_size = size(sensor_data.p_max_all);
+        after_exit_plane_mask = ones(comp_grid_size);
+        bowl_depth_grid = round((parameters.transducer.curv_radius_mm-...
+            parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm);
+        % Places the exit plane mask in the grid, adjusted to the amount of dimensions
+        if parameters.n_sim_dims == 3
+            if trans_pos_final(3) > comp_grid_size(3)/2
+                after_exit_plane_mask(:,:,(trans_pos_final(parameters.n_sim_dims)-...
+                    bowl_depth_grid):end) = 0;
+            else
+                after_exit_plane_mask(:,:,1:(trans_pos_final(parameters.n_sim_dims)+...
+                    bowl_depth_grid)) = 0;
+            end
+        else
+            if trans_pos_final(2) > comp_grid_size(2)/2
+                after_exit_plane_mask(:,(trans_pos_final(parameters.n_sim_dims)-...
+                    bowl_depth_grid):end) = 0;
+            else
+                after_exit_plane_mask(:,1:(trans_pos_final(parameters.n_sim_dims)+...
+                    bowl_depth_grid)) = 0;
+            end
+        end
+    
+        % Calculates the X, Y and Z coordinates of the max. intensity
+        [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = ...
+            masked_max_3d(acoustic_isppa, after_exit_plane_mask);
+        
+        % Combines these coordinates into a point of max. intensity in the grid
+        if parameters.n_sim_dims==3
+            max_isppa_eplane_pos = [Ix_eplane, Iy_eplane, Iz_eplane];
+        else 
+            max_isppa_eplane_pos = [Ix_eplane, Iy_eplane];
+        end
+        disp('Final transducer, expected focus, and max ISPPA positions')
+    
+        % Calculates the average Isppa within a circle around the target
+        [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
+        real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*...
+            parameters.grid_step_mm;
+        distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*...
+            parameters.grid_step_mm;
+        avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
+        avg_isppa_around_target = acoustic_isppa(...
+            (focus_pos_final(1)-avg_radius):(focus_pos_final(1)+avg_radius),...
+            (focus_pos_final(2)-avg_radius):(focus_pos_final(2)+avg_radius),...
+            (focus_pos_final(3)-avg_radius):(focus_pos_final(3)+avg_radius));
+        avg_isppa_around_target = mean(avg_isppa_around_target(:));
+        
+        % Reports the Isppa within the original stimulation target
+        isppa_at_target = acoustic_isppa(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
+        
+        % Creates a logical skull mask and register skull_ids
+        labels = fieldnames(parameters.layer_labels);
+        skull_i = find(strcmp(labels, 'skull_cortical'));
+        trabecular_i = find(strcmp(labels, 'skull_trabecular'));
+        all_skull_ids = [skull_i, trabecular_i];
+        mask_skull = ismember(medium_masks,all_skull_ids);
+        brain_i = find(strcmp(labels, 'brain'));
+        mask_brain = ismember(medium_masks,brain_i);
+        skin_i = find(strcmp(labels, 'skin'));
+        mask_skin = ismember(medium_masks,skin_i);
+        
+        % Overwrites the max Isppa by dividing it up into the max Isppa for
+        % each layer in case a layered simulation_medium was selected
+        if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+            [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(acoustic_isppa, mask_brain);
+            [min_Isppa_brain] = min(acoustic_isppa(mask_brain));
+            half_max = acoustic_isppa >= max_Isppa_brain/2 & mask_brain;
+            half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
+            [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_pressure, mask_brain);
+            [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_MI, mask_brain);
+            
+            [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(acoustic_isppa, mask_skull);
+            [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_pressure, mask_skull);
+            [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_MI, mask_skull);
+            
+            [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(acoustic_isppa, mask_skin);
+            [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_pressure, mask_skin);
+            [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_MI, mask_skin);
+    
+            highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
+            real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
+    
+            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
+        else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
+            max_Isppa = max(acoustic_isppa(:)); %  Does this step need to be included? already done at line 225.
+            highlighted_pos = max_isppa_eplane_pos;
+            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
+        end
+    
+        % Plots the Isppa on the segmented image
+        
+        if parameters.n_sim_dims==3
+            %options.isppa_color_range = [0.5, max_Isppa_brain];
+            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+                acoustic_isppa, segmented_image_cropped, source_labels, parameters, ...
+                {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
+        else
+            [~,~,h]=plot_isppa_over_image_2d(acoustic_isppa, segmented_image_cropped, ...
+                source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+        end
+        output_plot = fullfile(parameters.output_dir,...
+            sprintf('sub-%03d_%s_isppa%s.png', ...
+            subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        set(h, 'InvertHardcopy', 'off'); % keep original colours
+        saveas(h, output_plot, 'png')
+        close(h);
+    else
+        disp('No acoustic simulation results available. Skipping analysis...')
+    end
+
+    %% HEATING SIMULATIONS
+    % =========================================================================
+
+    parameters.heating_available = 0;
+    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims && parameters.acoustics_available == 1
         disp('Starting heating simulations...')
         % Creates an output file to which output is written at a later stage
         filename_heating_data = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_res%s.mat', ...
@@ -468,12 +506,24 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
                     'heating_window_dims','sensor','heating_maxT','heating_focal_planeT','heating_CEM43','focal_planeCEM43','-v7.3');
             end
-        else 
+            parameters.heating_available = 1;
+        elseif exist(filename_heating_data, 'file')
             disp('Skipping, the file already exists, loading it instead.')
             load(filename_heating_data);
+            parameters.heating_available = 1;
+        else 
+            warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
+            parameters.heating_available = 0;
         end
+    end
 
-        % Sets up an empty medium mask if non is specified
+    %% PROCESS HEATING RESULTS
+    % ================================================================
+
+    if parameters.heating_available == 1
+        disp('Processing the results of heating simulations...')
+
+        % Sets up an empty medium mask if none is specified
         if isempty(medium_masks)
             medium_masks = zeros(parameters.grid_dims);
         end
@@ -524,13 +574,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         saveas(h, output_plot_filename, 'png')
         close(h);
+    else
+        disp('No heating simulation results available. Skipping analysis...')
     end
 
-    %% Plots the data on the original T1 image and in MNI space
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
+    %% CREATE NIFTI IMAGES
+    % ============================================================================
+    % plot various metrics on both the subject-space T1 image and in MNI space
 
-        data_types = ["isppa","MI","pressure","medium_masks"];
+    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+
+        data_types = "medium_masks";
+        if parameters.acoustics_available == 1 
+            data_types  = [data_types, "isppa","MI","pressure"];
+        end
         if  isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
             data_types  = [data_types, "heating", "heatrise", "CEM43"];
         end
@@ -583,6 +640,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
                                                             size(t1_image_orig), t1_header.PixelDimensions(1));
                 % Plots the Isppa over the untransformed image
+                backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
                 [~,~,~,~,~,~,~,h]=plot_isppa_over_image(data_backtransf, t1_image_orig, source_labels, ...
                     parameters, {'y', backtransf_coordinates(2,2)}, backtransf_coordinates(1,:), ...
                     backtransf_coordinates(2,:), backtransf_coordinates(3,:), ...
@@ -630,8 +688,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
     
-    %% Runs posthoc water simulations
+    %% Post-hoc acoustic simulations in water
+    % ============================================================================
     % To check sonication parameters of the transducer in free water
+
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
         new_parameters = parameters;
