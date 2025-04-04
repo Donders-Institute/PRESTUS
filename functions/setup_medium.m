@@ -54,9 +54,11 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         for label_i = 1:length(labels)
             label_name = labels{label_i};
             if strcmp(label_name, 'water')
-               continue % Loops to next label since the baseline medium is set to water anyways
+               continue % Loops to next label since the baseline medium is set to water
             end
-            if parameters.usepseudoCT == 1 && (strcmp(label_name, 'skull_cortical') || strcmp(label_name, 'skull_trabecular'))
+            if parameters.usepseudoCT == 1 && ...
+                    (strcmp(label_name, 'skull_cortical') || ...
+                    strcmp(label_name, 'skull_trabecular'))
                 skull_idx = find(medium_masks==label_i);
                 thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;                
                 specific_heat(skull_idx) = medium.(label_name).specific_heat_capacity;
@@ -79,16 +81,12 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         offset_HU   = 1000;
                         rho_max     = 2100;     % max. density in skull [kg/m3]
 
-                        HU_min = 300;	  % minimum HU considered as skull
-                        HU_max = 2000;	  % maximum HU considered as skull
-
                         % Preprocess pCT values
                         % Offset CT values to use housfield2density
-                        %pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
-                        % regularize skull pCT
-                        % note: this does not account for the offset (desired?)
-                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),HU_min);
-                        pseudoCT(skull_idx) = min(pseudoCT(skull_idx),HU_max);
+                        pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
+
+                        % set minimum to air tissue (pHU=-1000, pHU_scaled = 0)
+                        pseudoCT(skull_idx) = max(pseudoCT(skull_idx),0);
 
                         % estimate density
                         density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
@@ -137,6 +135,23 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         % estimate sound speed
                         sound_speed(skull_idx) = c_water + (c_skull - c_water) * ...
                             (density(skull_idx) - rho_water) / (rho_bone - rho_water);
+
+                    case "marquet"
+                        c_water = 1500;
+                        if strcmp(label_name, 'skull_cortical')
+                            c_skull = 3100;
+                        else
+                            c_skull = 2200;
+                        end
+                        rho_water = 1000;
+                        rho_bone = 2200;
+
+                        phi(skull_idx) = 1-(pseudoCT(skull_idx));
+                        density(skull_idx) = rho_water * phi(skull_idx) + ...
+                            rho_bone * (1-phi(skull_idx));
+                        sound_speed(skull_idx) = c_water * phi(skull_idx) + ...
+                            c_bone * (1-phi(skull_idx));
+
                     otherwise
                         error("Specified pCT variant is not supported.")
                 end
@@ -150,11 +165,12 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 alpha_0_true(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power_true);
 
                 % for k-plan, use fixed attenuation
-                if strcmp(pCT_variant, 'k-plan')
+                if strcmp(pCT_variant, {'k-plan', 'marquet'})
                     kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     kPlan_alpha_power = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     % Note that we allow different values to be specified in the config.
                     % If replication of k-Wave is the goal, the above values should be specified.
+                    % Throw a warning in the case of deviations.
                     if medium.(label_name).alpha_0_true ~= kPlan_alpha || ...
                         medium.(label_name).alpha_power_true ~= kPlan_alpha_power
                         warning('Specified attenuation varies from k-Plan setup.')
