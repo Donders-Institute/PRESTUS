@@ -637,6 +637,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             end
             if strcmp(data_type, "isppa")
                 % Creates a visual overlay of the transducer
+                backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
                 [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
                                                             size(t1_image_orig), t1_header.PixelDimensions(1));
                 % Plots the Isppa over the untransformed image
