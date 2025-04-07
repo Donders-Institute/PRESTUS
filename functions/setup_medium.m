@@ -139,9 +139,9 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                     case "marquet"
                         c_water = 1500;
                         if strcmp(label_name, 'skull_cortical')
-                            c_skull = 3100;
+                            c_bone = 3100;
                         else
-                            c_skull = 2200;
+                            c_bone = 2200;
                         end
                         rho_water = 1000;
                         rho_bone = 2200;
