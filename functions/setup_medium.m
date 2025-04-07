@@ -146,14 +146,14 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         rho_water = 1000;
                         rho_bone = 2200;
 
-                        phi(skull_idx) = 1-(pseudoCT(skull_idx));
+                        phi(skull_idx) = 1-(pseudoCT(skull_idx)/1000);
                         density(skull_idx) = rho_water * phi(skull_idx) + ...
                             rho_bone * (1-phi(skull_idx));
                         sound_speed(skull_idx) = c_water * phi(skull_idx) + ...
                             c_bone * (1-phi(skull_idx));
 
-                        % regularize sound speed to a minimum of 0
-                        sound_speed(skull_idx) = max(sound_speed(skull_idx),0);
+                        % regularize sound speed to a minimum of water
+                        sound_speed(skull_idx) = max(sound_speed(skull_idx),c_water);
 
                     otherwise
                         error("Specified pCT variant is not supported.")
