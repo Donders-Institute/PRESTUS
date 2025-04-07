@@ -17,6 +17,14 @@ function [x, y] = getArc(center, radius, angleStart, angleEnd, npoints)
 %   x          - [1xnpoints] array containing the x coordinates of points along the arc.
 %   y          - [1xnpoints] array containing the y coordinates of points along the arc.
 
+    arguments
+        center (1,2) double
+        radius (1,1) double
+        angleStart (1,1) double
+        angleEnd (1,1) double
+        npoints (1,1) int8 = 200
+    end
+
     % Generate angles uniformly between `angleStart` and `angleEnd`
     theta = linspace(angleStart, angleEnd, npoints);
 

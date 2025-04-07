@@ -588,7 +588,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         if parameters.acoustics_available == 1 
             data_types  = [data_types, "isppa","MI","pressure"];
         end
-        if  isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
+        if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
             data_types  = [data_types, "heating", "heatrise", "CEM43"];
         end
         for data_type = data_types

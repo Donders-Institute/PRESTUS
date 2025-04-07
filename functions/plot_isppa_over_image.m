@@ -91,41 +91,68 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
     slice_y = 1:size(Isppa_map,2);
     slice_z = 1:size(Isppa_map,3);
    
-    if strcmp(slice{1}, 'x')
+    if slice{1} == 'x'
         slice_x = slice{2};
-        focus_pos = focus_pos(2:3);
-        trans_pos = trans_pos(2:3);
+        if ~isempty(focus_pos)
+            focus_pos = focus_pos(2:3);
+        end
+        if ~isempty(trans_pos)
+            trans_pos = trans_pos(2:3);
+        end
         max_isppa_pos = max_isppa_pos(2:3);
-    elseif strcmp(slice{1}, 'y')
+    elseif slice{1} == 'y'
         slice_y = slice{2};
-        focus_pos = focus_pos([1,3]);
-        trans_pos = trans_pos([1,3]);
+        if ~isempty(focus_pos)
+            focus_pos = focus_pos([1,3]);
+        end
+        if ~isempty(trans_pos)
+            trans_pos = trans_pos([1,3]);
+        end
         max_isppa_pos = max_isppa_pos([1,3]);
-    elseif strcmp(slice{1}, 'z')
+    elseif slice{1} == 'z'
         slice_z = slice{2};
+        if ~isempty(focus_pos)
         focus_pos = focus_pos(1:2);
+        end
+        if ~isempty(trans_pos)
         trans_pos = trans_pos([1,2]);
+        end
         max_isppa_pos = max_isppa_pos([1,2]);
     else
-        error("Slice must be a cell array with 'x', 'y', or 'z' as first element and a number as second element");
+        error("slice must be a cell array with the first element of 'x','y', or 'z' and a second element a slice number")
     end
-
-    % Extract slices from input images and masks
-    bg_slice = squeeze(bg_image(slice_x,slice_y,slice_z));
     
-    % Normalize background image intensity values
-    if isempty(options.bg_range)
-        bg_min = min(bg_slice(:));
-        bg_max = max(bg_slice(:));
-    else
-        bg_min = options.bg_range(1);
-        bg_max = options.bg_range(2);
+    bg_slice = squeeze(bg_image(slice_x, slice_y, slice_z));
+    if ~isempty(options.segmented_img)
+        segmented_slice = squeeze(options.segmented_img(slice_x, slice_y, slice_z));
     end
+    
+    if (~isempty(options.segmented_img) && all(options.segmented_img == bg_image,'all')) || (isinteger(bg_image) && max(bg_image(:))< 12)
+        bg_slice = mat2gray(bg_slice);
+        bg_min =  min(bg_slice(:));
+        bg_max =  max(bg_slice(:));
 
-    bg_slice = mat2gray(bg_slice,[bg_min,bg_max]);
+    else
+        if ~isempty(options.bg_range)
+            bg_min = options.bg_range(1);
+            bg_max = options.bg_range(2);
+        elseif ~isempty(options.segmented_img)
+            %bg_slice(segmented_img_slice==0) = 0;
+            bg_slice_brain = bg_slice(segmented_slice>0&segmented_slice<3);
+            bg_min =  min(bg_slice_brain(:));
+            bg_max =  max(bg_slice_brain(:));
+            %bg_slice(bg_slice>0) = rescale(bg_slice(bg_slice>0), 'InputMin', bg_min, 'InputMax', bg_max);
+        else
+            bg_min = min(bg_slice(:));
+            bg_max = max(bg_slice(:));
+        end
 
-    % Extract ISppa map and apply rotation if specified
-    Isppa_map = squeeze(Isppa_map(slice_x,slice_y,slice_z));
+        bg_slice = mat2gray(bg_slice, double([bg_min, bg_max]));
+    end
+    if ~isempty(trans_pos)
+        transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
+    end
+    Isppa_map = gather(squeeze(Isppa_map(slice_x, slice_y, slice_z)));
 
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];
