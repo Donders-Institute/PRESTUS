@@ -1,5 +1,44 @@
 function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = ...
-    plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options )
+    plot_isppa_over_image(Isppa_map, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_isppa_pos, options)
+
+% PLOT_ISPPA_OVER_IMAGE Visualizes ISppa map overlaid on a 2D slice of a 3D background image.
+%
+% This function overlays the spatial peak pulse-average intensity (ISppa) map 
+% on a specific 2D slice of a 3D background image (`bg_image`). It highlights 
+% key positions such as the transducer position, focus position, and maximum ISppa 
+% position. The function supports various customization options for visualization.
+%
+% Input:
+%   Isppa_map       - [Nx x Ny x Nz] matrix representing the ISppa intensity map.
+%   bg_image        - [Nx x Ny x Nz] matrix representing the 3D background image (e.g., anatomical image).
+%   transducer_bowl - [Nx x Ny x Nz] binary mask representing the transducer bowl region.
+%   parameters      - Struct containing simulation parameters (e.g., grid step size).
+%   slice           - Cell array specifying the slice to visualize:
+%                     * First element: axis ('x', 'y', or 'z').
+%                     * Second element: slice number along the specified axis.
+%   trans_pos       - [1x3] array specifying the transducer position in grid coordinates (row, col, slice).
+%   focus_pos       - [1x3] array specifying the focus position in grid coordinates (row, col, slice).
+%   max_isppa_pos   - [1x3] array specifying the maximum ISppa position in grid coordinates (row, col, slice).
+%   options         - Struct containing optional visualization settings:
+%                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
+%                     * grid_step: Grid step size in mm (default: from parameters).
+%                     * rect_size: Size of rectangles for key positions (default: 2).
+%                     * isppa_threshold_low/high: Thresholds for alpha scaling of ISppa map.
+%                     * isppa_color_range: Range for ISppa map color scaling.
+%                     * color_scale: Colormap for ISppa map (default: 'viridis').
+%                     * rotation: Rotation angle for visualization (default: 0).
+%                     * show_colorbar: Boolean flag to display colorbar (default: 1).
+%
+% Output:
+%   bg_slice        - Extracted 2D slice from the background image.
+%   transducer_bowl - Extracted 2D slice from the transducer bowl mask.
+%   Isppa_map       - Extracted 2D slice from the ISppa map.
+%   ax1             - Handle to the axes displaying the background image.
+%   ax2             - Handle to the axes displaying the ISppa map overlay.
+%   bg_min          - Minimum intensity value of the background image slice.
+%   bg_max          - Maximum intensity value of the background image slice.
+%   h               - Handle to the created figure.
+
     arguments
         Isppa_map (:,:,:)
         bg_image (:,:,:)
@@ -9,11 +48,12 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
         trans_pos (:,3)
         focus_pos (:,3)
         max_isppa_pos (1,3)
-        options.show_rectangles = 1 % show rectangles for transducer, focus, and the real focus
+        options.show_rectangles = 1
         options.grid_step = parameters.grid_step_mm
         options.rect_size = 2
-        options.isppa_threshold_low (1,1) = min(Isppa_map, [], 'all') % threshold for the lower boundary of the alpha values (i.e., alpha would scale from 0 to 1 on the range [isppa_threshold_low, isppa_threshold_high])
-        options.isppa_threshold_high (1,1) = min(Isppa_map, [], 'all') + (max(Isppa_map, [], 'all')-min(Isppa_map, [], 'all'))*0.8
+        options.isppa_threshold_low (1,1) = min(Isppa_map(:))
+        options.isppa_threshold_high (1,1) = min(Isppa_map(:)) + ...
+            (max(Isppa_map(:)) - min(Isppa_map(:))) * 0.8
         options.isppa_color_range = []
         options.use_isppa_alpha (1,1) = 1
         options.color_scale = 'viridis'
@@ -25,94 +65,67 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
         options.bg_range = []
         options.overlay_segmented = 0  
     end
-    
+
+    %% Validate input positions against image boundaries
     if any(focus_pos > size(bg_image))
-        error('Focus point is outside of image boundaries')
+        error('Focus point is outside of image boundaries');
     end
-    if ~isempty(trans_pos)
-        if any(trans_pos>size(bg_image))
-            error('Transducer point is outside of image boundaries')
-        end
+    if ~isempty(trans_pos) && any(trans_pos > size(bg_image))
+        error('Transducer point is outside of image boundaries');
     end
-    if any(max_isppa_pos>size(bg_image))
-        error('Max ISPPA point is outside of image boundaries')
+    if any(max_isppa_pos > size(bg_image))
+        error('Max ISPPA point is outside of image boundaries');
     end
-    
+
+    %% Set thresholds and color range for ISppa map
     if options.isppa_threshold_low == options.isppa_threshold_high
         options.isppa_threshold_low = options.isppa_threshold_low - 0.05;
     end
     if isempty(options.isppa_color_range)
         options.isppa_color_range = [max([options.isppa_threshold_low, min(Isppa_map(:)), 0]), max(Isppa_map(:))];
     end
-    
+
+    %% Extract specified slice from images and masks
+    % Determine slicing axis and adjust positions accordingly
     slice_x = 1:size(Isppa_map,1);
     slice_y = 1:size(Isppa_map,2);
     slice_z = 1:size(Isppa_map,3);
    
-    if slice{1} == 'x'
+    if strcmp(slice{1}, 'x')
         slice_x = slice{2};
-        if ~isempty(focus_pos)
-            focus_pos = focus_pos(2:3);
-        end
-        if ~isempty(trans_pos)
-            trans_pos = trans_pos(2:3);
-        end
+        focus_pos = focus_pos(2:3);
+        trans_pos = trans_pos(2:3);
         max_isppa_pos = max_isppa_pos(2:3);
-    elseif slice{1} == 'y'
+    elseif strcmp(slice{1}, 'y')
         slice_y = slice{2};
-        if ~isempty(focus_pos)
-            focus_pos = focus_pos([1,3]);
-        end
-        if ~isempty(trans_pos)
-            trans_pos = trans_pos([1,3]);
-        end
+        focus_pos = focus_pos([1,3]);
+        trans_pos = trans_pos([1,3]);
         max_isppa_pos = max_isppa_pos([1,3]);
-    elseif slice{1} == 'z'
+    elseif strcmp(slice{1}, 'z')
         slice_z = slice{2};
-        if ~isempty(focus_pos)
         focus_pos = focus_pos(1:2);
-        end
-        if ~isempty(trans_pos)
         trans_pos = trans_pos([1,2]);
-        end
         max_isppa_pos = max_isppa_pos([1,2]);
     else
-        error("slice must be a cell array with the first element of 'x','y', or 'z' and a second element a slice number")
+        error("Slice must be a cell array with 'x', 'y', or 'z' as first element and a number as second element");
     end
-    
-    bg_slice = squeeze(bg_image(slice_x, slice_y, slice_z));
-    if ~isempty(options.segmented_img)
-        segmented_slice = squeeze(options.segmented_img(slice_x, slice_y, slice_z));
-    end
-    
-    if (~isempty(options.segmented_img) && all(options.segmented_img == bg_image,'all')) || (isinteger(bg_image) && max(bg_image(:))< 12)
-        bg_slice = mat2gray(bg_slice);
-        bg_min =  min(bg_slice(:));
-        bg_max =  max(bg_slice(:));
 
+    % Extract slices from input images and masks
+    bg_slice = squeeze(bg_image(slice_x,slice_y,slice_z));
+    
+    % Normalize background image intensity values
+    if isempty(options.bg_range)
+        bg_min = min(bg_slice(:));
+        bg_max = max(bg_slice(:));
     else
-        if ~isempty(options.bg_range)
-            bg_min = options.bg_range(1);
-            bg_max = options.bg_range(2);
-        elseif ~isempty(options.segmented_img)
-            %bg_slice(segmented_img_slice==0) = 0;
-            bg_slice_brain = bg_slice(segmented_slice>0&segmented_slice<3);
-            bg_min =  min(bg_slice_brain(:));
-            bg_max =  max(bg_slice_brain(:));
-            %bg_slice(bg_slice>0) = rescale(bg_slice(bg_slice>0), 'InputMin', bg_min, 'InputMax', bg_max);
-        else
-            bg_min = min(bg_slice(:));
-            bg_max = max(bg_slice(:));
-        end
+        bg_min = options.bg_range(1);
+        bg_max = options.bg_range(2);
+    end
 
-        bg_slice = mat2gray(bg_slice, double([bg_min, bg_max]));
-    end
-    if ~isempty(trans_pos)
-        transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
-    end
-    %before_exit_plane_mask = ~squeeze(after_exit_plane_mask(slice_x, slice_y, slice_z));
-    Isppa_map = gather(squeeze(Isppa_map(slice_x, slice_y, slice_z)));
-    %Isppa_map(Isppa_map<=0.5) = 0;
+    bg_slice = mat2gray(bg_slice,[bg_min,bg_max]);
+
+    % Extract ISppa map and apply rotation if specified
+    Isppa_map = squeeze(Isppa_map(slice_x,slice_y,slice_z));
 
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];

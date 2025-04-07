@@ -6,31 +6,63 @@ function [res_image, transducer_pars, h] = plot_isppa_over_image_2d(...
     trans_pos, focus_pos, ...
     max_isppa_pos)
 
-    bg_slice = mat2gray(bg_image);
-    transducer_bowl = mat2gray(transducer_bowl);
-    before_exit_plane_mask = ~after_exit_plane_mask;
+% PLOT_ISPPA_OVER_IMAGE_2D Visualizes ISppa map overlaid on a background image.
+%
+% This function overlays the spatial peak pulse-average intensity (ISppa) map 
+% on a 2D background image (`bg_image`) and highlights key positions such as 
+% the transducer position, focus position, and maximum ISppa position. The 
+% visualization includes additional masks for regions before and after the 
+% transducer's exit plane.
+%
+% Input:
+%   Isppa_map             - [Nx x Ny] matrix representing the ISppa intensity map.
+%   bg_image              - [Nx x Ny] matrix representing the background image (e.g., anatomical image).
+%   transducer_bowl       - [Nx x Ny] binary mask representing the transducer bowl region.
+%   after_exit_plane_mask - [Nx x Ny] binary mask for regions after the transducer's exit plane.
+%   trans_pos             - [1x2] array specifying the transducer position in grid coordinates (row, col).
+%   focus_pos             - [1x2] array specifying the focus position in grid coordinates (row, col).
+%   max_isppa_pos         - [1x2] array specifying the maximum ISppa position in grid coordinates (row, col).
+%
+% Output:
+%   res_image             - Combined visualization of ISppa map and background image (optional output).
+%   transducer_pars       - Placeholder for additional parameters (currently unused).
+%   h                     - Handle to the created figure.
 
-    h = figure;
-    ax1 = axes;
-    imagesc(bg_slice+transducer_bowl+0.2*before_exit_plane_mask);
-    colormap(ax1,'gray');
-    axis image
+    %% Normalize and prepare slices for visualization
+    bg_slice = mat2gray(bg_image); % Normalize background image
+    transducer_bowl = mat2gray(transducer_bowl); % Normalize transducer bowl mask
+    before_exit_plane_mask = ~after_exit_plane_mask; % Compute mask for regions before exit plane
+
+    %% Create figure and overlay images
+    h = figure; % Create figure
+    ax1 = axes; % First axes for background image
+    imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask); % Overlay masks on background slice
+    colormap(ax1, 'gray'); % Use grayscale colormap for background
+    axis image;
     axis off;
-    ax2 = axes;
-    imagesc(ax2,Isppa_map,'alphadata', (Isppa_map-min(Isppa_map))/max(Isppa_map(:)));
-    colormap(ax2,'viridis');
-%     if exist("clim")==2 % renamed in R2022a
-%         clim(ax2,[min(Isppa_map(:)) max(Isppa_map(:))]);
-%     elseif exist("caxis")==2
-%         caxis(ax2,[min(Isppa_map(:)) max(Isppa_map(:))]);
-%     end
-    ax2.Visible = 'off';
-    %linkprop([ax1 ax2],'Position');
-    axis image
+
+    ax2 = axes; % Second axes for ISppa map
+    imagesc(ax2, Isppa_map, 'alphadata', (Isppa_map - min(Isppa_map)) / max(Isppa_map(:))); % Overlay ISppa map with transparency
+    colormap(ax2, 'viridis'); % Use viridis colormap for ISppa map
+    ax2.Visible = 'off'; % Hide second axes visibility
+
+    axis image;
     axis off;
-    rect_size = 2;
-    rectangle('Position', [trans_pos(2)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'g', 'LineWidth',1,'LineStyle','-')
-    rectangle('Position', [focus_pos(2)-rect_size/2 focus_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
-    rectangle('Position', [max_isppa_pos(2)-rect_size/2 max_isppa_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'b', 'LineWidth',1,'LineStyle','-')
-    %colorbar;
+
+    %% Highlight key positions with rectangles
+    rect_size = 2; % Size of rectangles
+
+    % Transducer position (green rectangle)
+    rectangle('Position', [trans_pos(2) - rect_size / 2, trans_pos(1) - rect_size / 2, rect_size * 2 + 1, rect_size * 2 + 1], ...
+              'EdgeColor', 'g', 'LineWidth', 1, 'LineStyle', '-');
+
+    % Focus position (red rectangle)
+    rectangle('Position', [focus_pos(2) - rect_size / 2, focus_pos(1) - rect_size / 2, rect_size * 2 + 1, rect_size * 2 + 1], ...
+              'EdgeColor', 'r', 'LineWidth', 1, 'LineStyle', '-');
+
+    % Maximum ISppa position (blue rectangle)
+    rectangle('Position', [max_isppa_pos(2) - rect_size / 2, max_isppa_pos(1) - rect_size / 2, rect_size * 2 + 1, rect_size * 2 + 1], ...
+              'EdgeColor', 'b', 'LineWidth', 1, 'LineStyle', '-');
+
 end
+

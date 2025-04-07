@@ -1,64 +1,75 @@
 function pct_skullmapping(subject_id, base_path)
-    
+
+% PCT_SKULLMAPPING Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.
+%
+% This function processes UTE (ultrashort echo time) images and tissue masks 
+% to compute pseudo-CT mappings for cortical and trabecular bone. It identifies 
+% key points such as maxima, FWHM widths, and crossover points between cortical 
+% and trabecular histograms. The function also generates visualizations and 
+% exports the mapping formula to a text file.
+%
+% Input:
+%   subject_id - String specifying the subject ID.
+%   base_path  - String specifying the base path to the subject's m2m folder.
+%
+% Output:
+%   None. The function saves visualizations and mapping coefficients in the subject's folder.
+
+    %% Load UTE image and tissue mask
     subject_folder = fullfile(base_path, sprintf('m2m_sub-%03s', subject_id));
     ute_file = fullfile(subject_folder, 'UTE_reg_thr0_corr_norm.nii.gz');
     ute_corr = niftiread(ute_file);
 
-    % Note: hard-coded to simnibs labels
-    idx_cortical = 7;
-    idx_trabecular = 8;
-    idx_air = 0;
+    % Hard-coded SimNIBS labels for tissue types
+    idx_cortical = 7; % Cortical bone
+    idx_trabecular = 8; % Trabecular bone
+    idx_air = 0; % Air
 
-    % constrain to cortical and trabecular bone
+    % Load tissue mask
     mask_file = fullfile(subject_folder, 'final_tissues.nii.gz');
     mask_corr = niftiread(mask_file);
 
-    mask_cortical = logical(mask_corr==idx_cortical);
+    %% Extract UTE values for each tissue type
+    mask_cortical = logical(mask_corr == idx_cortical);
     ute_cortical = ute_corr(mask_cortical);
 
-    mask_trabecular = logical(mask_corr==idx_trabecular);
+    mask_trabecular = logical(mask_corr == idx_trabecular);
     ute_trabecular = ute_corr(mask_trabecular);
 
-    mask_air = logical(mask_corr==idx_air);
+    mask_air = logical(mask_corr == idx_air);
     ute_air = ute_corr(mask_air);
 
-    x = []; y1 = []; y2 = [];
-    x = [0:0.01:1.5];
-    y1 = hist(ute_cortical, x);
-    y2 = hist(ute_trabecular, x);
-    y3 = hist(ute_air, x);
+    %% Compute histograms for UTE values
+    x = [0:0.01:1.5]; % Bin edges for histograms
+    y1 = hist(ute_cortical, x); % Cortical bone histogram
+    y2 = hist(ute_trabecular, x); % Trabecular bone histogram
+    y3 = hist(ute_air, x); % Air histogram
 
-    % For skull distributions, interpolate values between 0.95 and 1.05 
-    % (exclude potential soft tissue partial volumes)
-
+    %% Interpolate values between 0.90 and 1.10 to exclude partial volumes
     interpPoints = [0.90:0.01:1.1];
-    idx_interp = find(x>=interpPoints(1) & x<=interpPoints(end));
+    idx_interp = find(x >= interpPoints(1) & x <= interpPoints(end));
     y1(idx_interp) = NaN;
     y2(idx_interp) = NaN;
     y1(idx_interp) = interp1(x, y1, interpPoints, 'spline');
     y2(idx_interp) = interp1(x, y2, interpPoints, 'spline');
 
-    % normalize to maximum
+    %% Normalize histograms to their maximum values
+    y1 = y1 ./ max(y1);
+    y2 = y2 ./ max(y2);
+    y3 = y3 ./ max(y3);
 
-    y1 = y1./max(y1);
-    y2 = y2./max(y2);
-    y3 = y3./max(y3);
-
-    %% Step 1: Find maxima of both histograms
-
-    % scale by CTE to highlight trabecular peak
-    [pks1, locs1] = findpeaks(y1, x);
-    [pks2, locs2] = findpeaks(x.*y2, x);
+    %% Step 1: Find maxima of cortical and trabecular histograms
+    [pks1, locs1] = findpeaks(y1, x); % Peaks for cortical histogram
+    [pks2, locs2] = findpeaks(x .* y2, x); % Peaks for trabecular histogram (scaled by x)
     
-    % Identify global maxima for each histogram
     [~, idxMax1] = max(pks1);
     [~, idxMax2] = max(pks2);
     
-    xMax1 = locs1(idxMax1); % x-coordinate of max for y1
-    xMax2 = locs2(idxMax2); % x-coordinate of max for y2
+    xMax1 = locs1(idxMax1); % Cortical peak position
+    xMax2 = locs2(idxMax2); % Trabecular peak position
     
-    disp(['Maxima of y1 at x = ', num2str(xMax1)]);
-    disp(['Maxima of y2 at x = ', num2str(xMax2)]);
+    disp(['Maxima of cortical histogram at x = ', num2str(xMax1)]);
+    disp(['Maxima of trabecular histogram at x = ', num2str(xMax2)]);
 
     %% Step 2: Calculate FWQM for y1 (x1, cortical bone)
 
