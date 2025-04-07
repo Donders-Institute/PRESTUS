@@ -157,7 +157,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 end
 
                 % assign attenuation coefficients
-                if strcmp(pCT_variant, {'k-plan', 'marquet'}) % for k-plan & marquet, define fixed attenuation coefficient
+                if any(strcmp(pCT_variant, {'k-plan', 'marquet'})) % for k-plan & marquet, define fixed attenuation coefficient
                     kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     kPlan_alpha_power = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     % Note that we allow different values to be specified in the config.
