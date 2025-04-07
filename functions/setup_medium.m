@@ -152,6 +152,9 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         sound_speed(skull_idx) = c_water * phi(skull_idx) + ...
                             c_bone * (1-phi(skull_idx));
 
+                        % regularize sound speed to a minimum of 0
+                        sound_speed(skull_idx) = max(sound_speed(skull_idx),0);
+
                     otherwise
                         error("Specified pCT variant is not supported.")
                 end
@@ -206,7 +209,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
                 sound_speed(medium_masks==label_i) = medium.(label_name).sound_speed; 
                 density(medium_masks==label_i) = medium.(label_name).density;
-                alpha_0_true(medium_masks==label_i) =  medium.(label_name).alpha_0_true; 
+                alpha_0_true(medium_masks==label_i) = medium.(label_name).alpha_0_true; 
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
                 if isfield(parameters.thermal.temp_0, label_name)
                     temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                             % [degC]
