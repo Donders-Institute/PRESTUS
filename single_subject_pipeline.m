@@ -491,20 +491,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             end
 
             % For more documentation, see 'run_heating_simulations'
-            [kwaveDiffusion, time_status_seq, heating_maxT, heating_focal_planeT, heating_CEM43, focal_planeCEM43]= ...
+            [kwaveDiffusion, time_status_seq, heating_maxT, heating_focal_planeT, heating_CEM43, heating_focal_planeCEM43]= ...
                 run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos_final);
             
             % apply gather in case variables are GPU arrays
             heating_maxT = gather(heating_maxT);
             heating_focal_planeT = gather(heating_focal_planeT);
             heating_CEM43 = gather(heating_CEM43);
-            focal_planeCEM43 = gather(focal_planeCEM43);
+            heating_focal_planeCEM43 = gather(heating_focal_planeCEM43);
 
             if isfield(parameters, 'savemat') && parameters.savemat==1
                 disp("Not saving heating output matrices ...")
             else
                 save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
-                    'heating_window_dims','sensor','heating_maxT','heating_focal_planeT','heating_CEM43','focal_planeCEM43','-v7.3');
+                    'heating_window_dims','sensor','heating_maxT','heating_focal_planeT','heating_CEM43','heating_focal_planeCEM43','-v7.3');
             end
             parameters.heating_available = 1;
         elseif exist(filename_heating_data, 'file')
@@ -552,7 +552,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         [~, source_labels] = transducer_setup(parameters.transducer, trans_pos_final, focus_pos_final, ...
                                                     size(segmented_image_cropped), t1_header.PixelDimensions(1));
         % Creates a line graph and a video of the heating effects
-        plot_heating_sims(heating_focal_planeT, time_status_seq, parameters, trans_pos_final, medium_masks, focal_planeCEM43);
+        plot_heating_sims(...
+            heating_focal_planeT, ...
+            time_status_seq, ...
+            parameters, ...
+            trans_pos_final, ...
+            medium_masks, ...
+            heating_focal_planeCEM43);
                 
         % Plots the maximum temperature in the segmented brain
         if output_table.maxT < 38

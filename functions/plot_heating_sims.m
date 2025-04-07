@@ -1,4 +1,4 @@
-function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos, brain_img, CEM43)
+function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43)
 
 % PLOT_HEATING_SIMS Visualizes heating simulation results over time.
 %
@@ -13,7 +13,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 %   time_status_seq   - Struct array containing time points and status of the simulation (e.g., 'on', 'off').
 %   parameters        - Struct containing simulation parameters (e.g., output directory, transducer position).
 %   trans_pos         - [1x3] array specifying the transducer position in grid coordinates.
-%   brain_img         - [Nx x Ny x Nz] matrix representing the brain image used for visualization.
+%   medium_masks      - [Nx x Ny x Nz] matrix representing the brain labels
 %   CEM43             - [Nx x Ny x Nt] matrix representing CEM43 values over time.
 %
 % Output:
@@ -32,19 +32,37 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         focal_planeT = gather(focal_planeT);
     end
 
-    %% Extract temperature profiles along the focal axis
+    %% Extract temperature profiles along the focal axis (note: not max.)
     focal_axis_temperature = squeeze(focal_planeT(trans_pos(1), :, :));
     focal_axis_trise = squeeze(focal_planeT(trans_pos(1), :, :) - focal_planeT(trans_pos(1), :, 1));
+    focal_CEM = squeeze(CEM43(trans_pos(1),:,:));
+
+    %% Extract tissue indices along the focal axis
+
+    medium_masks_focal = squeeze(medium_masks(trans_pos(1),trans_pos(2),:));
+    labels = fieldnames(parameters.layer_labels);
+    skull_i = find(strcmp(labels, 'skull_cortical'));
+    trabecular_i = find(strcmp(labels, 'skull_trabecular'));
+    all_skull_ids = [skull_i, trabecular_i];
+    mask_skull = ismember(medium_masks_focal,all_skull_ids);
+    brain_i = find(strcmp(labels, 'brain'));
+    mask_brain = ismember(medium_masks_focal,brain_i);
+    skin_i = find(strcmp(labels, 'skin'));
+    mask_skin = ismember(medium_masks_focal,skin_i);
 
     %% Plot temperature profile over time
+
+    recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
+
     h = figure;
-    plot([time_status_seq(find([time_status_seq.recorded]==1)).time], ...
-        focal_axis_temperature(1:10:size(focal_axis_temperature, 1), 1:size(time_status_seq,2))'); % plot every 10th voxel   
+    hold on;
+    p1 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    p2 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    p3 = plot(recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
     y_range = ylim();
-    hold on;
     for i = 2:(length(time_status_seq)-1)
         if ~strcmp(time_status_seq(i).status,'on')
             continue
@@ -55,18 +73,23 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
+    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'});
+    legend('boxoff');
+    title('Temperature in focal plane (avg. in tissue)');
     saveas(h, output_plot, 'png');
     close(h);
 
     %% Plot temperature rise over time
+
     h = figure;
-    plot([time_status_seq(find([time_status_seq.recorded]==1)).time], ...
-        focal_axis_trise(1:10:size(focal_axis_trise, 1), 1:size(time_status_seq,2))'); % plot every 10th voxel   
+    hold on;
+    p1 = plot(recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    p2 = plot(recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    p3 = plot(recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
     y_range = ylim();
-    hold on;
     for i = 2:(length(time_status_seq)-1)
         if ~strcmp(time_status_seq(i).status,'on')
             continue
@@ -77,21 +100,23 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
+    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'}, 'location', 'NorthWest');
+    legend('boxoff');
+    title('Temperature rise in focal plane (avg. in tissue)');
     saveas(h, output_plot_rise, 'png');
     close(h);
 
     %% Plot CEM43 values over time
-    g = figure;
-    focal_CEM = squeeze(CEM43(trans_pos(1),:,1:numel(time_status_seq)));
 
-    plot([time_status_seq(find([time_status_seq.recorded]==1)).time], ...
-        max(focal_CEM(:, 1:size(time_status_seq,2)),[],1)); 
+    g = figure;
+    hold on;
+    p1 = plot(recordedtime, max(focal_CEM(mask_skull, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
+    p2 = plot(recordedtime, max(focal_CEM(mask_skin, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
+    p3 = plot(recordedtime, max(focal_CEM(mask_brain, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel(sprintf('CEM43'));
-
     y_range = ylim();
-    hold on;
     for i = 2:(length(time_status_seq)-1)
         if ~strcmp(time_status_seq(i).status,'on')
             continue
@@ -102,6 +127,9 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
         a.FaceAlpha = 0.1;
     end
     hold off
+    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'}, 'location', 'NorthWest');
+    legend('boxoff');
+    title('CEM43 in focal plane (max. in tissue)');
     saveas(g, output_plotCEM, 'png');
     close(g);
 
@@ -112,7 +140,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     end
     if parameters.heatingvideo == 1
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
-        brain_slice = mat2gray(squeeze(brain_img(:,parameters.transducer.pos_grid(2),:)));
+        brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.pos_grid(2),:)));
         output_video_name = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_animation%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
         v = VideoWriter(output_video_name,'Uncompressed AVI');
         v.FrameRate = 2; % frames per second
