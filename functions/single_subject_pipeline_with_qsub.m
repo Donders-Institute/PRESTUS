@@ -19,9 +19,9 @@ function single_subject_pipeline_with_qsub(subject_id, parameters, wait_for_job,
     % Make subfolder (if enabled) and check if directory exists
     % This ensures that log files are saved in the subject subdirectory
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+        output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
     else
-        output_dir = fullfile(parameters.temp_output_dir);
+        output_dir = fullfile(parameters.sim_path);
     end
     
     if ~isfolder(output_dir)
