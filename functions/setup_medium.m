@@ -156,16 +156,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                         error("Specified pCT variant is not supported.")
                 end
 
-                % estimate attenuation coefficients
-                alpha_pseudoCT(skull_idx) = alpha_min + (alpha_max - alpha_min) * ...
-                    (1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;
-                alpha_power_true(skull_idx) = medium.(label_name).alpha_power_true;
-                % convert alpha at 500 kHz into prefactor alpha0 (dB/MHz/cm) according to specified alpha_power_true
-                % (definition of lower and upper attenuation bounds is derived from 500kHz)
-                alpha_0_true(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power_true);
-
-                % for k-plan, use fixed attenuation
-                if strcmp(pCT_variant, {'k-plan', 'marquet'})
+                % assign attenuation coefficients
+                if strcmp(pCT_variant, {'k-plan', 'marquet'}) % for k-plan & marquet, define fixed attenuation coefficient
                     kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     kPlan_alpha_power = 1;   % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
                     % Note that we allow different values to be specified in the config.
@@ -177,6 +169,14 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                     end
                     alpha_0_true(skull_idx) = medium.(label_name).alpha_0_true;
                     alpha_power_true(skull_idx) = medium.(label_name).alpha_power_true;
+                else % for all other algorithms, estimate attenuation form (pseudo-)HU
+                    % estimate attenuation coefficients
+                    alpha_pseudoCT(skull_idx) = alpha_min + (alpha_max - alpha_min) * ...
+                        (1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;
+                    alpha_power_true(skull_idx) = medium.(label_name).alpha_power_true;
+                    % convert alpha at 500 kHz into prefactor alpha0 (dB/MHz/cm) according to specified alpha_power_true
+                    % (definition of lower and upper attenuation bounds is derived from 500kHz)
+                    alpha_0_true(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power_true);
                 end
                 
                 % save plots for debugging
