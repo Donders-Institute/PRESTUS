@@ -20,6 +20,7 @@ function A = mergeStructure(varargin)
 % See also struct, fieldnames
 %   Created by: Johan Winges
 %   $Revision: 1.0$  $Date: 2014-10-21 16:00:00$
+
 %% Merge structures:
 % Find fieldnames of structures:
 fAn   = cellfun(@(An) fieldnames(An), varargin,'un',0);
