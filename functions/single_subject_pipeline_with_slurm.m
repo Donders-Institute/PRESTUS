@@ -70,7 +70,6 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     else
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
-    fprintf(fid, '#SBATCH --gres=gpu:1\n');
     if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
         fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
     end
