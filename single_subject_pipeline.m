@@ -634,7 +634,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                     data_backtransf = tformarray(data, inv_final_transformation_matrix, ...
                                             makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
                     
-                    orig_hdr = t1_header;
                     orig_hdr.Datatype = 'single';
                 end
                 niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true)
