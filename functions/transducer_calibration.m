@@ -84,7 +84,10 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     parameters.simulation_medium = 'water'; % indicate that we only want the simulation in the water medium for now
     parameters.interactive = 0;
     parameters.overwrite_files = 'never';
+    parameters.run_source_setup = 1;
+    parameters.run_acoustic_sims = 1;
     parameters.run_heating_sims = 0;
+    parameters.savemat = 1;
     if ismac % if run locally on a mac
         parameters.using_donders_hpc = 0;
         parameters.code_type = 'matlab_cpu';
@@ -303,10 +306,12 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     opt_parameters = load_parameters(['config_',transducer_name,'.yaml']); % load the configuration file
 
+    opt_parameters.run_source_setup = 1;
+    opt_parameters.run_acoustic_sims = 1;
     opt_parameters.run_heating_sims = 0;
     opt_parameters.data_path = parameters.data_path;
     opt_parameters.seg_path = parameters.seg_path;
-    opt_parameters.temp_output_dir = pn.data_sims;
+    opt_parameters.sim_path = pn.data_sims;
     opt_parameters.transducer.source_amp = opt_source_amp;
     opt_parameters.transducer.source_phase_rad = [0 opt_phases];
     opt_parameters.transducer.source_phase_deg = [0 opt_phases]/pi*180;
@@ -316,6 +321,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     opt_parameters.overwrite_files = 'always';
     opt_parameters.interactive = 0;
     opt_parameters.usepseudoCT = 0;
+    opt_parameters.savemat = 1;
 
     single_subject_pipeline(subject_id, opt_parameters);
 
