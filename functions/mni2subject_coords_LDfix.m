@@ -1,4 +1,5 @@
 function coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters, transformation_type)
+
 % Transforms a set of coordinates in MNI space to subject space
 % This function calls the command line tool "mni2subject_coords", so it has
 % a large overhead.

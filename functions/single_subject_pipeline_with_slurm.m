@@ -1,7 +1,8 @@
-function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, memorylimit)
+function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job, timelimit, memorylimit)
     arguments
         subject_id double
         parameters struct
+        wait_for_job logical = false % boolean for waiting for job to finish before continuing the code
         timelimit string = "04:00:00" % time limit for a job in seconds (4 hours by default)
         memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
     end
@@ -18,9 +19,9 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
     % Make subfolder (if enabled) and check if directory exists
     % This ensures that log files are saved in the subject subdirectory
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
-        output_dir = fullfile(parameters.temp_output_dir, sprintf('sub-%03d', subject_id));
+        output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
     else
-        output_dir = fullfile(parameters.temp_output_dir);
+        output_dir = fullfile(parameters.sim_path);
     end
     
     if ~isfolder(output_dir)
@@ -59,14 +60,26 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
     fid = fopen([temp_slurm_file '.sh'], 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
-    fprintf(fid, '#SBATCH --partition=gpu\n');
-    fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    if isfield(parameters, 'hcp_partition') && ~isempty(parameters.hcp_partition)
+        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hcp_partition);
+    else
+        fprintf(fid, '#SBATCH --partition=gpu\n');
+    end
+    if isfield(parameters, 'hcp_gpu') && ~isempty(parameters.hcp_gpu)
+        fprintf(fid, '#SBATCH --gres=%s\n', parameters.hcp_gpu);
+    else
+        fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    end
+    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
+        fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
+    end
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', timelimit);
     fprintf(fid, '#SBATCH --output=%s\n', sprintf('%s_slurm_output_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --error=%s\n', sprintf('%s_slurm_error_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
-    fprintf(fid, 'module load matlab\n');
+    fprintf(fid, 'nvidia-smi\n');
+    fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file_name);
     fclose(fid);
 
@@ -76,7 +89,66 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, timelimit, m
     % Execute the full command
     full_cmd = sprintf('cd %s; %s', log_dir, sbatch_call);
 	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
-	[res, out] = system(full_cmd);
+    [status, out] = system(full_cmd);
+
+    job_id = regexp(out, '\d+', 'match');
+    job_id = str2double(job_id{1});
+    fprintf('Job name: %s; job ID: %i\n', job_name, job_id)
     
-    fprintf('Job name: %s; job ID: %s', job_name, out)
+    if status == 0
+        disp('Job submitted successfully');
+        
+        % Polling for job status
+        job_completed = true;
+        if wait_for_job
+            disp('User has chosen to wait until job is finished...');
+            job_completed = false;
+        end
+    
+        while ~job_completed
+            % SLURM equivalent of qstat to check job state
+            check_cmd = sprintf('sacct -j %i -o State --noheader | tail -n 1', job_id);
+            [status, out] = system(check_cmd);
+            
+            n_sec = 20; % Pause for n seconds before checking again
+            if status == 0
+                % Extract the job state (e.g., "RUNNING", "PENDING", "COMPLETED")
+                job_state = strtrim(out);
+                
+                if strcmp(job_state, 'RUNNING') == true
+                    disp('Job is still running...');
+                    pause(n_sec); % Pause for n seconds before checking again
+                elseif strcmp(job_state, 'PENDING') == true
+                    disp('Job is still queued...');
+                    pause(n_sec); % Pause for n seconds before checking again
+                elseif strcmp(job_state, 'COMPLETED') == true
+                    disp('Job completed successfully.');
+                    job_completed = true;
+                else
+                    disp(['Job status: ', job_state]);
+                    pause(n_sec); % Pause for n seconds before checking again
+                    % Additional states: "FAILED", "CANCELLED", etc.
+                end
+            else
+                disp('Failed to check job status.');
+                disp(out);
+    
+                % Handle case where job might have completed and dropped from squeue
+                check_cmd = sprintf('scontrol show job %s', job_id);
+                [status, out] = system(check_cmd);
+                if status ~= 0
+                    disp('Job is no longer listed in squeue. Assuming it completed.');
+                    job_completed = true;
+                else
+                    break;
+                end
+            end
+        end
+    else
+        disp('Command failed to submit the job.');
+        disp(out); % Display the error message
+    end
+    
+    % Continue with MATLAB script
+    disp('Continuing with the MATLAB script...');
 end

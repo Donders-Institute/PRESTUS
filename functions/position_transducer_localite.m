@@ -1,68 +1,72 @@
-function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transducer_localite(localite_instr_file, mri_hdr, ...
-    parameters)
+function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transducer_localite(localite_instr_file, mri_hdr, parameters)
 
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                         Position transducer                       %
-    %                                                                   %
-    % Position_transducer uses the data from the Localite instrument    %
-    % markers and MRI scan header to determine the transducer coordinate%
-    % in voxel (ijk) space.                                             %
-    %                                                                   %
-    % Some notes:                                                       %
-    % - 'localite_instr_file' is the path to the Localite instrument    %
-    % markers XML file.                                                 %
-    % - 'mri_hdr' is the header of the MRI file that has the desired    %
-    % voxel space (used to extract world to voxel transformation matrix)%
-    % - 'reference_transducer_distance' is the distance between the     %
-    % reference used for the neuronavigation and the transducer, mm.    %
-    % - 'focal_distance' is the distance between the transducer and the %
-    % focus point, mm.                                                  %
-    %                                                                   %
-    % The Localite coordinates are in RAS format. For the helpful info  %
-    % on the NIFTI coordinates and headers, see the section             %
-    % "Orientation information" here:                                   %
-    % https://brainder.org/2012/09/23/the-nifti-file-format/            %
-    %                                                                   %
-    % The code for reading Localite data is written by Judith Lefkes    %
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+% POSITION_TRANSDUCER_LOCALITE Determines transducer and focus positions in voxel space using Localite data.
+%
+% This function uses instrument marker data from a Localite XML file and an MRI header to calculate 
+% the transducer position and focus point in voxel (ijk) space. The Localite coordinates are provided 
+% in RAS format and are converted to voxel space using the transformation matrix from the MRI header.
+%
+% Input:
+%   localite_instr_file - Path to the Localite instrument markers XML file.
+%   mri_hdr             - Header of the MRI file containing the world-to-voxel transformation matrix.
+%   parameters          - Struct containing additional parameters:
+%                         * reference_transducer_distance_mm: Distance between reference point and transducer (in mm).
+%                         * expected_focal_distance_mm: Distance between transducer and focus point (in mm).
+%
+% Output:
+%   trans_pos           - [1x3] array specifying the transducer position in voxel coordinates (ijk).
+%   focus_pos           - [1x3] array specifying the focus position in voxel coordinates (ijk).
+%   trans_pos_ras       - [1x4] array specifying the transducer position in RAS coordinates.
+%   focus_pos_ras       - [1x4] array specifying the focus position in RAS coordinates.
+
+    %% Notes on Inputs and Coordinate Systems
+    % - 'localite_instr_file' contains the path to the Localite instrument markers XML file.
+    % - 'mri_hdr' is the header of the MRI file that provides world-to-voxel transformation matrix.
+    % - 'reference_transducer_distance_mm' is the distance between neuronavigation reference point and transducer (mm).
+    % - 'expected_focal_distance_mm' is the distance between transducer and focus point (mm).
+    %
+    % The Localite coordinates are provided in RAS format. For details on NIFTI coordinate systems, refer to:
+    % "Orientation information" at https://brainder.org/2012/09/23/the-nifti-file-format/.
     
-    % Read in the instrument marker data to get the transducer coordinates
-    % Example file of one of the participants from LocaliteData folder
-    % localite_instr_file = "../data/example_transducer_Localite.xml";
+    %% Parse Localite XML File
+    % Read instrument marker data from Localite XML file using `xml2struct`.
     xml = xml2struct(localite_instr_file);
-    
-    % Instrument markers are saved in the 4x4 matrix.
-    % Read in the 4D matrix of Instrument marker position
-    coord_xml = xml.Children(4).Children(2).Children(2);
-    coord_matrix = {coord_xml.Attributes.Value};
-    
-    % First convert into array then reshape
+
+    % Extract 4x4 coordinate matrix from XML data.
+    coord_xml = xml.Children(4).Children(2).Children(2);  % Navigate XML hierarchy to marker data
+    coord_matrix = {coord_xml.Attributes.Value};          % Extract coordinate values as strings
+
+    %% Convert Coordinate Matrix
+    % Convert string values to numeric array and reshape into a 4x4 matrix.
     coord_matrix = str2double(coord_matrix);
-    coord_matrix = reshape(coord_matrix',[4,4])';
-     
-    % The x axis goes down vertically from the center of the coil housing to the
-    % head; y axis goes in the direction of the handle and the z axis passes from left to
-    % right, starting at the center of the coil housing (calibrated ?hotspot?) at a right 
-    % angle to the x axis.
-    
-    % Converting into 3D vectors
-    reference_pos = coord_matrix(:,4); % Position of the reference
-    reference_center_to_head = coord_matrix(:,1); % From the center of the coil towards head
-    % y = coord_matrix(:,2); % From the center of the coil to the left coil handle
-    % z = coord_matrix(:,3); % From the center of the coil to the right coil handle
-    
-    trans_pos_ras = reference_pos + parameters.reference_transducer_distance_mm*reference_center_to_head; 
-    focus_pos_ras = trans_pos_ras + parameters.expected_focal_distance_mm*reference_center_to_head;
-    
-    trans_pos = round(mri_hdr.Transform.T' \ trans_pos_ras);
-    focus_pos = round(mri_hdr.Transform.T' \ focus_pos_ras);
-    
+    coord_matrix = reshape(coord_matrix', [4, 4])';
+
+    %% Extract Reference Position and Direction Vectors
+    % Reference position: translation vector from neuronavigation reference point.
+    reference_pos = coord_matrix(:, 4); 
+
+    % Direction vector pointing from coil center towards head.
+    reference_center_to_head = coord_matrix(:, 1);
+
+    %% Compute Transducer and Focus Positions in RAS Space
+    % Calculate transducer position relative to reference point.
+    trans_pos_ras = reference_pos + parameters.reference_transducer_distance_mm * reference_center_to_head;
+
+    % Calculate focus position relative to transducer position.
+    focus_pos_ras = trans_pos_ras + parameters.expected_focal_distance_mm * reference_center_to_head;
+
+    %% Convert Positions from RAS Space to Voxel Space
+    % Use MRI header's transformation matrix to convert RAS coordinates to voxel coordinates.
+    trans_pos = round(mri_hdr.Transform.T' \ trans_pos_ras);  % Transducer position in voxel space.
+    focus_pos = round(mri_hdr.Transform.T' \ focus_pos_ras);  % Focus position in voxel space.
+
+    % Extract x, y, z components of positions (ignore homogeneous coordinate).
     trans_pos = trans_pos(1:3);
     focus_pos = focus_pos(1:3);
-    disp('The transducer position is taken from the localite files, the expected focus position is set based on the expected focal distance')
-    disp('The transducer position & the focus position:')
-    [trans_pos focus_pos]
-    
-    % actual_focus = t+35.1*x; 
+
+    %% Display Results
+    disp('The transducer position is taken from the Localite files, and the expected focus position is set based on the expected focal distance.');
+    disp('The transducer position & the focus position:');
+    disp([trans_pos, focus_pos]);
 
 end
