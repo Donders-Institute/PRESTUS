@@ -28,29 +28,30 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
     elseif ~isequal(size(focus_pos), [1 parameters.n_sim_dims])
         error('Transducer and focus positions should have size [N 1] or [1 N], where N is the number of simulation dimensions.');
     end
-
+    
     % Convert element diameters from mm to grid points
     transducer_pars = parameters.transducer;
     grid_step_mm = parameters.grid_step_mm;
-
-    transducer_pars.Elements_OD = 2 * floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
-    transducer_pars.Elements_ID = 2 * floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
-    transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
-
-    % Convert curvature radius from mm to grid points
-    transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_step_mm);
-
-    %% Setup source signal
-    cw_signal = createCWSignals(...
-        kgrid.t_array, ...
-        parameters.transducer.source_freq_hz, ...
-        parameters.transducer.source_amp, ...
-        parameters.transducer.source_phase_rad);
-
-    source = struct();
+    if parameters.unique_tran_design == 1
+        transducer_pars.Elements_OD = 2 * floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
+        transducer_pars.Elements_ID = 2 * floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
+        transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
+    
+        % Convert curvature radius from mm to grid points
+        transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_step_mm);
+    end
 
     %% Custom element geometry (non-kWaveArray setup)
     if parameters.use_kWaveArray == 0
+        %% Setup source signal
+        cw_signal = createCWSignals(...
+        kgrid.t_array, ...
+        transducer_pars.source_freq_hz, ...
+        transducer_pars.source_amp, ...
+        transducer_pars.source_phase_rad);
+
+        source = struct();
+
         grid_dims = parameters.grid_dims;
         transducer_mask = zeros(grid_dims);
         source_labels = zeros(grid_dims);
@@ -92,7 +93,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         end
 
         source.p_mask = transducer_mask;
-
+    
     %% kWaveArray-based setup (for advanced simulations)
     else
         disp('Setting up kWaveArray (might take a bit of time)');
@@ -100,11 +101,29 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         % Create empty kWaveArray object
         karray = kWaveArray('BLITolerance', 0.1, 'UpsamplingRate', 10, 'BLIType', 'sinc');
 
-        % Add annular array elements to the kWaveArray object
-        karray.addAnnularArray([kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))], ...
-                               transducer_pars.curv_radius_mm * 1e-3, ...
-                               [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
-                               [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))]);
+        if parameters.unique_tran_design == 1  
+            % Add annular array elements to the kWaveArray object
+            karray.addAnnularArray([kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))], ...
+                                   transducer_pars.curv_radius_mm * 1e-3, ...
+                                   [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
+                                   [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))]);
+
+        %% new design
+        elseif parameters.unique_tran_design == 2
+            transducer_pars = setup_dolphin_transducer_design(transducer_pars, kgrid, trans_pos, focus_pos, karray, parameters.medium.water.sound_speed, parameters.n_sim_dims, parameters.display_tran);
+        else
+            fprintf("Transducer design number %i hasn't been implemented. \n", parameters.unique_tran_design)
+        end
+
+        % Define signal
+        %% Setup source signal
+        cw_signal = createCWSignals(...
+        kgrid.t_array, ...
+        transducer_pars.source_freq_hz, ...
+        transducer_pars.source_amp, ...
+        transducer_pars.source_phase_rad);
+
+        source = struct();
 
         % Compute weights for each element in the computational grid
         grid_weights_4d = zeros(transducer_pars.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
@@ -154,5 +173,4 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         source.p_mask = binary_mask;
         source.p = distributed_source_signal;
     end
-
 end

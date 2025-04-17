@@ -78,7 +78,7 @@ overwrite_simnibs: 0
 run_source_setup: 1 # Should we set up acoustic source? useful to switch off to look at initial segmentation results only
 run_acoustic_sims: 1 # Should we run the acoustic simulations? useful to switch off to look at initial segmentation results only
 run_heating_sims: 0 # Should we run the heating simulations? useful to switch off to look at initial segmentation results only
-run_posthoc_water_sims: 0 # Should we run the simulations in free water with exactly the same parameter? useful for double checking that the true intensity matches the desired one
+run_posthoc_water_sims: 1 # Should we run the simulations in free water with exactly the same parameter? useful for double checking that the true intensity matches the desired one
 
 # In interactive mode (1), the figures are shown and confirmation dialogs appear (the latter of which will halt the pipeline until confirmation)
 # In non-interactive mode (0), no plots are shown and no confirmation dialogs will 
@@ -184,7 +184,11 @@ pml_size: 10
 csf_mask_expansion_factor: 40
 
 # Use the kwaveArray class for simulations
-use_kWaveArray: 0
+use_kWaveArray: 1
+
+# New transducer development implementation
+unique_tran_design: 2 # 1: Annular array, 2: 
+display_tran: 1
 
 # Thresholds for smoothing the skull and other masks
 skull_smooth_threshold: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)

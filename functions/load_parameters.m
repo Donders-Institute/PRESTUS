@@ -135,7 +135,7 @@ function parameters = load_parameters(varargin)
     end
 
     % Check segmentation software path existence and warn user if missing
-    if isfield(parameters, 'simnibs_bin_path') && ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file')
+    if isfield(parameters, 'simnibs_bin_path') && ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software + '.cmd'), 'file')
         assert(all(confirmation_dlg(sprintf('The segmentation software (%s) does not exist at %s. Do you want to continue?', ...
                                             parameters.segmentation_software, parameters.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
@@ -165,5 +165,13 @@ function parameters = load_parameters(varargin)
        assert(all(confirmation_dlg('MATLAB appears to be outdated. Please update before continuing. Do you want to continue?', ...
                                    'Yes', 'No')), 'Exiting');
     end
+
+    if ~isfield(parameters, 'use_kWaveArray')
+        parameters.use_kWaveArray = 0;
+    end
+
+    if parameters.use_kWaveArray == 0 || ~isfield(parameters, 'unique_tran_design')
+        parameters.unique_tran_design = 1;
+    end  
 
 end

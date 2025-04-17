@@ -80,9 +80,16 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
     % Create unprocessed T1 slice oriented along the transducer's axis
     h = figure;
-    imshowpair(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters), ...
-               plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters, 'slice_dim', 1), 'montage');
-    title('T1 with transducer');
+    subplot(1,3,1)
+    imshow(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters));
+    
+    subplot(1,3,2)
+    imshow(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters, 'slice_dim', 1));
+    
+    subplot(1,3,3)
+    imshow(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), trans_pos_grid, focus_pos_grid, parameters, 'slice_dim', 3));
+   
+    sgtitle('T1 with transducer');
     output_plot_filename = fullfile(parameters.debug_dir, ...
         sprintf('sub-%03d_t1_with_transducer_before_smoothing_and_cropping%s.png', ...
         subject_id, parameters.results_filename_affix));

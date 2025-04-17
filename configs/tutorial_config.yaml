@@ -1,5 +1,5 @@
-data_path: /home/.../Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
-simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
+data_path: C:\Users\marge\OneDrive - Radboud Universiteit\Documenten\Software\repositories\prestus\Example data\simnibs4_examples\m2m_ernie\ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+simnibs_bin_path: C:\Users\marge\OneDrive - Radboud Universiteit\Documenten\Software\repositories\prestus\SimNIBS-4.0\bin\ # change to simnibs install
 
 t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
 t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
@@ -36,3 +36,5 @@ thermal:
 
 
 
+# Segmentation software (current options are 'headreco' and 'charm')
+segmentation_software: charm
