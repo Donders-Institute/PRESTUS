@@ -184,8 +184,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % If a PML layer is used to absorb waves reaching the edge of the grid,
     % this will check if there is enough room for a PML layer between the
     % transducer and the edge of the grid
-    assert(min(abs([0,0,0;parameters.grid_dims]-trans_pos_final ),[],'all') > parameters.pml_size, 'The minimal distance between the transducer and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
-    assert(min(abs([0,0,0;parameters.grid_dims]-focus_pos_final ),[],'all') > parameters.pml_size, 'The minimal distance between the focus position and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
+    assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
+        trans_pos_final ),[],'all') > parameters.pml_size, ...
+        'The minimal distance between the transducer and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
+    assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
+        focus_pos_final ),[],'all') > parameters.pml_size, ...
+        'The minimal distance between the focus position and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
     
     % Saves the new transducer and focus positions after all previous grid
     % manipulations
@@ -381,15 +385,15 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*...
             parameters.grid_step_mm;
         avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
-        avg_isppa_around_target = acoustic_isppa(...
-            (focus_pos_final(1)-avg_radius):(focus_pos_final(1)+avg_radius),...
-            (focus_pos_final(2)-avg_radius):(focus_pos_final(2)+avg_radius),...
-            (focus_pos_final(3)-avg_radius):(focus_pos_final(3)+avg_radius));
+        idx = arrayfun(@(d) max(1,focus_pos_final(d)-avg_radius):min(size(acoustic_isppa,d),focus_pos_final(d)+avg_radius), ...
+               1:ndims(acoustic_isppa), 'UniformOutput', false);
+        avg_isppa_around_target = acoustic_isppa(idx{:});
         avg_isppa_around_target = mean(avg_isppa_around_target(:));
         
         % Reports the Isppa within the original stimulation target
-        isppa_at_target = acoustic_isppa(focus_pos_final(1),focus_pos_final(2),focus_pos_final(3));
-        
+        idx = num2cell(focus_pos_final);
+        isppa_at_target = acoustic_isppa(idx{:});
+
         % Creates a logical skull mask and register skull_ids
         labels = fieldnames(parameters.layer_labels);
         skull_i = find(strcmp(labels, 'skull_cortical'));
@@ -437,8 +441,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 acoustic_isppa, segmented_image_cropped, source_labels, parameters, ...
                 {'y', focus_pos_final(2)}, trans_pos_final, focus_pos_final, highlighted_pos);
         else
-            [~,~,h]=plot_isppa_over_image_2d(acoustic_isppa, segmented_image_cropped, ...
-                source_labels, parameters,  trans_pos_final, focus_pos_final, highlighted_pos);
+            h = plot_isppa_over_image_2d(acoustic_isppa, segmented_image_cropped, ...
+                source_labels, after_exit_plane_mask,  trans_pos_final, focus_pos_final, highlighted_pos);
         end
         output_plot = fullfile(parameters.output_dir,...
             sprintf('sub-%03d_%s_isppa%s.png', ...
