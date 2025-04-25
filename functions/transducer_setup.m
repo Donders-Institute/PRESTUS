@@ -19,10 +19,10 @@ function [transducer_mask, source_label, transducer_pars] = ...
 %                       * Elements_ID_mm: Inner diameter of each element (in mm).
 %                       * curv_radius_mm: Curvature radius of the elements (in mm).
 %
-%   trans_pos         - [1x3] or [3x1] array specifying the Cartesian coordinates 
+%   trans_pos         - [1x2/3] or [2/3x1] array specifying the Cartesian coordinates 
 %                       of the transducer position.
 %
-%   focus_pos         - [1x3] or [3x1] array specifying the Cartesian coordinates 
+%   focus_pos         - [1x2/3] or [2/3x1] array specifying the Cartesian coordinates 
 %                       of the geometric focus position.
 %
 %   grid_dims         - [Nx, Ny, Nz] array defining the dimensions of the computational grid.
@@ -47,11 +47,11 @@ function [transducer_mask, source_label, transducer_pars] = ...
     end
 
     % Ensure the positions are formatted as row vectors with size [1, 3]
-    if isequal(size(focus_pos), [3 1])
+    if isequal(size(focus_pos), [3 1]) | isequal(size(focus_pos), [2 1])
         focus_pos = focus_pos'; % Convert column vector to row vector
         trans_pos = trans_pos'; % Convert column vector to row vector
-    elseif ~isequal(size(focus_pos), [1 3])
-        error('Transducer and focus positions should have the size [3 1] or [1 3]')
+    elseif ~isequal(size(focus_pos), [1 3]) & ~isequal(size(focus_pos), [1 2])
+        error('Transducer and focus positions should have the size [1 2] or [1 3]')
     end
 
     % Convert element diameters from millimeters to grid points and ensure they are odd integers

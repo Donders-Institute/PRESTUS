@@ -1,4 +1,4 @@
-function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, transducer_name, subject_id, desired_intensity)
+function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, transducer_name, subject_id, desired_intensity, real_profile)
 
     % TO DO: specify necessary input parameters
 
@@ -16,7 +16,10 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     % the depth of the acoustic peak (and thus the focus) can be steered by changing 
     % the set of phases for the individual transducer elements with respect to one-another. 
     
-    real_profile = readmatrix(fullfile(pn.configs, [transducer_name, '.csv']));
+    % Attempt to read in empirical profile if values are not provided
+    if isempty(real_profile)
+        real_profile = readmatrix(fullfile(pn.configs, [transducer_name, '.csv']));
+    end
     
     % if the peak is calibrated to less than the desired intensity, scale
     % profile linearly
@@ -143,7 +146,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     velocity = parameters.transducer.source_amp(1)/(parameters.medium.water.density*parameters.medium.water.sound_speed);   % [m/s]
     
     % define position vectors
-    axial_position = (1:parameters.default_grid_dims(3)).*parameters.grid_step_mm; % [mm]
+    axial_position = (1:parameters.default_grid_dims(end)).*parameters.grid_step_mm; % [mm]
     
     % evaluate pressure analytically
     % focusedAnnulusONeil provides an analytic solution for the pressure at the
@@ -160,7 +163,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     xlabel('Axial Position [mm]');
     ylabel('Intensity [W/cm^2]');
     hold on
-    plot(axial_position-(parameters.transducer.pos_grid(3)-1)*parameters.grid_step_mm, ...
+    plot(axial_position-(parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm, ...
         pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
     plot(real_profile(:,1),real_profile(:,2))
     hold off
@@ -333,8 +336,13 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     % get maximum pressure
     p_max = gather(opt_res.sensor_data.p_max_all);
-    pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.pos_grid(1), opt_res.parameters.transducer.pos_grid(2),:));
-    
+
+    if numel(opt_res.parameters.transducer.pos_grid)==3 % 3D
+        pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.pos_grid(1), opt_res.parameters.transducer.pos_grid(2),:));
+    else % 2D
+        pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.pos_grid(1),:));
+    end
+
     h = figure('Position', [10 10 900 500]);
     hold on
     plot(axial_position, p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
@@ -342,7 +350,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     ylabel('Intensity [W/cm^2]');
     plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
     
-    sim_res_axial_position = axial_position-(opt_res.parameters.transducer.pos_grid(3)-1)*parameters.grid_step_mm; % axial position for the simulated results, relative to transducer position
+    sim_res_axial_position = axial_position-(opt_res.parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm; % axial position for the simulated results, relative to transducer position
     plot(sim_res_axial_position, ...
         pred_axial_pressure_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
     plot(real_profile(:,1),real_profile(:,2))

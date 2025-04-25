@@ -31,6 +31,7 @@ The following documents the functions provided in PRESTUS.
 | `load_parameters`                       | Helper         | Loads and merges configuration files for simulation parameters.                                 |
 | `masked_max_3d`                         | Helper         | Computes the maximum intensity within a masked 3D region.                                       |
 | `median_montage`                        | Plotting       | Creates a montage of central slices from a 3D T1 image.                                         |
+| `medium_mask_create`                    | Helper       | Map segmentation indices onto the medium labels in the config |
 | `mergeStructure`                        | Helper         | Merges multiple scalar structures into one.                                                     |
 | `mni2subject_coords_LDfix`              | Helper         |                        |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.              |

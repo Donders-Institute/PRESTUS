@@ -158,9 +158,9 @@ thermal:
 
   # These should only be changed if they don't meet the criteria described in "run_heating_simulations"
   sim_time_steps: 0.01 # [s] simulation time steps during the stimulation period
-  post_stim_time_step_dur: 0.1 # post-stimulation (inter-trial) steps
-  on_off_step_duration: 0.1 # duration of the on+off cycle (e.g., with a duty cycle of 0.3 and 0.01 s time steps for simulation, the whole on+off cycle will take 0.1 s)
-  equal_steps: 0 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
+  post_stim_dur: 0.1 # post-stimulation (inter-trial) steps
+  pri_duration: 0.1 # duration of the on+off cycle (e.g., with a duty cycle of 0.3 and 0.01 s time steps for simulation, the whole on+off cycle will take 0.1 s)
+  equal_steps: 1 # is the duration of the simulation steps equal for on and off steps? if not, it is computed based on the sim_time_steps * n_steps where n_steps is the needed number of on and off steps derived from the duty cycle
   
   # Optional parameters:
   temp_0: #[deg C] initial temperature

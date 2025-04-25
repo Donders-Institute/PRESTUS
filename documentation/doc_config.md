@@ -130,13 +130,12 @@ see doc_thermal-simulations.md
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `thermal.duty_cycle`              | Fraction of stimulation duration during which the stimulation is active (`0 to 1`).                           |   |
-| `thermal.iti`                     | Interval between trials, measured from the start of one trial to the start of another (in seconds).           |   |
 | `thermal.n_trials`                | Number of trials simulated, determining total simulation duration (`n_trials * iti`).                         |   |
-| `thermal.stim_duration`           | Duration of stimulation within a trial (in seconds).                                                          |   |
+| `thermal.duty_cycle`              | Fraction of stimulation duration during which the stimulation is active (`0 to 1`).                           |   |
+| `thermal.pri_duration`            | Duration of the pulse repetition interval (i.e., an on/off cycle during stimulation; in seconds).    |   |
 | `thermal.sim_time_steps`          | Simulation time steps during the stimulation period (in seconds).                                             |   |
-| `thermal.post_stim_time_step_dur` | Time step duration during post-stimulation period (inter-trial interval, in seconds).                         |   |
-| `thermal.on_off_step_duration`    | Duration of the on/off cycle during stimulation, computed based on duty cycle and time steps (in seconds).    |   |
+| `thermal.post_stim_dur`           | Duration of post-stimulation period (in seconds).                           |   |
+| `thermal.post_time_steps`         | Step size of post-stimulation recordings (in seconds). If not specificed, the step size is identical to sim_time_steps.                         |   |
 | `thermal.equal_steps`             | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
 | `thermal.temp_0.water`            | Initial temperature of water medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.skull`            | Initial temperature of skull medium before simulation (in °C).                                                |   |
@@ -147,7 +146,6 @@ see doc_thermal-simulations.md
 | `thermal.sensor_xy_halfsize`      | Maximum size of the sensor window for temperature recording (in grid units).                                  |   |
 | `thermal.record_t_at_every_step`  | Whether to record temperature at every time step for the whole sensor window (`1 = yes, 0 = no`).             |   |
 | `thermal.record_t_at_every_step`  | Whether to record temperature at every time step for the whole sensor window (`1 = yes, 0 = no`).             |   |
-  `thermal.continuous_protocol`     | Model a continuous pulsed protocol?                                                                           |   |
 | `heatingvideo`                    | Save a video of incremental heating? (`1 = yes, 0 = no`)                                                      |   |
 
 

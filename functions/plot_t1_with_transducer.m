@@ -23,8 +23,8 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
     arguments
         t1_image (:,:,:) double
         voxel_size_mm (1,1) double
-        trans_pos_grid (1,3) double
-        focus_pos_grid (1,3) double
+        trans_pos_grid (1,:) double
+        focus_pos_grid (1,:) double
         parameters struct
         plot_options.slice_dim (1,1) double = 2 % Default slicing dimension (y-axis)
         plot_options.slice_ind (1,1) double = 0 % Default slice index (transducer position)
@@ -60,8 +60,11 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
 
     %% Highlight focus position on T1 slice
     focus_pos_ind = find(~cellfun(@(x) ~strcmp(x, ':'), slice_pointer)); % Identify dimensions used for slicing
+    try
     res_image(focus_pos_grid(focus_pos_ind(1)) + (-2:2), ... % Draw square around focus position in green channel
               focus_pos_grid(focus_pos_ind(2)) + (-2:2), ...
               2) = 1;
+    catch warning('Boxes may be out of bounds...');
+    end
 
 end

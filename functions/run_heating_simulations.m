@@ -74,24 +74,33 @@ T_max = thermal_diff_obj.T;
 thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
 CEM43_max = thermal_diff_obj.cem43;
 
-[~, on_off_repetitions, on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, post_stim_steps_n, post_stim_time_step_dur] = ...
+[on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, ...
+    post_stim_step_n, post_stim_step_dur] = ...
     check_thermal_parameters(parameters);
 
 time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
 
 % Set final parameters for simulation
-total_timepoints = 1+parameters.thermal.n_trials*(on_off_repetitions*(1+double(off_steps_n>0))+1);
+total_timepoints = 1+parameters.thermal.n_trials*(double(on_steps_n>0)+1);
 cur_timepoint = 1;
-T_focal = gpuArray(NaN([size(T_max,[1,3]) total_timepoints]));
-T_focal(:,:,cur_timepoint) = squeeze(T_max(:,trans_pos(2),:));
 
-CEM43_focal = gpuArray(NaN([size(T_max,[1,3]),total_timepoints]));
-CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_max(:,trans_pos(2),:));
+% Set results for the focal axis (3D; for 2D assume that focal axis is provided)
+if ndims(T_max) == 3
+    T_focal = gpuArray(NaN([size(T_max,[1,3]) total_timepoints]));
+    T_focal(:,:,cur_timepoint) = squeeze(T_max(:,trans_pos(2),:));
+    CEM43_focal = gpuArray(NaN([size(T_max,[1,3]),total_timepoints]));
+    CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_max(:,trans_pos(2),:));
+elseif ndims(T_max) == 2
+    T_focal = gpuArray(NaN([size(T_max,[1,2]) total_timepoints]));
+    T_focal(:,:,cur_timepoint) = squeeze(T_max);
+    CEM43_focal = gpuArray(NaN([size(T_max,[1,2]),total_timepoints]));
+    CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_max);
+end
 
 % Loop over trials, so that the heat can accumulate
 for trial_i = 1:parameters.thermal.n_trials
-  fprintf('Trial %i\n', trial_i)
-
+    fprintf('Trial %i\n', trial_i)
+    
     is_break_period = 0;
     if isfield(parameters, 'start_break_trials')
         for i_break = 1:length(parameters.start_break_trials)
@@ -101,68 +110,84 @@ for trial_i = 1:parameters.thermal.n_trials
         end
     end
     
-  % Calculate the heat accumulation within a trial
-  for pulse_i = 1:on_off_repetitions
-      fprintf('Pulse %i\n', pulse_i)
-
-      if is_break_period == 0
+    % Calculate the heat accumulation within a trial
+    for pulse_i = 1:1
+        fprintf('Pulse %i\n', pulse_i)
+        
+        if is_break_period == 0
           thermal_diff_obj.Q = source.Q;
           tmp_status = 'on';
-      else
+        else
           thermal_diff_obj.Q(:,:,:) = 0;
           tmp_status = 'off';
           disp('Break active');
-      end
-
-      thermal_diff_obj.takeTimeStep(on_steps_n, on_steps_dur);
-      
-      time_status_seq = [time_status_seq, ...
-          struct('time', num2cell(max([time_status_seq(:).time]) + (1:on_steps_n)*on_steps_dur), ...
-                 'step', num2cell(max([time_status_seq(:).step]) + (1:on_steps_n)), ...
+        end
+        
+        thermal_diff_obj.takeTimeStep(on_steps_n, on_steps_dur);
+        
+        time_status_seq = [time_status_seq, ...
+          struct('time', num2cell(max([time_status_seq(:).time]) + (on_steps_n)*on_steps_dur), ...
+                 'step', num2cell(max([time_status_seq(:).step]) + (on_steps_n)), ...
                  'status', tmp_status,...
                  'recorded',1)];
-      curT = thermal_diff_obj.T;
-      curCEM43 = thermal_diff_obj.cem43;
-      cur_timepoint = cur_timepoint+1;
-      T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
-      CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
-
-      % update T_max and CEM43_max where applicable
-      T_max = max(T_max, curT);
-      CEM43_max = max(CEM43_max, curCEM43);
-
-      % Pulse off 
-      if off_steps_n>0
-          thermal_diff_obj.Q(:,:,:) = 0;
-          thermal_diff_obj.takeTimeStep(off_steps_n, off_steps_dur);
-          time_status_seq = [time_status_seq,...
-              struct('time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), ...
-              'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)),...
+        curT = thermal_diff_obj.T;
+        curCEM43 = thermal_diff_obj.cem43;
+        cur_timepoint = cur_timepoint+1;
+        
+        if ndims(T_max) == 3
+            T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+        elseif ndims(T_max) == 2
+            T_focal(:,:,cur_timepoint) = squeeze(curT);
+            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43);
+        end
+        
+        % update T_max and CEM43_max where applicable
+        T_max = max(T_max, curT);
+        CEM43_max = max(CEM43_max, curCEM43);
+        
+        % Pulse off 
+        if off_steps_n>0
+            thermal_diff_obj.Q(:,:,:) = 0;
+            thermal_diff_obj.takeTimeStep(off_steps_n, off_steps_dur);
+            time_status_seq = [time_status_seq,...
+              struct('time', num2cell(max([time_status_seq(:).time]) + (off_steps_n)*off_steps_dur), ...
+              'step', num2cell(max([time_status_seq(:).step]) + (off_steps_n)),...
               'status', "off",...
               'recorded',1)];
-          cur_timepoint = cur_timepoint+1;
-          curT = thermal_diff_obj.T;
-          curCEM43 = thermal_diff_obj.cem43;
-          T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
-          CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
-      end
-  end
+            cur_timepoint = cur_timepoint+1;
+            curT = thermal_diff_obj.T;
+            curCEM43 = thermal_diff_obj.cem43;
+            if ndims(T_max) == 3
+                T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+            elseif ndims(T_max) == 2
+                T_focal(:,:,cur_timepoint) = squeeze(curT);
+                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43);
+            end
+        end
+    end
 end
 
 % Post-stimulation period
-if post_stim_steps_n > 0 
-  thermal_diff_obj.Q(:,:,:) = 0;
-  thermal_diff_obj.takeTimeStep(post_stim_steps_n, post_stim_time_step_dur);
-  time_status_seq = [time_status_seq struct(...
-      'time', num2cell(max([time_status_seq(:).time]) + (1:off_steps_n)*off_steps_dur), ...
-      'step', num2cell(max([time_status_seq(:).step]) + (1:off_steps_n)), ...
+if post_stim_step_n > 0 
+    thermal_diff_obj.Q(:,:,:) = 0;
+    thermal_diff_obj.takeTimeStep(post_stim_step_n, post_stim_step_dur);
+    time_status_seq = [time_status_seq struct(...
+      'time', num2cell(max([time_status_seq(:).time]) + (post_stim_step_n)*post_stim_step_dur), ...
+      'step', num2cell(max([time_status_seq(:).step]) + (post_stim_step_n)), ...
       'status', "off",...
       'recorded',1)];
-  cur_timepoint = cur_timepoint+1;
-  curT = thermal_diff_obj.T;
-  curCEM43 = thermal_diff_obj.cem43;
-  T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
-  CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+    cur_timepoint = cur_timepoint+1;
+    curT = thermal_diff_obj.T;
+    curCEM43 = thermal_diff_obj.cem43;
+    if ndims(T_max) == 3
+        T_focal(:,:,cur_timepoint) = squeeze(curT(:,trans_pos(2),:));
+        CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+    elseif ndims(T_max) == 2
+        T_focal(:,:,cur_timepoint) = squeeze(curT);
+        CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43);
+    end
 end
 
 end

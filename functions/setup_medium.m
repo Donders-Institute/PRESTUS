@@ -21,10 +21,14 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
     grid_of_ones = ones(parameters.grid_dims);
     
     % Fills this grid with a baseline medium
-    if strcmp(parameters.simulation_medium, 'water') || strcmp(parameters.simulation_medium, 'water_and_skull') || strcmp(parameters.simulation_medium, 'layered') 
+    if strcmp(parameters.simulation_medium, 'water') || ...
+            strcmp(parameters.simulation_medium, 'water_and_skull') || ...
+            strcmp(parameters.simulation_medium, 'layered') || ...
+            strcmp(parameters.simulation_medium, 'phantom') 
         baseline_medium_name = 'water';
         baseline_medium = medium.(baseline_medium_name);
-    elseif strcmp(parameters.simulation_medium, 'brain') || strcmp(parameters.simulation_medium, 'brain_and_skull')
+    elseif strcmp(parameters.simulation_medium, 'brain') || ...
+            strcmp(parameters.simulation_medium, 'brain_and_skull')
         baseline_medium_name = 'brain';
         baseline_medium = medium.(baseline_medium_name);
     end
@@ -48,7 +52,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
 
     % Changes the values of the acoustic and thermal properties in the
     % baseline_medium in the shape of the labelled mask
-    if strcmp(parameters.simulation_medium, 'layered')
+    if strcmp(parameters.simulation_medium, 'layered') || strcmp(parameters.simulation_medium, 'phantom')
         labels = fieldnames(parameters.layer_labels);
         % Loops through each labelled layer to create a new mask
         for label_i = 1:length(labels)
@@ -317,17 +321,25 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                           'temp_0', temp_0);
     
     % save images for debugging
-    if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
+    if (contains(parameters.simulation_medium, 'skull') || ...
+            contains(parameters.simulation_medium, 'layered') || ...
+            contains(parameters.simulation_medium, 'phantom'))
+
         if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
-        % filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
-        % niftiwrite(density, filename_density, 'Compressed',true);
-        % filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('matrix_sound_speed'));
-        % niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
-        % filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_0_true'));
-        % niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
-        % filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_power'));
-        % niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
-        % filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
-        % niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
+
+        try
+            filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
+            niftiwrite(density, filename_density, 'Compressed',true);
+            filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('matrix_sound_speed'));
+            niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
+            filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_0_true'));
+            niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+            filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_power'));
+            niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+            filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
+            niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
+        catch
+            warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
+        end
     end
 end

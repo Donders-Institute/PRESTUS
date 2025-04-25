@@ -39,11 +39,16 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     %% Extract tissue indices along the focal axis
 
-    medium_masks_focal = squeeze(medium_masks(trans_pos(1),trans_pos(2),:));
+    if ndims(medium_masks) == 3
+        medium_masks_focal = squeeze(medium_masks(trans_pos(1),trans_pos(2),:));
+    else
+        medium_masks_focal = squeeze(medium_masks(trans_pos(1),:));
+    end
     labels = fieldnames(parameters.layer_labels);
-    skull_i = find(strcmp(labels, 'skull_cortical'));
+    skull_i = find(strcmp(labels, 'skull'));
+    cortical_i = find(strcmp(labels, 'skull_cortical'));
     trabecular_i = find(strcmp(labels, 'skull_trabecular'));
-    all_skull_ids = [skull_i, trabecular_i];
+    all_skull_ids = [skull_i, cortical_i, trabecular_i];
     mask_skull = ismember(medium_masks_focal,all_skull_ids);
     brain_i = find(strcmp(labels, 'brain'));
     mask_brain = ismember(medium_masks_focal,brain_i);
@@ -110,9 +115,22 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     g = figure;
     hold on;
-    p1 = plot(recordedtime, max(focal_CEM(mask_skull, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
-    p2 = plot(recordedtime, max(focal_CEM(mask_skin, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
-    p3 = plot(recordedtime, max(focal_CEM(mask_brain, 1:size(time_status_seq,2)),[],1), 'LineWidth', 2);
+    % create dummy values to avoid crashes when mask is empty
+    data2plot = NaN(numel(recordedtime), 1);
+    if any(find(mask_skull))
+        data2plot = max(focal_CEM(mask_skull, 1:size(time_status_seq,2)),[],1);
+    end
+    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_skin))
+        data2plot = max(focal_CEM(mask_skin, 1:size(time_status_seq,2)),[],1);
+    end
+    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_brain))
+        data2plot = max(focal_CEM(mask_brain, 1:size(time_status_seq,2)),[],1);
+    end
+    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel(sprintf('CEM43'));
@@ -140,32 +158,41 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     end
     if parameters.heatingvideo == 1
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
-        brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.pos_grid(2),:)));
-        output_video_name = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_heating_animation%s.avi', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        if ndims(medium_masks) == 3
+            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.pos_grid(2),:)));
+        elseif ndims(medium_masks) == 2
+            brain_slice = mat2gray(squeeze(medium_masks));
+        end
+        output_video_name = fullfile(parameters.output_dir,...
+            sprintf('sub-%03d_%s_heating_animation%s.avi', ...
+            parameters.subject_id, ...
+            parameters.simulation_medium, ...
+            parameters.results_filename_affix));
         v = VideoWriter(output_video_name,'Uncompressed AVI');
         v.FrameRate = 2; % frames per second
         % Create a video writer object for the output video file and open the object for writing.
         open(v);
+        g = figure('Position', [100 100 304 156]);
         tss_recorded = time_status_seq(find([time_status_seq.recorded]==1));
         %Generate a set of frames, get the frame from the figure, and then write each frame to the file.
         gray_img_brain = repmat(mat2gray(brain_slice),[1 1 3]);
         for k = 1:size(focal_planeT,3) 
             cur_temp = squeeze(focal_planeT(:, :,  k));
             rgbImage = ind2rgb(round((cur_temp-color_limits(1))/diff(color_limits)*256), viridis(256));
-            rgbImage(cur_temp <=37.01) = nan;
+            rgbImage(cur_temp <=37.01) = NaN;
             imshowpair(gray_img_brain, rgbImage, 'blend')
             %set(h, 'AlphaData', 0.2)
             try
-                title(sprintf('Timepoint: %i, time: %.2f s, max temperature: %.2f C, transducer: %s', ...
-                    k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 10)
+                title(sprintf('sample: %i, time: %.2f s\nmax temp: %.2f C, status: %s', ...
+                    k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 8)
+                frame = getframe(gcf);
+                writeVideo(v,frame);
             catch
                 warning("Some parameter is out of bounds")
                 disp(['k:', num2str(k)]);
                 disp(['dim focal plane (3):', num2str(size(focal_planeT,3))]);
                 disp(['dim tss_recorded:', num2str(size(tss_recorded) )]);
             end
-            frame = getframe(gcf);
-            writeVideo(v,frame);
         end
         close(v);
     end
