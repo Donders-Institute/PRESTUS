@@ -86,10 +86,11 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     parameters.simulation_medium = 'water'; % indicate that we only want the simulation in the water medium for now
     parameters.interactive = 0;
-    parameters.overwrite_files = 'never';
+    parameters.overwrite_files = 'always';
     parameters.run_source_setup = 1;
     parameters.run_acoustic_sims = 1;
     parameters.run_heating_sims = 0;
+    parameters.run_posthoc_water_sims = 0;
     parameters.savemat = 1;
     if ismac % if run locally on a mac
         parameters.using_donders_hpc = 0;
@@ -117,9 +118,15 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     % plot 2d intensity map
     h = figure;
-    imagesc((1:size(p_max,1))*parameters.grid_step_mm, ...
-        (1:size(p_max,3))*parameters.grid_step_mm , ...
-        squeeze(p_max(:,parameters.transducer.pos_grid(2),:))')
+    x1 = (1:size(p_max,1))*parameters.grid_step_mm;
+    if ndims(p_max) == 3
+        x2 = (1:size(p_max,3))*parameters.grid_step_mm;
+        y = squeeze(p_max(:,parameters.transducer.pos_grid(2),:))';
+    elseif ndims(p_max) == 2
+        x2 = (1:size(p_max,2))*parameters.grid_step_mm;
+        y = squeeze(p_max(:,:))';
+    end
+    imagesc(x1,x2,y)
     axis image;
     colormap(getColorMap);
     xlabel('Lateral Position [mm]');
@@ -138,8 +145,12 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     % 1949) and implemented in k-wave |focusedAnnulusONeil()| function.
     
     % simulated pressure along the focal axis
-    pred_axial_pressure = squeeze(p_max(parameters.transducer.pos_grid(1),parameters.transducer.pos_grid(2),:)); % get the values at the focal axis
-    
+    if ndims(p_max) == 3
+        pred_axial_pressure = squeeze(p_max(parameters.transducer.pos_grid(1),parameters.transducer.pos_grid(2),:)); % get the values at the focal axis
+    elseif ndims(p_max) == 2
+        pred_axial_pressure = squeeze(p_max(parameters.transducer.pos_grid(1),:));
+    end
+
     % compute O'Neil solution and plot it along with comparisons
     % define transducer parameters
     
@@ -159,12 +170,13 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     % plot focal axis pressure
     h = figure('Position', [10 10 900 500]);
-    plot(axial_position, p_axial_oneil .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+    intensity_oneil = p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density).*1e-4;
+    plot(axial_position, intensity_oneil);
     xlabel('Axial Position [mm]');
     ylabel('Intensity [W/cm^2]');
     hold on
-    plot(axial_position-(parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm, ...
-        pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
+    intensity_simulated = pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density).*1e-4;
+    plot(axial_position-(parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm, intensity_simulated,'--');
     plot(real_profile(:,1),real_profile(:,2))
     hold off
     xline(parameters.expected_focal_distance_mm, '--');
@@ -302,7 +314,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     end
     
     opt_source_amp = round(opt_velocity/velocity*parameters.transducer.source_amp/simulated_grid_adj_factor);
-    
+
     %% Simulate again in water to check the optimization results
 
     % Now we will update the settings with the optimized parameters, and rerun the simulations. 
