@@ -64,18 +64,35 @@ kwave_medium = rmfield(kwave_medium, 'temp_0');
 if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.record_t_at_every_step 
     sensor = [];
 end
-thermal_diff_obj = kWaveDiffusion(kgrid, kwave_medium, source, sensor, 'PlotSim', boolean(parameters.interactive));
+
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+    datacast = 'gpuArray-double';
+else
+    datacast = 'off';
+end    
+
+thermal_diff_obj = kWaveDiffusion(...
+    kgrid, ...
+    kwave_medium, ...
+    source, ...
+    sensor, ...
+    'PlotSim', boolean(parameters.interactive), ...
+    'DataCast', datacast);
 
 % initialize field temperature
-thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+    thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
+end    
 T_max = thermal_diff_obj.T;
 
 % initialize field for cem43
-thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+    thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
+end
 CEM43_max = thermal_diff_obj.cem43;
 
 % initialize field for cem43 (iso variant)
-tmp_obj.cem43_iso = gpuArray(zeros(size(thermal_diff_obj.T)));
+tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
 
 [on_steps_n,  on_steps_dur, off_steps_n, off_steps_dur, ...
     post_stim_step_n, post_stim_step_dur] = ...
@@ -89,14 +106,14 @@ cur_timepoint = 1;
 
 % Set results for the focal axis (3D; for 2D assume that focal axis is provided)
 if ndims(T_max) == 3
-    T_focal = gpuArray(NaN([size(T_max,[1,3]) total_timepoints]));
+    T_focal = NaN([size(T_max,[1,3]) total_timepoints]);
     T_focal(:,:,cur_timepoint) = squeeze(T_max(:,trans_pos(2),:));
-    CEM43_focal = gpuArray(NaN([size(T_max,[1,3]),total_timepoints]));
+    CEM43_focal = NaN([size(T_max,[1,3]),total_timepoints]);
     CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_max(:,trans_pos(2),:));
 elseif ndims(T_max) == 2
-    T_focal = gpuArray(NaN([size(T_max,[1,2]) total_timepoints]));
+    T_focal = NaN([size(T_max,[1,2]) total_timepoints]);
     T_focal(:,:,cur_timepoint) = squeeze(T_max);
-    CEM43_focal = gpuArray(NaN([size(T_max,[1,2]),total_timepoints]));
+    CEM43_focal = NaN([size(T_max,[1,2]),total_timepoints]);
     CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_max);
 end
 
