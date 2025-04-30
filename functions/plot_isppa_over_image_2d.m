@@ -75,8 +75,12 @@ function [h] = plot_isppa_over_image_2d(...
     
     h = figure;
     ax1 = axes;
-    imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask, options.bg_bw_range); % Overlay masks on background slice
-    colormap(ax1, 'grey');
+    if options.bg_bw_range(2)>0
+        imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask, options.bg_bw_range); % Overlay masks on background slice
+    else
+        imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask);
+    end
+    colormap(ax1, 'gray');
     axis image;
     axis off;
 
