@@ -1,5 +1,5 @@
 function [h] = plot_isppa_over_image_2d(...
-    Isppa_map, ...
+    overlay_image, ...
     bg_image, ...
     transducer_bowl, ...
     after_exit_plane_mask, ...
@@ -17,7 +17,7 @@ function [h] = plot_isppa_over_image_2d(...
 % transducer's exit plane.
 %
 % Input:
-%   Isppa_map             - [Nx x Ny] matrix representing the ISppa intensity map.
+%   overlay_image         - [Nx x Ny] matrix representing the overlay image.
 %   bg_image              - [Nx x Ny] matrix representing the background image (e.g., anatomical image).
 %   transducer_bowl       - [Nx x Ny] binary mask representing the transducer bowl region.
 %   after_exit_plane_mask - [Nx x Ny] binary mask for regions after the transducer's exit plane.
@@ -27,15 +27,16 @@ function [h] = plot_isppa_over_image_2d(...
 %   options         - Struct containing optional visualization settings:
 %                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
 %                     * rect_size: Size of rectangles for key positions (default: 2).
-%                     * isppa_threshold_low/high: Thresholds for alpha scaling of ISppa map.
-%                     * isppa_color_range: Range for ISppa map color scaling.
+%                     * overlay_threshold_low/high: Thresholds for alpha scaling of ISppa map.
+%                     * overlay_color_range: Range for overlay map color scaling.
+%                     * bg_bw_range: Black/white min-max range for background map.
 %                     * color_scale: Colormap for ISppa map (default: 'viridis').
 %                     * show_colorbar: Boolean flag to display colorbar (default: 1).
 % Output:
 %   h                     - Handle to the created figure.
 
     arguments
-        Isppa_map (:,:)
+        overlay_image (:,:)
         bg_image (:,:)
         transducer_bowl (:,:)
         after_exit_plane_mask (:,:)
@@ -44,21 +45,25 @@ function [h] = plot_isppa_over_image_2d(...
         max_isppa_pos (:,2)
         options.show_rectangles = 1
         options.rect_size = 2
-        options.isppa_threshold_low (1,1) = min(Isppa_map(:))
-        options.isppa_threshold_high (1,1) = min(Isppa_map(:)) + ...
-            (max(Isppa_map(:)) - min(Isppa_map(:))) * 0.8
-        options.isppa_color_range = []
-        options.use_isppa_alpha (1,1) = 1
+        options.overlay_threshold_low (1,1) = min(overlay_image(:))
+        options.overlay_threshold_high (1,1) = min(overlay_image(:)) + ...
+            (max(overlay_image(:)) - min(overlay_image(:))) * 0.8
+        options.overlay_color_range = []
+        options.bg_bw_range = []
+        options.use_overlay_alpha (1,1) = 1
         options.color_scale = 'viridis'
         options.show_colorbar = 1
     end
 
     %% Set thresholds and color range for ISppa map
-    if options.isppa_threshold_low == options.isppa_threshold_high
-        options.isppa_threshold_low = options.isppa_threshold_low - 0.05;
+    if options.overlay_threshold_low == options.overlay_threshold_high
+        options.overlay_threshold_low = options.overlay_threshold_low - 0.05;
     end
-    if isempty(options.isppa_color_range)
-        options.isppa_color_range = [max([options.isppa_threshold_low, min(Isppa_map(:)), 0]), max(Isppa_map(:))];
+    if isempty(options.overlay_color_range)
+        options.overlay_color_range = [max([options.overlay_threshold_low, min(overlay_image(:)), 0]), max(overlay_image(:))];
+    end
+    if isempty(options.bg_bw_range)
+        options.bg_bw_range = [0 max(bg_image(:))];
     end
 
     %% Normalize and prepare slices for visualization
@@ -70,26 +75,26 @@ function [h] = plot_isppa_over_image_2d(...
     
     h = figure;
     ax1 = axes;
-    imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask); % Overlay masks on background slice
-    colormap(ax1, 'gray');
+    imagesc(bg_slice + transducer_bowl + 0.2 * before_exit_plane_mask, options.bg_bw_range); % Overlay masks on background slice
+    colormap(ax1, 'grey');
     axis image;
     axis off;
 
     ax2 = axes;
 
-    if options.use_isppa_alpha
-        isppa_alpha = rescale(Isppa_map, 'InputMin', options.isppa_threshold_low, 'InputMax', options.isppa_threshold_high);
+    if options.use_overlay_alpha
+        isppa_alpha = rescale(overlay_image, 'InputMin', options.overlay_threshold_low, 'InputMax', options.overlay_threshold_high);
     else
-        isppa_alpha = ones(size(Isppa_map));
-        isppa_alpha(Isppa_map==min(Isppa_map(:))) = 0;
+        isppa_alpha = ones(size(overlay_image));
+        isppa_alpha(overlay_image==min(overlay_image(:))) = 0;
     end
     
-    imagesc(ax2, Isppa_map,'alphadata', isppa_alpha);
+    imagesc(ax2, overlay_image,'alphadata', isppa_alpha);
 
     if exist("clim")==2 % renamed in R2022a
-        clim(options.isppa_color_range);
+        clim(options.overlay_color_range);
     elseif exist("caxis")==2
-        caxis(options.isppa_color_range);
+        caxis(options.overlay_color_range);
     end
     colormap(ax2, options.color_scale);
 
