@@ -137,6 +137,7 @@ see doc_thermal-simulations.md
 | `thermal.post_stim_dur`           | Duration of post-stimulation period (in seconds).                           |   |
 | `thermal.post_time_steps`         | Step size of post-stimulation recordings (in seconds). If not specificed, the step size is identical to sim_time_steps.                         |   |
 | `thermal.equal_steps`             | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
+| `thermal.cem43_iso`             | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                        |   |
 | `thermal.temp_0.water`            | Initial temperature of water medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.skull`            | Initial temperature of skull medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.brain`            | Initial temperature of brain medium before simulation (in °C).                                                |   |

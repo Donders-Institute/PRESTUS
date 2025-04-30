@@ -42,8 +42,6 @@ The following is a possible trial-by-trial design.
 
 # Parameters explained
 
-## Parameters that should be changed with caution
-
 These parameters influence the underlying mechanisms of how the thermal simulations are run.
 
 - `sim_time_steps` refer to the duration of each simulated step, so the length of the loop.
@@ -57,9 +55,33 @@ Not meeting the following assumptions can prevent the thermal simulations from r
 - `cycle_duration / pri_duration` should produce an integer.
 - `cycle_duration` is the product of `stim_duration / pri_duration`.
 
-## Optional parameters
+### Optional parameters
 
 - `post_stim_dur` refers to the duration of a post-stimulation period.
 - `temp_0` refers to the starting temperature in degrees, and can be specified for each tissue separately.
 - `sensory_xy_halfsize` refers to the window along the transducer axis in which temperature changed are recorded.
 - `record_t_at_every_step` can be enabled if there is a need to record temperature changes at every time step, but can lead to `out of memory` errors.
+
+### Thermal dose calculation
+
+There are two implementations of thermal dose calculations:
+
+- By default, PRESTUS calculates CEM43 as implemented in kWave's kWaveDiffusion.
+
+```
+obj.cem43 = obj.cem43 + ...
+        dt ./ 60 .* ...
+        (0.25 .* (obj.T >= 37 & obj.T < 43 ) + ...
+        0.5 .* (obj.T >= 43)).^(43 - obj.T);
+```
+
+- By setting ```paramaters.thermal.cem43_iso``` to 1, PRESTUS calculates CEM43 according to ISO standards. This variant defines CEM43 as zero below 39 degrees Celsius, sets it to infinite above 57 degrees, and applies a scaling of 0.5 to all voxels that have crossed 43 degrees in the past (not just following the most recent energy update).
+
+```
+ obj.cem43_iso = obj.cem43_iso + ...
+        dt ./ 60 .* ...
+        (0 .* (obj.T < 39) + ...
+        0.25 .* (obj.T >= 39 & obj.T < 43 ) + ...
+        0.5 .* (obj.T >= 43 || T_max >= 43) + ...
+        Inf .* (obj.T >= 57)).^(43 - obj.T);
+```
