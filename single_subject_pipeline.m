@@ -423,25 +423,36 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         skin_i = find(strcmp(labels, 'skin'));
         mask_skin = ismember(medium_masks,skin_i);
         
-        % Overwrites the max Isppa by dividing it up into the max Isppa for
-        % each layer in case a layered simulation_medium was selected
-        if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-            [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = masked_max_3d(acoustic_isppa, mask_brain);
+        % Layer-specific outcomes (in case a layered simulation)
+        if contains(parameters.simulation_medium, 'skull') || ...
+                strcmp(parameters.simulation_medium, 'layered') || ...
+                strcmp(parameters.simulation_medium, 'phantom')
+
+            % calculate max. isppa and location across full space
+            [~, Ix, Iy, Iz] = masked_max_3d(acoustic_isppa, ones(size(medium_masks)));
+            
+            % extract indices in brain medium
+            [max_Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = ...
+                masked_max_3d(acoustic_isppa, mask_brain);
             [min_Isppa_brain] = min(acoustic_isppa(mask_brain));
             half_max = acoustic_isppa >= max_Isppa_brain/2 & mask_brain;
             half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid_step_mm^3);
-            [max_pressure_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_pressure, mask_brain);
-            [max_MI_brain, Px_brain, Py_brain, Pz_brain] = masked_max_3d(acoustic_MI, mask_brain);
+            [max_pressure_brain] = masked_max_3d(acoustic_pressure, mask_brain);
+            [max_MI_brain] = masked_max_3d(acoustic_MI, mask_brain);
             
-            [max_Isppa_skull, Ix_skull, Iy_skull, Iz_skull] = masked_max_3d(acoustic_isppa, mask_skull);
-            [max_pressure_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_pressure, mask_skull);
-            [max_MI_skull, Px_skull, Py_skull, Pz_skull] = masked_max_3d(acoustic_MI, mask_skull);
+            % extract indices in skull medium
+            [max_Isppa_skull] = masked_max_3d(acoustic_isppa, mask_skull);
+            [max_pressure_skull] = masked_max_3d(acoustic_pressure, mask_skull);
+            [max_MI_skull] = masked_max_3d(acoustic_MI, mask_skull);
             
-            [max_Isppa_skin, Ix_skin, Iy_skin, Iz_skin] = masked_max_3d(acoustic_isppa, mask_skin);
-            [max_pressure_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_pressure, mask_skin);
-            [max_MI_skin, Px_skin, Py_skin, Pz_skin] = masked_max_3d(acoustic_MI, mask_skin);
+            % extract indices in skin medium
+            [max_Isppa_skin] = masked_max_3d(acoustic_isppa, mask_skin);
+            [max_pressure_skin] = masked_max_3d(acoustic_pressure, mask_skin);
+            [max_MI_skin] = masked_max_3d(acoustic_MI, mask_skin);
     
-            highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
+            % calculate real focal distance based on max isppa in whole medium
+            highlighted_pos = [Ix, Iy, Iz];
+            highlighted_pos = highlighted_pos(1:ndims(trans_pos_final));
             real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
     
             writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
@@ -571,7 +582,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         output_table.maxCEM43 = max(heating_CEM43, [], 'all');
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
-        if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+        if contains(parameters.simulation_medium, 'skull') || ...
+                strcmp(parameters.simulation_medium, 'layered') || ...
+                strcmp(parameters.simulation_medium, 'phantom')
             output_table.maxT_brain = masked_max_3d(heating_maxT, mask_brain);
             output_table.maxT_skull = masked_max_3d(heating_maxT, mask_skull); 
             output_table.maxT_skin = masked_max_3d(heating_maxT, mask_skin);
