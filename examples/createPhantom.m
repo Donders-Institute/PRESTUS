@@ -1,6 +1,23 @@
 % Create a 2D nifti image according to the desired tissue specification
 
-%% Create a 1 mm version
+%% Benchmark 1: Create a 1 mm version
+
+% Initialize the matrix with global value 0
+data = zeros(120, 70);
+% Generate coordinate grids for each pixel
+[X, Y] = meshgrid(1:70, 1:120);
+% Fill region with white matter (soft tissue) labels
+data(30:120,:) = 1;
+% Reshape data to 3D for NIfTI compatibility
+data_3d = reshape(data, [120, 70, 1]);
+% Invert image to match what we would like
+% data_3d = data_3d(end:-1:1,:,:);
+% Write the data to a NIfTI file with 1x1x1 mm voxel size
+niftiwrite(data_3d, 'benchmark1.nii');
+
+% Note: copy this to a file called final_tissues.nii.gz in m2m_sub-xxx folder in the simnibs folder.
+
+%% Benchmark 2: Create a 1 mm version
 
 % Step 1: Initialize the matrix with global value 0 (dimensions: 120 rows (y), 70 columns (x))
 data = zeros(120, 70);
@@ -18,7 +35,7 @@ distance = sqrt((X - center_x).^2 + (Y - center_y).^2);
 % Step 5: Assign values based on distance from center and y position
 % Only fill below the center (Y >= center_y)
 annulus_mask = (distance > 68.5) & (distance <= 75) & (Y >= center_y);
-inner_mask   = (distance <= 68.5) & (Y >= center_y);
+inner_mask   = (distance <= 68.5);
 
 data(annulus_mask) = 4;    % Annular layer
 data(inner_mask)   = 1;    % Inner region
