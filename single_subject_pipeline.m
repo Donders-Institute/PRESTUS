@@ -652,7 +652,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % ============================================================================
     % plot various metrics on both the subject-space T1 image and in MNI space
 
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+    if contains(parameters.simulation_medium, 'skull') || ...
+            strcmp(parameters.simulation_medium, 'layered') || ...
+            strcmp(parameters.simulation_medium, 'phantom')
 
         data_types = "medium_masks";
         if parameters.acoustics_available == 1 
@@ -685,26 +687,31 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
             if confirm_overwriting(orig_file_with_ext, parameters)
-                % Transforms the data to original T1 image dimensions and orientation
-                orig_hdr = t1_header;
-
-                if strcmp(data_type, "medium_masks")
-                    data_backtransf = tformarray(uint8(data), inv_final_transformation_matrix, ...
-                                            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
-
-                    orig_hdr.Datatype = 'uint8';
-                    orig_hdr.BitsPerPixel = 8;
+                if ~strcmp(parameters.simulation_medium, 'phantom')
+                    % Transforms the data to original T1 image dimensions and orientation
+                    orig_hdr = t1_header;
+    
+                    if strcmp(data_type, "medium_masks")
+                        data_backtransf = tformarray(uint8(data), inv_final_transformation_matrix, ...
+                                                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
+    
+                        orig_hdr.Datatype = 'uint8';
+                        orig_hdr.BitsPerPixel = 8;
+                    else
+                        data_backtransf = tformarray(data, inv_final_transformation_matrix, ...
+                                                makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
+                        
+                        orig_hdr.Datatype = 'single';
+                    end
+                    niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
                 else
-                    data_backtransf = tformarray(data, inv_final_transformation_matrix, ...
-                                            makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
-                    
-                    orig_hdr.Datatype = 'single';
+                    niftiwrite(data, orig_file, 'Compressed', true);
                 end
-                niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true)
             else 
                 data_backtransf = niftiread(orig_file_with_ext);
             end
-            if strcmp(data_type, "isppa")
+
+            if strcmp(data_type, "isppa") && ~strcmp(parameters.simulation_medium, 'phantom')
                 % Creates a visual overlay of the transducer
                 backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
                 [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
@@ -736,12 +743,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             end
             
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
-                
-            if ~confirm_overwriting(mni_file, parameters)
+            
+            % transform outputs to MNI space (using SimNibs or applying transformation matrix)
+            if ~confirm_overwriting(mni_file, parameters) || strcmp(parameters.simulation_medium, 'phantom')
                 continue
             end
             if strcmp(parameters.segmentation_software, 'headreco')
-                
                 if strcmp(data_type, "medium_masks")
                    convert_final_to_MNI_matlab(data, m2m_folder, inv_final_transformation_matrix, parameters, 'nifti_filename', mni_file,  'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
                 else
