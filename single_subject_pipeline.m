@@ -763,7 +763,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         clear data acoustic_* heating_* mask_* temp_0
         
         % Since charm does not transform the T1 into MNI space, one is manually created here
-        if strcmp(parameters.segmentation_software, 'charm')
+        if strcmp(parameters.segmentation_software, 'charm') && ~strcmp(parameters.simulation_medium, 'phantom')
             path_to_input_img = fullfile(m2m_folder,'T1.nii.gz');
             path_to_output_img = fullfile(m2m_folder,'toMNI','T1_to_MNI_post-hoc.nii.gz');
 
