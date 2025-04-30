@@ -62,12 +62,12 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
     if isfield(parameters, 'hcp_partition') && ~isempty(parameters.hcp_partition)
         fprintf(fid, '#SBATCH --partition=%s\n', parameters.hcp_partition);
-    else
+    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
         fprintf(fid, '#SBATCH --partition=gpu\n');
     end
     if isfield(parameters, 'hcp_gpu') && ~isempty(parameters.hcp_gpu)
         fprintf(fid, '#SBATCH --gres=%s\n', parameters.hcp_gpu);
-    else
+    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
     if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
