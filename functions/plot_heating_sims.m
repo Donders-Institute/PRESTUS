@@ -61,9 +61,25 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     h = figure;
     hold on;
-    p1 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-    p2 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-    p3 = plot(recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    % create dummy values to avoid crashes when mask is empty
+    data2plot = NaN(numel(recordedtime), 1);
+    if any(find(mask_skull))
+        data2plot = max(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),[],1);
+    end
+    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_skin))
+        data2plot = max(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),[],1);
+    end
+    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_brain))
+        data2plot = max(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),[],1);
+    end
+    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -80,7 +96,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     hold off
     legend([p1, p2, p3], {'skull'; 'skin'; 'brain'});
     legend('boxoff');
-    title('Temperature in focal plane (avg. in tissue)');
+    title('Temperature in focal plane (max. in tissue)');
     saveas(h, output_plot, 'png');
     close(h);
 
@@ -88,9 +104,25 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     h = figure;
     hold on;
-    p1 = plot(recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-    p2 = plot(recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-    p3 = plot(recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+    % create dummy values to avoid crashes when mask is empty
+    data2plot = NaN(numel(recordedtime), 1);
+    if any(find(mask_skull))
+        data2plot = max(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),[],1);
+    end
+    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_skin))
+        data2plot = max(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),[],1);
+    end
+    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    if any(find(mask_brain))
+        data2plot = max(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),[],1);
+    end
+    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -107,7 +139,7 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     hold off
     legend([p1, p2, p3], {'skull'; 'skin'; 'brain'}, 'location', 'NorthWest');
     legend('boxoff');
-    title('Temperature rise in focal plane (avg. in tissue)');
+    title('Temperature rise in focal plane (max. in tissue)');
     saveas(h, output_plot_rise, 'png');
     close(h);
 
