@@ -84,36 +84,50 @@ To set up a specific application, an additional `config_xxx.yaml` should be prov
 | `medium.water.density`                            | Density of water (in kg/m³).                                                      | Tissue Properties DB.|
 | `medium.water.alpha_0_true`                       | Attenuation coefficient for water (in dB/cm/MHz).                                 | k-Plan documentation.|
 | `medium.water.alpha_power_true`                   | Exponent for attenuation coefficient power law for water.                         | Tissue Properties DB.|
+| `medium.water.thermal_conductivity`               | Thermal conductivity of water (in W/m/°C).                                        | Tissue Properties DB.| 
+| `medium.water.specific_heat_capacity`             | Specific heat capacity of water [J/kg/°C].                                        | Tissue Properties DB.| 
+| `medium.water.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.water.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
 | `medium.skull.sound_speed`                        | Speed of sound in skull bone (in m/s).                                            | ITRUSST benchmarks.  |
 | `medium.skull.density`                            | Density of skull bone (in kg/m³).                                                 | ITRUSST benchmarks.  |
 | `medium.skull.alpha_0_true`                       | Attenuation coefficient at for skull bone (in dB/cm/MHz).                         | Pinton et al., 2011. |
 | `medium.skull.alpha_power_true`                   | Exponent for attenuation coefficient power law for skull bone.                    | k-Plan documentation.|
 | `medium.skull.thermal_conductivity`               | Thermal conductivity of skull bone (in W/m/°C).                                   | Tissue Properties DB.| 
 | `medium.skull.specific_heat_capacity`             | Specific heat capacity of skull bone (in J/kg/°C).                                | Tissue Properties DB.| 
+| `medium.skull.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.skull.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
 | `medium.brain.sound_speed`                        | Speed of sound in brain tissue (in m/s).                                          | Tissue Properties DB.|
 | `medium.brain.density`                            | Density of brain tissue (in kg/m³).                                               | Tissue Properties DB.|
-| `medium.brain.alpha_0_true`                       | Attenuation coefficient at for brain tissue (in dB/cm/MHz).                       | k-Plan documentation.|
+| `medium.brain.alpha_0_true`                       | Attenuation coefficient for brain tissue (in dB/cm/MHz).                          | k-Plan documentation.|
 | `medium.brain.alpha_power_true`                   | Exponent for attenuation coefficient power law for brain tissue.                  | k-Plan documentation.|
 | `medium.brain.thermal_conductivity`               | Thermal conductivity of brain tissue (in W/m/°C).                                 | Tissue Properties DB.| 
 | `medium.brain.specific_heat_capacity`             | Specific heat capacity of brain tissue (in J/kg/°C).                              | Tissue Properties DB.| 
+| `medium.brain.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.brain.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
 | `medium.skin.sound_speed`                         | Speed of sound in skin tissue (in m/s).                                           | ITRUSST benchmarks.  |
 | `medium.skin.density`                             | Density of skin tissue (in kg/m³).                                                | ITRUSST benchmarks.  |
 | `medium.skin.alpha_0_true`                        | Attenuation coefficient for skin tissue (in dB/cm/MHz).                           | ITRUSST benchmarks.  |
 | `medium.skin.alpha_power_true`                    | Exponent for attenuation coefficient power law for skin tissue.                   | ITRUSST benchmarks.  |
 | `medium.skin.thermal_conductivity`                | Thermal conductivity of skin tissue (in W/m/°C).                                  | Tissue Properties DB.| 
 | `medium.skin.specific_heat_capacity`              | Specific heat capacity of skin tissue (in J/kg/°C).                               | Tissue Properties DB.| 
+| `medium.skin.perfusion`                           | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.skin.absorption_fraction`                 | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. |
 | `medium.skull_trabecular.sound_speed`             | Speed of sound in trabecular bone (in m/s).                                       | ITRUSST benchmarks.  |
 | `medium.skull_trabecular.density`                 | Density of trabecular bone (in kg/m³).                                            | ITRUSST benchmarks.  |
 | `medium.skull_trabecular.alpha_0_true`            | Attenuation coefficient for trabecular bone (in dB/cm/MHz).                       | Pinton et al., 2011. |
 | `medium.skull_trabecular.alpha_power_true`        | Exponent for attenuation coefficient power law for trabecular bone.               | k-Plan documentation.|
 | `medium.skull_trabecular.thermal_conductivity`    | Thermal conductivity of trabecular bone (in W/m/°C).                              | Tissue Properties DB.| 
 | `medium.skull_trabecular.specific_heat_capacity`  | Specific heat capacity of trabecular bone (in J/kg/°C).                           | Tissue Properties DB.| 
+| `medium.skull_trabecular.perfusion`               | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.skull_trabecular.absorption_fraction`     | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. |  
 | `medium.skull_cortical.sound_speed`               | Speed of sound in cortical bone (in m/s).                                         | ITRUSST benchmarks.  |
 | `medium.skull_cortical.density`                   | Density of cortical bone (in kg/m³).                                              | ITRUSST benchmarks.  |
 | `medium.skull_cortical.alpha_0_true`              | Attenuation coefficient for cortical bone (in dB/cm/MHz).                         | Pinton et al., 2011. |
 | `medium.skull_cortical.alpha_power_true`          | Exponent for attenuation coefficient power law for cortical bone.                 | k-Plan documentation.|
 | `medium.skull_cortical.thermal_conductivity`      | Thermal conductivity of cortical bone (in W/m/°C).                                | Tissue Properties DB.| 
 | `medium.skull_cortical.specific_heat_capacity`    | Specific heat capacity of cortical bone (in J/kg/°C).                             | Tissue Properties DB.| 
+| `medium.skull_cortical.perfusion`                 | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
+| `medium.skull_cortical.absorption_fraction`       | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
 
 
 ### pseudoCT mapping to skull properties
