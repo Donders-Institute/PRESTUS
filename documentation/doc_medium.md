@@ -31,15 +31,20 @@ PRESTUS supports various medium configurations. These can be specified with ```p
 ### Default medium properties
 
 The following are the current default medium properties in a full layered simualtion. Parameters are specified in the default_config.yaml file (see doc_config.md).
+When a homogeneous skull layer is requested, the default assumes the medium properties of cortical bone.
 
-| Tissue           | Density [kg/m³] | Sound Speed [m/s] | Absorption Coefficient [dB/(cm·MHzy)]      | Absorption Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion (WIP) | Absorption Fraction* (WIP) |
+| Tissue           | Density [kg/m³] | Sound Speed [m/s] | Absorption Coefficient [dB/(cm·MHzy)]      | Absorption Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption Fraction [Note1] |
 |------------------|--------|----------|----------|-------|--------|------|-------|---|
 | Water            | 994    | 1500     | 0.00217  | 2     | 0.6    | 4178 | 0     | 1 |
 | Brain            | 1046   | 1546     | 0.59     | 1.2   | 0.51   | 3630 | 559   | 1 |
 | Skin             | 1090   | 1610     | 0.4      | 1     | 0.37   | 3391 | 106   | 1 |
-| Skull-trabecular | 1700   | 2300     | 13.3     | 1     | 0.32   | 2274 | 30    | 1 |
-| Skull-cortical   | 1850   | 2800     | 13.3     | 1     | 0.3    | 1313 | 10    | 1 |
+| Skull-trabecular | 1700   | 2300     | 13.3     | 1     | 0.32   | 2274 | 30    | 0.28 |
+| Skull-cortical   | 1850   | 2800     | 13.3     | 1     | 0.3    | 1313 | 10    | 0.28 |
 
-* The fraction of attenuation (alpha) that is assumed to be absorbed in the bioheat equation (heating simulations).
+[Note1] The fraction of attenuation (alpha) that is assumed to be absorbed in the bioheat equation (heating simulations). The value for skull is informed as follows: The bulk attenuation coefficient includes contributions from both longitudinal and shear waves. However, longitudinal waves contribute most (~ 80%,  Wang et al., 2018) to absorption and heating in the skull (Pinton et al., 2012; White et al., 2006). For longitudinal and shear waves, attenuation values of 2.7 dB/cm2/MHz, and 5.4 dB/cm2/MHz have been reported (Pinto et al., 2012), with a global attenuation of 13.3 dB/cm2/MHz. As such, we assume: absorption fraction = (longitudinal wave attenuation + 0.2 * shear wave attenuation) / global attenuation. This yields (2.7+0.2*5.4)/13.3 = 0.28.
 
-When only a binary skull layer is requested, the default assumes the medium properties of cortical bone.
+*References*
+
+- Pinton G, Aubry J, Bossy E, Muller M, Pernot M, Tanter M. Attenuation, scattering, and absorption of ultrasound in the skull bone. Méd Phys 2012;39:299–307. https://doi.org/10.1118/1.3668316.
+- Wang X-D, Lin W-J, Su C, Wang X-M. Influence of mode conversions in the skull on transcranial focused ultrasound and temperature fields utilizing the wave field separation method: A numerical study. Chin Phys B 2018;27:024302. https://doi.org/10.1088/1674-1056/27/2/024302.
+- White PJ, Clement GT, Hynynen K. Longitudinal and shear mode ultrasound propagation in human skull bone. Ultrasound Med Biol 2006;32:1085–96. https://doi.org/10.1016/j.ultrasmedbio.2006.03.015.

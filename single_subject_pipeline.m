@@ -222,42 +222,27 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     else
         kwave_medium = setup_medium(parameters, medium_masks);
     end
-
-    % split temp_0 from kwave_medium (due to kwave checks)
-    temp_0 = kwave_medium.temp_0;
-    kwave_medium = rmfield(kwave_medium, 'temp_0');
     
-    % save medium images for debugging
+    % save images of assigned medium properties
     if (contains(parameters.simulation_medium, 'skull') || ...
             contains(parameters.simulation_medium, 'layered'))
-                
-        orig_hdr = t1_header; % header is based on original T1w (always present)
-        orig_hdr.Datatype = 'single';
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'sound_speed')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'density')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'alpha_coeff')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'alpha_power')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'thermal_conductivity')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'specific_heat')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'perfusion_coeff')
+        medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'absorption_fraction')
+    end
 
-        filename_density = fullfile(parameters.debug_dir, sprintf('density'));
-        density = single(tformarray(kwave_medium.density, inv_final_transformation_matrix, ...
-            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        if ~isfile(filename_density)
-            niftiwrite(density, filename_density, orig_hdr, 'Compressed',true);
-        end
-        clear filename_density density;
-        
-        filename_sound_speed = fullfile(parameters.debug_dir, sprintf('sound_speed'));
-        sound_speed = single(tformarray(kwave_medium.sound_speed, inv_final_transformation_matrix, ...
-            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        if ~isfile(filename_sound_speed)
-            niftiwrite(sound_speed, filename_sound_speed, orig_hdr, 'Compressed',true);
-        end
-        clear filename_sound_speed sound_speed;
-        
-        filename_alpha_coeff = fullfile(parameters.debug_dir, sprintf('alpha_coeff'));
-        alpha_coeff = single(tformarray(kwave_medium.alpha_coeff, inv_final_transformation_matrix, ...
-            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
-        if ~isfile(filename_alpha_coeff)
-            niftiwrite(alpha_coeff, filename_alpha_coeff, orig_hdr, 'Compressed',true);
-        end
-        clear filename_alpha_coeff alpha_coeff;
-    end    
+    % split temp_0 & absorption_fraction from kwave_medium (due to kwave checks)
+    temp_0 = kwave_medium.temp_0;
+    kwave_medium = rmfield(kwave_medium, 'temp_0');
+    absorption_fraction = kwave_medium.absorption_fraction;
+    kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
+    perfusion_coeff = kwave_medium.perfusion_coeff;
+    kwave_medium = rmfield(kwave_medium, 'perfusion_coeff');
 
     %% SETUP SOURCE
     % =========================================================================
@@ -323,6 +308,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
         sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, ...
             kwave_input_args, parameters);
+
+        % re-add fields for future loading
+        kwave_medium.temp_0 = temp_0;
+        kwave_medium.absorption_fraction = absorption_fraction;
+        kwave_medium.perfusion_coeff = perfusion_coeff;
+
         if isfield(parameters, 'savemat') && parameters.savemat==0
             disp("Not saving acoustic output matrices ...")
         else
@@ -526,9 +517,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             end
             sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
-            % add starting temperature
-            kwave_medium.temp_0 = temp_0;
-
             % if k-plan pseudoCT setup is used, density and sound speed in bone are fixed for heating sims
             % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
             if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
@@ -536,6 +524,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 kwave_medium.sound_speed(medium_masks==mask_skull) = ...
                     1.33*kwave_medium.density(medium_masks==mask_skull)+167; 
             end
+
+            % convert attenuation into absorption
+            kwave_medium.alpha_coeff = kwave_medium.alpha_coeff .* kwave_medium.absorption_fraction;
 
             % For more documentation, see 'run_heating_simulations'
             [kwaveDiffusion, ...

@@ -39,17 +39,28 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 % thermal parameters, see doc_thermal_simulations.                  %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
-% Convert the absorption coefficients to nepers/m (!)
-% for the following, see also fitPowerLawParamsMulti.m
-% define frequency in rad/s
-w = 2*pi*parameters.transducer.source_freq_hz;
-% convert absorption to Nepers/((rad/s)^y m)
-a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power);
+% convert the absorption coefficients to nepers/m (!)
+% see also fitPowerLawParamsMulti.m
+w = 2*pi*parameters.transducer.source_freq_hz; % Frequency [rad/s]
+a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power); % [Nepers/((rad/s)^y m)]
 alpha_np = a0_np.*w.^kwave_medium.alpha_power;
 clear w a0_np;
 
 % alternative simplified conversion dB to Nepers
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (parameters.transducer.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
+
+% save absorption coefficient [Np] for debugging
+if (contains(parameters.simulation_medium, 'skull') || ...
+        contains(parameters.simulation_medium, 'layered') || ...
+        contains(parameters.simulation_medium, 'phantom'))
+    if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
+    try
+        filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
+        niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
+    catch
+        warning("Error with saving absorption debug image...")
+    end
+end
 
 % Get the maximum pressure (in Pa) and calculate Q, the volume rate of heat deposition
 p = gather(abs(sensor_data.p_max_all));
@@ -57,8 +68,16 @@ source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_spe
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
 clear alpha_np p;
 
-% split temp_0 off from kWave_medium
+% remove unexpected fields from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');
+kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
+
+% if perfusion was specified, implement it by specifying blood temperature
+if ~all(isnan(kwave_medium.perfusion_coeff))
+    kwave_medium.blood_ambient_temperature = 37; % [degC]
+else
+    kwave_medium = rmfield(kwave_medium, 'perfusion_coeff');
+end
 
 % create kWaveDiffusion object
 if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.record_t_at_every_step 

@@ -100,50 +100,62 @@ default_grid_size: 144
 default_grid_dims: [144, 144, 400]
 
 # Medium properties, references: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
-# Note: defined at 500 kHz, use with abundant caution, see https://github.com/Donders-Institute/PRESTUS/issues/40!
+# Note: attenuation values remain debated, use defaults with caution, see https://github.com/Donders-Institute/PRESTUS/issues/40!
 medium:
   water:
-    sound_speed: 1500 # [m/s] ITRUSST benchmarks 
-    density: 994 # [kg/m^3] Tissue Properties DB or waterDensity(37) function in kWave
-    alpha_0_true: 2.17e-3  # k-Plan https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#evaluating-plans
-    alpha_power_true: 2 # k-Plan
-    thermal_conductivity: 0.60 # [W/m/°C] Tissue Properties DB
-    specific_heat_capacity: 4178 # [J/kg/°C] Tissue Properties DB
+    sound_speed: 1500
+    density: 994
+    alpha_0_true: 2.17e-3
+    alpha_power_true: 2
+    thermal_conductivity: 0.60 # [W/m/°C]
+    specific_heat_capacity: 4178 # [J/kg/°C]
+    perfusion: 0
+    absorption_fraction: 1
   skull: # cortical bone 
-    sound_speed: 2800 # [m/s], ITRUSST benchmarks 
-    density: 1850 # [kg/m^3], ITRUSST benchmarks
-    alpha_0_true: 13.3 # Pinton et al., 2011
-    alpha_power_true: 1 # k-Plan
-    thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
-  brain:
-    sound_speed: 1546 # [m/s] Tissue Properties DB 
-    density: 1046 # [kg/m^3], ITRUSST benchmarks or waterDensity(temp_0)
-    alpha_0_true: 0.59 # k-Plan
-    alpha_power_true: 1.2 # k-Plan
-    thermal_conductivity: 0.51 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 3630 # [J/kg/°C] Tissue Properties DB
-  skin:
-    sound_speed: 1610 # [m/s], ITRUSST benchmarks 
-    density: 1090 # [kg/m^3], ITRUSST benchmarks
-    alpha_0_true: 0.4 # ITRUSST benchmarks
+    sound_speed: 2800 # [m/s]
+    density: 1850 # [kg/m^3]
+    alpha_0_true: 13.3
     alpha_power_true: 1
-    thermal_conductivity: 0.37 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 3391 # [J/kg/°C] Tissue Properties DB
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 1313 # [J/kg/°C]
+    perfusion: 10
+    absorption_fraction: 0.28
+  brain:
+    sound_speed: 1546 # [m/s]
+    density: 1046 # [kg/m^3]
+    alpha_0_true: 0.59
+    alpha_power_true: 1.2
+    thermal_conductivity: 0.51 # [W/m/°C]
+    specific_heat_capacity: 3630 # [J/kg/°C]
+    perfusion: 559
+    absorption_fraction: 1
+  skin:
+    sound_speed: 1610 # [m/s]
+    density: 1090 # [kg/m^3]
+    alpha_0_true: 0.4
+    alpha_power_true: 1
+    thermal_conductivity: 0.37 # [W/m/°C]
+    specific_heat_capacity: 3391 # [J/kg/°C]
+    perfusion: 106
+    absorption_fraction: 1
   skull_trabecular: # trabecular bone
-    sound_speed: 2300 # [m/s], ITRUSST benchmarks 
-    density: 1700 # [kg/m^3], ITRUSST benchmarks
-    alpha_0_true: 13.3 # k-Plan, Pinton et al., 2011
-    alpha_power_true: 1 # k-Plan
-    thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 2274 # [J/kg/°C] Tissue Properties DB
+    sound_speed: 2300 # [m/s]
+    density: 1700 # [kg/m^3]
+    alpha_0_true: 13.3
+    alpha_power_true: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 2274 # [J/kg/°C]
+    perfusion: 30
+    absorption_fraction: 0.28
   skull_cortical: # cortical bone
-    sound_speed: 2800 # [m/s], ITRUSST benchmarks 
-    density: 1850 # [kg/m^3], ITRUSST benchmarks
-    alpha_0_true: 13.3 # k-Plan, Pinton et al., 2011
-    alpha_power_true: 1 # k-Plan
-    thermal_conductivity: 0.32 # [W/m/°C] Tissue Properties DB 
-    specific_heat_capacity: 1313 # [J/kg/°C] Tissue Properties DB
+    sound_speed: 2800 # [m/s]
+    density: 1850 # [kg/m^3]
+    alpha_0_true: 13.3
+    alpha_power_true: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 1313 # [J/kg/°C]
+    perfusion: 10
+    absorption_fraction: 0.28
 
 # Radius of the target area around the focus in which the ISPPA is averaged for the outputs
 focus_area_radius: 5 # [mm]

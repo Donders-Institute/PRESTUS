@@ -33,19 +33,25 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         baseline_medium = medium.(baseline_medium_name);
     end
     
-    % 'sound_speed' and 'density' are 3D arrays determining the speed of sound and the medium density within the simulation grid
+    % create matrices for medium properties
     sound_speed = baseline_medium.sound_speed*grid_of_ones; 
     density = baseline_medium.density*grid_of_ones;
     alpha_0_true = baseline_medium.alpha_0_true*grid_of_ones;
     alpha_power_true = baseline_medium.alpha_power_true*grid_of_ones;
-
-    % 'thermal conductivity' and 'specific_heat' are constants that define
-    % the transmission of heat and the amount of heat required to change
-    % the temperature within a givven mass of the tissue.
-    thermal_conductivity = baseline_medium.thermal_conductivity * grid_of_ones;                                    % [W/(m.K)]
-    specific_heat = baseline_medium.specific_heat_capacity * grid_of_ones;                                         % [J/(kg.K)]
+    thermal_conductivity = baseline_medium.thermal_conductivity*grid_of_ones;       % [W/(m.K)]
+    specific_heat = baseline_medium.specific_heat_capacity*grid_of_ones;            % [J/(kg.K)]
+    if isfield(baseline_medium, 'perfusion')
+        perfusion = baseline_medium.perfusion*grid_of_ones;
+    else
+        perfusion = NaN.*grid_of_ones;
+    end
+    if isfield(baseline_medium, 'absorption_fraction')
+        absorption_fraction = baseline_medium.absorption_fraction*grid_of_ones;
+    else
+        absorption_fraction = grid_of_ones; % default: convert entire attenuation to absorption
+    end
     if isfield(parameters.thermal.temp_0, baseline_medium_name)
-        temp_0 = parameters.thermal.temp_0.(baseline_medium_name) * grid_of_ones;                                  % [degC]
+        temp_0 = parameters.thermal.temp_0.(baseline_medium_name) * grid_of_ones;   % [degC]
     else % if a global temp0 is indicated
         temp_0 = parameters.thermal.temp_0 * grid_of_ones;
     end
@@ -66,6 +72,12 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                 skull_idx = find(medium_masks==label_i);
                 thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;                
                 specific_heat(skull_idx) = medium.(label_name).specific_heat_capacity;
+                if isfield(medium.(label_name), 'perfusion')
+                    perfusion(skull_idx) = medium.(label_name).perfusion;
+                end
+                if isfield(medium.(label_name), 'absorption_fraction')
+                    absorption_fraction(skull_idx) = medium.(label_name).absorption_fraction;
+                end
                 if isfield(parameters.thermal.temp_0, label_name)
                     temp_0(skull_idx) = parameters.thermal.temp_0.(label_name);
                 end
@@ -254,20 +266,24 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
 
                 clear skull_idx
             else
-                % Sets the parameters in the shape of the mask
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
                 sound_speed(medium_masks==label_i) = medium.(label_name).sound_speed; 
                 density(medium_masks==label_i) = medium.(label_name).density;
                 alpha_0_true(medium_masks==label_i) = medium.(label_name).alpha_0_true; 
                 alpha_power_true(medium_masks==label_i) = medium.(label_name).alpha_power_true;
+                if isfield(medium.(label_name), 'perfusion')
+                    perfusion(medium_masks==label_i) = medium.(label_name).perfusion;
+                end
+                if isfield(medium.(label_name), 'absorption_fraction')
+                    absorption_fraction(medium_masks==label_i) = medium.(label_name).absorption_fraction;
+                end
                 if isfield(parameters.thermal.temp_0, label_name)
                     temp_0(medium_masks==label_i) = parameters.thermal.temp_0.(label_name);                             % [degC]
                 end
             end
         end
     elseif ~isempty(medium_masks) % Use the medium_masks if one is specified and the simulation_medium is not layered
-        % Sets the parameters in the shape of the medium_masks
         % identify tissue ids
         if isfield(parameters, 'layer_labels')
             labels = fieldnames(parameters.layer_labels);
@@ -288,18 +304,21 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
             density(medium_masks==i_skull) = medium.skull.density;
             alpha_0_true(medium_masks==i_skull) =  medium.skull.alpha_0_true; 
             alpha_power_true(medium_masks==i_skull) = medium.skull.alpha_power_true;
+            if isfield(medium.skull, 'perfusion')
+                perfusion(medium_masks==i_skull) = medium.skull.perfusion;
+            end
+            if isfield(medium.skull, 'absorption_fraction')
+                absorption_fraction(medium_masks==i_skull) = medium.skull.absorption_fraction;
+            end
             if isfield(parameters.thermal.temp_0, 'skull')
                 temp_0(medium_masks==i_skull) = parameters.thermal.temp_0.skull;
             end
         end
     end
 
-    % Account for actual absorption behaviour in k-Wave, which varies when high
-    % absorption is used (see https://doi.org/10.1121/1.4894790).
-
-    % 'alpha_coeff' is tweaked so any alpha_power could be used, 
-    % as long as the alpha_0_true and alpa_power_true are correct for a
-    % given frequency.
+    % account for k-Wave's actual attenuation behaviour
+    % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
+    % 'alpha_coeff' is rescaled to match the specified alpha_0_true and alpa_power_true for the center frequency
 
     alpha_power_fixed = 2;
 
@@ -311,13 +330,19 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         alpha_power_fixed, ...
         false);
     
-    % Outputs the medium as a structure
+    % convert perfusion rate [mL/min/kg] into perfusion coefficient [1/s]
+    perfusion_coeff = (perfusion ./ 60) .* density * 1e-6; % [1/s]
+
+    % specify the medium as a kWave-compatible structure 
+    % Note: absorption_fraction and temp_0 need to be removed later)
     kwave_medium = struct('sound_speed', sound_speed, ...
                           'density', density, ...
                           'alpha_coeff', alpha_coeff,...
                           'alpha_power', alpha_power_fixed, ...
                           'thermal_conductivity', thermal_conductivity,...
                           'specific_heat', specific_heat,...
+                          'perfusion_coeff', perfusion_coeff,...
+                          'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
     % save images for debugging
@@ -338,6 +363,10 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
             niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
             filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
             niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
+            filename_perfusion = fullfile(parameters.output_dir, 'debug', sprintf('matrix_perfusion'));
+            niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true);
+            filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
+            niftiwrite(absorption, filename_absorption, 'Compressed',true);
         catch
             warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
         end
