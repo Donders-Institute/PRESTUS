@@ -241,8 +241,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     kwave_medium = rmfield(kwave_medium, 'temp_0');
     absorption_fraction = kwave_medium.absorption_fraction;
     kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
-    perfusion_coeff = kwave_medium.perfusion_coeff;
-    kwave_medium = rmfield(kwave_medium, 'perfusion_coeff');
 
     %% SETUP SOURCE
     % =========================================================================
@@ -252,7 +250,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         disp('Setting up kwave source...')
 
         max_sound_speed = max(kwave_medium.sound_speed(:));
-        [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final);
+        [kgrid, source, sensor, source_labels] = ...
+            setup_grid_source_sensor(...
+            parameters, ...
+            max_sound_speed, ...
+            trans_pos_final, ...
+            focus_pos_final);
+        
         % check stability
         % If estimated time step is smaller than the time step based on
         % default CFL, the estimated time step is used to redefine
@@ -312,7 +316,6 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         % re-add fields for future loading
         kwave_medium.temp_0 = temp_0;
         kwave_medium.absorption_fraction = absorption_fraction;
-        kwave_medium.perfusion_coeff = perfusion_coeff;
 
         if isfield(parameters, 'savemat') && parameters.savemat==0
             disp("Not saving acoustic output matrices ...")

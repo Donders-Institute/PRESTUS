@@ -50,14 +50,21 @@
    % Save new input arguments for simulations
    input_args_cell = zip_fields(input_args);
    
-   % Debugging info for non-interactive simulations on the Donders cluster
+   % Remove fields that are not recognized for acoustic simulations
    medium = rmfield(medium,'thermal_conductivity');
    medium = rmfield(medium,'specific_heat');
+   medium = rmfield(medium,'perfusion_coeff');
 
    % Runs simulations on the CPU only in 3 or 2 dimensions
    if parameters.n_sim_dims == 3
        sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
-   else
+   elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+       [kgrid, medium, source] = convert_2d_to_axisymmetric(kgrid, medium, source);
+       sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:});
+       % Convert the sensor data from symmetric about x=0 to a mirrored 2d setup.
+       sensor_data.p_final = cat(1, sensor_data.p_final, flipud(sensor_data.p_final));
+       sensor_data.p_max_all = cat(1, sensor_data.p_max_all, flipud(sensor_data.p_max_all));
+   else % by default assume 2D simulation (e.g., free-water calibration)
        sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
    end
 

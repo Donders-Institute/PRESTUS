@@ -118,7 +118,7 @@ medium:
     alpha_power_true: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 1313 # [J/kg/°C]
-    perfusion: 10
+    perfusion: 20
     absorption_fraction: 0.28
   brain:
     sound_speed: 1546 # [m/s]
