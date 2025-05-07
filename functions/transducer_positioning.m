@@ -1,5 +1,25 @@
 function transducer_positioning(parameters, pn, subject_id, target_name, mni_targets)
 
+% TRANSDUCER_POSITIONING Determines optimal transducer placement for a given target.
+%
+% This function calculates the optimal placement of a transducer for a specified target 
+% based on segmented brain images and MNI coordinates. It performs the following tasks:
+%   - Adds required paths to MATLAB's environment.
+%   - Converts MNI coordinates to subject-specific coordinates.
+%   - Identifies valid transducer positions based on distance constraints.
+%   - Computes geometric properties (e.g., focus position, exit plane) for transducer placement.
+%   - Visualizes segmentation results and transducer placement.
+%
+% Input:
+%   parameters  - Struct containing simulation parameters (e.g., paths, transducer settings).
+%   pn          - Struct containing subject-specific paths (e.g., segmentation folder).
+%   subject_id  - Integer specifying the subject ID.
+%   target_name - String specifying the name of the target (e.g., 'motor_cortex').
+%   mni_targets - Struct containing MNI coordinates for each target.
+%
+% Output:
+%   None. The function saves visualizations and transducer placement results in the specified output directory.
+
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
     functionsLoc = fullfile(currentLoc,'..','functions');

@@ -7,7 +7,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
 
     % 1) make logs directory if does not exist
     
-    log_dir = fullfile(parameters.temp_output_dir, 'batch_job_logs');
+    log_dir = fullfile(parameters.sim_path, 'batch_job_logs');
     if ~isfolder(log_dir)
         mkdir(log_dir)
     end
