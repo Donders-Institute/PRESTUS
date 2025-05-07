@@ -30,5 +30,5 @@ for i = 1:n_v_elem - 1
 end
 
 % Print the results
-fprintf('Inner diameter of each virtual element: %s \n', mat2str(id)); % Display the array of inner diameters
-fprintf('Outer diameter of each virtual element: %s \n', mat2str(od)); % Display the array of outer diameters
+fprintf('Inner diameter of each virtual element: [%s%s]\n', sprintf('%.3f, ', id(1:end-1)), sprintf('%.3f', id(end))); % Display the array of inner diameters
+fprintf('Outer diameter of each virtual element: [%s%s]\n', sprintf('%.3f, ', od(1:end-1)), sprintf('%.3f', od(end))); % Display the array of outer diameters

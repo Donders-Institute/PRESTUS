@@ -11,6 +11,13 @@ t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string
 # If you encounter the error "The qform and sform of do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
 use_forceqform: 0
 
+# Use the kwaveArray class for simulations
+use_kWaveArray: 1
+
+# New transducer development implementation
+unique_tran_design: 3 # 1: Annular array, 2: 
+display_tran: 3
+
 transducer: 
   n_elements: 4 # number of elements in the transducer
   Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]

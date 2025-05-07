@@ -1,4 +1,4 @@
-function transducer_pars = setup_dolphin_transducer_design(transducer_pars, kgrid, trans_pos, focus_pos, karray, water_c0, n_sim_dims, display_tran)
+function [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_pars, kgrid, trans_pos, focus_pos, karray, water_c0, n_sim_dims, display_tran)
             % Define geometry
             % Create coordinate grids for the transducer elements (not the simulation grid)
             [X, Y] = meshgrid(1:transducer_pars.n_elem_col, 1:transducer_pars.n_elem_row);

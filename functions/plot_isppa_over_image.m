@@ -187,37 +187,128 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
     
     % draw transducer
     if ~isempty(trans_pos)
-        focal_slope = (trans_pos-focus_pos)/norm(trans_pos-focus_pos);
-        focal_angle = atan2(focal_slope(2),focal_slope(1));
-        
-        grid_step = options.grid_step;
-        ex_plane_pos = trans_pos - (parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
-        geom_focus_pos = trans_pos - (parameters.transducer.curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
-        max_od = max(parameters.transducer.Elements_OD_mm);
-        dist_to_ep = 0.5*sqrt(4*parameters.transducer.curv_radius_mm^2-max_od^2)/grid_step;
-        ex_plane_pos_trig = geom_focus_pos + dist_to_ep *[cos(focal_angle), sin(focal_angle)];
-        ort_angle = atan(-focal_slope(1)/focal_slope(2));
+        if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4
+            focal_slope = (trans_pos-focus_pos)/norm(trans_pos-focus_pos);
+            focal_angle = atan2(focal_slope(2),focal_slope(1));
+            
+            grid_step = options.grid_step;
+            ex_plane_pos = trans_pos - (parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
+            geom_focus_pos = trans_pos - (parameters.transducer.curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
+            max_od = max(parameters.transducer.Elements_OD_mm);
+            dist_to_ep = 0.5*sqrt(4*parameters.transducer.curv_radius_mm^2-max_od^2)/grid_step;
+            ex_plane_pos_trig = geom_focus_pos + dist_to_ep *[cos(focal_angle), sin(focal_angle)];
+            ort_angle = atan(-focal_slope(1)/focal_slope(2));
+    
+            arc_halfangle = atan(max_od/2/dist_to_ep/grid_step);
+    
+            r = max(parameters.transducer.Elements_OD_mm)/2/grid_step;
+    
+            hold on
+            lineWidth = 1;
+    
+            boxColor = [235, 185, 47]/255*(1-overlay_weight) + overlay_color*overlay_weight;
+            LineSmoothing = 'on';
+    
+            trans_full_depth = 16/grid_step;
+            trans_back = ex_plane_pos_trig+trans_full_depth*focal_slope;
+            line([trans_back(2)-r*sin(ort_angle), trans_back(2) + r*sin(ort_angle)], [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth, 'Color', boxColor,'LineSmoothing',LineSmoothing )
+            line([ex_plane_pos_trig(2), trans_back(2)]-r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]-r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing  )
+            line([ex_plane_pos_trig(2), trans_back(2)]+r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]+r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing )
+            % exit plane
+            line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
+            % transducer curvature
+            [arc_x, arc_y] = getArc(geom_focus_pos, parameters.transducer.curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
+            plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
 
-        arc_halfangle = atan(max_od/2/dist_to_ep/grid_step);
+        elseif parameters.unique_tran_design == 2
+            % Convert physical dimensions to grid points
+            elem_width_grid = round(parameters.transducer.elem_width / parameters.grid_step_m);  
+            elem_height_grid = round(parameters.transducer.elem_height / parameters.grid_step_m);
+            elem_spacing_width_grid = round(parameters.transducer.elem_spacing_width / parameters.grid_step_m);
+            elem_spacing_height_grid = round(parameters.transducer.elem_spacing_height / parameters.grid_step_m);
+            
+            % Define geometry for the mask
+            [X, Y] = meshgrid(1:parameters.transducer.n_elem_col, 1:parameters.transducer.n_elem_row);
+            centerX = (parameters.transducer.n_elem_col + 1) / 2;
+            centerY = (parameters.transducer.n_elem_row + 1) / 2;
+    
+            % Create circular mask
+            mask = (X - centerX).^2 + (Y - centerY).^2 <= parameters.transducer.modular_radius^2;
+            mask(:,1) = [];
+            totalMask = [fliplr(mask), mask];
+            
+            % Find the boundaries of the active elements
+            [rows, cols] = find(totalMask);
+            min_row = min(rows);
+            max_row = max(rows);
+            min_col = min(cols);
+            max_col = max(cols);
+            
+            % Calculate the grid extents of the array
+            half_width = (max_col - min_col + 1) * (elem_width_grid + elem_spacing_width_grid) / 2;
+            half_height = (max_row - min_row + 1) * (elem_height_grid + elem_spacing_height_grid) / 2;
+            
+            % Calculate the focal slope similar to design 1
+            focal_slope = (trans_pos - focus_pos) / norm(trans_pos - focus_pos);
+            
+            % Calculate the orthogonal angle
+            ort_angle = atan(-focal_slope(1) / focal_slope(2));
+            
+            % Depth of transducer in grid units
+            trans_full_depth = parameters.transducer.depth_mm / grid_step;
+            
+            % Front face center position
+            front_center = trans_pos;
+            
+            % Back face center position
+            back_center = front_center + trans_full_depth * focal_slope;
+            
+            % Calculate the focal angle
+            focal_angle = atan2(focal_slope(2), focal_slope(1));
+            
+            % The projection of the width onto the viewing plane depends on the focal angle
+            % As the transducer rotates, the width component in the viewing plane increases
+            width_projection = half_width * abs(sin(focal_angle));
+            
+            % The projection of the height is always fully visible on the y-axis
+            height_projection = half_height * abs(cos(focal_angle));
+            
+            % For non-zero angles, we need the maximum of both projections for each direction
+            max_y_projection = max(width_projection, height_projection);
+            
+            % Define the bounding box with these projections
+            transducer_box = [[back_center(2) - max_y_projection * sin(ort_angle), back_center(1) - max_y_projection * cos(ort_angle)], ...
+                              [back_center(2) + max_y_projection * sin(ort_angle), back_center(1) + max_y_projection * cos(ort_angle)], ...
+                              [front_center(2) - max_y_projection * sin(ort_angle), front_center(1) - max_y_projection * cos(ort_angle)], ...
+                              [front_center(2) + max_y_projection * sin(ort_angle), front_center(1) + max_y_projection * cos(ort_angle)]];
 
-        r = max(parameters.transducer.Elements_OD_mm)/2/grid_step;
+            hold on
+            lineWidth = 1;
+    
+            boxColor = [235, 185, 47]/255*(1-overlay_weight) + overlay_color*overlay_weight;
+            LineSmoothing = 'on';
 
-        hold on
-        lineWidth = 1;
+            line([transducer_box(1), transducer_box(3)], ...
+                 [transducer_box(2), transducer_box(4)], ...
+                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
 
-        boxColor = [235, 185, 47]/255*(1-overlay_weight) + overlay_color*overlay_weight;
-        LineSmoothing = 'on';
+            line([transducer_box(5), transducer_box(1)], ...
+                 [transducer_box(6), transducer_box(2)], ...
+                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+    
+            line([transducer_box(7), transducer_box(3)], ...
+                 [transducer_box(8), transducer_box(4)], ...
+                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
 
-        trans_full_depth = 16/grid_step;
-        trans_back = ex_plane_pos_trig+trans_full_depth*focal_slope;
-        line([trans_back(2)-r*sin(ort_angle), trans_back(2) + r*sin(ort_angle)], [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth, 'Color', boxColor,'LineSmoothing',LineSmoothing )
-        line([ex_plane_pos_trig(2), trans_back(2)]-r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]-r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing  )
-        line([ex_plane_pos_trig(2), trans_back(2)]+r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]+r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing )
-        % exit plane
-        line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
-        % transducer curvature
-        [arc_x, arc_y] = getArc(geom_focus_pos, parameters.transducer.curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
-        plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
+            % Draw front face 
+            line([front_center(2) - max_y_projection*sin(ort_angle), front_center(2) + max_y_projection*sin(ort_angle)],...
+                 [front_center(1) - max_y_projection*cos(ort_angle), front_center(1) + max_y_projection*cos(ort_angle)],...
+                 'LineWidth', lineWidth, 'Color', boxColor, 'LineStyle', ':', 'LineSmoothing', LineSmoothing);
+    
+        else
+            fprintf("Transducer design number %i hasn't been implemented. \n", parameters.unique_tran_design)
+        end
+
     end
     
     if options.overlay_segmented

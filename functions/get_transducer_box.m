@@ -28,7 +28,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         plot = 1 % Enable/disable visualization (default: enabled)
     end
 
-    if parameters.unique_tran_design == 1
+    if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4
 
         %% Compute focal slope and angle
         % Calculate unit vector pointing from focus to transducer and its angle
@@ -108,7 +108,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         ort_angle = atan(-focal_slope(1) / focal_slope(2));
         
         % Depth of transducer in grid units
-        trans_full_depth = 16 / grid_step;
+        trans_full_depth = parameters.transducer.depth_mm / grid_step;
         
         % Front face center position
         front_center = trans_pos;
@@ -116,30 +116,25 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         % Back face center position
         back_center = front_center + trans_full_depth * focal_slope;
         
-        % Calculate corners of the bounding box
-        % Front face corners
-        front_corner1 = [front_center(1) - half_width * cos(ort_angle), front_center(2) - half_width * sin(ort_angle)];
-        front_corner2 = [front_center(1) + half_width * cos(ort_angle), front_center(2) + half_width * sin(ort_angle)];
-        front_corner3 = [front_center(1) - half_height * sin(ort_angle), front_center(2) + half_height * cos(ort_angle)];
-        front_corner4 = [front_center(1) + half_height * sin(ort_angle), front_center(2) - half_height * cos(ort_angle)];
+        % Calculate the focal angle
+        focal_angle = atan2(focal_slope(2), focal_slope(1));
         
-        % Back face corners
-        back_corner1 = [back_center(1) - half_width * cos(ort_angle), back_center(2) - half_width * sin(ort_angle)];
-        back_corner2 = [back_center(1) + half_width * cos(ort_angle), back_center(2) + half_width * sin(ort_angle)];
-        back_corner3 = [back_center(1) - half_height * sin(ort_angle), back_center(2) + half_height * cos(ort_angle)];
-        back_corner4 = [back_center(1) + half_height * sin(ort_angle), back_center(2) - half_height * cos(ort_angle)];
+        % The projection of the width onto the viewing plane depends on the focal angle
+        % As the transducer rotates, the width component in the viewing plane increases
+        width_projection = half_width * abs(sin(focal_angle));
         
-        back_y_values = [back_corner1(2), back_corner2(2), back_corner3(2), back_corner4(2)];
-        back_x_values = [back_corner1(1), back_corner2(1), back_corner3(1), back_corner4(1)];
-        front_y_values = [front_corner1(2), front_corner2(2), front_corner3(2), front_corner4(2)];
-        front_x_values = [front_corner1(1), front_corner2(1), front_corner3(1), front_corner4(1)];
+        % The projection of the height is always fully visible on the y-axis
+        height_projection = half_height * abs(cos(focal_angle));
         
-        transducer_box = [
-            [min(back_y_values), min(back_x_values)],
-            [max(back_y_values), max(back_x_values)],
-            [min(front_y_values), min(front_x_values)],
-            [max(front_y_values), max(front_x_values)]
-        ];
+        % For non-zero angles, we need the maximum of both projections for each direction
+        max_y_projection = max(width_projection, height_projection);
+        
+        % Define the bounding box with these projections
+        transducer_box = [[back_center(2) - max_y_projection * sin(ort_angle), back_center(1) - max_y_projection * cos(ort_angle)], ...
+                          [back_center(2) + max_y_projection * sin(ort_angle), back_center(1) + max_y_projection * cos(ort_angle)], ...
+                          [front_center(2) - max_y_projection * sin(ort_angle), front_center(1) - max_y_projection * cos(ort_angle)], ...
+                          [front_center(2) + max_y_projection * sin(ort_angle), front_center(1) + max_y_projection * cos(ort_angle)]];
+
     else
         fprintf("Transducer design number %i hasn't been implemented. \n", parameters.unique_tran_design)
     end
@@ -154,52 +149,18 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         boxColor = [235, 185, 47] / 255 * (1 - overlay_weight) + overlay_color * overlay_weight; % Box color blending
         LineSmoothing = 'on'; % Enable line smoothing
 
-        if parameters.unique_tran_design == 1
-            % Draw bounding box lines for visualization
-            line([trans_back(2) - r * sin(ort_angle), trans_back(2) + r * sin(ort_angle)], ...
-                 [trans_back(1) - r * cos(ort_angle), trans_back(1) + r * cos(ort_angle)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-    
-            line([ex_plane_pos_trig(2), trans_back(2)] - r * sin(ort_angle), ...
-                 [ex_plane_pos_trig(1), trans_back(1)] - r * cos(ort_angle), ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-    
-            line([ex_plane_pos_trig(2), trans_back(2)] + r * sin(ort_angle), ...
-                 [ex_plane_pos_trig(1), trans_back(1)] + r * cos(ort_angle), ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-        elseif parameters.unique_tran_design == 2
-            % Draw back face
-            line([back_corner1(2), back_corner2(2)], [back_corner1(1), back_corner2(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([back_corner2(2), back_corner4(2)], [back_corner2(1), back_corner4(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([back_corner4(2), back_corner3(2)], [back_corner4(1), back_corner3(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([back_corner3(2), back_corner1(2)], [back_corner3(1), back_corner1(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            
-            % Draw front face
-            line([front_corner1(2), front_corner2(2)], [front_corner1(1), front_corner2(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner2(2), front_corner4(2)], [front_corner2(1), front_corner4(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner4(2), front_corner3(2)], [front_corner4(1), front_corner3(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner3(2), front_corner1(2)], [front_corner3(1), front_corner1(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            
-            % Connect front to back
-            line([front_corner1(2), back_corner1(2)], [front_corner1(1), back_corner1(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner2(2), back_corner2(2)], [front_corner2(1), back_corner2(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner3(2), back_corner3(2)], [front_corner3(1), back_corner3(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-            line([front_corner4(2), back_corner4(2)], [front_corner4(1), back_corner4(1)], ...
-                 'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
-        else
-            fprintf("Transducer design number %i hasn't been implemented. \n", parameters.unique_tran_design)
-        end
+        % % Draw bounding box lines for visualization
+        line([transducer_box(1), transducer_box(3)], ...
+             [transducer_box(2), transducer_box(4)], ...
+             'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+
+        line([transducer_box(5), transducer_box(1)], ...
+             [transducer_box(6), transducer_box(2)], ...
+             'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+
+        line([transducer_box(7), transducer_box(3)], ...
+             [transducer_box(8), transducer_box(4)], ...
+             'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
     end
 
 end
