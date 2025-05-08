@@ -28,7 +28,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         plot = 1 % Enable/disable visualization (default: enabled)
     end
 
-    if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4
+    if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4 || parameters.unique_tran_design == 5
 
         %% Compute focal slope and angle
         % Calculate unit vector pointing from focus to transducer and its angle

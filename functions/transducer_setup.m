@@ -54,7 +54,7 @@ function [transducer_mask, source_label, transducer_pars] = ...
         error('Transducer and focus positions should have the size [3 1] or [1 3]')
     end
 
-    if unique_tran_design == 1 || unique_tran_design == 3 || unique_tran_design == 4
+    if unique_tran_design == 1 || unique_tran_design == 3 || unique_tran_design == 4 || unique_tran_design == 5
         % Convert element diameters from millimeters to grid points and ensure they are odd integers
         transducer_pars.Elements_OD = 2*floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
         transducer_pars.Elements_ID = 2*floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points

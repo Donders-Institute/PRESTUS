@@ -187,7 +187,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
     
     % draw transducer
     if ~isempty(trans_pos)
-        if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4
+        if parameters.unique_tran_design == 1 || parameters.unique_tran_design == 3 || parameters.unique_tran_design == 4 || parameters.unique_tran_design == 5
             focal_slope = (trans_pos-focus_pos)/norm(trans_pos-focus_pos);
             focal_angle = atan2(focal_slope(2),focal_slope(1));
             
@@ -255,7 +255,7 @@ function [bg_slice, transducer_bowl, Isppa_map, ax1, ax2, bg_min, bg_max, h] = .
             ort_angle = atan(-focal_slope(1) / focal_slope(2));
             
             % Depth of transducer in grid units
-            trans_full_depth = parameters.transducer.depth_mm / grid_step;
+            trans_full_depth = parameters.transducer.depth_mm / options.grid_step;
             
             % Front face center position
             front_center = trans_pos;

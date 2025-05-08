@@ -35,7 +35,7 @@ function [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_
             % Element counter for numbering
             element_counter = 1;
             
-            phases_deg = zeros(1, num_elems);
+            phases_rad = zeros(1, num_elems);
             % Process each element in the grid using the total mask dimensions
             for row = 1:transducer_pars.n_elem_row
                 for col = 1:totalMaskCols
@@ -50,7 +50,7 @@ function [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_
                             
                         phaseDifference = mod(k * distance, 2 * pi);
                         
-                        phases_deg(element_counter) = phaseDifference;
+                        phases_rad(element_counter) = phaseDifference;
 
                         % Add rectangular element to array with correct position
                         % Parameters: position, width, height, depth, normal direction
@@ -70,23 +70,6 @@ function [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_
                 xlabel('Column Index');
                 ylabel('Row Index');
                 colorbar;
-                
-                % 2. Show the 3D binary mask of the transducer in the grid
-                source_mask = karray.getArrayBinaryMask(kgrid);
-                figure('Name', 'Transducer in Simulation Grid');
-                
-                if n_sim_dims == 3
-                    % 3D visualization
-                    sliceViewer(source_mask);
-                    title('Transducer Binary Mask in Simulation Grid');
-                else
-                    % 2D visualization
-                    imagesc(source_mask);
-                    axis equal tight;
-                    colormap(hot);
-                    title('Transducer Binary Mask in Simulation Grid');
-                    colorbar;
-                end
                 
                 % % 3. Visualize individual element positions in 3D space
                 % figure('Name', 'Element Positions');
@@ -143,6 +126,6 @@ function [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_
             end
             
             % calculate phases
-            transducer_pars.source_phase_deg = phases_deg;
-            transducer_pars.source_phase_rad = deg2rad(phases_deg);
+            transducer_pars.source_phase_rad = phases_rad;
+            transducer_pars.source_phase_deg = rad2deg(phases_rad);
 end

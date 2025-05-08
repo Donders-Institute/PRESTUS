@@ -1,0 +1,59 @@
+data_path: C:\Users\marge\OneDrive - Radboud Universiteit\Documenten\Software\repositories\prestus\Example data\simnibs4_examples\m2m_ernie\ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+simnibs_bin_path: C:\Users\marge\OneDrive - Radboud Universiteit\Documenten\Software\repositories\prestus\SimNIBS-4.0\bin\ # change to simnibs install
+
+#data_path: /home/neuromod/marcorn/Documents/simnibs4_examples/m2m_ernie/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+#simnibs_bin_path: /home/neuromod/marcorn/SimNIBS-4.0/bin/  # change to simnibs install
+
+t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
+t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+
+# An optional path to LD_LIBRARY used during SimNIBS installation
+# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
+#ld_library_path: /opt/gcc/7.2.0/lib64  % or for slurm /home/.../SimNIBS-4.0/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+#ld_library_path: /home/neuromod/marcorn/SimNIBS-4.0/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+
+# If you encounter the error "The qform and sform of do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
+use_forceqform: 0
+
+# Use the kwaveArray class for simulations
+use_kWaveArray: 1
+
+# New transducer development implementation
+unique_tran_design: 4 # 1: Annular array, 2: old lookalike dolphin design, 3: flat circular matrix transducer, 4: curved circular matrix transducer
+display_tran: 1
+
+transducer: 
+  n_elements: 240 # number of elements in the transducer
+  n_elem_row: 18 # number of rows in the transducer
+  n_elem_col: 18 # number of columns in the transducer
+  elem_height: 2.58e-3 # [m] 
+  elem_width: 2.58e-3 # [m]
+  elem_spacing_height: 3.1e-3 # [m]
+  elem_spacing_width: 3.1e-3 # [m]
+  curv_radius_mm: 75 # radius of curvature of the bowl 
+  dist_to_plane_mm: 75 #65.3 # ? 9.7 mm taken from IS distance to the transducer plane from the geometric focus
+  source_amp: 1000000 # [Pa]
+  source_phase_deg: [0] # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
+  source_freq_hz: 400e3 # [Hz] the central frequency
+  pos_t1_grid: [128, 139, 15] # position on T1 grid 
+  
+  # For visualization purposes, use calc_virtual_elem to define them
+  Elements_ID_mm: [0.000, 0.387, 0.774, 1.161, 1.548, 1.936, 2.323, 2.710, 3.097, 3.484, 3.871, 4.258, 4.645, 5.032, 5.420, 5.807, 6.194, 6.581, 6.968, 7.355, 7.742, 8.129, 8.516, 8.904, 9.291, 9.678, 10.065, 10.452, 10.839, 11.226, 11.613, 12.000, 12.387, 12.775, 13.162, 13.549, 13.936, 14.323, 14.710, 15.097, 15.484, 15.871, 16.259, 16.646, 17.033, 17.420, 17.807, 18.194, 18.581, 18.968, 19.355, 19.743, 20.130, 20.517, 20.904, 21.291, 21.678, 22.065, 22.452, 22.839, 23.227, 23.614, 24.001, 24.388, 24.775, 25.162, 25.549, 25.936, 26.323, 26.711, 27.098, 27.485, 27.872, 28.259, 28.646, 29.033, 29.420, 29.807, 30.195, 30.582, 30.969, 31.356, 31.743, 32.130, 32.517, 32.904, 33.291, 33.679, 34.066, 34.453, 34.840, 35.227, 35.614, 36.001, 36.388, 36.775, 37.163, 37.550, 37.937, 38.324, 38.711, 39.098, 39.485, 39.872, 40.259, 40.646, 41.034, 41.421, 41.808, 42.195, 42.582, 42.969, 43.356, 43.743, 44.130, 44.518, 44.905, 45.292, 45.679, 46.066, 46.453, 46.840, 47.227, 47.614, 48.002, 48.389, 48.776, 49.163, 49.550, 49.937, 50.324, 50.711, 51.098, 51.486, 51.873, 52.260, 52.647, 53.034, 53.421, 53.808, 54.195, 54.582, 54.970, 55.357, 55.744, 56.131, 56.518, 56.905, 57.292, 57.679, 58.066, 58.454, 58.841, 59.228, 59.615, 60.002, 60.389, 60.776, 61.163, 61.550, 61.938, 62.325, 62.712, 63.099, 63.486, 63.873, 64.260, 64.647, 65.034, 65.421, 65.809, 66.196, 66.583, 66.970, 67.357, 67.744, 68.131, 68.518, 68.905, 69.293, 69.680, 70.067, 70.454, 70.841, 71.228, 71.615, 72.002, 72.389, 72.777, 73.164, 73.551, 73.938, 74.325, 74.712, 75.099, 75.486, 75.873, 76.261, 76.648, 77.035, 77.422, 77.809, 78.196, 78.583, 78.970, 79.357, 79.745, 80.132, 80.519, 80.906, 81.293, 81.680, 82.067, 82.454, 82.841, 83.229, 83.616, 84.003, 84.390, 84.777, 85.164, 85.551, 85.938, 86.325, 86.712, 87.100, 87.487, 87.874, 88.261, 88.648, 89.035, 89.422, 89.809, 90.196, 90.584, 90.971, 91.358, 91.745, 92.132, 92.519, 92.906, 93.293, 93.680, 94.068, 94.455, 94.842, 95.229, 95.616, 96.003, 96.390, 96.777, 97.164, 97.552, 97.939, 98.326, 98.713]
+  Elements_OD_mm: [0.387, 0.774, 1.161, 1.548, 1.936, 2.323, 2.710, 3.097, 3.484, 3.871, 4.258, 4.645, 5.032, 5.420, 5.807, 6.194, 6.581, 6.968, 7.355, 7.742, 8.129, 8.516, 8.904, 9.291, 9.678, 10.065, 10.452, 10.839, 11.226, 11.613, 12.000, 12.387, 12.775, 13.162, 13.549, 13.936, 14.323, 14.710, 15.097, 15.484, 15.871, 16.259, 16.646, 17.033, 17.420, 17.807, 18.194, 18.581, 18.968, 19.355, 19.743, 20.130, 20.517, 20.904, 21.291, 21.678, 22.065, 22.452, 22.839, 23.227, 23.614, 24.001, 24.388, 24.775, 25.162, 25.549, 25.936, 26.323, 26.711, 27.098, 27.485, 27.872, 28.259, 28.646, 29.033, 29.420, 29.807, 30.195, 30.582, 30.969, 31.356, 31.743, 32.130, 32.517, 32.904, 33.291, 33.679, 34.066, 34.453, 34.840, 35.227, 35.614, 36.001, 36.388, 36.775, 37.163, 37.550, 37.937, 38.324, 38.711, 39.098, 39.485, 39.872, 40.259, 40.646, 41.034, 41.421, 41.808, 42.195, 42.582, 42.969, 43.356, 43.743, 44.130, 44.518, 44.905, 45.292, 45.679, 46.066, 46.453, 46.840, 47.227, 47.614, 48.002, 48.389, 48.776, 49.163, 49.550, 49.937, 50.324, 50.711, 51.098, 51.486, 51.873, 52.260, 52.647, 53.034, 53.421, 53.808, 54.195, 54.582, 54.970, 55.357, 55.744, 56.131, 56.518, 56.905, 57.292, 57.679, 58.066, 58.454, 58.841, 59.228, 59.615, 60.002, 60.389, 60.776, 61.163, 61.550, 61.938, 62.325, 62.712, 63.099, 63.486, 63.873, 64.260, 64.647, 65.034, 65.421, 65.809, 66.196, 66.583, 66.970, 67.357, 67.744, 68.131, 68.518, 68.905, 69.293, 69.680, 70.067, 70.454, 70.841, 71.228, 71.615, 72.002, 72.389, 72.777, 73.164, 73.551, 73.938, 74.325, 74.712, 75.099, 75.486, 75.873, 76.261, 76.648, 77.035, 77.422, 77.809, 78.196, 78.583, 78.970, 79.357, 79.745, 80.132, 80.519, 80.906, 81.293, 81.680, 82.067, 82.454, 82.841, 83.229, 83.616, 84.003, 84.390, 84.777, 85.164, 85.551, 85.938, 86.325, 86.712, 87.100, 87.487, 87.874, 88.261, 88.648, 89.035, 89.422, 89.809, 90.196, 90.584, 90.971, 91.358, 91.745, 92.132, 92.519, 92.906, 93.293, 93.680, 94.068, 94.455, 94.842, 95.229, 95.616, 96.003, 96.390, 96.777, 97.164, 97.552, 97.939, 98.326, 98.713, 99.100]
+
+focus_pos_t1_grid: [128, 142, 85] # stimulation target on T1 grid
+
+default_grid_dims: [300, 300, 300]
+
+thermal:
+  duty_cycle: 0.5 # share of the stimulation duration during which the stimulation is on
+  sim_time_steps: 0.1 # [s] simulation time steps during the stimulation period
+  temp_0: 37 #[deg C] initial temperature, currently not used
+  stim_duration: 0.6 # [s] stimulation duration within a trial
+  iti: 1.2 # interval between the trials, from the start of one trial to the start of another [s]
+  n_trials: 12 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
+
+
+
+# Segmentation software (current options are 'headreco' and 'charm')
+segmentation_software: charm

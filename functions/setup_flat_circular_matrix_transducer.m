@@ -70,16 +70,16 @@ function [transducer_pars, karray] = setup_flat_circular_matrix_transducer(trans
             lambda = parameters.medium.water.sound_speed / transducer_pars.source_freq_hz; % [m]
             k = 2 * pi / lambda; % [rad/m]
 
-            source_phase_deg = zeros(1, transducer_pars.n_elements);
+            source_phase_rad = zeros(1, transducer_pars.n_elements);
             elem_pos = elem_pos';
             for ind = 1:size(elem_pos, 2)
                 distance = sqrt((elem_pos(1, ind) - focus_pos_m(1))^2 + (elem_pos(2, ind) - focus_pos_m(2))^2 + (elem_pos(3, ind) - focus_pos_m(3))^2);
                             
-                source_phase_deg(ind) = mod(k * distance, 2 * pi);
+                source_phase_rad(ind) = mod(k * distance, 2 * pi);
                 
                 karray.addRectElement(elem_pos(:, ind), transducer_pars.elem_height, transducer_pars.elem_width, [0, 0, 0])
             end
            
-            transducer_pars.source_phase_deg = source_phase_deg;
-            transducer_pars.source_phase_rad = deg2rad(source_phase_deg);
+            transducer_pars.source_phase_rad = source_phase_rad;
+            transducer_pars.source_phase_deg = rad2deg(source_phase_rad);
 end

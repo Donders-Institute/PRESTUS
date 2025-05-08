@@ -1,12 +1,15 @@
-function [transducer_pars, karray] = setup_curved_circular_matrix_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray)
-            elem_pos = makeCartBowl( ...
-                [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))], ...
-                transducer_pars.curv_radius_mm * 1e-3, ...
-                transducer_pars.Elements_OD_mm(end) * 1e-3, ...
-                [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))], ...
-                transducer_pars.n_elements, ...
-                true);
-            
+function [transducer_pars, karray] = setup_stanford_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray)
+            tran_info = readtable('TR64pcd1d65r75_Stanford_fromED.xlsx');
+    
+            phys_positions = table2array(tran_info(1:64, 2:4));
+
+            % Convert from mm to m, and recenter to [0,0,0] by subtracting the actual center
+            phys_positions_m = (phys_positions - [0, 0, 75]) / 1000;
+            phys_positions_m(:,3) = -phys_positions_m(:,3);  % flip Z curvature
+           
+            elem_pos = phys_positions_m + [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))];
+            elem_pos = elem_pos';
+
             % Define focus in meters
             focus_pos_m = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))]';
 
@@ -54,7 +57,7 @@ function [transducer_pars, karray] = setup_curved_circular_matrix_transducer(kgr
 
                 karray.addRectElement(el_pos, transducer_pars.elem_height, transducer_pars.elem_width, [roll, pitch, yaw])
 
-                distance = sqrt((elem_pos(1, ind) - focus_pos_m(1))^2 + (elem_pos(2, ind) - focus_pos_m(2))^2 + (elem_pos(3, ind) - focus_pos_m(3))^2);
+                distance = sqrt((el_pos(1) - focus_pos_m(1))^2 + (el_pos(2) - focus_pos_m(2))^2 + (el_pos(3) - focus_pos_m(3))^2);
                             
                 source_phase_rad(ind) = mod(k * distance, 2 * pi);
 

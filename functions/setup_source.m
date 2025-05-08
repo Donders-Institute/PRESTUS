@@ -115,6 +115,8 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
             [transducer_pars, karray] = setup_flat_circular_matrix_transducer(transducer_pars, kgrid, trans_pos, parameters, focus_pos, karray);
         elseif parameters.unique_tran_design == 4
             [transducer_pars, karray] = setup_curved_circular_matrix_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray);
+        elseif parameters.unique_tran_design == 5
+            [transducer_pars, karray] = setup_stanford_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray);
         else
             fprintf("Transducer design number %i hasn't been implemented. \n", parameters.unique_tran_design)
         end
