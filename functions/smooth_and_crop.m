@@ -37,7 +37,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     
         % create "medium_masks" that contains indices according to the label order in parameters.layer_labels
         windowSize = 4; % smoothing window size
-        [medium_masks] = medium_mask_create(segmented_img, parameters, windowSize)
+        [medium_masks] = medium_mask_create(segmented_img, parameters, windowSize);
         
         % fill gaps in the skull by using the boundary of a bone image
         if any(contains(labels, 'skull_cortical'))  
