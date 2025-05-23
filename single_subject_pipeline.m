@@ -446,7 +446,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
             % calculate real focal distance based on max isppa in whole medium
             highlighted_pos = [Ix, Iy, Iz];
-            highlighted_pos = highlighted_pos(1:ndims(trans_pos_final));
+            highlighted_pos = highlighted_pos(1:length(trans_pos_final));
             real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
     
             writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
