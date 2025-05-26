@@ -1,5 +1,11 @@
-function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters)
-    
+function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters, options)
+    arguments
+        subject_id 
+        parameters struct
+        options.adopted_heatmap (:,:,:) = []
+        options.sequential_configs struct = struct()
+    end
+
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                       Single subject pipeline                     %
     %                                                                   %
@@ -237,7 +243,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % split temp_0 & absorption_fraction from kwave_medium (due to kwave checks)
-    temp_0 = kwave_medium.temp_0;
+    if isfield(parameters, 'adopted_heatmap')
+        heatmap_image = niftiread(parameters.adopted_heatmap);
+        temp_0 = double(tformarray(heatmap_image, maketform("affine", final_transformation_matrix), ...
+            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+    else
+        temp_0 = kwave_medium.temp_0;
+    end
     kwave_medium = rmfield(kwave_medium, 'temp_0');
     absorption_fraction = kwave_medium.absorption_fraction;
     kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
@@ -544,7 +556,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 sensor, ...
                 source, ...
                 parameters, ...
-                trans_pos_final);
+                trans_pos_final, ...
+                final_transformation_matrix, ...
+                medium_masks);
             
             % apply gather in case variables are GPU arrays
             heating_maxT = gather(heating_maxT);
