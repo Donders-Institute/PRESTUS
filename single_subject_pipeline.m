@@ -734,6 +734,34 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                 makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
                         
                         orig_hdr.Datatype = 'single';
+
+                        if strcmp(data_type, "heating")
+                            % Removes edge artifacts
+                            heatmap_mask = data_backtransf > 0;
+                            % Removes the edge that often contains a mix of values
+                            heatmap_mask_eroded = imerode(heatmap_mask, strel('sphere', 3));
+                            % Takes a second edge within the new mask to determine what
+                            % values to replace the 0's with
+                            heatmap_mask_eroded_edge = imdilate(heatmap_mask_eroded, strel('sphere', 1)) & heatmap_mask & ~heatmap_mask_eroded;
+                            heatmap_band_values = data_backtransf(heatmap_mask_eroded_edge);
+                            if ~isempty(heatmap_band_values)
+                                heatmap_band_value = median(heatmap_band_values);
+                            else
+                                heatmap_band_value = parameters.thermal.temp_0.water;
+                            end
+                            data_backtransf(~heatmap_mask_eroded) = heatmap_band_value;
+                            data_backtransf(1:2,:,:)     = parameters.thermal.temp_0.water;  % First two planes in the 1st dimension
+                            data_backtransf(end-1:end,:,:) = parameters.thermal.temp_0.water;  % Last two planes in the 1st dimension
+                            
+                            data_backtransf(:,1:2,:)     = parameters.thermal.temp_0.water;  % First two planes in the 2nd dimension
+                            data_backtransf(:,end-1:end,:) = parameters.thermal.temp_0.water;  % Last two planes in the 2nd dimension
+                            
+                            data_backtransf(:,:,1:2)     = parameters.thermal.temp_0.water;  % First two planes in the 3rd dimension
+                            data_backtransf(:,:,end-1:end) = parameters.thermal.temp_0.water;  % Last two planes in the 3rd dimension
+                        elseif strcmp(data_type, "CEM43")
+                            % Removes edge artifacts
+                            data_backtransf(data_backtransf <= 0) = 0.0000001;
+                        end
                     end
                     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
                 else
