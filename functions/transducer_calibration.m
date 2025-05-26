@@ -1,4 +1,5 @@
-function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, transducer_name, subject_id, desired_intensity, real_profile)
+function [opt_source_amp, opt_phases] = transducer_calibration(...
+    pn, parameters, transducer_name, subject_id, desired_intensity, real_profile)
 
     % TO DO: specify necessary input parameters
 
@@ -26,13 +27,16 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     
     scaling = desired_intensity/max(real_profile(:,2));
     real_profile(:,2) = real_profile(:,2).*scaling;
-    
-    dist_to_exit_plane = round(parameters.transducer.curv_radius_mm-...
-        parameters.transducer.dist_to_plane_mm); % from the transducer specifications
 
-    % need to add distance from transducer to exit plane to profiles
-    parameters.expected_focal_distance_mm = parameters.expected_focal_distance_mm + dist_to_exit_plane;
-    real_profile(:,1) = dist_to_exit_plane + real_profile(:,1);
+    if isfield(parameters, 'correctEPdistance') && parameters.correctEPdistance == 1
+        dist_to_exit_plane = round(parameters.transducer.curv_radius_mm-...
+        parameters.transducer.dist_to_plane_mm); % from the transducer specifications
+        % need to add distance from transducer to exit plane to profiles
+        parameters.expected_focal_distance_mm = parameters.expected_focal_distance_mm + dist_to_exit_plane;
+        real_profile(:,1) = dist_to_exit_plane + real_profile(:,1);
+    else
+        dist_to_exit_plane = 0;
+    end
 
     h = figure('Position', [10 10 900 500]);
     % calibrations done at the surface, we have to add distance to transducer
@@ -129,8 +133,8 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     imagesc(x1,x2,y)
     axis image;
     colormap(getColorMap);
-    xlabel('Lateral Position [mm]');
-    ylabel('Axial Position [mm]');
+    xlabel('Radial [mm]');
+    ylabel('Axial (longitudinal) [mm]');
     axis image;
     cb = colorbar;
     title('Pressure for the focal plane')
@@ -171,16 +175,17 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     % plot focal axis pressure
     h = figure('Position', [10 10 900 500]);
     intensity_oneil = p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density).*1e-4;
-    plot(axial_position, intensity_oneil);
+    p1 = plot(axial_position, intensity_oneil);
     xlabel('Axial Position [mm]');
     ylabel('Intensity [W/cm^2]');
     hold on
     intensity_simulated = pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density).*1e-4;
-    plot(axial_position-(parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm, intensity_simulated,'--');
-    plot(real_profile(:,1),real_profile(:,2))
+    p2 = plot(axial_position-(parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm, intensity_simulated,'--');
+    p3 = plot(real_profile(:,1),real_profile(:,2), 'k');
     hold off
     xline(parameters.expected_focal_distance_mm, '--');
-    legend('Analytic solution','Simulated results','Real profile')
+    yline(desired_intensity, '--');
+    legend([p1, p2, p3], {'Analytic solution','Simulated results','Real profile'})
     title('Pressure along the beam axis')
     % what is distance to the maximum pressure?
     fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',...
@@ -297,7 +302,7 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     plot(real_profile(:,1),real_profile(:,2))
     hold off
     xline(parameters.expected_focal_distance_mm, '--');
-    yline(30, '--');
+    yline(desired_intensity, '--');
     legend('Original simulation', sprintf('Optimized to match the real profile'),'Real profile')
     title('Pressure along the beam axis')
     plotname = fullfile(pn.outputs_folder, 'real_fitted_profiles.png');
@@ -358,27 +363,26 @@ function [opt_source_amp, opt_phases] = transducer_calibration(pn, parameters, t
     h = figure('Position', [10 10 900 500]);
     hold on
     plot(axial_position, p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
-    xlabel('Axial Position [mm]');
-    ylabel('Intensity [W/cm^2]');
     plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
-    
     sim_res_axial_position = axial_position-(opt_res.parameters.transducer.pos_grid(end)-1)*parameters.grid_step_mm; % axial position for the simulated results, relative to transducer position
-    plot(sim_res_axial_position, ...
-        pred_axial_pressure_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+    plot(sim_res_axial_position, pred_axial_pressure_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
     plot(real_profile(:,1),real_profile(:,2))
     hold off
     xline(opt_res.parameters.expected_focal_distance_mm, '--');
     yline(desired_intensity, '--');
     legend('Original simulation', sprintf('Optimized for %2.f mm distance, analytical', opt_res.parameters.expected_focal_distance_mm), ...
         sprintf('Optimized for %2.f mm distance, simulated', opt_res.parameters.expected_focal_distance_mm),'Real profile','Location', 'best')
+    xlabel('Axial Position [mm from transducer bowl/simulation grid]');
+    ylabel('Intensity [W/cm^2]');
     plotname = fullfile(pn.outputs_folder, 'simulation_analytic.png');
     saveas(h, plotname, 'png');
     close(h);
     
-    fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',...
+    fprintf('Estimated distance to maximum pressure: %.2f mm (rel. to. transducer pos.)\n',...
         sim_res_axial_position(pred_axial_pressure_opt==max(pred_axial_pressure_opt)))
 
     % Now the simulated acoustic profile should have the desired distance 
-    % to maximum and intensity, which means we can start with the simulations for 
-    % the actual brain.
+    % to maximum and intensity in free-water. This indicates successful
+    % calibration.
+
 end

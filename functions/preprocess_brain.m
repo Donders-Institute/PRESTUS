@@ -64,14 +64,6 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     t1_image = niftiread(filename_t1);
     t1_header = niftiinfo(filename_t1);
 
-%     % 2D T1 image: copy matrix to a third dimension
-%     if length(size(t1_image)) == 2
-%         t1_image = cat(3, t1_image, t1_image);
-%         plot_options.slice_dim = 3;
-%     else
-%         plot_options.slice_dim = 2;
-%     end
-
     % Determine transducer position based on Localite or configuration file
     if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
         [trans_pos_grid, focus_pos_grid, ~, ~] = ...

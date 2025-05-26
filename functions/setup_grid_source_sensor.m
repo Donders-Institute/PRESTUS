@@ -18,7 +18,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
                       parameters.grid_dims(2), parameters.grid_step_m);
     end
     
-    wave_period   = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
+    wave_period = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
     
     % Check the number of input arguments
     % As a default the time step is based on the default CFL number of 0.3.
