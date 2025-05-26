@@ -839,15 +839,39 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
-        new_parameters = parameters;
-        new_parameters.simulation_medium = 'water';
-        new_parameters.run_heating_sims = 0;
-        new_parameters.default_grid_dims = new_parameters.grid_dims;
+        water_parameters = parameters;
+        water_parameters.simulation_medium = 'water';
+        water_parameters.run_heating_sims = 0;
+        water_parameters.default_grid_dims = water_parameters.grid_dims;
         % restore subject-specific path to original path if done earlier in this function
-        if isfield(new_parameters,'subject_subfolder') && new_parameters.subject_subfolder == 1
-            new_parameters.output_dir = fileparts(new_parameters.output_dir);
+        if isfield(water_parameters,'subject_subfolder') && water_parameters.subject_subfolder == 1
+            water_parameters.output_dir = fileparts(water_parameters.output_dir);
         end
-        single_subject_pipeline(subject_id, new_parameters);
+        single_subject_pipeline(subject_id, water_parameters);
+    end
+
+    %% Runs subsequent simulations if we want to copy the medium over
+    if ~isempty(fieldnames(options.sequential_configs))
+        % Select the config next in line
+        sequential_configs = options.sequential_configs;
+        fields = fieldnames(sequential_configs);
+        numbers = cellfun(@(x) sscanf(x, 'config_%d'), fields);
+        [~, minIdx] = min(numbers);
+        lowestField = fields{minIdx};
+        sequential_parameters = sequential_configs.(lowestField);
+        sequential_configs = rmfield(sequential_configs, lowestField);
+        % restore subject-specific path to original path if done earlier in this function
+        sequential_parameters.adopted_heatmap = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                subject_id, 'heating', parameters.results_filename_affix));
+        sequential_parameters.adopted_cumulative_heat = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                subject_id, 'CEM43', parameters.results_filename_affix));
+        adopted_heatmap = ones(2,2,2);
+        fprintf('Running subsequent heating simulation on %s\n', lowestField);
+        if ~isempty(fieldnames(sequential_configs))
+            single_subject_pipeline_with_slurm(subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap, 'sequential_configs', sequential_configs);
+        else
+            single_subject_pipeline_with_slurm(subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap);
+        end
     end
 
     disp('Pipeline finished successfully');
