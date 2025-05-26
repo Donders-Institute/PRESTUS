@@ -33,6 +33,34 @@ function parameters = load_parameters(varargin)
         extra_config_location = varargin{2};
         extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
         parameters = MergeStruct(parameters, extra_parameters);
+    elseif nargin > 2
+        % Replace files in the config from the extra config
+        extra_config_file = varargin{1};
+        extra_config_location = varargin{2};
+        extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
+        parameters = MergeStruct(parameters, extra_parameters);
+
+        % Process any additional name/value pairs to overwrite parameters
+        % Get the extra arguments (starting at the 3rd argument)
+        extraArgs = varargin(3:end);
+        % Check that they come in pairs
+        if mod(numel(extraArgs), 2) ~= 0
+            error('Extra parameters must be provided as name/value pairs.');
+        end
+        % Loop through each pair and assign to the structure
+        for i = 1:2:numel(extraArgs)
+            fieldName = extraArgs{i};
+            fieldValue = extraArgs{i+1};
+            if contains(fieldName, '.')
+                % Split the field name into its components
+                parts = strsplit(fieldName, '.');
+                % Update the nested field
+                parameters = setfield(parameters, parts{:}, fieldValue);
+            else
+                % Update or add the top-level field
+                parameters.(fieldName) = fieldValue;
+            end
+        end
     end
 
     %% Check interactive mode requirements
