@@ -1,5 +1,5 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
-    run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos)
+    run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos, final_transformation_matrix, medium_masks)
 
 % RUN_HEATING_SIMULATIONS Simulates thermal effects of ultrasound using k-Wave.
 %
@@ -106,7 +106,13 @@ T_max = thermal_diff_obj.T;
 
 % initialize field for cem43
 if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
-    thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
+    if isfield(parameters, 'adopted_cumulative_heat')
+        cumulative_heat_image = niftiread(parameters.adopted_cumulative_heat);
+        thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, maketform("affine", final_transformation_matrix), ...
+            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+    else
+        thermal_diff_obj.cem43 = gpuArray(zeros(size(thermal_diff_obj.T)));
+    end
 end
 CEM43_max = thermal_diff_obj.cem43;
 

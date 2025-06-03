@@ -1,5 +1,11 @@
-function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters)
-    
+function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters, options)
+    arguments
+        subject_id 
+        parameters struct
+        options.adopted_heatmap (:,:,:) = []
+        options.sequential_configs struct = struct()
+    end
+
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                       Single subject pipeline                     %
     %                                                                   %
@@ -278,7 +284,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     end
 
     % split temp_0 & absorption_fraction from kwave_medium (due to kwave checks)
-    temp_0 = kwave_medium.temp_0;
+    if isfield(parameters, 'adopted_heatmap')
+        heatmap_image = niftiread(parameters.adopted_heatmap);
+        temp_0 = double(tformarray(heatmap_image, maketform("affine", final_transformation_matrix), ...
+            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+    else
+        temp_0 = kwave_medium.temp_0;
+    end
     kwave_medium = rmfield(kwave_medium, 'temp_0');
     absorption_fraction = kwave_medium.absorption_fraction;
     kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
@@ -510,7 +522,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             % calculate real focal distance based on max isppa in whole medium
             highlighted_pos = [Ix, Iy, Iz];
             highlighted_pos = highlighted_pos(1:numel(trans_pos_final));
-            real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
+
+real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
     
             writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
         else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
@@ -607,7 +620,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                 sensor, ...
                 source, ...
                 parameters, ...
-                trans_pos_final);
+                trans_pos_final, ...
+                final_transformation_matrix, ...
+                medium_masks);
             
             % apply gather in case variables are GPU arrays
             heating_maxT = gather(heating_maxT);
@@ -783,6 +798,34 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
                                                 makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], size(t1_image_orig), [], 0) ;
                         
                         orig_hdr.Datatype = 'single';
+
+                        if strcmp(data_type, "heating")
+                            % Removes edge artifacts
+                            heatmap_mask = data_backtransf > 0;
+                            % Removes the edge that often contains a mix of values
+                            heatmap_mask_eroded = imerode(heatmap_mask, strel('sphere', 3));
+                            % Takes a second edge within the new mask to determine what
+                            % values to replace the 0's with
+                            heatmap_mask_eroded_edge = imdilate(heatmap_mask_eroded, strel('sphere', 1)) & heatmap_mask & ~heatmap_mask_eroded;
+                            heatmap_band_values = data_backtransf(heatmap_mask_eroded_edge);
+                            if ~isempty(heatmap_band_values)
+                                heatmap_band_value = median(heatmap_band_values);
+                            else
+                                heatmap_band_value = parameters.thermal.temp_0.water;
+                            end
+                            data_backtransf(~heatmap_mask_eroded) = heatmap_band_value;
+                            data_backtransf(1:2,:,:)     = parameters.thermal.temp_0.water;  % First two planes in the 1st dimension
+                            data_backtransf(end-1:end,:,:) = parameters.thermal.temp_0.water;  % Last two planes in the 1st dimension
+                            
+                            data_backtransf(:,1:2,:)     = parameters.thermal.temp_0.water;  % First two planes in the 2nd dimension
+                            data_backtransf(:,end-1:end,:) = parameters.thermal.temp_0.water;  % Last two planes in the 2nd dimension
+                            
+                            data_backtransf(:,:,1:2)     = parameters.thermal.temp_0.water;  % First two planes in the 3rd dimension
+                            data_backtransf(:,:,end-1:end) = parameters.thermal.temp_0.water;  % Last two planes in the 3rd dimension
+                        elseif strcmp(data_type, "CEM43")
+                            % Removes edge artifacts
+                            data_backtransf(data_backtransf <= 0) = 0.0000001;
+                        end
                     end
                     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
                 else
@@ -860,15 +903,39 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
-        new_parameters = parameters;
-        new_parameters.simulation_medium = 'water';
-        new_parameters.run_heating_sims = 0;
-        new_parameters.default_grid_dims = new_parameters.grid_dims;
+        water_parameters = parameters;
+        water_parameters.simulation_medium = 'water';
+        water_parameters.run_heating_sims = 0;
+        water_parameters.default_grid_dims = water_parameters.grid_dims;
         % restore subject-specific path to original path if done earlier in this function
-        if isfield(new_parameters,'subject_subfolder') && new_parameters.subject_subfolder == 1
-            new_parameters.output_dir = fileparts(new_parameters.output_dir);
+        if isfield(water_parameters,'subject_subfolder') && water_parameters.subject_subfolder == 1
+            water_parameters.output_dir = fileparts(water_parameters.output_dir);
         end
-        single_subject_pipeline(subject_id, new_parameters);
+        single_subject_pipeline(subject_id, water_parameters);
+    end
+
+    %% Runs subsequent simulations if we want to copy the medium over
+    if ~isempty(fieldnames(options.sequential_configs))
+        % Select the config next in line
+        sequential_configs = options.sequential_configs;
+        fields = fieldnames(sequential_configs);
+        numbers = cellfun(@(x) sscanf(x, 'config_%d'), fields);
+        [~, minIdx] = min(numbers);
+        lowestField = fields{minIdx};
+        sequential_parameters = sequential_configs.(lowestField);
+        sequential_configs = rmfield(sequential_configs, lowestField);
+        % restore subject-specific path to original path if done earlier in this function
+        sequential_parameters.adopted_heatmap = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                subject_id, 'heating', parameters.results_filename_affix));
+        sequential_parameters.adopted_cumulative_heat = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                subject_id, 'CEM43', parameters.results_filename_affix));
+        adopted_heatmap = ones(2,2,2);
+        fprintf('Running subsequent heating simulation on %s\n', lowestField);
+        if ~isempty(fieldnames(sequential_configs))
+            single_subject_pipeline_with_slurm(subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap, 'sequential_configs', sequential_configs);
+        else
+            single_subject_pipeline_with_slurm(subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap);
+        end
     end
 
     disp('Pipeline finished successfully');
