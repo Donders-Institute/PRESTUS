@@ -59,11 +59,14 @@
    if parameters.n_sim_dims == 3
        sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
    elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
-       [kgrid, medium, source] = convert_2d_to_axisymmetric(kgrid, medium, source);
-       sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:});
-       % Convert the sensor data from symmetric about x=0 to a mirrored 2d setup.
-       sensor_data.p_final = cat(1, sensor_data.p_final, flipud(sensor_data.p_final));
-       sensor_data.p_max_all = cat(1, sensor_data.p_max_all, flipud(sensor_data.p_max_all));
+%        [kgrid, medium, source] = convert_2d_to_axisymmetric(kgrid, medium, source);
+       sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:}, 'RadialSymmetry', 'WSWA-FFT');
+       % debug plot of setup
+%        figure; 
+%        subplot(3,1,1); imagesc(source.p_mask); title('Radial (half) source');
+%        subplot(3,1,2); imagesc(medium.sound_speed); title('Radial (half) sound speed');
+%        subplot(3,1,3); imagesc(sensor_data.p_max_all); title('Full max. pressure');
+
    else % by default assume 2D simulation (e.g., free-water calibration)
        sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
    end

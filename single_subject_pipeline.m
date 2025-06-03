@@ -132,12 +132,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         clear filename_t1 t1_info focal_distance_t1 t1_grid_step_mm;
     end
     
-    % if there is no specification of usepseudoCT, go for default of 0
+    % deactivate pseudoCT by default
     if ~isfield(parameters, 'usepseudoCT')
         parameters.usepseudoCT = 0;
     end
 
-    % Pre-processes the MRI data to segment the different forms of tissue
+    % Pre-processes MRI data to segment the different forms of tissue
     % and visualise the position of the transducer with some help from SimNIBS.
     % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
@@ -150,12 +150,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
         parameters.grid_dims = size(medium_masks);
     else % In case simulations are not run in a skull of layered tissue, alternative grid dimensions are set up
-        assert(isfield(parameters, 'default_grid_dims'), 'The parameters structure should have the field grid_dims for the grid dimensions')
+        assert(isfield(parameters, 'default_grid_dims'), ...
+            'The parameters structure should have the field grid_dims for the grid dimensions')
         parameters.grid_dims = parameters.default_grid_dims;
         if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
             parameters.grid_dims = squeeze(parameters.grid_dims);
             parameters.n_sim_dims = length(parameters.grid_dims);
-            disp('One of the simulation grid dimensions is of length 1, assuming you want 2d simulations, dropping this dimension')
+            disp('One of the simulation grid dimensions is of length 1. Assuming you want 2D simulations ... dropping this dimension')
         end
 
         % Checks whether the transducer location and orientation are set,
@@ -182,25 +183,38 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
         end
+        % set transducer position in grid
         if ~isfield(parameters.transducer, 'pos_grid')
-            trans_pos_final = round([parameters.grid_dims(1:(parameters.n_sim_dims-1))/2 parameters.pml_size+1]); % transducer positioned arbitrarily
+            % transducer positioned arbitrarily (2D only)
+            % y: first position beyond pml layer
+            % x: halfway
+            trans_pos_final = round(...
+                [parameters.grid_dims(1:(parameters.n_sim_dims-1))/2, ...
+                parameters.pml_size+1]);
         else
             trans_pos_final = parameters.transducer.pos_grid;
+            % Adjust if the positions are transposed
+            if size(trans_pos_final,1)>size(trans_pos_final, 2)
+                warning('Specified transducer position appears transposed...adjusting');
+                trans_pos_final = trans_pos_final';
+            end
         end
+        % set focus position in grid
         if ~isfield(parameters, 'focus_pos_grid')
+            % focus positioned at expected distance from transducer (2D only)
+            % this already accounts for PML size
             focus_pos_final = trans_pos_final;
-            focus_pos_final(parameters.n_sim_dims) = round(focus_pos_final(parameters.n_sim_dims) + parameters.expected_focal_distance_mm/parameters.grid_step_mm);
+            focus_pos_final(2) = ...
+                round(focus_pos_final(2) + ...
+                parameters.expected_focal_distance_mm/parameters.grid_step_mm);
         else
-            focus_pos_final = parameters.focus_pos_grid;    
+            focus_pos_final = parameters.focus_pos_grid;
+            % Adjust if the positions are transposed
+            if size(focus_pos_final,1)>size(focus_pos_final, 2)
+                warning('Specified focus position appears transposed...adjusting');
+                focus_pos_final = focus_pos_final';
+            end
         end
-
-    end
-
-    % If dimension 1 is bigger than 2, the matrices of the focus and
-    % transducer locations are transposed
-    if size(trans_pos_final,1)>size(trans_pos_final, 2)
-        focus_pos_final = focus_pos_final';
-        trans_pos_final = trans_pos_final';
     end
     
     % If a PML layer is used to absorb waves reaching the edge of the grid,
@@ -212,12 +226,35 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
         focus_pos_final ),[],'all') > parameters.pml_size, ...
         'The minimal distance between the focus position and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
-    
-    % Saves the new transducer and focus positions after all previous grid
-    % manipulations
+       
+    % adapt grid dimensions to axisymmetry if requested
+    % grid should be specified as [axial, radial x 2]
+    if numel(focus_pos_final) == 2 && ...
+            isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+        % ensure that radial(y) dim is shorter than axial (x) dim
+        if parameters.grid_dims(2) > parameters.grid_dims(1)
+            parameters.grid_dims = fliplr(parameters.grid_dims);
+            parameters.default_grid_dims = fliplr(parameters.default_grid_dims);
+            trans_pos_final = fliplr(trans_pos_final);
+            focus_pos_final = fliplr(focus_pos_final);
+            segmented_image_cropped = segmented_image_cropped';
+            medium_masks = medium_masks';
+        end
+        % halve the grid along the radial axis
+        % see http://www.k-wave.org/documentation/kspaceFirstOrderAS.php
+        Ny_half = floor(parameters.grid_dims(2)/2);
+        parameters.grid_dims(2) = Ny_half;
+        parameters.default_grid_dims(2) = Ny_half;
+        segmented_image_cropped = segmented_image_cropped(:,Ny_half+1:end);
+        medium_masks = medium_masks(:,Ny_half+1:end);
+        % set transducer and focus position to the radial midline
+        trans_pos_final(2) = 1; 
+        focus_pos_final(2) = 1; 
+    end
+
+    % Retain transducer and focus positions after all grid manipulations
     parameters.transducer.pos_grid = trans_pos_final;
     parameters.focus_pos_grid = focus_pos_final;
-   
 
     %% SETUP MEDIUM
     % For more documentation, see 'setup_medium'
@@ -308,8 +345,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             sprintf('sub-%03d_%s_output%s.h5', subject_id, ...
             parameters.simulation_medium, parameters.results_filename_affix));
 
-        % Defines the edge of the simulation as the edge of the PML layer (see line 148)
-        kwave_input_args = struct('PMLInside', true, ...
+        % Defines the edge of the simulation as the edge of the PML layer
+%         if strcmp(parameters.simulation_medium, 'phantom')
+%             plminside = false; % phantom does not yet include pml
+%             if isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+%                 trans_pos_final(1) = trans_pos_final(1)-parameters.pml_size;
+%                 focus_pos_final(1) = focus_pos_final(1)-parameters.pml_size;
+%             else
+%                 trans_pos_final(2) = trans_pos_final(2)-parameters.pml_size;
+%                 focus_pos_final(2) = focus_pos_final(2)-parameters.pml_size;
+%             end
+%         else
+            plminside = true;
+%         end
+        kwave_input_args = struct('PMLInside', plminside, ...
             'PMLSize', parameters.pml_size, ...
             'PlotPML', true);
 
@@ -326,8 +375,18 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             kwave_input_args, parameters);
 
         % re-add fields for future loading
-        kwave_medium.temp_0 = temp_0;
-        kwave_medium.absorption_fraction = absorption_fraction;
+        kwave_medium.temp_0 = temp_0; clear temp_0;
+        kwave_medium.absorption_fraction = absorption_fraction; clear absorption_fraction;
+
+        % if using axisymmetric settings, rearrange axes
+        if numel(focus_pos_final) == 2 && ...
+                isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+            [sensor_data, parameters, trans_pos_final, focus_pos_final, ...
+                segmented_image_cropped, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+                convert_axisymmetric_to_2d(...
+                sensor_data, parameters, trans_pos_final, focus_pos_final, ...
+                segmented_image_cropped, medium_masks, kwave_medium, source, source_labels);
+        end
 
         if isfield(parameters, 'savemat') && parameters.savemat==0
             disp("Not saving acoustic output matrices ...")
@@ -402,13 +461,14 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         disp('Final transducer, expected focus, and max ISPPA positions')
     
         % Calculates the average Isppa within a circle around the target
-        [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
+%         [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
         real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*...
             parameters.grid_step_mm;
         distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*...
             parameters.grid_step_mm;
         avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
-        idx = arrayfun(@(d) max(1,focus_pos_final(d)-avg_radius):min(size(acoustic_isppa,d),focus_pos_final(d)+avg_radius), ...
+        idx = arrayfun(@(d) max(1,focus_pos_final(d)-avg_radius):...
+            min(size(acoustic_isppa,d),focus_pos_final(d)+avg_radius), ...
                1:ndims(acoustic_isppa), 'UniformOutput', false);
         avg_isppa_around_target = acoustic_isppa(idx{:});
         avg_isppa_around_target = mean(avg_isppa_around_target(:));
@@ -458,8 +518,9 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
             % calculate real focal distance based on max isppa in whole medium
             highlighted_pos = [Ix, Iy, Iz];
-            highlighted_pos = highlighted_pos(1:length(trans_pos_final));
-            real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
+            highlighted_pos = highlighted_pos(1:numel(trans_pos_final));
+
+real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step_mm;
     
             writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
         else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
@@ -712,7 +773,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             elseif strcmp(data_type, "heating")
                 data = single(heating_maxT);
             elseif strcmp(data_type, "heatrise")
-                data = single(heating_maxT-temp_0);
+                data = single(heating_maxT-kwave_medium.temp_0);
             elseif strcmp(data_type, "CEM43")
                 data = single(heating_CEM43);
             end

@@ -97,63 +97,128 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
     %% kWaveArray-based setup (for advanced simulations)
     else
         disp('Setting up kWaveArray (might take a bit of time)');
-        
-        % Create empty kWaveArray object
-        karray = kWaveArray('BLITolerance', 0.1, 'UpsamplingRate', 10, 'BLIType', 'sinc');
 
-        % Add annular array elements to the kWaveArray object
-        karray.addAnnularArray([kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))], ...
-                               transducer_pars.curv_radius_mm * 1e-3, ...
-                               [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
-                               [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))]);
-
-        % Compute weights for each element in the computational grid
-        grid_weights_4d = zeros(transducer_pars.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
-        
-        for ind = 1:transducer_pars.n_elements
-            fprintf('Computing weights for element %i...', ind);
-            grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);                
-            fprintf(' done\n');
+        % Determine if axisymmetric mode should be enabled
+        if numel(trans_pos) == 2 && ...
+                isfield(parameters, 'axisymmetric') && ...
+                parameters.axisymmetric == 1
+            axisymmetric = true;
+            disp("Using axisymmetric setup for 2D input...")
+        else
+            axisymmetric = false;
         end
-
-        % Generate binary mask and distributed source signal
-        binary_mask = squeeze(sum(grid_weights_4d, 1)) ~= 0;
-        Nt = size(cw_signal, 2);
-
-        mask_ind = find(binary_mask);
-        num_source_points = sum(binary_mask(:));
-
-        distributed_source_signal = zeros(num_source_points, Nt);
         
-        source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+        % Create kWaveArray object (always without axisymmetry)
+        karray = kWaveArray('Axisymmetric', false, ...
+                           'BLITolerance', 0.1, ...
+                           'UpsamplingRate', 10, ...
+                           'BLIType', 'sinc');
         
-        if canUseGPU
-            cw_signal = gpuArray(cw_signal);
-            distributed_source_signal = gpuArray(distributed_source_signal);
+        % Set focus position and transducer position vectors in physical coordinates
+        if numel(trans_pos) == 3
+            % 3D annular array
+            pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))];
+            focus_vec = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))];
+            
+            karray.addAnnularArray(pos_vec, ...
+                                   transducer_pars.curv_radius_mm * 1e-3, ...
+                                   [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
+                                   focus_vec);
+        elseif numel(trans_pos) == 2 && axisymmetric == false
+
+            % 2D arc-shaped element
+            pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2))];
+            focus_vec = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2))];
+            
+            karray.addArcElement(pos_vec, ...
+                                 transducer_pars.curv_radius_mm * 1e-3, ...
+                                 transducer_pars.Elements_OD_mm * 1e-3, ...
+                                 focus_vec);
         end
+        
+        if axisymmetric
+            
+            % Approach: create a double sized grid and crop the source
 
-        % Assign signals to elements based on weights
-        for ind = 1:transducer_pars.n_elements
-            source_weights = squeeze(grid_weights_4d(ind,:,:,:));
-            el_binary_mask = source_weights ~= 0;
-
-            if canUseGPU
-                source_weights = gpuArray(source_weights);
+            % make a new grid with odd number of pts. 
+            kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
+            karray_full = kWaveArray('BLITolerance', 0.01, 'UpsamplingRate', 100);
+            % position of the central point on the bowl surface
+            x_offset = (trans_pos(1)-1).*(1/parameters.grid_step_mm); % account for the plm (mm offset)
+            position_full = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
+            % lateral grid point
+%             focus_pos_half = [0, kgrid.y_vec(1)];
+            focus_pos_full = [0, 0+eps]; % eps =  smallest step in MATLAB
+            % add the arc element (2D bowl)
+            karray_full.addArcElement(position_full, ...
+                                 transducer_pars.curv_radius_mm * 1e-3, ...
+                                 transducer_pars.Elements_OD_mm * 1e-3, ...
+                                 focus_pos_full);
+            % Get binary mask for the array elements on the grid
+            source.p_mask = karray_full.getArrayBinaryMask(kgrid_mirrored);
+            % Get the source weighting for each point in the mask
+            grid_weights = karray_full.getElementGridWeights(kgrid_mirrored, 1);
+            % Get distributed source signal weighted by element geometry
+            % consider half of the y-axis space for axisymmetry now
+            source.p_mask = source.p_mask(:,kgrid.Ny:end);
+            grid_weights = grid_weights(:, kgrid.Ny:end);
+            tmp = grid_weights(source.p_mask);
+            source.p = bsxfun(@times, cw_signal, tmp(:));
+            % binarize the source mask based on weight threshold
+            source_labels = (source.p_mask.*grid_weights)>.25;
+            
+        else
+            % --- Non-axisymmetric mode: compute weights and distribute signals manually ---
+            
+            % Initialize 4D array for element weights: [elements, Nx, Ny, Nz]
+            grid_weights_4d = zeros(transducer_pars.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            
+            for ind = 1:transducer_pars.n_elements
+                fprintf('Computing weights for element %i...', ind);
+                grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
+                fprintf(' done\n');
             end
-
-            element_mask_ind = find(el_binary_mask);
-            local_ind = ismember(mask_ind, element_mask_ind);
-
-            distributed_source_signal(local_ind,:) = ...
-                distributed_source_signal(local_ind,:) + ...
-                source_weights(element_mask_ind) * cw_signal(ind,:);
-
-            source_labels = source_labels + ind * el_binary_mask;
+            
+            % Sum weights over elements and create binary mask of active source points
+            binary_mask = squeeze(sum(grid_weights_4d, 1)) ~= 0;
+            
+            Nt = size(cw_signal, 2);
+            mask_ind = find(binary_mask);
+            num_source_points = sum(binary_mask(:));
+            
+            distributed_source_signal = zeros(num_source_points, Nt);
+            source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            
+            if canUseGPU
+                cw_signal = gpuArray(cw_signal);
+                distributed_source_signal = gpuArray(distributed_source_signal);
+            end
+            
+            % Distribute signals weighted by element weights
+            for ind = 1:transducer_pars.n_elements
+                source_weights = squeeze(grid_weights_4d(ind,:,:,:));
+                el_binary_mask = source_weights ~= 0;
+                
+                if canUseGPU
+                    source_weights = gpuArray(source_weights);
+                end
+                
+                element_mask_ind = find(el_binary_mask);
+                local_ind = ismember(mask_ind, element_mask_ind);
+                
+                distributed_source_signal(local_ind,:) = ...
+                    distributed_source_signal(local_ind,:) + ...
+                    source_weights(element_mask_ind) * cw_signal(ind,:);
+                
+                source_labels = source_labels + ind * el_binary_mask;
+            end
+            
+            % Assign outputs
+            source.p_mask = binary_mask;
+            source.p = distributed_source_signal;
         end
 
-        % Assign binary mask and distributed signals to the source structure
-        source.p_mask = binary_mask;
-        source.p = distributed_source_signal;
+
     end
 
 end
