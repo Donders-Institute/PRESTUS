@@ -195,16 +195,20 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
         % set focus position in grid
         if ~isfield(parameters, 'focus_pos_grid')
-            % focus positioned at expected distance from transducer (2D only)
+            % no focus point specified
+            % position focus at expected distance from transducer
+            % index dimension depends on 2D/3D
             % this already accounts for PML size
             focus_pos_final = trans_pos_final;
-            focus_pos_final(2) = ...
-                round(focus_pos_final(2) + ...
+            n_dim = numel(focus_pos_final);
+            focus_pos_final(n_dim) = ...
+                round(focus_pos_final(n_dim) + ...
                 parameters.expected_focal_distance_mm/parameters.grid_step_mm);
+            clear n_dim;
         else
             focus_pos_final = parameters.focus_pos_grid;
-            % Adjust if the positions are transposed
-            if size(focus_pos_final,1)>size(focus_pos_final, 2)
+            % Adjust if the positions are transposed (2D only)
+            if numel(focus_pos_final) == 2 && size(focus_pos_final,1)>size(focus_pos_final, 2)
                 warning('Specified focus position appears transposed...adjusting');
                 focus_pos_final = focus_pos_final';
             end
@@ -450,11 +454,10 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     
         % Calculates the average Isppa within a circle around the target
 %         [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
-        real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*...
-            parameters.grid_step_mm;
-        distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*...
-            parameters.grid_step_mm;
-        avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); %grid
+        real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm; % [mm]
+        distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*parameters.grid_step_mm; % [mm]
+        % convert the radius from mm to voxels
+        avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); % [voxel]
         idx = arrayfun(@(d) max(1,focus_pos_final(d)-avg_radius):...
             min(size(acoustic_isppa,d),focus_pos_final(d)+avg_radius), ...
                1:ndims(acoustic_isppa), 'UniformOutput', false);
