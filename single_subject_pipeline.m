@@ -206,15 +206,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             % index dimension depends on 2D/3D
             % this already accounts for PML size
             focus_pos_final = trans_pos_final;
-            n_dim = numel(focus_pos_final);
-            focus_pos_final(n_dim) = ...
-                round(focus_pos_final(n_dim) + ...
+            focus_pos_final(parameters.n_sim_dims) = ...
+                round(focus_pos_final(parameters.n_sim_dims) + ...
                 parameters.expected_focal_distance_mm/parameters.grid_step_mm);
-            clear n_dim;
         else
             focus_pos_final = parameters.focus_pos_grid;
             % Adjust if the positions are transposed (2D only)
-            if numel(focus_pos_final) == 2 && size(focus_pos_final,1)>size(focus_pos_final, 2)
+            if parameters.n_sim_dims == 2 && size(focus_pos_final,1)>size(focus_pos_final, 2)
                 warning('Specified focus position appears transposed...adjusting');
                 focus_pos_final = focus_pos_final';
             end
