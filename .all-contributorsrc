@@ -9,6 +9,25 @@
   "contributorsPerLine": 7,
   "contributors": [
     {
+      "login": "jkosciessa",
+      "name": "Julian Kosciessa",
+      "avatar_url": "https://avatars.githubusercontent.com/u/40263608?v=4",
+      "profile": "http://juliankosciessa.eu",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial",
+        "maintenance",
+        "bug",
+        "doc"
+      "login": "achetverikov",
+      "name": "Andrey Chetverikov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1465806?v=4",
+      "profile": "http://andreychetverikov.org",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial"
       "login": "KTZ228",
       "name": "Kenneth van der Zee",
       "avatar_url": "https://avatars.githubusercontent.com/u/51954604?v=4",
