@@ -79,8 +79,17 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/KTZ228"><img src="https://avatars.githubusercontent.com/u/51954604?v=4?s=100" width="100px;" alt="Kenneth van der Zee"/><br /><sub><b>Kenneth van der Zee</b></sub></a><br /><a href="#code-KTZ228" title="Code">💻</a> <a href="#ideas-KTZ228" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-KTZ228" title="Maintenance">🚧</a> <a href="#bug-KTZ228" title="Bug reports">🐛</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
