@@ -79,8 +79,17 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sirmrmarty"><img src="https://avatars.githubusercontent.com/u/140894211?v=4?s=100" width="100px;" alt="Martin Wimmers"/><br /><sub><b>Martin Wimmers</b></sub></a><br /><a href="#tutorial-sirmrmarty" title="Tutorials">✅</a> <a href="#bug-sirmrmarty" title="Bug reports">🐛</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
