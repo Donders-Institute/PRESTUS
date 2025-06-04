@@ -1,4 +1,23 @@
 {
   "projectName": "PRESTUS",
-  "projectOwner": "Donders-Institute"
+  "projectOwner": "Donders-Institute",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "achetverikov",
+      "name": "Andrey Chetverikov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1465806?v=4",
+      "profile": "http://andreychetverikov.org",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial"
+      ]
+    }
+  ]
 }
