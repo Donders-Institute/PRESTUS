@@ -1,4 +1,22 @@
 {
   "projectName": "PRESTUS",
-  "projectOwner": "Donders-Institute"
+  "projectOwner": "Donders-Institute",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "sirmrmarty",
+      "name": "Martin Wimmers",
+      "avatar_url": "https://avatars.githubusercontent.com/u/140894211?v=4",
+      "profile": "https://github.com/sirmrmarty",
+      "contributions": [
+        "tutorial",
+        "bug"
+      ]
+    }
+  ]
 }
