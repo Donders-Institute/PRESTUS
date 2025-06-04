@@ -20,6 +20,14 @@
         "maintenance",
         "bug",
         "doc"
+      "login": "achetverikov",
+      "name": "Andrey Chetverikov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1465806?v=4",
+      "profile": "http://andreychetverikov.org",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial"
       ]
     }
   ]
