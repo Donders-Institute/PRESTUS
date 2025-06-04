@@ -2,7 +2,7 @@
 
 # PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
 
-PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed TUS simulations: from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
+PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
 
 Key features include:
 - Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
@@ -23,11 +23,13 @@ If you would like to assist the community development of this tool, please consi
 
 # Installation
 
-## DCC/N Cluster
+## Donders Institute HPC Cluster
 
-When working on the DCCN cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
+When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
 
-Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path*. Now you can start matlab R2022b.
+Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
+
+For more information on HPC usage, see [doc_hpc](documentation/doc_hpc.md)
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
 
@@ -35,9 +37,7 @@ If you want to get started with simulations, you can use the PRESTUS example dat
 cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
 ```
 
-*this will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions.
-
-## Outside the DCC/N
+## Outside the Donders HPC
 
 Download and install these tools:
 
@@ -74,13 +74,14 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 
 # Contributors
 
-- Andrey Chetverikov (@achetverikov)
-- Julian Kosciessa (@jkosciessa)
-- Kenneth van der Zee (@KTZ228)
-- Margely Cornelissen (@MaCuinea)
-- Matthias Ekman (@mekman)
-- Eleonora Carpino (@eleonoracarpino)
-- Martin Wimmers (@sirmrmarty)
+[![Contributors](https://img.shields.io/github/contributors/Donders-Institute/PRESTUS.svg?color=00B4D8&style=flat-square)](https://github.com/Donders-Institute/PRESTUS/graphs/contributors)
+[![All Contributors](https://img.shields.io/github/all-contributors/Donders-Institute/PRESTUS?color=00B4D8&style=flat-square)](#contributors)
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
 

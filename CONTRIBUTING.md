@@ -29,10 +29,11 @@ PRESTUS is a research tool, and we strive for transparency, reproducibility, and
 - Create a new branch for your feature or fix.
 - Ensure (to the best of your ability) that your features work as expected and the pipeline remains functional. Unit tests have not yet been implemented, so please verify your changes manually and describe your testing process.
 - Submit a pull request to the `development` branch with a clear description. Before this pull request can be accepted, it will need to be reviewed by another contributor.
-- Optionally, attach a log or summary to the pull request, stating that the "pipeline has finished successfully" or describing any issues encountered.
+- [Optional] Attach a log or summary to the pull request, stating that the "pipeline has finished successfully" or describing any issues encountered.
+- [Optional] Add yourself to the contributor list in the readme (you will automatically be recognized by GitHub's contribution tracker). Follow [these instructions](https://allcontributors.org/docs/en/bot/usage).
 
 ## Code of Conduct
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 ## Contact
-If you have questions, please open an issue.
+If you have questions, please [open an issue](https://github.com/Donders-Institute/PRESTUS/issues).
