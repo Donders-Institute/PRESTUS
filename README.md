@@ -90,6 +90,7 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mekman"><img src="https://avatars.githubusercontent.com/u/139282?v=4?s=100" width="100px;" alt="Matthias Ekman"/><br /><sub><b>Matthias Ekman</b></sub></a><br /><a href="#bug-mekman" title="Bug reports">🐛</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/sirmrmarty"><img src="https://avatars.githubusercontent.com/u/140894211?v=4?s=100" width="100px;" alt="Martin Wimmers"/><br /><sub><b>Martin Wimmers</b></sub></a><br /><a href="#tutorial-sirmrmarty" title="Tutorials">✅</a> <a href="#bug-sirmrmarty" title="Bug reports">🐛</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/neurodream"><img src="https://avatars.githubusercontent.com/u/117816806?v=4?s=100" width="100px;" alt="Nico Adelhöfer"/><br /><sub><b>Nico Adelhöfer</b></sub></a><br /><a href="#ideas-neurodream" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://lennartverhagen.com"><img src="https://avatars.githubusercontent.com/u/12236166?v=4?s=100" width="100px;" alt="Lennart Verhagen"/><br /><sub><b>Lennart Verhagen</b></sub></a><br /><a href="#ideas-lennartverhagen" title="Ideas, Planning, & Feedback">🤔</a></td>
     </tr>
   </tbody>
 </table>
