@@ -6,9 +6,72 @@
   ],
   "commitType": "docs",
   "commitConvention": "angular",
-  "contributorsPerLine": 7,
+  "contributorsPerLine": 10,
   "contributors": [
     {
+      "login": "jkosciessa",
+      "name": "Julian Kosciessa",
+      "avatar_url": "https://avatars.githubusercontent.com/u/40263608?v=4",
+      "profile": "http://juliankosciessa.eu",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial",
+        "maintenance",
+        "bug",
+        "doc"
+      ]
+      "login": "achetverikov",
+      "name": "Andrey Chetverikov",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1465806?v=4",
+      "profile": "http://andreychetverikov.org",
+      "contributions": [
+        "code",
+        "ideas",
+        "tutorial"
+      ]
+      "login": "KTZ228",
+      "name": "Kenneth van der Zee",
+      "avatar_url": "https://avatars.githubusercontent.com/u/51954604?v=4",
+      "profile": "https://github.com/KTZ228",
+      "contributions": [
+        "code",
+        "ideas",
+        "maintenance",
+        "bug"
+      ]
+      "login": "MaCuinea",
+      "name": "Margely Cornelissen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/134381864?v=4",
+      "profile": "https://github.com/MaCuinea",
+      "contributions": [
+        "code",
+        "maintenance",
+        "tutorial",
+        "bug"]
+      "login": "eleonoracarpino",
+      "name": "Eleonora Carpino",
+      "avatar_url": "https://avatars.githubusercontent.com/u/123380299?v=4",
+      "profile": "https://github.com/eleonoracarpino",
+      "contributions": [
+        "code",
+        "ideas"
+      ]
+      "login": "mekman",
+      "name": "Matthias Ekman",
+      "avatar_url": "https://avatars.githubusercontent.com/u/139282?v=4",
+      "profile": "https://github.com/mekman",
+      "contributions": [
+      "bug"
+      ]
+      "login": "sirmrmarty",
+      "name": "Martin Wimmers",
+      "avatar_url": "https://avatars.githubusercontent.com/u/140894211?v=4",
+      "profile": "https://github.com/sirmrmarty",
+      "contributions": [
+        "tutorial",
+        "bug"
+      ]
       "login": "neurodream",
       "name": "Nico Adelhöfer",
       "avatar_url": "https://avatars.githubusercontent.com/u/117816806?v=4",
