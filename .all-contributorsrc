@@ -1,4 +1,21 @@
 {
   "projectName": "PRESTUS",
-  "projectOwner": "Donders-Institute"
+  "projectOwner": "Donders-Institute",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "mekman",
+      "name": "Matthias Ekman",
+      "avatar_url": "https://avatars.githubusercontent.com/u/139282?v=4",
+      "profile": "https://github.com/mekman",
+      "contributions": [
+        "bug"
+      ]
+    }
+  ]
 }
