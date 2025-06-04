@@ -2,9 +2,24 @@
 
 # PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
 
-PRESTUS is an open-source toolbox that facilitates imaging-informed TUS simulations. PRESTUS provides an integrated solution for defining relevant tissue parameters based on personalized MR or CT images, and using them to run  acoustic and heating simulations (with HCP support), and summarizing outputs in standard template space. These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting.
+PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed TUS simulations: from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
 
-The examples folder contains some examples of how to run the pipeline, including a tutorial.
+Key features include:
+- Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
+- 2D / 3D grid setup.
+- Multi-layer medium property mapping (water, skin, multi-layer skull, and brain).
+- (pseudo-)CT-informed continuous skull mapping.
+- Virtual multi-element transducer calibration (free-water profile emulation).
+- Estimation of entry-target coordinates.
+- Flexible temporal protocol specification (e.g., including session breaks).
+- k-Wave integration for robust acoustic and heating simulations.
+- Support for high-performance computing.
+- 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
+
+These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
+The ```documentation``` folder contains evolving documentation of the main workflows and parameters, alongside a tutorial on how to run the integrated pipeline.
+
+If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
 
 # Installation
 
@@ -55,7 +70,7 @@ Example data: We are currently working on a solution to make the example dataset
 
 # Reference
 
-Chetverikov, A., Kosciessa, J. Q., van der Zee, K., & Verhagen, L. (2024). PRESTUS (0.3.0). Zenodo. https://doi.org/10.5281/zenodo.15095861
+Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen, L. (2024). PRESTUS (0.3.0). Zenodo. https://doi.org/10.5281/zenodo.15095861
 
 # Contributors
 
@@ -70,3 +85,6 @@ Chetverikov, A., Kosciessa, J. Q., van der Zee, K., & Verhagen, L. (2024). PREST
 # License
 
 Released under GNU General Public License v3.0 (see LICENSE).
+
+> **Disclaimer**
+> This software is currently under development and is provided “as is” without warranty of any kind, either express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement. This tool is intended for research purposes only and is not designed, intended, or approved for medical or clinical use, diagnosis, or treatment of patients. The contributors accept no liability for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; or business interruption) arising in any way out of the use of this software. Use at your own risk.
