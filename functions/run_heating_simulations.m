@@ -105,7 +105,7 @@ end
 T_max = thermal_diff_obj.T;
 
 % initialize field for cem43
-if isfield(parameters, 'adopted_cumulative_heat')
+if isfield(parameters, 'adopted_cumulative_heat') && parameters.adopted_cumulative_heat == 1
     cumulative_heat_image = niftiread(parameters.adopted_cumulative_heat);
     thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, ...
         maketform("affine", final_transformation_matrix), ...
