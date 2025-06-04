@@ -79,8 +79,17 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="http://juliankosciessa.eu"><img src="https://avatars.githubusercontent.com/u/40263608?v=4?s=100" width="100px;" alt="Julian Kosciessa"/><br /><sub><b>Julian Kosciessa</b></sub></a><br /><a href="#code-jkosciessa" title="Code">💻</a> <a href="#ideas-jkosciessa" title="Ideas, Planning, & Feedback">🤔</a> <a href="#tutorial-jkosciessa" title="Tutorials">✅</a> <a href="#maintenance-jkosciessa" title="Maintenance">🚧</a> <a href="#bug-jkosciessa" title="Bug reports">🐛</a> <a href="#doc-jkosciessa" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
