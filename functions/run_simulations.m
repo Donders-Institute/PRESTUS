@@ -50,14 +50,24 @@
    % Save new input arguments for simulations
    input_args_cell = zip_fields(input_args);
    
-   % Debugging info for non-interactive simulations on the Donders cluster
+   % Remove fields that are not recognized for acoustic simulations
    medium = rmfield(medium,'thermal_conductivity');
    medium = rmfield(medium,'specific_heat');
+   medium = rmfield(medium,'perfusion_coeff');
 
    % Runs simulations on the CPU only in 3 or 2 dimensions
    if parameters.n_sim_dims == 3
        sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
-   else
+   elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+%        [kgrid, medium, source] = convert_2d_to_axisymmetric(kgrid, medium, source);
+       sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:}, 'RadialSymmetry', 'WSWA-FFT');
+       % debug plot of setup
+%        figure; 
+%        subplot(3,1,1); imagesc(source.p_mask); title('Radial (half) source');
+%        subplot(3,1,2); imagesc(medium.sound_speed); title('Radial (half) sound speed');
+%        subplot(3,1,3); imagesc(sensor_data.p_max_all); title('Full max. pressure');
+
+   else % by default assume 2D simulation (e.g., free-water calibration)
        sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
    end
 

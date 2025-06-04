@@ -1,16 +1,35 @@
-# PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation package
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15095860.svg)](https://doi.org/10.5281/zenodo.15095860)
 
-PRESTUS provides a set of functions for ultrasonic simulations including brain preprocessing, extracting data from Localite neuronavigation files, and more. 
+# PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
 
-The examples folder contains some examples of how to run the pipeline, including a tutorial.
+PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
+
+Key features include:
+- Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
+- 2D / 3D grid setup.
+- Multi-layer medium property mapping (water, skin, multi-layer skull, and brain).
+- (pseudo-)CT-informed continuous skull mapping.
+- Virtual multi-element transducer calibration (free-water profile emulation).
+- Estimation of entry-target coordinates.
+- Flexible temporal protocol specification (e.g., including session breaks).
+- k-Wave integration for robust acoustic and heating simulations.
+- Support for high-performance computing.
+- 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
+
+These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
+The ```documentation``` folder contains evolving documentation of the main workflows and parameters, alongside a tutorial on how to run the integrated pipeline.
+
+If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
 
 # Installation
 
-## DCC/N Cluster
+## Donders Institute HPC Cluster
 
-When working on the DCCN cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
+When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
 
-Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path*. Now you can start matlab R2022b.
+Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
+
+For more information on HPC usage, see [doc_hpc](documentation/doc_hpc.md)
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
 
@@ -18,9 +37,7 @@ If you want to get started with simulations, you can use the PRESTUS example dat
 cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
 ```
 
-*this will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions.
-
-## Outside the DCC/N
+## Outside the Donders HPC
 
 Download and install these tools:
 
@@ -51,17 +68,24 @@ You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/buil
 
 Example data: We are currently working on a solution to make the example dataset available for users outside the DCCN.
 
-# Authorship
+# Reference
 
-The initial version was developed by Andrey Chetverikov (website: http://andreychetverikov.org, GitLab: @A.Chetverikov, GitHub: https://github.com/achetverikov).
+Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen, L. (2024). PRESTUS (0.3.0). Zenodo. https://doi.org/10.5281/zenodo.15095861
 
 # Contributors
 
-- Kenneth van der Zee (GitLab: @kenneth.vanderzee, GitHub: https://github.com/KTZ228)
-- Julian Kosciessa (GitLab: @julian-kosciessa, GitHub: https://github.com/jkosciessa)
-- Matthias Ekman (GitLab: @m.ekman, GitHub: https://github.com/mekman)
-- Eleonora Carpino (GitLab: @eleonora.carpino, GitHub: https://github.com/eleonoracarpino)
+[![Contributors](https://img.shields.io/github/contributors/Donders-Institute/PRESTUS.svg?color=00B4D8&style=flat-square)](https://github.com/Donders-Institute/PRESTUS/graphs/contributors)
+[![All Contributors](https://img.shields.io/github/all-contributors/Donders-Institute/PRESTUS?color=00B4D8&style=flat-square)](#contributors)
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
 
 Released under GNU General Public License v3.0 (see LICENSE).
+
+> **Disclaimer**
+> This software is currently under development and is provided “as is” without warranty of any kind, either express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement. This tool is intended for research purposes only and is not designed, intended, or approved for medical or clinical use, diagnosis, or treatment of patients. The contributors accept no liability for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; or business interruption) arising in any way out of the use of this software. Use at your own risk.

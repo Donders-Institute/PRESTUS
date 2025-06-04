@@ -34,31 +34,11 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % when using pseudoCTs.
     
     if strcmp(parameters.simulation_medium, 'layered') && parameters.usepseudoCT==0
-        % Note: here, we create a new image of "medium_masks" that is
-        % structured according to the indices in parameters.layer_labels.
-
-        % smoothing window size
-        windowSize = 4;
-        % Creates an empty grid the size of the segmented image
-        medium_masks = zeros(size(segmented_img));
-        % add a smoothing threshold to bone and other non-water tissue.
-        for label_i = 1:length(labels)
-            if strcmp(labels{label_i}, 'water')
-               continue
-            end
-            sim_nibs_layers = parameters.layer_labels.(labels{label_i});
-            layer_mask = ismember(segmented_img, sim_nibs_layers);
-            if contains(labels{label_i}, 'skull')
-                smooth_threshold = parameters.skull_smooth_threshold;    
-                if any(contains(labels, 'skull_cortical')) % two bone types are smoothed together later
-                    continue
-                end
-            else
-                smooth_threshold = parameters.other_smooth_threshold;
-            end
-            layer_mask_smoothed = smooth_img(layer_mask, windowSize, smooth_threshold);
-            medium_masks(layer_mask_smoothed~=0) = label_i;
-        end
+    
+        % create "medium_masks" that contains indices according to the label order in parameters.layer_labels
+        windowSize = 4; % smoothing window size
+        [medium_masks] = medium_mask_create(segmented_img, parameters, windowSize);
+        
         % fill gaps in the skull by using the boundary of a bone image
         if any(contains(labels, 'skull_cortical'))  
             skull_i = find(strcmp(labels, 'skull_cortical')); % gives to skull_i the index of skull_cortical in labels array
@@ -290,10 +270,6 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     saveas(h, output_plot_filename, 'png')
     close(h);
 
-    % save medium mask
-    segmented_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
-    niftiwrite(uint8(medium_masks), segmented_file  ,'Compressed', 1);
-    
     % plot the smoothed and unsmoothed skull segmentation with transducer and focus locations
     h = figure;
     imshowpair(plot_t1_with_transducer(segmented_image_cropped, voxel_size_mm, trans_pos_final, focus_pos_final, parameters),...
@@ -306,8 +282,5 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     saveas(h, output_plot_filename, 'png')
     close(h);
     
-    % save skull mask/pseudoCT
-    skull_mask_file = fullfile(parameters.debug_dir, sprintf('sub-%03d_skull_final', parameters.subject_id));
-    niftiwrite(uint8(segmented_image_cropped), skull_mask_file ,'Compressed', 1);
 end
 

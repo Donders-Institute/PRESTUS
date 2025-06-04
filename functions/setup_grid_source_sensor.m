@@ -18,7 +18,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
                       parameters.grid_dims(2), parameters.grid_step_m);
     end
     
-    wave_period   = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
+    wave_period = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
     
     % Check the number of input arguments
     % As a default the time step is based on the default CFL number of 0.3.
@@ -55,10 +55,10 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     sensor.mask = ones(parameters.grid_dims);
     sensor.record = {'p_max_all','p_final'};
 
-    % Record the last 3 cycles in steady state (when sonic waves have
-    % traversed the entire medium)
+    % Record the last 3 cycles in steady state (when sonic waves have traversed the entire medium)
     num_periods = 3;
     time_points_to_record = round(num_periods * wave_period / kgrid.dt);
     sensor.record_start_index = simulation_time_points - time_points_to_record + 1;
+    % alternative (EM): sensor.record_start_index = simulation_time_points - 3*points_per_period;
 
 end
