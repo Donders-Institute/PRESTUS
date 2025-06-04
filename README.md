@@ -79,8 +79,17 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="http://andreychetverikov.org"><img src="https://avatars.githubusercontent.com/u/1465806?v=4?s=100" width="100px;" alt="Andrey Chetverikov"/><br /><sub><b>Andrey Chetverikov</b></sub></a><br /><a href="#code-achetverikov" title="Code">💻</a> <a href="#ideas-achetverikov" title="Ideas, Planning, & Feedback">🤔</a> <a href="#tutorial-achetverikov" title="Tutorials">✅</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
