@@ -1,4 +1,21 @@
 {
   "projectName": "PRESTUS",
-  "projectOwner": "Donders-Institute"
+  "projectOwner": "Donders-Institute",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "neurodream",
+      "name": "Nico Adelhöfer",
+      "avatar_url": "https://avatars.githubusercontent.com/u/117816806?v=4",
+      "profile": "https://github.com/neurodream",
+      "contributions": [
+        "ideas"
+      ]
+    }
+  ]
 }
