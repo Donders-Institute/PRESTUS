@@ -1,4 +1,24 @@
 {
   "projectName": "PRESTUS",
-  "projectOwner": "Donders-Institute"
+  "projectOwner": "Donders-Institute",
+  "files": [
+    "README.md"
+  ],
+  "commitType": "docs",
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "contributors": [
+    {
+      "login": "MaCuinea",
+      "name": "Margely Cornelissen",
+      "avatar_url": "https://avatars.githubusercontent.com/u/134381864?v=4",
+      "profile": "https://github.com/MaCuinea",
+      "contributions": [
+        "code",
+        "maintenance",
+        "tutorial",
+        "bug"
+      ]
+    }
+  ]
 }
