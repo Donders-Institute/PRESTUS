@@ -79,8 +79,17 @@ Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen,
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/MaCuinea"><img src="https://avatars.githubusercontent.com/u/134381864?v=4?s=100" width="100px;" alt="Margely Cornelissen"/><br /><sub><b>Margely Cornelissen</b></sub></a><br /><a href="#code-MaCuinea" title="Code">💻</a> <a href="#maintenance-MaCuinea" title="Maintenance">🚧</a> <a href="#tutorial-MaCuinea" title="Tutorials">✅</a> <a href="#bug-MaCuinea" title="Bug reports">🐛</a></td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
+
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 # License
