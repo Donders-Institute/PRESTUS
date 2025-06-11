@@ -176,6 +176,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             end
             % create medium mask according to indices in parameters.layer_labels (see smooth_and_crop.m)
             [medium_masks] = medium_mask_create(segmented_img, parameters, 1);
+            % specify that no transformation was applied
+            final_transformation_matrix = zeros(size(medium_masks));
             clear segmented_img;
         end
         segmented_image_cropped = zeros(parameters.grid_dims);
