@@ -35,7 +35,7 @@ function [on_steps_n,  on_steps_dur, ...
     end
 
     % Set or validate post-stimulation step duration
-    if ~isfield(parameters.thermal,'post_stim_dur')
+    if ~isfield(parameters.thermal,'post_stim_dur') || parameters.thermal.post_stim_dur == 0
         disp("No post-stimulation time requested...")
         post_stim_step_dur = 0;
         post_stim_step_n = 0;
