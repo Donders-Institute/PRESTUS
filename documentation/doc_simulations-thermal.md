@@ -13,6 +13,7 @@ For a continuous pulse protocol, the default option is to model each pulse train
 - `pri_duration`: 0.2           | duration of a pulse repetition interval [s]
 - `sim_time_steps`: 0.04        | simulation time steps during the stimulation period [s]
 - `post_stim_dur`: 10           | duration of post-stimulation diffusion [s]
+- `post_time_steps`: 0.2        | (coarser) time steps for post-stimulation diffusion [s]
 - `equal_steps`: 0              | [0] Variable step duration between pulse on & off [fixed step count = 1] [1] Variable step number between pulse on & off [fixed step duration: sim_time_steps]
 
 Note that you may also specify a version of your protocol that neglects the fine-grained heating dynamics between each pulse, as cooling effects during the off-cycle are limited. Here, you specify the protocol via a single virtual trial that assumes concatenated stim-on followed by concatenated stim-off. For example, you could model a protocol with a duty cycle of 20% (`duty_cycle`, 0.2) and a total stimulation duration of 80s, as follows (with a longer simulation time step):
