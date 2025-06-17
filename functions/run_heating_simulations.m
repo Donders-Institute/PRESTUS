@@ -1,5 +1,7 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
-    run_heating_simulations(sensor_data, kgrid, kwave_medium, sensor, source, parameters, trans_pos, final_transformation_matrix, medium_masks)
+    run_heating_simulations(...
+    sensor_data, kgrid, kwave_medium, sensor, source, parameters, ...
+    trans_pos, final_transformation_matrix, medium_masks)
 
 % RUN_HEATING_SIMULATIONS Simulates thermal effects of ultrasound using k-Wave.
 %
@@ -15,6 +17,8 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 %   source       - Struct defining the heat deposition source for thermal simulations.
 %   parameters   - Struct containing simulation parameters (e.g., thermal properties).
 %   trans_pos    - [1x3] array specifying the transducer position in grid coordinates.
+%   final_transformation_matrix
+%   medium_masks
 %
 % Output:
 %   thermal_diff_obj - kWaveDiffusion object used for thermal simulations.
@@ -88,7 +92,7 @@ if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'c
     datacast = 'gpuArray-double';
 else
     datacast = 'off';
-end    
+end
 
 thermal_diff_obj = kWaveDiffusion(...
     kgrid, ...
