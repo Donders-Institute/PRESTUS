@@ -630,7 +630,7 @@ real_focal_distance = norm(highlighted_pos-trans_pos_final)*parameters.grid_step
             heating_CEM43 = gather(heating_CEM43);
             heating_focal_planeCEM43 = gather(heating_focal_planeCEM43);
 
-            if isfield(parameters, 'savemat') && parameters.savemat==1
+            if isfield(parameters, 'savemat') && parameters.savemat==0
                 disp("Not saving heating output matrices ...")
             else
                 save(filename_heating_data, 'kwaveDiffusion','time_status_seq',...
