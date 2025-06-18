@@ -28,7 +28,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
-    fprintf('Starting processing for subject %i %s\n',subject_id, parameters.results_filename_affix)
+    fprintf('Starting processing for subject %i %s\n',...
+        subject_id, parameters.results_filename_affix)
     
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
@@ -95,6 +96,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         subject_id, parameters.results_filename_affix, ...
         datestr(now,'ddmmyy_HHMM')));
     save(parameters_file, 'parameters')
+
+    % Create a log
+    filename_log = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_%s.txt', ...
+        subject_id, parameters.results_filename_affix, ...
+        datestr(now,'ddmmyy_HHMM')));
+    diary(filename_log);
     
     % Add subject_id to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
@@ -959,5 +967,12 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
     end
 
+    allvars = whos;
+    memused = sum([allvars.bytes]);
+    memused_GB = memused / (1024^3); % 1 GB = 1024^3 bytes
+    disp(['Total MATLAB variable memory usage: ', num2str(memused_GB, '%.2f'), ' GB']);
+
     disp('Pipeline finished successfully');
+
+    diary('off')
 end
