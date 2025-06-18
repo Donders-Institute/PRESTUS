@@ -6,7 +6,7 @@ PRESTUS is designed for HPC deployment: the most efficient way to run simulation
 
 The following sections describe workflows at the Donders to start (interactive) jobs.
 
-For more extensive documentation, see the [HCP wiki](https://hpc.dccn.nl/) (*intranet required*).
+For more extensive documentation, see the [HPC wiki](https://hpc.dccn.nl/) (*intranet required*).
 
 ### PBS
 
@@ -89,8 +89,8 @@ The following settings can be used to specify the HPC GPU setup.
 
 | Field                           | Default | Explanation                  |
 |-------------------------------|-------------|-----------------------------|
-| parameters.hcp_gpu                   | "gpu:1"       | Specific GPUs could be requested here (e.g.,```"nvidia_a100-sxm4-40gb:1"```, but this is not recommended. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types.|
-| parameters.hcp_partition                   | "gpu"       | The Donders HCP has a ```gpu40g``` partition that should be used for the majority of thermal simulations.  It consists of nodes with GPU with vRAM > 40 GB.|
+| parameters.hpc_gpu                   | "gpu:1"       | Specific GPUs could be requested here (e.g.,```"nvidia_a100-sxm4-40gb:1"```, but this is not recommended. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types.|
+| parameters.hpc_partition                   | "gpu"       | The Donders HPC offers a ```gpu40g``` partition that should be used for the majority of thermal simulations.  It consists of nodes with GPU with vRAM > 40 GB.|
 | parameters.hpc_reservation                   | ""       | By default do not use a reserved cue.|
 
 #### Benchmark data Nvidia GPUs
