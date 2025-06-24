@@ -57,29 +57,32 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     %% Plot temperature profile over time
 
-    recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
+    HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
 
     h = figure;
     hold on;
-%     p1 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     % create dummy values to avoid crashes when mask is empty
-    data2plot = NaN(numel(recordedtime), 1);
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
     if any(find(mask_skull))
         data2plot = max(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),[],1);
     end
-    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.temp.Skull = data2plot;
+    p1 = plot(HEAT.recordedtime, HEAT.temp.Skull, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_skin))
         data2plot = max(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),[],1);
     end
-    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.temp.Skin = data2plot;
+    p2 = plot(HEAT.recordedtime, HEAT.temp.Skin, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_brain))
         data2plot = max(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),[],1);
     end
-    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    HEAT.temp.Brain = data2plot;
+    p3 = plot(HEAT.recordedtime, HEAT.temp.Brain, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -104,25 +107,28 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
 
     h = figure;
     hold on;
-%     p1 = plot(recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     % create dummy values to avoid crashes when mask is empty
-    data2plot = NaN(numel(recordedtime), 1);
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
     if any(find(mask_skull))
         data2plot = max(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),[],1);
     end
-    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.tempRise.Skull = data2plot;
+    p1 = plot(HEAT.recordedtime, HEAT.tempRise.Skull, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_skin))
         data2plot = max(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),[],1);
     end
-    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.tempRise.Skin = data2plot;
+    p2 = plot(HEAT.recordedtime, HEAT.tempRise.Skin, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_brain))
         data2plot = max(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),[],1);
     end
-    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    HEAT.tempRise.Brain = data2plot;
+    p3 = plot(HEAT.recordedtime, HEAT.tempRise.Brain, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -148,21 +154,24 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     g = figure;
     hold on;
     % create dummy values to avoid crashes when mask is empty
-    data2plot = NaN(numel(recordedtime), 1);
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
     if any(find(mask_skull))
         data2plot = max(focal_CEM(mask_skull, 1:size(time_status_seq,2)),[],1);
     end
-    p1 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.CEM43.Skull = data2plot;
+    p1 = plot(HEAT.recordedtime, HEAT.CEM43.Skull, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_skin))
         data2plot = max(focal_CEM(mask_skin, 1:size(time_status_seq,2)),[],1);
     end
-    p2 = plot(recordedtime, data2plot, 'LineWidth', 2);
-    data2plot = NaN(numel(recordedtime), 1); % create dummy values to avoid crashes
+    HEAT.CEM43.Skin = data2plot;
+    p2 = plot(HEAT.recordedtime, HEAT.CEM43.Skin, 'LineWidth', 2);
+    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
     if any(find(mask_brain))
         data2plot = max(focal_CEM(mask_brain, 1:size(time_status_seq,2)),[],1);
     end
-    p3 = plot(recordedtime, data2plot, 'LineWidth', 2);
+    HEAT.CEM43.Brain = data2plot;
+    p3 = plot(HEAT.recordedtime, HEAT.CEM43.Brain, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel(sprintf('CEM43'));
@@ -182,6 +191,12 @@ function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos,
     title('CEM43 in focal plane (max. in tissue)');
     saveas(g, output_plotCEM, 'png');
     close(g);
+
+    %% Save values for group analysis
+
+    output_HEAT = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_HEAT%s.mat', ...
+        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    save(output_HEAT, 'HEAT');
 
     %% Create a video of heating effects over the course of the experiment (if requested)
 
