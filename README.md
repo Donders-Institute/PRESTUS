@@ -19,6 +19,8 @@ Key features include:
 These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
 The ```documentation``` folder contains evolving documentation of the main workflows and parameters, alongside a tutorial on how to run the integrated pipeline.
 
+A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
+
 If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
 
 # Installation
