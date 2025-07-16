@@ -72,7 +72,7 @@ Example data: We are currently working on a solution to make the example dataset
 
 # Reference
 
-Chetverikov, A., Kosciessa, J. Q., Cornelissen, M., van der Zee, K., & Verhagen, L. (2024). PRESTUS (0.3.0). Zenodo. https://doi.org/10.5281/zenodo.15095861
+Chetverikov, A.\*, Kosciessa, J. Q.\*, Cornelissen, M., Carpino, E., van der Zee, K., & Verhagen, L. (2025). PRESTUS (0.4.0). Zenodo. https://doi.org/10.5281/zenodo.15965832
 
 # Contributors
 
