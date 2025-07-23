@@ -38,7 +38,7 @@ When a homogeneous skull layer is requested, the default assumes the medium prop
 | Water                 | 994    | 1500     | 0.00217  | 2     | 0.6    | 4178 | 0     | 1 |
 | Brain                 | 1046   | 1546     | 0.59     | 1.2   | 0.51   | 3630 | 559   | 1 |
 | Skin                  | 1090   | 1610     | 0.4      | 1     | 0.37   | 3391 | 106   | 1 |
-| Skull (single)        | 1850   | 2800     | 13.3     | 1     | 0.32   | 1313 | 20    | 0.28 |
+| Skull (single)        | 1850   | 2800     | 13.3     | 1     | 0.32   | 1793 | 20    | 0.28 |
 | Skull (cortical)      | 1850   | 2800     | 13.3     | 1     | 0.32   | 1313 | 10    | 0.28 |
 | Skull (trabecular)    | 1700   | 2300     | 13.3     | 1     | 0.32   | 2274 | 30    | 0.28 |
 
