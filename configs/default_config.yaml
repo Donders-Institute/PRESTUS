@@ -111,13 +111,13 @@ medium:
     specific_heat_capacity: 4178 # [J/kg/°C]
     perfusion: 0
     absorption_fraction: 1
-  skull: # cortical bone 
+  skull: # (single skull layer only; mostly following cortical bone)
     sound_speed: 2800 # [m/s]
     density: 1850 # [kg/m^3]
     alpha_0_true: 13.3
     alpha_power_true: 1
     thermal_conductivity: 0.32 # [W/m/°C]
-    specific_heat_capacity: 1313 # [J/kg/°C]
+    specific_heat_capacity: 1793 # [J/kg/°C]
     perfusion: 20
     absorption_fraction: 0.28
   brain:
