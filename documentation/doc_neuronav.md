@@ -4,6 +4,8 @@ PRESTUS provides functions that aim to facilitate the read-in and preprocessing 
 
 Recorded locations will be averaged within a position (associated with a continuous time stamp stream). Multiple positions per recording session are supported. Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). The functions also facilitate standard-space definitons (experimental), e.g., to plot average transducer positions in standard space.
 
+To get started, see an example demo (wihtout provided data) in '/examples/demo_localite.m'.
+
 ### Relevant spaces and coordinate systems
 
 1. **Subject Space [planning image] (voxels)**
