@@ -1,4 +1,4 @@
-function coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters, transformation_type)
+function coords_sub = subject2mni_coords_LDfix(coords_mni, subdir, parameters, transformation_type)
 
 % Transforms a set of coordinates in MNI space to subject space
 % This function calls the command line tool "mni2subject_coords", so it has
@@ -44,13 +44,8 @@ else
 end
 
 % Run mni2subject_coords
-[status,result] = system(sprintf('%s%s/mni2subject_coords -m %s -s %s -o %s -t %s;', ...
+[status,result] = system(sprintf('%s%s/subject2mni_coords -m %s -s %s -o %s -t %s;', ...
     ld_command, parameters.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
-
-
-% system([simnibs_cli_call('mni2subject_coords')...
-%                          ' -m "' subdir '" -s ' fn_in ' -o ' fn_out ...
-%                          ' -t ' transformation_type]);
 
 % Check if call was successefull
 if status ~= 0
