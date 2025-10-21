@@ -64,7 +64,8 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
 		    
     
   	        % execute simnibs call in segmentation directory
-		    full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
+		    full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', ...
+                parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
 		    
 	      % 3) submit segmentation job
 		    fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -73,10 +74,13 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
 		    display(out);
 		    
 		    fprintf('Now wait for the job with the id listed above to finish')
+
         elseif strcmp(parameters.submit_medium, 'slurm')
+
             % Create a temporary SLURM batch script file
             temp_slurm_file = tempname(log_dir);
             job_name = ['simnibs-', subj_id_string];
+            
             fid = fopen([temp_slurm_file '.sh'], 'w+');
             fprintf(fid, '#!/bin/bash\n');
             fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
@@ -86,16 +90,23 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
             fprintf(fid, '#SBATCH --time=24:00:00\n');
             fprintf(fid, '#SBATCH --output=%s\n', fullfile(log_dir, sprintf('%s_slurm_segment_output_%%j.log', subj_id_string)));
             fprintf(fid, '#SBATCH --error=%s\n', fullfile(log_dir, sprintf('%s_slurm_segment_error_%%j.log', subj_id_string)));
-            fprintf(fid, '#SBATCH --chdir=%s\n', parameters.seg_path);
             
-            % Add environment setup and the segmentation command
+            % Add environment setup
+            fprintf(fid, 'source /etc/profile\n'); % load system-wide environment variable setups and shell initialization commands
             fprintf(fid, 'export PATH=%s:$PATH\n', parameters.simnibs_bin_path);
             fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.ld_library_path);
-            fprintf(fid, '%s\n', segment_call);
+            
+            % Add segmentation call
+            fprintf(fid, 'cd %s\n', parameters.seg_path);
+            fprintf(fid, 'charm --version\n');
+            fprintf(fid, '%s\n', [parameters.simnibs_bin_path, '/', segment_call]);
             fclose(fid);
         
+            % Ensure script is executable
+            system(sprintf('chmod +x %s', [temp_slurm_file,'.sh']));
+
             % Create the full command to submit the batch script
-            sbatch_call = sprintf('sbatch %s.sh', temp_slurm_file);
+            sbatch_call = sprintf('sbatch --export=MANPATH %s.sh', temp_slurm_file);
         
             % 4) Submit segmentation job
             fprintf('Running segmentation with a command \n%s\n', sbatch_call);
