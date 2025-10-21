@@ -173,6 +173,11 @@ function parameters = load_parameters(varargin)
     if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path)
         parameters.seg_path = parameters.data_path;
     end
+
+    %% Default: deactivate pseudoCT unless specified
+    if ~isfield(parameters, 'usepseudoCT')
+        parameters.usepseudoCT = 0;
+    end
     
     %% Convert additional paths into cell arrays for processing
     

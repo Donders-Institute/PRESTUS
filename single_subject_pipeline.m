@@ -1,4 +1,4 @@
-function [output_pressure_file, parameters] = single_subject_pipeline(subject_id, parameters, options)
+function [filename_output_table, parameters] = single_subject_pipeline(subject_id, parameters, options)
     arguments
         subject_id 
         parameters struct
@@ -31,6 +31,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     fprintf('Starting processing for subject %i %s\n',...
         subject_id, parameters.results_filename_affix)
     
+    %% General setup and path management
+
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
     functionsLoc = fullfile(currentLoc,'functions');
@@ -90,12 +92,13 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         mkdir(parameters.seg_path);
     end
     
-    % Save parameters to have a backlog
-    parameters_file = fullfile(parameters.output_dir, ...
+    % Save parameters
+    filename_parameters = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_parameters%s_%s.mat', ...
         subject_id, parameters.results_filename_affix, ...
         datestr(now,'ddmmyy_HHMM')));
-    save(parameters_file, 'parameters')
+    save(filename_parameters, 'parameters');
+    clear filename_parameters;
 
     % Create a log
     filename_log = fullfile(parameters.output_dir, ...
@@ -103,25 +106,39 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         subject_id, parameters.results_filename_affix, ...
         datestr(now,'ddmmyy_HHMM')));
     diary(filename_log);
+
+    % Create an output file
+    filename_output_table = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
+        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     % Add subject_id to parameters to pass arguments to functions more easily
     parameters.subject_id = subject_id;
     
-    %% Extra settings needed for better usability
-    warning('off','MATLAB:prnRenderer:opengl'); % suppress unneccessary warnings from export_fig when running without OpenGL
+    % suppress unneccessary warnings from export_fig when running without OpenGL
+    warning('off','MATLAB:prnRenderer:opengl');
     
-    % output GPU information (if requested)
+    % display GPU information (if requested)
     if strcmp(parameters.code_type, 'cuda') || strcmp(parameters.code_type, 'matlab_gpu')
         gpuDevice()
     end
-
-    %% Start of simulations
-    % Creates an output file to which output is written at a later stage
-    output_pressure_file = fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
-        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
-    % Tries an alternative method to calculate the expected focal distance
-    % if none is entered into the config file
+    %% SEGMENT structural MRI (SimNIBS)
+    % if segmentations are not yet available
+
+    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+        preprocess_segmentation(parameters, subject_id)
+    end
+
+    % stop here is no simulation is requested (= segmentation only)
+    if ~any([parameters.run_acoustic_sims, parameters.run_heating_sims, parameters.run_posthoc_water_sims])
+        disp(newline)
+        disp('No simulation requested...')
+        exit;
+    end
+
+    %% Focal distance calculation
+    % calculate the expected focal distance (if not specified in config)
+
     if ~isfield(parameters, 'expected_focal_distance_mm')
         disp('Expected focal distance is not specified, trying to get it from positions on T1 grid')
         if ~isfield(parameters.transducer, 'pos_t1_grid') || ~isfield(parameters, 'focus_pos_t1_grid')
@@ -139,21 +156,17 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm; 
         clear filename_t1 t1_info focal_distance_t1 t1_grid_step_mm;
     end
-    
-    % deactivate pseudoCT by default
-    if ~isfield(parameters, 'usepseudoCT')
-        parameters.usepseudoCT = 0;
-    end
 
-    % Pre-processes MRI data to segment the different forms of tissue
-    % and visualise the position of the transducer with some help from SimNIBS.
+    %% PREPROCESS structural MRI & POSITION transducer + target
+    % reorient image, determine transducer & target position in image
     % For more documentation, see the 'preprocess_brain' function.
+
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
         focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
         inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
-            output_pressure_file = '';
+            filename_output_table = '';
             return;
         end
         parameters.grid_dims = size(medium_masks);
@@ -544,11 +557,11 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             highlighted_pos = [Ix, Iy, Iz];
             highlighted_pos = highlighted_pos(1:numel(trans_pos_final));
     
-            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), output_pressure_file);
+            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, real_focal_distance, max_Isppa_skin, max_Isppa_skull, max_Isppa_brain, max_pressure_skin, max_pressure_skull, max_pressure_brain, max_MI_skin, max_MI_skull, max_MI_brain, Ix_brain, Iy_brain, Iz_brain, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target, half_max_ISPPA_volume_brain), filename_output_table);
         else % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
             max_Isppa = max(acoustic_isppa(:)); %  Does this step need to be included? already done at line 225.
             highlighted_pos = max_isppa_eplane_pos;
-            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), output_pressure_file);
+            writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), filename_output_table);
         end
     
         % Plot intensity on the segmented image
@@ -688,7 +701,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
         end
 
         % Creates an output table for temperature readings
-        output_table = readtable(output_pressure_file);
+        output_table = readtable(filename_output_table);
 
         output_table.maxT = max(heating_maxT, [], 'all');
         output_table.maxCEM43 = max(heating_CEM43, [], 'all');
@@ -707,7 +720,7 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
             output_table.CEM43_skull = masked_max_3d(heating_CEM43, mask_skull); 
             output_table.CEM43_skin = masked_max_3d(heating_CEM43, mask_skin);
         end
-        writetable(output_table, output_pressure_file);
+        writetable(output_table, filename_output_table);
 
         % Creates a visual overlay of the transducer (if 3D T1 image is available)
         if exist('t1_header')
