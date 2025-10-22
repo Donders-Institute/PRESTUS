@@ -39,7 +39,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     end
 
     % Define path to T1 image (simnibs; aligned with segmentation space)
-    filename_t1_simnibs = fullfile(parameters.segmentation_folder, 'T1.nii.gz');
+    filename_t1_simnibs = fullfile(segmentation_folder, 'T1.nii.gz');
 
     % Validate existence of files
     files_to_check = {filename_t1, filename_segmented, filename_t1_simnibs};
