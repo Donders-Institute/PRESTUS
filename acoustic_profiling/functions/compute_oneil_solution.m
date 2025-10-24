@@ -1,16 +1,16 @@
-function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = compute_oneil_solution(parameters, pred_axial_pressure, dist_exit_plane, adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, prestus_dir, equipment_name, save_in_general_folder)
+function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = ...
+    compute_oneil_solution(parameters, pred_axial_pressure, dist_exit_plane, adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
     % Compute O'Neil solution and plot it along with comparisons
     %
     % Arguments:
     % - parameters: Structure containing simulation and transducer parameters.
+    %   parameters.calibration.path_output: Directory for saving results and figures.
     % - pred_axial_pressure: Predicted pressure along the beam axis [Pa].
     % - dist_exit_plane: Axial distance from the transducer exit plane [mm].
     % - adjusted_profile_focus: Adjusted intensity profile for the focus.
     % - focus_wrt_exit_plane: Focal distance relative to the exit plane [mm].
     % - desired_intensity: Desired intensity at the focal point [W/cm^2].
-    % - prestus_dir: Directory for saving results and figures.
     % - equipment_name: Name of the equipment for labeling results.
-    % - save_in_general_folder: Option to save data in the general PRESTUS output folder.
     %
     % Returns:
     % - p_axial_oneil: Computed O'Neil solution for pressure along the beam axis [Pa].
@@ -58,14 +58,8 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     grid on;
 
     % Save the figure
-    if save_in_general_folder
-        fig_path = fullfile(prestus_dir, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
-            focus_wrt_exit_plane, desired_intensity, equipment_name));
-    else
-        fig_path = fullfile(parameters.output_location, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
+    fig_path = fullfile(parameters.calibration.path_output, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
         focus_wrt_exit_plane, desired_intensity, equipment_name));
-    end
-
     saveas(gcf, fig_path);
 
     % Report the estimated distance to the point of maximum pressure

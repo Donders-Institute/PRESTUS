@@ -3,21 +3,28 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
 
     % TO DO: specify necessary input parameters
 
-    %% Simulations in free water
-
-    % Now, we start with the actual simulations. The first thing with the simulations 
-    % is to ensure that you have the right settings. For the real US transducers, 
-    % the settings are calibrated by the manufacturer. The company we buy the transducers 
-    % from calibrates them to have a given maximum intensity and a given location 
-    % of the acoustic peak (specifically, the center of its half-maximum range). 
-    % 
-    % Below, we read in two columns from the calibration sheet provided by the manufacturer. 
-    % Specifically, we take the distance from the transducer axis and the intensity 
-    % measured at each of these points. When using transducers with multiple elements, 
+    % Transducers are calibrated by the manufacturer to have a 
+    % given maximum intensity and a given location of the acoustic peak 
+    % (specifically, the center of its half-maximum range). 
+    % When using transducers with multiple elements, 
     % the depth of the acoustic peak (and thus the focus) can be steered by changing 
-    % the set of phases for the individual transducer elements with respect to one-another. 
+    % the set of phases for the individual transducer elements with respect to one-another.
+    % Unfortunately, the manufacturer's settings generally do not predict the 
+    % interactions that generate the observed profile.
+    % The approach here is to have an acoustic profile (i.e., the intensity along the beam 
+    % axis of the transducer) so that the maximum point is at the expected distance 
+    % and has the expected pressure.
+
+    % Goal: approximate element-specific amplitude and phase
+    % settings to emulate the observed profile.
+
+    %% Read and plot empirical profile
+
+    % Read in two columns from the calibration sheet (provided by the manufacturer). 
+    % Specifically, we take the distance from the transducer axis and the intensity 
+    % measured at each of these points. 
     
-    % Attempt to read in empirical profile if values are not provided
+    % Attempt to read in empirical profile (if values are not explicitly provided)
     if isempty(real_profile)
         real_profile = readmatrix(fullfile(pn.configs, [transducer_name, '.csv']));
     end
@@ -27,6 +34,9 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     
     scaling = desired_intensity/max(real_profile(:,2));
     real_profile(:,2) = real_profile(:,2).*scaling;
+
+    % We assume that profiles are referenced to 0 = exit plane.
+    % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
 
     if isfield(parameters, 'correctEPdistance') && parameters.correctEPdistance == 1
         dist_to_exit_plane = round(parameters.transducer.curv_radius_mm-...
@@ -39,11 +49,12 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     end
 
     h = figure('Position', [10 10 900 500]);
-    % calibrations done at the surface, we have to add distance to transducer
+    % plot empirical profile against distance from exit plane
     plot(real_profile(:,1),real_profile(:,2), 'linewidth', 2)
-    
-    halfMax = (min(real_profile(:,2)) + max(real_profile(:,2))) / 2;
+
+    % find and plot FWHM
     % Find where the data first drops below half the max.
+    halfMax = (min(real_profile(:,2)) + max(real_profile(:,2))) / 2;
     % Hack to exclude the first few points
     index1 = 10+find(real_profile(11:end,2) >= halfMax, 1, 'first');
     % Find where the data last rises above half the max.
@@ -78,15 +89,9 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     saveas(h, plotname, 'png');
     close(h);
     
-    %% 
-    % These settings are transformed into a set of phases for the individual transducer 
-    % elements. Unfortunately, each transducer is unique, so the manufacturer's settings 
-    % are not necessarily the ones you want to use in your simulations. The approach 
-    % used here is to have an acoustic profile (i.e., the intensity along the beam 
-    % axis of the transducer) so that the maximum point is at the expected distance 
-    % and has the expected pressure. To have that, we start with the simulations in 
-    % the water medium to find the phase-angles for the transducer elements needed 
-    % for the simulation. 
+    %% [a] free-water simulations (unoptimized default settings)
+ 
+    % Perform initial simulations in the water medium -> estimate profile of original settings
     
     parameters.simulation_medium = 'water'; % indicate that we only want the simulation in the water medium for now
     parameters.interactive = 0;
@@ -105,7 +110,8 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     
     single_subject_pipeline(subject_id, parameters);
     
-    %% 
+    %% Visualize estimated profile
+
     % After the simulations have finished, you can load the results. The results 
     % are saved under |sim_outputs| subdirectory of the data path that is defined 
     % in the config file along with some plots and summary statistics.
@@ -142,7 +148,8 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     saveas(h, plotname, 'png');
     close(h);
     
-    %% 
+    %% Compare estimated profile
+
     % Then, we can compare the simulated pressure along the focal axis and the pressure 
     % estimated with an analytic solution based on the equations provided by O'Neil 
     % (O'Neil, H. Theory of focusing radiators. J. Acoust. Soc. Am., 21(5), 516-526, 
@@ -216,72 +223,45 @@ function [opt_source_amp, opt_phases] = transducer_calibration(...
     % calibration sheet. We do so by searching through the parameter space (that is, 
     % varying the phases) as to minimize the error in distance to maximum pressure 
     % point. 
-    
-    opt_limits = [real_profile(2,1), real_profile(end,1)];
 
-    [flhm_center, flhm_center_index] = get_flhm_center_position(real_profile(:,1), real_profile(:,2));
+    parameters.ap_opt_limits = [real_profile(2,1), real_profile(end,1)];
+    parameters.ap_weights = 1;
+
+    dist_exit_plane = real_profile(:,1);
+    adjusted_profile_focus = real_profile(:,2);
+
+    [opt_phases, opt_velocity, min_err] = perform_global_search(...
+        parameters, dist_exit_plane, adjusted_profile_focus, velocity);
 
     % narrowness = .25; % the lower, the broader the gaussian weight filter
-    % weights = normpdf(real_profile(:,1), real_profile(flhm_center_index,1), real_profile(flhm_center_index,1)/narrowness);
-    weights = 1;
+    %[flhm_center, flhm_center_index] = get_flhm_center_position(real_profile(:,1), real_profile(:,2));
+    % parameters.weights = normpdf(real_profile(:,1), real_profile(flhm_center_index,1), real_profile(flhm_center_index,1)/narrowness);
 
-    % alternative: use Margely's implementation (MATLAB native functions)
-    %[opt_phases, opt_velocity, min_err] = perform_global_search(parameters, dist_exit_plane, adjusted_profile_focus, velocity)
+    %% Calculate input amplitude
 
-    optimize_phases = @(phases_and_velocity) phase_optimization_annulus_full_curve(...,
-        phases_and_velocity(1:parameters.transducer.n_elements-1), ...
-        parameters, ...
-        phases_and_velocity(parameters.transducer.n_elements), ...
-        real_profile(:,1), ...
-        real_profile(:,2),...
-        0, ...
-        opt_limits, ...
-        weights);
-    
-    rng(100,'twister') % setting seed for consistency
-    
-    func = optimize_phases;
-    x0 = [randi(360, [1 n_elem-1])/180*pi velocity];
-    lb = zeros(1,n_elem);
-    ub = [2*pi*ones(1,n_elem-1) 0.2];
-    options = setoptimoptions('popsize',5000, 'FinDiffType', 'central'); % number of initializations [, 'TolCon', 1e-8]
-    [opt_phases_and_velocity, min_err] = minimize(func, x0, [],[],[],[],lb, ub, [], options);
-    
-    % plot optimization results
-    [~, ~, ~, h] = phase_optimization_annulus_full_curve(...
-        opt_phases_and_velocity(1:end-1), ...
-        parameters, ...
-        opt_phases_and_velocity(end),...
-        real_profile(:,1), ...
-        real_profile(:,2), ...
-        1, ...
-        opt_limits, ...
-        weights);
-    
-    plotname = fullfile(pn.outputs_folder, 'optimized_profile.png');
-    saveas(h, plotname, 'png');
-    close(h);
-
-    fprintf('Optimal phases: %s deg.; velocity: %.2f; optimization error: %.2f', ...
-        mat2str(round(opt_phases_and_velocity(1:end-1)/pi*180)), opt_phases_and_velocity(end), min_err)
-
-    % The left plot above shows the real and the fitted profiles along with the 
-    % cost function used for fitting, while the right shows the error in fitting (the 
-    % squared difference between the real and the fitted profile weighted by the cost 
-    % function). 
-    % 
-    % The phase-angles given above should be copied into the config under the parameter 
-    % "source_phase_deg". Keep in mind that different settings should be calculated 
-    % and used for every transducer and every focus distance.
-    % 
-    % We also need to know the pressure for the simulated transducer so that in 
-    % the water, the intensity (ISPPA) would be 30 W/cm^2. To do so, we first compute 
+    % We also need to know the pressure for the simulated transducer. 
+    % To do so, we first compute 
     % the analytic solution with the new phases but the original pressure, and then 
     % use it to adjust the simulated pressure and recompute the analytic solution 
     % (the latter is just for plotting). 
     
     opt_phases = opt_phases_and_velocity(1:end-1);
     opt_velocity = opt_phases_and_velocity(end);
+
+    p_axial_oneil_opt = recalculate_analytical_sol(...
+        parameters, ...
+        p_axial_oneil, ...
+        opt_phases, ...
+        opt_velocity, ...
+        dist_from_tran, ...
+        adjusted_profile_focus, ...
+        axial_position, ...
+        focus_wrt_exit_plane, ...
+        desired_intensity, ...
+        prestus_dir, ...
+        equipment_name, ...
+        save_in_general_folder);
+
     
     [p_axial_oneil_opt] = focusedAnnulusONeil(...
         parameters.transducer.curv_radius_mm/1e3, ...

@@ -1,8 +1,10 @@
-function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position, dist_exit_plane, adjusted_profile_focus, p_axial_oneil_opt, p_axial_oneil, focus_wrt_exit_plane, desired_intensity, prestus_dir, equipment_name, min_err, save_in_general_folder)
+function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position, dist_exit_plane, adjusted_profile_focus, p_axial_oneil_opt, p_axial_oneil, focus_wrt_exit_plane, desired_intensity, equipment_name, min_err)
     % Plot optimized simulation results and compare with desired profiles
     %
     % Arguments:
     % - opt_param: Structure containing optimized parameters.
+    %   opt_param.calibration.path_output: Directory for saving output.
+    %   opt_param.calibration.save_in_calibration_folder: Option to save data in the general PRESTUS output folder.
     % - outputs_folder: Directory containing output simulation results.
     % - sim_id: Simulation ID for loading specific results.
     % - axial_position: Axial position vector [mm].
@@ -12,10 +14,8 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     % - p_axial_oneil: Original O'Neil solution for pressure [Pa].
     % - focus_wrt_exit_plane: Focal depth with respect to the transducer exit plane [mm].
     % - desired_intensity: Target intensity for optimization [W/cm^2].
-    % - prestus_dir: Directory for saving output.
     % - equipment_name: Name of the equipment used.
     % - min_err: Minimum optimization error.
-    % - save_in_general_folder: Option to save data in the general PRESTUS output folder.
     
     % Load optimized simulation results    
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', outputs_folder, sim_id, opt_param.results_filename_affix),'sensor_data','parameters');
@@ -36,8 +36,8 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     title('Pressure for the Focal Plane')
     
     % Save the 2D intensity map figure
-    if save_in_general_folder
-        fig_path = fullfile(prestus_dir, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+    if opt_param.calibration.save_in_calibration_folder
+        fig_path = fullfile(opt_param.calibration.path_output, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     else
         fig_path = fullfile(opt_param.output_location, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     end
@@ -72,10 +72,10 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     title(sprintf('Desired vs Optimized Profiles - Optimization Error: %.4f', min_err));
     
     % Save the profile comparison figure
-    if save_in_general_folder
-        fig_path = fullfile(prestus_dir, strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+    if opt_param.calibration.save_in_calibration_folder
+        fig_path = fullfile(opt_param.calibration.path_output, strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     else
-         fig_path = fullfile(opt_param.output_location, strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+        fig_path = fullfile(opt_param.output_location, strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     end
 
     saveas(gcf, fig_path);

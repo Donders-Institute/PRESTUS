@@ -1,16 +1,22 @@
-function [norm_profile_focus, max_intens] = extract_real_intensity_profile(available_foci_wrt_exit_plane, focus_wrt_exit_plane, intens_data, prestus_dir, equipment_name, dist_from_tran, skip_front_peak_mm, local_output_dir, save_in_general_folder)        
+function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
+    parameters,...
+    available_foci_wrt_exit_plane, ...
+    focus_wrt_exit_plane, ...
+    intens_data, ...
+    equipment_name, ...
+    dist_from_tran)
+
     % Extracts or interpolates the intensity profile at a specific focal depth.
     %
     % Arguments:
+    % - parameters
+    %   parameters.calibration.skip_front_peak_mm: Distance to skip near-field peaks when finding the maximum intensity [mm].
+    %   parameters.calibration.path_output_profiles: Directory path for saving results.
     % - available_foci_wrt_exit_plane: Array of available focal depths relative to the exit plane [mm].
     % - focus_wrt_exit_plane: Desired focal depth relative to the exit plane [mm].
     % - intens_data: Matrix containing intensity profiles for different focal depths.
-    % - prestus_dir: Directory path for saving results.
     % - equipment_name: Name of the equipment for labeling plots.
     % - dist_from_tran: Distance vector from the transducer [mm].
-    % - skip_front_peak_mm: Distance to skip near-field peaks when finding the maximum intensity [mm].
-    % - local_output_dir: local output directory if data is not saved in general PRESTUS output folder.
-    % - save_in_general_folder: Option to save data in the general PRESTUS output folder.
     %
     % Returns:
     % - profile_focus: Extracted or interpolated intensity profile at the desired focal depth.
@@ -102,19 +108,16 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(avail
         ylabel('Intensity [W/cm^2]');
         title(['Axial Profile at Focus wrt Exit Plane: ' num2str(focus_wrt_exit_plane) ' [mm]']);
     end
-
+    % Create output profile if it does not yet exist
+    if ~exist(parameters.calibration.path_output_profiles); mkdir(parameters.calibration.path_output_profiles); end
     % Save the plot to the specified directory
-    if save_in_general_folder
-        fig_path = fullfile(prestus_dir, strcat('Interpolation_at_F_', num2str(focus_wrt_exit_plane), '_', equipment_name, '.png'));
-    else
-        fig_path = fullfile(local_output_dir, strcat('Interpolation_at_F_', num2str(focus_wrt_exit_plane), '_', equipment_name, '.png'));
-    end
-
+    fig_path = fullfile(parameters.calibration.path_output_profiles, ...
+        strcat('Interpolation_at_F_', num2str(focus_wrt_exit_plane), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
 
     % Determine the maximum intensity beyond the specified skip distance 
     % for scaling to prevent catching max peak in near field peak.
-    [~, closestIndex] = min(abs(dist_from_tran - skip_front_peak_mm));
+    [~, closestIndex] = min(abs(dist_from_tran - parameters.calibration.skip_front_peak_mm));
     max_intens = max(norm_profile_focus(closestIndex:end));
     
 end

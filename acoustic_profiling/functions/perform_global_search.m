@@ -11,12 +11,10 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     % - opt_phases: Optimized phases for each transducer element [rad].
     % - opt_velocity: Optimized particle velocity [m/s].
     % - min_err: Minimum error achieved during optimization.
-
-    % Initialize a GlobalSearch object to perform the optimization.
-    gs = GlobalSearch;
     
-    % Define the objective function for optimization.
-    % This function evaluates the error based on the current phases and velocity.
+    if ~isfield(parameters.calibration, 'opt_limits'); parameters.calibration.opt_limits = [1, max(dist_exit_plane)]; end
+    if ~isfield(parameters.calibration, 'weights'); parameters.calibration.weights = 1; end
+
     % Define the objective function for optimization.
     % This function evaluates the error based on the current phases and velocity.
     optimize_phases = @(phases_and_velocity) phase_optimization_annulus_full_curve(...
@@ -24,7 +22,10 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         parameters, ... % Simulation and transducer parameters
         phases_and_velocity(parameters.transducer.n_elements), ... % Particle velocity
         dist_exit_plane, ... % Distance vector
-        adjusted_profile_focus); % Desired intensity profile
+        adjusted_profile_focus,... % Desired intensity profile
+        0, ... % Disable plotting
+        parameters.calibration.opt_limits, ...
+        parameters.calibration.weights);
     
     % Set a random seed for reproducibility.
     rng(195, 'twister');
@@ -34,15 +35,40 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     lower_bounds = zeros(1, parameters.transducer.n_elements); % Lower bounds: [0 rad, 0 m/s]
     upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements - 1), 0.2]; % Upper bounds: [2pi rad, 0.2 m/s]
     
-    problem = createOptimProblem('fmincon', ...
-        'x0', initial_guess, ...
-        'objective', optimize_phases, ...
-        'lb', lower_bounds, ...
-        'ub', upper_bounds, ...
-        'options', optimoptions('fmincon', 'OptimalityTolerance', 1e-8));
-    
-    % Perform the global search to find optimal phases and velocity.
-    [opt_phases_and_velocity, min_err] = run(gs, problem);
+    % Set default optimization algorithm (if not specified)
+    parameters.calibration.optmethod = 'FEXminimize';
+
+    if strcmp(parameters.calibration.optmethod, 'FEXminimize')
+        % by default use FEXminimize
+        func = optimize_phases;
+        options = setoptimoptions('popsize', 5000, 'FinDiffType', 'central', 'TolCon', 1e-8);
+
+        % Perform the global search to find optimal phases and velocity.
+        [opt_phases_and_velocity, min_err] = minimize(...
+            func, ...
+            initial_guess, ...
+            [],...
+            [],...
+            [],...
+            [],...
+            lower_bounds, ...
+            upper_bounds, ...
+            [], ...
+            options);
+    elseif strcmp(parameters.calibration.optmethod, 'GlobalSearch')
+        % The GlobalSearch functionality is part of MATLAB's Global Optimization Toolbox.
+        % Initialize a GlobalSearch object to perform the optimization.
+        gs = GlobalSearch;
+        problem = createOptimProblem('fmincon', ...
+            'x0', initial_guess, ...
+            'objective', optimize_phases, ...
+            'lb', lower_bounds, ...
+            'ub', upper_bounds, ...
+            'options', optimoptions('fmincon', 'OptimalityTolerance', 1e-8));
+        
+        % Perform the global search to find optimal phases and velocity.
+        [opt_phases_and_velocity, min_err] = run(gs, problem);
+    end
 
     % Extract optimized phases and velocity from the result.
     opt_phases = opt_phases_and_velocity(1:(parameters.transducer.n_elements - 1));
@@ -54,8 +80,15 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         parameters, ... % Simulation and transducer parameters
         opt_velocity, ... % Optimized velocity
         dist_exit_plane, ... % Distance vector
-        adjusted_profile_focus, ... % Desired intensity profile
-        1); % Enable plotting
+        adjusted_profile_focus,... % Desired intensity profile
+        1, ... % Enable plotting
+        parameters.calibration.opt_limits, ...
+        parameters.calibration.weights);
+
+    % The left plot above shows the real and the fitted profiles along with the 
+    % cost function used for fitting, while the right shows the error in fitting (the 
+    % squared difference between the real and the fitted profile weighted by the cost 
+    % function). 
 
     % Display optimization results.
     fprintf('Optimal phases: %s deg; velocity: %.4f m/s; optimization error: %.4f \n', ...

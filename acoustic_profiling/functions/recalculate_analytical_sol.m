@@ -1,4 +1,4 @@
-function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_oneil, opt_phases, opt_velocity, dist_from_tran, adjusted_profile_focus, axial_position, focus_wrt_exit_plane, desired_intensity, prestus_dir, equipment_name, save_in_general_folder)
+function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_oneil, opt_phases, opt_velocity, dist_from_tran, adjusted_profile_focus, axial_position, focus_wrt_exit_plane, desired_intensity, equipment_name)
     % Recalculate analytical solution based on optimized phases and velocity.
     %
     % Arguments:
@@ -11,19 +11,21 @@ function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_onei
     % - axial_position: Axial position vector [mm].
     % - focus_wrt_exit_plane: Focal depth with respect to the transducer exit plane [mm].
     % - desired_intensity: Target intensity for optimization [W/cm^2].
-    % - prestus_dir: Directory for saving output.
     % - equipment_name: Name of the equipment used.
-    % - save_in_general_folder: Option to save data in the general PRESTUS output folder.
     %
     % Returns:
     % - p_axial_oneil_opt: Optimized O'Neil solution for pressure along the beam axis [Pa].
 
     % Compute optimized analytical pressure profile
-    p_axial_oneil_opt = focusedAnnulusONeil(parameters.transducer.curv_radius_mm / 1e3, ...
+    p_axial_oneil_opt = focusedAnnulusONeil(...
+        parameters.transducer.curv_radius_mm / 1e3, ...
         [parameters.transducer.Elements_ID_mm; parameters.transducer.Elements_OD_mm] / 1e3, ...
         repmat(opt_velocity, 1, parameters.transducer.n_elements), ...
-        [0 opt_phases], parameters.transducer.source_freq_hz, parameters.medium.water.sound_speed, ...
-        parameters.medium.water.density, (axial_position - 0.5) * 1e-3);
+        [0 opt_phases], ...
+        parameters.transducer.source_freq_hz, ...
+        parameters.medium.water.sound_speed, ...
+        parameters.medium.water.density, ...
+        (axial_position - 0.5) * 1e-3);
     
     % Convert pressure to intensity
     i_axial_oneil = p_axial_oneil .^ 2 / (2 * parameters.medium.water.sound_speed * parameters.medium.water.density) * 1e-4;
@@ -48,15 +50,22 @@ function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_onei
     title('Pressure Along the Beam Axis');
     
     % Save the profile comparison figure
-    if save_in_general_folder
-        fig_path = fullfile(prestus_dir, strcat('Recalculated_oneil_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
-    else
-        fig_path = fullfile(parameters.output_location, strcat('Recalculated_oneil_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
-    end
-
+    fig_path = fullfile(parameters.calibration.path_output, ...
+        strcat('Recalculated_oneil_at_F_', num2str(focus_wrt_exit_plane), ...
+        '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
 
-    fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n', axial_position(p_axial_oneil_opt == max(p_axial_oneil_opt)))
-    fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', get_flhm_center_position(axial_position, p_axial_oneil_opt))
+    % exclude the near-field if requested
+    p_axial_oneil_opt_summary = p_axial_oneil_opt;
+    if parameters.calibration.skip_front_peak_mm ~=0
+        i_remove = axial_position <= parameters.calibration.skip_front_peak_mm;
+        axial_position(i_remove) = [];
+        p_axial_oneil_opt_summary(i_remove) = [];
+    end
+
+    fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n', ...
+        axial_position(p_axial_oneil_opt_summary == max(p_axial_oneil_opt_summary)))
+    fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', ...
+        get_flhm_center_position(axial_position, p_axial_oneil_opt_summary))
     
 end

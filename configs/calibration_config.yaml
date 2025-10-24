@@ -1,0 +1,17 @@
+# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
+
+  path_input_profiles: '/project/2423053.01/amythal_sim/amythal_sim/data/acoustic_profiling/'  # Base path for acoustic profiling input data
+  path_output: '/project/2423053.01/amythal_sim/amythal_sim/data/calibration/'  # Folder path for saving simulation results
+  path_output_profiles: '/project/2423053.01/amythal_sim/amythal_sim/data/calibration/PRESTUS_virtual_parameters'  # Folder path for saving simulation results
+  filename_calibrated_CSV: 'PRESTUS_virtual_IS_PCD15287_01001~IGT_128_ch_comb_10_ch.csv'
+  submit_medium: 'slurm'                    # Simulation submit mode: matlab (debug), slurm (recommended), or qsub
+  save_in_calibration_folder: true          # Boolean flag to save outputs in general output folder or simulation-specific folder. If TRUE, results are appended to existing calibration for this equipment instead of overwritten.
+  skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
+  optmethod: 'GlobalSearch'                  # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
+  weights: 1                                # Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 - equal weighting)
+  # combinations:                             # List of equipment/transducer combinations to calibrate
+  #  - 'IS_PCD15287_01001_IGT_128_ch_comb_10_ch'
+  # focal_depths_wrt_exit_plane:              # Nested lists of focal depths (mm) relative to the transducer exit plane, per equipment combination
+  #  [85]
+  # desired_intensities:                      # Nested lists of desired intensities (W/cm^2) per equipment combination and focal depth
+  #  [30]

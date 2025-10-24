@@ -1,15 +1,15 @@
-function sim_param = set_real_phases(phase_table, tran, focus_wrt_exit_plane, sim_param, SOUND_SPEED_WATER)
-    % Set the real phases of the transducer for a given focal depth.
+function source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters)
+    % Set the manufacturer-specified phases of the transducer for a given focal depth.
     %
     % Arguments:
     % - phase_table: Additional data for phase calculations.
     % - tran: Transducer structure containing manufacturer and element details.
     % - focus_wrt_exit_plane: Desired focal depth with respect to the transducer exit plane [mm].
-    % - sim_param: Simulation parameters structure.
-    % - SOUND_SPEED_WATER: Speed of sound in water [m/s].
+    % - parameters
+    %       .medium.water.sound_speed: Speed of sound in water [m/s].
     %
     % Returns:
-    % - sim_param: Updated simulation parameters with the new phase values.
+    % - source_phase_deg: new phase values.
 
     % Extract or interpolate phases for the given focal depth
     if isequal(tran.manufact, "Sonic Concepts")
@@ -21,7 +21,7 @@ function sim_param = set_real_phases(phase_table, tran, focus_wrt_exit_plane, si
         init_phases = table2array(phases(foc_index, :));
     elseif isequal(tran.manufact, "Imasonic")
         % Compute phases based on the focal depth
-        init_phases = compute_phases(SOUND_SPEED_WATER, tran, focus_wrt_exit_plane, phase_table);
+        init_phases = compute_phases(parameters.medium.water.sound_speed, tran, focus_wrt_exit_plane, phase_table);
     else
         error('Unsupported transducer manufacturer: %s', tran.manufact);
     end
@@ -40,7 +40,7 @@ function sim_param = set_real_phases(phase_table, tran, focus_wrt_exit_plane, si
         init_phases = mod(virtual_phases, 360);
     end
 
-    % Update simulation parameters with the calculated phases
-    sim_param.transducer.source_phase_deg = init_phases;
+    % Output source phase
+    source_phase_deg = init_phases;
 
 end
