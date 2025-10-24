@@ -48,7 +48,10 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     hold on;
     plot(axial_position - (parameters.transducer.pos_grid(3) - 1) * 0.5, pred_axial_intensity, '--', 'LineWidth', 1.5, 'DisplayName', 'Inital Simulated Intensity');
     plot(dist_exit_plane, adjusted_profile_focus, 'LineWidth', 1.5, 'DisplayName', 'Desired Profile');
-    xline(parameters.expected_focal_distance_mm, '--', 'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance');
+    if isfield(parameters, 'expected_focal_distance_EP_mm')
+        xline(parameters.expected_focal_distance_EP_mm, '--', ...
+            'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from EP)');
+    end
     hold off;
 
     xlabel('Distance w.r.t. Exit Plane [mm]');

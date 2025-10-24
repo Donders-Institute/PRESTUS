@@ -113,7 +113,13 @@ for i = 1:length(parameters.calibration.combinations)
 
     % Convert exit plane reference to mid-bowl reference
     % Simulation results are w.r.t. mid-bowl of transducer
-    dist_tran_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
+    % Profiles are referenced to 0 = exit plane.
+    % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
+    if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
+        dist_tran_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
+    else
+        dist_tran_exit_plane = 0;
+    end
     dist_from_tran = dist_from_exit_plane + dist_tran_exit_plane;
 
     % Ensure focal depths are specified. 
@@ -140,7 +146,10 @@ for i = 1:length(parameters.calibration.combinations)
         end
 
         % [SIM] Set the expected focal distance to exit plane distance 
-        parameters.expected_focal_distance_mm = focus_wrt_exit_plane;
+        % Account for the potential distance between bowl (actual focal
+        % distance) and exit plane (axial profile definition)
+        parameters.expected_focal_distance_mm = focus_wrt_exit_plane + dist_tran_exit_plane;
+        parameters.expected_focal_distance_EP_mm = focus_wrt_exit_plane;
 
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
         source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters);
@@ -161,6 +170,19 @@ for i = 1:length(parameters.calibration.combinations)
             
             % assign a loop-specific simulation id
             sim_id = i*j*k;
+
+            % if the original profiles are measured from the exit plane,
+            % we do not model the space until the exit plane; this can lead
+            % to suboptimal solutions; assume that the amplitude is zero in
+            % that space (i.e., no strong near-field interference)
+
+            % add distance values prior to the exit plane
+            Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
+            dist_from_tran = cat(1, ...
+                linspace(0, dist_from_tran(1), Nvals)',...
+                dist_from_tran);
+            % set those to initial value in amplitude profile
+            profile_focus = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
 
             % collect data on empirical profile
             profile_empirical.profile_focus = profile_focus;

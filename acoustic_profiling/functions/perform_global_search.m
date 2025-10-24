@@ -1,9 +1,9 @@
-function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, dist_exit_plane, adjusted_profile_focus, velocity)
+function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, axial_position, adjusted_profile_focus, velocity)
     % Perform a global search to optimize transducer phases and particle velocity.
     %
     % Arguments:
     % - parameters: Structure containing simulation and transducer parameters.
-    % - dist_exit_plane: Distance vector for the desired intensity profile [mm].
+    % - axial_position: Distance vector for the intensity profile [mm from transducer bowl].
     % - adjusted_profile_focus: Adjusted desired intensity profile [W/cm^2].
     % - velocity: Initial particle velocity estimate [m/s].
     %
@@ -12,33 +12,41 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     % - opt_velocity: Optimized particle velocity [m/s].
     % - min_err: Minimum error achieved during optimization.
     
-    if ~isfield(parameters.calibration, 'opt_limits'); parameters.calibration.opt_limits = [1, max(dist_exit_plane)]; end
-    if ~isfield(parameters.calibration, 'weights'); parameters.calibration.weights = 1; end
+    if ~isfield(parameters.calibration, 'opt_limits')
+        opt_limits = [1, max(axial_position)];
+    else
+        opt_limits = parameters.calibration.opt_limits;
+    end
+
+    if ~isfield(parameters.calibration, 'weights') 
+        weights = 1;
+    else
+        weights = parameters.calibration.weights;
+    end
 
     % Define the objective function for optimization.
     % This function evaluates the error based on the current phases and velocity.
     optimize_phases = @(phases_and_velocity) phase_optimization_annulus_full_curve(...
-        phases_and_velocity(1:(parameters.transducer.n_elements - 1)), ... % Phases for transducer elements
+        phases_and_velocity(1:end-1), ... % Phases for transducer elements
         parameters, ... % Simulation and transducer parameters
-        phases_and_velocity(parameters.transducer.n_elements), ... % Particle velocity
-        dist_exit_plane, ... % Distance vector
+        phases_and_velocity(end), ... % Particle velocity
+        axial_position, ... % Distance vector
         adjusted_profile_focus,... % Desired intensity profile
         0, ... % Disable plotting
-        parameters.calibration.opt_limits, ...
-        parameters.calibration.weights);
+        opt_limits, ...
+        weights);
     
     % Set a random seed for reproducibility.
-    rng(195, 'twister');
+    if isfield(parameters.calibration, 'seed') 
+        rng(parameters.calibration.seed, 'twister');
+    end
 
     % Define initial guess, bounds, and options for the optimization problem.
-    initial_guess = [randi(360, [1, parameters.transducer.n_elements - 1]) / 180 * pi, velocity];
-    lower_bounds = zeros(1, parameters.transducer.n_elements); % Lower bounds: [0 rad, 0 m/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements - 1), 0.2]; % Upper bounds: [2pi rad, 0.2 m/s]
-    
-    % Set default optimization algorithm (if not specified)
-    parameters.calibration.optmethod = 'FEXminimize';
+    initial_guess = [randi(360, [1, parameters.transducer.n_elements]) / 180 * pi, velocity];
+    lower_bounds = zeros(1, parameters.transducer.n_elements+1); % Lower bounds: [0 rad, 0 m/s]
+    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), 0.2]; % Upper bounds: [2pi rad, 0.2 m/s]
 
-    if strcmp(parameters.calibration.optmethod, 'FEXminimize')
+    if ~isfield(parameters.calibration, 'optmethod') || strcmp(parameters.calibration.optmethod, 'FEXminimize')
         % by default use FEXminimize
         func = optimize_phases;
         options = setoptimoptions('popsize', 5000, 'FinDiffType', 'central', 'TolCon', 1e-8);
@@ -71,19 +79,19 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     end
 
     % Extract optimized phases and velocity from the result.
-    opt_phases = opt_phases_and_velocity(1:(parameters.transducer.n_elements - 1));
-    opt_velocity = opt_phases_and_velocity(parameters.transducer.n_elements);
+    opt_phases = opt_phases_and_velocity(1:end-1);
+    opt_velocity = opt_phases_and_velocity(end);
 
     % Plot and evaluate the optimization result.
     phase_optimization_annulus_full_curve(...
         opt_phases, ... % Optimized phases
         parameters, ... % Simulation and transducer parameters
         opt_velocity, ... % Optimized velocity
-        dist_exit_plane, ... % Distance vector
+        axial_position, ... % Distance vector
         adjusted_profile_focus,... % Desired intensity profile
         1, ... % Enable plotting
-        parameters.calibration.opt_limits, ...
-        parameters.calibration.weights);
+        opt_limits, ...
+        weights);
 
     % The left plot above shows the real and the fitted profiles along with the 
     % cost function used for fitting, while the right shows the error in fitting (the 

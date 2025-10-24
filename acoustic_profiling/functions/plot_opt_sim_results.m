@@ -41,7 +41,6 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     else
         fig_path = fullfile(opt_param.output_location, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     end
-        
     saveas(gcf, fig_path);
 
     % Simulated pressure along the focal axis
