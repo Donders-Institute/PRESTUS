@@ -177,12 +177,15 @@ for i = 1:length(parameters.calibration.combinations)
             % that space (i.e., no strong near-field interference)
 
             % add distance values prior to the exit plane
-            Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
-            dist_from_tran = cat(1, ...
-                linspace(0, dist_from_tran(1), Nvals)',...
-                dist_from_tran);
-            % set those to initial value in amplitude profile
-            profile_focus = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
+            parameters.calibration.interpolateToEP = 1;
+            if parameters.calibration.interpolateToEP == 1
+                Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
+                dist_from_tran = cat(1, ...
+                    linspace(0, dist_from_tran(1), Nvals)',...
+                    dist_from_tran);
+                % set those to initial value in amplitude profile
+                profile_focus = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
+            end
 
             % collect data on empirical profile
             profile_empirical.profile_focus = profile_focus;

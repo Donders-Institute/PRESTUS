@@ -11,7 +11,7 @@
   weights: 1                                # Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 - equal weighting)
   seed: 251024                              # Random seed for optimization
   addEPdistance: 1                          # Add distance from transducer bowl to exit plane (if 0 in profiles = EP)
-  # combinations:                             # List of equipment/transducer combinations to calibrate
+  interpolateToEP: 1                        # Interpolate values between bowl and exit plane [default: add initial value in empirical measurements]
   #  - 'IS_PCD15287_01001_IGT_128_ch_comb_10_ch'
   # focal_depths_wrt_exit_plane:              # Nested lists of focal depths (mm) relative to the transducer exit plane, per equipment combination
   #  [85]
