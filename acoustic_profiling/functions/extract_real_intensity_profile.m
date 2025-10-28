@@ -62,8 +62,8 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
                                  max(max(x1_norm), max(x2_norm)), length(dist_from_tran));
      
         % Interpolate profiles in normalized space
-        y1_interp_norm = interp1(x1_norm, profile_1, x_common_norm, 'spline', 0);
-        y2_interp_norm = interp1(x2_norm, profile_2, x_common_norm, 'spline', 0);
+        y1_interp_norm = interp1(x1_norm, profile_1, x_common_norm, 'spline', 'extrap');
+        y2_interp_norm = interp1(x2_norm, profile_2, x_common_norm, 'spline', 'extrap');
         
         % Calculate weight (alpha) for interpolation based on the relative focal depths
         alpha = (focus_wrt_exit_plane - focus_wrt_exit_plane_1) / ...
