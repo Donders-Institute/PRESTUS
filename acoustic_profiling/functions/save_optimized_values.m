@@ -23,7 +23,7 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
     % Check if the CSV file exists
     if isfile(output_file_path)
         % Read existing data
-        virtual_data = readcell(output_file_path);
+        virtual_data = readcell(output_file_path, 'Delimiter', ',');
         prestus_foci_wrt_exit_plane = round(cell2mat(virtual_data(1, 2:end)), 2);
         prestus_int = cell2mat(virtual_data(2:end, 1));
 
