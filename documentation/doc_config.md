@@ -2,7 +2,7 @@
 
 The following documents the parameters used in PRESTUS. The specification philosophy is the following: `default_config.yaml` provides a list of all parameters with default settings and will be read in first by the function `load_parameters`. This default configuration file should not be changed in standard applications to ensure that necessary fields are provided. 
 
-To set up a specific application, an additional `config_xxx.yaml` should be provided. This file should contain exclusively the fields where defaults should be overwritten (e.g., to provide specific transducer settings). Alternatively, parameters can be specified prior to calling the `single_subject_pipeline` in MATLAB. This allows dynamic iterations over parameters of interest.
+To set up a specific application, an additional `config_<STUDY>.yaml` should be provided. This file should contain exclusively the fields where defaults should be overwritten (e.g., to provide specific transducer settings). Alternatively, parameters can be specified prior to calling the `single_subject_pipeline` in MATLAB. This allows dynamic iterations over parameters of interest.
 
 ### I/O management
 
@@ -176,3 +176,26 @@ see doc_hpc.md
 | `hpc_gpu`                         | Request a specific GPU. [Optional]                                                                                   |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
 | `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                                                        | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
 | `hpc_reservation`                  | Request a reserved cue. [Optional]                                                                                  | |
+
+### Transducer calibration
+
+For transducer calibration, a separate `calibration_config.yaml` applies that should be loaded as `parameters.calibration`.
+
+| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `path_input_axial`              | Directory containing axial profiles         |   |
+| `path_input_phase`              | Directory containing phase data        |   |
+| `path_output`                   | Directory for saving free-water simulation results         |   |
+| `path_output_profiles`          | Directory for saving optimized profile data         |   |
+| `filename_calibrated_CSV`       | Filename of calibrated CSV data         | Mandatory only when not generated within standalone script based on equipment name.  |
+| `submit_medium`                 | Simulation submit mode: `slurm` (recommended), `matlab` (debug; doesn't overwrite), or `qsub`         |   |
+| `save_in_calibration_folder`    | `FALSE`: save outputs in general output folder; `TRUE`: save in simulation-specific folder|  If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten. |
+| `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.         | Used only for calculating the peak distance and FWHM.  |
+| `optmethod`                     | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)         |   |
+| `weights`                       | Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)         |   |
+| `seed`                          | Random seed for optimization         |   |
+| `addEPdistance`                 | Append distance from transducer bowl to exit plane (set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl)         |   |
+| `interpolateToEP`               | Interpolate values between bowl and exit plane          | If active, the profile is padded (between bowl and exit plane) with the initial value available in the profile. This can stabilize the fitting procedure in the near field.  |
+| `combinations`                  | Equipment combinations (must refer to equipment in `equipment_config.yaml`)         | Multiple combinations can be specified. Every [] specification will be performed for the corresponding (ordered) index equipment combination. Example: all foci within the first [] will be executed for the first equipment combination. If array is empty ([]), all focal depths of available characterization data will be used. |
+| `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.         | Multiple combinations can be specified. |
+| `desired_intensities`           | Desired free-water intensities [W/cm^2]          | Multiple combinations can be specified. |
