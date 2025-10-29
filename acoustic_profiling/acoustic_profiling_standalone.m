@@ -30,39 +30,28 @@ addpath(genpath('acoustic_profiling'));
 addpath(genpath('configs'));
 addpath(genpath('toolboxes'));
 
-% Load configuration
+%% Load configuration settings
+
 % Load equipment parameters from the YAML configuration file
 equip_param = yaml.loadFile('equipment_config.yaml', 'ConvertToArray', true);
+% Equipment information (by default Donders-specific)
 parameters = yaml.loadFile('default_config.yaml', 'ConvertToArray', true);
+% User-defined calibration parameters
 parameters.calibration = yaml.loadFile('calibration_config.yaml', 'ConvertToArray', true);
+
+% small post-processing of parameters.calibration (turn into cells if necessary)
+fields = {'combinations', 'focal_depths_wrt_exit_plane', 'desired_intensities'};
+for f = fields
+    field = f{1};
+    if ~iscell(parameters.calibration.(field))
+        parameters.calibration.(field) = {parameters.calibration.(field)};
+    end
+end
 
 % Display available equipment combinations (Donders equipment)
 available_combos = fieldnames(equip_param.combos);
 disp('Available Equipment Combinations:');
 disp(available_combos);
-
-%% User-defined input parameters
-% Define data path and simulation medium
-% Path containing 'Axial profiles' and 'PRESTUS virtual parameter' folders 
-% of /home/common/matlab/PRESTUS.
-% data_path = '\\ru.nl\WrkGrp\FUS_Researchers\';
-
-% Specify equipment combinations and simulation parameters
-parameters.calibration.combinations = {...
-    'IS_PCD15287_01001_IGT_128_ch_comb_10_ch', ...
-    'IS_PCD15287_01002_IGT_128_ch_comb_10_ch'};
-
-% Every [] will be performed for same index equipment combination. Example:
-% all foci within the first [] will be executed for the first equipment 
-% combination. If array is empty ([]), focal depths of available 
-% characterization data will be used.
-parameters.calibration.focal_depths_wrt_exit_plane = {[85], [30, 50]}; % Focal depths in mm
-
-% Every [] will be performed for same index equipment combination and for 
-% each foci in same index focal depth set []. Example: for the first
-% equipment combination, all foci within the first [] will be executed per
-% intensity within the first desired intensity set [].
-parameters.calibration.desired_intensities = {[30], [30, 60]}; % Desired intensities in W/cm^2
 
 %% Iterate through equipment combinations
 for i = 1:length(parameters.calibration.combinations)
@@ -95,7 +84,7 @@ for i = 1:length(parameters.calibration.combinations)
         strcat(equip_param.gen.prestus_virt_name, equipment_name, '.csv');
 
     % Load manufacturer-provided phase data (only possible if phase tables are available)
-    combo.phase_table = fullfile(parameters.calibration.path_input_profiles, combo.phase_table);
+    combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
     if isequal(tran.manufact, "Sonic Concepts")
         phase_table = readtable(combo.phase_table);
     elseif isequal(tran.manufact, "Imasonic")
@@ -105,7 +94,7 @@ for i = 1:length(parameters.calibration.combinations)
     end
 
     % Load characterization data
-    combo.char_data_path = fullfile(parameters.calibration.path_input_profiles, combo.char_data_path);
+    combo.char_data_path = fullfile(parameters.calibration.path_input_axial, combo.char_data_path);
     charac_data = readmatrix(combo.char_data_path);
     available_foci_wrt_exit_plane = round(charac_data(2, 2:end), 2);
     dist_from_exit_plane = charac_data(3:end, 1);
@@ -145,11 +134,11 @@ for i = 1:length(parameters.calibration.combinations)
             continue;
         end
 
-        % [SIM] Set the expected focal distance to exit plane distance 
+        % [SIM] Set the expected focal distance to exit plane 
         % Account for the potential distance between bowl (actual focal
         % distance) and exit plane (axial profile definition)
-        parameters.expected_focal_distance_mm = focus_wrt_exit_plane + dist_tran_exit_plane;
-        parameters.expected_focal_distance_EP_mm = focus_wrt_exit_plane;
+        parameters.expected_focal_distance_mm = focus_wrt_exit_plane;
+        parameters.expected_focal_distance_bowl_mm = focus_wrt_exit_plane + dist_tran_exit_plane;
 
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
         source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters);

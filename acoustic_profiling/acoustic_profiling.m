@@ -11,12 +11,11 @@ function acoustic_profiling(...
 %   profile_empirical
 %       profile_focus        - Measured or theoretical intensity profile along beam axis
 %       dist_from_tran       - Distance from transducer reference point (mm)
-%       focus_wrt_exit_plane - Distance related to transducer exit plane (mm)
+%       focus_wrt_exit_plane - Desired focal distance from transducer exit plane (mm)
 %   equipment_name       - Name/identifier for the transducer or equipment
 %   desired_intensity    - Target focal intensity (W/cm^2)
 %   parameters           - Structure with simulation parameters and paths
-%   .calibration.path_output_profiles  - Directory path for saving outputs
-%   .calibration.filename_calibrated_CSV - Virtual path for saving optimized parameter files
+%   parameters.calibration - Structure with calibration settings
 %   sim_id               - Numeric ID of the subject (or simulation)
 %
 % Outputs:
@@ -49,6 +48,7 @@ function acoustic_profiling(...
         parameters.data_path = parameters.calibration.path_output;
         parameters.subject_subfolder = 0;
         parameters.sim_path = parameters.calibration.path_output;
+        parameters.seg_path = parameters.calibration.path_output;
     end
 
     % Copy calibration settings to relevant entries in simulation config
@@ -156,8 +156,8 @@ function acoustic_profiling(...
 
     opt_param = sim_param;
     opt_param.transducer.source_amp = opt_source_amp;
-    opt_param.transducer.source_phase_rad = [0 opt_phases];
-    opt_param.transducer.source_phase_deg = [0 opt_phases]/pi*180;
+    opt_param.transducer.source_phase_rad = opt_phases;
+    opt_param.transducer.source_phase_deg = opt_phases/pi*180;
     opt_param.results_filename_affix = '_optimized';
 
     switch sim_param.submit_medium

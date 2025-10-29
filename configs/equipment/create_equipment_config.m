@@ -11,11 +11,11 @@ cd(config_path)
 
 % Initialize the structure
 config = struct();
-config.gen.charac_folder = 'Axial_profiles/';
+config.gen.charac_folder = '';
 config.gen.axial_prof_name = 'Axial_profiles_'; % First part of axial profiles filename, second part is always a combination of [transducer name]~[driving system name]
 config.gen.prestus_virt_folder = 'PRESTUS_virtual_parameters/';
 config.gen.prestus_virt_name = 'PRESTUS_virtual_'; % First part of PRESTUS virtual parameters filename, second part is always a combination of [transducer name]~[driving system name]
-config.gen.phase_table_folder = 'Phase_tables/';
+config.gen.phase_table_folder = '';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                   Transducers

@@ -1,5 +1,9 @@
-gen: {charac_folder: Axial_profiles/, axial_prof_name: Axial_profiles_, prestus_virt_folder: PRESTUS_virtual_parameters/,
-  prestus_virt_name: PRESTUS_virtual_, phase_table_folder: Phase_tables/}
+gen:
+  charac_folder: []
+  axial_prof_name: Axial_profiles_
+  prestus_virt_folder: PRESTUS_virtual_parameters/
+  prestus_virt_name: PRESTUS_virtual_
+  phase_table_folder: []
 trans:
   CTX_250_001:
     serial: CTX_250_001
@@ -102,8 +106,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15287_01001
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 0.0
-    max_foc: 200.0
+    min_foc: 7.19
+    max_foc: 96.01
     prestus:
       transducer:
         n_elements: 30.0
@@ -123,8 +127,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15287_01002
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 0.0
-    max_foc: 200.0
+    min_foc: 7.05
+    max_foc: 93.92
     prestus:
       transducer:
         n_elements: 30.0
@@ -144,8 +148,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15473_01001
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 0.0
-    max_foc: 200.0
+    min_foc: 11.41
+    max_foc: 92.51
     prestus:
       transducer:
         n_elements: 10.0
@@ -159,8 +163,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15473_01002
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 0.0
-    max_foc: 200.0
+    min_foc: 11.81
+    max_foc: 94.63
     prestus:
       transducer:
         n_elements: 10.0
@@ -179,52 +183,44 @@ ds:
   IGT_32_ch_comb_10_ch: {serial: IGT_32_ch_comb_10_ch, name: IGT  32 ch. - 10 ch.,
     manufact: IGT, available_ch: 32.0}
 combos:
-  CTX_250_001_SC_203_035: {tran_serial: CTX_250_001, ds_serial: SC_203_035, char_data_path: Axial_profiles/Axial_profiles_CTX-250-001~TPO-203-035.csv,
-    phase_table: Phase_tables/CTX-250-001 - TPO-203-035 - Steer Table.csv}
-  CTX_250_009_SC_203_035: {tran_serial: CTX_250_009, ds_serial: SC_203_035, char_data_path: Axial_profiles/Axial_profiles_CTX-250-009~TPO-203-035.csv,
-    phase_table: Phase_tables/CTX-250-009 - TPO-203-035 - Steer Table.csv}
-  CTX_250_014_SC_203_035: {tran_serial: CTX_250_014, ds_serial: SC_203_035, char_data_path: Axial_profiles/Axial_profiles_CTX-250-014~TPO-203-035.csv,
-    phase_table: Phase_tables/CTX-250-014 - TPO-203-035 - Steer Table.csv}
+  CTX_250_001_SC_203_035: {tran_serial: CTX_250_001, ds_serial: SC_203_035, char_data_path: Axial_profiles_CTX-250-001~TPO-203-035.csv,
+    phase_table: CTX-250-001 - TPO-203-035 - Steer Table.csv}
+  CTX_250_009_SC_203_035: {tran_serial: CTX_250_009, ds_serial: SC_203_035, char_data_path: Axial_profiles_CTX-250-009~TPO-203-035.csv,
+    phase_table: CTX-250-009 - TPO-203-035 - Steer Table.csv}
+  CTX_250_014_SC_203_035: {tran_serial: CTX_250_014, ds_serial: SC_203_035, char_data_path: Axial_profiles_CTX-250-014~TPO-203-035.csv,
+    phase_table: CTX-250-014 - TPO-203-035 - Steer Table.csv}
   CTX_250_026_SC_203_035: {tran_serial: CTX_250_026, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_CTX-250-026~TPO-203-035.csv, phase_table: Phase_tables/CTX-250-026
+    char_data_path: Axial_profiles_CTX-250-026~TPO-203-035.csv, phase_table: CTX-250-026
       - TPO-203-035 - Steer Table.csv}
-  CTX_500_006_SC_203_035: {tran_serial: CTX_500_006, ds_serial: SC_203_035, char_data_path: Axial_profiles/Axial_profiles_CTX-500-006~TPO-203-035.csv,
-    phase_table: Phase_tables/CTX-500-006 - TPO-203-035 - Steer Table.csv}
-  CTX_500_026_SC_203_035: {tran_serial: CTX_500_026, ds_serial: SC_203_035, char_data_path: Axial_profiles/Axial_profiles_CTX-500-026~TPO-203-035.csv,
-    phase_table: Phase_tables/CTX-500-026 - TPO-203-035 - Steer Table.csv}
-  CTX_250_001_SC_105_010: {tran_serial: CTX_250_001, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-250-001~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-250-001 - TPO-105-010 - Steer Table.csv}
-  CTX_250_009_SC_105_010: {tran_serial: CTX_250_009, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-250-009~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-250-009 - TPO-105-010 - Steer Table.csv}
-  CTX_250_014_SC_105_010: {tran_serial: CTX_250_014, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-250-014~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-250-014 - TPO-105-010 - Steer Table.csv}
-  CTX_250_026_SC_105_010: {tran_serial: CTX_250_026, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-250-026~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-250-026 - TPO-105-010 - Steer Table.csv}
-  CTX_500_006_SC_105_010: {tran_serial: CTX_500_006, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-500-006~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-500-006 - TPO-105-010 - Steer Table.csv}
-  CTX_500_026_SC_105_010: {tran_serial: CTX_500_026, ds_serial: SC_105_010, char_data_path: Axial_profiles/Axial_profiles_CTX-500-026~TPO-105-010.csv,
-    phase_table: Phase_tables/CTX-500-026 - TPO-105-010 - Steer Table.csv}
+  CTX_500_006_SC_203_035: {tran_serial: CTX_500_006, ds_serial: SC_203_035, char_data_path: Axial_profiles_CTX-500-006~TPO-203-035.csv,
+    phase_table: CTX-500-006 - TPO-203-035 - Steer Table.csv}
+  CTX_500_026_SC_203_035: {tran_serial: CTX_500_026, ds_serial: SC_203_035, char_data_path: Axial_profiles_CTX-500-026~TPO-203-035.csv,
+    phase_table: CTX-500-026 - TPO-203-035 - Steer Table.csv}
+  CTX_250_001_SC_105_010: {tran_serial: CTX_250_001, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-250-001~TPO-105-010.csv,
+    phase_table: CTX-250-001 - TPO-105-010 - Steer Table.csv}
+  CTX_250_009_SC_105_010: {tran_serial: CTX_250_009, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-250-009~TPO-105-010.csv,
+    phase_table: CTX-250-009 - TPO-105-010 - Steer Table.csv}
+  CTX_250_014_SC_105_010: {tran_serial: CTX_250_014, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-250-014~TPO-105-010.csv,
+    phase_table: CTX-250-014 - TPO-105-010 - Steer Table.csv}
+  CTX_250_026_SC_105_010: {tran_serial: CTX_250_026, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-250-026~TPO-105-010.csv,
+    phase_table: CTX-250-026 - TPO-105-010 - Steer Table.csv}
+  CTX_500_006_SC_105_010: {tran_serial: CTX_500_006, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-500-006~TPO-105-010.csv,
+    phase_table: CTX-500-006 - TPO-105-010 - Steer Table.csv}
+  CTX_500_026_SC_105_010: {tran_serial: CTX_500_026, ds_serial: SC_105_010, char_data_path: Axial_profiles_CTX-500-026~TPO-105-010.csv,
+    phase_table: CTX-500-026 - TPO-105-010 - Steer Table.csv}
   IS_PCD15287_01001_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15287_01001, ds_serial: IGT_128_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15287_01001~IGT_128_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15287_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15287_01001~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15287_01002_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15287_01002, ds_serial: IGT_128_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15287_01002~IGT_128_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15287_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15473_01001_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_128_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15473_01001~IGT_128_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15473_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15473_01001~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
   IS_PCD15473_01002_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_128_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15473_01002~IGT_128_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15473_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15473_01002~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
   IS_PCD15287_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01001, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15287_01001~IGT_32_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15287_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15287_01001~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15287_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01002, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15287_01002~IGT_32_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15287_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15473_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15473_01001~IGT_32_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15473_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15473_01001~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
   IS_PCD15473_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles/Axial_profiles_IS_PCD15473_01002~IGT_32_ch_comb_10_ch.csv,
-    phase_table: Phase_tables/transducer_15473_10_300kHz.ini}
+    char_data_path: Axial_profiles_IS_PCD15473_01002~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
