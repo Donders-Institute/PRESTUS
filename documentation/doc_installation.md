@@ -20,6 +20,12 @@ If you clone this repository, you can retrieve the submodules as follows:
 ```
 git clone --recurse-submodules https://github.com/Donders-Institute/PRESTUS.git
 ```
+
+If you want to recursively clone the `development` branch, you can use the following command:
+```
+git clone --recurse-submodules -b development https://github.com/Donders-Institute/PRESTUS.git
+```
+
 *Note: If you do not clone this repository, you must manually download the toolboxes specified above, and place them in the respective PRESTUS subdirectory.*
 
 If you cloned this repository in the past, and updated it, you can retrieve submodules as follows:
