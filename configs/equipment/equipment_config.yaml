@@ -106,8 +106,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15287_01001
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 7.19
-    max_foc: 96.01
+    min_foc: 5.0
+    max_foc: 91.7
     prestus:
       transducer:
         n_elements: 30.0
@@ -127,8 +127,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15287_01002
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 7.05
-    max_foc: 93.92
+    min_foc: 6.1
+    max_foc: 93.2
     prestus:
       transducer:
         n_elements: 30.0
@@ -148,8 +148,8 @@ trans:
     name: Imasonic  10 ch. IS_PCD15473_01001
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 11.41
-    max_foc: 92.51
+    min_foc: 6.7
+    max_foc: 92.6
     prestus:
       transducer:
         n_elements: 10.0
@@ -158,13 +158,43 @@ trans:
         curv_radius_mm: 100.0
         dist_to_plane_mm: 92.7
         source_freq_hz: 300000.0
-  IS_PCD15473_01002:
-    serial: IS_PCD15473_01002
-    name: Imasonic  10 ch. IS_PCD15473_01002
+  IS_PCD15473_01003:
+    serial: IS_PCD15473_01003
+    name: Imasonic  10 ch. IS_PCD15473_01003
     manufact: Imasonic
     n_elem: 10.0
-    min_foc: 11.81
-    max_foc: 94.63
+    min_foc: 7.2
+    max_foc: 93.6
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+        Elements_OD_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+        curv_radius_mm: 100.0
+        dist_to_plane_mm: 92.7
+        source_freq_hz: 300000.0
+  IS_PCD15473_01001_OPM:
+    serial: IS_PCD15473_01001_OPM
+    name: Imasonic  10 ch. IS_PCD15473_01001_OPM
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 7.3
+    max_foc: 92.0
+    prestus:
+      transducer:
+        n_elements: 10.0
+        Elements_ID_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+        Elements_OD_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+        curv_radius_mm: 100.0
+        dist_to_plane_mm: 92.7
+        source_freq_hz: 300000.0
+  IS_PCD15473_01003_OPM:
+    serial: IS_PCD15473_01003_OPM
+    name: Imasonic  10 ch. IS_PCD15473_01003_OPM
+    manufact: Imasonic
+    n_elem: 10.0
+    min_foc: 6.7
+    max_foc: 93.2
     prestus:
       transducer:
         n_elements: 10.0
@@ -214,13 +244,19 @@ combos:
     char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15473_01001_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_128_ch_comb_10_ch,
     char_data_path: Axial_profiles_IS_PCD15473_01001~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
-  IS_PCD15473_01002_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_128_ch_comb_10_ch,
-    char_data_path: Axial_profiles_IS_PCD15473_01002~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
+  IS_PCD15473_01003_IGT_128_ch_comb_10_ch: {tran_serial: IS_PCD15473_01003, ds_serial: IGT_128_ch_comb_10_ch,
+    char_data_path: Axial_profiles_IS_PCD15473_01003~IGT_128_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
   IS_PCD15287_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01001, ds_serial: IGT_32_ch_comb_10_ch,
     char_data_path: Axial_profiles_IS_PCD15287_01001~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15287_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15287_01002, ds_serial: IGT_32_ch_comb_10_ch,
     char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15287_10_300kHz.ini}
   IS_PCD15473_01001_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001, ds_serial: IGT_32_ch_comb_10_ch,
     char_data_path: Axial_profiles_IS_PCD15473_01001~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
-  IS_PCD15473_01002_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01002, ds_serial: IGT_32_ch_comb_10_ch,
-    char_data_path: Axial_profiles_IS_PCD15473_01002~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
+  IS_PCD15473_01003_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01003, ds_serial: IGT_32_ch_comb_10_ch,
+    char_data_path: Axial_profiles_IS_PCD15473_01003~IGT_32_ch_comb_10_ch.csv, phase_table: transducer_15473_10_300kHz.ini}
+  IS_PCD15473_01001_OPM_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01001_OPM,
+    ds_serial: IGT_32_ch_comb_10_ch, char_data_path: Axial_profiles_IS_PCD15473_01001_OPM~IGT_32_ch_comb_10_ch.csv,
+    phase_table: transducer_15473_10_300kHz.ini}
+  IS_PCD15473_01003_OPM_IGT_32_ch_comb_10_ch: {tran_serial: IS_PCD15473_01003_OPM,
+    ds_serial: IGT_32_ch_comb_10_ch, char_data_path: Axial_profiles_IS_PCD15473_01003_OPM~IGT_32_ch_comb_10_ch.csv,
+    phase_table: transducer_15473_10_300kHz.ini}

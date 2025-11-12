@@ -121,8 +121,8 @@ config.trans.(field_name_tran_7).serial = field_name_tran_7;
 config.trans.(field_name_tran_7).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_7).serial));
 config.trans.(field_name_tran_7).manufact = IMASONIC;
 config.trans.(field_name_tran_7).n_elem = 10; % number of elements
-config.trans.(field_name_tran_7).min_foc = 7.19; % [mm], focus wrt exit plane
-config.trans.(field_name_tran_7).max_foc = 96.01; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_7).min_foc = 5.0; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_7).max_foc = 91.7; % [mm], focus wrt exit plane
 config.trans.(field_name_tran_7).prestus.transducer.n_elements = 30; % number of virtual elements
 config.trans.(field_name_tran_7).prestus.transducer.Elements_ID_mm = [10, 13.7667, 17.5333, 22.3, 24.5667, 26.8333, 30, 31.7667, 33.5333, 36.3, 37.7667, 39.2333, 41.7, 43.0, 44.3, 46.5, 47.6667, 48.8333, 51, 52.0333, 53.0667, 55.1, 56.0667, 57.0333, 58.9, 59.8, 60.7, 62.5, 63.3333, 64.1667]; % Inner diameter of each element [mm]
 config.trans.(field_name_tran_7).prestus.transducer.Elements_OD_mm = [13.7667, 17.5333, 21.3, 24.5667, 26.8333, 29.1, 31.7667, 33.5333, 35.3, 37.7667, 39.2333, 40.7, 43.0, 44.3, 45.6, 47.6667, 48.8333, 50, 52.0333, 53.0667, 54.1, 56.0667, 57.0333, 58, 59.8, 60.7, 61.6, 63.3333, 64.1667, 65]; % Outer diameter of each element [mm]
@@ -135,8 +135,8 @@ config.trans.(field_name_tran_8).serial = field_name_tran_8;
 config.trans.(field_name_tran_8).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_8).serial));
 config.trans.(field_name_tran_8).manufact = IMASONIC;
 config.trans.(field_name_tran_8).n_elem = 10; % number of elements
-config.trans.(field_name_tran_8).min_foc = 7.05; % [mm], focus wrt exit plane
-config.trans.(field_name_tran_8).max_foc = 93.92; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_8).min_foc = 6.1; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_8).max_foc = 93.2; % [mm], focus wrt exit plane
 config.trans.(field_name_tran_8).prestus.transducer.n_elements = 30; % number of virtual elements
 config.trans.(field_name_tran_8).prestus.transducer.Elements_ID_mm = [10, 13.7667, 17.5333, 22.3, 24.5667, 26.8333, 30, 31.7667, 33.5333, 36.3, 37.7667, 39.2333, 41.7, 43.0, 44.3, 46.5, 47.6667, 48.8333, 51, 52.0333, 53.0667, 55.1, 56.0667, 57.0333, 58.9, 59.8, 60.7, 62.5, 63.3333, 64.1667]; % Inner diameter of each element [mm]
 config.trans.(field_name_tran_8).prestus.transducer.Elements_OD_mm = [13.7667, 17.5333, 21.3, 24.5667, 26.8333, 29.1, 31.7667, 33.5333, 35.3, 37.7667, 39.2333, 40.7, 43.0, 44.3, 45.6, 47.6667, 48.8333, 50, 52.0333, 53.0667, 54.1, 56.0667, 57.0333, 58, 59.8, 60.7, 61.6, 63.3333, 64.1667, 65]; % Outer diameter of each element [mm]
@@ -149,8 +149,8 @@ config.trans.(field_name_tran_9).serial = field_name_tran_9;
 config.trans.(field_name_tran_9).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_9).serial));
 config.trans.(field_name_tran_9).manufact = IMASONIC;
 config.trans.(field_name_tran_9).n_elem = 10; % number of elements
-config.trans.(field_name_tran_9).min_foc = 11.41; % [mm], focus wrt exit plane
-config.trans.(field_name_tran_9).max_foc = 92.51; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_9).min_foc = 6.7; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_9).max_foc = 92.6; % [mm], focus wrt exit plane
 config.trans.(field_name_tran_9).prestus.transducer.n_elements = 10; % number of virtual elements
 config.trans.(field_name_tran_9).prestus.transducer.Elements_ID_mm = [10, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]; % Inner diameter of each element [mm]
 config.trans.(field_name_tran_9).prestus.transducer.Elements_OD_mm = [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65]; % Outer diameter of each element [mm]
@@ -158,19 +158,47 @@ config.trans.(field_name_tran_9).prestus.transducer.curv_radius_mm = 100; % Radi
 config.trans.(field_name_tran_9).prestus.transducer.dist_to_plane_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_9).prestus.transducer.source_freq_hz = 300000; % [Hz]
 
-field_name_tran_10 = 'IS_PCD15473_01002';
+field_name_tran_10 = 'IS_PCD15473_01003';
 config.trans.(field_name_tran_10).serial = field_name_tran_10;
 config.trans.(field_name_tran_10).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_10).serial));
 config.trans.(field_name_tran_10).manufact = IMASONIC;
 config.trans.(field_name_tran_10).n_elem = 10; % number of elements
-config.trans.(field_name_tran_10).min_foc = 11.81; % [mm], focus wrt exit plane
-config.trans.(field_name_tran_10).max_foc = 94.63; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_10).min_foc = 7.2; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_10).max_foc = 93.6; % [mm], focus wrt exit plane
 config.trans.(field_name_tran_10).prestus.transducer.n_elements = 10; % number of virtual elements
 config.trans.(field_name_tran_10).prestus.transducer.Elements_ID_mm = [10, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]; % Inner diameter of each element [mm]
 config.trans.(field_name_tran_10).prestus.transducer.Elements_OD_mm = [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65]; % Outer diameter of each element [mm]
 config.trans.(field_name_tran_10).prestus.transducer.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_10).prestus.transducer.dist_to_plane_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_10).prestus.transducer.source_freq_hz = 300000; % [Hz]
+
+field_name_tran_11 = 'IS_PCD15473_01001_OPM';
+config.trans.(field_name_tran_11).serial = field_name_tran_11;
+config.trans.(field_name_tran_11).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_11).serial));
+config.trans.(field_name_tran_11).manufact = IMASONIC;
+config.trans.(field_name_tran_11).n_elem = 10; % number of elements
+config.trans.(field_name_tran_11).min_foc = 7.3; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_11).max_foc = 92.0; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_11).prestus.transducer.n_elements = 10; % number of virtual elements
+config.trans.(field_name_tran_11).prestus.transducer.Elements_ID_mm = [10, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]; % Inner diameter of each element [mm]
+config.trans.(field_name_tran_11).prestus.transducer.Elements_OD_mm = [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65]; % Outer diameter of each element [mm]
+config.trans.(field_name_tran_11).prestus.transducer.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
+config.trans.(field_name_tran_11).prestus.transducer.dist_to_plane_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
+config.trans.(field_name_tran_11).prestus.transducer.source_freq_hz = 300000; % [Hz]
+
+field_name_tran_12 = 'IS_PCD15473_01003_OPM';
+config.trans.(field_name_tran_12).serial = field_name_tran_12;
+config.trans.(field_name_tran_12).name = string(strcat(IMASONIC, {' '}, ' 10 ch.', {' '}, config.trans.(field_name_tran_12).serial));
+config.trans.(field_name_tran_12).manufact = IMASONIC;
+config.trans.(field_name_tran_12).n_elem = 10; % number of elements
+config.trans.(field_name_tran_12).min_foc = 6.7; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_12).max_foc = 93.2; % [mm], focus wrt exit plane
+config.trans.(field_name_tran_12).prestus.transducer.n_elements = 10; % number of virtual elements
+config.trans.(field_name_tran_12).prestus.transducer.Elements_ID_mm = [10, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]; % Inner diameter of each element [mm]
+config.trans.(field_name_tran_12).prestus.transducer.Elements_OD_mm = [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65]; % Outer diameter of each element [mm]
+config.trans.(field_name_tran_12).prestus.transducer.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
+config.trans.(field_name_tran_12).prestus.transducer.dist_to_plane_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
+config.trans.(field_name_tran_12).prestus.transducer.source_freq_hz = 300000; % [Hz]
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                   Driving systems
@@ -306,7 +334,7 @@ config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder, 
 split_combo = string(strcat(field_name_tran_10, '_', field_name_ds_3)); 
 config.combos.(split_combo).tran_serial = field_name_tran_10;
 config.combos.(split_combo).ds_serial = field_name_ds_3; 
-config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01002~IGT_128_ch_comb_10_ch.csv');
+config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01003~IGT_128_ch_comb_10_ch.csv');
 config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder,  'transducer_15473_10_300kHz.ini');
 
 split_combo = string(strcat(field_name_tran_7, '_', field_name_ds_4)); 
@@ -330,7 +358,19 @@ config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder, 
 split_combo = string(strcat(field_name_tran_10, '_', field_name_ds_4)); 
 config.combos.(split_combo).tran_serial = field_name_tran_10;
 config.combos.(split_combo).ds_serial = field_name_ds_4; 
-config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01002~IGT_32_ch_comb_10_ch.csv');
+config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01003~IGT_32_ch_comb_10_ch.csv');
+config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder,  'transducer_15473_10_300kHz.ini');
+
+split_combo = string(strcat(field_name_tran_11, '_', field_name_ds_4)); 
+config.combos.(split_combo).tran_serial = field_name_tran_11;
+config.combos.(split_combo).ds_serial = field_name_ds_4; 
+config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01001_OPM~IGT_32_ch_comb_10_ch.csv');
+config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder,  'transducer_15473_10_300kHz.ini');
+
+split_combo = string(strcat(field_name_tran_12, '_', field_name_ds_4)); 
+config.combos.(split_combo).tran_serial = field_name_tran_12;
+config.combos.(split_combo).ds_serial = field_name_ds_4; 
+config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01003_OPM~IGT_32_ch_comb_10_ch.csv');
 config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder,  'transducer_15473_10_300kHz.ini');
 
 yaml.dumpFile('equipment_config.yaml', config)
