@@ -142,8 +142,8 @@ function [output_pressure_file, parameters] = single_subject_pipeline(subject_id
     % For more documentation, see the 'preprocess_brain' function.
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
         [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
-        focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
-        inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
+        	focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
+        	inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
             output_pressure_file = '';
             return;
