@@ -34,10 +34,15 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         scale_factor double
         parameters struct
     end
-
+    
     %% Step 1: Compute focal axis
     % The focal axis is defined as a vector from `trans_pos_grid` to `focus_pos_grid`.
-    focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
+    if parameters.perform_focus_rotation
+        focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
+    else
+        natural_focus = [trans_pos_grid(1), trans_pos_grid(2), trans_pos_grid(3) + parameters.transducer.curv_radius_mm/parameters.grid_step_mm];
+        focal_axis = [natural_focus - trans_pos_grid, 1]';
+    end
 
     %% Step 2: Compute rotation angles
     % Rotate around the y-axis first to align focal axis with z-axis projection in x-z plane

@@ -211,7 +211,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % bounds of the image dimensions
     medium_masks(~csf_mask_expanded) = 0;
     % calculate size if the transducer bowl
-    transducer_bowl = transducer_setup(parameters.transducer, trans_pos_upsampled_grid, focus_pos_upsampled_grid, size(segmented_img), voxel_size_mm);
+    transducer_bowl = transducer_setup(parameters.transducer, trans_pos_upsampled_grid, focus_pos_upsampled_grid, size(segmented_img), voxel_size_mm, parameters.perform_focus_rotation);
     [min_dims, max_dims, new_grid_dims] = get_crop_dims(medium_masks+transducer_bowl, crop_margin);
     
     % In case the minimum dimensions are too small, 

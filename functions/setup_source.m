@@ -28,30 +28,30 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
     elseif ~isequal(size(focus_pos), [1 parameters.n_sim_dims])
         error('Transducer and focus positions should have size [N 1] or [1 N], where N is the number of simulation dimensions.');
     end
-
+    
     % Convert element diameters from mm to grid points
     transducer_pars = parameters.transducer;
     grid_step_mm = parameters.grid_step_mm;
-
-    transducer_pars.Elements_OD = 2 * floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
-    transducer_pars.Elements_ID = 2 * floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
-    transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
-
-    % Convert curvature radius from mm to grid points
-    transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_step_mm);
-
-    %% Setup source signal
+    if strcmp(parameters.transducer.element_shape, 'annular') || ~strcmp(parameters.transducer.element_shape.matrix.matrix_shape, 'dolphin')
+        transducer_pars.Elements_OD = 2 * floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
+        transducer_pars.Elements_ID = 2 * floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
+        transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
     
-    cw_signal = createCWSignals(...
-        kgrid.t_array, ...
-        parameters.transducer.source_freq_hz, ...
-        parameters.transducer.source_amp, ...
-        parameters.transducer.source_phase_rad);
-
-    source = struct();
+        % Convert curvature radius from mm to grid points
+        transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_step_mm);
+    end
 
     %% Custom element geometry (non-kWaveArray setup)
     if parameters.use_kWaveArray == 0
+        %% Setup source signal
+        cw_signal = createCWSignals(...
+        kgrid.t_array, ...
+        transducer_pars.source_freq_hz, ...
+        transducer_pars.source_amp, ...
+        transducer_pars.source_phase_rad);
+
+        source = struct();
+
         grid_dims = parameters.grid_dims;
         transducer_mask = zeros(grid_dims);
         source_labels = zeros(grid_dims);
@@ -93,132 +93,163 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         end
 
         source.p_mask = transducer_mask;
-
+    
     %% kWaveArray-based setup (for advanced simulations)
     else
         disp('Setting up kWaveArray (might take a bit of time)');
+        
+        % Create empty kWaveArray object
+        karray = kWaveArray('BLITolerance', 0.1, 'UpsamplingRate', 10, 'BLIType', 'sinc');
 
-        % Determine if axisymmetric mode should be enabled
-        if numel(trans_pos) == 2 && ...
-                isfield(parameters, 'axisymmetric') && ...
-                parameters.axisymmetric == 1
-            axisymmetric = true;
-            disp("Using axisymmetric setup for 2D input...")
-        else
-            axisymmetric = false;
-        end
-        
-        % Create kWaveArray object (always without axisymmetry)
-        karray = kWaveArray('Axisymmetric', false, ...
-                           'BLITolerance', 0.1, ...
-                           'UpsamplingRate', 10, ...
-                           'BLIType', 'sinc');
-        
-        % Set focus position and transducer position vectors in physical coordinates
-        if numel(trans_pos) == 3
-            % 3D annular array
-            pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))];
-            focus_vec = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))];
-            
-            karray.addAnnularArray(pos_vec, ...
+        if strcmp(parameters.transducer.element_shape.type, 'annular')
+            % Add annular array elements to the kWaveArray object
+            karray.addAnnularArray([kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))], ...
                                    transducer_pars.curv_radius_mm * 1e-3, ...
                                    [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
-                                   focus_vec);
-        elseif numel(trans_pos) == 2 && axisymmetric == false
+                                   [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))]);
 
-            % 2D arc-shaped element
-            pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2))];
-            focus_vec = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2))];
-            
-            karray.addArcElement(pos_vec, ...
-                                 transducer_pars.curv_radius_mm * 1e-3, ...
-                                 transducer_pars.Elements_OD_mm * 1e-3, ...
-                                 focus_vec);
-        end
-        
-        if axisymmetric
-            
-            % Approach: create a double sized grid and crop the source
-
-            % make a new grid with odd number of pts. 
-            kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
-            karray_full = kWaveArray('BLITolerance', 0.01, 'UpsamplingRate', 100);
-            % position of the central point on the bowl surface
-            x_offset = (trans_pos(1)-1).*(1/parameters.grid_step_mm); % account for the plm (mm offset)
-            position_full = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
-            % lateral grid point
-%             focus_pos_half = [0, kgrid.y_vec(1)];
-            focus_pos_full = [0, 0+eps]; % eps =  smallest step in MATLAB
-            % add the arc element (2D bowl)
-            karray_full.addArcElement(position_full, ...
-                                 transducer_pars.curv_radius_mm * 1e-3, ...
-                                 transducer_pars.Elements_OD_mm * 1e-3, ...
-                                 focus_pos_full);
-            % Get binary mask for the array elements on the grid
-            source.p_mask = karray_full.getArrayBinaryMask(kgrid_mirrored);
-            % Get the source weighting for each point in the mask
-            grid_weights = karray_full.getElementGridWeights(kgrid_mirrored, 1);
-            % Get distributed source signal weighted by element geometry
-            % consider half of the y-axis space for axisymmetry now
-            source.p_mask = source.p_mask(:,kgrid.Ny:end);
-            grid_weights = grid_weights(:, kgrid.Ny:end);
-            tmp = grid_weights(source.p_mask);
-            source.p = bsxfun(@times, cw_signal, tmp(:));
-            % binarize the source mask based on weight threshold
-            source_labels = (source.p_mask.*grid_weights)>.25;
-            
+        %% matrix designs
         else
-            % --- Non-axisymmetric mode: compute weights and distribute signals manually ---
-            
-            % Initialize 4D array for element weights: [elements, Nx, Ny, Nz]
-            grid_weights_4d = zeros(transducer_pars.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
-            
-            for ind = 1:transducer_pars.n_elements
-                fprintf('Computing weights for element %i...', ind);
-                grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
-                fprintf(' done\n');
-            end
-            
-            % Sum weights over elements and create binary mask of active source points
-            binary_mask = squeeze(sum(grid_weights_4d, 1)) ~= 0;
-            
-            Nt = size(cw_signal, 2);
-            mask_ind = find(binary_mask);
-            num_source_points = sum(binary_mask(:));
-            
-            distributed_source_signal = zeros(num_source_points, Nt);
-            source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
-            
-            if canUseGPU
-                cw_signal = gpuArray(cw_signal);
-                distributed_source_signal = gpuArray(distributed_source_signal);
-            end
-            
-            % Distribute signals weighted by element weights
-            for ind = 1:transducer_pars.n_elements
-                source_weights = squeeze(grid_weights_4d(ind,:,:,:));
-                el_binary_mask = source_weights ~= 0;
-                
-                if canUseGPU
-                    source_weights = gpuArray(source_weights);
+            matrix_pars = parameters.transducer.element_shape.matrix;
+            if strcmp(matrix_pars.matrix_shape.type, 'define_here')
+                is_rect_grid = false;
+                if strcmp(matrix_pars.matrix_shape.define_here.grid_shape.type, 'rect')
+                    is_rect_grid = true;
                 end
                 
-                element_mask_ind = find(el_binary_mask);
-                local_ind = ismember(mask_ind, element_mask_ind);
-                
-                distributed_source_signal(local_ind,:) = ...
-                    distributed_source_signal(local_ind,:) + ...
-                    source_weights(element_mask_ind) * cw_signal(ind,:);
-                
-                source_labels = source_labels + ind * el_binary_mask;
+                is_curved = matrix_pars.matrix_shape.define_here.is_curved;
+                is_clover_module_cut = matrix_pars.matrix_shape.define_here.clover_module_cut;
+                [transducer_pars, karray] = setup_circular_matrix_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray, is_rect_grid, is_curved, is_clover_module_cut);
+
+            elseif strcmp(matrix_pars.matrix_shape.type, 'stanford')
+                [transducer_pars, karray] = setup_stanford_transducer(kgrid, trans_pos, transducer_pars, focus_pos, parameters, karray);
+
+            elseif strcmp(matrix_pars.matrix_shape.type, 'dolphin')
+                [transducer_pars, karray] = setup_dolphin_transducer_design(transducer_pars, kgrid, trans_pos, focus_pos, karray, parameters.medium.water.sound_speed, parameters.n_sim_dims);
+            else
+                error('ERROR: %s is an unknown transducer design.', matrix_pars.matrix_shape.type);
             end
             
-            % Assign outputs
-            source.p_mask = binary_mask;
-            source.p = distributed_source_signal;
+            % Update Elements OD and ID in the case part of elements have
+            % been removed
+            transducer_pars.Elements_OD = 2 * floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
+            transducer_pars.Elements_ID = 2 * floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
+            transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
+        end
+ 
+        % Define signal
+        %% Setup source signal
+        cw_signal = createCWSignals(...
+        kgrid.t_array, ...
+        transducer_pars.source_freq_hz, ...
+        transducer_pars.source_amp, ...
+        transducer_pars.source_phase_rad);
+
+        source = struct();
+
+        binary_mask = false(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+        source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+        Nt = size(cw_signal, 2);
+
+        % Pre-allocate temporary arrays
+        if canUseGPU
+            cw_signal = gpuArray(cw_signal);
         end
 
+        for ind = 1:transducer_pars.n_elements
+            fprintf('Computing weights for element %i...', ind);
+            element_weights = karray.getElementGridWeights(kgrid, ind);  
+            el_binary_mask = element_weights ~= 0;
+            binary_mask = binary_mask | el_binary_mask;
 
+            source_labels = source_labels + ind * el_binary_mask;
+
+            fprintf(' done\n');
+        end
+
+        mask_ind = find(binary_mask);
+        num_source_points = length(mask_ind);
+        distributed_source_signal = zeros(num_source_points, Nt);
+        if canUseGPU
+            distributed_source_signal = gpuArray(distributed_source_signal);
+        end
+
+        % Create a mapping from 3D indices to linear indices in the mask
+        [grid_i, grid_j, grid_k] = ind2sub([kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1)], mask_ind);
+        mask_mapping = sparse(grid_i, grid_j + kgrid.Ny * (grid_k - 1), 1:num_source_points, ...
+                             kgrid.Nx, kgrid.Ny * max(kgrid.Nz, 1));
+
+
+        % Assign signals to elements based on weights
+        for ind = 1:transducer_pars.n_elements
+            fprintf('Assigning signals for element %i...', ind);
+
+            element_weights = karray.getElementGridWeights(kgrid, ind); 
+            el_binary_mask = element_weights ~= 0;
+
+            if canUseGPU
+                element_weights = gpuArray(element_weights);
+            end
+
+            % Find indices where this element contributes
+            [el_i, el_j, el_k] = ind2sub([kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1)], find(el_binary_mask));
+            
+            % Map to positions in distributed_source_signal
+            for p = 1:length(el_i)
+                idx = full(mask_mapping(el_i(p), el_j(p) + kgrid.Ny * (el_k(p) - 1)));
+                if idx > 0 % Should always be true if masks are constructed properly
+                    distributed_source_signal(idx, :) = distributed_source_signal(idx, :) + ...
+                        element_weights(el_i(p), el_j(p), el_k(p)) * cw_signal(ind, :);
+                end
+            end
+            fprintf(' done\n');
+        end
+
+        % Assign binary mask and distributed signals to the source structure
+        source.p_mask = binary_mask;
+        source.p = distributed_source_signal;
+
+        % Show the 3D binary mask of the transducer in the grid
+        source_mask = karray.getArrayBinaryMask(kgrid);
+        if parameters.n_sim_dims == 3
+            h = figure;
+            hold on;
+            
+            % Extract isosurface
+            p = patch(isosurface(source_mask, 0.5));  % 0.5 is the threshold for binary mask
+            isonormals(source_mask, p);  % Add surface normals for better visualization
+            set(p, 'FaceColor', 'r', 'EdgeColor', 'none');  % Set color and edges
+            camlight; lighting gouraud;  % Improve lighting
+            
+            axis equal;
+            xlabel('x-grid'); ylabel('y-grid'); zlabel('z-grid');
+            title('3D Visualization of Binary Mask');
+
+            output_plot_filename = fullfile(parameters.debug_dir, ...
+                sprintf('sub-%03d_%s_binary_transducer_mask%s.fig', ...
+                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            saveas(h, output_plot_filename, 'fig')
+
+            output_plot_filename = fullfile(parameters.debug_dir, ...
+                sprintf('sub-%03d_%s_binary_transducer_mask%s.png', ...
+                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            saveas(h, output_plot_filename, 'png')
+            close(h);
+
+        else
+            h = figure('Name', 'Transducer in Simulation Grid');
+            % 2D visualization
+            imagesc(source_mask);
+            axis equal tight;
+            colormap(hot);
+            title('Transducer Binary Mask in Simulation Grid');
+            colorbar;
+    
+            output_plot_filename = fullfile(parameters.debug_dir, ...
+                sprintf('sub-%03d_%s_binary_transducer_mask%s.png', ...
+                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            saveas(h, output_plot_filename, 'png')
+            close(h);
+        end
     end
-
 end
