@@ -55,7 +55,7 @@ disp(available_combos);
 
 %% Iterate through equipment combinations
 for i = 1:length(parameters.calibration.combinations)
-    combo_name = parameters.calibration.combinations{i};
+    combo_name = parameters.calibration.combinations{1}(i);
     combo = equip_param.combos.(combo_name);
     
     % Extract equipment details
@@ -165,6 +165,7 @@ for i = 1:length(parameters.calibration.combinations)
             % to suboptimal solutions; assume that the amplitude is zero in
             % that space (i.e., no strong near-field interference)
 
+            % add distance values prior to the exit plane
             parameters.calibration.interpolateToEP = 1;
             if parameters.calibration.interpolateToEP == 1
                 Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
@@ -176,6 +177,9 @@ for i = 1:length(parameters.calibration.combinations)
             else
                 profile_focus_tmp = profile_focus;
             end
+
+            % [cleanup] regularize lower values to 0 [possible after interpolation]
+            profile_focus_tmp(profile_focus_tmp<0) = 0;
 
             % collect data on empirical profile
             profile_empirical.profile_focus = profile_focus_tmp;
