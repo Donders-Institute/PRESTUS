@@ -1,10 +1,10 @@
 # The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
 
   # Simulation paths (note: specific for calibration) [Change to your directories...]
-  path_input_axial: '/project/2423053.01/amythal_sim/amythal_sim/data/acoustic_profiling/Axial_profiles'  # Base path for axial profiles
-  path_input_phase: '/project/2423053.01/amythal_sim/amythal_sim/data/acoustic_profiling/Phase_tables'  # Base path for phase data
-  path_output: '/project/2423053.01/amythal_sim/amythal_sim/data/calibration/'  # Folder path for saving simulation results
-  path_output_profiles: '/project/2423053.01/amythal_sim/amythal_sim/data/calibration/PRESTUS_virtual_parameters'  # Folder for saving optimized profile data
+  path_input_axial: '//home/common/matlab/PRESTUS/Axial_profiles/'  # Base path for axial profiles
+  path_input_phase: '//home/common/matlab/PRESTUS/Phase_tables/'  # Base path for phase data
+  path_output: '/project/2425122.01/calibration/data/calibration/'  # Folder path for saving simulation results
+  path_output_profiles: '/project/2425122.01/calibration/data/PRESTUS_virtual_parameters/'  # Folder for saving optimized profile data
   filename_calibrated_CSV: '' # Filename of calibrated CSV data (default: standalone script generates name based on equipment)
 
   # Internal settings
@@ -14,21 +14,25 @@
   skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
   optmethod: 'FEXminimize'                  # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
   weights: 1                                # Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)
-  seed: 251024                              # Random seed for optimization
+  seed: 130                                 # Random seed for optimization
   addEPdistance: 1                          # Append distance from transducer bowl to exit plane (if zero point in provided profiles = exit plane, != transducer bowl)
   interpolateToEP: 1                        # Interpolate values between bowl and exit plane [default: add initial value in empirical measurements]
-  
+  force_kwavearray: 1                        # Force to run free-water simulations with kwavearray?
+
   # List combinations of setups (e.g., transducer-TPO) and calibration targets.
   # Every [] specification will be performed for the corresponding (ordered) index equipment combination. 
   # Example: all foci within the first [] will be executed for the first equipment combination. 
   # If array is empty ([]), all focal depths of available characterization data will be used.
 
   combinations:                             # Equipment combinations
-    - IS_PCD15287_01001_IGT_128_ch_comb_10_ch
+    - IS_PCD15287_01001_IGT_32_ch_comb_10_ch
+    - IS_PCD15473_01001_IGT_32_ch_comb_10_ch
   focal_depths_wrt_exit_plane:              # List of focal depths (in mm) to be characterized.
-    - [85]
+    - [37, 58]
+    - [37, 58]
   desired_intensities:                      # Desired intensities in W/cm^2       
-    - [30]
+    - [35, 83]
+    - [35, 83]
 
   # Example for multiple equipment-depth-intensity combinations:
   # combinations:

@@ -1,5 +1,6 @@
 function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = ...
-    compute_oneil_solution(parameters, pred_axial_pressure, dist_exit_plane, adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
+    compute_oneil_solution(parameters, pred_axial_pressure, dist_exit_plane, ...
+    adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
     % Compute O'Neil solution and plot it along with comparisons
     %
     % Arguments:
