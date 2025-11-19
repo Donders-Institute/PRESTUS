@@ -36,21 +36,27 @@ function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_onei
 
     % Plot comparison of profiles
     figure('Position', [10, 10, 900, 500]);
-    plot(axial_position, i_axial_oneil, 'DisplayName', 'Original Analytical Profile');
+    plot(axial_position, i_axial_oneil, ...
+        'LineWidth', 1, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Original Profile (Analytical)');
     hold on;
-    plot(axial_position, i_axial_oneil_opt, 'DisplayName', 'Optimized Analytical Profile');
-    plot(dist_from_tran, adjusted_profile_focus, 'DisplayName', 'Desired Profile');
+    plot(axial_position, i_axial_oneil_opt, ...
+        'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'Optimized Profile (Analytical)');
+    plot(dist_from_tran, adjusted_profile_focus, ...
+        'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
     hold off;
     xline(focus_wrt_mid_bowl, '--', 'DisplayName', 'Focal Point wrt Mid-Bowl');
     yline(desired_intensity, '--', 'DisplayName', 'Desired Intensity');
 
     xlabel('Distance wrt Mid-Bowl of Transducer [mm]');
     ylabel('Intensity [W/cm^2]');
-    legend('Location', 'best');
+    legend('Location', 'NorthEast');
+    legend('boxoff')
     title('Pressure Along the Beam Axis');
+    ylim([0 inf]);
+    xlim([-5 inf]);
     
     % Save the profile comparison figure
-    fig_path = fullfile(parameters.calibration.path_output, ...
+    fig_path = fullfile(parameters.calibration.path_output_profiles, ...
         strcat('Recalculated_oneil_at_F_', num2str(focus_wrt_exit_plane), ...
         '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);

@@ -99,7 +99,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         disp('Setting up kWaveArray (might take a bit of time)');
 
         % Determine if axisymmetric mode should be enabled
-        if numel(trans_pos) == 2 && ...
+        if parameters.n_sim_dims == 2 && ...
                 isfield(parameters, 'axisymmetric') && ...
                 parameters.axisymmetric == 1
             axisymmetric = true;
@@ -115,7 +115,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
                            'BLIType', 'sinc');
         
         % Set focus position and transducer position vectors in physical coordinates
-        if numel(trans_pos) == 3
+        if parameters.n_sim_dims == 3
             % 3D annular array
             pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2)), kgrid.z_vec(trans_pos(3))];
             focus_vec = [kgrid.x_vec(focus_pos(1)), kgrid.y_vec(focus_pos(2)), kgrid.z_vec(focus_pos(3))];
@@ -124,7 +124,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
                                    transducer_pars.curv_radius_mm * 1e-3, ...
                                    [transducer_pars.Elements_ID_mm; transducer_pars.Elements_OD_mm] * 1e-3, ...
                                    focus_vec);
-        elseif numel(trans_pos) == 2 && axisymmetric == false
+        elseif parameters.n_sim_dims == 2 && axisymmetric == false
 
             % 2D arc-shaped element
             pos_vec = [kgrid.x_vec(trans_pos(1)), kgrid.y_vec(trans_pos(2))];
@@ -137,35 +137,72 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
         end
         
         if axisymmetric
-            
-            % Approach: create a double sized grid and crop the source
-
-            % make a new grid with odd number of pts. 
+            % Create a mirrored grid with odd number of points
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
-            karray_full = kWaveArray('BLITolerance', 0.01, 'UpsamplingRate', 100);
-            % position of the central point on the bowl surface
-            x_offset = (trans_pos(1)-1).*(1/parameters.grid_step_mm); % account for the plm (mm offset)
-            position_full = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
-            % lateral grid point
-%             focus_pos_half = [0, kgrid.y_vec(1)];
-            focus_pos_full = [0, 0+eps]; % eps =  smallest step in MATLAB
-            % add the arc element (2D bowl)
-            karray_full.addArcElement(position_full, ...
-                                 transducer_pars.curv_radius_mm * 1e-3, ...
-                                 transducer_pars.Elements_OD_mm * 1e-3, ...
-                                 focus_pos_full);
-            % Get binary mask for the array elements on the grid
-            source.p_mask = karray_full.getArrayBinaryMask(kgrid_mirrored);
-            % Get the source weighting for each point in the mask
-            grid_weights = karray_full.getElementGridWeights(kgrid_mirrored, 1);
-            % Get distributed source signal weighted by element geometry
-            % consider half of the y-axis space for axisymmetry now
-            source.p_mask = source.p_mask(:,kgrid.Ny:end);
-            grid_weights = grid_weights(:, kgrid.Ny:end);
-            tmp = grid_weights(source.p_mask);
-            source.p = bsxfun(@times, cw_signal, tmp(:));
-            % binarize the source mask based on weight threshold
-            source_labels = (source.p_mask.*grid_weights)>.25;
+            karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
+            
+            % Base position in physical units
+            x_offset = (trans_pos(1)-1)*(1/parameters.grid_step_mm);
+            position_base = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
+            focus_pos_full = [0, 0+eps];
+            
+            % Add each element separately with lateral displacement
+            for el_i = 1:transducer_pars.n_elements
+                % Element-specific parameters
+                el_OD_m = transducer_pars.Elements_OD_mm(el_i) * 1e-3; % Outer diameter converted from millimeters to meters
+                
+                % Compute lateral y-position shift to arrange elements side by side,
+                % centered around the base position. The formula centers the elements so that
+                % element indices run from negative to positive offsets.
+                % The spacing is set as the element diameter.
+                y_shift = (el_i - (transducer_pars.n_elements+1)/2) * el_OD_m;
+                
+                % Calculate the element's exact position by shifting the base position in y.
+                % position_base is the central position in x; y is offset by y_shift.
+                element_pos = position_base + [0, y_shift];
+                
+                % Add the arc element to the kWaveArray with:
+                % - element_pos: position of the element center on the rear surface [x, y] in meters
+                % - transducer_pars.curv_radius_mm * 1e-3: radius of curvature in meters
+                % - el_OD_m: aperture diameter in meters
+                % - focus_pos_full: a point on the beam axis defining its angular direction [x, y] (meters)
+                karray_full.addArcElement(element_pos, transducer_pars.curv_radius_mm * 1e-3, el_OD_m, focus_pos_full);
+            end
+    
+            % Initialize mask and weights
+            source_mask_full = false(kgrid_mirrored.Nx, kgrid_mirrored.Ny);
+            grid_weights_3d = zeros(transducer_pars.n_elements, kgrid_mirrored.Nx, kgrid_mirrored.Ny);
+            
+            % Compute weights and aggregate mask
+            for el_i = 1:transducer_pars.n_elements
+                % Retrieve element-specific grid weights
+                grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
+                % Update the mask
+                source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0);
+            end
+            
+            % Crop to half space for axisymmetry
+            source.p_mask = source_mask_full(:, kgrid.Ny:end);
+            grid_weights_cropped = grid_weights_3d(:, :, kgrid.Ny:end);
+            
+            % Number of source points
+            source_idx = find(source.p_mask);
+            num_points = numel(source_idx);
+            nTime = size(cw_signal, 2);
+            
+            % Initialize pressure matrix
+            source.p = zeros(num_points, nTime);
+            
+            % Sum weighted signals over all elements
+            for el_i = 1:transducer_pars.n_elements
+                weights_el = squeeze(grid_weights_cropped(el_i, :, :));
+                weights_vec = weights_el(source_idx);
+                source.p = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
+            end
+            
+            % Optional: create source_labels (thresholded weights)
+            source_labels = sum(grid_weights_cropped > 0, 1) > 0;
+            source_labels = squeeze(source_labels);
             
         else
             % --- Non-axisymmetric mode: compute weights and distribute signals manually ---

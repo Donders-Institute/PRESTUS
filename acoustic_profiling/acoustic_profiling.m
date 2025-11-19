@@ -39,10 +39,10 @@ function acoustic_profiling(...
     % Run all simulations in calibration folder (default)
     if parameters.calibration.save_in_calibration_folder
         parameters.data_path = parameters.calibration.path_output;
-        parameters.subject_subfolder = 0;
-        parameters.sim_path = parameters.calibration.path_output;
         parameters.seg_path = parameters.calibration.path_output;
+        parameters.sim_path = parameters.calibration.path_output;
     end
+    disp(['Saving free-water calibration in ', parameters.sim_path{1}]);
 
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;
@@ -75,7 +75,11 @@ function acoustic_profiling(...
     end
 
     % Load initial results
-    outputs_folder = sprintf('%s', sim_param.data_path);
+    if sim_param.subject_subfolder
+        outputs_folder = sprintf('%s/sub-%03d', sim_param.sim_path, sim_id);
+    else
+        outputs_folder = sprintf('%s', sim_param.sim_path);
+    end
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
         outputs_folder, sim_id, sim_param.results_filename_affix),...
         'sensor_data','parameters');
@@ -85,9 +89,15 @@ function acoustic_profiling(...
     
     % Plot 2D intensity map
     figure;
-    imagesc((1:size(p_max, 1)) * initial_res.parameters.grid_step_mm, ...
-        (1:size(p_max, 3)) * initial_res.parameters.grid_step_mm, ...
-        squeeze(p_max(:, initial_res.parameters.transducer.pos_grid(2), :))')
+    p_distance = (1:size(p_max, 1)) * initial_res.parameters.grid_step_mm;
+    p_width = (1:size(p_max, sim_param.n_sim_dims)) * initial_res.parameters.grid_step_mm;
+    if sim_param.n_sim_dims == 2
+        p_axialprofile = squeeze(p_max(:, :))';
+    elseif sim_param.n_sim_dims == 3
+        p_axialprofile = squeeze(p_max(:, initial_res.parameters.transducer.pos_grid(2), :))';
+    end
+    imagesc(p_distance, p_width, p_axialprofile);
+    clear p_distance p_width p_axialprofile;
     axis image;
     colormap(getColorMap);
     xlabel('Lateral Position [mm]');
@@ -105,9 +115,16 @@ function acoustic_profiling(...
     %% Optimization
 
     % Extract simulated pressure along the focal axis
-    i_x = initial_res.parameters.transducer.pos_grid(1);
-    i_y = initial_res.parameters.transducer.pos_grid(2);
-    pred_axial_pressure = squeeze(p_max(i_x, i_y,:));
+    if sim_param.n_sim_dims == 2
+        i_x = initial_res.parameters.transducer.pos_grid(1);
+        pred_axial_pressure = squeeze(p_max(i_x,:));
+        clear i_x;
+    elseif sim_param.n_sim_dims == 3
+        i_x = initial_res.parameters.transducer.pos_grid(1);
+        i_y = initial_res.parameters.transducer.pos_grid(2);
+        pred_axial_pressure = squeeze(p_max(i_x, i_y,:));
+        clear i_x i_y;
+    end
 
     % Scale the profile to the desired intensity
     profile_opt.adjusted_profile_focus = scale_real_intensity_profile(...

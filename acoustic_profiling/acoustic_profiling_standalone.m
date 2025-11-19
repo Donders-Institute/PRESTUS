@@ -187,6 +187,16 @@ for i = 1:length(parameters.calibration.combinations)
             profile_empirical.dist_from_tran = dist_from_tran_tmp;
             profile_empirical.focus_wrt_exit_plane = focus_wrt_exit_plane;
 
+            % convert from default 3D to 2D axisymmetric simulation (if requested)
+            if isfield(parameters.calibration, 'axisymmetric2D') && ...
+                    parameters.calibration.axisymmetric2D == 1
+                parameters.n_sim_dims = 2;
+                parameters.axisymmetric = 1;
+                if numel(parameters.default_grid_dims)==3
+                    parameters.default_grid_dims(2) = [];
+                end
+            end
+
             % perform the acoustic profiling
             acoustic_profiling(...
                 profile_empirical, ...

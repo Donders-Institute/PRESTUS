@@ -14,10 +14,11 @@
   skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
   optmethod: 'FEXminimize'                  # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
   weights: 1                                # Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)
-  seed: 130                                 # Random seed for optimization
+  seed: 251024                              # Random seed for optimization
   addEPdistance: 1                          # Append distance from transducer bowl to exit plane (if zero point in provided profiles = exit plane, != transducer bowl)
   interpolateToEP: 1                        # Interpolate values between bowl and exit plane [default: add initial value in empirical measurements]
-  force_kwavearray: 1                        # Force to run free-water simulations with kwavearray?
+  force_kwavearray: 1                       # Force to run free-water simulations with kwavearray?
+  axisymmetric2D: 0                         # [EXPERIMENTAL; default: 0] Convert (default; depends on study config) 3D free-water simulation setup to 2D axisymmetry for efficiency
 
   # List combinations of setups (e.g., transducer-TPO) and calibration targets.
   # Every [] specification will be performed for the corresponding (ordered) index equipment combination. 
@@ -43,4 +44,3 @@
   #   - [30, 50]
   # desired_intensities: 
   #   - [30]
-  #   - [30, 60]

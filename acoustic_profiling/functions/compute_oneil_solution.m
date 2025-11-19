@@ -26,7 +26,7 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     % TODO: should the resolution be retrieved from somewhere else?
     % Define the axial position vector [mm]
     % Assumes grid spacing of 0.5 mm (default resolution).
-    axial_position = (1:parameters.default_grid_dims(3)) * 0.5;
+    axial_position = (1:parameters.default_grid_dims(end)) * 0.5;
     
     % Compute O'Neil analytical solution for pressure along the beam axis [Pa]
     p_axial_oneil = focusedAnnulusONeil(...
@@ -45,10 +45,13 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
 
     % Plot intensity along the beam axis
     figure('Position', [10, 10, 900, 500]);
-    plot(axial_position, i_axial_oneil, 'LineWidth', 1.5, 'DisplayName', 'O''Neil Analytical Solution');
+    plot(axial_position, i_axial_oneil, ...
+        'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'O''Neil Analytical Solution');
     hold on;
-    plot(axial_position - (parameters.transducer.pos_grid(3) - 1) * 0.5, pred_axial_intensity, '--', 'LineWidth', 1.5, 'DisplayName', 'Inital Simulated Intensity');
-    plot(dist_exit_plane, adjusted_profile_focus, 'LineWidth', 1.5, 'DisplayName', 'Desired Profile');
+    plot(axial_position - (parameters.transducer.pos_grid(end) - 1) * 0.5, pred_axial_intensity, ...
+        '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
+    plot(dist_exit_plane, adjusted_profile_focus, ...
+        'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
     if isfield(parameters, 'expected_focal_distance_EP_mm')
         xline(parameters.expected_focal_distance_EP_mm, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from EP)');
@@ -60,6 +63,8 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     legend('show');
     title('Intensity Along the Beam Axis');
     grid on;
+    ylim([0 inf]);
+    xlim([-5 inf]);
 
     % Save the figure
     fig_path = fullfile(parameters.calibration.path_output, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...

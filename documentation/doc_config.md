@@ -8,15 +8,15 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                 |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `data_path`                       | Absolute path to input data.                          | [string] Mandatory |
+| `data_path`                       | Absolute path to structural input data location.      | [string] Mandatory |
 | `seg_path`                        | Absolute path to SimNIBS segmentations.               | [string] Mandatory |
-| `data_path`                       | Absolute path to the data location.                   | [string] Mandatory |
 | `sim_path`                        | Absolute path to the simulation output.               | [string] Mandatory |
 | `simnibs_bin_path`                | Absolute path to SimNIBS binaries.                    | [string] Mandatory |
 | `paths_to_add`                    | Toolbox paths to add with addpath().                  | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subpaths_to_add`                 | Toolbox paths to add with addpath(genpath()).         | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subject_subfolder`               | Manage outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
 | `results_filename_affix`          | Affix for result file names                           | [string] Can be used to differentiate simulation outputs for the same subject-transducer combination(e.g., different intensities and/or targets.)  |
+| `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).                                | (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
 | `overwrite_simnibs`               | Overwrite SimNIBS segmentation results?               | (`1 = yes, 0 = no` [default]) |
 
 ### Simulation type
@@ -30,8 +30,9 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
 | `run_heating_sims`                | Run heating simulations.                                                              | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
-| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                                                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. |
-| `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).                                | (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
+| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                                                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
+| `n_sim_dims`                      | Simulation type (2D / 3D).                                             | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
+| `axisymmetric`                  | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).  | (`1 = yes, 0 = no`) see `doc_simulations-acoustic.md`.    |
 | `use_kWaveArray`                  | Use the kWaveArray class for simulations.                                             | (`1 = yes, 0 = no`) see k-Wave documentation.    |
 | `savemat`                         | Save outputs of acoustic and/or heating simulations as .mat files?                    | (`1 = yes, 0 = no`) For many parallel simulations, setting this to 0 saves disk space.    |
 
@@ -188,8 +189,9 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `path_output`                   | Directory for saving free-water simulation results         |   |
 | `path_output_profiles`          | Directory for saving optimized profile data         |   |
 | `filename_calibrated_CSV`       | Filename of calibrated CSV data         | Mandatory only when not generated within standalone script based on equipment name.  |
-| `submit_medium`                 | Simulation submit mode: `slurm` (recommended), `matlab` (debug; doesn't overwrite), or `qsub`         |   |
-| `save_in_calibration_folder`    | `FALSE`: save outputs in general output folder; `TRUE`: save in simulation-specific folder|  If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten. |
+| `submit_medium`                 | Simulation submit mode         | `slurm` (recommended), `matlab` (debug; doesn't overwrite), `qsub`  |
+| `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.         | (`1 = yes, 0 = no`)  |
+| `save_in_calibration_folder`    | `TRUE` (default): save in `path_output` ; `FALSE`: save outputs in `sim_path` (see regular config). |  Note: If TRUE calibration results are also appended to existing calibration for this equipment instead of overwritten. |
 | `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.         | Used only for calculating the peak distance and FWHM.  |
 | `optmethod`                     | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)         |   |
 | `weights`                       | Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)         |   |

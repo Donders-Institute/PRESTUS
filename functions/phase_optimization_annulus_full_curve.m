@@ -73,16 +73,18 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         % Plot computed and desired profiles along with weights
         ax1 = subplot(1, 2, 1);
         hold on;
-        plot(axial_position, i_axial_oneil);
-        plot(axial_position, desired_intensity_curve);
+        plot(axial_position, i_axial_oneil, 'Color', [0 0 0]);
+        plot(axial_position, desired_intensity_curve, 'Color', [1 0 0]);
         yyaxis right;
         plot(axial_position, weights);
         hold off;
-        legend(["fitted profile", "real profile", "cost function", "error"]);
+        legend(["fitted profile", "real profile", "cost function", "error"], 'Location', 'South');
+        legend('boxoff')
+        ylim([-10 inf]);
 
         % Plot error values within optimization limits
         ax2 = subplot(1, 2, 2);
-        plot(axial_position(limit_ind), error_v,'-o');
+        plot(axial_position(limit_ind), error_v,'-o', 'Color', [0 0 0], 'MarkerFaceColor', [0 0 0]);
         legend(["error"]);
     end
 
