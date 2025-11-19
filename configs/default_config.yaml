@@ -196,7 +196,7 @@ pml_size: 10
 csf_mask_expansion_factor: 40
 
 # Use the kwaveArray class for simulations
-use_kWaveArray: 0
+use_kWaveArray: 1
 
 # Thresholds for smoothing the skull and other masks
 skull_smooth_threshold: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
