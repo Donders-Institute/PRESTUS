@@ -165,7 +165,6 @@ for i = 1:length(parameters.calibration.combinations)
             % to suboptimal solutions; assume that the amplitude is zero in
             % that space (i.e., no strong near-field interference)
 
-            % add distance values prior to the exit plane
             parameters.calibration.interpolateToEP = 1;
             if parameters.calibration.interpolateToEP == 1
                 Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
@@ -173,11 +172,13 @@ for i = 1:length(parameters.calibration.combinations)
                     linspace(0, dist_from_tran(1), Nvals)',...
                     dist_from_tran);
                 % set those to initial value in amplitude profile
-                profile_focus = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
+                profile_focus_tmp = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
+            else
+                profile_focus_tmp = profile_focus;
             end
 
             % collect data on empirical profile
-            profile_empirical.profile_focus = profile_focus;
+            profile_empirical.profile_focus = profile_focus_tmp;
             profile_empirical.dist_from_tran = dist_from_tran;
             profile_empirical.focus_wrt_exit_plane = focus_wrt_exit_plane;
 
