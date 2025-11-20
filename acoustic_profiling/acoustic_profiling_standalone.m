@@ -37,16 +37,7 @@ equip_param = yaml.loadFile('equipment_config.yaml', 'ConvertToArray', true);
 % Equipment information (by default Donders-specific)
 parameters = yaml.loadFile('default_config.yaml', 'ConvertToArray', true);
 % User-defined calibration parameters
-parameters.calibration = yaml.loadFile('calibration_config.yaml', 'ConvertToArray', true);
-
-% small post-processing of parameters.calibration (turn into cells if necessary)
-fields = {'combinations', 'focal_depths_wrt_exit_plane', 'desired_intensities'};
-for f = fields
-    field = f{1};
-    if ~iscell(parameters.calibration.(field))
-        parameters.calibration.(field) = num2cell(parameters.calibration.(field));
-    end
-end
+parameters.calibration = yaml.loadFile('calibration_config.yaml');
 
 % Display available equipment combinations (Donders equipment)
 available_combos = fieldnames(equip_param.combos);
@@ -54,7 +45,8 @@ disp('Available Equipment Combinations:');
 disp(available_combos);
 
 %% Iterate through equipment combinations
-for i = 1:length(parameters.calibration.combinations)
+N_i = length(parameters.calibration.combinations);
+for i = 1:N_i
     combo_name = parameters.calibration.combinations{i};
     combo = equip_param.combos.(combo_name);
     
@@ -123,8 +115,9 @@ for i = 1:length(parameters.calibration.combinations)
     fprintf('Equipment: transducer %s and driving system %s \n', [tran.name, ds.name])
 
     % Iterate across focal depths
-    for j = 1:length(parameters.calibration.focal_depths_wrt_exit_plane(i,:))
-        focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i,j});
+    N_j = length(parameters.calibration.focal_depths_wrt_exit_plane{i});
+    for j = 1:N_j
+        focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
         fprintf('Focus: %.2f \n', focus_wrt_exit_plane)
 
         % Verify focal range
@@ -154,11 +147,12 @@ for i = 1:length(parameters.calibration.combinations)
             dist_from_tran);
 
         % Iterate across intensities
-        for k = 1:length(parameters.calibration.desired_intensities(i,:))
-            desired_intensity = parameters.calibration.desired_intensities{i,k};
+        N_k = length(parameters.calibration.desired_intensities{i});
+        for k = 1:N_k
+            desired_intensity = parameters.calibration.desired_intensities{i}{k};
             
             % assign a loop-specific simulation id
-            sim_id = i*j*k;
+            sim_id = (i-1)*N_j*N_k + (j-1)*N_k + (k-1) + 1;
 
             % if the original profiles are measured from the exit plane,
             % we do not model the space until the exit plane; this can lead
@@ -196,6 +190,10 @@ for i = 1:length(parameters.calibration.combinations)
                     parameters.default_grid_dims(2) = [];
                 end
             end
+
+            % Show current iteration
+            disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
+                ' F ', num2str(profile_empirical.focus_wrt_exit_plane), ' I ', num2str(desired_intensity)])
 
             % perform the acoustic profiling
             acoustic_profiling(...

@@ -66,7 +66,7 @@ function acoustic_profiling(...
         sim_param.code_type = 'matlab_cpu';
         sim_param.using_donders_hpc = 0;
     else
-        sim_param.overwrite_files = 'never';
+        sim_param.overwrite_files = 'always';
         sim_param.interactive = 0;
     end
     
