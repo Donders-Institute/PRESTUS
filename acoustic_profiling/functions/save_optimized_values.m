@@ -1,12 +1,11 @@
-function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensity, opt_param, equipment_name)
+function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensity, equipment_name)
     % Save optimized phases and amplitude values to a CSV file.
     %
     % Arguments:
-    % - parameters
+    % - parameters: Structure containing optimized parameters, including transducer values.
     %   parameters.calibration.path_output: Path to the output for saving optimized values.
     % - focus_wrt_exit_plane: Target focal distance with respect to the exit plane [mm].
     % - desired_intensity: Target intensity for optimization [W/cm^2].
-    % - opt_param: Structure containing optimized parameters, including transducer values.
     % - equipment_name: Serial number of the driving system & transducer.
     
     disp('Saving optimized values to CSV file...');
@@ -15,8 +14,8 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
         parameters.calibration.filename_calibrated_CSV);
     
     % Extract and round phases and amplitudes
-    opt_phases = round(opt_param.transducer.source_phase_deg, 2);
-    source_amp = double(opt_param.transducer.source_phase_deg(1));
+    opt_phases = round(parameters.transducer.source_phase_deg, 2);
+    source_amp = double(parameters.transducer.source_phase_deg(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     
@@ -79,11 +78,11 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
     yaml_file = sprintf('%s-F%.0fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
     yaml_path = fullfile(parameters.calibration.path_output_profiles, yaml_file);
 
-    opt_param.transducer.set_focus_wrt_exit_plane_mm = focus_wrt_exit_plane;
-    opt_param.transducer.set_intensity_w_per_cm2 = desired_intensity;
+    parameters.transducer.set_focus_wrt_exit_plane_mm = focus_wrt_exit_plane;
+    parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
 
     % Wrap transducer parameters in a parent structure for YAML
-    data = struct('transducer', opt_param.transducer);
+    data = struct('transducer', parameters.transducer);
     yaml.dumpFile(yaml_path, data);
 
     fprintf('Transducer parameters with optimized values saved to YAML: %s \n', yaml_path);

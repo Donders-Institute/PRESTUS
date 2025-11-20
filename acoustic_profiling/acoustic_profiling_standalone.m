@@ -44,7 +44,7 @@ fields = {'combinations', 'focal_depths_wrt_exit_plane', 'desired_intensities'};
 for f = fields
     field = f{1};
     if ~iscell(parameters.calibration.(field))
-        parameters.calibration.(field) = {parameters.calibration.(field)};
+        parameters.calibration.(field) = num2cell(parameters.calibration.(field));
     end
 end
 
@@ -55,7 +55,7 @@ disp(available_combos);
 
 %% Iterate through equipment combinations
 for i = 1:length(parameters.calibration.combinations)
-    combo_name = parameters.calibration.combinations{1}(i);
+    combo_name = parameters.calibration.combinations{i};
     combo = equip_param.combos.(combo_name);
     
     % Extract equipment details
@@ -123,8 +123,8 @@ for i = 1:length(parameters.calibration.combinations)
     fprintf('Equipment: transducer %s and driving system %s \n', [tran.name, ds.name])
 
     % Iterate across focal depths
-    for j = 1:length(parameters.calibration.focal_depths_wrt_exit_plane{i})
-        focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i}(j), 2);
+    for j = 1:length(parameters.calibration.focal_depths_wrt_exit_plane(i,:))
+        focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i,j});
         fprintf('Focus: %.2f \n', focus_wrt_exit_plane)
 
         % Verify focal range
@@ -154,8 +154,8 @@ for i = 1:length(parameters.calibration.combinations)
             dist_from_tran);
 
         % Iterate across intensities
-        for k = 1:length(parameters.calibration.desired_intensities{i})
-            desired_intensity = parameters.calibration.desired_intensities{i}(k);
+        for k = 1:length(parameters.calibration.desired_intensities(i,:))
+            desired_intensity = parameters.calibration.desired_intensities{i,k};
             
             % assign a loop-specific simulation id
             sim_id = i*j*k;

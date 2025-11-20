@@ -9,7 +9,7 @@
 
   # Internal settings
   
-  submit_medium: 'slurm'                    # Simulation submit mode: matlab (debug; doesn't overwrite), slurm (recommended), or qsub
+  submit_medium: 'slurm'                    # Simulation submit mode: matlab (debug; doesn't overwrite; force cpu mode), slurm (recommended), or qsub
   save_in_calibration_folder: true          # Boolean flag to save outputs in general output folder or simulation-specific folder. If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten.
   skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
   optmethod: 'FEXminimize'                  # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)

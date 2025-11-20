@@ -56,10 +56,11 @@ function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_onei
     xlim([-5 inf]);
     
     % Save the profile comparison figure
-    fig_path = fullfile(parameters.calibration.path_output_profiles, ...
+    fig_path = fullfile(parameters.outputs_folder, ...
         strcat('Recalculated_oneil_at_F_', num2str(focus_wrt_exit_plane), ...
         '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+    close(gcf);
 
     % exclude the near-field if requested
     p_axial_oneil_opt_summary = p_axial_oneil_opt;

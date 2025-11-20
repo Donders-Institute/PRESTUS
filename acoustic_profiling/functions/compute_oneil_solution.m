@@ -67,9 +67,10 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     xlim([-5 inf]);
 
     % Save the figure
-    fig_path = fullfile(parameters.calibration.path_output, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
+    fig_path = fullfile(parameters.outputs_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
         focus_wrt_exit_plane, desired_intensity, equipment_name));
     saveas(gcf, fig_path);
+    close(gcf);
 
     % Report the estimated distance to the point of maximum pressure
     [~, max_idx] = max(p_axial_oneil);

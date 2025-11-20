@@ -1,11 +1,11 @@
-function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position, dist_exit_plane, adjusted_profile_focus, p_axial_oneil_opt, p_axial_oneil, focus_wrt_exit_plane, desired_intensity, equipment_name, min_err)
+function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane, adjusted_profile_focus, p_axial_oneil_opt, p_axial_oneil, focus_wrt_exit_plane, desired_intensity, equipment_name, min_err)
     % Plot optimized simulation results and compare with desired profiles
     %
     % Arguments:
     % - opt_param: Structure containing optimized parameters.
     %   opt_param.calibration.path_output: Directory for saving output.
     %   opt_param.calibration.save_in_calibration_folder: Option to save data in the general PRESTUS output folder.
-    % - outputs_folder: Directory containing output simulation results.
+    %   opt_param.outputs_folder: Directory containing output simulation results.
     % - sim_id: Simulation ID for loading specific results.
     % - axial_position: Axial position vector [mm].
     % - dist_exit_plane: Distance vector for desired profile focus [mm].
@@ -18,7 +18,8 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     % - min_err: Minimum optimization error.
     
     % Load optimized simulation results    
-    opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', outputs_folder, sim_id, opt_param.results_filename_affix),'sensor_data','parameters');
+    opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
+        opt_param.outputs_folder, sim_id, opt_param.results_filename_affix),'sensor_data','parameters');
 
     % Extract maximum pressure data
     p_max = gather(opt_res.sensor_data.p_max_all);
@@ -43,12 +44,7 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     title('Pressure for the Focal Plane')
     
     % Save the 2D intensity map figure
-    if opt_param.subject_subfolder
-        outputs_folder = sprintf('%s/sub-%03d', opt_param.sim_path, sim_id);
-    else
-        outputs_folder = sprintf('%s', opt_param.sim_path);
-    end
-    fig_path = fullfile(outputs_folder, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+    fig_path = fullfile(opt_param.outputs_folder, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
 
     % Simulated pressure along the focal axis
@@ -85,8 +81,35 @@ function plot_opt_sim_results(opt_param, outputs_folder, sim_id, axial_position,
     xlim([-5 inf]);
     
     % Save the profile comparison figure
-    fig_path = fullfile(outputs_folder, strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+    fig_path = fullfile(opt_param.outputs_folder, ...
+        strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+
+    %% save a simplified version in the virtual transducer directory
+
+    figure('Position', [10, 10, 900, 500]);
+    hold on;
+        % Adjust axial position for simulated results
+    sim_res_axial_position = axial_position - (opt_res.parameters.transducer.pos_grid(end) - 1) * 0.5;
+    plot(sim_res_axial_position, pred_axial_pressure_opt .^ 2 / (2 * opt_param.medium.water.sound_speed * opt_param.medium.water.density) * 1e-4, ...
+        'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'Optimized (Simulated)');
+    plot(dist_exit_plane, adjusted_profile_focus, ...
+        'LineWidth', 2, 'Color', 'r', 'DisplayName', 'Desired Profile');
+    hold off;
+    % Add focus and intensity reference lines
+    xline(focus_wrt_mid_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
+    yline(desired_intensity, '--', 'DisplayName', 'Desired Intensity');
+    xlabel('Distance wrt Mid-Bowl of Transducer [mm]');
+    ylabel('Intensity [W/cm^2]');
+    legend('Location', 'best');
+    ylim([0 inf]);
+    xlim([-5 inf]);
+    % Save the profile comparison figure
+    fig_path = fullfile(opt_param.calibration.path_output_profiles, ...
+        strcat('OptProfile_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
+    saveas(gcf, fig_path);
+
+    %% display summary
 
     max_pressure_index = find(pred_axial_pressure_opt == max(pred_axial_pressure_opt), 1);
     fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n', sim_res_axial_position(max_pressure_index));

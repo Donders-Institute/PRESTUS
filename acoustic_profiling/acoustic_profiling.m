@@ -44,12 +44,20 @@ function acoustic_profiling(...
     end
     disp(['Saving free-water calibration in ', parameters.sim_path{1}]);
 
+    % if a subfolder is requested, move outputs to subfolders
+    if parameters.subject_subfolder
+        parameters.outputs_folder = sprintf('%s/sub-%03d', parameters.sim_path, sim_id);
+    else
+        parameters.outputs_folder = sprintf('%s', parameters.sim_path);
+    end
+
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;
     sim_param.submit_medium = parameters.calibration.submit_medium;
 
     % Manage the submission setup
     sim_param.simulation_medium = 'water';
+    sim_param.save_mat = 0; % do not save full results
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
         sim_param.use_kwavearray = 1; % force to run with kwavearray setup
@@ -58,7 +66,7 @@ function acoustic_profiling(...
         sim_param.code_type = 'matlab_cpu';
         sim_param.using_donders_hpc = 0;
     else
-        sim_param.overwrite_files = 'always';
+        sim_param.overwrite_files = 'never';
         sim_param.interactive = 0;
     end
     
@@ -74,20 +82,18 @@ function acoustic_profiling(...
             error('Submit medium does not correspond to available options.');
     end
 
-    % Load initial results
-    if sim_param.subject_subfolder
-        outputs_folder = sprintf('%s/sub-%03d', sim_param.sim_path, sim_id);
-    else
-        outputs_folder = sprintf('%s', sim_param.sim_path);
-    end
+    %% Load initial results
+
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        outputs_folder, sim_id, sim_param.results_filename_affix),...
+        sim_param.outputs_folder, sim_id, sim_param.results_filename_affix),...
         'sensor_data','parameters');
     
-    % Get maximum pressure
+    %% Get maximum pressure
+
     p_max = gather(initial_res.sensor_data.p_max_all); % transform from GPU array to normal array
     
-    % Plot 2D intensity map
+    %% Plot 2D intensity map
+    
     figure;
     p_distance = (1:size(p_max, 1)) * initial_res.parameters.grid_step_mm;
     p_width = (1:size(p_max, sim_param.n_sim_dims)) * initial_res.parameters.grid_step_mm;
@@ -107,10 +113,11 @@ function acoustic_profiling(...
     title('Pressure for the focal plane')
     
     % Save the intensity map
-    fig_path = fullfile(parameters.calibration.path_output, ...
+    fig_path = fullfile(sim_param.outputs_folder, ...
         strcat('Initial_Intensity_map_2D_at_F_', num2str(profile_empirical.focus_wrt_exit_plane), ...
         '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+    close(gcf);
 
     %% Optimization
 
@@ -128,7 +135,7 @@ function acoustic_profiling(...
 
     % Scale the profile to the desired intensity
     profile_opt.adjusted_profile_focus = scale_real_intensity_profile(...
-        parameters, ...
+        initial_res.parameters, ...
         desired_intensity, ...
         profile_empirical.profile_focus);
     
@@ -194,7 +201,6 @@ function acoustic_profiling(...
     % Plot optimized simulation results
     plot_opt_sim_results(...
         opt_param, ...
-        outputs_folder, ...
         sim_id, ...
         axial_position, ...
         profile_empirical.dist_from_tran, ...
@@ -208,10 +214,9 @@ function acoustic_profiling(...
 
     % Save optimized values
     save_optimized_values(...
-        parameters, ...
+        opt_param, ...
         profile_empirical.focus_wrt_exit_plane, ...
         desired_intensity, ...
-        opt_param, ...
         equipment_name);
 
 end
