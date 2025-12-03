@@ -19,9 +19,10 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     
     % Load optimized simulation results    
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        opt_param.outputs_folder, sim_id, opt_param.results_filename_affix),'sensor_data','parameters');
+        opt_param.outputs_folder, sim_id, opt_param.results_filename_affix),...
+        'sensor_data','parameters');
 
-    % Extract maximum pressure data
+    % Extract maximum pressure profile
     p_max = gather(opt_res.sensor_data.p_max_all);
 
     p_distance = (1:size(p_max, 1)) * opt_res.parameters.grid_step_mm;
@@ -32,7 +33,14 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
         p_axialprofile = squeeze(p_max(:, opt_res.parameters.transducer.pos_grid(2), :))';
     end
 
-    % Plot 2D intensity map for the focal plane
+    % Simulated pressure along the focal axis
+    pred_axial_pressure_opt = p_axialprofile(:,opt_res.parameters.transducer.pos_grid(1));
+
+    % Compute focal position relative to the mid-bowl of the transducer
+    focus_wrt_mid_bowl = focus_wrt_exit_plane + (opt_res.parameters.transducer.curv_radius_mm - opt_res.parameters.transducer.dist_to_plane_mm);
+
+    %% Plot 2D intensity map for the focal plane
+
     figure;
     imagesc(p_distance, p_width, p_axialprofile);
     clear p_distance p_width;
@@ -46,14 +54,10 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     % Save the 2D intensity map figure
     fig_path = fullfile(opt_param.outputs_folder, strcat('Opt_intensity_map_2D_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+    close(gcf);
 
-    % Simulated pressure along the focal axis
-    pred_axial_pressure_opt = p_axialprofile(:,opt_res.parameters.transducer.pos_grid(1));
+    %% Plot comparison of profiles
 
-    % Compute focal position relative to the mid-bowl of the transducer
-    focus_wrt_mid_bowl = focus_wrt_exit_plane + (opt_res.parameters.transducer.curv_radius_mm - opt_res.parameters.transducer.dist_to_plane_mm);
-
-    % Plot comparison of profiles
     figure('Position', [10, 10, 900, 500]);
     hold on;
     plot(axial_position, p_axial_oneil .^ 2 / (2 * opt_param.medium.water.sound_speed * opt_param.medium.water.density) * 1e-4, ...
@@ -84,8 +88,9 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     fig_path = fullfile(opt_param.outputs_folder, ...
         strcat('Opt_simulation_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+    close(gcf);
 
-    %% save a simplified version in the virtual transducer directory
+    %% Plot a simplified version and save in the virtual transducer directory
 
     figure('Position', [10, 10, 900, 500]);
     hold on;
@@ -104,10 +109,12 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     legend('Location', 'best');
     ylim([0 inf]);
     xlim([-5 inf]);
+
     % Save the profile comparison figure
     fig_path = fullfile(opt_param.calibration.path_output_profiles, ...
         strcat('OptProfile_at_F_', num2str(focus_wrt_exit_plane), '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
+    close(gcf);
 
     %% display summary
 
