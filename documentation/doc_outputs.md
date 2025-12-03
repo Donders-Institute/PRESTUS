@@ -15,7 +15,7 @@ This output table provides an overview of key metrics.
 | subject_id                    | Unique identifier for the subject                   |
 | max_Isppa                     | Maximum intensity [W/cm²]                           |
 | max_Isppa_after_exit_plane    | Maximum intensity after the exit plane [W/cm²]      |
-| real_focal_distance           | Empirical focal distance (distance between transducer and max. intensity in medium) [mm] |
+| real_focal_distance           | Empirical focal distance (distance between transducer and max. intensity in brain medium (if modelled) or in any medium beyond the exit plane) [mm] |
 | max_Isppa_skin                | Maximum intensity (skin medium) [W/cm²]             |
 | max_Isppa_skull               | Maximum intensity (skull medium) [W/cm²]            |
 | max_Isppa_brain               | Maximum intensity (brain medium) [W/cm²]            |

@@ -495,10 +495,20 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             end
         end
     
-        % Calculates the X, Y and Z coordinates of the max. intensity
-        [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = ...
-            masked_max_3d(acoustic_isppa, after_exit_plane_mask);
-        
+        % Calculate the X, Y and Z coordinates of the max. intensity 
+        % If brain tissue is included in medium mask, consider only intensities within the brain
+        % Otherwise: consider all media beyond the exit plane
+        labels = fieldnames(parameters.layer_labels);
+        brain_i = find(strcmp(labels, 'brain')); 
+        mask_brain = ismember(medium_masks,brain_i);
+        if ~isempty(mask_brain)
+            [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = ...
+                masked_max_3d(acoustic_isppa, mask_brain);
+        else
+            [max_Isppa_after_exit_plane, Ix_eplane, Iy_eplane, Iz_eplane] = ...
+                masked_max_3d(acoustic_isppa, after_exit_plane_mask);
+        end
+
         % Combines these coordinates into a point of max. intensity in the grid
         if parameters.n_sim_dims==3
             max_isppa_eplane_pos = [Ix_eplane, Iy_eplane, Iz_eplane];
@@ -507,10 +517,10 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         end
         disp('Final transducer, expected focus, and max ISPPA positions')
     
-        % Calculates the average Isppa within a circle around the target
-%         [trans_pos_final', focus_pos_final', max_isppa_eplane_pos']
+        % Calculates the realized focal distance
         real_focal_distance = norm(max_isppa_eplane_pos-trans_pos_final)*parameters.grid_step_mm; % [mm]
-        distance_target_real_maximum = norm(max_isppa_eplane_pos-focus_pos_final)*parameters.grid_step_mm; % [mm]
+
+        % Calculate the average Isppa within a circle around the target
         % convert the radius from mm to voxels
         avg_radius = round(parameters.focus_area_radius/parameters.grid_step_mm); % [voxel]
         idx = arrayfun(@(d) max(1,focus_pos_final(d)-avg_radius):...
