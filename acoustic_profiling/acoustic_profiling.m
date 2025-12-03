@@ -1,4 +1,4 @@
-function acoustic_profiling(...
+function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = acoustic_profiling(...
     profile_empirical,...
     equipment_name, ...
     desired_intensity, ...
@@ -19,7 +19,9 @@ function acoustic_profiling(...
 %   sim_id               - Numeric ID of the subject (or simulation)
 %
 % Outputs:
-%   None (results and plots are saved to disk)
+%   opt_source_amp          | Optimized amplitude
+%   opt_source_phase_deg    | Optimized phases (degrees)
+%   opt_source_phase_rad    | Optimized phases (radians)
 %
 % Description:
 %   This function scales the input intensity profile to the desired value,
@@ -42,7 +44,7 @@ function acoustic_profiling(...
         parameters.seg_path = parameters.calibration.path_output;
         parameters.sim_path = parameters.calibration.path_output;
     end
-    disp(['Saving free-water calibration in ', parameters.sim_path{1}]);
+    disp(['Saving free-water calibration in ', parameters.sim_path]);
 
     % if a subfolder is requested, move outputs to subfolders
     if parameters.subject_subfolder
@@ -177,14 +179,18 @@ function acoustic_profiling(...
         initial_res.parameters.transducer.source_amp / ...
         simulated_grid_adj_factor);
 
+    % Collect phases
+    opt_source_phase_rad = opt_phases;
+    opt_source_phase_deg = opt_phases/pi*180;
+
     fprintf('The optimized source_amp = %i\n', opt_source_amp(1));
 
     %% Rerun water simulation with optimized phases and source amplitude
 
     opt_param = sim_param;
     opt_param.transducer.source_amp = opt_source_amp;
-    opt_param.transducer.source_phase_rad = opt_phases;
-    opt_param.transducer.source_phase_deg = opt_phases/pi*180;
+    opt_param.transducer.source_phase_rad = opt_source_phase_rad;
+    opt_param.transducer.source_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
     switch sim_param.submit_medium
@@ -218,5 +224,5 @@ function acoustic_profiling(...
         profile_empirical.focus_wrt_exit_plane, ...
         desired_intensity, ...
         equipment_name);
-
+    
 end

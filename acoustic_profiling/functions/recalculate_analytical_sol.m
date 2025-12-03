@@ -72,7 +72,11 @@ function p_axial_oneil_opt = recalculate_analytical_sol(parameters, p_axial_onei
 
     fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n', ...
         axial_position(p_axial_oneil_opt_summary == max(p_axial_oneil_opt_summary)))
-    fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', ...
-        get_flhm_center_position(axial_position, p_axial_oneil_opt_summary))
+    try
+        fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', ...
+            get_flhm_center_position(axial_position, p_axial_oneil_opt_summary))
+    catch
+        warning('Could not estimated distance to the center of half-maximum range');
+    end
     
 end

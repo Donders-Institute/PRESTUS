@@ -23,10 +23,8 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     velocity = parameters.transducer.source_amp(1) / ...
                (parameters.medium.water.density * parameters.medium.water.sound_speed);
     
-    % TODO: should the resolution be retrieved from somewhere else?
     % Define the axial position vector [mm]
-    % Assumes grid spacing of 0.5 mm (default resolution).
-    axial_position = (1:parameters.default_grid_dims(end)) * 0.5;
+    axial_position = (1:parameters.default_grid_dims(end)) * parameters.grid_step_mm;
     
     % Compute O'Neil analytical solution for pressure along the beam axis [Pa]
     p_axial_oneil = focusedAnnulusONeil(...
@@ -48,7 +46,7 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     plot(axial_position, i_axial_oneil, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'O''Neil Analytical Solution');
     hold on;
-    plot(axial_position - (parameters.transducer.pos_grid(end) - 1) * 0.5, pred_axial_intensity, ...
+    plot(axial_position - (parameters.transducer.pos_grid(end) - 1) * parameters.grid_step_mm, pred_axial_intensity, ...
         '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
     plot(dist_exit_plane, adjusted_profile_focus, ...
         'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
