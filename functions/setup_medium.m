@@ -316,20 +316,45 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         end
     end
 
+    % activate debug mode
+    if (contains(parameters.simulation_medium, 'skull') || ...
+            contains(parameters.simulation_medium, 'layered') || ...
+            contains(parameters.simulation_medium, 'phantom'))
+        debug_mode = true;
+        if ~exist(fullfile(parameters.output_dir, 'debug'))
+            mkdir(parameters.output_dir, 'debug'); 
+        end
+    else
+        debug_mode = false;
+    end
+
     % account for k-Wave's actual attenuation behaviour
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
     % 'alpha_coeff' is rescaled to match the specified alpha_0_true and alpa_power_true for the center frequency
 
     alpha_power_fixed = 2;
 
+    if debug_mode==true
+        plot_fit = true;
+    else
+        plot_fit = false;
+    end
+    
     alpha_coeff = fitPowerLawParamsMulti(...
         alpha_0_true, ...
         alpha_power_true, ...
         sound_speed, ...
         parameters.transducer.source_freq_hz, ...
         alpha_power_fixed, ...
-        false);
-    
+        plot_fit);
+
+    if debug_mode==true
+        fig_path = fullfile(parameters.output_dir, 'debug', ...
+        ['AttenuationFit', parameters.results_filename_affix, '.png']);
+        saveas(gcf, fig_path);
+        close(gcf);
+    end
+
     % convert perfusion rate [mL/min/kg] into perfusion coefficient [1/s]
     perfusion_coeff = (perfusion ./ 60) .* density * 1e-6; % [1/s]
 
@@ -346,12 +371,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                           'temp_0', temp_0);
     
     % save images for debugging
-    if (contains(parameters.simulation_medium, 'skull') || ...
-            contains(parameters.simulation_medium, 'layered') || ...
-            contains(parameters.simulation_medium, 'phantom'))
-
-        if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
-
+    if debug_mode==true
         try
             filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
             niftiwrite(density, filename_density, 'Compressed',true);
