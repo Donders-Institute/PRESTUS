@@ -345,7 +345,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     end
 
     % Retain transducer and focus positions after all grid manipulations
-    parameters.transducer.pos_grid = trans_pos_final;
+    parameters.transducers(1).pos_grid = trans_pos_final;
     parameters.focus_pos_grid = focus_pos_final;
 
     %% SETUP MEDIUM
@@ -546,8 +546,8 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         end
         comp_grid_size = size(sensor_data.p_max_all);
         after_exit_plane_mask = ones(comp_grid_size);
-        bowl_depth_grid = round((parameters.transducer.curv_radius_mm-...
-            parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm);
+        bowl_depth_grid = round((parameters.transducers(1).curv_radius_mm-...
+            parameters.transducers(1).dist_to_plane_mm)/parameters.grid_step_mm);
         % Places the exit plane mask in the grid, adjusted to the amount of dimensions
         if parameters.n_sim_dims == 3
             if trans_pos_final(3) > comp_grid_size(3)/2
@@ -724,8 +724,8 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             heating_window_dims = ones(2,3);
             for i = 1:2
                 heating_window_dims(:,i) = [...
-                    max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i)), ...
-                    min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer.pos_grid(i))];
+                    max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducers(1).pos_grid(i)), ...
+                    min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducers(1).pos_grid(i))];
             end
 
             % Sets up a window to perform simulations in
