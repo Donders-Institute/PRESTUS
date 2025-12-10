@@ -11,14 +11,14 @@ function [upsampled_image, transformation_matrix, trans_pos_new, focus_pos_new] 
 %   nii_image                   - [Nx x Ny x Nz] matrix representing the 3D image to be upsampled.
 %   previous_transformation_matrix - [4x4] affine transformation matrix used for the previous grid.
 %   resample_factor             - Scalar specifying the resampling factor (e.g., 2 for doubling resolution).
-%   trans_pos_grid              - [1x3] array specifying the transducer position in the original grid.
-%   focus_pos_grid              - [1x3] array specifying the focus position in the original grid.
+%   trans_pos_grid              - [nx3] array specifying the transducer position in the original grid.
+%   focus_pos_grid              - [nx3] array specifying the focus position in the original grid.
 %
 % Output:
 %   upsampled_image             - [Mx x My x Mz] matrix representing the upsampled 3D image.
 %   transformation_matrix       - [4x4] affine transformation matrix for the new grid.
-%   trans_pos_new               - [1x3] array specifying the transducer position in the upsampled grid.
-%   focus_pos_new               - [1x3] array specifying the focus position in the upsampled grid.
+%   trans_pos_new               - [nx3] array specifying the transducer position in the upsampled grid.
+%   focus_pos_new               - [nx3] array specifying the focus position in the upsampled grid.
 
     % Update transformation matrix to include resampling
     transformation_matrix = diag([repmat(resample_factor, [1 3]), 1]) * previous_transformation_matrix;
@@ -38,8 +38,16 @@ function [upsampled_image, transformation_matrix, trans_pos_new, focus_pos_new] 
         [1 2 3], [1 2 3], new_dims, [], 0);
 
     % Compute new positions for transducer and focus points in the upsampled grid
-    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], TF));
+    nT = size(trans_pos_grid, 1);
+    
+    trans_pos_new = zeros(size(trans_pos_grid));
+    focus_pos_new = zeros(size(focus_pos_grid));
+    
+    for i = 1:nT
+        out_mat = round(tformfwd([trans_pos_grid(i, :); focus_pos_grid(i, :)], TF));        % [2n × 3]
+    
+        trans_pos_new(i, :) = out_mat(1, :);     % n×3
+        focus_pos_new(i, :) = out_mat(2, :);     % n×3
+    end
 
-    trans_pos_new = out_mat(1,:)';
-    focus_pos_new = out_mat(2,:)';
 end

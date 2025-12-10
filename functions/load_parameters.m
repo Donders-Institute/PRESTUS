@@ -68,45 +68,67 @@ function parameters = load_parameters(varargin)
            'MATLAB should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
 
     %% Transducer settings validation and derived calculations
+    
+    % To enable n transducers while maintaining backward comp of configs,
+    % a single "transducer" field in parameters becomes "transducers(1)"
+
     if isfield(parameters, 'transducer')
-        % Ensure source phase is set in radians or degrees
-        if ~isfield(parameters.transducer, 'source_phase_rad')
-            assert(isfield(parameters.transducer, 'source_phase_deg'), ...
-                   'Source phase should be set in transducer parameters as source_phase_rad or source_phase_deg');
-            parameters.transducer.source_phase_rad = parameters.transducer.source_phase_deg / 180 * pi;
-        end
 
-        % Calculate distance to transducer plane if not provided
-        if ~isfield(parameters.transducer, 'dist_to_plane_mm')
-            parameters.transducer.dist_to_plane_mm = sqrt(parameters.transducer.curv_radius_mm^2 - ...
-                                                          (max(parameters.transducer.Elements_OD_mm) / 2)^2);
-            fprintf('Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                    parameters.transducer.dist_to_plane_mm);
+        if isfield(parameters, 'transducers')
+            error('the parameter file(s) include both fields transducer as well as transducers - only one of those fields is expected!');
         end
+        parameters.transducers(1) = parameters.transducer;
+        parameters.transducer = [];
 
-        % Ensure source amplitude matches number of transducer elements
-        if length(parameters.transducer.source_amp) == 1 && parameters.transducer.n_elements > 1
-            parameters.transducer.source_amp = repmat(parameters.transducer.source_amp, [1, parameters.transducer.n_elements]);
-        end
+    elseif isfield(parameters, 'transducers')
+        
+        parameters.transducer = [];
 
-        % Evaluate source phase expressions if stored as cell arrays
-        if iscell(parameters.transducer.source_phase_rad)
-            for i = 1:length(parameters.transducer.source_phase_rad)
-                if ~isnumeric(parameters.transducer.source_phase_rad{i})
-                    parameters.transducer.source_phase_rad{i} = eval(parameters.transducer.source_phase_rad{i});
-                end
-            end
-            parameters.transducer.source_phase_rad = cell2mat(parameters.transducer.source_phase_rad);
-        end
-
-        % Ensure source phase degrees are calculated from radians if not provided
-        if ~isfield(parameters.transducer, 'source_phase_deg')
-            parameters.transducer.source_phase_deg = parameters.transducer.source_phase_rad / pi * 180;
-        end
     elseif nargin == 1
+
         % Warn user about missing transducer information
         assert(all(confirmation_dlg('The transducer info is missing in the configuration file. Do you want to continue?', 'Yes', 'No')), ...
                'Exiting');
+
+    end
+
+    for t_i = 1:numel(parameters.transducers)
+        
+        % Ensure source phase is set in radians or degrees
+        if ~isfield(parameters.transducers(t_i), 'source_phase_rad')
+            assert(isfield(parameters.transducers(t_i), 'source_phase_deg'), ...
+                   'Source phase should be set in transducer parameters as source_phase_rad or source_phase_deg');
+            parameters.transducers(t_i).source_phase_rad = parameters.transducers(t_i).source_phase_deg / 180 * pi;
+        end
+
+        % Calculate distance to transducer plane if not provided
+        if ~isfield(parameters.transducers(t_i), 'dist_to_plane_mm')
+            parameters.transducers(t_i).dist_to_plane_mm = sqrt(parameters.transducers(t_i).curv_radius_mm^2 - ...
+                                                          (max(parameters.transducers(t_i).Elements_OD_mm) / 2)^2);
+            fprintf('Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
+                    parameters.transducers(t_i).dist_to_plane_mm);
+        end
+
+        % Ensure source amplitude matches number of transducer elements
+        if length(parameters.transducers(t_i).source_amp) == 1 && parameters.transducers(t_i).n_elements > 1
+            parameters.transducers(t_i).source_amp = repmat(parameters.transducers(t_i).source_amp, [1, parameters.transducers(t_i).n_elements]);
+        end
+
+        % Evaluate source phase expressions if stored as cell arrays
+        if iscell(parameters.transducers(t_i).source_phase_rad)
+            for i = 1:length(parameters.transducers(t_i).source_phase_rad)
+                if ~isnumeric(parameters.transducers(t_i).source_phase_rad{i})
+                    parameters.transducers(t_i).source_phase_rad{i} = eval(parameters.transducers(t_i).source_phase_rad{i});
+                end
+            end
+            parameters.transducers(t_i).source_phase_rad = cell2mat(parameters.transducers(t_i).source_phase_rad);
+        end
+
+        % Ensure source phase degrees are calculated from radians if not provided
+        if ~isfield(parameters.transducers(t_i), 'source_phase_deg')
+            parameters.transducers(t_i).source_phase_deg = parameters.transducers(t_i).source_phase_rad / pi * 180;
+        end
+
     end
 
     %% Derived grid settings

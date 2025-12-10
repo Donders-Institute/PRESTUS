@@ -7,13 +7,13 @@
 clear; close all;
 medium = 'layered'; % water or layered
 submit = 'slurm'; % run scripts via 'matlab' (debugging) or via a job using 'slurm' (recommended) or 'qsub'
-subject_id = 1; % subject number, if none, choose 1
+subject_id = 9; % subject number, if none, choose 1
 
 % add paths
 addpath('functions')
 addpath(genpath('toolboxes')) 
 
-parameters = load_parameters('tutorial_config.yaml'); % load the configuration file
+parameters = load_parameters('tmp_test_3-transducers.yaml'); % load the configuration file
 
 parameters.simulation_medium = medium;
 if strcmp(submit, 'matlab') == true

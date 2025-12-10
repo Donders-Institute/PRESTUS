@@ -191,16 +191,16 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         focal_angle = atan2(focal_slope(2),focal_slope(1));
         
         grid_step = options.grid_step;
-        ex_plane_pos = trans_pos - (parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
-        geom_focus_pos = trans_pos - (parameters.transducer.curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
-        max_od = max(parameters.transducer.Elements_OD_mm);
-        dist_to_ep = 0.5*sqrt(4*parameters.transducer.curv_radius_mm^2-max_od^2)/grid_step;
+        ex_plane_pos = trans_pos - (parameters.transducers(1).curv_radius_mm-parameters.transducers(1).dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
+        geom_focus_pos = trans_pos - (parameters.transducers(1).curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
+        max_od = max(parameters.transducers(1).Elements_OD_mm);
+        dist_to_ep = 0.5*sqrt(4*parameters.transducers(1).curv_radius_mm^2-max_od^2)/grid_step;
         ex_plane_pos_trig = geom_focus_pos + dist_to_ep *[cos(focal_angle), sin(focal_angle)];
         ort_angle = atan(-focal_slope(1)/focal_slope(2));
 
         arc_halfangle = atan(max_od/2/dist_to_ep/grid_step);
 
-        r = max(parameters.transducer.Elements_OD_mm)/2/grid_step;
+        r = max(parameters.transducers(1).Elements_OD_mm)/2/grid_step;
 
         hold on
         lineWidth = 1;
@@ -216,7 +216,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         % exit plane
         line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
         % transducer curvature
-        [arc_x, arc_y] = getArc(geom_focus_pos, parameters.transducer.curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
+        [arc_x, arc_y] = getArc(geom_focus_pos, parameters.transducers(1).curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
         plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
     end
     
@@ -255,10 +255,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             rectangle('Position', [trans_pos(2)-1-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',2,'LineStyle','-')
             text(trans_pos(2)-1, trans_pos(1)+10, [num2str(round((trans_pos(2)-1)*parameters.grid_step_mm))], 'Color', 'w')
             % the following plots the onset of the grid; note: grid is in voxels, not mm
-            rectangle('Position', [trans_pos(2)-parameters.transducer.pos_grid(3)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'w', 'LineWidth',1,'LineStyle',':')
+            rectangle('Position', [trans_pos(2)-parameters.transducers(1).pos_grid(3)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'w', 'LineWidth',1,'LineStyle',':')
             rectangle('Position', [parameters.grid_dims(3)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'w', 'LineWidth',1,'LineStyle',':')
             % exit plane
-            dist_to_exit_plane = parameters.transducer.curv_radius_mm-parameters.transducer.dist_to_plane_mm;
+            dist_to_exit_plane = parameters.transducers(1).curv_radius_mm-parameters.transducers(1).dist_to_plane_mm;
             % convert to voxels
             dist_to_exit_plane_vox = round(dist_to_exit_plane*(1/parameters.grid_step_mm));
             rectangle('Position', [(trans_pos(2)-1+dist_to_exit_plane_vox)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',1,'LineStyle',':')

@@ -71,8 +71,13 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         [trans_pos_grid, focus_pos_grid, ~, ~] = ...
             position_transducer_localite(localite_file, t1_header, parameters);
     else
-        trans_pos_grid = parameters.transducer.pos_t1_grid';
-        focus_pos_grid = parameters.focus_pos_t1_grid';
+        trans_pos_grid = parameters.transducers(1).pos_t1_grid';
+        focus_pos_grid = parameters.transducers(1).focus_pos_t1_grid';
+
+        if numel(parameters.transducers) > 1
+            warning('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
+        end
+
     end
     
     if size(trans_pos_grid, 1) > size(trans_pos_grid, 2)
@@ -331,19 +336,6 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     end    
     parameters.grid_dims = new_grid_size;
 
-    % Plot brain segmentation
-    [seg_with_trans_img, transducer_pars] = plot_t1_with_transducer(...
-        medium_masks, parameters.grid_step_mm, trans_pos_final, focus_pos_final, parameters);
-    
-    h = figure;
-    imshow(seg_with_trans_img);
-    title('Segmentation with transducer');
-    output_plot_filename = fullfile(parameters.debug_dir, ...
-        sprintf('sub-%03d_%s_segmented_brain_final%s.png', ...
-        subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    saveas(h, output_plot_filename, 'png')
-    close(h);
-
     % Check that transformations are correct by inverting them and
     % comparing to the original 
     if ~exist('inv_final_transformation_matrix','var')
@@ -360,22 +352,66 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         disp([trans_pos_final, focus_pos_final]')
         disp('Backtransformed coordinates')
         disp(backtransf_coordinates)
-        exit()
+        % exit()
     end
+
+    %% DEBUG PLOTS (UP TO 2 TRANSDUCERS)
+
+    max_plots = min(2, numel(parameters.transducers));
+    if numel(parameters.transducers) > max_plots
+        warning('More than two transducers defined; only the first 2 will be shown in debug plots');
+    end
+
+    for ti = 1:max_plots
+        
+        % prep
+        if ti == 1
+            % canonical pair already used to define the transform
+            tpos_t1 = trans_pos_grid;
+            fpos_t1 = focus_pos_grid;
+            tpos_sim = trans_pos_final;
+            fpos_sim = focus_pos_final;
+        else % ti == 2
+            tr = parameters.transducers(ti);
+            
+            % T1-grid positions
+            tpos_t1 = tr.pos_t1_grid(:).';
+            fpos_t1 = tr.focus_pos_t1_grid(:).';
     
-    % Plot positioning of transducer on segmentation
-    output_plot_filename = fullfile(parameters.debug_dir, ...
-        sprintf('sub-%03d_positioning%s.png', ...
-        subject_id, parameters.results_filename_affix));
-    show_positioning_plots(...
-        tissues_mask_image,...
-        tissues_mask_header.PixelDimensions(1), ...
-        trans_pos_grid, ...
-        focus_pos_grid, ...
-        medium_masks, ...
-        trans_pos_final, ...
-        focus_pos_final, ...
-        parameters, ...
-        output_plot_filename)
+            % map to simulation grid using the same global transform
+            pts_sim = round(tformfwd([tpos_t1; fpos_t1], maketform('affine', final_transformation_matrix))); % 2×3
+            tpos_sim = pts_sim(1,:);
+            fpos_sim = pts_sim(2,:);
+        end
+
+        % Plot brain segmentation
+        [seg_with_trans_img, transducer_pars] = plot_t1_with_transducer(...
+            medium_masks, parameters.grid_step_mm, tpos_sim, fpos_sim, parameters);
+        
+        h = figure;
+        imshow(seg_with_trans_img);
+        title('Segmentation with transducer');
+        output_plot_filename = fullfile(parameters.debug_dir, ...
+            sprintf('sub-%03d_%s_segmented_brain_final_T%02d%s.png', ...
+            subject_id, parameters.simulation_medium, ti, parameters.results_filename_affix));
+        saveas(h, output_plot_filename, 'png')
+        close(h);
+        
+        % Plot positioning of transducer on segmentation
+        output_plot_filename = fullfile(parameters.debug_dir, ...
+            sprintf('sub-%03d_positioning_T%02d%s.png', ...
+            subject_id, ti, parameters.results_filename_affix));
+        show_positioning_plots(...
+            tissues_mask_image, ...
+            tissues_mask_header.PixelDimensions(1), ...
+            tpos_t1, ...
+            fpos_t1, ...
+            medium_masks, ...
+            tpos_sim, ...
+            fpos_sim, ...
+            parameters, ...
+            output_plot_filename);
+
+    end
 
 end

@@ -5,7 +5,8 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     %                                                                   %
     % This function sets up the transducer in the grid, the timeperiod  %
     % during which simulations will take place and the sensor that      %
-    % records the pressure-levels in the grid.                          %
+    % records the pressure-levels in the grid.                          %     
+    % Time axis is set from the (first) transducer source frequency.    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Creates a simulation grid in 3 or 2 dimensions
@@ -17,8 +18,21 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
         kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
                       parameters.grid_dims(2), parameters.grid_step_m);
     end
-    
-    wave_period = 1 / parameters.transducer.source_freq_hz;                                                       % period [s]
+
+    % Backward-compatible access to (first) transducer
+    if isfield(parameters, 'transducers') && ~isempty(parameters.transducers)
+        tx = parameters.transducers(1);
+        freqs = [parameters.transducers.source_freq_hz];
+        if numel(unique(freqs)) > 1
+            warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', freqs(1))
+        end
+    elseif isfield(parameters, 'transducer')
+        tx = parameters.transducer;
+    else
+        error('parameters must contain either .transducers or .transducer.')
+    end
+
+    wave_period = 1 / tx.source_freq_hz;                                                       % period [s]
     
     % Check the number of input arguments
     % As a default the time step is based on the default CFL number of 0.3.
@@ -27,11 +41,11 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     % instability.
     if nargin < 5
         % Calculate the time step using an integer number of points per period
-        points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);      % points per wavelength
+        points_per_wavelength = max_sound_speed / (tx.source_freq_hz * parameters.grid_step_m);      % points per wavelength
         cfl = 0.3;                                                                                                      % CFL number (kwave default)
         points_per_period = ceil(points_per_wavelength / cfl);                                                          % points per period
         grid_time_step = (wave_period / points_per_period)/2;                                                           % time step [s]  
-     end
+    end
 
     % Calculate the number of time steps to reach steady state
     t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / max_sound_speed;                           % [s]
@@ -43,7 +57,45 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     % Create source (transducer with focuspoint)
     parameters.kwave_source_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     if confirm_overwriting(parameters.kwave_source_filename, parameters)
-        [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos_final, focus_pos_final);
+
+        % build per-transducer positions for geometry when not using kWaveArray
+        if isfield(parameters, 'transducers') && ~isempty(parameters.transducers) && parameters.use_kWaveArray == 0
+            nT = numel(parameters.transducers);
+            trans_pos = zeros(nT, parameters.n_sim_dims);
+            focus_pos = zeros(nT, parameters.n_sim_dims);
+
+            for ti = 1:nT
+                tr = parameters.transducers(ti);
+
+                % transducer position in grid
+                if isfield(tr, 'pos_grid') && ~isempty(tr.pos_grid)
+                    pos = tr.pos_grid;
+                    if size(pos,1) > size(pos,2)
+                        pos = pos';
+                    end
+                    trans_pos(ti,:) = pos;
+                else
+                    trans_pos(ti,:) = trans_pos_final;
+                end
+
+                % focus position in grid
+                if isfield(tr, 'focus_pos_grid') && ~isempty(tr.focus_pos_grid)
+                    fpos = tr.focus_pos_grid;
+                    if size(fpos,1) > size(fpos,2)
+                        fpos = fpos';
+                    end
+                    focus_pos(ti,:) = fpos;
+                else
+                    focus_pos(ti,:) = focus_pos_final;
+                end
+            end
+        else
+            % legacy / single-transducer / kWaveArray case
+            trans_pos = trans_pos_final;
+            focus_pos = focus_pos_final;
+        end
+
+        [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos, focus_pos);
         save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
     else
         load(parameters.kwave_source_filename);

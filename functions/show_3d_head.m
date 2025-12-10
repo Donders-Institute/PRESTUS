@@ -106,13 +106,13 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
         % Plot transducer exit plane if not cropped
         if ~any(crop_at_target)
             % All shapes in downsampled space
-            max_od_mm = max(parameters.transducer.Elements_OD_mm);
+            max_od_mm = max(parameters.transducers(1).Elements_OD_mm);
             max_od_grid = max_od_mm / pixel_size;
             norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
 
             % Geometric focus in grid space
-            geom_focus = thisTrans - norm_vec * (parameters.transducer.curv_radius_mm) / pixel_size;
-            dist_gf_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer.curv_radius_mm^2 - max_od_mm^2);
+            geom_focus = thisTrans - norm_vec * (parameters.transducers(1).curv_radius_mm) / pixel_size;
+            dist_gf_to_ep_mm = 0.5 * sqrt(4 * parameters.transducers(1).curv_radius_mm^2 - max_od_mm^2);
             ex_plane = geom_focus + norm_vec * dist_gf_to_ep_mm / pixel_size;
 
             % Now get full-res (voxel) coordinates, then downsample
@@ -159,6 +159,11 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
         
             dists = sqrt(sum((mesh_valid - targ_ds).^2, 2));
             flag = dists < 3;
+            
+            if ~any(flag)
+                warning('Target lies outside plotted volume – no sphere drawn. Check transform & cropping (smooth_and_crop.m)')
+                continue
+            end
         
             idx_x = mesh_valid(flag,1);
             idx_y = mesh_valid(flag,2);
