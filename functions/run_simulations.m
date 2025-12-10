@@ -34,7 +34,7 @@
        sensor_data = kspaceFirstOrder3DG(kgrid, medium, source, sensor, input_args_cell{:});
     else
         
-    input_args.PlotScale = [-1, 1] * parameters.transducer.source_amp(1);
+    input_args.PlotScale = [-1, 1] * parameters.transducers(1).source_amp(1);
    
    if strcmp(parameters.code_type,'matlab_gpu')
       input_args.DataCast = 'gpuArray-single';

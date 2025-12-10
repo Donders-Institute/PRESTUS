@@ -80,11 +80,15 @@ function parameters = load_parameters(varargin)
         parameters.transducers(1) = parameters.transducer;
         parameters.transducer = [];
 
+    elseif isfield(parameters, 'transducers')
+        
+        parameters.transducer = [];
+
     elseif nargin == 1
+
         % Warn user about missing transducer information
         assert(all(confirmation_dlg('The transducer info is missing in the configuration file. Do you want to continue?', 'Yes', 'No')), ...
                'Exiting');
-        parameters.transducers = [];
 
     end
 

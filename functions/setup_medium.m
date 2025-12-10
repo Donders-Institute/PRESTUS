@@ -355,7 +355,7 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
 
     if debug_mode==true
         fig_path = fullfile(parameters.output_dir, 'debug', ...
-        ['AttenuationFit', parameters.results_filename_affix, '.png']);
+        ['AttenuationFit', char(parameters.results_filename_affix), '.png']);
         saveas(gcf, fig_path);
         close(gcf);
     end

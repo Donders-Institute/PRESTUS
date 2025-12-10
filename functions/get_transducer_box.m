@@ -35,14 +35,14 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
 
     %% Compute geometric focus position
     % Calculate geometric focus position based on curvature radius and focal angle
-    geom_focus_pos = trans_pos - (parameters.transducer.curv_radius_mm) / grid_step * [cos(focal_angle), sin(focal_angle)];
+    geom_focus_pos = trans_pos - (parameters.transducers(1).curv_radius_mm) / grid_step * [cos(focal_angle), sin(focal_angle)];
 
     %% Compute distance to exit plane
     % Maximum outer diameter of transducer elements
-    max_od = max(parameters.transducer.Elements_OD_mm);
+    max_od = max(parameters.transducers(1).Elements_OD_mm);
 
     % Distance from geometric focus to exit plane in mm
-    dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer.curv_radius_mm^2 - max_od^2);
+    dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducers(1).curv_radius_mm^2 - max_od^2);
 
     % Convert distance to exit plane from mm to grid units
     dist_to_ep_grid = dist_to_ep_mm / grid_step;
@@ -57,7 +57,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
 
     %% Compute bounding box dimensions
     % Radius of bounding box based on maximum outer diameter of elements
-    r = max(parameters.transducer.Elements_OD_mm) / 2 / grid_step;
+    r = max(parameters.transducers(1).Elements_OD_mm) / 2 / grid_step;
 
     % Depth of transducer in grid units
     trans_full_depth = 16 / grid_step;

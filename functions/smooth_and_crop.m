@@ -191,7 +191,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % The csf will be expanded to be used as a guide for what bone tissue should be left in.
     
     % To do this, the csf volume will first be expanded by a lot.
-    SE = strel('cube', parameters.csf_mask_expansion_factor/voxel_size_mm);
+    SE = strel('cube', ceil(parameters.csf_mask_expansion_factor/voxel_size_mm));
     csf_mask_expanded = imdilate(csf_mask, SE);
     
     % Plots the result of the CSF expansion
@@ -211,7 +211,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % bounds of the image dimensions
     medium_masks(~csf_mask_expanded) = 0;
     % calculate size if the transducer bowl
-    transducer_bowl = transducer_setup(parameters.transducer, trans_pos_upsampled_grid, focus_pos_upsampled_grid, size(segmented_img), voxel_size_mm);
+    transducer_bowl = transducer_setup(parameters.transducers(1), trans_pos_upsampled_grid, focus_pos_upsampled_grid, size(segmented_img), voxel_size_mm);
     [min_dims, max_dims, new_grid_dims] = get_crop_dims(medium_masks+transducer_bowl, crop_margin);
     
     % In case the minimum dimensions are too small, 

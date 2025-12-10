@@ -20,9 +20,6 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % run the pipeline.                                                 %
     %                                                                   %
     % Some notes:                                                       %
-    % - The pipeline is only able to simulate one transducer at a time, %
-    % meaning that the pipeline has to be run once for each transducer  %
-    % used in each subject.                                             %
     % - At least Matlab 2022b, SimNIBS 4.0 and k-Wave 1.4 must be used  %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
@@ -137,24 +134,56 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     end
 
     %% Focal distance calculation
-    % calculate the expected focal distance (if not specified in config)
+    % Expected focal distance handling (multi-transducer, with backward compat)
 
-    if ~isfield(parameters, 'expected_focal_distance_mm')
-        disp('Expected focal distance is not specified, trying to get it from positions on T1 grid')
-        if ~isfield(parameters.transducer, 'pos_t1_grid') || ~isfield(parameters, 'focus_pos_t1_grid')
-            error('Either the transducer position or the focus position on T1 grid are not specified, cannot compute the expected focal distance')
+    % 1) If parameters.expected_focal_distance_mm is set (legacy), copy to all transducers
+    if isfield(parameters, 'expected_focal_distance_mm') && ~isempty(parameters.expected_focal_distance_mm)
+        for ti = 1:numel(parameters.transducers)
+            if ~isfield(parameters.transducers(ti), 'expected_focal_distance_mm') || ...
+                    isempty(parameters.transducers(ti).expected_focal_distance_mm)
+                parameters.transducers(ti).expected_focal_distance_mm = parameters.expected_focal_distance_mm;
+            end
         end
+    end
+    
+    % 2) For any transducer still missing expected_focal_distance_mm, try to derive it from T1 positions
+    needs_t1 = false;
+    for ti = 1:numel(parameters.transducers)
+        tr = parameters.transducers(ti);
+        if ~isfield(tr, 'expected_focal_distance_mm') || isempty(tr.expected_focal_distance_mm)
+            needs_t1 = true;
+            break
+        end
+    end
+    
+    if needs_t1
+        disp('Expected focal distance not specified for all transducers, trying to get it from positions on T1 grid')
+    
+        % load T1 header once
         filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
         if isempty(filename_t1)
-            error('File does not exist: \r\n%s', filename_t1);
+            error('File does not exist for T1 (t1_path_template): %s', ...
+                  fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
         end
-        % select first match in case multiple are found
-        filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name);
+        filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name); % first match
         t1_info = niftiinfo(filename_t1);
         t1_grid_step_mm = t1_info.PixelDimensions(1);
-        focal_distance_t1 = norm(parameters.focus_pos_t1_grid - parameters.transducer.pos_t1_grid);
-        parameters.expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm; 
-        clear filename_t1 t1_info focal_distance_t1 t1_grid_step_mm;
+    
+        % fill missing expected_focal_distance_mm per transducer
+        for ti = 1:numel(parameters.transducers)
+            tr = parameters.transducers(ti);
+            if ~isfield(tr, 'expected_focal_distance_mm') || isempty(tr.expected_focal_distance_mm)
+                if ~isfield(tr, 'pos_t1_grid')  || isempty(tr.pos_t1_grid) || ...
+                   ~isfield(tr, 'focus_pos_t1_grid') || isempty(tr.focus_pos_t1_grid)
+                    error('Transducer %d: pos_t1_grid or focus_pos_t1_grid missing; cannot compute expected focal distance.', ti);
+                end
+    
+                focal_distance_t1 = norm(tr.focus_pos_t1_grid - tr.pos_t1_grid);
+                parameters.transducers(ti).expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm;
+            end
+        end
+    
+        clear filename_t1 t1_info t1_grid_step_mm focal_distance_t1
     end
 
     %% PREPROCESS structural MRI & POSITION transducer + target
@@ -162,14 +191,40 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % For more documentation, see the 'preprocess_brain' function.
 
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, ...
-        focus_pos_final, t1_image_orig, t1_header, final_transformation_matrix, ...
-        inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
+
+        % global preprocessing based on first transducer–focus pair in T1 space
+        [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final_1, ...
+            focus_pos_final_1, t1_image_orig, t1_header, final_transformation_matrix, ...
+            inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
         if isempty(medium_masks)
             filename_output_table = '';
             return;
         end
-        parameters.grid_dims = size(medium_masks);
+        parameters.grid_dims  = size(medium_masks);
+        parameters.n_sim_dims = numel(parameters.grid_dims);
+    
+        % map all transducers from T1 grid to sim grid using the same transform
+        for ti = 1:numel(parameters.transducers)
+            tr = parameters.transducers(ti);
+
+            % require T1-grid positions for each transducer
+            assert(isfield(tr, 'pos_t1_grid') && isfield(tr, 'focus_pos_t1_grid') && ...
+                   ~isempty(tr.pos_t1_grid) && ~isempty(tr.focus_pos_t1_grid), ...
+                   'pos_t1_grid and focus_pos_t1_grid must be defined for each transducer');
+
+            pts_t1 = [tr.pos_t1_grid(:).'; tr.focus_pos_t1_grid(:).'];  % 2×3
+            pts_sim = round(tformfwd(pts_t1, maketform('affine', final_transformation_matrix))); % 2×3
+
+            parameters.transducers(ti).pos_grid       = pts_sim(1,:);
+            parameters.transducers(ti).focus_pos_grid = pts_sim(2,:);
+            parameters.transducers(ti).trans_pos_final  = pts_sim(1,:);
+            parameters.transducers(ti).focus_pos_final  = pts_sim(2,:);
+        end
+
+        % canonical first pair for backward compatibility and local variables
+        trans_pos_final = trans_pos_final_1;
+        focus_pos_final = focus_pos_final_1;
+
     else % In case simulations are not run in a skull of layered tissue, alternative grid dimensions are set up
         assert(isfield(parameters, 'default_grid_dims'), ...
             'The parameters structure should have the field grid_dims for the grid dimensions')
@@ -202,12 +257,16 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             clear segmented_img;
         end
         segmented_image_cropped = zeros(parameters.grid_dims);
-        if ~isfield(parameters.transducer, 'pos_grid') || ~isfield(parameters, 'focus_pos_grid')
+
+        % work with a canonical first transducer in non-skull media
+        tr1 = parameters.transducers(1);
+
+        if ~isfield(tr1, 'pos_grid') || ~isfield(tr1, 'focus_pos_grid')
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
         end
         % set transducer position in grid
-        if ~isfield(parameters.transducer, 'pos_grid')
+        if ~isfield(tr1, 'pos_grid')
             % transducer positioned arbitrarily (2D only)
             % y: first position beyond pml layer
             % x: halfway
@@ -215,7 +274,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                 [parameters.grid_dims(1:(parameters.n_sim_dims-1))/2, ...
                 parameters.pml_size+1]);
         else
-            trans_pos_final = parameters.transducer.pos_grid;
+            trans_pos_final = tr1.pos_grid;
             % Adjust if the positions are transposed
             if size(trans_pos_final,1)>size(trans_pos_final, 2)
                 warning('Specified transducer position appears transposed...adjusting');
@@ -233,7 +292,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                 round(focus_pos_final(parameters.n_sim_dims) + ...
                 parameters.expected_focal_distance_mm/parameters.grid_step_mm);
         else
-            focus_pos_final = parameters.focus_pos_grid;
+            focus_pos_final = tr1.focus_pos_grid;
             % Adjust if the positions are transposed (2D only)
             if parameters.n_sim_dims == 2 && size(focus_pos_final,1)>size(focus_pos_final, 2)
                 warning('Specified focus position appears transposed...adjusting');
@@ -244,18 +303,26 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     
     % If a PML layer is used to absorb waves reaching the edge of the grid,
     % this will check if there is enough room for a PML layer between the
-    % transducer and the edge of the grid
-    assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
-        trans_pos_final ),[],'all') > parameters.pml_size, ...
-        'The minimal distance between the transducer and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
-    assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
-        focus_pos_final ),[],'all') > parameters.pml_size, ...
-        'The minimal distance between the focus position and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size')
+    % transducers and the edge of the grid
+    for ti = 1:numel(parameters.transducers)
+        tp = parameters.transducers(ti).trans_pos_final;
+        fp = parameters.transducers(ti).focus_pos_final;
+        assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
+            tp ),[],'all') > parameters.pml_size, ...
+            sprintf('The minimal distance between the transducer %i and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size', ti))
+        assert(min(abs([repmat(0, 1, numel(parameters.grid_dims));parameters.grid_dims]-...
+            fp ),[],'all') > parameters.pml_size, ...
+            sprintf('The minimal distance between the focus position of transducer %i and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size', ti))
+    end
        
     % adapt grid dimensions to axisymmetry if requested
     % grid should be specified as [axial, radial x 2]
     if numel(focus_pos_final) == 2 && ...
             isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+
+        if numel(parameters.transducers) > 1
+            error('Axisymmetric simulations with multiple transducers are not supported (only a single transducer is allowed when axisymmetric == 1)');
+        end
         % ensure that radial(y) dim is shorter than axial (x) dim
         if parameters.grid_dims(2) > parameters.grid_dims(1)
             parameters.grid_dims = fliplr(parameters.grid_dims);
@@ -469,9 +536,14 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     
         % Calculates the Mechanical Index for every gridpoint
         acoustic_MI = (acoustic_pressure/10^6)/...
-            sqrt((parameters.transducer.source_freq_hz/10^6));
+            sqrt((parameters.transducers(1).source_freq_hz/10^6));
     
         % Creates the foundation for a mask before the exit plane to calculate max values outside of it
+        if numel(parameters.transducers) > 1
+            warning(['Multi-transducer: exit-plane related metrics (after_exit_plane_mask, ' ...
+                     'max_Isppa_after_exit_plane, real_focal_distance, etc.) are computed ' ...
+                     'only w.r.t. the canonical first transducer.']);
+        end
         comp_grid_size = size(sensor_data.p_max_all);
         after_exit_plane_mask = ones(comp_grid_size);
         bowl_depth_grid = round((parameters.transducer.curv_radius_mm-...
@@ -583,35 +655,50 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             writetable(table(subject_id, max_Isppa, max_Isppa_after_exit_plane, max_pressure, real_focal_distance, trans_pos_final, focus_pos_final, isppa_at_target, avg_isppa_around_target), filename_output_table);
         end
     
-        % Plot intensity on the segmented image
-        
-        if parameters.n_sim_dims==3
-            %options.isppa_color_range = [0.5, max_Isppa_brain];
-            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
-                acoustic_isppa, ...
-                segmented_image_cropped, ...
-                source_labels, ...
-                parameters, ...
-                {'y', focus_pos_final(2)}, ...
-                trans_pos_final, ...
-                focus_pos_final, ...
-                highlighted_pos);
-        else
-            h = plot_isppa_over_image_2d(...
-                acoustic_isppa, ...
-                segmented_image_cropped, ...
-                source_labels, ...
-                after_exit_plane_mask, ...
-                trans_pos_final, ...
-                focus_pos_final, ...
-                highlighted_pos);
+        % Plot intensity on the segmented image (up to 2 transducers)
+        max_plots = min(2, numel(parameters.transducers));
+        if numel(parameters.transducers) > max_plots
+            warning('More than two transducers: ISPPA plots on segmentation will be created only for the first 2 transducers');
         end
-        output_plot = fullfile(parameters.output_dir,...
-            sprintf('sub-%03d_%s_isppa%s.png', ...
-            subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-        set(h, 'InvertHardcopy', 'off'); % keep original colours
-        saveas(h, output_plot, 'png')
-        close(h);
+        
+        for ti = 1:max_plots
+            if ti == 1
+                tpos_sim = trans_pos_final;
+                fpos_sim = focus_pos_final;
+            else
+                tpos_sim = parameters.transducers(ti).trans_pos_final;
+                fpos_sim = parameters.transducers(ti).focus_pos_final;
+            end
+        
+            if parameters.n_sim_dims==3
+                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+                    acoustic_isppa, ...
+                    segmented_image_cropped, ...
+                    source_labels, ...
+                    parameters, ...
+                    {'y', fpos_sim(2)}, ...
+                    tpos_sim, ...
+                    fpos_sim, ...
+                    highlighted_pos);
+            else
+                h = plot_isppa_over_image_2d(...
+                    acoustic_isppa, ...
+                    segmented_image_cropped, ...
+                    source_labels, ...
+                    after_exit_plane_mask, ...
+                    tpos_sim, ...
+                    fpos_sim, ...
+                    highlighted_pos);
+            end
+        
+            output_plot = fullfile(parameters.output_dir, ...
+                sprintf('sub-%03d_%s_isppa_T%02d%s.png', ...
+                subject_id, parameters.simulation_medium, ti, parameters.results_filename_affix));
+            set(h, 'InvertHardcopy', 'off'); % keep original colours
+            saveas(h, output_plot, 'png')
+            close(h);
+        end
+
     else
         disp('No acoustic simulation results available. Skipping analysis...')
     end
@@ -659,6 +746,20 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             % convert attenuation into absorption
             kwave_medium.alpha_coeff = ...
                 kwave_medium.alpha_coeff .* kwave_medium.absorption_fraction;
+
+            if numel(parameters.transducers) > 1
+                warning(['***************************************************\n' ...
+                         '*  MULTI-TRANSDUCER HEATING RESULTS — READ CAREFULLY\n' ...
+                         '*\n' ...
+                         '*  Thermal diffusion is simulated for the COMBINED field,\n' ...
+                         '*  but ALL focal-plane / time-course heating plots reflect\n' ...
+                         '*  ONLY first transducer and MAY MISS HOTSPOTS near other beams\n' ...
+                         '*\n' ...
+                         '*  DO NOT use these 1D/2D plots as a complete safety check\n' ...
+                         '*\n' ...
+                         '*  ALWAYS inspect 3D maxT and CEM43 volumes (NIfTIs)\n' ...
+                         '***************************************************'])
+            end
 
             % run heating simulations
             [kwaveDiffusion, ...
@@ -897,35 +998,60 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             end
 
             if strcmp(data_type, "isppa") && ~strcmp(parameters.simulation_medium, 'phantom')
-                % Creates a visual overlay of the transducer
-                backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
-                [~, source_labels] = transducer_setup(parameters.transducer, backtransf_coordinates(1,:), backtransf_coordinates(2,:), ...
-                                                            size(t1_image_orig), t1_header.PixelDimensions(1));
-                % Plots the Isppa over the untransformed image
-                backtransf_coordinates = round(tformfwd([trans_pos_final;  focus_pos_final; highlighted_pos], inv_final_transformation_matrix));
-                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
-                    data_backtransf, ...
-                    t1_image_orig, ...
-                    source_labels, ...
-                    parameters, ...
-                    {'y', backtransf_coordinates(2,2)}, ...
-                    backtransf_coordinates(1,:), ...
-                    backtransf_coordinates(2,:), ...
-                    backtransf_coordinates(3,:), ...
-                    'show_rectangles', 0, ...
-                    'grid_step', t1_header.PixelDimensions(1), ...
-                    'overlay_color_range', [0 max_Isppa_brain], ...
-                    'overlay_threshold_low', 0, ...
-                    'overlay_threshold_high', max_Isppa_brain, ...
-                    'rotation', 0); % rotation = 90 not implemented for transducer overlay
-        
-                output_plot_filename = fullfile(parameters.output_dir,...
-                    sprintf('sub-%03d_%s_isppa_t1%s.png', ...
-                    subject_id, parameters.simulation_medium, ...
-                    parameters.results_filename_affix));
-                saveas(h, output_plot_filename, 'png')
-                close(h);
+            
+                max_plots = min(2, numel(parameters.transducers));
+                if numel(parameters.transducers) > max_plots
+                    warning('More than two transducers: ISPPA-over-T1 plots will be created only for the first 2 transducers');
+                end
+            
+                for ti = 1:max_plots
+                    if ti == 1
+                        tpos_sim = trans_pos_final;
+                        fpos_sim = focus_pos_final;
+                    else
+                        tpos_sim = parameters.transducers(ti).trans_pos_final;
+                        fpos_sim = parameters.transducers(ti).focus_pos_final;
+                    end
+            
+                    % map canonical / per-T positions + highlighted_pos back to T1 space
+                    backtransf_coordinates = round(tformfwd(...
+                        [tpos_sim; fpos_sim; highlighted_pos], ...
+                        inv_final_transformation_matrix));
+            
+                    % Creates a visual overlay of this transducer
+                    [~, source_labels] = transducer_setup(...
+                        parameters.transducer, ...
+                        backtransf_coordinates(1,:), ...
+                        backtransf_coordinates(2,:), ...
+                        size(t1_image_orig), ...
+                        t1_header.PixelDimensions(1));
+            
+                    % Plots the Isppa over the untransformed image
+                    [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+                        data_backtransf, ...
+                        t1_image_orig, ...
+                        source_labels, ...
+                        parameters, ...
+                        {'y', backtransf_coordinates(2,2)}, ...
+                        backtransf_coordinates(1,:), ...
+                        backtransf_coordinates(2,:), ...
+                        backtransf_coordinates(3,:), ...
+                        'show_rectangles', 0, ...
+                        'grid_step', t1_header.PixelDimensions(1), ...
+                        'overlay_color_range', [0 max_Isppa_brain], ...
+                        'overlay_threshold_low', 0, ...
+                        'overlay_threshold_high', max_Isppa_brain, ...
+                        'rotation', 0); % rotation = 90 not implemented for transducer overlay
+            
+                    output_plot_filename = fullfile(parameters.output_dir, ...
+                        sprintf('sub-%03d_%s_isppa_t1_T%02d%s.png', ...
+                        subject_id, parameters.simulation_medium, ti, ...
+                        parameters.results_filename_affix));
+                    saveas(h, output_plot_filename, 'png')
+                    close(h);
+                end
             end
+
             
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
@@ -964,6 +1090,11 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
+        if numel(parameters.transducers) > 1
+            warning(['Post-hoc water simulation runs with the combined field of all transducers. ' ...
+                     'Per-transducer water checks (one simulation per transducer) are not yet implemented. ' ...
+                     'Consider running separate configs manually if you need those.']);
+        end
         water_parameters = parameters;
         water_parameters.simulation_medium = 'water';
         water_parameters.run_heating_sims = 0;

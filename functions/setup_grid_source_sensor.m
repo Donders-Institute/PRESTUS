@@ -22,8 +22,8 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     % Backward-compatible access to (first) transducer
     if isfield(parameters, 'transducers')
         tx = parameters.transducers(1);
-        if numel(unique(parameters.transducers.source_freq_hz)) > 1
-            warning('Multiple source frequencies not supported here yet. Using %i Hz.', freqs(1))
+        if numel(unique([parameters.transducers.source_freq_hz])) > 1
+            warning('Individual source frequencies per transducer are not supported yet. Using %i Hz.', freqs(1))
         end
     elseif isfield(parameters, 'transducer')
         tx = parameters.transducer;
