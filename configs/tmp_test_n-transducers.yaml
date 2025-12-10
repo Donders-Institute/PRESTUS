@@ -86,7 +86,7 @@ transducers:
 subject_subfolder: 1
 
 # Optional affix for result files names
-results_filename_affix: ''
+results_filename_affix: 'tmp_test_3-transducers'
 
 # This allows you to add additional paths and subpaths while running the pipeline
 paths_to_add: []

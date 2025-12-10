@@ -13,7 +13,7 @@ subject_id = 9; % subject number, if none, choose 1
 addpath('functions')
 addpath(genpath('toolboxes')) 
 
-parameters = load_parameters('tmp_test_n-transducers.yaml'); % load the configuration file
+parameters = load_parameters('tmp_test_3-transducers.yaml'); % load the configuration file
 
 parameters.simulation_medium = medium;
 if strcmp(submit, 'matlab') == true

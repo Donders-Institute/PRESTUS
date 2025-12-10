@@ -20,10 +20,11 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     end
 
     % Backward-compatible access to (first) transducer
-    if isfield(parameters, 'transducers')
+    if isfield(parameters, 'transducers') && ~isempty(parameters.transducers)
         tx = parameters.transducers(1);
-        if numel(unique([parameters.transducers.source_freq_hz])) > 1
-            warning('Individual source frequencies per transducer are not supported yet. Using %i Hz.', freqs(1))
+        freqs = [parameters.transducers.source_freq_hz];
+        if numel(unique(freqs)) > 1
+            warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', freqs(1))
         end
     elseif isfield(parameters, 'transducer')
         tx = parameters.transducer;
@@ -31,8 +32,6 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
         error('parameters must contain either .transducers or .transducer.')
     end
 
-
-    
     wave_period = 1 / tx.source_freq_hz;                                                       % period [s]
     
     % Check the number of input arguments
@@ -46,7 +45,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
         cfl = 0.3;                                                                                                      % CFL number (kwave default)
         points_per_period = ceil(points_per_wavelength / cfl);                                                          % points per period
         grid_time_step = (wave_period / points_per_period)/2;                                                           % time step [s]  
-     end
+    end
 
     % Calculate the number of time steps to reach steady state
     t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / max_sound_speed;                           % [s]
@@ -58,7 +57,45 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     % Create source (transducer with focuspoint)
     parameters.kwave_source_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     if confirm_overwriting(parameters.kwave_source_filename, parameters)
-        [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos_final, focus_pos_final);
+
+        % build per-transducer positions for geometry when not using kWaveArray
+        if isfield(parameters, 'transducers') && ~isempty(parameters.transducers) && parameters.use_kWaveArray == 0
+            nT = numel(parameters.transducers);
+            trans_pos = zeros(nT, parameters.n_sim_dims);
+            focus_pos = zeros(nT, parameters.n_sim_dims);
+
+            for ti = 1:nT
+                tr = parameters.transducers(ti);
+
+                % transducer position in grid
+                if isfield(tr, 'pos_grid') && ~isempty(tr.pos_grid)
+                    pos = tr.pos_grid;
+                    if size(pos,1) > size(pos,2)
+                        pos = pos';
+                    end
+                    trans_pos(ti,:) = pos;
+                else
+                    trans_pos(ti,:) = trans_pos_final;
+                end
+
+                % focus position in grid
+                if isfield(tr, 'focus_pos_grid') && ~isempty(tr.focus_pos_grid)
+                    fpos = tr.focus_pos_grid;
+                    if size(fpos,1) > size(fpos,2)
+                        fpos = fpos';
+                    end
+                    focus_pos(ti,:) = fpos;
+                else
+                    focus_pos(ti,:) = focus_pos_final;
+                end
+            end
+        else
+            % legacy / single-transducer / kWaveArray case
+            trans_pos = trans_pos_final;
+            focus_pos = focus_pos_final;
+        end
+
+        [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos, focus_pos);
         save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
     else
         load(parameters.kwave_source_filename);
