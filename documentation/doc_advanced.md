@@ -13,3 +13,26 @@ For many parameters, this can simply be done by specifying different values for 
 parameters.adopted_heatmap | path to nifti file
 parameters.adopted_cumulative_heat | path to nifti file
 options.sequential_configs
+
+
+#### Modeling multiple transducers (experimental support)
+
+Multiple transducers can be specified in layered simulations. See [this pull request](https://github.com/Donders-Institute/PRESTUS/pull/100) for examples.
+
+```
+transducer:
+  - name: right
+    n_elements: 10
+    ...
+
+  - name: left
+    n_elements: 10
+    ...
+```
+
+Limitations: 
+- simulations that do not inclue a skull or layered setup (e.g., 'water') only model the first transducer
+- setup with kWaveArray not supported
+- different source frequencies not supported (see ```setup_grid_source_sensor.m```)
+- exit-plane related metrics refer to the first transducer
+- Thermal diffusion is simulated for the COMBINED field, but ALL focal-plane time-course heating plots reflect ONLY the focal plane of the first transducer and MAY MISS HOTSPOTS near other beams. DO NOT use these 1D/2D plots as an exhaustive safety check, but ALWAYS inspect 3D maxT and CEM43 volumes (NIfTIs).
