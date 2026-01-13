@@ -21,6 +21,8 @@
         "bug",
         "doc"
       ]
+    },
+    {
       "login": "achetverikov",
       "name": "Andrey Chetverikov",
       "avatar_url": "https://avatars.githubusercontent.com/u/1465806?v=4",
@@ -30,6 +32,8 @@
         "ideas",
         "tutorial"
       ]
+    },
+    {
       "login": "KTZ228",
       "name": "Kenneth van der Zee",
       "avatar_url": "https://avatars.githubusercontent.com/u/51954604?v=4",
@@ -40,6 +44,8 @@
         "maintenance",
         "bug"
       ]
+    },
+    {
       "login": "MaCuinea",
       "name": "Margely Cornelissen",
       "avatar_url": "https://avatars.githubusercontent.com/u/134381864?v=4",
@@ -48,7 +54,10 @@
         "code",
         "maintenance",
         "tutorial",
-        "bug"]
+        "bug"
+      ]
+    },
+    {
       "login": "eleonoracarpino",
       "name": "Eleonora Carpino",
       "avatar_url": "https://avatars.githubusercontent.com/u/123380299?v=4",
@@ -57,13 +66,17 @@
         "code",
         "ideas"
       ]
+    },
+    {
       "login": "mekman",
       "name": "Matthias Ekman",
       "avatar_url": "https://avatars.githubusercontent.com/u/139282?v=4",
       "profile": "https://github.com/mekman",
       "contributions": [
-      "bug"
+        "bug"
       ]
+    },
+    {
       "login": "sirmrmarty",
       "name": "Martin Wimmers",
       "avatar_url": "https://avatars.githubusercontent.com/u/140894211?v=4",
@@ -72,6 +85,8 @@
         "tutorial",
         "bug"
       ]
+    },
+    {
       "login": "neurodream",
       "name": "Nico Adelhöfer",
       "avatar_url": "https://avatars.githubusercontent.com/u/117816806?v=4",
@@ -79,6 +94,8 @@
       "contributions": [
         "ideas"
       ]
+    },
+    {
       "login": "lennartverhagen",
       "name": "Lennart Verhagen",
       "avatar_url": "https://avatars.githubusercontent.com/u/12236166?v=4",
