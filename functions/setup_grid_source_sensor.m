@@ -27,10 +27,14 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     % instability.
     if nargin < 5
         % Calculate the time step using an integer number of points per period
-        points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);      % points per wavelength
-        cfl = 0.3;                                                                                                      % CFL number (kwave default)
-        points_per_period = ceil(points_per_wavelength / cfl);                                                          % points per period
-        grid_time_step = (wave_period / points_per_period)/2;                                                           % time step [s]  
+        points_per_wavelength = max_sound_speed / (parameters.transducer.source_freq_hz * parameters.grid_step_m);
+        % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
+        cfl = 0.3;                                                          
+        % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; k-Wave default.
+        points_per_period = ceil(points_per_wavelength / cfl);              
+        % Temporal samples per wave period; ceil enforces integer ≥ PPW/CFL.
+        grid_time_step = (wave_period / points_per_period)/2;               
+        % dt: Half the standard dt, conservative; wave_period=1/source_freq.                                                      % time step [s]  
      end
 
     % Calculate the number of time steps to reach steady state
@@ -47,7 +51,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
         save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
     else
         load(parameters.kwave_source_filename);
-    end    
+    end
 
     % Creates a sensor that records the the maximum and final pressure
     % values in every point of the grid

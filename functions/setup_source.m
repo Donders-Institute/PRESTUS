@@ -178,7 +178,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
                 % Retrieve element-specific grid weights
                 grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
                 % Update the mask
-                source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0);
+                source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0.25);
             end
             
             % Crop to half space for axisymmetry
