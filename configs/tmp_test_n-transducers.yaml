@@ -50,7 +50,7 @@ seg_labels:
   eye: [6]
 
 # Parameters differ for each transducer and can be obtained from the manufacturer
-transducers:
+transducer:
   - name: right
     n_elements: 10
     Elements_ID_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
