@@ -71,10 +71,10 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         [trans_pos_grid, focus_pos_grid, ~, ~] = ...
             position_transducer_localite(localite_file, t1_header, parameters);
     else
-        trans_pos_grid = parameters.transducers(1).pos_t1_grid';
-        focus_pos_grid = parameters.transducers(1).focus_pos_t1_grid';
+        trans_pos_grid = parameters.transducer(1).pos_t1_grid';
+        focus_pos_grid = parameters.transducer(1).focus_pos_t1_grid';
 
-        if numel(parameters.transducers) > 1
+        if numel(parameters.transducer) > 1
             warning('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
         end
 
@@ -357,8 +357,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
     %% DEBUG PLOTS (UP TO 2 TRANSDUCERS)
 
-    max_plots = min(2, numel(parameters.transducers));
-    if numel(parameters.transducers) > max_plots
+    max_plots = min(2, numel(parameters.transducer));
+    if numel(parameters.transducer) > max_plots
         warning('More than two transducers defined; only the first 2 will be shown in debug plots');
     end
 
@@ -372,7 +372,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             tpos_sim = trans_pos_final;
             fpos_sim = focus_pos_final;
         else % ti == 2
-            tr = parameters.transducers(ti);
+            tr = parameters.transducer(ti);
             
             % T1-grid positions
             tpos_t1 = tr.pos_t1_grid(:).';

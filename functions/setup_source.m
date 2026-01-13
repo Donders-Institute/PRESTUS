@@ -7,7 +7,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
 %   - single transducer with kWaveArray-based setup (use_kWaveArray ~= 0)
 %
 % Input:
-%   parameters      - struct containing simulation parameters (must contain parameters.transducers)
+%   parameters      - struct containing simulation parameters (must contain parameters.transducer)
 %   kgrid           - k-Wave grid struct (e.g., kWaveGrid)
 %   trans_pos       - [nT x n_sim_dims] or [1 x n_sim_dims] / [n_sim_dims x 1]
 %   focus_pos       - same shape rules as trans_pos
@@ -17,7 +17,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
 %   source_labels   - grid of integer labels identifying active source regions
 %   transducer_pars - struct array of transducer parameters with grid-based fields
 
-    nT = numel(parameters.transducers);
+    nT = numel(parameters.transducer);
 
     if parameters.use_kWaveArray ~= 0 && nT > 1
         error(['Multiple transducers with kWaveArray (use_kWaveArray ~= 0) ' ...
@@ -41,7 +41,7 @@ function [source, source_labels, transducer_pars] = setup_source(parameters, kgr
 
     %% Convert element diameters from mm to grid points (for all transducers)
 
-    transducer_pars = parameters.transducers;
+    transducer_pars = parameters.transducer;
     grid_step_mm    = parameters.grid_step_mm;
 
     for it = 1:nT

@@ -77,7 +77,7 @@ function parameters = load_parameters(varargin)
         if isfield(parameters, 'transducers')
             error('the parameter file(s) include both fields transducer as well as transducers - only one of those fields is expected!');
         end
-        parameters.transducers(1) = parameters.transducer;
+        parameters.transducer(1) = parameters.transducer;
         parameters.transducer = [];
 
     elseif isfield(parameters, 'transducers')
@@ -92,41 +92,41 @@ function parameters = load_parameters(varargin)
 
     end
 
-    for t_i = 1:numel(parameters.transducers)
+    for t_i = 1:numel(parameters.transducer)
         
         % Ensure source phase is set in radians or degrees
-        if ~isfield(parameters.transducers(t_i), 'source_phase_rad')
-            assert(isfield(parameters.transducers(t_i), 'source_phase_deg'), ...
+        if ~isfield(parameters.transducer(t_i), 'source_phase_rad')
+            assert(isfield(parameters.transducer(t_i), 'source_phase_deg'), ...
                    'Source phase should be set in transducer parameters as source_phase_rad or source_phase_deg');
-            parameters.transducers(t_i).source_phase_rad = parameters.transducers(t_i).source_phase_deg / 180 * pi;
+            parameters.transducer(t_i).source_phase_rad = parameters.transducer(t_i).source_phase_deg / 180 * pi;
         end
 
         % Calculate distance to transducer plane if not provided
-        if ~isfield(parameters.transducers(t_i), 'dist_to_plane_mm')
-            parameters.transducers(t_i).dist_to_plane_mm = sqrt(parameters.transducers(t_i).curv_radius_mm^2 - ...
-                                                          (max(parameters.transducers(t_i).Elements_OD_mm) / 2)^2);
+        if ~isfield(parameters.transducer(t_i), 'dist_to_plane_mm')
+            parameters.transducer(t_i).dist_to_plane_mm = sqrt(parameters.transducer(t_i).curv_radius_mm^2 - ...
+                                                          (max(parameters.transducer(t_i).Elements_OD_mm) / 2)^2);
             fprintf('Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                    parameters.transducers(t_i).dist_to_plane_mm);
+                    parameters.transducer(t_i).dist_to_plane_mm);
         end
 
         % Ensure source amplitude matches number of transducer elements
-        if length(parameters.transducers(t_i).source_amp) == 1 && parameters.transducers(t_i).n_elements > 1
-            parameters.transducers(t_i).source_amp = repmat(parameters.transducers(t_i).source_amp, [1, parameters.transducers(t_i).n_elements]);
+        if length(parameters.transducer(t_i).source_amp) == 1 && parameters.transducer(t_i).n_elements > 1
+            parameters.transducer(t_i).source_amp = repmat(parameters.transducer(t_i).source_amp, [1, parameters.transducer(t_i).n_elements]);
         end
 
         % Evaluate source phase expressions if stored as cell arrays
-        if iscell(parameters.transducers(t_i).source_phase_rad)
-            for i = 1:length(parameters.transducers(t_i).source_phase_rad)
-                if ~isnumeric(parameters.transducers(t_i).source_phase_rad{i})
-                    parameters.transducers(t_i).source_phase_rad{i} = eval(parameters.transducers(t_i).source_phase_rad{i});
+        if iscell(parameters.transducer(t_i).source_phase_rad)
+            for i = 1:length(parameters.transducer(t_i).source_phase_rad)
+                if ~isnumeric(parameters.transducer(t_i).source_phase_rad{i})
+                    parameters.transducer(t_i).source_phase_rad{i} = eval(parameters.transducer(t_i).source_phase_rad{i});
                 end
             end
-            parameters.transducers(t_i).source_phase_rad = cell2mat(parameters.transducers(t_i).source_phase_rad);
+            parameters.transducer(t_i).source_phase_rad = cell2mat(parameters.transducer(t_i).source_phase_rad);
         end
 
         % Ensure source phase degrees are calculated from radians if not provided
-        if ~isfield(parameters.transducers(t_i), 'source_phase_deg')
-            parameters.transducers(t_i).source_phase_deg = parameters.transducers(t_i).source_phase_rad / pi * 180;
+        if ~isfield(parameters.transducer(t_i), 'source_phase_deg')
+            parameters.transducer(t_i).source_phase_deg = parameters.transducer(t_i).source_phase_rad / pi * 180;
         end
 
     end

@@ -20,9 +20,9 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     end
 
     % Backward-compatible access to (first) transducer
-    if isfield(parameters, 'transducers') && ~isempty(parameters.transducers)
-        tx = parameters.transducers(1);
-        freqs = [parameters.transducers.source_freq_hz];
+    if isfield(parameters, 'transducers') && ~isempty(parameters.transducer)
+        tx = parameters.transducer(1);
+        freqs = [parameters.transducer.source_freq_hz];
         if numel(unique(freqs)) > 1
             warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', freqs(1))
         end
@@ -59,13 +59,13 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
     if confirm_overwriting(parameters.kwave_source_filename, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray
-        if isfield(parameters, 'transducers') && ~isempty(parameters.transducers) && parameters.use_kWaveArray == 0
-            nT = numel(parameters.transducers);
+        if isfield(parameters, 'transducers') && ~isempty(parameters.transducer) && parameters.use_kWaveArray == 0
+            nT = numel(parameters.transducer);
             trans_pos = zeros(nT, parameters.n_sim_dims);
             focus_pos = zeros(nT, parameters.n_sim_dims);
 
             for ti = 1:nT
-                tr = parameters.transducers(ti);
+                tr = parameters.transducer(ti);
 
                 % transducer position in grid
                 if isfield(tr, 'pos_grid') && ~isempty(tr.pos_grid)
