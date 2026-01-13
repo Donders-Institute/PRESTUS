@@ -258,15 +258,21 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         end
         segmented_image_cropped = zeros(parameters.grid_dims);
 
-        % work with a canonical first transducer in non-skull media
-        tr1 = parameters.transducer(1);
+        % non-layered media currently only support a single transducer
+        % only the first specified transducer will be modeled
+        % this is a known limitation
 
-        if ~isfield(tr1, 'pos_grid') || ~isfield(tr1, 'focus_pos_grid')
+        if numel(parameters.transducer)>1
+            warning("Non-skull and/or non-layered simulations currently only support a single transducer. Only the first specified transducer will be retained...");
+            parameters.transducer = parameters.transducer(1);
+        end
+
+        if ~isfield(parameters.transducer, 'pos_grid') || ~isfield(parameters.transducer, 'focus_pos_grid')
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
         end
         % set transducer position in grid
-        if ~isfield(tr1, 'pos_grid')
+        if ~isfield(parameters.transducer, 'pos_grid')
             % transducer positioned arbitrarily (2D only)
             % y: first position beyond pml layer
             % x: halfway
@@ -274,7 +280,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                 [parameters.grid_dims(1:(parameters.n_sim_dims-1))/2, ...
                 parameters.pml_size+1]);
         else
-            trans_pos_final = tr1.pos_grid;
+            trans_pos_final = parameters.transducer.pos_grid;
             % Adjust if the positions are transposed
             if size(trans_pos_final,1)>size(trans_pos_final, 2)
                 warning('Specified transducer position appears transposed...adjusting');
@@ -292,13 +298,16 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                 round(focus_pos_final(parameters.n_sim_dims) + ...
                 parameters.expected_focal_distance_mm/parameters.grid_step_mm);
         else
-            focus_pos_final = tr1.focus_pos_grid;
+            focus_pos_final = parameters.transducer.focus_pos_grid;
             % Adjust if the positions are transposed (2D only)
             if parameters.n_sim_dims == 2 && size(focus_pos_final,1)>size(focus_pos_final, 2)
                 warning('Specified focus position appears transposed...adjusting');
                 focus_pos_final = focus_pos_final';
             end
         end
+        % Retain transducer and focus positions
+        parameters.transducer.trans_pos_final = trans_pos_final;
+        parameters.transducer.focus_pos_final = focus_pos_final;
     end
     
     % If a PML layer is used to absorb waves reaching the edge of the grid,
@@ -319,7 +328,6 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % grid should be specified as [axial, radial x 2]
     if numel(focus_pos_final) == 2 && ...
             isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
-
         if numel(parameters.transducer) > 1
             error('Axisymmetric simulations with multiple transducers are not supported (only a single transducer is allowed when axisymmetric == 1)');
         end
