@@ -68,21 +68,10 @@ function parameters = load_parameters(varargin)
            'MATLAB should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
 
     %% Transducer settings validation and derived calculations
-    
-    % To enable n transducers while maintaining backward comp of configs,
-    % a single "transducer" field in parameters becomes "transducers(1)"
 
     if isfield(parameters, 'transducer')
 
-        if isfield(parameters, 'transducers')
-            error('the parameter file(s) include both fields transducer as well as transducers - only one of those fields is expected!');
-        end
         parameters.transducer(1) = parameters.transducer;
-        parameters.transducer = [];
-
-    elseif isfield(parameters, 'transducers')
-        
-        parameters.transducer = [];
 
     elseif nargin == 1
 
