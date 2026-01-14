@@ -27,12 +27,12 @@ focus_pos_t1_grid: [128, 142, 75] # stimulation target on T1 grid
 default_grid_dims: [144, 144, 256]
 
 thermal:
-  duty_cycle: 0.5 # share of the stimulation duration during which the stimulation is on
-  sim_time_steps: 0.1 # [s] simulation time steps during the stimulation period
-  temp_0: 37 #[deg C] initial temperature, currently not used
-  stim_duration: 0.6 # [s] stimulation duration within a trial
-  iti: 1.2 # interval between the trials, from the start of one trial to the start of another [s]
-  n_trials: 12 # number of trials to simulate; the total simulated duration is then n_trials*iti seconds
-
-
-
+  pd: 0.3
+  pri: 0.6  
+  ptd: 0.6
+  pt_timestep: 0.1
+  ptri: 1.2
+  ptrd: 14.4
+  post_ptri_dur: 15
+  post_pt_timestep: 1
+  equal_step_duration: 0

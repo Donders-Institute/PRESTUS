@@ -145,14 +145,16 @@ see doc_thermal-simulations.md
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `thermal.n_trials`                | Number of trials simulated, determining total simulation duration (`n_trials * iti`).                         |   |
-| `thermal.duty_cycle`              | Fraction of stimulation duration during which the stimulation is active (`0 to 1`).                           |   |
-| `thermal.pri_duration`            | Duration of the pulse repetition interval (i.e., an on/off cycle during stimulation; in seconds).    |   |
-| `thermal.sim_time_steps`          | Simulation time steps during the stimulation period (in seconds).                                             |   |
-| `thermal.post_stim_dur`           | Duration of post-stimulation period (in seconds).                           |   |
-| `thermal.post_time_steps`         | Step size of post-stimulation recordings (in seconds). If not specificed, the step size is identical to sim_time_steps.                         |   |
-| `thermal.equal_steps`             | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
-| `thermal.cem43_iso`             | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                        |   |
+| `thermal.pd`                      | Pulse Duration (PD) [seconds]  | Duty cycle (DC) inside a Pulse Train [%] is internally calculated as `pd`/`pri`.                       |   |
+| `thermal.pri`                     | Pulse Repetition Interval (PRI) [seconds] (i.e., an on/off cycle during stimulation).    | Pulse Repetition Frequency (PRF) is internally calculated as 1/`pri`.   |
+| `thermal.ptd`                     | Pulse Train Duration (PTD) [seconds]                                             |   |
+| `thermal.pt_timestep`             | Modeling time steps inside a PT [seconds]                           |   |
+| `thermal.ptri`                    | Pulse Train Repetition Interval (PTRI) [seconds]                         | Duration of OFF period within a PTRI is internally calculated as `ptri`-`ptd`.  |
+| `thermal.ptrd`                    | Pulse Train Repetition Duration (PTRD) [seconds]                          |   |
+| `thermal.post_ptri_dur`           | Post-PTRI Steady-state Duration [seconds]                         |   |
+| `thermal.post_pt_timestep`        | Modeling time steps following PT & PTRI [seconds]                         |   |
+| `thermal.equal_step_duration`     | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
+| `thermal.cem43_iso`               | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                        |   |
 | `thermal.temp_0.water`            | Initial temperature of water medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.skull`            | Initial temperature of skull medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.brain`            | Initial temperature of brain medium before simulation (in °C).                                                |   |

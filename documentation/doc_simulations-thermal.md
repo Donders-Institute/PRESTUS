@@ -1,4 +1,4 @@
-# Tips on running the thermal simulations
+# Setting up thermal simulations
 
 Thermal simulations depend on the output of the acoustic simulations. As such, running thermal simulations without first running acoustic simulations is not an option.
 
@@ -44,15 +44,12 @@ These parameters influence the underlying mechanisms of how the thermal simulati
 - `equal_step_duration`
         - When `equal_step_duration` is enabled, the amount of simulated steps is calculated with the `pt_timestep` duration. For example, when using a `pt_timestep` duration of 10 ms, 6 steps of stimulation and 14 steps without stimulation are simulated 5 times for each `pt_timestep` (20\*5 = 100 steps).
         - When `equal_step_duration` is disabled, every on and off step will be simulated as one simulation step (2\*5 = 10 steps), reducing the computational load.
-
-### Optional parameters
-
 - `post_ptri_dur` refers to the duration of a post-stimulation period.
 - `temp_0` refers to the starting temperature in degrees, and can be specified for each tissue separately.
 - `sensory_xy_halfsize` refers to the window along the transducer axis in which temperature changed are recorded.
 - `record_t_at_every_step` can be enabled if there is a need to record temperature changes at every time step, but can lead to `out of memory` errors.
 
-### Thermal dose calculation
+### Thermal dose (CEM43) calculation
 
 There are two implementations of thermal dose calculations:
 
