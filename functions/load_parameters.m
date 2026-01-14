@@ -126,8 +126,9 @@ function parameters = load_parameters(varargin)
     end
 
     %% Validate thermal simulation settings
+
     if parameters.run_heating_sims
-        check_thermal_parameters(parameters);
+        thermal_parameters(parameters);
     end
 
     %% Output file settings validation and sanitization
