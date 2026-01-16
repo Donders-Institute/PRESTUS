@@ -3,9 +3,9 @@
 # Create a pseudoCT from a PETRA UTE image and a SimNIBS 4 segmentation
 
 # Example usage:
-# create_pseudoCT "001" "${rootpath}/data/simnibs" "/opt/matlab/R2022b/bin/matlab" "kosciessa" "1"
+# pct_create_pseudoCT "001" "${rootpath}/data/simnibs" "/opt/matlab/R2022b/bin/matlab" "kosciessa" "1"
 
-function create_pseudoCT() 
+function pct_create_pseudoCT() 
 {
     echo "starting pseudoCT creation"
 

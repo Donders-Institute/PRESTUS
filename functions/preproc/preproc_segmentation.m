@@ -1,6 +1,6 @@
-function preprocess_segmentation(parameters, subject_id)
+function preproc_segmentation(parameters, subject_id)
 
-% PREPROCESS_SEGMENTATION Segment the data using SimNIBS
+% PREPROC_SEGMENTATION Segment the data using SimNIBS
 %
 % Note: T1, T2 (or UTE/CT) paths should correspond to BIDS directory
 
@@ -38,7 +38,7 @@ function preprocess_segmentation(parameters, subject_id)
         end
 
         if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
-            run_segmentation(parameters.data_path, subject_id, filename_t1, filename_t2, parameters);
+            segmentation_run(parameters.data_path, subject_id, filename_t1, filename_t2, parameters);
             return;
         end
     else

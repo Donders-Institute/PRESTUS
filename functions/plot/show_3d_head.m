@@ -161,7 +161,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             flag = dists < 3;
             
             if ~any(flag)
-                warning('Target lies outside plotted volume – no sphere drawn. Check transform & cropping (smooth_and_crop.m)')
+                warning('Target lies outside plotted volume – no sphere drawn. Check transform & cropping (preproc_smooth_and_crop.m)')
                 continue
             end
         

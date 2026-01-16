@@ -1,7 +1,7 @@
 function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h] = ...
-    plot_isppa_over_image(overlay_image, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_data_pos, options)
+    plot_overlay(overlay_image, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_data_pos, options)
 
-% PLOT_ISPPA_OVER_IMAGE Visualizes overlay on a 2D slice of a 3D background image.
+% PLOT_OVERLAY Visualizes overlay on a 2D slice of a 3D background image.
 %
 % This function overlays a computed metric (e.g., intensity) 
 % on a specific 2D slice of a 3D background image (`bg_image`). It highlights 

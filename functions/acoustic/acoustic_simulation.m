@@ -1,7 +1,7 @@
-    function  [sensor_data] = run_simulations(kgrid, medium, source, sensor, input_args, parameters)
+    function  [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, input_args, parameters)
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                           Run simulations                         %
+    %                  Run acoustic simulation                          %
     %                                                                   %
     % Loads the parameters into a k-wave function.                      %
     % Changes some input parameters based on what cpu, gpu and which    %

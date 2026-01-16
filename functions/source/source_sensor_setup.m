@@ -1,4 +1,4 @@
-function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
+function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
     
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Set up the transducer and sensor                 %
@@ -91,7 +91,7 @@ function [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(param
             trans_pos = trans_pos_final;
             focus_pos = focus_pos_final;
         end
-        [source, source_labels, ~] = setup_source(parameters, kgrid, trans_pos, focus_pos);
+        [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
         save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
     else
         load(parameters.kwave_source_filename);

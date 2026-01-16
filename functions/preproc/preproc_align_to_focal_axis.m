@@ -1,6 +1,6 @@
-function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = align_to_focus_axis_and_scale(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
+function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
 
-% ALIGN_TO_FOCUS_AXIS_AND_SCALE Aligns a 3D image to the focal axis and scales it.
+% preproc_align_to_focal_axis Aligns a 3D image to the focal axis and scales it.
 %
 % This function rotates a 3D image (`nii_image`) such that the focal axis 
 % (defined by `trans_pos_grid` and `focus_pos_grid`) aligns with the z-axis 

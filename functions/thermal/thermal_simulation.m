@@ -1,9 +1,9 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
-    run_heating_simulations(...
+    thermal_simulation(...
     sensor_data, kgrid, kwave_medium, sensor, source, parameters, ...
     trans_pos, final_transformation_matrix, medium_masks)
 
-% RUN_HEATING_SIMULATIONS Simulates thermal effects of ultrasound using k-Wave.
+% THERMAL_SIMULATION Simulates thermal effects of ultrasound using k-Wave.
 %
 % This function runs heating simulations based on acoustic simulation results 
 % from k-Wave. It models the temperature rise and thermal dose (CEM43) caused 
@@ -129,7 +129,7 @@ tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
 params_thermal = thermal_parameters(parameters);
 
 % Visualize the thermal parameters
-thermal_visualize_protocol(params_thermal)
+thermal_plot_protocol(params_thermal)
 
 % Total timepoints estimation
 % Records: 1 per ON, 1 per OFF (inside PT), 1 per PTRI-off block, 1 per post-PTRI step

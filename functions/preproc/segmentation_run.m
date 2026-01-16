@@ -1,11 +1,11 @@
-function run_segmentation(data_path, subject_id, filename_t1, filename_t2, parameters)
+function segmentation_run(data_path, subject_id, filename_t1, filename_t2, parameters)
 
     % set segmentation path to data_path if no specific seg_path is defined
     if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path)
         parameters.seg_path = data_path;
     end
 
-    % 1) make logs directory if does not exist
+    % Create log directory if it does not exist
     
     log_dir = fullfile(parameters.sim_path, 'batch_job_logs');
     if ~isfolder(log_dir)
@@ -14,7 +14,7 @@ function run_segmentation(data_path, subject_id, filename_t1, filename_t2, param
     
     subj_id_string = sprintf('sub-%03d', subject_id);
 
-    % 2) specify segmentation job
+    % If no segmentation software is specified, default to SimNIBS' charm
     if ~isfield(parameters, 'segmentation_software')
         parameters.segmentation_software = 'charm';
     end

@@ -1,6 +1,6 @@
-function [prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull] = analyze_transducer_position_fast(i, norm_v, ex_plane_pos, coord_mesh_gpu, full_skull_mask_idx, skin_boundary_coords, skull_boundary_coords, max_od)
+function [prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull] = transducer_analyze_position_fast(i, norm_v, ex_plane_pos, coord_mesh_gpu, full_skull_mask_idx, skin_boundary_coords, skull_boundary_coords, max_od)
 
-% ANALYZE_TRANSDUCER_POSITION_FAST Analyzes the transducer position relative to the skull and skin.
+% TRANSDUCER_ANALYZE_POSITION_FAST Analyzes the transducer position relative to the skull and skin.
 %
 % This function computes the proportion of intersection between a transducer's 
 % orthogonal plane and the skull mask. It also calculates statistical measures 

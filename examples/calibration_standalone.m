@@ -1,13 +1,15 @@
-%% Main script to deploy acoustic profiling simulations
-% This script configures and executes acoustic profiling simulations 
+%% Main script to deploy transducer calibrations
+%
+% This script configures and executes calibration simulations 
 % using equipment configurations and user-defined input parameters. 
 % By performing focal adjustments, intensity scaling, and interpolating
 % acoustic profiles, it determines the real axial profile. This profile
 % is then used to optimize the virtual transducer's amplitude and phases
 % to replicate the behavior of the actual transducer measured in a water tank.
+%
 % Due to model constraints, additional virtual elements might be required 
 % to mimic the actual transducer behavior accurately. The script
-% calc_virtual_elem.m in acoustic_profiling/functions can be used for this purpose.
+% calc_virtual_elem.m in functions/calibration can be used for this purpose.
 % 
 % This preprocessing step generates optimized amplitude and phase values, 
 % which serve as inputs for subsequent acoustic and/or heating simulations.
@@ -20,13 +22,12 @@ format long; % Ensures accurate display of intensity values
 
 % Set up paths
 % Determine the current and main folder paths
-func_path = fileparts(mfilename('fullpath'));
+func_path = fileparts(mfilename('fullpath'), '..');
 main_folder = fileparts(func_path);
 cd(main_folder); % Change directory to the main folder
 
 % Add necessary paths for functions and toolboxes
-addpath('functions');
-addpath(genpath('acoustic_profiling'));
+addpath(genpath('functions'));
 addpath(genpath('configs'));
 addpath(genpath('toolboxes'));
 
@@ -195,8 +196,8 @@ for i = 1:N_i
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
                 ' F ', num2str(profile_empirical.focus_wrt_exit_plane), ' I ', num2str(desired_intensity)])
 
-            % perform the acoustic profiling
-            acoustic_profiling(...
+            % perform the calibration
+            calibration_transducer(...
                 profile_empirical, ...
                 equipment_name, ...
                 desired_intensity, ...

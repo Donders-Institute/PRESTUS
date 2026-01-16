@@ -1,5 +1,5 @@
-function thermal_visualize_protocol(params_thermal, varargin)
-% THERMAL_VISUALIZE_PROTOCOL Plots the full ultrasound stimulation protocol timeline.
+function thermal_plot_protocol(params_thermal, varargin)
+% THERMAL_PLOT_PROTOCOL Plots the full ultrasound stimulation protocol timeline.
 %
 % Input:
 %   params_thermal - Struct from thermal_parameters() containing:
@@ -115,8 +115,8 @@ legend(h1, 'US Pulse', 'Location', 'southeast');
 subplot(2,1,2);
 hold on;
 
-% === Plot 2: 100 equi-distant ON patches across full PTRD ===
-MAX_PATCHES = 100;
+% === Plot 2: max. 20 equi-distant ON patches across full PTRD ===
+MAX_PATCHES = 20;
 total_ptri_reps = params_thermal.n_ptri_reps;
 
 if total_ptri_reps <= MAX_PATCHES

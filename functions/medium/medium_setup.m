@@ -1,4 +1,4 @@
-function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
+function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                         Setup k-wave medium                       %
@@ -20,17 +20,13 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
     % Creates an empty grid according to the grid dimensions
     grid_of_ones = ones(parameters.grid_dims);
     
-    % Fills this grid with a baseline medium
+    % Fills this grid with a baseline medium (water)
     if strcmp(parameters.simulation_medium, 'water') || ...
-            strcmp(parameters.simulation_medium, 'water_and_skull') || ...
             strcmp(parameters.simulation_medium, 'layered') || ...
             strcmp(parameters.simulation_medium, 'phantom') 
         baseline_medium_name = 'water';
         baseline_medium = medium.(baseline_medium_name);
-    elseif strcmp(parameters.simulation_medium, 'brain') || ...
-            strcmp(parameters.simulation_medium, 'brain_and_skull')
-        baseline_medium_name = 'brain';
-        baseline_medium = medium.(baseline_medium_name);
+    else warning("Not applying a baseline medium!")
     end
     
     % create matrices for medium properties
@@ -316,26 +312,17 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         end
     end
 
-    % activate debug mode
-    if (contains(parameters.simulation_medium, 'skull') || ...
-            contains(parameters.simulation_medium, 'layered') || ...
-            contains(parameters.simulation_medium, 'phantom'))
-        debug_mode = true;
-        if ~exist(fullfile(parameters.output_dir, 'debug'))
-            mkdir(parameters.output_dir, 'debug'); 
-        end
-    else
-        debug_mode = false;
-    end
-
     % account for k-Wave's actual attenuation behaviour
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
     % 'alpha_coeff' is rescaled to match the specified alpha_0_true and alpa_power_true for the center frequency
 
     alpha_power_fixed = 2;
 
-    if debug_mode==true
+    if parameters.debug == 1
         plot_fit = true;
+        if ~exist(fullfile(parameters.output_dir, 'debug'))
+            mkdir(parameters.output_dir, 'debug'); 
+        end
     else
         plot_fit = false;
     end
@@ -353,7 +340,8 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
         alpha_power_fixed, ...
         plot_fit);
 
-    if debug_mode==true
+    % DEBUG mode: save plot of fitted attenuation values
+    if parameters.debug == 1
         fig_path = fullfile(parameters.output_dir, 'debug', ...
         ['AttenuationFit', char(parameters.results_filename_affix), '.png']);
         saveas(gcf, fig_path);
@@ -376,20 +364,26 @@ function kwave_medium = setup_medium(parameters, medium_masks, pseudoCT)
                           'temp_0', temp_0);
     
     % save images for debugging
-    if debug_mode==true
+    if parameters.debug == 1
         try
             filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
             niftiwrite(density, filename_density, 'Compressed',true);
+            pause(0.1);
             filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('matrix_sound_speed'));
             niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
+            pause(0.1);
             filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_0_true'));
             niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
+            pause(0.1);
             filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_power'));
             niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
+            pause(0.1);
             filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
             niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
+            pause(0.1);
             filename_perfusion = fullfile(parameters.output_dir, 'debug', sprintf('matrix_perfusion'));
             niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true);
+            pause(0.1);
             filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
             niftiwrite(absorption, filename_absorption, 'Compressed',true);
         catch

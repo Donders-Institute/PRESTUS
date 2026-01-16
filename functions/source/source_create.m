@@ -1,6 +1,6 @@
-function [source, source_labels, transducer_pars] = setup_source(parameters, kgrid, trans_pos, focus_pos)
+function [source, source_labels, transducer_pars] = source_create(parameters, kgrid, trans_pos, focus_pos)
 
-% SETUP_SOURCE Creates a source for k-Wave simulations based on transducer parameters.
+% SOURCE_CREATE Creates a source for k-Wave simulations based on transducer parameters.
 %
 % Supports:
 %   - multiple transducers, each with multiple elements (use_kWaveArray == 0)

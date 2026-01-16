@@ -37,8 +37,8 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     allPaths = regexp(path,pathsep,'Split');
 
     if ~any(ismember(functionsLoc,allPaths))
-        addpath(functionsLoc);
-        disp(['Adding ', functionsLoc]);
+        addpath(genpath(functionsLoc));
+        disp(['Adding ', functionsLoc, 'and subfolders']);
     else
     end
 
@@ -123,7 +123,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % if segmentations are not yet available
 
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
-        preprocess_segmentation(parameters, subject_id)
+        preproc_segmentation(parameters, subject_id)
     end
 
     % stop here is no simulation is requested (= segmentation only)
@@ -134,68 +134,19 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     end
 
     %% Focal distance calculation
-    % Expected focal distance handling (multi-transducer, with backward compat)
 
-    % 1) If parameters.expected_focal_distance_mm is set (legacy), copy to all transducers
-    if isfield(parameters, 'expected_focal_distance_mm') && ~isempty(parameters.expected_focal_distance_mm)
-        for ti = 1:numel(parameters.transducer)
-            if ~isfield(parameters.transducer(ti), 'expected_focal_distance_mm') || ...
-                    isempty(parameters.transducer(ti).expected_focal_distance_mm)
-                parameters.transducer(ti).expected_focal_distance_mm = parameters.expected_focal_distance_mm;
-            end
-        end
-    end
-    
-    % 2) For any transducer still missing expected_focal_distance_mm, try to derive it from T1 positions
-    needs_t1 = false;
-    for ti = 1:numel(parameters.transducer)
-        tr = parameters.transducer(ti);
-        if ~isfield(tr, 'expected_focal_distance_mm') || isempty(tr.expected_focal_distance_mm)
-            needs_t1 = true;
-            break
-        end
-    end
-    
-    if needs_t1
-        disp('Expected focal distance not specified for all transducers, trying to get it from positions on T1 grid')
-    
-        % load T1 header once
-        filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
-        if isempty(filename_t1)
-            error('File does not exist for T1 (t1_path_template): %s', ...
-                  fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
-        end
-        filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name); % first match
-        t1_info = niftiinfo(filename_t1);
-        t1_grid_step_mm = t1_info.PixelDimensions(1);
-    
-        % fill missing expected_focal_distance_mm per transducer
-        for ti = 1:numel(parameters.transducer)
-            tr = parameters.transducer(ti);
-            if ~isfield(tr, 'expected_focal_distance_mm') || isempty(tr.expected_focal_distance_mm)
-                if ~isfield(tr, 'pos_t1_grid')  || isempty(tr.pos_t1_grid) || ...
-                   ~isfield(tr, 'focus_pos_t1_grid') || isempty(tr.focus_pos_t1_grid)
-                    error('Transducer %d: pos_t1_grid or focus_pos_t1_grid missing; cannot compute expected focal distance.', ti);
-                end
-    
-                focal_distance_t1 = norm(tr.focus_pos_t1_grid - tr.pos_t1_grid);
-                parameters.transducer(ti).expected_focal_distance_mm = focal_distance_t1 * t1_grid_step_mm;
-            end
-        end
-    
-        clear filename_t1 t1_info t1_grid_step_mm focal_distance_t1
-    end
+    parameters = focal_distance_calculation(parameters);
 
     %% PREPROCESS structural MRI & POSITION transducer + target
     % reorient image, determine transducer & target position in image
-    % For more documentation, see the 'preprocess_brain' function.
+    % For more documentation, see the 'preproc_head' function.
 
     if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
 
         % global preprocessing based on first transducer–focus pair in T1 space
         [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final_1, ...
             focus_pos_final_1, t1_image_orig, t1_header, final_transformation_matrix, ...
-            inv_final_transformation_matrix] = preprocess_brain(parameters, subject_id);
+            inv_final_transformation_matrix] = preproc_head(parameters, subject_id);
         if isempty(medium_masks)
             filename_output_table = '';
             return;
@@ -250,7 +201,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             else
                 warning('WARNING: phantom dimensions DO NOT fit requested grid...')
             end
-            % create medium mask according to indices in parameters.layer_labels (see smooth_and_crop.m)
+            % create medium mask according to indices in parameters.layer_labels (see preproc_smooth_and_crop.m)
             [medium_masks] = medium_mask_create(segmented_img, parameters, 1);
             % specify that no transformation was applied
             final_transformation_matrix = zeros(size(medium_masks));
@@ -357,18 +308,17 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     parameters.focus_pos_grid = focus_pos_final;
 
     %% SETUP MEDIUM
-    % For more documentation, see 'setup_medium'
+    % For more documentation, see 'medium_setup'
     disp('Setting up kwave medium...')
 
     if parameters.usepseudoCT == 1
-        kwave_medium = setup_medium(parameters, medium_masks, segmented_image_cropped);
+        kwave_medium = medium_setup(parameters, medium_masks, segmented_image_cropped);
     else
-        kwave_medium = setup_medium(parameters, medium_masks);
+        kwave_medium = medium_setup(parameters, medium_masks);
     end
     
     % save images of assigned medium properties
-    if (contains(parameters.simulation_medium, 'skull') || ...
-            contains(parameters.simulation_medium, 'layered'))
+    if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered')) && parameters.debug == 1
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'sound_speed')
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'density')
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'alpha_coeff')
@@ -393,14 +343,14 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
 
     %% SETUP SOURCE
     % =========================================================================
-    % For more documentation, see 'setup_grid_source_sensor'
+    % For more documentation, see 'source_sensor_setup'
 
     if parameters.run_source_setup
         disp('Setting up kwave source...')
 
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
-            setup_grid_source_sensor(...
+            source_sensor_setup(...
             parameters, ...
             max_sound_speed, ...
             trans_pos_final, ...
@@ -417,7 +367,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
 			disp('Adapt time step for simulation stability...')
             grid_time_step = dt_stability_limit*0.90; % use 90% of the limit (which are only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
-            [kgrid, source, sensor, source_labels] = setup_grid_source_sensor(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step);
+            [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step);
         end
     end
 
@@ -471,7 +421,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             error('Source setup not requested. Not able to proceed with acoustic simulation.')
         end
 
-        sensor_data = run_simulations(kgrid, kwave_medium, source, sensor, ...
+        sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, ...
             kwave_input_args, parameters);
 
         % re-add fields for future loading
@@ -679,7 +629,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             end
         
             if parameters.n_sim_dims==3
-                [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+                [~,~,~,~,~,~,~,h]=plot_overlay(...
                     acoustic_isppa, ...
                     segmented_image_cropped, ...
                     source_labels, ...
@@ -689,7 +639,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                     fpos_sim, ...
                     highlighted_pos);
             else
-                h = plot_isppa_over_image_2d(...
+                h = plot_overlay_2d(...
                     acoustic_isppa, ...
                     segmented_image_cropped, ...
                     source_labels, ...
@@ -776,7 +726,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                 heating_focal_planeT, ...
                 heating_CEM43, ...
                 heating_focal_planeCEM43] = ...
-                run_heating_simulations(sensor_data, ...
+                thermal_simulation(sensor_data, ...
                 kgrid, ...
                 kwave_medium, ...
                 sensor, ...
@@ -817,7 +767,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         end
     end
 
-    %% PROCESS HEATING RESULTS
+    %% PROCESS THERMAL RESULTS
     % ================================================================
 
     if parameters.heating_available == 1
@@ -863,8 +813,8 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             source_labels = zeros(size(segmented_image_cropped));
         end
 
-        % Creates a line graph and a video of the heating effects
-        plot_heating_sims(...
+        % Creates a line graph and (OPTIONAL) video of the heat propagation
+        thermal_plot_sim(...
             heating_focal_planeT, ...
             time_status_seq, ...
             parameters, ...
@@ -883,7 +833,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
 
         % plot heating superimposed on segmentation
         if ndims(heating_maxT) == 3
-            [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+            [~,~,~,~,~,~,~,h]=plot_overlay(...
                     heating_maxT, ...
                     segmented_image_cropped, ...
                     source_labels, ...
@@ -894,7 +844,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                     highlighted_pos, ...
                     'overlay_color_range', temp_color_range);
         elseif ndims(heating_maxT) == 2
-            [h]=plot_isppa_over_image_2d(...
+            [h]=plot_overlay_2d(...
                     heating_maxT, ...
                     medium_masks, ...
                     source_labels, ...
@@ -1035,7 +985,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                         t1_header.PixelDimensions(1));
             
                     % Plots the Isppa over the untransformed image
-                    [~,~,~,~,~,~,~,h]=plot_isppa_over_image(...
+                    [~,~,~,~,~,~,~,h]=plot_overlay(...
                         data_backtransf, ...
                         t1_image_orig, ...
                         source_labels, ...

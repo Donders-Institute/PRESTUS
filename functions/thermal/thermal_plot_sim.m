@@ -1,6 +1,6 @@
-function plot_heating_sims(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43)
+function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43)
 
-% PLOT_HEATING_SIMS Visualizes heating simulation results over time.
+% THERMAL_PLOT_SIM Visualizes heating simulation results over time.
 %
 % This function generates plots and visualizations for heating simulations, including:
 %   1. Temperature profile over time.
