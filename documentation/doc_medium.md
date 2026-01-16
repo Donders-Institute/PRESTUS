@@ -8,10 +8,6 @@ PRESTUS supports various medium configurations. These can be specified with ```p
 
     Places a transducer into homogeneous water tissue.
 
-- ```water_and_skull``` or ```brain_and_skull``` (deprecated)
-
-    Use a baseline medium of either water or brain, and insert skull based on imaging masks. Constrained variant of the ```layered``` setup that may be deprecated in future releases.
-
 - ```layered```
 
     Heterogeneous tissue composition based on charm segmentation. By default, the following media are included: 

@@ -47,7 +47,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `other_smooth_threshold`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
 
 
-### Transducer modeling
+### Transducer specification
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
@@ -59,10 +59,17 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).    |    |
 | `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                             | Must be calibrated.   |
 | `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                            | Must be calibrated.   |
+| `transducer.pos_t1_grid`          | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
 | `expected_focal_distance_mm`      | Expected distance to the stimulation focus (in mm).                   | Transducer depth setting |
 | `transducer_from_localite`        | Load transducer position from Localite files?.                        | (`1 = yes, 0 = no` [default])   |
 | `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).             | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
 
+### Target specification
+
+| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `focus_pos_t1_grid`               | Position of stimulation target (XYZ, T1 grid voxel space).                                                           | |
+| `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).                                          | Default: 5 mm|
 
 ### Simulation grid
 
@@ -71,11 +78,8 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                                                     | |
 | `default_grid_size`               | Default size of the simulation grid per dimension (number of points).                                                | |
 | `default_grid_dims`               | Default dimensions of the simulation grid `[Nx, Ny, Nz]`.                                                            | |
-| `focus_pos_t1_grid`               | Stimulation target position on T1 grid space.                                                                        | |
-| `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).                                          | |
 | `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
 | `prime_factor_max_grid_expansion` | Maximum expansion factor for computational grid to optimize prime numbers and speed up computations.                 | |
-
 
 ### Medium properties
 
