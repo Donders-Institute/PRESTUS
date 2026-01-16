@@ -221,3 +221,5 @@ segmentation_software: charm
 # If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
 #torque: ld_library_path: /opt/gcc/7.2.0/lib64
 #slurm: ld_library_path: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+
+debug: 1 # Activate a debug mode in which more intermediate outputs are provided?
