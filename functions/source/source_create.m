@@ -197,7 +197,6 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         if parameters.n_sim_dims == 3
             % 3D annular array
             pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
-            focus_vec = [kgrid.x_vec(focus_pos_1(1)), focus_vec_y(kgrid, focus_pos_1, parameters), kgrid.z_vec(focus_pos_1(3))]; %#ok<*NASGU>
             focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
 
             karray.addAnnularArray(pos_vec, ...
