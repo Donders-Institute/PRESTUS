@@ -32,19 +32,20 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
 
     % Adds the paths to the 'functions' and 'toolboxes' folders
     currentLoc = fileparts(mfilename("fullpath"));
-    functionsLoc = fullfile(currentLoc,'functions');
-    toolboxesLoc = fullfile(currentLoc,'toolboxes');
+    disp(currentLoc)
+    functionsLoc = fullfile(currentLoc, '..', 'functions');
+    toolboxesLoc = fullfile(currentLoc, '..', 'toolboxes');
     allPaths = regexp(path,pathsep,'Split');
 
-    if ~any(ismember(functionsLoc,allPaths))
+    if ~any(ismember(fullfile(functionsLoc, 'helper'),allPaths))
         addpath(genpath(functionsLoc));
-        disp(['Adding ', functionsLoc, 'and subfolders']);
+        disp(['Adding ', functionsLoc, ' and subfolders']);
     else
     end
 
     if ~any(ismember(toolboxesLoc,allPaths))
         addpath(genpath(toolboxesLoc));
-        disp(['Adding ', toolboxesLoc, 'and subfolders']);
+        disp(['Adding ', toolboxesLoc, ' and subfolders']);
     else
     end
 
