@@ -122,7 +122,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     %% SEGMENT structural MRI (SimNIBS)
     % if segmentations are not yet available
 
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+    if contains(parameters.simulation_medium, {'skull'; 'layered'})
         preproc_segmentation(parameters, subject_id)
     end
 
@@ -141,7 +141,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % reorient image, determine transducer & target position in image
     % For more documentation, see the 'preproc_head' function.
 
-    if contains(parameters.simulation_medium, 'skull') || strcmp(parameters.simulation_medium, 'layered')
+    if contains(parameters.simulation_medium, {'skull'; 'layered'})
 
         % global preprocessing based on first transducer–focus pair in T1 space
         [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final_1, ...
@@ -318,7 +318,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     end
     
     % save images of assigned medium properties
-    if (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered')) && parameters.debug == 1
+    if contains(parameters.simulation_medium, {'skull'; 'layered'}) && parameters.debug == 1
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'sound_speed')
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'density')
         medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, 'alpha_coeff')
@@ -412,8 +412,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
             'PMLSize', parameters.pml_size, ...
             'PlotPML', true);
 
-        if contains(parameters.simulation_medium, 'skull')|| ...
-                strcmp(parameters.simulation_medium, 'layered')
+        if contains(parameters.simulation_medium, {'skull'; 'layered'})
             kwave_input_args.DisplayMask = skull_edge;
         end
 
@@ -576,9 +575,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         mask_skin = ismember(medium_masks,skin_i);
         
         % Layer-specific outcomes (in case a layered simulation)
-        if contains(parameters.simulation_medium, 'skull') || ...
-                strcmp(parameters.simulation_medium, 'layered') || ...
-                strcmp(parameters.simulation_medium, 'phantom')
+        if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
 
             % calculate max. isppa and location across full space
             [~, Ix, Iy, Iz] = masked_max_3d(acoustic_isppa, ones(size(medium_masks)));
@@ -785,9 +782,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         output_table.maxCEM43 = max(heating_CEM43, [], 'all');
         % Overwrites the max temperature by dividing it up for each layer
         % in case a layered simulation_medium was selected
-        if contains(parameters.simulation_medium, 'skull') || ...
-                strcmp(parameters.simulation_medium, 'layered') || ...
-                strcmp(parameters.simulation_medium, 'phantom')
+        if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
             output_table.maxT_brain = masked_max_3d(heating_maxT, mask_brain);
             output_table.maxT_skull = masked_max_3d(heating_maxT, mask_skull); 
             output_table.maxT_skin = masked_max_3d(heating_maxT, mask_skin);
@@ -868,9 +863,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % ============================================================================
     % plot various metrics on both the subject-space T1 image and in MNI space
 
-    if contains(parameters.simulation_medium, 'skull') || ...
-            strcmp(parameters.simulation_medium, 'layered') || ...
-            strcmp(parameters.simulation_medium, 'phantom')
+    if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
 
         data_types = "medium_masks";
         if parameters.acoustics_available == 1 
@@ -1047,7 +1040,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % To check sonication parameters of the transducer in free water
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
-            (contains(parameters.simulation_medium, 'skull') || contains(parameters.simulation_medium, 'layered'))
+            contains(parameters.simulation_medium, {'skull'; 'layered'})
         if numel(parameters.transducer) > 1
             warning(['Water checks for multiple transducers are not implemented. ' ...
                      'Post-hoc water simulation will be run only for the first specified transducer. ' ...
