@@ -20,7 +20,7 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
     % run the pipeline.                                                 %
     %                                                                   %
     % Some notes:                                                       %
-    % - At least Matlab 2022b, SimNIBS 4.0 and k-Wave 1.4 must be used  %
+    % - Matlab 2022b+, SimNIBS 4.0, and k-Wave 1.4 have been tested     %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -65,9 +65,11 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
         end
     end
     
-    % test that kwave is added
+    % Verify that kwave is added and print k-wave information
     if ~exist('makeBowl','file')
         error('kwave not added');
+    else
+        kwave_version(getkWavePath);
     end
 
     % Make subfolder (if enabled) and check if directory exists
@@ -1003,7 +1005,6 @@ function [filename_output_table, parameters] = single_subject_pipeline(subject_i
                     close(h);
                 end
             end
-
             
             m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
             
