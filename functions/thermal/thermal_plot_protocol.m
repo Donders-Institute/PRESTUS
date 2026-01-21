@@ -1,4 +1,4 @@
-function thermal_plot_protocol(params_thermal, varargin)
+function thermal_plot_protocol(params_thermal, parameters, varargin)
 % THERMAL_PLOT_PROTOCOL Plots the full ultrasound stimulation protocol timeline.
 %
 % Input:
@@ -59,7 +59,8 @@ function [t_high, signal_high] = generate_segment(t_start, total_duration, dt_co
     end
 end
 
-% === Plot 1: First pulse detail ===
+%% Prepare Plot 1: Pulse train
+
 total_on_dur  = params_thermal.pt_on_steps_n  * params_thermal.pt_on_steps_dur;
 total_off_dur = params_thermal.pt_off_steps_n * params_thermal.pt_off_steps_dur;
 
@@ -74,48 +75,9 @@ if params_thermal.pt_off_steps_n > 0 && params_thermal.pt_off_steps_dur>0
     t_first_pulse = [t_first_pulse; t_off]; signal_first_pulse = [signal_first_pulse; s_off];
 end
 
-% === Plot 2: Red ON patches only ===
-t_on_patches = [];  % Start/end times of ALL ON periods (PTs)
-t_current = 0;
+%% Prepare Plot 2: Patches for ON period in pulse repetitions
 
-for rep_i = 1:params_thermal.n_ptri_reps
-    % Each PT = ON period → red patch
-    t_on_start = t_current;
-    t_on_end = t_current + params_thermal.pt_on_steps_dur*params_thermal.pt_on_steps_n;
-    t_on_patches = [t_on_patches; t_on_start t_on_end];
-    t_current = t_current + params_thermal.ptri;  % Full PTRI
-end
-
-t_total_end = t_current + params_thermal.post_ptri_dur;
-
-% === Plot ===
-figure('Position', [100 100 fig_size(1)*100 fig_size(2)*100], 'Color', 'w');
-
-% PLOT 1: First pulse (sine ON + flat OFF)
-subplot(2,1,1);
-h1 = plot(t_first_pulse, signal_first_pulse, pulse_color, 'LineWidth', 2.5); hold on;
-
-% Shade pulse OFF only
-off_mask = abs(signal_first_pulse) < 1e-10;
-if any(off_mask)
-    off_starts = find(diff([false; off_mask]) > 0);
-    off_ends = find(diff([off_mask; false]) < 0);
-    for i = 1:min(length(off_starts), length(off_ends))
-        ts = t_first_pulse(off_starts(i):off_ends(i));
-        fill(ts([1 end end 1]), [-1.2 -1.2 1.2 1.2], off_color, ...
-             'FaceAlpha', 0.4, 'EdgeColor', 'none');
-    end
-end
-
-title(sprintf('Pulse Detail: PRI=%.1fms'), 'FontSize', 13);
-ylabel('Signal'); grid on; ylim([-1.2 1.2]);
-legend(h1, 'US Pulse', 'Location', 'southeast');
-
-% PLOT 2: Red ON patches (PT periods only) - NO SINE
-subplot(2,1,2);
-hold on;
-
-% === Plot 2: max. 20 equi-distant ON patches across full PTRD ===
+% max. 20 equi-distant ON patches across full PTRD
 MAX_PATCHES = 20;
 total_ptri_reps = params_thermal.n_ptri_reps;
 
@@ -142,26 +104,62 @@ end
 % Full x-axis span
 t_total_end = total_ptri_reps * params_thermal.ptri + params_thermal.post_ptri_dur;
 
-% Plot patches
-hold on;
-for i = 1:size(t_on_patches, 1)
-    t_patch = t_on_patches(i, :);
-    fill([t_patch(1) t_patch(2) t_patch(2) t_patch(1)], [0 0 1 1], pulse_color, ...
-         'FaceAlpha', 0.7, 'EdgeColor', pulse_color, 'LineWidth', 1);
-end
+%% Plot the thermal protocol
 
-% Title & axis
-title(sprintf('%d/%d PTs shown every %dth (%.1fs total + %.1fs post)', ...
-    size(t_on_patches,1), total_ptri_reps, step_reps, params_thermal.ptrd, params_thermal.post_ptri_dur));
-xlim([0 t_total_end]);
-xlim([0 t_total_end]);
-sgtitle(sprintf('Thermal Protocol: PD=%.1fms/PRI=%.0fms/%d pulses-PT (%.1f%% DC)', ...
-    params_thermal.pd*1e3, params_thermal.pri*1e3, params_thermal.n_pulses_per_pt, params_thermal.dc*100), ...
-    'FontSize', 15, 'FontWeight', 'bold');
+h = figure('Position', [100 100 fig_size(1)*100 fig_size(2)*100], 'Color', 'w');
+% PLOT 1: First pulse (sine ON + flat OFF)
+subplot(2,1,1);
+    h1 = plot(t_first_pulse, signal_first_pulse, pulse_color, 'LineWidth', 2.5); hold on;
+    
+    % Shade pulse OFF only
+    off_mask = abs(signal_first_pulse) < 1e-10;
+    if any(off_mask)
+        off_starts = find(diff([false; off_mask]) > 0);
+        off_ends = find(diff([off_mask; false]) < 0);
+        for i = 1:min(length(off_starts), length(off_ends))
+            ts = t_first_pulse(off_starts(i):off_ends(i));
+            fill(ts([1 end end 1]), [-1.2 -1.2 1.2 1.2], off_color, ...
+                 'FaceAlpha', 0.4, 'EdgeColor', 'none');
+        end
+    end
+    
+    title(sprintf('Pulse Detail: PRI=%.1fms'), 'FontSize', 13);
+    ylabel('Signal'); grid on; ylim([-1.2 1.2]);
+    legend(h1, 'US Pulse', 'Location', 'southeast');
 
-% Summary
+% PLOT 2: Red ON patches (PT periods only) - NO SINE
+subplot(2,1,2);
+    hold on;
+    
+    % Plot patches
+    hold on;
+    for i = 1:size(t_on_patches, 1)
+        t_patch = t_on_patches(i, :);
+        fill([t_patch(1) t_patch(2) t_patch(2) t_patch(1)], [0 0 1 1], pulse_color, ...
+             'FaceAlpha', 0.7, 'EdgeColor', pulse_color, 'LineWidth', 1);
+    end
+
+    % Title & axis
+    title(sprintf('%d/%d PTs shown every %dth (%.1fs total + %.1fs post)', ...
+        size(t_on_patches,1), total_ptri_reps, step_reps, params_thermal.ptrd, params_thermal.post_ptri_dur));
+    xlim([0 t_total_end]);
+    xlim([0 t_total_end]);
+    sgtitle(sprintf('Thermal Protocol: PD=%.1fms/PRI=%.0fms/%d pulses-PT (%.1f%% DC)', ...
+        params_thermal.pd*1e3, params_thermal.pri*1e3, params_thermal.n_pulses_per_pt, params_thermal.dc*100), ...
+        'FontSize', 15, 'FontWeight', 'bold');
+
+% save plot
+output_plot_filename = fullfile(parameters.output_dir,...
+    sprintf('sub-%03d_%s_thermal_protocol%s.png',...
+    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+saveas(h, output_plot_filename, 'png')
+close(h);
+
+%% Print protocol summary
+
 fprintf('Pulse: %.1fms ON + %.1fms OFF = %.1fms PRI ✓\n', ...
     total_on_dur*1e3, total_off_dur*1e3, (total_on_dur+total_off_dur)*1e3);
 fprintf('PTRD: %d PT × %.2fs = %.1fs + %.1fs post ✓\n', params_thermal.n_ptri_reps, ...
     params_thermal.ptd, params_thermal.ptrd, params_thermal.post_ptri_dur);
+
 end
