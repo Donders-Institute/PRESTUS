@@ -1,0 +1,318 @@
+function print_parameter_summary(parameters)
+% PRINT_PARAMETER_SUMMARY displays PRESTUS pipeline using EXACT config field names.
+%
+% Use as:
+%   print_parameter_summary(parameters)
+%
+% Checks field existence before printing; shows exact YAML parameter names
+% from PRESTUS configuration documentation.
+
+arguments
+    parameters struct
+end
+
+fprintf('========================================\n');
+fprintf('PRESTUS CONFIGURATION SUMMARY\n');
+fprintf('========================================\n\n');
+
+%% 1. I/O Management
+
+fprintf('📁 I/O MANAGEMENT\n');
+print_if_field(parameters, 'data_path', '%s');
+print_if_field(parameters, 'seg_path', '%s');
+print_if_field(parameters, 'sim_path', '%s');
+print_if_field(parameters, 'simnibs_bin_path', '%s');
+print_if_field(parameters, 'results_filename_affix', '%s');
+print_overwrite_pair(parameters);
+fprintf('\n');
+
+%% 2. Simulation Type
+
+fprintf('⚙️ SIMULATION TYPE\n');
+print_if_field(parameters, 'simulation_medium', '%s');
+print_if_field(parameters, 'n_sim_dims', '%dD');
+print_flag(parameters, 'axisymmetric');
+print_modules(parameters);
+fprintf('\n');
+
+%% 3. Simulation Grid
+
+fprintf('📐 SIMULATION GRID\n');
+print_if_field(parameters, 'grid_step_mm', '%.2f mm');
+print_if_field(parameters, 'default_grid_size', '%d');
+print_if_field(parameters, 'default_grid_dims', '%s');
+print_if_field(parameters, 'pml_size', '%d');
+print_if_field(parameters, 'prime_factor_max_grid_expansion', '%.1f');
+fprintf('\n');
+
+%% 4. Transducer Specification
+
+fprintf('🎯 TRANSDUCER SPECIFICATION\n');
+td = get_struct_or_default(parameters, 'transducer');
+print_if_field(td, 'source_freq_hz', '%.1f Hz');
+print_if_field(td, 'n_elements', '%d');
+print_if_field(td, 'curv_radius_mm', '%.0f mm');
+print_if_field(td, 'source_amp', '%.1f Pa');
+print_if_field(td, 'trans_pos', '[%.1f %.1f %.1f]');
+print_if_field(td, 'focus_pos', '[%.1f %.1f %.1f]');
+if isfield(td, 'trans_pos') && isfield(td, 'focus_pos')
+    focal_dist = norm(td.focus_pos - td.trans_pos) * getfield_or_default(parameters, 'grid_step_mm', 0.5);
+    fprintf('  expected_focal_distance_mm: %.1f mm\n', focal_dist);
+end
+fprintf('\n');
+
+%% 5. Medium Properties
+
+fprintf('🧪 MEDIUM PROPERTIES\n');
+
+tissues = {'water', 'skull', 'brain', 'skin', 'skull_trabecular', 'skull_cortical'};
+props = {'sound_speed', 'density', 'alpha_0_true', 'alpha_power_true', ...
+         'thermal_conductivity', 'specific_heat_capacity', 'perfusion', 'absorption_fraction'};
+labels = {'Sound Speed', 'Density', 'Attenuation (1 MHz)', 'Att:Frequency-scaling', ...
+         'Thermal Conductivity', 'Heat Capacity', 'Perfusion', 'Absorption Fraction'};
+
+for t_idx = 1:length(tissues)
+    tissue = tissues{t_idx};
+    fprintf('  %s:\n', upper(tissue));
+    
+    has_props = false;
+    for p_idx = 1:length(props)
+        prop = props{p_idx};
+        label = labels{p_idx};
+        full_path = sprintf('medium.%s.%s', tissue, prop);
+        val = get_nested_safe(parameters, full_path);
+        
+        if ~isempty(val) && ~isnan(val) && isfinite(val)
+            unit = get_unit(prop);
+            
+            % use fixed-point formats
+            if contains(prop, 'sound_speed') || contains(prop, 'density') || ...
+                    contains(prop, 'specific_heat_capacity') || contains(prop, 'perfusion')
+                fmt = '%.0f';
+            elseif contains(prop, 'alpha_0_true')
+                fmt = '%.4f';
+            elseif contains(prop, 'alpha_power_true') || contains(prop, 'absorption_fraction')
+                fmt = '%.2f';
+            else  % thermal properties
+                fmt = '%.3f';
+            end
+            
+            fprintf('    %-25s %s %s\n', label, sprintf(fmt, val), unit);
+            has_props = true;
+        end
+    end
+    
+    if ~has_props
+        fprintf('    No properties defined\n');
+    end
+    fprintf('\n');
+end
+
+%% 6. Thermal Sequence
+
+if isfield(parameters, 'thermal') && parameters.run_heating_sims == 1
+    fprintf('🔥 THERMAL SEQUENCE\n');
+    th = parameters.thermal;
+    print_if_field(th, 'pd', '%.3fs', 'Pulse Duration');
+    print_if_field(th, 'pri', '%.3fs', 'Pulse Repetition Interval');
+    print_if_field(th, 'ptd', '%.3fs', 'Pulse Train Duration');
+    print_if_field(th, 'ptri', '%.3fs', 'Pulse Train Repetition Interval');
+    print_if_field(th, 'ptrd', '%.3fs', 'Pulse Train Repetition Duration');
+    print_if_field(th, 'post_ptri_dur', '%.3fs', 'Steady-State Duration');
+    fprintf('\n');
+end
+
+%% 7. HPC/GPU
+
+fprintf('💻 HPC/GPU OPTIONS\n');
+print_if_field(parameters, 'code_type', '%s');
+print_flag(parameters, 'using_donders_hpc');
+if getfield_or_default(parameters, 'using_donders_hpc', 0)
+    print_if_field(parameters, 'hpc_partition', '%s');
+end
+fprintf('\n');
+
+fprintf('========================================\n');
+fprintf('Configuration verified - Ready to run!\n');
+fprintf('========================================\n');
+
+end
+
+%% Helper functions
+
+function print_if_field(s, field, fmt, alternate_name)
+    if nargin < 4, alternate_name = ''; end
+    
+    % Use alternate_name if provided, otherwise original field
+    display_name = iif(~isempty(alternate_name), alternate_name, field);
+    
+    if isfield(s, field)
+        val = s.(field);
+        
+        % SPECIAL HANDLING: Vector dimensions
+        if strcmp(field, 'default_grid_dims') || strcmp(field, 'grid_dims')
+            if ~isempty(val) && all(isfinite(val(:))) && ~any(isnan(val(:)))
+                if length(val) <= 10
+                    grid_str = sprintf('%g ', val);
+                    grid_str = strtrim(grid_str);
+                    fprintf('  %-30s [%s]\n', [display_name ':'], grid_str);  % Uses display_name
+                else
+                    fprintf('  %-30s [%dx...%dx%d]\n', [display_name ':'], size(val,1), size(val,2), length(val));
+                end
+            else
+                fprintf('  ⚠️  %-30s [EMPTY/NaN VECTOR]\n', [display_name ':']);
+            end
+            return;
+        end
+
+        % NUMERIC SCALAR
+        if isnumeric(val) && isscalar(val)
+            if isfinite(val) && ~isnan(val)
+                fprintf('  %-30s %s\n', [display_name ':'], sprintf(fmt, val));
+            else
+                fprintf('  ⚠️  %-30s [NaN/Inf]\n', [display_name ':']);
+            end
+            return;
+        end
+        
+        % STRING
+        if ischar(val) || isstring(val)
+            val_str = char(val);
+            if ~isempty(val_str) && ~strcmpi(val_str, 'NA') && ~strcmpi(val_str, 'N/A')
+                fprintf('  %-30s %s\n', [display_name ':'], sprintf(fmt, val_str));
+            else
+                fprintf('  ⚠️  %-30s [EMPTY/NA]\n', [display_name ':']);
+            end
+            return;
+        end
+        
+        % OTHER VECTORS/ARRAYS
+        if isvector(val)
+            if length(val) > 0 && all(isfinite(val)) && ~any(isnan(val))
+                fprintf('  %-30s %s\n', [display_name ':'], sprintf(fmt, val));
+            else
+                fprintf('  ⚠️  %-30s [EMPTY/NaN VECTOR]\n', [display_name ':']);
+            end
+            return;
+        end
+        
+        % STRUCT/CELL/OTHER
+        if ~isempty(val)
+            fprintf('  %-30s PRESENT\n', [display_name ':']);
+        else
+            fprintf('  ⚠️  %-30s [EMPTY]\n', [display_name ':']);
+        end
+        
+    else
+        % MISSING FIELD - uses alternate_name in warning
+        fprintf('  ❗ %-30s [MISSING - add to config]\n', [display_name ':']);
+    end
+end
+
+function str = iif(condition, true_val, false_val)
+    if condition
+        str = true_val;
+    else
+        str = false_val;
+    end
+end
+
+function print_overwrite_pair(s)
+    has_overwrite = isfield(s, 'overwrite_files');
+    has_simnibs = isfield(s, 'overwrite_simnibs');
+    if has_overwrite || has_simnibs
+        fprintf('  %-30s %s', 'overwrite_files:', ...
+            getfield_or_default(s, 'overwrite_files', ''));
+        if has_simnibs
+            fprintf(' / overwrite_simnibs: %d\n', s.overwrite_simnibs);
+        else
+            fprintf('\n');
+        end
+    end
+end
+
+function print_flag(s, field)
+    if getfield_or_default(s, field, 0)
+        fprintf('  %-30s Yes\n', [field ':']);
+    end
+end
+
+function print_modules(s)
+    modules = {
+        'run_source_setup',    'Source';
+        'run_acoustic_sims',   'Acoustic'; 
+        'run_heating_sims',    'Thermal';
+        'run_posthoc_water_sims', 'Post-water'
+    };
+    
+    fprintf('  Modules:        ');
+    for i = 1:size(modules, 1)
+        mod_field = modules{i, 1};
+        mod_label = modules{i, 2};
+        status = getfield_or_default(s, mod_field, 0);
+        if status
+            mark = ' ✓';
+        else
+            mark = ' ✗';
+        end
+        fprintf('%-10s%s ', [mod_label ':'], mark);
+    end
+    fprintf('\n');
+end
+
+function s = get_struct_or_default(params, field)
+    if isfield(params, field) && isstruct(params.(field))
+        s = params.(field);
+    else
+        s = struct();
+    end
+end
+
+function val = getfield_or_default(s, field, default)
+    if isfield(s, field)
+        val = s.(field);
+    else
+        val = default;
+    end
+end
+
+function val = get_nested_safe(s, path)
+    try
+        parts = strsplit(path, '.');
+        val = s;
+        for i = 1:length(parts)
+            val = val.(parts{i});
+        end
+    catch
+        val = NaN;
+    end
+end
+
+function [base, prop] = split_path(path)
+    parts = strsplit(path, '.');
+    base = strjoin(parts(1:end-1), '.');
+    prop = parts{end};
+end
+
+function unit = get_unit(prop)
+% GET_UNIT returns units for tissue properties (MATLAB R2016b+ compatible)
+if contains(prop, 'sound_speed')
+    unit = 'm/s';
+elseif contains(prop, 'density')
+    unit = 'kg/m³';
+elseif contains(prop, 'alpha_0_true')
+    unit = 'dB/cm/MHz';
+elseif contains(prop, 'alpha_power_true')
+    unit = '(scalar)';
+elseif contains(prop, 'thermal_conductivity')
+    unit = 'W/m/°C';
+elseif contains(prop, 'specific_heat_capacity')
+    unit = 'J/kg/°C';
+elseif contains(prop, 'perfusion')
+    unit = 'mL/min/kg';
+elseif contains(prop, 'absorption_fraction')
+    unit = '[0-1]';
+else
+    unit = 'N/A';
+end
+end

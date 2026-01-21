@@ -81,6 +81,9 @@ function [parameters] = path_log_setup(parameters, currentLoc, subject_id)
         datestr(now,'ddmmyy_HHMM')));
     diary(filename_log);
 
+    % summarize parameters
+    print_parameter_summary(parameters)
+
     % Define the filename of the summary table
     parameters.filename_output_table = ...
         fullfile(parameters.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
@@ -94,5 +97,9 @@ function [parameters] = path_log_setup(parameters, currentLoc, subject_id)
     
     % display GPU information (if requested)
     if strcmp(parameters.code_type, 'cuda') || strcmp(parameters.code_type, 'matlab_gpu')
+        fprintf('========================================\n');
+        fprintf('GPU INFO \n');
+        fprintf('========================================\n\n');
         gpuDevice()
+        fprintf('========================================\n\n');
     end

@@ -17,9 +17,11 @@ function parameters = load_parameters(varargin)
 %   parameters - Struct containing merged simulation parameters.
 
     %% Load default configuration file
+
     parameters = yaml.loadFile('configs/default_config.yaml', "ConvertToArray", true);
 
     %% Merge with additional configuration files or structures
+
     if nargin == 1
         extra_config_file = varargin{1};
         if isstruct(extra_config_file)
@@ -64,6 +66,7 @@ function parameters = load_parameters(varargin)
     end
 
     %% Check interactive mode requirements
+
     assert(parameters.interactive == 0 || usejava('desktop'), ...
            'MATLAB should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
 
@@ -109,6 +112,7 @@ function parameters = load_parameters(varargin)
     end
 
     %% Derived grid settings
+
     parameters.grid_step_m = parameters.grid_step_mm / 1e3; % Convert grid step from mm to meters
 
     % Set simulation dimensions based on default grid dimensions or fallback to 3D
@@ -126,9 +130,10 @@ function parameters = load_parameters(varargin)
     end
 
     %% Validate thermal simulation settings
+    % Request no timing overview here
 
     if parameters.run_heating_sims
-        thermal_parameters(parameters);
+        thermal_parameters(parameters, true);
     end
 
     %% Output file settings validation and sanitization
@@ -172,11 +177,13 @@ function parameters = load_parameters(varargin)
     end
 
     %% Default segmentation path fallback
+
     if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path)
         parameters.seg_path = parameters.data_path;
     end
 
     %% Default: deactivate pseudoCT unless specified
+
     if ~isfield(parameters, 'usepseudoCT')
         parameters.usepseudoCT = 0;
     end
@@ -199,6 +206,15 @@ function parameters = load_parameters(varargin)
     if verLessThan('matlab', '9.13')
        assert(all(confirmation_dlg('MATLAB appears to be outdated. Please update before continuing. Do you want to continue?', ...
                                    'Yes', 'No')), 'Exiting');
+    end
+
+    %% [DEBUG] Summary of requested parameters
+    % With debugging off, the parameters are saved to the log at the
+    % start of pipeline execution (see path_log_setup).
+
+    if parameters.debug == 1
+        fprintf('PRELIMINARY specified parameters. Note that this may not be the final specification...\n');
+        print_parameter_summary(parameters)
     end
 
 end
