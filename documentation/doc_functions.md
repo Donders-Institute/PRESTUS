@@ -4,8 +4,11 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Category**    | **Description**                                                                                |
 |-----------------------------------------|-----------------|------------------------------------------------------------------------------------------------|
-| `acoustic_simulation`                   | ACOUSTIC       |                                                                                                 |
-| `calc_virtual_elem`                     | CALIBRATION    | Calculate additional virtual elements (STANDALONE)                                              |
+| `acoustic_analysis`                     | ACOUSTIC       |                                                                                                 |
+| `acoustic_convert_axisymmetry`          | ACOUSTIC       |                                                                                                 |
+| `acoustic_simulation`                   | ACOUSTIC       | Set up acoustic simulation                                                                      |
+| `acoustic_wrapper`                      | ACOUSTIC       | Set up acoustic simulation                                                                      |
+| `calc_virtual_elem`                     | CALIBRATION    | (STANDALONE) Calculate additional virtual elements                                              |
 | `calibration_transducer`                | CALIBRATION    |                                                                                                 |
 | `compute_oneil_solution`                | CALIBRATION    |                                                                                                 |
 | `compute_phases`                        | CALIBRATION    |                                                                                                 |
@@ -19,6 +22,9 @@ The following documents the functions provided in PRESTUS.
 | `save_optimized_values`                 | CALIBRATION    |                                                                                                 |
 | `scale_real_intensity_profile`          | CALIBRATION    |                                                                                                 |
 | `set_real_phases`                       | CALIBRATION    |                                                                                                 |
+| `load_parameters`                       | CORE           | Loads and merges configuration files for simulation parameters.                                 |
+| `path_log_setup`                        | CORE           | Set up internal paths and logging, filename for output table                                    |
+| `simulation_nifti`                      | CORE           | Save key outputs as 3D Niftis                                                                   |
 | `changem_vectorized`                    | GROUP          |                                                                                                 |
 | `combine_plots_by_suffix`               | GROUP          |                                                                                                 |
 | `create_group_MNI_plots`                | GROUP          |                                                                                                 |
@@ -31,12 +37,12 @@ The following documents the functions provided in PRESTUS.
 | `get_slice_by_label`                    | HELPER         | Extracts a specific slice from a 3D image based on axis label and slice number.                 |
 | `get_xyz_mesh`                          | HELPER         | Generates a mesh of 3D coordinates for a given image.                                           |
 | `getidx`                                | HELPER         | Retrieves indices for requested tissues from a parameter structure.                             |
-| `load_parameters`                       | HELPER         | Loads and merges configuration files for simulation parameters.                                 |
 | `masked_max_3d`                         | HELPER         | Computes the maximum intensity within a masked 3D region.                                       |
 | `mergeStructure`                        | HELPER         | Merges multiple scalar structures into one.                                                     |
 | `read_ini_file`                         | HELPER         |                                                                                                 |
 | `round_if_integer`                      | HELPER         | Rounds values if they are sufficiently close to integers; otherwise raises an error.            |
 | `subset_fields`                         | HELPER         |                                                                                                 |
+| `tissuemask_binary`                     | HELPER         | Extract binary tissue segmentation masks (for indexing)                                         |
 | `upsample_to_grid`                      | HELPER         |                                                                                                 |
 | `zip_fields`                            | HELPER         |                                                                                                 |
 | `single_subject_pipeline_with_qsub`     | HPC            |                                                                                                 |
@@ -60,8 +66,10 @@ The following documents the functions provided in PRESTUS.
 | `pct_create_pseudoCT`                   | PSEUDO-CT      |                                                                                                 |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
 | `pct_soft_tissue_peak`                  | PSEUDO-CT      | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
-| `plot_overlay_2d`                       | PLOT           | Overlays ISppa map on a background image slice with key positions highlighted.                  |
-| `plot_overlay`                          | PLOT           | Visualizes ISppa map overlaid on a 2D slice of a 3D background image with advanced options.     |
+| `plot_coronal_slices`                   | PLOT           | (DEPRECATED) Visualizes coronal slices of a 3D image with optional legends for labeled images.  |
+| `plot_median_montage`                   | PLOT           | (DEPRECATED) Creates a montage of central slices from a 3D T1 image.                            |
+| `plot_overlay_2d`                       | PLOT           | Overlays map on a background image slice with key positions highlighted.                        |
+| `plot_overlay`                          | PLOT           | Visualizes map overlaid on a 2D slice of a 3D background image with advanced options.           |
 | `plot_t1_with_transducer`               | PLOT           | Creates a plot of a T1 slice oriented along the transducer's axis with overlays.                |
 | `show_3d_head`                          | PLOT           | Visualizes segmented brain images in 3D with transducer placement and target location.          |
 | `show_positioning_plots`                | PLOT           | Visualizes transducer positioning before and after preprocessing using segmented images.        |
@@ -71,19 +79,24 @@ The following documents the functions provided in PRESTUS.
 | `preproc_segmentation`                  | PREPROC        |                                                                                                 |
 | `preproc_smooth_and_crop`               | PREPROC        |                                                                                                 |
 | `segmentation_run`                      | PREPROC        |                                                                                                 |
+| `grid_axisymmetry`                      | SOURCE         | Convert grid to axisymmetry                                                                     |
+| `grid_tissue_setup`                     | SOURCE         | Set up grid dimensions, preprocess head (if modeled), and place in grid                         |
+| `grid_transducer_location`              | SOURCE         | Position transducer (and target) in simulation grid                                             |
 | `source_create`                         | SOURCE         | Creates ultrasound source signals and masks for k-Wave simulations based on transducer geometry.|
 | `source_sensor_setup`                   | SOURCE         |                                                                                                 |
-| `thermal_simulation`                    | THERMAL        |                                                                                                 |
+| `thermal_analysis`                      | THERMAL        | Analyze output of thermal simulations                                                           |
 | `thermal_parameters`                    | THERMAL        | Checks and converts protocol timing setup for thermal estimation                                |
 | `thermal_plot_protocol`                 | THERMAL        | Visualize the requested protocol timing                                                         |
 | `thermal_plot_sim`                      | THERMAL        | Visualizes heating simulation results over time (temperature, rise, CEM43). Optional video      |
+| `thermal_simulation`                    | THERMAL        |                                                                                                 |
+| `focal_distance_calculation`            | TRANSDUCER     |                                                                                                 |
+| `get_trans_pos_from_trigger_markers`    | TRANSDUCER     | Determines transducer and target positions using Localite trigger marker files.                 |
+| `get_transducer_box`                    | TRANSDUCER     | Computes transducer box dimensions and positions for simulations.                               |
+| `get_arc`                               | TRANSDUCER     |                                                                                                 |
 | `transducer_analyze_position_fast`      | TRANSDUCER     |                                                                                                 |
 | `transducer_analyze_position`           | TRANSDUCER     |                                                                                                 |
 | `transducer_positioning`                | TRANSDUCER     |                                                                                                 |
 | `transducer_setup`                      | TRANSDUCER     |                                                                                                 |
-| `get_trans_pos_from_trigger_markers`    | TRANSDUCER     | Determines transducer and target positions using Localite trigger marker files.                 |
-| `get_transducer_box`                    | TRANSDUCER     | Computes transducer box dimensions and positions for simulations.                               |
-| `getArc`                                | TRANSDUCER     |                                                                                                 |
 | `convert_2d_to_axisymmetric`            | TRANSFORM      |                                                                                                 |
 | `convert_axisymmetric_to_2d`            | TRANSFORM      |                                                                                                 |
 | `convert_axisymmetric_to_3d`            | TRANSFORM      |                                                                                                 |
@@ -93,9 +106,3 @@ The following documents the functions provided in PRESTUS.
 | `radialExpand2DTo3D`                    | TRANSFORM      |                                                                                                 |
 | `ras_to_grid`                           | TRANSFORM      | Converts RAS coordinates to voxel (grid) coordinates using NIfTI header transformation matrix.  |
 | `subject2mni_coords_LDfix`              | TRANSFORM      |                                                                                                 |
-
-## Deprecated?
-| **Function Name**                      | **Category**    | **Description**                                                                                 |
-|----------------------------------------|-----------------|-------------------------------------------------------------------------------------------------|
-| `plot_coronal_slices`                  | PLOT            | Visualizes coronal slices of a 3D image with optional legends for labeled images.               |
-| `median_montage`                       | PLOT            | Creates a montage of central slices from a 3D T1 image.                                         |

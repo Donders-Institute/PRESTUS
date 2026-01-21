@@ -1,6 +1,6 @@
-function [x, y] = getArc(center, radius, angleStart, angleEnd, npoints)
+function [x, y] = get_arc(center, radius, angleStart, angleEnd, npoints)
 
-% GETARC Generates the coordinates of an arc in 2D space.
+% GET_ARC Generates the coordinates of an arc in 2D space.
 %
 % This function computes the x and y coordinates of points along an arc 
 % defined by a center, radius, start angle, and end angle. The arc is 

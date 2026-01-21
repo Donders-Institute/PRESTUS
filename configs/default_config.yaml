@@ -52,10 +52,8 @@ seg_labels:
 #   source_amp # [Pa] 
 #   source_phase_deg # Source phase [deg] 
 #   source_freq_hz # [Hz] The central frequency
-#   pos_t1_grid # Position on T1 grid [T1 grid space] (can be left out if importing location data)
-
-# Stimulation target on T1 grid [T1 grid space] (again, can be left out if importing location data)
-# focus_pos_t1_grid: []
+#   trans_pos # Position on T1 grid [T1 grid space]
+#   focus_pos # Stimulation target on T1 grid [T1 grid space]
 
 # Important to note: the alpha values in 'alpha_0_true' are currently set for 500KHz transducers
 # These should be adjusted to the values shown in their respected comments below the medium parameters

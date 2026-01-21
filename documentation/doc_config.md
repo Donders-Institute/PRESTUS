@@ -59,7 +59,8 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).    |    |
 | `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                             | Must be calibrated.   |
 | `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                            | Must be calibrated.   |
-| `transducer.pos_t1_grid`          | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
+| `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
+| `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).            | |
 | `expected_focal_distance_mm`      | Expected distance to the stimulation focus (in mm).                   | Transducer depth setting |
 | `transducer_from_localite`        | Load transducer position from Localite files?.                        | (`1 = yes, 0 = no` [default])   |
 | `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).             | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
@@ -68,7 +69,6 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `focus_pos_t1_grid`               | Position of stimulation target (XYZ, T1 grid voxel space).                                                           | |
 | `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).                                          | Default: 5 mm|
 
 ### Simulation grid

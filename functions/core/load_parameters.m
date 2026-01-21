@@ -167,6 +167,8 @@ function parameters = load_parameters(varargin)
         assert(all(confirmation_dlg(sprintf('The segmentation software (%s) does not exist at %s. Do you want to continue?', ...
                                             parameters.segmentation_software, parameters.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
+    elseif ~isfield(parameters, 'simnibs_bin_path') && contains(parameters.simulation_medium, {'skull'; 'layered'})
+        warning('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
 
     %% Default segmentation path fallback

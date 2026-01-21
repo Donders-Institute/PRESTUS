@@ -45,8 +45,8 @@ for i = 1:numel(fields)
 end
 
 % Retain transducer and focus positions after all grid manipulations
-parameters.transducer.pos_grid = trans_pos_final;
-parameters.focus_pos_grid = focus_pos_final;
+parameters.transducer(1).pos_grid = trans_pos_final;
+parameters.transducer(1).focus_pos = focus_pos_final;
 
 % set up kgrid again for eventual heating sim
 kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...

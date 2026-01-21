@@ -52,7 +52,9 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     kgrid.setTime(simulation_time_points, grid_time_step);
 
     % Create source (transducer with focuspoint)
-    parameters.kwave_source_filename  = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_kwave_source%s.mat', parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.kwave_source_filename  = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_kwave_source%s.mat', ...
+        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix)); 
     if confirm_overwriting(parameters.kwave_source_filename, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray

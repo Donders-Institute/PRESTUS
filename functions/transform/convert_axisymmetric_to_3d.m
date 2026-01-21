@@ -47,10 +47,11 @@ trans_pos_final = [trans_pos_final(1), trans_pos_final(1), trans_pos_final(2)];
 focus_pos_final = fliplr(focus_pos_final);
 focus_pos_final = [focus_pos_final(1), focus_pos_final(1), focus_pos_final(2)];
 
-parameters.transducer.pos_grid = trans_pos_final;
-parameters.focus_pos_grid = focus_pos_final;
+% encode in the transducer position
+parameters.transducer.trans_pos = trans_pos_final;
+parameters.transducer.focus_pos = focus_pos_final;
 
-%% set up 3d kgrid for follow-up heating simulations
+%% set up 3D kgrid for follow-up heating simulations
 
 kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
           parameters.grid_dims(2), parameters.grid_step_m, ...

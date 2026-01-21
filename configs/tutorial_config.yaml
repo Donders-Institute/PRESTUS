@@ -20,9 +20,8 @@ transducer:
   source_amp: 91590 # [Pa]
   source_phase_deg: [0, 0, 0, 274] # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
   source_freq_hz: 250e3 # [Hz] the central frequency
-  pos_t1_grid: [128, 139, 15] # position on T1 grid 
-
-focus_pos_t1_grid: [128, 142, 75] # stimulation target on T1 grid
+  trans_pos: [128, 139, 15] # position on T1 grid 
+  focus_pos: [128, 142, 75] # stimulation target on T1 grid
 
 default_grid_dims: [144, 144, 256]
 

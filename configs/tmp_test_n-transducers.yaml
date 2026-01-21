@@ -60,8 +60,8 @@ transducer:
     source_amp: 200608
     source_phase_deg: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     source_freq_hz: 300e3
-    pos_t1_grid: [186, 209, 189]
-    focus_pos_t1_grid: [131, 185, 171]
+    trans_pos: [186, 209, 189]
+    focus_pos: [131, 185, 171]
 
   - name: left
     n_elements: 10
@@ -72,8 +72,8 @@ transducer:
     source_amp: 200608
     source_phase_deg: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     source_freq_hz: 300e3
-    pos_t1_grid: [42, 213, 189]
-    focus_pos_t1_grid: [131, 185, 171]
+    trans_pos: [42, 213, 189]
+    focus_pos: [131, 185, 171]
 
 
 # Important to note: the alpha values in 'alpha_0_true' are currently set for 500 kHz transducers

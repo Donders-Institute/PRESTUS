@@ -25,6 +25,18 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 %   angle_x_rad      - Scalar angle (in radians) of rotation around the x-axis.
 %   angle_y_rad      - Scalar angle (in radians) of rotation around the y-axis.
 %   montage_img      - Montage image comparing original and transformed images with transducer positions.
+%
+% Detailed conversion algorithm:
+% 1. Focal vector d = focus_pos_grid - trans_pos_grid (homogeneous).
+% 2. theta_y = atan2(d(1), d(3)); R_y(-theta_y) via makehgtform.
+% 3. d' = R_y * d; theta_x = atan2(d'(2), d'(3)); R_x(theta_x).
+% 4. R = R_x * R_y; S = scale; T_rs = R * S.
+% 5. Bounds from tformfwd on corners; newdims = ceil(max-min).
+% 6. Center c = (sz+1)/2; forward = translate(-c); backward = translate((newdims+1)/2).
+% 7. T = forward' * T_rs' * backward'; rotated_img = tformarray(nii_image, T).
+% Dependency: Image Processing Toolbox (makehgtform, tformarray).
+%
+% Notes: Assumes right-handed coords; angles ensure positive rotation.
 
     arguments
         nii_image (:,:,:)

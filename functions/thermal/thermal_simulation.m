@@ -1,7 +1,7 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
     thermal_simulation(...
-    sensor_data, kgrid, kwave_medium, sensor, source, parameters, ...
-    trans_pos, final_transformation_matrix, medium_masks)
+    parameters, sensor_data, kgrid, kwave_medium, sensor, source, ...
+    trans_pos, transf, medium_masks)
 
 % THERMAL_SIMULATION Simulates thermal effects of ultrasound using k-Wave.
 %
@@ -10,14 +10,14 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 % by ultrasound transducers over multiple trials and pulses.
 %
 % Input:
+%   parameters   - Struct containing simulation parameters (e.g., thermal properties).
 %   sensor_data  - Struct containing acoustic simulation results (e.g., pressure fields).
 %   kgrid        - Struct representing the k-Wave computational grid (e.g., `kWaveGrid`).
 %   kwave_medium - Struct containing medium properties (e.g., density, sound speed).
 %   sensor       - Struct defining the sensor mask for thermal simulations.
 %   source       - Struct defining the heat deposition source for thermal simulations.
-%   parameters   - Struct containing simulation parameters (e.g., thermal properties).
 %   trans_pos    - [1x3] array specifying the transducer position in grid coordinates.
-%   final_transformation_matrix
+%   transf
 %   medium_masks
 %
 % Output:
@@ -43,6 +43,38 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 % thermal parameters, see doc_thermal_simulations.                  %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
+% Clear the sensor mask
+sensor.mask = zeros(size(sensor.mask));
+
+% Place sensor along the focal axis 
+heating_window_dims = ones(2,3);
+for i = 1:2
+    heating_window_dims(:,i) = [...
+        max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducer(1).trans_pos(i)), ...
+        min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer(1).trans_pos(i))];
+end
+
+% Define a simulation window
+if length(size(parameters.grid_dims))>2
+    heating_window_dims(2,3) = parameters.grid_dims(3);
+end
+sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
+
+% [(pseudo-)CT] if 'k-plan' setup is used:
+% density and sound speed in bone are fixed for heating estimation
+% https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
+if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
+    skull_i = find(strcmp(fieldnames(parameters.layer_labels), {'skull', 'skull_cortical', 'skull_trabecular'}));
+    kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
+    kwave_medium.sound_speed(ismember(medium_masks,skull_i)) = ...
+        1.33*kwave_medium.density(ismember(medium_masks,skull_i))+167; 
+    clear skull_i;
+end
+
+% convert attenuation into absorption coefficients
+kwave_medium.alpha_coeff = ...
+    kwave_medium.alpha_coeff .* kwave_medium.absorption_fraction;
+
 % convert the absorption coefficients to nepers/m (!)
 % see also fitPowerLawParamsMulti.m
 w = 2*pi*parameters.transducer.source_freq_hz; % Frequency [rad/s]
@@ -54,10 +86,7 @@ clear w a0_np;
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (parameters.transducer.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
 
 % save absorption coefficient [Np] for debugging
-if (contains(parameters.simulation_medium, 'skull') || ...
-        contains(parameters.simulation_medium, 'layered') || ...
-        contains(parameters.simulation_medium, 'phantom'))
-    if ~exist(fullfile(parameters.output_dir, 'debug')); mkdir(parameters.output_dir, 'debug'); end
+if contains(parameters.simulation_medium, {'skull', 'layered', 'phantom'}) && parameters.debug == 1
     try
         filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
@@ -112,7 +141,7 @@ T_max = thermal_diff_obj.T;
 if isfield(parameters, 'adopted_cumulative_heat') && parameters.adopted_cumulative_heat == 1
     cumulative_heat_image = niftiread(parameters.adopted_cumulative_heat);
     thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, ...
-        maketform("affine", final_transformation_matrix), ...
+        maketform("affine", transf), ...
         makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
 else
     thermal_diff_obj.cem43 = zeros(size(thermal_diff_obj.T));
@@ -129,7 +158,7 @@ tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
 params_thermal = thermal_parameters(parameters);
 
 % Visualize the thermal parameters
-thermal_plot_protocol(params_thermal)
+thermal_plot_protocol(params_thermal, parameters);
 
 % Total timepoints estimation
 % Records: 1 per ON, 1 per OFF (inside PT), 1 per PTRI-off block, 1 per post-PTRI step
@@ -161,30 +190,13 @@ fprintf('Starting %d PTRI reps (PTRD=%.1fs), each with %d pulses (PTD=%.2fs)\n',
 for rep_i = 1:n_ptri_reps
     fprintf('Pulse Train Repetition %d/%d\n', rep_i, n_ptri_reps);
     
-    % implement a break for the specified pulse train
-    % is_break_period = 0;
-    % if isfield(parameters, 'start_break_trials')
-    %     for i_break = 1:length(parameters.start_break_trials)
-    %         if rep_i >= parameters.start_break_trials(i_break) && ...
-    %            rep_i <= parameters.stop_break_trials(i_break)
-    %             is_break_period = 1;
-    %         end
-    %     end
-    % end
-    
     % === 1. Inner loop: Pulse Trains (multiple pulses) ===
     for pulse_i = 1:n_pulses_pt
         fprintf('  Pulse train %d/%d\n', pulse_i, n_pulses_pt);
         
-        % % PULSE ON
-        % if is_break_period == 0
-            thermal_diff_obj.Q = source.Q;
-            tmp_status = 'on';
-        % else
-        %     thermal_diff_obj.Q(:,:,:) = 0;
-        %     tmp_status = 'off';
-        %     disp('  Break active');
-        % end
+        % PULSE ON
+        thermal_diff_obj.Q = source.Q;
+        tmp_status = 'on';
         
         thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
         
@@ -337,9 +349,15 @@ if params_thermal.post_ptri_steps_n > 0
     end
 end
 
-% Trim unused timepoints if needed
+% Trim unused timepoints (if too many were originally required)
 T_focal     = T_focal(:,:,1:cur_timepoint);
 CEM43_focal = CEM43_focal(:,:,1:cur_timepoint);
+
+% Apply gather (if variables are GPU arrays)
+T_max = gather(T_max);
+T_focal = gather(T_focal);
+CEM43_max = gather(CEM43_max);
+CEM43_focal = gather(CEM43_focal);
 
 fprintf('Thermal simulation complete. Recorded %d timepoints.\n', cur_timepoint);
 

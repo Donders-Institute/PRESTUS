@@ -1,6 +1,6 @@
-function median_montage(t1_image)
+function plot_median_montage(t1_image)
 
-% MEDIAN_MONTAGE Creates a montage of central slices from a 3D T1 image.
+% PLOT_MEDIAN_MONTAGE Creates a montage of central slices from a 3D T1 image.
 %
 % This function extracts the central slices along the x, y, and z axes from 
 % a 3D T1-weighted image (`t1_image`) and creates a montage for visualization. 
