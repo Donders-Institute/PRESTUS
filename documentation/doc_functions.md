@@ -37,6 +37,8 @@ The following documents the functions provided in PRESTUS.
 | `get_slice_by_label`                    | HELPER         | Extracts a specific slice from a 3D image based on axis label and slice number.                 |
 | `get_xyz_mesh`                          | HELPER         | Generates a mesh of 3D coordinates for a given image.                                           |
 | `getidx`                                | HELPER         | Retrieves indices for requested tissues from a parameter structure.                             |
+| `kwave_version`                         | HELPER         | Display k-Wave version number and (if available) git hash.                                      |
+| `log_timer`                             | HELPER         | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | HELPER         | Computes the maximum intensity within a masked 3D region.                                       |
 | `mergeStructure`                        | HELPER         | Merges multiple scalar structures into one.                                                     |
 | `read_ini_file`                         | HELPER         |                                                                                                 |

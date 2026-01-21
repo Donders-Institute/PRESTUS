@@ -42,8 +42,16 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % ====================================================================
     % if segmentation is not yet available
 
+    fprintf('========================================\n');
+    fprintf('SEGMENTATION \n');
+    fprintf('========================================\n\n');
+
     if contains(parameters.simulation_medium, {'skull'; 'layered'})
+        log_timer('start','segmentation', parameters.seg_path);
         preproc_segmentation(parameters)
+        log_timer('stop','segmentation');
+    else
+        disp('No head segmentation necessary...')
     end
 
     % EXIT is no simulation is requested (= segmentation only)
@@ -60,6 +68,12 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % ====================================================================
     % reorient image, determine transducer & target position in image
     % For more documentation, see the 'preproc_head' function.
+
+    fprintf('========================================\n');
+    fprintf('GRID SETUP & HEAD PREPROC \n');
+    fprintf('========================================\n\n');
+
+    log_timer('start','preproc', parameters.output_dir);
 
     % Focal distance calculation (if not specified)
     parameters = focal_distance_calculation(parameters);
@@ -79,11 +93,18 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     trans_pos = parameters.transducer(1).trans_pos;
     focus_pos = parameters.transducer(1).focus_pos;
 
+    log_timer('stop','preproc');
+    
     % ====================================================================
     %% SETUP MEDIUM
     % ====================================================================
     % For more documentation, see 'medium_setup'
-    disp('Setting up kwave medium...')
+    
+    fprintf('========================================\n');
+    fprintf('MEDIUM PROPERTY MAPPING \n');
+    fprintf('========================================\n\n');
+
+    log_timer('start','medium', parameters.output_dir);
 
     if parameters.usepseudoCT == 1
         kwave_medium = medium_setup(parameters, medium_masks, segmentation);
@@ -115,14 +136,20 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
     kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
 
+    log_timer('stop','medium');
+
     % ====================================================================
     %% SETUP SOURCE
     % ====================================================================
     % For more documentation, see 'source_sensor_setup'.
     % Precomputed source can be loaded (if available).
 
+    fprintf('========================================\n');
+    fprintf('K-WAVE SOURCE SETUP \n');
+    fprintf('========================================\n\n');
+
     if parameters.run_source_setup
-        disp('Setting up kwave source...')
+        log_timer('start','source', parameters.output_dir);
 
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
@@ -143,12 +170,21 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
             grid_time_step = dt_stability_limit*0.90;
             [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
         end
+        log_timer('stop', 'source');
+    else
+        disp('No source setup requested... no simulations will be performed.')
     end
 
     % ====================================================================
     %% ACOUSTIC SIMULATION
     % ====================================================================
     % See 'acoustic_simulation' for more documentation
+
+    fprintf('========================================\n');
+    fprintf('ACOUSTIC SIMULATION \n');
+    fprintf('========================================\n\n');
+
+    log_timer('start','acoustic', parameters.output_dir);
 
     filename_sensor_data = fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_%s_results%s.mat', ...
@@ -179,11 +215,19 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         parameters.acoustics_available = 0;
     end
 
+    log_timer('stop', 'acoustic');
+
     % =========================================================================
     %% ACOUSTIC ANALYSIS
     % =========================================================================
 
+    fprintf('========================================\n');
+    fprintf('ACOUSTIC ANALYSIS \n');
+    fprintf('========================================\n\n');
+
     if parameters.acoustics_available == 1
+        log_timer('start','acoustic_analysis', parameters.output_dir);
+
         % Pass thermally relevant (but kwave-irregular) medium fields
         % these need to be loaded here to potentially transform them from axisymmetry below
         kwave_medium.temp_0 = medium_plus.temp_0;
@@ -204,6 +248,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
             acoustic_analysis(parameters, kwave_medium, medium_masks, ...
                         sensor_data, trans_pos, focus_pos, segmentation, ...
                         source_labels);
+        log_timer('stop', 'acoustic_analysis');
     else
         disp('No acoustic simulation results available. Skipping analysis...')
     end
@@ -211,6 +256,12 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % =========================================================================
     %% THERMAL SIMULATIONS
     % =========================================================================
+
+    fprintf('========================================\n');
+    fprintf('THERMAL SIMULATIONS \n');
+    fprintf('========================================\n\n');
+
+    log_timer('start','thermal', parameters.output_dir);
 
     parameters.heating_available = 0;
     if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims && parameters.acoustics_available == 1
@@ -266,14 +317,21 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         parameters.heating_available = 0;
         results_heating = [];
     end
+    log_timer('stop','thermal');
 
     % ================================================================
     %% THERMAL ANALYSIS
     % ================================================================
 
+    fprintf('========================================\n');
+    fprintf('THERMAL ANALYSIS \n');
+    fprintf('========================================\n\n');
+
     if parameters.heating_available == 1
+        log_timer('start','thermal_analysis', parameters.output_dir);
         thermal_analysis(parameters, results_heating, time_status_seq, ...
             medium_masks, trans_pos, focus_pos, highlighted_pos, segmentation);
+        log_timer('stop','thermal');
     else
         disp('No heating simulation results available. Skipping thermal analysis...')
     end
@@ -282,13 +340,22 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     %% CREATE NIFTI IMAGES
     % ================================================================
     % plot various metrics on both the subject-space T1 image & MNI space
+    
+    fprintf('========================================\n');
+    fprintf('NIFTI IMAGES \n');
+    fprintf('========================================\n\n');
+    
+    log_timer('start','nifti', parameters.output_dir);
+
     simulation_nifti(parameters, planimg, results_acoustic, ...
                             acoustic_isppa, acoustic_MI, acoustic_pressure, ...
                             medium_masks, results_heating, kwave_medium, trans_pos, ...
                             focus_pos, highlighted_pos)
 
+    log_timer('stop','nifti');
+
     % cleanup to reduce RAM load
-    clear acoustic_* heating_* 
+    clear acoustic_* heating_*
 
     % ====================================================================
     %% POST-HOC ACOUSTIC WATER SIMULATION
@@ -297,6 +364,14 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
             contains(parameters.simulation_medium, {'skull'; 'layered'})
+
+        fprintf('========================================\n');
+        fprintf('POST-HOC ACOUSTIC WATER SIMULATION \n');
+        fprintf('========================================\n\n');
+
+        log_timer('start','post-hoc water', parameters.output_dir);
+
+
         if numel(parameters.transducer) > 1
             warning(['Post-hoc water simulations are not implemented for multiple transducers. ' ...
                      'Post-hoc water simulation will be run only for the first specified transducer. ' ...
@@ -312,6 +387,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         end
         single_subject_pipeline(parameters.subject_id, water_parameters);
         clear water_parameters;
+        log_timer('stop','post-hoc water');
     end
 
     % ====================================================================
@@ -319,6 +395,9 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % ====================================================================
 
     if ~isempty(fieldnames(options.sequential_configs))
+        fprintf('========================================\n');
+        fprintf('FOLLOW-UP SIMULATION WITH IDENTICAL MEDIUM \n');
+        fprintf('========================================\n\n');
         % Select the config next in line
         sequential_configs = options.sequential_configs;
         fields = fieldnames(sequential_configs);
@@ -346,11 +425,12 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     %% EXIT
     % ====================================================================
 
-    % capture latest RAM usage (not runtime use!)
-    allvars = whos;
-    memused = sum([allvars.bytes]);
-    memused_GB = memused / (1024^3); % 1 GB = 1024^3 bytes
-    disp(['Total MATLAB variable memory usage: ', num2str(memused_GB, '%.2f'), ' GB']);
+    fprintf('========================================\n');
+    fprintf('EXIT \n');
+    fprintf('========================================\n\n');
+
+    % capture time, RAM, & GB load of pipeline
+    log_timer('stop','single_subject_pipeline')
 
     % indicate success
     disp('Pipeline finished successfully');

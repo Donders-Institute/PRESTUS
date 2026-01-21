@@ -103,3 +103,6 @@ function [parameters] = path_log_setup(parameters, currentLoc, subject_id)
         gpuDevice()
         fprintf('========================================\n\n');
     end
+
+    % set initial time, RAM, GB state
+    log_timer('start','single_subject_pipeline', parameters.output_dir);
