@@ -124,11 +124,6 @@ function parameters = load_parameters(varargin)
         end            
     end
 
-    % Set default grid dimensions based on grid size if not explicitly defined
-    if ~isfield(parameters, 'default_grid_dims')
-        parameters.default_grid_dims = repmat(parameters.default_grid_size, [1, parameters.n_sim_dims]);
-    end
-
     %% Validate thermal simulation settings
     % Request no timing overview here
 
