@@ -66,7 +66,6 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     end
     if strcmp(sim_param.submit_medium, 'matlab') == true
         sim_param.code_type = 'matlab_cpu';
-        sim_param.using_donders_hpc = 0;
     else
         sim_param.overwrite_files = 'always';
         sim_param.interactive = 0;

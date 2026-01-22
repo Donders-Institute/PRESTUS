@@ -27,12 +27,13 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             parameters.transducer = parameters.transducer(1);
         end
 
-        if ~isfield(parameters.transducer, 'trans_pos') || ~isfield(parameters.transducer, 'focus_pos')
+        if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...
+                || (~isfield(parameters.transducer, 'focus_pos')|| isempty(parameters.transducer.focus_pos))
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
         end
         % set transducer position in grid
-        if ~isfield(parameters.transducer, 'trans_pos')
+        if ~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)
             % transducer positioned arbitrarily (2D only)
             % y: first position beyond pml layer
             % x: halfway
@@ -48,7 +49,7 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             end
         end
         % set focus position in grid
-        if ~isfield(parameters.transducer, 'focus_pos')
+        if ~isfield(parameters.transducer, 'focus_pos') || isempty(parameters.transducer.focus_pos)
             % no focus point specified
             % position focus at expected distance from transducer
             % index dimension depends on 2D/3D

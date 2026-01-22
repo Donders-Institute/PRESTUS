@@ -4,8 +4,6 @@
 # !!! Important !!!
 # This file is a user config derived from default_config.yaml + base_config_BFTUS.yaml
 
-#------------ This first segment of the config contains parameters mandatory for running a pipeline
-
 # Paths to the data location and SimNIBS environment (please use full paths)
 data_path: /project/2425076.01/sims/data/
 seg_path: /project/2425076.01/mri/seg/
@@ -18,36 +16,7 @@ t2_path_template: sub-%1$03d_T2.nii.gz
 # t1_path_template: sub-%1$03d_orig_T1w.nii.gz
 # t2_path_template: sub-%1$03d_orig_T2w.nii.gz
 
-# select which medium setup to use: 'water' or 'layered'
-# (a layered medium consists of several layers defined below)
 simulation_medium: layered
-
-# Labels for layered simulation, assuming for now the SimNIBS masks indices.
-# Note that the labels are applied in the order specified here, so the skull should normally
-# be the last as it matters the most.
-# This labeling scheme assumes the outputs of charm in SimNIBS.
-# You can remove or add layers. If you want a skull-only simulation, you can remove
-# brain and skin for example.
-layer_labels:
-  water: [0, 3, 6, 9, 10]     # this isn't really necessary as water is the default layer
-  brain: [1, 2]
-  skin: [5]
-  skull_cortical: [7]
-  skull_trabecular: [8]
-
-# If you are using headreco, those are the labels you probably want:
-# layer_labels:
-#   water: [0, 6, 7, 8]
-#   brain: [1, 2]
-#   skin: [5]
-#   skull: [4]
-
-# It is safer if we additionally include labels for segmentations,
-# otherwise hardcoded values will be used
-seg_labels:
-  csf: [3]
-  bonemask: [1, 2, 3, 4, 7, 8, 9]
-  eye: [6]
 
 # Parameters differ for each transducer and can be obtained from the manufacturer
 transducer:
@@ -75,46 +44,11 @@ transducer:
     trans_pos: [42, 213, 189]
     focus_pos: [131, 185, 171]
 
-
-# Important to note: the alpha values in 'alpha_0_true' are currently set for 500 kHz transducers
-# These should be adjusted to the values shown in their respected comments below the medium parameters
-# We are still not entirely sure what alpha values best to use, so be critical of our and your own choices
-
-#------------ This second segment contains parameters that can be used based on the specific needs of the analysis
-
 # Should output be ordered based on subject id?
 subject_subfolder: 1
 
 # Optional affix for result files names
-results_filename_affix: 'tmp_test_3-transducers'
-
-# This allows you to add additional paths and subpaths while running the pipeline
-paths_to_add: []
-subpaths_to_add: []
-
-# By default, SimNIBS segmentation results are not overwritten, unless enabled here
-overwrite_simnibs: 0
-
-# Can allow to only run specific components of the pipeline
-run_source_setup: 1      # Should we set up acoustic source?
-run_acoustic_sims: 1     # Should we run the acoustic simulations?
-run_heating_sims: 0      # Should we run the heating simulations?
-run_posthoc_water_sims: 0  # Should we run free-water simulations with the same parameters?
-
-# In interactive mode (1), the figures are shown and confirmation dialogs appear
-# In non-interactive mode (0), no plots are shown and no confirmation dialogs will
-interactive: 1
-
-# Needs to be included if running in a non-interactive mode
-# 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
-overwrite_files: never
-
-# Should the script position_transducer_localite be used?
-transducer_from_localite: 0
-
-# Allows one to correct for varying distances between the infrared trackers attached
-# to the transducer and the exit plane
-reference_transducer_distance_mm: 15  # (can only be used with transducer_from_localite)
+results_filename_affix: 'tmp_test_n-transducers'
 
 # Grid resolution (must be isotropic)
 grid_step_mm: 0.9  # [mm]

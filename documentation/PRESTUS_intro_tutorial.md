@@ -119,7 +119,6 @@ elseif strcmp(submit_medium, 'slurm')
 
     single_subject_pipeline_with_slurm(subject_id, parameters);
 else
-    parameters.using_donders_hpc = 0;
     single_subject_pipeline(subject_id, parameters);
 end
 ```
@@ -346,17 +345,14 @@ if strcmp(submit_medium, 'qsub')
     % If you are using the Donders HPC cluster, you can do the simulations in
     % a non-interactive session with a qsub. To do so, set the interactive flag
     % to zero, set overwrite_files to 'always' (if you already have the results and want to recompute them), and run single_subject_pipeline_with_qsub.
-
     opt_parameters.interactive = 0;
     opt_parameters.overwrite_files = 'always';
-    
     single_subject_pipeline_with_qsub(subject_id, opt_parameters);
 elseif strcmp(submit_medium, 'slurm')
     opt_parameters.interactive = 0;
     opt_parameters.overwrite_files = 'always';
     single_subject_pipeline_with_slurm(subject_id, opt_parameters);
 else
-    opt_parameters.using_donders_hpc = 0;
     single_subject_pipeline(subject_id, opt_parameters)
 end
 ```
@@ -457,7 +453,6 @@ elseif strcmp(submit_medium, 'slurm')
     single_subject_pipeline_with_slurm(subject_id, opt_parameters);
 else
     % or with
-    opt_parameters.using_donders_hpc = 0;
     single_subject_pipeline(subject_id, opt_parameters); 
 end
 ```

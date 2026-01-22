@@ -2,64 +2,20 @@
 
 # !!! Important !!! Do not edit this document. Instead, copy (at least) the first segment into your own config file.
 
-#------------ This first segment of the config contains parameters mandatory for running a pipeline
+#------------------------------------------------
+#------------ Setup-specific specfication (Defaults)
+# The following information is study-specific.
+# Defaults should be overwritten (where sensible or necessary) in a separate <simulation-X>config.yaml file.
+#------------------------------------------------
 
-# Paths to the data location and SimNIBS environment (please use full paths)
+#------------ I/O management
+
+# Paths to the data location (please use full paths)
 data_path: NA
-#simnibs_bin_path: /home/neuromod/julkos/SimNIBS/bin
 
 # Paths to T1 and T2 relative to data_path; all string substitutions will be done using subject_id
 # t1_path_template: sub-%1$03d_orig_T1w.nii.gz 
 # t2_path_template: sub-%1$03d_orig_T2w.nii.gz
-
-# select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
-simulation_medium: layered
-
-# Labels for layered simulation, assuming for now the SimNIBS masks indices;
-# Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
-# This labeling scheme assumes the outputs of charm in SimNIBS
-# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
-
-layer_labels:
-  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be water
-  brain: [1, 2]
-  skull: [4]
-  skin: [5]
-  skull_cortical: [7] 
-  skull_trabecular: [8]
-
-# If you are using headreco, those are the labels you probably want. 
-# layer_labels:  
-#  water: [0, 6, 7, 8]
-#  brain: [1, 2]
-#  skin: [5]
-#  skull: [4]
-
-# It is safer if we additionally include labels for segmentations, otherwise hardcoded values will be used
-seg_labels:
-  csf: [3]
-  bonemask: [1,2,3,4,7,8,9]
-  eye: [6]
-  skull: [4]
-  
-# Parameters differ for each transducer and can be obtained from the manufacturer
-# transducer:
-#   n_elements # Number of elements in the transducer
-#   Elements_ID_mm # Inner diameter of each element
-#   Elements_OD_mm # Outer diameter of each element
-#   curv_radius_mm # Radius of curvature of the bowl 
-#   dist_to_plane_mm # Distance to the transducer plane from the geometric focus
-#   source_amp # [Pa] 
-#   source_phase_deg # Source phase [deg] 
-#   source_freq_hz # [Hz] The central frequency
-#   trans_pos # Position on T1 grid [T1 grid space]
-#   focus_pos # Stimulation target on T1 grid [T1 grid space]
-
-# Important to note: the alpha values in 'alpha_0_true' are currently set for 500KHz transducers
-# These should be adjusted to the values shown in their respected comments below the medium parameters
-# We are still not entirely sure what alpha values best to use, so be critical of our and your own choices
-
-#------------ This second segment contains parameters that can be used based on the specific needs of the analysis
 
 # Should output be ordered based on subject id?
 subject_subfolder: 1
@@ -70,37 +26,137 @@ results_filename_affix: ''
 # This allows you to add additional paths and subpaths while running the pipeline
 paths_to_add: []
 subpaths_to_add: []
-
-# By default, SimNIBS segmentation results are not overwritten, unless enabled here
-overwrite_simnibs: 0
-
-# Can allow to only run specific components of the pipeline
-run_source_setup: 1 # Should we set up acoustic source? useful to switch off to look at initial segmentation results only
-run_acoustic_sims: 1 # Should we run the acoustic simulations? useful to switch off to look at initial segmentation results only
-run_heating_sims: 0 # Should we run the heating simulations? useful to switch off to look at initial segmentation results only
-run_posthoc_water_sims: 0 # Should we run the simulations in free water with exactly the same parameter? useful for double checking that the true intensity matches the desired one
+simnibs_bin_path: '' # Path to the SimNIBS environment (please use full paths)
 
 # In interactive mode (1), the figures are shown and confirmation dialogs appear (the latter of which will halt the pipeline until confirmation)
 # In non-interactive mode (0), no plots are shown and no confirmation dialogs will 
-interactive: 1
+interactive: 0
 # Needs to be included if running in a non-interactive mode
-overwrite_files: ask # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+overwrite_files: always # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+# By default, SimNIBS segmentation results are not overwritten, unless enabled here
+overwrite_simnibs: 0
 
-# Should the script position_transducer_localite be used?
-transducer_from_localite: 0
-# Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane
-reference_transducer_distance_mm: 15 # (can only be used wit the function 'transducer_from_localite')
+#------------ Simulation type
 
-# Grid resolution (must be isotropic) 
-grid_step_mm: 0.5  # [mm]
+# select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+simulation_medium: layered
 
-# These only need to be set manually if the simulations are done for water only
-# Select the desired simulation grid size (number of points per dimension)
-default_grid_size: 144
-default_grid_dims: [144, 144, 400]
+usepseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium properties
+pseudoCT_variant: kosciessa # pCT mapping algorithms (yaakub/carpino/k-plan/marquet/kosciessa [default])
 
-# Medium properties, references: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
-# Note: attenuation values remain debated, use defaults with caution, see https://github.com/Donders-Institute/PRESTUS/issues/40!
+# Only run specific components of the pipeline?
+run_source_setup: 1       # Should we set up acoustic source? switch off to look at initial segmentation results only
+run_acoustic_sims: 1      # Should we run the acoustic simulations?
+run_heating_sims: 1       # Should we run the heating simulations? Run once acoustic simulation provides sensible results.
+run_posthoc_water_sims: 1 # Should we run the simulations in free water with exactly the same parameter? Verify that free-water intensity matches target.
+
+# Select which k-Wave code to run (see 'run_simulations' for more documentation)
+#   MATLAB CPU code 'matlab_cpu'
+#   MATLAB GPU code 'matlab_gpu'
+#   C++ code (Interactive) 'cpp_interactive'
+#   C++ code (Non-Interactive) 'cpp_noninteractive'
+#   CUDA code 'cuda' (currently does not work at the Donders HPC, but 'matlab_gpu' works)
+code_type: matlab_gpu 
+
+savemat: 0 # Save output matrices?
+debug: 1 # Activate a debug mode in which more intermediate outputs are provided?
+
+#------------ High-performance computing
+
+hpc_gpu: ''
+hpc_partition: ''
+hpc_reservation: ''
+
+# An optional path to LD_LIBRARY used during SimNIBS installation
+# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
+ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+
+#------------ Target specification
+
+focus_area_radius: 5 # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+
+#------------ Transducer specification  (no defaults)
+transducer:
+  n_elements: []        # Number of elements in the transducer [#]
+  Elements_ID_mm: []    # Inner diameter of each element [mm]
+  Elements_OD_mm: []    # Outer diameter of each element [mm]
+  curv_radius_mm: []    # Radius of curvature of the bowl [mm]
+  dist_to_plane_mm: []  # Distance to the transducer plane from the geometric focus [mm]
+  source_amp: []        # Pressure amplitude [Pa] 
+  source_phase_deg: []  # Source phase [deg] 
+  source_freq_hz: []    # Fundamental frequency [Hz]
+  trans_pos: []         # Transducer position [T1 grid space]
+  focus_pos: []         # Stimulation target position[T1 grid space]
+
+# Use the kwaveArray class for transducer modeling?
+use_kWaveArray: 1
+
+#------------ Thermal parameters (no defaults for temporal protocol)
+thermal:
+  pd: 0
+  pri: 0  
+  ptd: 0
+  pt_timestep: 0.02 
+  ptri: 0
+  ptrd: 0
+  post_ptri_dur: 0
+  post_pt_timestep: 1
+  equal_step_duration: 0
+  # Optional parameters:
+  cem43_iso: 0
+  temp_0: #[deg C] initial temperature
+    water: 37
+    skull: 37
+    brain: 37
+    skin: 37
+    skull_trabecular: 37
+    skull_cortical: 37
+  sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
+  record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
+
+heatingvideo: 0 # Save a video of incremental heating? 
+
+#------------------------------------------------
+#------------ INTERNAL --------------------------
+#------------------------------------------------
+
+#------------ Head segmentation
+
+# Segmentation software ('charm' is recommended, 'headreco' is deprecated)
+segmentation_software: charm
+
+# Labels for layered simulation, assuming for now the SimNIBS masks indices;
+# Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
+# This labeling scheme assumes the outputs of charm in SimNIBS
+# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
+
+# Assign multi-layer compartments to model, and indicate SimNIBS segmentation ids
+layer_labels:
+  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
+  brain: [1, 2]
+  skull: [4]
+  skin: [5]
+  skull_cortical: [7] 
+  skull_trabecular: [8]
+
+# Provide SimNIBS segmentation labels
+seg_labels:
+  bonemask: [1,2,3,4,7,8,9] # include all media within the skull mask
+  external: [0]
+  wm: [1]
+  gm: [2]
+  csf: [3]
+  skull: [4]
+  skin: [5]
+  eye: [6]
+  skull_cortical: [7] 
+  skull_trabecular: [8]
+  blood: [9]
+  muscle: [10]
+
+#------------  Medium properties
+# References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
+# Note: skull attenuation and absorption values remain uncertain, use defaults with caution!
 medium:
   water:
     sound_speed: 1500
@@ -157,69 +213,36 @@ medium:
     perfusion: 10
     absorption_fraction: 0.28
 
-# Radius of the target area around the focus in which the ISPPA is averaged for the outputs
-focus_area_radius: 5 # [mm]
+#------------ Simulation grid
 
-# Thermal parameters (the initial values concern the protocol timing with no defaults)
-thermal:
-  pd: 0
-  pri: 0  
-  ptd: 0
-  pt_timestep: 0.02 
-  ptri: 0
-  ptrd: 0
-  post_ptri_dur: 0
-  post_pt_timestep: 1
-  equal_step_duration: 0
-  # Optional parameters:
-  temp_0: #[deg C] initial temperature
-    water: 37
-    skull: 37
-    brain: 37
-    skin: 37
-    skull_trabecular: 37
-    skull_cortical: 37
-  sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
-  record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
- 
+grid_step_mm: 0.5  # Grid resolution (must be isotropic) [mm]
+
+# These only need to be set manually if the simulations are done for water only
+default_grid_size: 144 # [points per dimension]
+default_grid_dims: [144, 144, 400] # [points per dimension]
+
 # select PML size, the default one for 3D is 10 (PML is the layer used in
 # kWaves to absorb waves reaching the end of the computational grid,
 # http://www.k-wave.org/documentation/example_na_controlling_the_pml.php)
 pml_size: 10
+
+# To what extent the computational grid can be expanded in order to get lower prime numbers to (potentially) speed up computations
+prime_factor_max_grid_expansion: 40
+
+#------------ Segmentation / Head preprocessing
 
 # Expansion factor for the cerebro-spinal fluid brain mask;
 # if the mask ends up being too big, try reducing it
 # (40 is the conservative default; the mask is dilated with csf_mask_expansion_factor/voxel_size_mm cubic kernel)
 csf_mask_expansion_factor: 40
 
-# Use the kwaveArray class for simulations
-use_kWaveArray: 1
-
 # Thresholds for smoothing the skull and other masks
 skull_smooth_threshold: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
 other_smooth_threshold: 0.5 # (higher threshold means thinner mask, lower threshold means thicker mask)
 
-# To what extent the computational grid can be expanded in order to get lower prime numbers to (potentially) speed up computations
-prime_factor_max_grid_expansion: 40
+#------------ Transducer placement (WIP)
 
-# Select which k-Wave code to run (see 'run_simulations' for more documentation)
-#   MATLAB CPU code 'matlab_cpu'
-#   MATLAB GPU code 'matlab_gpu'
-#   C++ code (Interactive) 'cpp_interactive'
-#   C++ code (Non-Interactive) 'cpp_noninteractive'
-#   CUDA code 'cuda' (currently does not work at the Donders HPC, but 'matlab_gpu' works)
-code_type: matlab_gpu 
-
-# Only use this if you are using the Donders HPC
-# If not, you would have to do some things by hand (currently it only affects SimNIBS segmentation)
-using_donders_hpc: 1
-
-# Segmentation software (current options are 'headreco' and 'charm')
-segmentation_software: charm
-
-# An optional path to LD_LIBRARY used during SimNIBS installation
-# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
-#torque: ld_library_path: /opt/gcc/7.2.0/lib64
-#slurm: ld_library_path: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
-
-debug: 1 # Activate a debug mode in which more intermediate outputs are provided?
+# Should the script position_transducer_localite be used?
+transducer_from_localite: 0
+# Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane
+reference_transducer_distance_mm: 15 # (can only be used with the function 'transducer_from_localite')

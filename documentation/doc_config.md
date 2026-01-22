@@ -16,6 +16,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `subpaths_to_add`                 | Toolbox paths to add with addpath(genpath()).         | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subject_subfolder`               | Manage outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
 | `results_filename_affix`          | Affix for result file names                           | [string] Can be used to differentiate simulation outputs for the same subject-transducer combination(e.g., different intensities and/or targets.)  |
+| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                                                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
 | `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).                                | (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
 | `overwrite_simnibs`               | Overwrite SimNIBS segmentation results?               | (`1 = yes, 0 = no` [default]) |
 
@@ -30,11 +31,10 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
 | `run_heating_sims`                | Run heating simulations.                                                              | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
-| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                                                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
 | `n_sim_dims`                      | Simulation type (2D / 3D).                                             | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
 | `axisymmetric`                  | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).  | (`1 = yes, 0 = no`) see `doc_simulations-acoustic.md`.    |
-| `use_kWaveArray`                  | Use the kWaveArray class for simulations.                                             | (`1 = yes, 0 = no`) see k-Wave documentation.    |
 | `savemat`                         | Save outputs of acoustic and/or heating simulations as .mat files?                    | (`1 = yes, 0 = no`) For many parallel simulations, setting this to 0 saves disk space.    |
+| `debug`                         | Activate a more verbose debug mode in which more intermediate output plots and files are provided?   | (`1 = yes, 0 = no`) |
 
 
 ### Segmentation/Preprocessing
@@ -64,6 +64,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `expected_focal_distance_mm`      | Expected distance to the stimulation focus (in mm).                   | Transducer depth setting |
 | `transducer_from_localite`        | Load transducer position from Localite files?.                        | (`1 = yes, 0 = no` [default])   |
 | `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).             | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
+| `use_kWaveArray`                  | Use the kWaveArray class for modeling transducers.                    | (`1 = yes, 0 = no`) see k-Wave documentation.    |
 
 ### Target specification
 
@@ -167,7 +168,6 @@ see doc_thermal-simulations.md
 | `thermal.temp_0.skull_cortical`   | Initial temperature of cortical skull medium before simulation (in °C).                                       |   |
 | `thermal.sensor_xy_halfsize`      | Maximum size of the sensor window for temperature recording (in grid units).                                  |   |
 | `thermal.record_t_at_every_step`  | Whether to record temperature at every time step for the whole sensor window (`1 = yes, 0 = no`).             |   |
-| `thermal.record_t_at_every_step`  | Whether to record temperature at every time step for the whole sensor window (`1 = yes, 0 = no`).             |   |
 | `heatingvideo`                    | Save a video of incremental heating? (`1 = yes, 0 = no`)                                                      |   |
 
 
@@ -177,12 +177,10 @@ see doc_hpc.md
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_interactive`, `cpp_noninteractive`, or `cuda`).         |   |
-| `using_donders_hpc`               | Run simulations on Donders HPC (`1 = yes, 0 = no`).                                                                  |(`1 = yes, 0 = no`)   |
-| `torque.ld_library_path`          | Path to LD_LIBRARY used during SimNIBS installation on Torque systems.                                     | [Optional] If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so` define the LD_LIBRARY location (e.g.,: ```/opt/gcc/7.2.0/lib64```) |
-| `slurm.ld_library_path`           | Path to LD_LIBRARY used during SimNIBS installation on Slurm systems. [Optional]                                     |  e.g.,: ```/home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux``` |
 | `hpc_gpu`                         | Request a specific GPU. [Optional]                                                                                   |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
 | `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                                                        | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
 | `hpc_reservation`                  | Request a reserved cue. [Optional]                                                                                  | |
+| `ld_library_path`                 | Path to LD_LIBRARY used during SimNIBS installation. [Optional]                                     |  If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, specify the LD_LIBRARY location e.g., `/opt/gcc/7.2.0/lib64` [torque] or ```/home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux``` [slurm] |
 
 ### Transducer calibration
 

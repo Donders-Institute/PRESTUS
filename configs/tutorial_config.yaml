@@ -4,10 +4,6 @@ simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
 t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
 t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
 
-# An optional path to LD_LIBRARY used during SimNIBS installation
-# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set the next line to your LD_LIBRARY location
-#ld_library_path: /opt/gcc/7.2.0/lib64  % or for slurm /home/.../SimNIBS-4.0/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
-
 # If you encounter the error "The qform and sform of do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
 use_forceqform: 0
 

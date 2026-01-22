@@ -126,10 +126,7 @@ end
 
 fprintf('💻 HPC/GPU OPTIONS\n');
 print_if_field(parameters, 'code_type', '%s');
-print_flag(parameters, 'using_donders_hpc');
-if getfield_or_default(parameters, 'using_donders_hpc', 0)
-    print_if_field(parameters, 'hpc_partition', '%s');
-end
+print_if_field(parameters, 'hpc_partition', '%s');
 fprintf('\n');
 
 fprintf('========================================\n');

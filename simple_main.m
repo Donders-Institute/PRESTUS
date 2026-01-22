@@ -18,7 +18,6 @@ parameters = load_parameters('tutorial_config.yaml'); % load the configuration f
 parameters.simulation_medium = medium;
 if strcmp(submit, 'matlab') == true
     parameters.code_type = 'matlab_cpu';
-    parameters.using_donders_hpc = 0;
     single_subject_pipeline(subject_id, parameters);
 elseif strcmp(submit, 'qsub') == true
     parameters.interactive = 0;

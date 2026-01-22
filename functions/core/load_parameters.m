@@ -162,17 +162,17 @@ function parameters = load_parameters(varargin)
     %% Validate paths for required libraries and binaries
     
     % Check LD_LIBRARY_PATH existence and warn user if missing
-    if isfield(parameters, 'ld_library_path') && ~exist(parameters.ld_library_path, 'dir')
-        assert(all(confirmation_dlg('The path in `parameters.ld_library_path` does not exist. Do you want to continue?', ...
+    if isfield(parameters, 'ld_library_path') && ~strcmp(parameters.ld_library_path, "") && ~exist(parameters.ld_library_path, 'dir')
+        assert(all(confirmation_dlg('The path `ld_library_path` has been specified but does not exist. Do you want to continue?', ...
                                     'Yes', 'No')), 'Exiting');
     end
 
     % Check segmentation software path existence and warn user if missing
-    if isfield(parameters, 'simnibs_bin_path') && ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file')
+    if isfield(parameters, 'simnibs_bin_path') && ~strcmp(parameters.simnibs_bin_path, "") && ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file')
         assert(all(confirmation_dlg(sprintf('The segmentation software (%s) does not exist at %s. Do you want to continue?', ...
                                             parameters.segmentation_software, parameters.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
-    elseif ~isfield(parameters, 'simnibs_bin_path') && contains(parameters.simulation_medium, {'skull'; 'layered'})
+    elseif (~isfield(parameters, 'simnibs_bin_path') || strcmp(parameters.simnibs_bin_path, "")) && contains(parameters.simulation_medium, {'skull'; 'layered'})
         warning('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
 
