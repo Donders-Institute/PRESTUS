@@ -1,12 +1,12 @@
-function [parameters] = path_log_setup(parameters, currentLoc, subject_id)
+function [parameters] = path_log_setup(parameters, prestus_path, subject_id)
 
     % currentLoc | Root of PRESTUS' 'functions' folder
-    
-    disp(['Location of PRESTUS: ', currentLoc])
+
+    disp(['Location of PRESTUS: ', prestus_path])
 
     % Add paths to the 'functions' and toolbox folders
-    functionsLoc = fullfile(currentLoc, '..', 'functions');
-    toolboxesLoc = fullfile(currentLoc, '..', 'toolboxes');
+    functionsLoc = fullfile(prestus_path, 'functions');
+    toolboxesLoc = fullfile(prestus_path, 'toolboxes');
     allPaths = regexp(path,pathsep,'Split');
 
     % Add 'functions' folders
@@ -39,6 +39,9 @@ function [parameters] = path_log_setup(parameters, currentLoc, subject_id)
         end
     end
     
+    % Print current PRESTUS version (Git-based)
+    prestus_version(prestus_path);
+
     % Verify that kwave is added and print k-wave information
     if ~exist('makeBowl','file')
         error('kwave not added');
