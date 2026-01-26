@@ -60,51 +60,41 @@ if isfield(td, 'trans_pos') && isfield(td, 'focus_pos')
 end
 fprintf('\n');
 
-%% 5. Medium Properties
+%% 5. Medium Properties (requested layers only)
 
-fprintf('🧪 MEDIUM PROPERTIES\n');
+fprintf('💀 MEDIUM PROPERTIES (requested layers)\n');
 
-tissues = {'water', 'skull', 'brain', 'skin', 'skull_trabecular', 'skull_cortical'};
+% Use parameters.layers (e.g. {'tissues', 'skull', 'brain'})
+if ~isfield(parameters, 'layers') || isempty(parameters.layers)
+    warning('No parameters.layers defined. Using all: water, skull, brain, skin...');
+    tissues = {'water', 'skull', 'brain', 'skin', 'skull_trabecular', 'skull_cortical'};
+else
+    tissues = fieldnames(parameters.layers);
+end
+
 props = {'sound_speed', 'density', 'alpha_0_true', 'alpha_power_true', ...
          'thermal_conductivity', 'specific_heat_capacity', 'perfusion', 'absorption_fraction'};
-labels = {'Sound Speed', 'Density', 'Attenuation (1 MHz)', 'Att:Frequency-scaling', ...
-         'Thermal Conductivity', 'Heat Capacity', 'Perfusion', 'Absorption Fraction'};
+labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz·cm)]', ...
+          'Attn: Freq^Power [-]', 'Thermal Cond. [W/(m·K)]', 'Heat Cap. [J/(kg·K)]', ...
+          'Perfusion [1/s]', 'Absorption Fraction [-]'};
 
 for t_idx = 1:length(tissues)
     tissue = tissues{t_idx};
-    fprintf('  %s:\n', upper(tissue));
     
-    has_props = false;
-    for p_idx = 1:length(props)
-        prop = props{p_idx};
-        label = labels{p_idx};
-        full_path = sprintf('medium.%s.%s', tissue, prop);
-        val = get_nested_safe(parameters, full_path);
-        
-        if ~isempty(val) && ~isnan(val) && isfinite(val)
-            unit = get_unit(prop);
-            
-            % use fixed-point formats
-            if contains(prop, 'sound_speed') || contains(prop, 'density') || ...
-                    contains(prop, 'specific_heat_capacity') || contains(prop, 'perfusion')
-                fmt = '%.0f';
-            elseif contains(prop, 'alpha_0_true')
-                fmt = '%.4f';
-            elseif contains(prop, 'alpha_power_true') || contains(prop, 'absorption_fraction')
-                fmt = '%.2f';
-            else  % thermal properties
-                fmt = '%.3f';
-            end
-            
-            fprintf('    %-25s %s %s\n', label, sprintf(fmt, val), unit);
-            has_props = true;
+    % Handle 'tissues' wildcard → all tissue props
+    if strcmp(tissue, 'tissues')
+        tissue_fields = fieldnames(parameters.medium);
+        tissue_list = tissue_fields(startsWith(tissue_fields, 'tissue_') | ...
+                                   startsWith(tissue_fields, 'brain') | ...
+                                   startsWith(tissue_fields, 'csf'));
+        for sub_tissue = tissue_list'
+            print_tissue_props(parameters, sub_tissue{1}, props, labels);
         end
+        continue;
     end
     
-    if ~has_props
-        fprintf('    No properties defined\n');
-    end
-    fprintf('\n');
+    fprintf('  %s:\n', upper(tissue));
+    print_tissue_props(parameters, tissue, props, labels);
 end
 
 %% 6. Thermal Sequence
@@ -241,7 +231,7 @@ function print_modules(s)
         'run_posthoc_water_sims', 'Post-water'
     };
     
-    fprintf('  Modules:        ');
+    fprintf('\n🔧 MODULES\n');
     for i = 1:size(modules, 1)
         mod_field = modules{i, 1};
         mod_label = modules{i, 2};
@@ -251,9 +241,8 @@ function print_modules(s)
         else
             mark = ' ✗';
         end
-        fprintf('%-10s%s ', [mod_label ':'], mark);
+        fprintf('  %-30s%s\n', [mod_label ':'], mark);
     end
-    fprintf('\n');
 end
 
 function s = get_struct_or_default(params, field)
@@ -311,4 +300,32 @@ elseif contains(prop, 'absorption_fraction')
 else
     unit = 'N/A';
 end
+end
+
+function print_tissue_props(params, tissue, props, labels)
+    has_props = false;
+    for p_idx = 1:length(props)
+        prop = props{p_idx}; label = labels{p_idx};
+        val = get_nested_safe(params, sprintf('medium.%s.%s', tissue, prop));
+        
+        if ~isempty(val) && ~isnan(val) && isfinite(val)
+            unit = get_unit(prop);  % Reuse your function
+            
+            % Smart formatting
+            if contains(prop, {'sound_speed','density','specific_heat_capacity','perfusion'})
+                fmt = '%.0f';
+            elseif strcmp(prop, 'alpha_0_true')
+                fmt = '%.4f';
+            else
+                fmt = '%.3f';
+            end
+            
+            fprintf('    %-28s %s %s\n', label, sprintf(fmt, val), unit);
+            has_props = true;
+        end
+    end
+    if ~has_props
+        fprintf('    No properties defined\n');
+    end
+    fprintf('\n');
 end
