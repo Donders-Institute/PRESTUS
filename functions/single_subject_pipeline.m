@@ -358,19 +358,31 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     clear acoustic_* heating_*
 
     % ====================================================================
+    %% END OF THIS SIMULATIN
+    % ====================================================================
+
+    fprintf('========================================\n');
+    fprintf('END \n');
+    fprintf('========================================\n\n');
+
+    % capture time, RAM, & GB load of pipeline
+    log_timer('stop','single_subject_pipeline')
+
+    % indicate success
+    disp('Pipeline finished successfully');
+
+    % end logging
+    diary('off')
+
+    % ====================================================================
     %% POST-HOC ACOUSTIC WATER SIMULATION
     % ====================================================================
     % To check sonication parameters of the transducer in free water
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
-            contains(parameters.simulation_medium, {'skull'; 'layered'})
+            contains(parameters.simulation_medium, {'layered'})
 
-        fprintf('========================================\n');
         fprintf('POST-HOC ACOUSTIC WATER SIMULATION \n');
-        fprintf('========================================\n\n');
-
-        log_timer('start','post-hoc water', parameters.output_dir);
-
 
         if numel(parameters.transducer) > 1
             warning(['Post-hoc water simulations are not implemented for multiple transducers. ' ...
@@ -387,9 +399,14 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         if isfield(water_parameters,'subject_subfolder') && water_parameters.subject_subfolder == 1
             water_parameters.output_dir = fileparts(water_parameters.output_dir);
         end
-        single_subject_pipeline(parameters.subject_id, water_parameters);
+        % inherit submit medium from main pipeline
+        switch parameters.hpc_submit_medium
+            case 'slurm'
+                single_subject_pipeline_with_slurm(subject_id, water_parameters, 0);
+            case 'matlab'
+                single_subject_pipeline(parameters.subject_id, water_parameters);
+        end
         clear water_parameters;
-        log_timer('stop','post-hoc water');
     end
 
     % ====================================================================
@@ -423,20 +440,4 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         end
     end
 
-    % ====================================================================
-    %% EXIT
-    % ====================================================================
-
-    fprintf('========================================\n');
-    fprintf('EXIT \n');
-    fprintf('========================================\n\n');
-
-    % capture time, RAM, & GB load of pipeline
-    log_timer('stop','single_subject_pipeline')
-
-    % indicate success
-    disp('Pipeline finished successfully');
-
-    % end logging
-    diary('off')
 end

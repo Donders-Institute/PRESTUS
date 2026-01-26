@@ -25,7 +25,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `simulation_medium`               | Medium setup for simulation (`water` or `layered`).                                   | Mandatory.   |
-| `layer_labels`                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory.   |
+| ` `                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory.   |
 | `seg_labels`                      | Labels for segmentations, specifying indices for CSF, bone mask, and eye regions.     | Mandatory.  |
 | `run_source_setup`                | Set up acoustic sources.                                                              | (`1 = yes, 0 = no`)  |
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
@@ -177,6 +177,7 @@ see doc_hpc.md
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_interactive`, `cpp_noninteractive`, or `cuda`).         |   |
+| `hpc_submit_medium`               | Simulation submit mode         | `slurm` (recommended), `matlab`, `qsub`      |
 | `hpc_gpu`                         | Request a specific GPU. [Optional]                                                                                   |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
 | `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                                                        | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
 | `hpc_reservation`                  | Request a reserved cue. [Optional]                                                                                  | |

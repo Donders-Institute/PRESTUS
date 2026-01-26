@@ -16,14 +16,16 @@ addpath(genpath('toolboxes'))
 parameters = load_parameters('tutorial_config.yaml'); % load the configuration file
 
 parameters.simulation_medium = medium;
-if strcmp(submit, 'matlab') == true
+parameters.hpc_submit_medium = submit;
+
+if strcmp(parameters.hpc_submit_medium, 'matlab') == true
     parameters.code_type = 'matlab_cpu';
     single_subject_pipeline(subject_id, parameters);
-elseif strcmp(submit, 'qsub') == true
+elseif strcmp(parameters.hpc_submit_medium, 'qsub') == true
     parameters.interactive = 0;
     parameters.overwrite_files = 'always';
     single_subject_pipeline_with_qsub(subject_id, parameters);
-elseif strcmp(submit, 'slurm') == true
+elseif strcmp(parameters.hpc_submit_medium, 'slurm') == true
     parameters.interactive = 0;
     parameters.overwrite_files = 'always';
     single_subject_pipeline_with_slurm(subject_id, parameters);
