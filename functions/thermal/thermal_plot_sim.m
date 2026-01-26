@@ -206,7 +206,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     if parameters.heatingvideo == 1
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
         if ndims(medium_masks) == 3
-            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.pos_grid(2),:)));
+            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.trans_pos(2),:)));
         elseif ndims(medium_masks) == 2
             brain_slice = mat2gray(squeeze(medium_masks));
         end
@@ -227,15 +227,15 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
             cur_temp = squeeze(focal_planeT(:, :,  k));
             rgbImage = ind2rgb(round((cur_temp-color_limits(1))/diff(color_limits)*256), viridis(256));
             rgbImage(cur_temp <=37.01) = NaN;
-            imshowpair(gray_img_brain, rgbImage, 'blend')
+            imshowpair(gray_img_brain, rgbImage, 'blend'),
             %set(h, 'AlphaData', 0.2)
             try
                 title(sprintf('sample: %i, time: %.2f s\nmax temp: %.2f C, status: %s', ...
-                    k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 8)
+                    k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 8);
                 frame = getframe(gcf);
                 writeVideo(v,frame);
             catch
-                warning("Some parameter is out of bounds")
+                warning("Some parameter is out of bounds");
                 disp(['k:', num2str(k)]);
                 disp(['dim focal plane (3):', num2str(size(focal_planeT,3))]);
                 disp(['dim tss_recorded:', num2str(size(tss_recorded) )]);
