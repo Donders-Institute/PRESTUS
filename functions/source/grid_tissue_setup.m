@@ -3,10 +3,18 @@ function [parameters, medium_masks, segmentation, skull_edge, planimg] = grid_ti
 % for ultrasound neuromodulation simulations, either by preprocessing a 
 % subject-specific head model (T1-weighted MRI) or loading phantom/alternative grids.
 
-if contains(parameters.simulation_medium, {'skull'; 'layered'})
-    % preprocessing 
-    % [multi-transducer] based on first transducer–focus pair in T1 space
-    % Note: do not pass converted positions directly, handle in later function
+if contains(parameters.simulation_medium, {'layered'})
+    
+    % Set up a grid containing a layered medium
+    % (1) Align planning image to transducer and rescale to requested grid resolution
+    %       [multi-transducer] based on first transducer–focus pair in T1 space
+    % (2) Convert segmentation to requested layers, crop grid to head +
+    % transducer + PML
+    %
+    % Note: The new grid positions are not yet encoded in the parameters.
+    % The original T1 positions are later transformed using the transf
+    % matrix.
+
     [medium_masks, segmentation, skull_edge, ~, ~, ...
         planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
@@ -44,7 +52,7 @@ else
             warning('WARNING: phantom dimensions DO NOT fit requested grid...')
         end
         % create medium mask according to indices in parameters.layer_labels (see preproc_smooth_and_crop.m)
-        [medium_masks] = preproc_medium_mask(segmented_img, parameters, 1);
+        [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
     else
         medium_masks = [];

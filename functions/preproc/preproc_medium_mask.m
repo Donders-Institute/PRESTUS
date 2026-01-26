@@ -1,4 +1,4 @@
-function medium_masks = medium_mask_create(segmented_img, parameters)
+function medium_masks = preproc_medium_mask(segmented_img, parameters)
 %MEDIUM_MASK_CREATE Convert SimNibs segmentation to smoothed label indices.
 %
 % INPUT:
