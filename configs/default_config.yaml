@@ -236,8 +236,10 @@ prime_factor_max_grid_expansion: 40
 csf_mask_expansion_factor: 40
 
 # Thresholds for smoothing the skull and other masks
-skull_smooth_threshold: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
-other_smooth_threshold: 0.5 # (higher threshold means thinner mask, lower threshold means thicker mask)
+smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'anisotropic'|'box']
+smooth_threshold_skull: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
+smooth_threshold_other: 0.5 # (higher threshold means thinner mask, lower threshold means thicker mask)
+smooth_window: 4 # Number of voxels for smoothing
 
 #------------ Transducer placement (WIP)
 

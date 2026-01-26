@@ -89,9 +89,12 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     hiso.SpecularColorReflectance = 0;
     hiso.SpecularExponent = 50;
 
-    % Plot caps for GM/WM/CSF/bone
     for_caps = segmented_img_ds;
-    for_caps(for_caps > 4) = 0;
+    % discard segmentation layers that are not GM/WM/CSF/bone
+    availableLayers = unique(for_caps);
+    relevantLayers = getidx(parameters.seg_labels, {'wm'; 'gm'; 'csf'; 'skull'});
+    discardedLayers = availableLayers(~ismember(availableLayers, relevantLayers));
+    for_caps(ismember(for_caps, discardedLayers)) = 0;
     cap_surf = isocaps(for_caps*10,4);
     cap_surf.vertices = cap_surf.vertices - origin_shift;
     hcap = patch(cap_surf, 'FaceColor', 'interp', 'EdgeColor', 'none', 'facealpha', 0.8);
@@ -141,7 +144,10 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             orth_plane_mask(orth_idx_ds) = 1;
 
             ep_surf = isosurface(smooth3(orth_plane_mask));
-            ep_surf.vertices = ep_surf.vertices - origin_shift;
+            origin_shift = origin_shift(:)';  % Force 1x3 row vector
+            if ~isempty(ep_surf.vertices)
+                ep_surf.vertices = ep_surf.vertices - origin_shift;
+            end
             patch(ep_surf, 'FaceColor', c, 'EdgeColor', 'none', 'FaceAlpha', 0.6);
         end
 

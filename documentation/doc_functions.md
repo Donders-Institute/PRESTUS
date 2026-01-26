@@ -53,7 +53,6 @@ The following documents the functions provided in PRESTUS.
 | `transducer_positioning_with_slurm`     | HPC            | Submits transducer positioning jobs to SLURM cluster using batch scripts.                       |
 | `fitPowerLawParamsMulti`                | MEDIUM         |                                                                                                 |
 | `get_alpha_coeff`                       | MEDIUM         |                                                                                                 |
-| `medium_mask_create`                    | MEDIUM         | Map segmentation indices onto the medium labels in the config                                   |
 | `medium_properties_nifti`               | MEDIUM         | Save NifTi image of the specified medium property map.                                          |
 | `medium_setup`                          | MEDIUM         | Set up medium                                                                                   |
 | `neuronav_compute_series_statistics`    | NEURONAV       |                                                                                                 |
@@ -75,12 +74,16 @@ The following documents the functions provided in PRESTUS.
 | `plot_t1_with_transducer`               | PLOT           | Creates a plot of a T1 slice oriented along the transducer's axis with overlays.                |
 | `show_3d_head`                          | PLOT           | Visualizes segmented brain images in 3D with transducer placement and target location.          |
 | `show_positioning_plots`                | PLOT           | Visualizes transducer positioning before and after preprocessing using segmented images.        |
-| `smooth_img`                            | PLOT           |                                                                                                 |
-| `preproc_align_to_focal_axis`           | PREPROC        |                                                                                                 |
+| `head_smooth_and_crop`                  | PREPROC        | Convert and smooth segmentations into medium map & crop grid for effiency                       |
+| `preproc_medium_mask`                   | PREPROC        | Map segmentation indices onto the medium labels (in the config) [layered only]                  |
+| `preproc_align_to_focal_axis`           | PREPROC        | Rotate input image and its grid coordinates to the transducer-focal axis (+Z)                   |
+| `preproc_crop_eCSF`                     | PREPROC        | Expand CSF to define outer edges of layered medium.                                             |
+| `preproc_crop_grid`                     | PREPROC        | Crop grid to head + transducer + PML.                                                           |
 | `preproc_head`                          | PREPROC        | Preprocesses structural brain data for simulations (segmentation, alignment, cropping).         |
-| `preproc_segmentation`                  | PREPROC        |                                                                                                 |
-| `preproc_smooth_and_crop`               | PREPROC        |                                                                                                 |
-| `segmentation_run`                      | PREPROC        |                                                                                                 |
+| `preproc_segmentation`                  | PREPROC        | Setup SimNIBS segmentation                                                                      |
+| `segmentation_run`                      | PREPROC        | Submit SimNIBS segmentation                                                                     |
+| `skull_fill_holes`                      | PREPROC        | Fill holes in skull segmentation and between skull and skin                                     |
+| `smooth_img`                            | PREPROC        | Apply 3D smoothing                                                                              |
 | `grid_axisymmetry`                      | SOURCE         | Convert grid to axisymmetry                                                                     |
 | `grid_tissue_setup`                     | SOURCE         | Set up grid dimensions, preprocess head (if modeled), and place in grid                         |
 | `grid_transducer_location`              | SOURCE         | Position transducer (and target) in simulation grid                                             |

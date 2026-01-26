@@ -42,10 +42,11 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `segmentation_software`           | Segmentation software used (`headreco` or `charm`).                                                       | Use of the former `headreco` may result in errors (e.g., when creating pseudoCTs) due to the assumption of charm-based tissue labels in parts of the codebase.    |
-| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls mask dilation based on voxel size.    |   |
-| `skull_smooth_threshold`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
-| `other_smooth_threshold`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
-
+| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [mm]    |   |
+| `smooth_method`                   | Smoothing filter type ['gaussian'(default)|'anisotropic'|'box']                                           |   |
+| `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
+| `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
+| `smooth_window`                   | Number of voxels for smoothing (default: 4)                                                               |   |
 
 ### Transducer specification
 
@@ -77,7 +78,6 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                                                     | |
-| `default_grid_size`               | Default size of the simulation grid per dimension (number of points).                                                | |
 | `default_grid_dims`               | Default dimensions of the simulation grid `[Nx, Ny, Nz]`.                                                            | |
 | `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
 | `prime_factor_max_grid_expansion` | Maximum expansion factor for computational grid to optimize prime numbers and speed up computations.                 | |

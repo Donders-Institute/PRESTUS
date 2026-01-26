@@ -102,17 +102,16 @@ function pct_skullmapping(subject_id, base_path)
 
     diffHistRestricted = y1Restricted - y2Restricted; % Difference between histograms
     % Define the window size for consecutive samples
-    windowSize = 5;
     % Preallocate array for moving averages
-    movingAvgDiff = zeros(length(diffHistRestricted) - windowSize + 1, 1);
+    movingAvgDiff = zeros(length(diffHistRestricted) - parameters.smooth_window + 1, 1);
     % Compute moving average of differences over the specified window size
     for i = 1:length(movingAvgDiff)
-        movingAvgDiff(i) = mean(diffHistRestricted(i:i+windowSize-1));
+        movingAvgDiff(i) = mean(diffHistRestricted(i:i+parameters.smooth_window-1));
     end
     % Find the index of the minimum absolute moving average difference
     [minDiff, minIdx] = min(abs(movingAvgDiff));
     % Adjust index to account for window size
-    crossIdx = minIdx + floor(windowSize / 2);
+    crossIdx = minIdx + floor(parameters.smooth_window / 2);
 
     % Display results
     fprintf('Min. difference: %.2f\n', minDiff);
