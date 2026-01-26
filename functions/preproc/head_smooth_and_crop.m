@@ -39,7 +39,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
         % Fill gaps in skull (and skull-skin) mask
         if any(contains(labels, 'skull'))        
             [medium_masks, skull_i] = skull_fill_holes(parameters, ...
-                medium_masks, labels, bone_img, focus_pos_grid, segmented_img);
+                medium_masks, labels, focus_pos_grid, segmented_img);
         end
 
         % [DEBUG] Plot segmentation and smoothed medium mask
@@ -81,7 +81,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
 
     % Extract the skull edge
     if any(contains(labels, 'skull')) 
-        skull_edge = edge3(medium_masks == skull_i, 'approxcanny', 0.1);
+        skull_edge = edge3(ismember(medium_masks, skull_i), 'approxcanny', 0.1);
     else
         skull_edge = zeros(size(medium_masks));
     end

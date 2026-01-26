@@ -1,5 +1,4 @@
-function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, labels, ...
-    bone_img, focus_pos_upsampled_grid, segmented_img)
+function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, labels, focus_pos_grid, segmented_img)
 % skull_fill_holes Expands skull mask and fills gaps to skin.
 %
 % This function processes a 3D medium mask used in ultrasound brain stimulation simulations (e.g., k-Wave).
@@ -19,8 +18,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %                     - seg_labels.eye             (optional int) Label index for eye tissue.
 %   medium_masks    - 3D array of initial medium labels (updated in-place and returned).
 %   labels          - Cell array of tissue label names (e.g., {'skin', 'skull_cortical'}).
-%   bone_img        - 3D array of bone intensity image for perimeter detection.
-%   focus_pos_upsampled_grid - 1x3 vector [x,y,z] indices of focus position for debug slice (y-slice used).
+%   focus_pos_grid  - 1x3 vector [x,y,z] indices of focus position for debug slice (y-slice used).
 %   segmented_img   - 3D array of original segmentation labels.
 %
 % Outputs:
@@ -42,7 +40,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 
     if any(contains(labels, 'skull_cortical'))  
         % treat cortical bone as the base layer
-        skull_i = find(strcmp(labels, 'skull_cortical'));
+        skull_i = find(ismember(labels, {'skull_cortical'; 'skull_trabecular'}));
     else
         skull_i = find(strcmp(labels,  'skull'));
     end
@@ -51,18 +49,18 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
     medium_with_gaps = medium_masks;
 
     % Ensure continuous skull (fill small holes, connect thin regions)
-    skull = medium_masks == skull_i;
+    skull = ismember(medium_masks, skull_i);
     se = strel('sphere', 3);  % 3D ball for isotropic smoothing
     skull_continuous = imclose(skull, se);  % Dilate then erode
     skull_new = skull_continuous & ~skull;
-    medium_masks(skull_new) = skull_i;  % Only add new voxels
+    medium_masks(skull_new) = skull_i(1);  % Only add new voxels as cortical bone (if differentiated)
 
     % [DEBUG] Plot skull expansion at focus y-slice
     if parameters.debug == 1
         h = figure;
-        montage({1-squeeze(skull(:,focus_pos_upsampled_grid(2),:))*255, ...
-            1-squeeze(skull_new(:,focus_pos_upsampled_grid(2),:))*255, ...
-            1-squeeze(skull_continuous(:,focus_pos_upsampled_grid(2),:))*255}, 'Size', [1 3]);
+        montage({1-squeeze(skull(:,focus_pos_grid(2),:)), ...
+            1-squeeze(skull_new(:,focus_pos_grid(2),:)), ...
+            1-squeeze(skull_continuous(:,focus_pos_grid(2),:))}, 'Size', [1 3]);
         title('Skull (left), closed bone (center), continuous skull (right)');
         output_plot_filename = fullfile(parameters.debug_dir, ...
             sprintf('sub-%03d_%s_skull_expansion%s.png', ...
@@ -75,17 +73,20 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
     if any(strcmp(labels, 'skin'))
         skin_i = find(strcmp(labels, 'skin'));
         skin = medium_masks == skin_i;
-        skull = medium_masks == skull_i;
+        skull = ismember(medium_masks, skull_i);
         skin_skull = skin | skull;
-        skin_skull_filled = imfill(skin_skull);
+        % 3D hole-filling
+        se = strel('sphere', 3);
+        skin_skull_filled = imclose(skin_skull, se);  % Close small gaps + fill
+        skin_skull_filled = imfill(skin_skull_filled, 'holes');  % Fill remaining
 
         % Preserve trabecular mask (if available)
         if any(contains(labels, 'skull_trabecular'))
             trabecular_i = find(strcmp(labels, 'skull_trabecular'));
             trabecular_mask = medium_masks(medium_masks==trabecular_i);
         end
-        % update medium mask
-        medium_masks((skin_skull_filled - skin_skull) > 0) = skull_i;
+        % update medium mask (with cortical skull in differentiated case)
+        medium_masks((skin_skull_filled - skin_skull) > 0) = skull_i(1);
         % re-insert trabecular mask (if available)
         if any(contains(labels, 'skull_trabecular'))
             medium_masks(trabecular_mask ~= 0) = trabecular_i;
@@ -101,11 +102,12 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 
     % [DEBUG] Plot before/after gap filling at focus y-slice
     if parameters.debug == 1
-        medium_mask_updates = medium_masks-medium_with_gaps;
+        medium_mask_updates = double(medium_masks-medium_with_gaps);
+        medium_mask_updates(medium_mask_updates ~=0) = 1; % indicate where changes occured
         h = figure;
-        imshowpair(label2rgb(squeeze(medium_mask_updates(:,focus_pos_upsampled_grid(2),:)), 'parula'), ...
-            label2rgb(squeeze(medium_masks(:,focus_pos_upsampled_grid(2),:)), 'parula'), 'montage');
-        title('Smoothed (left) and closed off (right) segmented images');
+        imshowpair(label2rgb(squeeze(medium_mask_updates(:,focus_pos_grid(2),:)), 'parula'), ...
+            label2rgb(squeeze(medium_masks(:,focus_pos_grid(2),:)), 'parula'), 'montage');
+        title('Updated (left) and closed off (right) segmented images');
         output_plot_filename = fullfile(parameters.debug_dir, ...
             sprintf('sub-%03d_%s_segmented_img_closing_gaps_changes%s.png', ...
             parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
