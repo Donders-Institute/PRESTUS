@@ -15,7 +15,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 % In the skull_cortical loop proceed sequentially with whole skull smoothing and then insert trabecular layer.
 
     labels = fieldnames(parameters.layer_labels);
-    medium_masks = zeros(size(segmented_img), 'int32');
+    medium_masks = zeros(size(segmented_img));
     
     % Skip water and handle multi-layer skull specially if present
     has_multiskull = any(strcmp(labels, 'skull_cortical'));
@@ -59,4 +59,6 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
                                              parameters.smooth_threshold_skull, parameters.smooth_method);
         medium_masks(trabecular_mask_smoothed ~= 0) = trabecular_i;
     end
+
+    medium_masks = single(medium_masks);
 end
