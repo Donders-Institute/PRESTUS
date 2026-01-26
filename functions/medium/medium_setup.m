@@ -55,7 +55,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
     % Changes the values of the acoustic and thermal properties in the
     % baseline_medium in the shape of the labelled mask
     if strcmp(parameters.simulation_medium, 'layered') || strcmp(parameters.simulation_medium, 'phantom')
-        labels = fieldnames(parameters.layer_labels);
+        labels = fieldnames(parameters.layers);
         % Loops through each labelled layer to create a new mask
         for label_i = 1:length(labels)
             label_name = labels{label_i};
@@ -281,8 +281,8 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
         end
     elseif ~isempty(medium_masks) % Use the medium_masks if one is specified and the simulation_medium is not layered
         % identify tissue ids
-        if isfield(parameters, 'layer_labels')
-            labels = fieldnames(parameters.layer_labels);
+        if isfield(parameters, 'layers')
+            labels = fieldnames(parameters.layers);
             i_skull = find(contains(labels,  'skull')); i_skull = i_skull(1);
             % i_brain = find(contains(labels,  'brain'));
         else

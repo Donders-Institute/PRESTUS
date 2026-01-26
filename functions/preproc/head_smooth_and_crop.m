@@ -19,7 +19,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
 
     grid_step_mm = parameters.grid_step_mm;
 
-    labels = fieldnames(parameters.layer_labels);
+    labels = fieldnames(parameters.layers);
    
     % If a standard layered solution is used, the segmented images have to
     % be postprocessed. This includes smoothing layer transitions and
@@ -29,8 +29,8 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % But: other tissues and mask to fill may still benefit from this...
     
     if parameters.usepseudoCT==0
-    
-        % create "medium_masks" that contains indices according to the label order in parameters.layer_labels
+
+        % create "medium_masks" that contains indices according to the label order in parameters.layers
         % each mask will be smoothed in the process
         log_timer('start','preproc_medium_mask', parameters.output_dir);
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
@@ -65,7 +65,7 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
             if strcmp(labels{label_i}, 'water')
                continue
             end
-            sim_nibs_layers = parameters.layer_labels.(labels{label_i});
+            sim_nibs_layers = parameters.layers.(labels{label_i});
             layer_mask = ismember(segmented_img, sim_nibs_layers);
             medium_masks(layer_mask) = label_i;
         end

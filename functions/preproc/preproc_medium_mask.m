@@ -3,10 +3,10 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 %
 % INPUT:
 %   segmented_img  - [Nx Ny Nz] SimNibs tissue labels (1=wm,2=gm,3=csf,...)
-%   parameters     - Struct with .layer_labels, smoothing params
+%   parameters     - Struct with .layers, smoothing params
 %
 % OUTPUT:
-%   medium_masks   - [Nx Ny Nz] Integer label indices (per layer_labels order)
+%   medium_masks   - [Nx Ny Nz] Integer label indices (per layers order)
 %
 % LOGIC:
 % Create a list of all requested layers. 
@@ -14,7 +14,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 % If skull_cortical is requested, remove skull and skull_trabecular from the loop. 
 % In the skull_cortical loop proceed sequentially with whole skull smoothing and then insert trabecular layer.
 
-    labels = fieldnames(parameters.layer_labels);
+    labels = fieldnames(parameters.layers);
     medium_masks = zeros(size(segmented_img));
     
     % Skip water and handle multi-layer skull specially if present
@@ -27,7 +27,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
     % Main loop: process non-special layers
     for label_i = 1:length(loop_labels)
         label_name = loop_labels{label_i};
-        sim_nibs_layers = parameters.layer_labels.(label_name);
+        sim_nibs_layers = parameters.layers.(label_name);
         layer_mask = ismember(segmented_img, sim_nibs_layers);
         
         % Tissue-specific smoothing
@@ -47,14 +47,14 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
         skull_i = find(strcmp(labels, 'skull_cortical'));
         
         % Combined cortical+trabecular skull base
-        layer_mask = ismember(segmented_img, getidx(parameters.layer_labels, 'skull'));
+        layer_mask = ismember(segmented_img, getidx(parameters.layers, 'skull'));
         layer_mask_smoothed = smooth_img(layer_mask, parameters.smooth_window, ...
                                         parameters.smooth_threshold_skull, parameters.smooth_method);
         medium_masks(layer_mask_smoothed ~= 0) = skull_i;
         
         % Overlay smoothed trabecular on top
         trabecular_i = find(strcmp(labels, 'skull_trabecular'));
-        trabecular_mask = ismember(segmented_img, getidx(parameters.layer_labels, 'skull_trabecular'));
+        trabecular_mask = ismember(segmented_img, getidx(parameters.layers, 'skull_trabecular'));
         trabecular_mask_smoothed = smooth_img(trabecular_mask, parameters.smooth_window, ...
                                              parameters.smooth_threshold_skull, parameters.smooth_method);
         medium_masks(trabecular_mask_smoothed ~= 0) = trabecular_i;

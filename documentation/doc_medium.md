@@ -18,7 +18,7 @@ PRESTUS supports various medium configurations. These can be specified with ```p
     - cortical skull bone 
     - trabecular skull bone
     
-    Tissue can be removed (or added if more detailed segmentations and tissue properties are included) via the ```layer_labels``` and ```medium``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```).
+    Tissue can be removed (or added if more detailed segmentations and tissue properties are included) via the ```layers``` and ```medium``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```).
 
 - ```phantom```
 

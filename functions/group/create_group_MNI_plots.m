@@ -19,8 +19,8 @@ function create_group_MNI_plots(subject_list, parameters, options)
 %
 %   parameters : struct containing required config values:
 %     - temp_output_dir [string]               : Path to output folder for subject images
-%     - layer_labels.brain [array]             : Label values of brain tissue (for binary mask)
-%     - layer_labels.water [array]             : Label values of water tissue (mask heating)
+%     - layers.brain [array]             : Label values of brain tissue (for binary mask)
+%     - layers.water [array]             : Label values of water tissue (mask heating)
 %     - segmentation_software [string]         : 'headreco' or 'simnibs' (for T1 path)
 %     - results_filename_affix [string/wildcard]: e.g., '_ses-*'. 
 %     - simulation_medium [string]             : Used in table filenames
@@ -164,7 +164,7 @@ for subject_i = 1:length(full_subject_list)
         max_pressure_map_mni = niftiread(max_pressure_mni_file);
 
         % -- Logical masks: brain extraction for region calculations --
-        brain_ind = parameters.layer_labels.brain;
+        brain_ind = parameters.layers.brain;
         new_brain_ind = ones(1, length(brain_ind));
         results_mask_original = changem_vectorized(segmented_image_mni, new_brain_ind, brain_ind);
         results_mask_original(results_mask_original > max(brain_ind)) = 0;
@@ -213,7 +213,7 @@ for subject_i = 1:length(full_subject_list)
 
         if isfield(options,'plot_heating') && options.plot_heating == 1 && exist('heating_data_mni_file','var')
             maxT_mni = niftiread(heating_data_mni_file);
-            water_ind = parameters.layer_labels.water;
+            water_ind = parameters.layers.water;
             new_water_ind = zeros(1, length(water_ind));
             heating_mask = logical(changem_vectorized(segmented_image_mni, new_water_ind, water_ind));
             maxT_mni = maxT_mni .* heating_mask;
@@ -323,7 +323,7 @@ for subject_i = 1:length(subject_list)
             end
         end
 
-        brain_ind = parameters.layer_labels.brain;
+        brain_ind = parameters.layers.brain;
         new_brain_ind = ones(1, length(brain_ind));
         results_mask_original = changem_vectorized(segmented_image_mni, new_brain_ind, brain_ind);
         results_mask_original(results_mask_original > max(brain_ind)) = 0;
@@ -343,7 +343,7 @@ for subject_i = 1:length(subject_list)
 
         if isfield(options,'plot_heating') && options.plot_heating == 1 && exist('heating_data_mni_file','var')
             maxT_mni = niftiread(heating_data_mni_file);
-            water_ind = parameters.layer_labels.water;
+            water_ind = parameters.layers.water;
             new_water_ind = zeros(1, length(water_ind));
             heating_mask = logical(changem_vectorized(segmented_image_mni, new_water_ind, water_ind));
             maxT_mni = maxT_mni .* heating_mask;

@@ -64,7 +64,7 @@ sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_di
 % density and sound speed in bone are fixed for heating estimation
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
 if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
-    skull_i = find(strcmp(fieldnames(parameters.layer_labels), {'skull', 'skull_cortical', 'skull_trabecular'}));
+    skull_i = find(strcmp(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
     kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
     kwave_medium.sound_speed(ismember(medium_masks,skull_i)) = ...
         1.33*kwave_medium.density(ismember(medium_masks,skull_i))+167; 

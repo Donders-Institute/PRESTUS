@@ -51,7 +51,7 @@ else
         else
             warning('WARNING: phantom dimensions DO NOT fit requested grid...')
         end
-        % create medium mask according to indices in parameters.layer_labels (see preproc_smooth_and_crop.m)
+        % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
     else

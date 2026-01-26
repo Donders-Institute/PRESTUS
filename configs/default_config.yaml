@@ -132,7 +132,7 @@ segmentation_software: charm
 # You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
 
 # Assign multi-layer compartments to model, and indicate SimNIBS segmentation ids
-layer_labels:
+layers:
   water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
   brain: [1, 2]
   skull: [4]

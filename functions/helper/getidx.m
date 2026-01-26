@@ -8,7 +8,7 @@ function idx = getidx(parameters_fields, string)
 %
 % Input:
 %   parameters_fields - Struct containing tissue labels and their associated indices.
-%                       Example: `parameters.layer_labels`.
+%                       Example: `parameters.layers`.
 %   string            - String specifying the tissue name to search for.
 %                       Example: `'skin'`.
 %

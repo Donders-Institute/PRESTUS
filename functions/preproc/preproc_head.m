@@ -264,8 +264,8 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         t1_slice = repmat(mat2gray(squeeze(t1_img_rr(:,trans_pos_rescaled(2),:))), [1 1 3]);
         % Create slices of segmented SimNIBS data
         % Segmentation labels can be different for the pseudoCT mask. See create_pseudoCT.sh.
-        skullidx = getidx(parameters.layer_labels,'skull'); % Includes all "skull_" segmentations
-        skinidx = getidx(parameters.layer_labels,'skin');
+        skullidx = getidx(parameters.layers,'skull'); % Includes all "skull_" segmentations
+        skinidx = getidx(parameters.layers,'skin');
         % Unsmoothed skull & skin masks
         skull_mask_unsmoothed = ismember(segmented_img_rr,skullidx);
         skin_mask_unsmoothed = ismember(segmented_img_rr,skinidx);

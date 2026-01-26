@@ -44,7 +44,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     else
         medium_masks_focal = squeeze(medium_masks(trans_pos(1),:));
     end
-    labels = fieldnames(parameters.layer_labels);
+    labels = fieldnames(parameters.layers);
     skull_i = find(strcmp(labels, 'skull'));
     cortical_i = find(strcmp(labels, 'skull_cortical'));
     trabecular_i = find(strcmp(labels, 'skull_trabecular'));
