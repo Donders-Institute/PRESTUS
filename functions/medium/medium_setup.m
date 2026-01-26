@@ -343,7 +343,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
     % DEBUG mode: save plot of fitted attenuation values
     if parameters.debug == 1
         fig_path = fullfile(parameters.output_dir, 'debug', ...
-        ['AttenuationFit', char(parameters.results_filename_affix), '.png']);
+        ['attenuation_fit', char(parameters.results_filename_affix), '.png']);
         saveas(gcf, fig_path);
         close(gcf);
     end
