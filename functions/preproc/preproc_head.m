@@ -253,7 +253,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             'rotation_matrix');
         log_timer('stop','preproc_rotscale');
     else 
-        disp('Skipping; the file already exists. Loading it instead.');
+        disp('Skipping reorientation; the file already exists. Loading it instead.');
         load(filename_reoriented_scaled_data);
     end
     
@@ -285,11 +285,10 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
         clear t1_slice skullidx skinidx skull_mask_unsmoothed skin_mask_unsmoothed skin_slice skull_slice skin_skull_img;
     end
     
-    %% SMOOTH & CROP SKULL
-    % the implementation varies between skull, layered, and pseudoCT calls
+    %% SEG-> MEDIUM, SMOOTH & CROP LAYERED
     % see preproc_smooth_and_crop
     
-    disp('Smoothing and cropping the skull...')
+    disp('Creating layered medium by smoothing and cropping the head segmentation...')
 
     % Defines output file location and name
     filename_cropped_smoothed_skull_data = fullfile(parameters.debug_dir, ...
@@ -303,8 +302,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             head_smooth_and_crop(...
             parameters, segmented_img_rr, bone_img_rr, trans_pos_rescaled, focus_pos_rescaled);
 
-        % Combines the matrix that defined the alignment with the transducer
-        % axis with the new matrix that defines the cropping of the skull
+        % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
 
@@ -347,19 +345,16 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
             'inv_final_transformation_matrix')
         log_timer('stop','preproc_skullsmooth');
     else 
-        disp('Skipping, the file already exists, loading it instead.')
+        disp('Skipping head smoothing and cropping, the file already exists, loading it instead.')
         load(filename_cropped_smoothed_skull_data);
     end    
     
-    % Encode new image dimensions
-    parameters.grid_dims = size(medium_masks);
-
     %% Sanity-check transformations
 
     % Check that transformations are correct by inverting locations and comparing them to the original 
     % If the transformation cannot be correctly inverted, this will be displayed
     % If the inverse transformation is off by > 1 voxel, the script exits
-    
+
     backtransf_coordinates = round(tformfwd([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
     diff_voxels = abs(backtransf_coordinates - [trans_pos_grid; focus_pos_grid]);
     
@@ -375,6 +370,9 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
     end
 
     %% Plot placement of up to 2 Transducers
+
+    % Update the parameters (for plottign below only)  
+    parameters.grid_dims = size(medium_masks);
 
     max_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > max_plots
@@ -402,7 +400,7 @@ function [medium_masks, segmented_image_cropped, skull_edge, trans_pos_final, fo
 
         if parameters.debug == 1
             % [DEBUG] Plot brain segmentation
-            [seg_with_trans_img, transducer_pars] = plot_t1_with_transducer(...
+            [seg_with_trans_img, ~] = plot_t1_with_transducer(...
                 medium_masks, parameters.grid_step_mm, tpos_sim, fpos_sim, parameters);
             
             h = figure;
