@@ -8,7 +8,7 @@ function [medium_masks, segmented_image_cropped, parameters, trans_pos_final, ..
 %
 % Inputs:
 %   parameters      - Struct with:
-%                     .csf_mask_expansion_factor (mm), .pml_size, .prime_factor_max_grid_expansion,
+%                     .csf_mask_expansion_factor (mm), .pml_size, .grid_max_expand,
 %                     .debug (1/0), .debug_dir, .subject_id, .simulation_medium, .results_filename_affix,
 %                     .parameters.grid_step_mm (voxel size, used elsewhere).
 %   medium_masks    - 3D array: Current medium labels (non-CSF regions zeroed).
@@ -61,9 +61,9 @@ function [medium_masks, segmented_image_cropped, parameters, trans_pos_final, ..
     end
 
     % Optimize dimensions for FFT
-    new_grid_dims(1) = find_min_factor(new_grid_dims(1), new_grid_dims(1) + parameters.prime_factor_max_grid_expansion);
-    new_grid_dims(2) = find_min_factor(new_grid_dims(2), new_grid_dims(2) + parameters.prime_factor_max_grid_expansion);
-    new_grid_dims(3) = find_min_factor(new_grid_dims(3), new_grid_dims(3) + parameters.prime_factor_max_grid_expansion);
+    new_grid_dims(1) = find_min_factor(new_grid_dims(1), new_grid_dims(1) + parameters.grid_max_expand);
+    new_grid_dims(2) = find_min_factor(new_grid_dims(2), new_grid_dims(2) + parameters.grid_max_expand);
+    new_grid_dims(3) = find_min_factor(new_grid_dims(3), new_grid_dims(3) + parameters.grid_max_expand);
     max_dims = min_dims + new_grid_dims - 1;
     
     % Pad post if max_dims exceeds

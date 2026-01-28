@@ -41,7 +41,7 @@ fprintf('📐 SIMULATION GRID\n');
 print_if_field(parameters, 'grid_step_mm', '%.2f mm');
 print_if_field(parameters, 'default_grid_dims', '%s');
 print_if_field(parameters, 'pml_size', '%d');
-print_if_field(parameters, 'prime_factor_max_grid_expansion', '%.1f');
+print_if_field(parameters, 'grid_max_expand', '%.1f');
 fprintf('\n');
 
 %% 4. Transducer Specification

@@ -80,7 +80,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                                                     | |
 | `default_grid_dims`               | Default dimensions of the simulation grid `[Nx, Ny, Nz]`.                                                            | |
 | `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
-| `prime_factor_max_grid_expansion` | Maximum expansion factor for computational grid to optimize prime numbers and speed up computations.                 | |
+| `grid_max_expand`                 | Maximum expansion [mm] for computational grid to optimize prime numbers and speed up computations.                 | |
 
 ### Medium properties
 
