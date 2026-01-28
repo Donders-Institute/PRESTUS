@@ -17,7 +17,8 @@ function [sensor_data] = acoustic_wrapper(parameters, kgrid, kwave_medium, sourc
         'PMLSize', parameters.pml_size, ...
         'PlotPML', true);
 
-    if contains(parameters.simulation_medium, {'skull'; 'layered'})
+    if contains(parameters.simulation_medium, {'layered'}) && ...
+            any(ismember(fieldnames(parameters.layers), {'skull'}))
         kwave_input_args.DisplayMask = skull_edge;
     end
 

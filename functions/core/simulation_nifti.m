@@ -27,7 +27,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 %       * MNI space:  sub-XXX_final_{isppa|MI|...}_MNI.nii.gz
 %     Plots: Isppa overlays on T1 for first 2 transducers.
 
-    if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
+    if contains(parameters.simulation_medium, {'layered'; 'phantom'})
 
         data_types = "medium_masks";
         if parameters.acoustics_available == 1 

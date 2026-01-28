@@ -86,7 +86,7 @@ clear w a0_np;
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (parameters.transducer.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
 
 % save absorption coefficient [Np] for debugging
-if contains(parameters.simulation_medium, {'skull', 'layered', 'phantom'}) && parameters.debug == 1
+if contains(parameters.simulation_medium, {'layered', 'phantom'}) && parameters.debug == 1
     try
         filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);

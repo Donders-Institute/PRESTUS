@@ -87,7 +87,7 @@ function [results, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_p
     real_focal_distance = norm(results.max_isppa_eplane_pos-trans_pos)*parameters.grid_step_mm; % [mm]
 
     % Layer-specific outcomes (in case a layered simulation)
-    if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
+    if contains(parameters.simulation_medium, {'layered'; 'phantom'})
 
         % calculate max. isppa and location across full space
         [~, Ix, Iy, Iz] = masked_max_3d(acoustic_isppa, ones(size(medium_masks)));

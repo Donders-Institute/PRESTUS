@@ -1,7 +1,7 @@
 function [parameters] = grid_transducer_location(parameters, planimg)
 % Position transducer(s) in the grid
 
-    if contains(parameters.simulation_medium, {'skull'; 'layered'})
+    if contains(parameters.simulation_medium, {'layered'})
         % map all transducers from T1 grid to sim grid using the same transform
         for ti = 1:numel(parameters.transducer)
             tr = parameters.transducer(ti);

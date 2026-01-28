@@ -36,7 +36,7 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     results_thermal.maxCEM43 = max(results_heating.CEM43, [], 'all');
     % Overwrites the max temperature by dividing it up for each layer
     % in case a layered simulation_medium was selected
-    if contains(parameters.simulation_medium, {'skull'; 'layered'; 'phantom'})
+    if contains(parameters.simulation_medium, {'layered'; 'phantom'})
         results_thermal.maxT_brain = masked_max_3d(results_heating.maxT, mask.brain);
         results_thermal.maxT_skull = masked_max_3d(results_heating.maxT, mask.skull); 
         results_thermal.maxT_skin = masked_max_3d(results_heating.maxT, mask.skin);

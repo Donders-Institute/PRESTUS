@@ -46,7 +46,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('SEGMENTATION \n');
     fprintf('========================================\n\n');
 
-    if contains(parameters.simulation_medium, {'skull'; 'layered'})
+    if contains(parameters.simulation_medium, {'layered'})
         log_timer('start','segmentation', parameters.seg_path);
         preproc_segmentation(parameters)
         log_timer('stop','segmentation');
@@ -113,7 +113,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     end
     
     % save images of assigned medium properties
-    if contains(parameters.simulation_medium, {'skull'; 'layered'}) && parameters.debug == 1
+    if contains(parameters.simulation_medium, {'layered'}) && parameters.debug == 1
         medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
         medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
         medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
