@@ -49,6 +49,9 @@ function [parameters] = path_log_setup(parameters, prestus_path, subject_id)
         kwave_version(getkWavePath);
     end
 
+    % return to PRESTUS path
+    cd(prestus_path);
+
     % Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
         parameters.output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
