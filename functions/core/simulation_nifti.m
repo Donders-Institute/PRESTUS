@@ -111,7 +111,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                 end
 
                 % define the maximum value to plot
-                if isfield(results_acoustic, 'max_Isppa_brain') & ~isempty(results_acoustic.max_Isppa_brain)
+                if isfield(results_acoustic, 'max_Isppa_brain') && ~isempty(results_acoustic.max_Isppa_brain) && ~isnan(results_acoustic.max_Isppa_brain)
                     max_val = results_acoustic.max_Isppa_brain;
                 else
                     max_val = results_acoustic.max_Isppa;
