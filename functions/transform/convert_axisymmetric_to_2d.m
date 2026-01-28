@@ -49,7 +49,7 @@ parameters.transducer(1).pos_grid = trans_pos_final;
 parameters.transducer(1).focus_pos = focus_pos_final;
 
 % set up kgrid again for eventual heating sim
-kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
-          parameters.grid_dims(2), parameters.grid_step_m);
+kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
+          parameters.grid_dims(2), parameters.grid_step_mm/1e3);
 
 end

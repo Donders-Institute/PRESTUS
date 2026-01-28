@@ -11,12 +11,12 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 
     % Creates a simulation grid in 3 or 2 dimensions
     if parameters.n_sim_dims == 3
-        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
-                      parameters.grid_dims(2), parameters.grid_step_m, ...
-                      parameters.grid_dims(3), parameters.grid_step_m);
+        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
+                      parameters.grid_dims(2), parameters.grid_step_mm/1e3, ...
+                      parameters.grid_dims(3), parameters.grid_step_mm/1e3);
     elseif parameters.n_sim_dims == 2
-        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
-                      parameters.grid_dims(2), parameters.grid_step_m);
+        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
+                      parameters.grid_dims(2), parameters.grid_step_mm/1e3);
     end
 
     % Backward-compatible access to (first) transducer
@@ -34,7 +34,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     % instability.
     if nargin < 5
         % Calculate the time step using an integer number of points per period
-        points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid_step_m);
+        points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid_step_mm/1e3);
         % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
         cfl = 0.3;                                                          
         % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; k-Wave default.

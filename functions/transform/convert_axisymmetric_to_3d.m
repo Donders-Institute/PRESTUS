@@ -52,10 +52,9 @@ parameters.transducer.trans_pos = trans_pos_final;
 parameters.transducer.focus_pos = focus_pos_final;
 
 %% set up 3D kgrid for follow-up heating simulations
-
-kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_m, ...
-          parameters.grid_dims(2), parameters.grid_step_m, ...
-          parameters.grid_dims(3), parameters.grid_step_m);
+kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
+          parameters.grid_dims(2), parameters.grid_step_mm/1e3, ...
+          parameters.grid_dims(3), parameters.grid_step_mm/1e3);
 
 %% DEBUG: visually inspect
 

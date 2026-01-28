@@ -113,8 +113,6 @@ function parameters = load_parameters(varargin)
 
     %% Derived grid settings
 
-    parameters.grid_step_m = parameters.grid_step_mm / 1e3; % Convert grid step from mm to meters
-
     % Set simulation dimensions based on default grid dimensions or fallback to 3D
     if ~isfield(parameters, 'n_sim_dims')
         if isfield(parameters, 'default_grid_dims')
