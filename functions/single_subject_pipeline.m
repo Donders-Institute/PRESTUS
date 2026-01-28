@@ -251,6 +251,11 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         log_timer('stop', 'acoustic_analysis');
     else
         disp('No acoustic simulation results available. Skipping analysis...')
+        results_acoustic = [];
+        acoustic_isppa = [];
+        acoustic_MI = [];
+        acoustic_pressure = [];
+        highlighted_pos = [];
     end
 
     % =========================================================================
@@ -330,7 +335,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     if parameters.heating_available == 1
         log_timer('start','thermal_analysis', parameters.output_dir);
         thermal_analysis(parameters, results_heating, time_status_seq, ...
-            medium_masks, trans_pos, focus_pos, highlighted_pos, segmentation);
+            medium_masks, highlighted_pos, segmentation);
         log_timer('stop','thermal_analysis');
     else
         disp('No heating simulation results available. Skipping thermal analysis...')
@@ -349,8 +354,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
 
     simulation_nifti(parameters, planimg, results_acoustic, ...
                             acoustic_isppa, acoustic_MI, acoustic_pressure, ...
-                            medium_masks, results_heating, kwave_medium, trans_pos, ...
-                            focus_pos, highlighted_pos)
+                            medium_masks, results_heating, kwave_medium, highlighted_pos)
 
     log_timer('stop','nifti');
 

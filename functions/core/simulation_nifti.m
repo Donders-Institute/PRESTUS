@@ -1,12 +1,10 @@
 function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, ...
-                         medium_masks, results_heating, kwave_medium, trans_pos, ...
-                         focus_pos, highlighted_pos)
+                         medium_masks, results_heating, kwave_medium, highlighted_pos)
 
-% SIMULATION_NIFTI - Export k-Wave simulation results to NIfTI (orig + MNI space).
+% SIMULATION_NIFTI - Export k-Wave simulation results to NIfTI (native + MNI space).
 %
 %   simulation_nifti(PARAMETERS, PLANIMG, ACOUSTIC_ISPPA, ACOUSTIC_MI, ACOUSTIC_PRESSURE, ...
-%                   MEDIUM_MASKS, HEATING_MAXT, HEATING_CEM43, KWAVE_MEDIUM, ...
-%                   TRANS_POS, FOCUS_POS, HIGHLIGHTED_POS)
+%                   MEDIUM_MASKS, HEATING_MAXT, HEATING_CEM43, KWAVE_MEDIUM, HIGHLIGHTED_POS)
 %
 % Inputs:
 %   - parameters (struct) - Simulation config: output_dir, simulation_medium, 
@@ -19,13 +17,6 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 %   - results_heating.maxT (array) - Max temperature from thermal sim [°C] (if run_heating_sims)
 %   - results_heating.CEM43 (array) - Cumulative Equivalent Minutes at 43°C
 %   - kwave_medium (struct) - k-Wave medium (for temp_0)
-%   - trans_pos, focus_pos, highlighted_pos (arrays) - Transducer/focus/max-Isppa voxel coords
-%
-% Outputs:
-%   - None (side effects): Saves NIfTIs (*.nii.gz) to parameters.output_dir:
-%       * orig coord: sub-XXX_final_{isppa|MI|...}_orig_coord.nii.gz
-%       * MNI space:  sub-XXX_final_{isppa|MI|...}_MNI.nii.gz
-%     Plots: Isppa overlays on T1 for first 2 transducers.
 
     if contains(parameters.simulation_medium, {'layered'; 'phantom'})
 
@@ -33,7 +24,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
         if parameters.acoustics_available == 1 
             data_types  = [data_types, "isppa","MI","pressure"];
         end
-        if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims 
+        if parameters.heating_available == 1
             data_types  = [data_types, "heating", "heatrise", "CEM43"];
         end
         for data_type = data_types
@@ -42,14 +33,14 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
             mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz',...
                 parameters.subject_id, data_type, parameters.results_filename_affix));
 
-            if strcmp(data_type, "isppa")
+            if strcmp(data_type, "medium_masks")
+                data = medium_masks;
+            elseif strcmp(data_type, "isppa")
                 data = single(acoustic_isppa);
             elseif strcmp(data_type, "MI")
                 data = single(acoustic_MI);
             elseif strcmp(data_type, "pressure")
                 data = single(acoustic_pressure);
-            elseif strcmp(data_type, "medium_masks")
-                data = medium_masks;
             elseif strcmp(data_type, "heating")
                 data = single(results_heating.maxT);
             elseif strcmp(data_type, "heatrise")
@@ -127,13 +118,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                 end
             
                 for ti = 1:max_plots
-                    if ti == 1
-                        tpos_sim = trans_pos;
-                        fpos_sim = focus_pos;
-                    else
-                        tpos_sim = parameters.transducer(ti).trans_pos;
-                        fpos_sim = parameters.transducer(ti).focus_pos;
-                    end
+                    tpos_sim = parameters.transducer(ti).trans_pos;
+                    fpos_sim = parameters.transducer(ti).focus_pos;
             
                     % map canonical / per-T positions + highlighted_pos back to T1 space
                     backtransf_coordinates = round(tformfwd(...
