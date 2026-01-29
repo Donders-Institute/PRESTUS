@@ -80,7 +80,8 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     fid = fopen([temp_slurm_file '.sh'], 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
-    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition)
+    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition) && ...
+            ~strcmp(parameters.hpc_partition, '')
         fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
         request_gpu = 1;
     elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
@@ -89,12 +90,14 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     else
         request_gpu = 0;
     end
-    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu)
+    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ...
+            ~strcmp(parameters.hpc_gpu, '')
         fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
     elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
-    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
+    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation) && ...
+            ~strcmp(parameters.hpc_reservation, '')
         fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
     end
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
@@ -118,8 +121,12 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     [status, out] = system(full_cmd);
 
     job_id = regexp(out, '\d+', 'match');
-    job_id = str2double(job_id{1});
-    fprintf('Job name: %s; job ID: %i\n', job_name, job_id)
+    try % there are instances where the system returns no job id but a warning, show this
+        job_id = str2double(job_id{1});
+        fprintf('Job name: %s; job ID: %i\n', job_name, job_id)
+    catch
+        disp(out);
+    end
     
     if status == 0
         disp('Job submitted successfully');
