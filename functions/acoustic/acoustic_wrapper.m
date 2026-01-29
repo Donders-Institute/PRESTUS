@@ -1,4 +1,4 @@
-function [sensor_data] = acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, skull_edge, filename_sensor_data)
+function [sensor_data] = acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, medium_masks, filename_sensor_data)
     
     disp('Specifying and Starting acoustic simulations...')
 
@@ -19,6 +19,10 @@ function [sensor_data] = acoustic_wrapper(parameters, kgrid, kwave_medium, sourc
 
     if contains(parameters.simulation_medium, {'layered'}) && ...
             any(ismember(fieldnames(parameters.layers), {'skull'}))
+        % Extract the skull edge ...
+        mask = tissuemask_binary(parameters, medium_masks);
+        skull_edge = edge3(ismember(medium_masks, mask.skull), 'approxcanny', 0.1);
+        % ... to set as display mask
         kwave_input_args.DisplayMask = skull_edge;
     end
 

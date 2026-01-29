@@ -1,4 +1,4 @@
-function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, focus_pos_final, ...
+function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_final, ...
     translation_matrix] = head_smooth_and_crop(parameters, segmented_img, bone_img, ...
     trans_pos_grid, focus_pos_grid)
     arguments
@@ -78,13 +78,6 @@ function [medium_masks, skull_edge, segmented_image_cropped, trans_pos_final, fo
     % Crop the simulation grid outside layered medium + transducer + PML for efficiency
     [medium_masks, segmented_image_cropped, parameters, trans_pos_final, focus_pos_final, translation_matrix] = ...
          preproc_crop_grid(parameters, medium_masks, segmented_img, trans_pos_grid, focus_pos_grid);
-
-    % Extract the skull edge
-    if any(contains(labels, 'skull')) 
-        skull_edge = edge3(ismember(medium_masks, skull_i), 'approxcanny', 0.1);
-    else
-        skull_edge = zeros(size(medium_masks));
-    end
     
     % [DEBUG] plot the smoothed and unsmoothed skull segmentation with transducer and focus locations
     if parameters.debug == 1

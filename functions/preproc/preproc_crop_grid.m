@@ -20,7 +20,6 @@ function [medium_masks, segmented_image_cropped, parameters, trans_pos_final, ..
 % Outputs:
 %   medium_masks          - Cropped 3D medium labels.
 %   segmented_image_cropped - Cropped original segmentation.
-%   skull_edge            - 3D binary: Skull edges (edge3 Canny).
 %   parameters            - Updated with .grid_dims = [Nx Ny Nz].
 %   trans_pos_final       - 1x3: Adjusted transducer pos in cropped grid.
 %   focus_pos_final       - 1x3: Adjusted focus pos in cropped grid.

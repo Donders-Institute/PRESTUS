@@ -1,4 +1,4 @@
-function [parameters, medium_masks, segmentation, skull_edge, planimg] = grid_tissue_setup(parameters)
+function [parameters, medium_masks, segmentation, planimg] = grid_tissue_setup(parameters)
 % GRID_TISSUE_SETUP sets up the computational grid and tissue masks
 % for ultrasound neuromodulation simulations, either by preprocessing a 
 % subject-specific head model (T1-weighted MRI) or loading phantom/alternative grids.
@@ -15,8 +15,7 @@ if contains(parameters.simulation_medium, {'layered'})
     % The original T1 positions are later transformed using the transf
     % matrix.
 
-    [medium_masks, segmentation, skull_edge, ~, ~, ...
-        planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
+    [medium_masks, segmentation, ~, ~, planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
     
     if isempty(medium_masks)
@@ -29,32 +28,33 @@ if contains(parameters.simulation_medium, {'layered'})
 else
     % In case simulations are not run in a skull of layered tissue, 
     % alternative grid dimensions are set up
-    assert(isfield(parameters, 'default_grid_dims'), ...
-        'The parameters structure should have the field grid_dims for the grid dimensions')
-    parameters.grid_dims = parameters.default_grid_dims;
-    if any(parameters.grid_dims==1)||length(parameters.grid_dims)==2
-        parameters.grid_dims = squeeze(parameters.grid_dims);
-        parameters.n_sim_dims = length(parameters.grid_dims);
-        disp('One of the simulation grid dimensions is of length 1. Assuming you want 2D simulations ... dropping this dimension')
-    end
-
-    % read in phantoms directly as medium masks 
     if strcmp(parameters.simulation_medium, 'phantom')
+        % read in phantoms directly as medium masks 
         segmentation_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', parameters.subject_id));
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
         segmented_img = niftiread(filename_segmented);
-        if size(segmented_img) == parameters.grid_dims
+        if size(segmented_img) == parameters.default_grid_dims
             disp('Check passed: phantom dimensions fit requested grid...');
-        elseif size(segmented_img') == parameters.grid_dims
+        elseif length(size(segmented_img))==2 && size(segmented_img') == parameters.default_grid_dims
             segmented_img = segmented_img';
-            disp('Check passed: phantom dimensions fit requested grid...');
+            disp('Check passed: phantom dimensions fit requested grid after rotating phantom...');
         else
-            warning('WARNING: phantom dimensions DO NOT fit requested grid...')
+            parameters.grid_dims = size(segmented_img);
+            parameters.n_sim_dims = length(parameters.grid_dims);
+            disp('Setting grid according to phantom dimensions...')
+            sprintf('%dD grid dimensions: [%d, %d, %d]', parameters.n_sim_dims, parameters.grid_dims);
         end
         % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
-    else
+    else % e.g., water
+        % set up default grid dimensions
+        assert(isfield(parameters, 'default_grid_dims'), ...
+            'The parameters structure should have the field grid_dims for the grid dimensions')
+        parameters.grid_dims = squeeze(parameters.default_grid_dims);
+        parameters.n_sim_dims = length(parameters.default_grid_dims);
+        sprintf('Using default %dD grid dimensions: [%d, %d, %d]', parameters.n_sim_dims, parameters.grid_dims);
+        % set up empty medium masks and segmentations
         medium_masks = [];
         segmentation = zeros(parameters.grid_dims);
     end
@@ -64,8 +64,5 @@ else
     planimg.t1_header = [];
     planimg.transf = zeros(parameters.grid_dims);
     planimg.inv_transf = zeros(parameters.grid_dims);
-
-    % create empty outputs for other variables
-    skull_edge = zeros(parameters.grid_dims);
 
 end
