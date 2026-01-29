@@ -96,8 +96,10 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     discardedLayers = availableLayers(~ismember(availableLayers, relevantLayers));
     for_caps(ismember(for_caps, discardedLayers)) = 0;
     cap_surf = isocaps(for_caps*10,4);
-    cap_surf.vertices = cap_surf.vertices - origin_shift;
-    hcap = patch(cap_surf, 'FaceColor', 'interp', 'EdgeColor', 'none', 'facealpha', 0.8);
+    if ~isempty(cap_surf.vertices)
+        cap_surf.vertices = cap_surf.vertices - origin_shift;
+        hcap = patch(cap_surf, 'FaceColor', 'interp', 'EdgeColor', 'none', 'facealpha', 0.8);
+    end
     lighting gouraud;
     hcap.AmbientStrength = 0.6;
 
