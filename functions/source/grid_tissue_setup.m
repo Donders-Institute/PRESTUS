@@ -34,8 +34,12 @@ else
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
         segmented_img = niftiread(filename_segmented);
         if size(segmented_img) == parameters.default_grid_dims
+            parameters.grid_dims = parameters.default_grid_dims;
+            parameters.n_sim_dims = length(parameters.grid_dims);
             disp('Check passed: phantom dimensions fit requested grid...');
-        elseif length(size(segmented_img))==2 && size(segmented_img') == parameters.default_grid_dims
+        elseif length(size(segmented_img))==2 && all(size(segmented_img') == parameters.default_grid_dims)
+            parameters.grid_dims = parameters.default_grid_dims;
+            parameters.n_sim_dims = length(parameters.grid_dims);
             segmented_img = segmented_img';
             disp('Check passed: phantom dimensions fit requested grid after rotating phantom...');
         else
