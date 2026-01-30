@@ -1,8 +1,11 @@
 function [results, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
-            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, trans_pos, focus_pos, ...
+            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
                                 segmentation, source_labels)
     
     disp('Processing the results of acoustic simulations...')
+
+    trans_pos = parameters.transducer(1).trans_pos;
+    focus_pos = parameters.transducer(1).focus_pos;
     
     % intialize output structure
     results = struct();
