@@ -1,7 +1,6 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
     thermal_simulation(...
-    parameters, sensor_data, kgrid, kwave_medium, sensor, source, ...
-    trans_pos, transf, medium_masks)
+    parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
 
 % THERMAL_SIMULATION Simulates thermal effects of ultrasound using k-Wave.
 %
@@ -16,7 +15,6 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 %   kwave_medium - Struct containing medium properties (e.g., density, sound speed).
 %   sensor       - Struct defining the sensor mask for thermal simulations.
 %   source       - Struct defining the heat deposition source for thermal simulations.
-%   trans_pos    - [1x3] array specifying the transducer position in grid coordinates.
 %   transf
 %   medium_masks
 %
@@ -171,8 +169,8 @@ total_timepoints = 1 + n_ptri_reps * snapshots_per_ptri + params_thermal.post_pt
 if ndims(T_max) == 3
     T_focal     = NaN([size(T_max,[1,3]) total_timepoints]);
     CEM43_focal = NaN([size(T_max,[1,3]) total_timepoints]);
-    T_focal(:,:,1)     = squeeze(T_max(:,trans_pos(2),:));
-    CEM43_focal(:,:,1) = squeeze(CEM43_max(:,trans_pos(2),:));
+    T_focal(:,:,1)     = squeeze(T_max(:,parameters.transducer(1).trans_pos(2),:));
+    CEM43_focal(:,:,1) = squeeze(CEM43_max(:,parameters.transducer(1).trans_pos(2),:));
 elseif ndims(T_max) == 2
     T_focal     = NaN([size(T_max) total_timepoints]);
     CEM43_focal = NaN([size(CEM43_max) total_timepoints]);
@@ -222,8 +220,8 @@ for rep_i = 1:n_ptri_reps
         end
         cur_timepoint = cur_timepoint + 1;
         if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)     = squeeze(curT(:,trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+            T_focal(:,:,cur_timepoint)     = squeeze(curT(:,parameters.transducer(1).trans_pos(2),:));
+            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,parameters.transducer(1).trans_pos(2),:));
         else
             T_focal(:,:,cur_timepoint)     = curT;
             CEM43_focal(:,:,cur_timepoint) = curCEM43;
@@ -258,8 +256,8 @@ for rep_i = 1:n_ptri_reps
             end
             cur_timepoint = cur_timepoint + 1;
             if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)     = squeeze(curT(:,trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+                T_focal(:,:,cur_timepoint)     = squeeze(curT(:,parameters.transducer(1).trans_pos(2),:));
+                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,parameters.transducer(1).trans_pos(2),:));
             else
                 T_focal(:,:,cur_timepoint)     = curT;
                 CEM43_focal(:,:,cur_timepoint) = curCEM43;
@@ -297,8 +295,8 @@ for rep_i = 1:n_ptri_reps
             end
             cur_timepoint = cur_timepoint + 1;
             if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)     = squeeze(curT(:,trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+                T_focal(:,:,cur_timepoint)     = squeeze(curT(:,parameters.transducer(1).trans_pos(2),:));
+                CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,parameters.transducer(1).trans_pos(2),:));
             else
                 T_focal(:,:,cur_timepoint)     = curT;
                 CEM43_focal(:,:,cur_timepoint) = curCEM43;
@@ -338,8 +336,8 @@ if params_thermal.post_ptri_steps_n > 0
         end
         cur_timepoint = cur_timepoint + 1;
         if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)     = squeeze(curT(:,trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,trans_pos(2),:));
+            T_focal(:,:,cur_timepoint)     = squeeze(curT(:,parameters.transducer(1).trans_pos(2),:));
+            CEM43_focal(:,:,cur_timepoint) = squeeze(curCEM43(:,parameters.transducer(1).trans_pos(2),:));
         else
             T_focal(:,:,cur_timepoint)     = curT;
             CEM43_focal(:,:,cur_timepoint) = curCEM43;

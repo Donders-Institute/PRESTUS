@@ -1,13 +1,10 @@
-function [sensor_data, parameters, trans_pos_final, focus_pos_final, ...
-    segmented_image_cropped, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-    convert_axisymmetric_to_2d(...
-    sensor_data, parameters, trans_pos_final, focus_pos_final, ...
-    segmented_image_cropped, medium_masks, kwave_medium, source, source_labels)
-
+function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+    convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels)
+          
 % Convert the data from symmetric about x=0 to a mirrored 2d setup.
 sensor_data.p_final = cat(2, fliplr(sensor_data.p_final), sensor_data.p_final);
 sensor_data.p_max_all = cat(2, fliplr(sensor_data.p_max_all), sensor_data.p_max_all);
-segmented_image_cropped = cat(2, fliplr(segmented_image_cropped), segmented_image_cropped);
+segmentation = cat(2, fliplr(segmentation), segmentation);
 medium_masks = cat(2, fliplr(medium_masks), medium_masks);
 source.p_mask = cat(2, fliplr(source.p_mask), source.p_mask);
 source_labels = cat(2, fliplr(source_labels), source_labels);
@@ -19,6 +16,9 @@ for i = 1:numel(fields)
 end
 
 % shift positions to diameter location
+trans_pos_final = parameters.transducer(1).trans_pos;
+focus_pos_final = parameters.transducer(1).focus_pos;
+
 trans_pos_final(2) = trans_pos_final(2)+parameters.grid_dims(2);
 focus_pos_final(2) = focus_pos_final(2)+parameters.grid_dims(2);
 
@@ -31,7 +31,7 @@ parameters.grid_dims = fliplr(parameters.grid_dims);
 parameters.default_grid_dims = fliplr(parameters.default_grid_dims);
 trans_pos_final = fliplr(trans_pos_final);
 focus_pos_final = fliplr(focus_pos_final);
-segmented_image_cropped = segmented_image_cropped';
+segmentation = segmentation';
 medium_masks = medium_masks';
 sensor_data.p_max_all = sensor_data.p_max_all';
 sensor_data.p_final = sensor_data.p_final';
@@ -45,7 +45,7 @@ for i = 1:numel(fields)
 end
 
 % Retain transducer and focus positions after all grid manipulations
-parameters.transducer(1).pos_grid = trans_pos_final;
+parameters.transducer(1).trans_pos = trans_pos_final;
 parameters.transducer(1).focus_pos = focus_pos_final;
 
 % set up kgrid again for eventual heating sim

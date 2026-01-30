@@ -1,14 +1,11 @@
-function [sensor_data, parameters, trans_pos_final, focus_pos_final, ...
-    segmented_image_cropped, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-    convert_axisymmetric_to_3d(...
-    sensor_data, parameters, trans_pos_final, focus_pos_final, ...
-    segmented_image_cropped, medium_masks, kwave_medium, source, source_labels)
+function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+    convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels)
 
 %% convert 2d axisymmetry images to 3d
 
 sensor_data.p_final = radialExpand2DTo3D(sensor_data.p_final);
 sensor_data.p_max_all = radialExpand2DTo3D(sensor_data.p_max_all);
-segmented_image_cropped = radialExpand2DTo3D(segmented_image_cropped);
+segmentation = radialExpand2DTo3D(segmentation);
 medium_masks = radialExpand2DTo3D(medium_masks);
 source.p_mask = radialExpand2DTo3D(double(source.p_mask));
 source_labels = radialExpand2DTo3D(double(source_labels));
@@ -24,6 +21,9 @@ end
 parameters.n_sim_dims = 3;
 
 % shift positions to diameter location
+trans_pos_final = parameters.transducer(1).trans_pos;
+focus_pos_final = parameters.transducer(1).focus_pos;
+
 trans_pos_final(2) = trans_pos_final(2)+parameters.grid_dims(2);
 focus_pos_final(2) = focus_pos_final(2)+parameters.grid_dims(2);
 

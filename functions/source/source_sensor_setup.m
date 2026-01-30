@@ -67,8 +67,8 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
                 tr = parameters.transducer(ti);
 
                 % transducer position in grid
-                if isfield(tr, 'pos_grid') && ~isempty(tr.pos_grid)
-                    pos = tr.pos_grid;
+                if isfield(tr, 'trans_pos') && ~isempty(tr.trans_pos)
+                    pos = tr.trans_pos;
                     if size(pos,1) > size(pos,2)
                         pos = pos';
                     end

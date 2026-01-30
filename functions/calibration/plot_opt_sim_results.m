@@ -30,11 +30,11 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     if opt_res.parameters.n_sim_dims == 2
         p_axialprofile = squeeze(p_max(:, :))';
     elseif opt_res.parameters.n_sim_dims == 3
-        p_axialprofile = squeeze(p_max(:, opt_res.parameters.transducer.pos_grid(2), :))';
+        p_axialprofile = squeeze(p_max(:, opt_res.parameters.transducer.trans_pos(2), :))';
     end
 
     % Simulated pressure along the focal axis
-    pred_axial_pressure_opt = p_axialprofile(:,opt_res.parameters.transducer.pos_grid(1));
+    pred_axial_pressure_opt = p_axialprofile(:,opt_res.parameters.transducer.trans_pos(1));
 
     % Compute focal position relative to the mid-bowl of the transducer
     focus_wrt_mid_bowl = focus_wrt_exit_plane + (opt_res.parameters.transducer.curv_radius_mm - opt_res.parameters.transducer.dist_to_plane_mm);
@@ -66,7 +66,7 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
         'LineWidth', 1, 'Color', [0 0 0], 'LineStyle', ':', 'DisplayName', 'Optimized (Analytical)');
 
     % Adjust axial position for simulated results
-    sim_res_axial_position = axial_position - (opt_res.parameters.transducer.pos_grid(end) - 1) * opt_res.parameters.grid_step_mm;
+    sim_res_axial_position = axial_position - (opt_res.parameters.transducer.trans_pos(end) - 1) * opt_res.parameters.grid_step_mm;
     plot(sim_res_axial_position, pred_axial_pressure_opt .^ 2 / (2 * opt_param.medium.water.sound_speed * opt_param.medium.water.density) * 1e-4, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'Optimized (Simulated)');
     plot(dist_exit_plane, adjusted_profile_focus, ...
@@ -95,7 +95,7 @@ function plot_opt_sim_results(opt_param, sim_id, axial_position, dist_exit_plane
     figure('Position', [10, 10, 900, 500]);
     hold on;
         % Adjust axial position for simulated results
-    sim_res_axial_position = axial_position - (opt_res.parameters.transducer.pos_grid(end) - 1) * opt_res.parameters.grid_step_mm;
+    sim_res_axial_position = axial_position - (opt_res.parameters.transducer.trans_pos(end) - 1) * opt_res.parameters.grid_step_mm;
     plot(sim_res_axial_position, pred_axial_pressure_opt .^ 2 / (2 * opt_param.medium.water.sound_speed * opt_param.medium.water.density) * 1e-4, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'Optimized (Simulated)');
     plot(dist_exit_plane, adjusted_profile_focus, ...

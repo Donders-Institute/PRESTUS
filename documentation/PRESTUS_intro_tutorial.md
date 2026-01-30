@@ -160,7 +160,7 @@ p_max = gather(sensor_data.p_max_all); % transform from GPU array to normal arra
 % plot 2d intensity map
 imagesc((1:size(p_max,1))*parameters.grid_step_mm, ...
     (1:size(p_max,3))*parameters.grid_step_mm , ...
-    squeeze(p_max(:,parameters.transducer.pos_grid(2),:))')
+    squeeze(p_max(:,parameters.transducer.trans_pos(2),:))')
 axis image;
 colormap(getColorMap);
 xlabel('Lateral Position [mm]');
@@ -176,7 +176,7 @@ Then, we can compare the simulated pressure along the focal axis and the pressur
 
 ```matlab:Code
 % simulated pressure along the focal axis
-pred_axial_pressure = squeeze(p_max(parameters.transducer.pos_grid(1),parameters.transducer.pos_grid(2),:)); % get the values at the focal axis
+pred_axial_pressure = squeeze(p_max(parameters.transducer.trans_pos(1),parameters.transducer.trans_pos(2),:)); % get the values at the focal axis
 
 % compute O'Neil solution and plot it along with comparisons
 % define transducer parameters
@@ -201,7 +201,7 @@ plot(axial_position, p_axial_oneil .^2/(2*parameters.medium.water.sound_speed*pa
 xlabel('Axial Position [mm]');
 ylabel('Intensity [W/cm^2]');
 hold on
-plot(axial_position-(parameters.transducer.pos_grid(3)-1)*0.5, pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
+plot(axial_position-(parameters.transducer.trans_pos(3)-1)*0.5, pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
 plot(real_profile(:,1),real_profile(:,2))
 hold off
 xline(parameters.expected_focal_distance_mm, '--');
@@ -381,7 +381,7 @@ Warning: Unable to load gpuArray data onto a GPU. Computations cannot be perform
 
 % get maximum pressure
 p_max = gather(opt_res.sensor_data.p_max_all);
-pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.pos_grid(1), opt_res.parameters.transducer.pos_grid(2),:));
+pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.trans_pos(1), opt_res.parameters.transducer.trans_pos(2),:));
 
 figure('Position', [10 10 900 500]);
 hold on
@@ -390,7 +390,7 @@ xlabel('Axial Position [mm]');
 ylabel('Intensity [W/cm^2]');
 plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 
-sim_res_axial_position = axial_position-(opt_res.parameters.transducer.pos_grid(3)-1)*0.5; % axial position for the simulated results, relative to transducer position
+sim_res_axial_position = axial_position-(opt_res.parameters.transducer.trans_pos(3)-1)*0.5; % axial position for the simulated results, relative to transducer position
 plot(sim_res_axial_position, ...
     pred_axial_pressure_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 plot(real_profile(:,1),real_profile(:,2))
