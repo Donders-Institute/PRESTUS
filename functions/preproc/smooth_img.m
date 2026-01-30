@@ -33,8 +33,9 @@ function thresholded_img = smooth_img(unsmoothed_img, smooth_window, threshold, 
                 smoothed_img = imgaussdiff(img, round(smooth_window*2.5), 0.125);
             case "gaussian"
                 sigma = smooth_window / 3;
-                filter_size = max(3, 2 * round(smooth_window / 2) + 1);  % Force odd: 5,7,9...
+                filter_size = max(2, 2 * round(smooth_window / 2) + 1);  % Force odd: 5,7,9... with minimal size 2
                 smoothed_img = imgaussfilt(img, sigma, 'FilterSize', filter_size);
+                disp(['Gaussian filtering: sigma ', num2str(sigma) ,' size ', num2str(filter_size), ' voxels']);
             case "box"
                 kernel = ones(smooth_window, smooth_window) / smooth_window^2;
                 smoothed_img = imfilter(img, kernel, 'replicate');
@@ -44,8 +45,9 @@ function thresholded_img = smooth_img(unsmoothed_img, smooth_window, threshold, 
             case "anisotropic"
                 smoothed_img = imdiffusefilt(img, 'NumberOfIterations', round(smooth_window*2.5));
             case "gaussian"
-                size_vec = max(3, 2 * round(smooth_window / 2) + 1);  % Also fix for consistency
-                smoothed_img = smooth3(img, 'gaussian', size_vec);
+                filter_size = max(2, 2 * round(smooth_window / 2) + 1);  % Also fix for consistency
+                smoothed_img = smooth3(img, 'gaussian', filter_size);
+                disp(['Gaussian filtering: size ', num2str(filter_size), ' voxels']);
             case "box"
                 kernel = ones(smooth_window, smooth_window, smooth_window) / smooth_window^3;
                 smoothed_img = convn(img, kernel, 'same');
