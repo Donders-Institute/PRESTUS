@@ -101,22 +101,6 @@ function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_fina
         focus_pos_grid = focus_pos_grid';
     end
 
-    %% [Optional] Create unprocessed T1 slice oriented along the transducer's axis
-
-    if parameters.debug==1
-        h = figure;
-        imshowpair(plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), ...
-            trans_pos_grid, focus_pos_grid, parameters), ...
-            plot_t1_with_transducer(t1_image, t1_header.PixelDimensions(1), ...
-            trans_pos_grid, focus_pos_grid, parameters, 'slice_dim', 1), 'montage');
-        title('T1 with transducer');
-        output_plot_filename = fullfile(parameters.debug_dir, ...
-            sprintf('sub-%03d_t1_with_transducer_og_%s.png', ...
-            parameters.subject_id, parameters.results_filename_affix));
-        saveas(h, output_plot_filename, 'png');
-        close(h);
-    end
-
     %% Rotate and scale images to match the stimulation trajectory
 
     disp('Rotating images to focal axis and rescaling to grid resolution ...')
