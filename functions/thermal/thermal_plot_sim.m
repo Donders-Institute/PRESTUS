@@ -18,6 +18,8 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 %
 % Output:
 %   None. The function saves plots and a video in the specified output directory.
+%   Note: The timeseries capture metrics in the focal axis of the
+%   transducer, not the maximum of observed values!
 
     %% Define output file paths for plots
     output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_heating_by_time%s.png', ...
@@ -32,7 +34,10 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         focal_planeT = gather(focal_planeT);
     end
 
-    %% Extract temperature profiles along the focal axis (note: not max.)
+    %% Extract temperature profiles along the focal axis (note: not max.!)
+    % Change definition to the location of the max. temperature increase in
+    % the sagittal transducer plane
+
     focal_axis_temperature = squeeze(focal_planeT(trans_pos(1), :, :));
     focal_axis_trise = squeeze(focal_planeT(trans_pos(1), :, :) - focal_planeT(trans_pos(1), :, 1));
     focal_CEM = squeeze(CEM43(trans_pos(1),:,:));
@@ -44,16 +49,10 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     else
         medium_masks_focal = squeeze(medium_masks(trans_pos(1),:));
     end
-    labels = fieldnames(parameters.layers);
-    skull_i = find(strcmp(labels, 'skull'));
-    cortical_i = find(strcmp(labels, 'skull_cortical'));
-    trabecular_i = find(strcmp(labels, 'skull_trabecular'));
-    all_skull_ids = [skull_i, cortical_i, trabecular_i];
-    mask_skull = ismember(medium_masks_focal,all_skull_ids);
-    brain_i = find(strcmp(labels, 'brain'));
-    mask_brain = ismember(medium_masks_focal,brain_i);
-    skin_i = find(strcmp(labels, 'skin'));
-    mask_skin = ismember(medium_masks_focal,skin_i);
+    % extract position of focus
+    target_pos_focal = parameters.transducer(1).focus_pos(end);
+
+    mask = tissuemask_binary(parameters, medium_masks_focal);
 
     %% Plot temperature profile over time
 
@@ -61,28 +60,31 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 
     h = figure;
     hold on;
-%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     % create dummy values to avoid crashes when mask is empty
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask_skull))
-        data2plot = max(focal_axis_temperature(mask_skull, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skull))
+        data2plot = max(focal_axis_temperature(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.temp.Skull, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_skin))
-        data2plot = max(focal_axis_temperature(mask_skin, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skin))
+        data2plot = max(focal_axis_temperature(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.temp.Skin, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_brain))
-        data2plot = max(focal_axis_temperature(mask_brain, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.brain))
+        data2plot = max(focal_axis_temperature(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.temp.Brain, 'LineWidth', 2);
+    % add target
+    HEAT.temp.TARGET = focal_axis_temperature(target_pos_focal, 1:size(time_status_seq,2));
+    p4 = plot(HEAT.recordedtime, HEAT.temp.TARGET, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -97,9 +99,9 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a.FaceAlpha = 0.1;
     end
     hold off
-    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'});
+    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'});
     legend('boxoff');
-    title('Temperature in focal plane (max. in tissue)');
+    title('Temperature in focal plane (NOT overall tissue max.)');
     saveas(h, output_plot, 'png');
     close(h);
 
@@ -107,28 +109,31 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 
     h = figure;
     hold on;
-%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
+%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     % create dummy values to avoid crashes when mask is empty
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask_skull))
-        data2plot = max(focal_axis_trise(mask_skull, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skull))
+        data2plot = max(focal_axis_trise(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.tempRise.Skull, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_skin))
-        data2plot = max(focal_axis_trise(mask_skin, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skin))
+        data2plot = max(focal_axis_trise(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.tempRise.Skin, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_brain))
-        data2plot = max(focal_axis_trise(mask_brain, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.brain))
+        data2plot = max(focal_axis_trise(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.tempRise.Brain, 'LineWidth', 2);
+    % add target
+    HEAT.tempRise.TARGET = focal_axis_trise(target_pos_focal, 1:size(time_status_seq,2));
+    p4 = plot(HEAT.recordedtime, HEAT.tempRise.TARGET, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -143,9 +148,9 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a.FaceAlpha = 0.1;
     end
     hold off
-    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'}, 'location', 'NorthWest');
+    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
     legend('boxoff');
-    title('Temperature rise in focal plane (max. in tissue)');
+    title('Temperature rise in focal plane (NOT overall tissue max.)');
     saveas(h, output_plot_rise, 'png');
     close(h);
 
@@ -155,23 +160,26 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     hold on;
     % create dummy values to avoid crashes when mask is empty
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask_skull))
-        data2plot = max(focal_CEM(mask_skull, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skull))
+        data2plot = max(focal_CEM(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.CEM43.Skull, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_skin))
-        data2plot = max(focal_CEM(mask_skin, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.skin))
+        data2plot = max(focal_CEM(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.CEM43.Skin, 'LineWidth', 2);
     data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask_brain))
-        data2plot = max(focal_CEM(mask_brain, 1:size(time_status_seq,2)),[],1);
+    if any(find(mask.brain))
+        data2plot = max(focal_CEM(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.CEM43.Brain, 'LineWidth', 2);
+    % add target
+    HEAT.CEM43.TARGET = focal_CEM(target_pos_focal, 1:size(time_status_seq,2));
+    p4 = plot(HEAT.recordedtime, HEAT.CEM43.TARGET, 'LineWidth', 2);
     colormap('lines')
     xlabel('Time [s]');
     ylabel(sprintf('CEM43'));
@@ -186,9 +194,9 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a.FaceAlpha = 0.1;
     end
     hold off
-    legend([p1, p2, p3], {'skull'; 'skin'; 'brain'}, 'location', 'NorthWest');
+    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
     legend('boxoff');
-    title('CEM43 in focal plane (max. in tissue)');
+    title('CEM43 in focal plane (NOT overall tissue max.)');
     saveas(g, output_plotCEM, 'png');
     close(g);
 
