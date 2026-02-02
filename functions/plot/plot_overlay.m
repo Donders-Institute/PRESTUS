@@ -74,10 +74,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         error('Transducer point is outside of image boundaries');
     end
     if any(max_data_pos > size(bg_image))
-        error('Max ISPPA point is outside of image boundaries');
+        warning('Max ISPPA point is outside of image boundaries. Regularizing to max. of dimensions');
+        max_data_pos = min([max_data_pos; size(bg_image)]);
     end
 
-    %% Set thresholds and color range for ISppa map
+    %% Set thresholds and color range for ISPPA map
     if options.overlay_threshold_low == options.overlay_threshold_high
         options.overlay_threshold_low = options.overlay_threshold_low - 0.05;
     end
