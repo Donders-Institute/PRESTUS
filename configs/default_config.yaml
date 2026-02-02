@@ -240,7 +240,7 @@ csf_mask_expansion_factor: 40
 smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'anisotropic'|'box']
 smooth_threshold_skull: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
 smooth_threshold_other: 0.5 # (higher threshold means thinner mask, lower threshold means thicker mask)
-smooth_window: 4 # Number of voxels for smoothing
+smooth_window: 3 # Number of voxels for smoothing
 
 #------------ Transducer placement (WIP)
 
