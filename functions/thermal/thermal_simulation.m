@@ -1,4 +1,4 @@
-function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal] = ...
+function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_focal, timeseries] = ...
     thermal_simulation(...
     parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
 
@@ -25,6 +25,7 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, CEM43_max, CEM43_fo
 %   T_focal          - Temperature at the focal plane over time. [x,z,time]
 %   CEM43_max        - Maximum cumulative equivalent minutes at 43°C (CEM43) during the simulation.
 %   CEM43_focal      - CEM43 values at the focal plane over time. [x,z,time]
+%   timeseries       - Temeperature, Trise, and CEM43 for different layers. [time]
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % Notes:                                                            %
@@ -178,6 +179,9 @@ elseif ndims(T_max) == 2
     CEM43_focal(:,:,1) = CEM43_max;
 end
 
+% setup structure for layer-specific timerseries
+timeseries = thermal_update_timeseries(parameters, medium_masks);
+
 cur_timepoint = 1;
 time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
 
@@ -228,6 +232,7 @@ for rep_i = 1:n_ptri_reps
         end
         T_max     = max(T_max,     curT);
         CEM43_max = max(CEM43_max, curCEM43);
+        timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43);
         
         % PULSE OFF (within PT)
         if params_thermal.pt_off_steps_n > 0
@@ -264,6 +269,8 @@ for rep_i = 1:n_ptri_reps
             end
             T_max     = max(T_max,     curT);
             CEM43_max = max(CEM43_max, curCEM43);
+            timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43);
+
         end  % end pulse OFF
     end  % end pulse loop
     
@@ -303,6 +310,8 @@ for rep_i = 1:n_ptri_reps
             end
             T_max     = max(T_max,     curT);
             CEM43_max = max(CEM43_max, curCEM43);
+            timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43);
+
         end
     end
 end  % end PTRI rep loop
@@ -344,6 +353,8 @@ if params_thermal.post_ptri_steps_n > 0
         end
         T_max     = max(T_max,     curT);
         CEM43_max = max(CEM43_max, curCEM43);
+        timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43);
+
     end
 end
 

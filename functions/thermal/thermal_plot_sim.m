@@ -1,4 +1,4 @@
-function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43)
+function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries)
 
 % THERMAL_PLOT_SIM Visualizes heating simulation results over time.
 %
@@ -22,11 +22,11 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 %   transducer, not the maximum of observed values!
 
     %% Define output file paths for plots
-    output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_heating_by_time%s.png', ...
+    output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermal%s.png', ...
         parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plot_rise = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_heatrise_by_time%s.png', ...
+    output_plot_rise = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermalrise%s.png', ...
         parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plotCEM = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_CEM_by_time%s.png', ...
+    output_plot_CEM = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_CEM%s.png', ...
         parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
     %% Convert GPU arrays to CPU if necessary
@@ -34,6 +34,8 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         focal_planeT = gather(focal_planeT);
     end
 
+    %% Plot data for the focal axis
+    
     %% Extract temperature profiles along the focal axis (note: not max.!)
     % Change definition to the location of the max. temperature increase in
     % the sagittal transducer plane
@@ -54,15 +56,12 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 
     mask = tissuemask_binary(parameters, medium_masks_focal);
 
-    %% Plot temperature profile over time
+    %% [focal axis] temperature over time
 
     HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
 
     h = figure;
     hold on;
-%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_temperature(mask.brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
     % create dummy values to avoid crashes when mask is empty
     data2plot = NaN(numel(HEAT.recordedtime), 1);
     if any(find(mask.skull))
@@ -98,6 +97,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
+    xlim([0, HEAT.recordedtime(end)]);
     hold off
     legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'});
     legend('boxoff');
@@ -105,7 +105,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     saveas(h, output_plot, 'png');
     close(h);
 
-    %% Plot temperature rise over time
+    %% [focal axis] temperature rise over time
 
     h = figure;
     hold on;
@@ -147,6 +147,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
+    xlim([0, HEAT.recordedtime(end)]);
     hold off
     legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
     legend('boxoff');
@@ -154,7 +155,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     saveas(h, output_plot_rise, 'png');
     close(h);
 
-    %% Plot CEM43 values over time
+    %% [focal axis] CEM43 values over time
 
     g = figure;
     hold on;
@@ -193,20 +194,115 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
+    xlim([0, HEAT.recordedtime(end)]);
     hold off
     legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
     legend('boxoff');
     title('CEM43 in focal plane (NOT overall tissue max.)');
-    saveas(g, output_plotCEM, 'png');
+    saveas(g, output_plot_CEM, 'png');
     close(g);
 
-    %% Save values for group analysis
+    %% Plot timeseries for maximum in medium
+
+    output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermal_max%s.png', ...
+        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot_rise = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermalrise_max%s.png', ...
+        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot_CEM = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_CEM_max%s.png', ...
+        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+
+    % [layer-max] temperature over time
+
+    HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
+    HEAT.recordedtime = HEAT.recordedtime(2:end);
+    available_layers = fieldnames(timeseries.T);
+
+    h = figure; hold on;
+    for i_layer = 1:numel(available_layers)
+        plot(HEAT.recordedtime, timeseries.T.(available_layers{i_layer}), 'LineWidth', 2);
+    end
+    colormap('lines')
+    xlabel('Time [s]');
+    ylabel('Temperature [°C]');
+    y_range = ylim();
+    for i = 2:(length(time_status_seq)-1)
+        if ~strcmp(time_status_seq(i).status,'on')
+            continue
+        end
+        x_points = [time_status_seq(i-1).time time_status_seq(i-1).time time_status_seq(i).time time_status_seq(i).time];
+        y_points = [y_range(1) y_range(2) y_range(2) y_range(1)];
+        a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
+        a.FaceAlpha = 0.1;
+    end
+    xlim([1, HEAT.recordedtime(end)]);
+    hold off
+    legend(available_layers);
+    legend('boxoff');
+    title('Temperature (overall tissue max.)');
+    saveas(h, [output_plot], 'png');
+    close(h);
+
+    % [layer-max] temperature change over time
+
+    h = figure; hold on;
+    for i_layer = 1:numel(available_layers)
+        plot(HEAT.recordedtime, timeseries.Tdiff.(available_layers{i_layer}), 'LineWidth', 2);
+    end
+    colormap('lines')
+    xlabel('Time [s]');
+    ylabel('Temperature Change [°C]');
+    y_range = ylim();
+    for i = 2:(length(time_status_seq)-1)
+        if ~strcmp(time_status_seq(i).status,'on')
+            continue
+        end
+        x_points = [time_status_seq(i-1).time time_status_seq(i-1).time time_status_seq(i).time time_status_seq(i).time];
+        y_points = [y_range(1) y_range(2) y_range(2) y_range(1)];
+        a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
+        a.FaceAlpha = 0.1;
+    end
+    xlim([1, HEAT.recordedtime(end)]);
+    hold off
+    legend(available_layers);
+    legend('boxoff');
+    title('Temperature change (overall tissue max.)');
+    saveas(h, [output_plot_rise], 'png');
+    close(h);
+
+    % [layer-max] thermal index over time
+
+    h = figure; hold on;
+    for i_layer = 1:numel(available_layers)
+        plot(HEAT.recordedtime, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
+    end
+    colormap('lines')
+    xlabel('Time [s]');
+    ylabel('Thermal Index [CEM43]');
+    y_range = ylim();
+    for i = 2:(length(time_status_seq)-1)
+        if ~strcmp(time_status_seq(i).status,'on')
+            continue
+        end
+        x_points = [time_status_seq(i-1).time time_status_seq(i-1).time time_status_seq(i).time time_status_seq(i).time];
+        y_points = [y_range(1) y_range(2) y_range(2) y_range(1)];
+        a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
+        a.FaceAlpha = 0.1;
+    end
+    xlim([1, HEAT.recordedtime(end)]);
+    hold off
+    legend(available_layers);
+    legend('boxoff');
+    title('Thermal Index CEM43 (overall tissue max.)');
+    saveas(h, [output_plot_CEM], 'png');
+    close(h);
+
+    %% Save values for post-hoc group analysis
 
     output_HEAT = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_HEAT%s.mat', ...
         parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    save(output_HEAT, 'HEAT');
+    save(output_HEAT, 'HEAT', 'timeseries');
 
-    %% Create a video of heating effects over the course of the experiment (if requested)
+    %% Create a video of sagittal in-plane heating (if requested)
 
     if ~isfield(parameters, 'heatingvideo')
         parameters.heatingvideo = 1; % default: create & save video
