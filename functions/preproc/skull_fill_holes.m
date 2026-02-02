@@ -78,15 +78,14 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
         % 3D hole-filling
         se = strel('sphere', 3);
         skin_skull_filled = imclose(skin_skull, se);  % Close small gaps + fill
-        skin_skull_filled = imfill(skin_skull_filled, 'holes');  % Fill remaining
-
         % Preserve trabecular mask (if available)
         if any(contains(labels, 'skull_trabecular'))
             trabecular_i = find(strcmp(labels, 'skull_trabecular'));
             trabecular_mask = medium_masks(medium_masks==trabecular_i);
         end
         % update medium mask (with cortical skull in differentiated case)
-        medium_masks((skin_skull_filled - skin_skull) > 0) = skull_i(1);
+        layer_holes = (skin_skull_filled - skin_skull) > 0;
+        medium_masks(layer_holes) = skull_i(1);
         % re-insert trabecular mask (if available)
         if any(contains(labels, 'skull_trabecular'))
             medium_masks(trabecular_mask ~= 0) = trabecular_i;
