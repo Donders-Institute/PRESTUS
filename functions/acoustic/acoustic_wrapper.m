@@ -31,7 +31,7 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
             any(ismember(fieldnames(parameters.layers), {'skull'}))
         % Extract the skull edge ...
         mask = tissuemask_binary(parameters, medium_masks);
-        skull_edge = edge3(ismember(medium_masks, mask.skull), 'approxcanny', 0.1);
+        skull_edge = edge3(mask.skull, 'approxcanny', 0.1);
         % ... to set as display mask
         kwave_input_args.DisplayMask = skull_edge;
     end
