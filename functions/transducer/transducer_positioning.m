@@ -1,8 +1,8 @@
 function transducer_positioning(parameters, pn, subject_id, target_name, mni_targets)
 
-% TRANSDUCER_POSITIONING Determines optimal transducer placement for a given target.
+% TRANSDUCER_POSITIONING Determine heuristic transducer placement for a given target.
 %
-% This function calculates the optimal placement of a transducer for a specified target 
+% This function calculates the heuristic placement of a transducer for a specified target 
 % based on segmented brain images and MNI coordinates. It performs the following tasks:
 %   - Adds required paths to MATLAB's environment.
 %   - Converts MNI coordinates to subject-specific coordinates.
