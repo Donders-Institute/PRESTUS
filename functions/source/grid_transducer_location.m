@@ -61,7 +61,8 @@ function [parameters] = grid_transducer_location(parameters, planimg)
         else
             focus_pos = parameters.transducer.focus_pos;
             % Adjust if the positions are transposed (2D only)
-            if parameters.n_sim_dims == 2 && size(focus_pos,1)>size(focus_pos, 2)
+            % In 2D, we expect the second index as the axial dimension
+            if parameters.n_sim_dims == 2 && focus_pos(1)>focus_pos(2)
                 warning('Specified focus position appears transposed...adjusting');
                 focus_pos = focus_pos';
             end
