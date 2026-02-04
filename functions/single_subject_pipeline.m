@@ -398,7 +398,8 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         water_parameters.simulation_medium = 'water';
         water_parameters.run_heating_sims = 0;
         water_parameters.run_posthoc_water_sims = 0;
-        % run with the same grid dimension as the real simulation (overkill?)
+        water_parameters.debug = 0;
+        % run with the same grid dimension as the real simulation
         water_parameters.default_grid_dims = water_parameters.grid_dims;
         % restore subject-specific path to original path if done earlier in this function
         if isfield(water_parameters,'subject_subfolder') && water_parameters.subject_subfolder == 1
