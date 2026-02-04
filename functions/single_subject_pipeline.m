@@ -1,4 +1,4 @@
-function [parameters, output_pressure_file] = single_subject_pipeline(subject_id, parameters, options)
+function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     arguments
         subject_id 
         parameters struct
