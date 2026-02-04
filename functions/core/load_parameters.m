@@ -18,7 +18,7 @@ function parameters = load_parameters(varargin)
 
     %% Load default configuration file
 
-    parameters = yaml.loadFile('configs/default_config.yaml', "ConvertToArray", true);
+    parameters = yaml.loadFile('default_config.yaml', "ConvertToArray", true);
 
     %% Merge with additional configuration files or structures
 
@@ -27,7 +27,7 @@ function parameters = load_parameters(varargin)
         if isstruct(extra_config_file)
             extra_parameters = extra_config_file; % Use provided struct directly
         else
-            extra_parameters = yaml.loadFile(fullfile('configs', extra_config_file), "ConvertToArray", true); 
+            extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true); 
         end        
         parameters = MergeStruct(parameters, extra_parameters);
     elseif nargin == 2
