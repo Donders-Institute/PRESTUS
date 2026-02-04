@@ -8,12 +8,31 @@ A general strategy toward such parameter iteration is to work on the basus of a 
 
 For many parameters, this can simply be done by specifying different values for ```parameters.<<xxx>>```. One exception is the intensity and depth setting of the transducer output, as these depend on the internal transducer calibration. PRESTUS by default provides a transducer calibration ("profiling"). This should in general be used for a given depth and free water intensity. However, this may not provide sufficient flexibility for exploring different output amplitudes. For that reason, PRERSTUS also provides the function ```transducer_calibration```, which can be used within an interative MATLAB loop to find suitable transducer phase and amplitude settings that closely replicate the desired free water output profile.
 
-#### Concatenating successive simulations
+#### Sequential simulations
 
+Applicable when you stimulate from different coordinates in sequence (for stimulation in parallel, see 'Modeling multiple transducers'). Instead of starting each heating simulation with the default starting temperatures, you can start your nth stimulation with the temperature and CEM43 maps from the previous simulation. To do this, you only need to feed the pipeline your other configs.
+
+Example:
+Since each config is a structure, you can easily place multiple configs in one structure without any converting.
+Let's say you have config_1, config_2 and config_3 and you want to run them in sequence.
+
+If you want the heatmaps to not carry over, you would run your pipeline like this:
+`single_subject_pipeline(subject_id, config_1)`
+`single_subject_pipeline(subject_id, config_2)`
+`single_subject_pipeline(subject_id, config_3)`
+
+But now, you will also feed it the configs for each subsequent simulation:
+`sequential_configs.config_2 = config_2`
+`sequential_configs.config_3 = config_3`
+`single_subject_pipeline(subject_id, config_1, 'sequential_configs', sequential_configs)`
+
+Please note that you have to use the names `config_x` in the sequential_configs, and that you have to use integers. So names like 'config_-5', 'config_0', 'config_1234' and 'config_007'.
+
+```
 parameters.adopted_heatmap | path to nifti file
 parameters.adopted_cumulative_heat | path to nifti file
 options.sequential_configs
-
+```
 
 #### Modeling multiple transducers (experimental support)
 

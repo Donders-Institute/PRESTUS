@@ -5,7 +5,6 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
         wait_for_job logical = false % boolean for waiting for job to finish before continuing the code
         timelimit string = "04:00:00" % time limit for a job in seconds (4 hours by default)
         memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
-        options.adopted_heatmap (:,:,:) = []
         options.sequential_configs struct = struct()
     end
 
@@ -50,20 +49,11 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     fid = fopen([temp_m_file '.m'], 'w+');
 
     % Depending on the input, determine what to save and what to submit to the pipeline
-    if ~isempty(fieldnames(options.sequential_configs)) && ~isempty(options.adopted_heatmap)
-        sequential_configs = options.sequential_configs;
-        adopted_heatmap = options.adopted_heatmap;
-        save(temp_data_path, "subject_id", "parameters", "sequential_configs", "adopted_heatmap");
-        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters, 'sequential_configs', sequential_configs, 'adopted_heatmap', adopted_heatmap); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
-    elseif ~isempty(fieldnames(options.sequential_configs)) && isempty(options.adopted_heatmap)
+    if ~isempty(fieldnames(options.sequential_configs))
         sequential_configs = options.sequential_configs;
         save(temp_data_path, "subject_id", "parameters", "sequential_configs");
         fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters, 'sequential_configs', sequential_configs); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
-    elseif isempty(fieldnames(options.sequential_configs)) && ~isempty(options.adopted_heatmap)
-        adopted_heatmap = options.adopted_heatmap;
-        save(temp_data_path, "subject_id", "parameters", "adopted_heatmap");
-        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters, 'adopted_heatmap', adopted_heatmap); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
-    elseif isempty(fieldnames(options.sequential_configs)) && isempty(options.adopted_heatmap)
+    else
         save(temp_data_path, "subject_id", "parameters");
         fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
     end

@@ -33,19 +33,30 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     results_thermal = readtable(parameters.filename_output_table);
 
     results_thermal.maxT = max(results_heating.maxT, [], 'all');
+    results_thermal.endT = max(results_heating.heating_endT, [], 'all');
     results_thermal.maxCEM43 = max(results_heating.CEM43, [], 'all');
+    results_thermal.maxCEM43end = max(results_heating.CEM43_end, [], 'all');
     % Overwrites the max temperature by dividing it up for each layer
     % in case a layered simulation_medium was selected
     if contains(parameters.simulation_medium, {'layered'; 'phantom'})
         results_thermal.maxT_brain = masked_max_3d(results_heating.maxT, mask.brain);
         results_thermal.maxT_skull = masked_max_3d(results_heating.maxT, mask.skull); 
         results_thermal.maxT_skin = masked_max_3d(results_heating.maxT, mask.skin);
+        results_thermal.endT_brain = masked_max_3d(results_heating.heating_endT, mask.brain);
+        results_thermal.endT_skull = masked_max_3d(results_heating.heating_endT, mask.skull); 
+        results_thermal.endT_skin = masked_max_3d(results_heating.heating_endT, mask.skin);
         results_thermal.riseT_brain = masked_max_3d(results_heating.maxT, mask.brain)-parameters.thermal.temp_0.brain;
         results_thermal.riseT_skull = masked_max_3d(results_heating.maxT, mask.skull)-parameters.thermal.temp_0.skull; 
         results_thermal.riseT_skin = masked_max_3d(results_heating.maxT, mask.skin)-parameters.thermal.temp_0.skin;
+        results_thermal.rise_endT_brain = masked_max_3d(results_heating.heating_endT, mask.brain)-parameters.thermal.temp_0.brain;
+        results_thermal.rise_endT_skull = masked_max_3d(results_heating.heating_endT, mask.skull)-parameters.thermal.temp_0.skull; 
+        results_thermal.rise_endT_skin = masked_max_3d(results_heating.heating_endT, mask.skin)-parameters.thermal.temp_0.skin;
         results_thermal.CEM43_brain = masked_max_3d(results_heating.CEM43, mask.brain);
         results_thermal.CEM43_skull = masked_max_3d(results_heating.CEM43, mask.skull); 
         results_thermal.CEM43_skin = masked_max_3d(results_heating.CEM43, mask.skin);
+        results_thermal.CEM43_end_brain = masked_max_3d(results_heating.CEM43_end, mask.brain);
+        results_thermal.CEM43_end_skull = masked_max_3d(results_heating.CEM43_end, mask.skull); 
+        results_thermal.CEM43_end_skin = masked_max_3d(results_heating.CEM43_end, mask.skin);
     end
     writetable(results_thermal, parameters.filename_output_table);
 

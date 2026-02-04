@@ -1,4 +1,4 @@
-function [parameters] = single_subject_pipeline(subject_id, parameters, options)
+function [parameters, output_pressure_file] = single_subject_pipeline(subject_id, parameters, options)
     arguments
         subject_id 
         parameters struct
@@ -125,8 +125,9 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     end
 
     % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
-    if isfield(parameters, 'adopted_heatmap') && parameters.adopted_heatmap == 1
+    if isfield(parameters, 'adopted_heatmap') && parameters.adopted_heatmap == 1 && isfile(parameters.adopted_heatmap)
         heatmap_image = niftiread(parameters.adopted_heatmap);
+        fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.adopted_heatmap)
         medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
             makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
     else
@@ -284,7 +285,9 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
                 results_heating.maxT, ...
                 results_heating.focal_planeT, ...
                 results_heating.CEM43, ...
+                results_heating.heating_endT, ...
                 results_heating.focal_planeCEM43, ...
+                results_heating.CEM43_end, ...
                 results_heating.timeseries] = ...
                 thermal_simulation(...
                 parameters, ...
@@ -429,16 +432,15 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         sequential_configs = rmfield(sequential_configs, lowestField);
         % restore subject-specific path to original path if done earlier in this function
         sequential_parameters.adopted_heatmap = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, 'heating', parameters.results_filename_affix));
-        sequential_parameters.adopted_cumulative_heat = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, 'CEM43', parameters.results_filename_affix));
-        adopted_heatmap = ones(2,2,2);
+                parameters.subject_id, 'heating_end', parameters.results_filename_affix));
+        sequential_parameters.adopted_cem43 = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                parameters.subject_id, 'CEM43_end', parameters.results_filename_affix));
         fprintf('Running subsequent heating simulation on %s\n', lowestField);
         % Limitation: currently only support SLURM
         if ~isempty(fieldnames(sequential_configs))
-            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap, 'sequential_configs', sequential_configs);
+            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64, 'sequential_configs', sequential_configs);
         else
-            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64, 'adopted_heatmap', adopted_heatmap);
+            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64);
         end
     end
 

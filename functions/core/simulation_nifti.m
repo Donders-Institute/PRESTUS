@@ -25,7 +25,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
             data_types  = [data_types, "isppa","MI","pressure"];
         end
         if parameters.heating_available == 1
-            data_types  = [data_types, "heating", "heatrise", "CEM43"];
+            data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end"];
         end
         for data_type = data_types
             orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
@@ -43,10 +43,16 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                 data = single(acoustic_pressure);
             elseif strcmp(data_type, "heating")
                 data = single(results_heating.maxT);
+            elseif strcmp(data_type, "heating_end")
+                data = single(results_heating.heating_endT);
             elseif strcmp(data_type, "heatrise")
                 data = single(results_heating.maxT-kwave_medium.temp_0);
+            elseif strcmp(data_type, "heatrise_end")
+                data = single(results_heating.heating_endT-kwave_medium.temp_0);
             elseif strcmp(data_type, "CEM43")
                 data = single(results_heating.CEM43);
+            elseif strcmp(data_type, "CEM43_end")
+                data = single(results_heating.CEM43_end);
             end
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
@@ -90,7 +96,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                             
                             data_backtransf(:,:,1:2)     = parameters.thermal.temp_0.water;  % First two planes in the 3rd dimension
                             data_backtransf(:,:,end-1:end) = parameters.thermal.temp_0.water;  % Last two planes in the 3rd dimension
-                        elseif strcmp(data_type, "CEM43")
+                        elseif strcmp(data_type, "CEM43") || strcmp(data_type, "CEM43_end")
                             % Removes edge artifacts
                             data_backtransf(data_backtransf <= 0) = 0.0000001;
                         end
