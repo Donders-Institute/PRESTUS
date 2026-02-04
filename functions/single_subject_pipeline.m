@@ -160,15 +160,16 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
             focus_pos);
         
         % Check stability & adjust source time step if necessary
-        % If estimated time step is smaller than the time step based on default CFL, the estimated time step is used to redefine transducer and sensor. 
-        % Note: The estimated time step does not guarantee a stable simulation. If NaN numbers result, a smaller time step than estimated may be optimal.	  
-        disp('Check stability...')
-        dt_stability_limit = checkStability(kgrid, kwave_medium);
-        if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
-			disp('Adapt time step for simulation stability...')
-            % Use 90% of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
-            grid_time_step = dt_stability_limit*0.90;
-            [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
+        if isfield(parameters, 'source_limit_fraction') && parameters.source_limit_fraction ~=0
+            disp('Check stability...')
+            dt_stability_limit = checkStability(kgrid, kwave_medium);
+            fprintf('Stability limit estimate for time step: %.1d.\n', dt_stability_limit);
+            if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
+			    disp('Adapt time step for simulation stability...')
+                % Use (by default 90%) fraction of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
+                grid_time_step = dt_stability_limit*parameters.source_limit_fraction;
+                [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
+            end
         end
         log_timer('stop', 'source');
     else

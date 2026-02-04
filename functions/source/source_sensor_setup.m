@@ -34,15 +34,29 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     % instability.
     if nargin < 5
         % Calculate the time step using an integer number of points per period
-        points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid_step_mm/1e3);
         % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
-        cfl = 0.3;                                                          
+        if ~isfield(parameters, 'source_ppw') || isempty(parameters.source_ppw)
+            points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid_step_mm/1e3);
+        else
+            points_per_wavelength = parameters.source_ppw;
+        end
         % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; k-Wave default.
+        if ~isfield(parameters, 'source_cfl') || isempty(parameters.source_cfl)
+            cfl = 0.3;
+        else
+            cfl = parameters.source_cfl;
+        end
+        % Temporal samples per wave period.
         points_per_period = ceil(points_per_wavelength / cfl);              
-        % Temporal samples per wave period; ceil enforces integer ≥ PPW/CFL.
-        grid_time_step = (wave_period / points_per_period)/2;               
-        % dt: Half the standard dt, conservative; wave_period=1/source_freq.    % time step [s]  
-     end
+        % Calculate time step dt  
+        grid_time_step = (wave_period / points_per_period);
+        % Print parameter summary
+        fprintf('Calculating the time step of %.1d based on PPW %d, CFL= %.1f and PPP %.1d\n.', ...
+            grid_time_step, round(points_per_wavelength), cfl, points_per_period);
+    else
+        fprintf('Using the time step of %.1d based on approx. max. stable time step.\n', ...
+            grid_time_step);
+    end
 
     % Calculate the number of time steps to reach steady state
     t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / max_sound_speed;    % [s]
