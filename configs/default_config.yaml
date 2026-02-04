@@ -230,7 +230,7 @@ pml_size: 10
 grid_max_expand: 40
 
 source_ppw: [] # Points Per Wavelength [default: calculated internally]
-source_cfl: 0.3 # Courant-Friedrichs-Lewy fraction
+source_cfl: 0.15 # Courant-Friedrichs-Lewy fraction
 source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
 
 #------------ Segmentation / Head preprocessing
