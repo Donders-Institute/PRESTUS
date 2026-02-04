@@ -54,10 +54,7 @@ print_if_field(td, 'curv_radius_mm', '%.0f mm');
 print_if_field(td, 'source_amp', '%.1f Pa');
 print_if_field(td, 'trans_pos', '[%.1f %.1f %.1f]');
 print_if_field(td, 'focus_pos', '[%.1f %.1f %.1f]');
-if isfield(td, 'trans_pos') && isfield(td, 'focus_pos')
-    focal_dist = norm(td.focus_pos - td.trans_pos) * getfield_or_default(parameters, 'grid_step_mm', 0.5);
-    fprintf('  expected_focal_distance_mm: %.1f mm\n', focal_dist);
-end
+print_if_field(parameters, 'expected_focal_distance_mm', '%.1f');
 fprintf('\n');
 
 %% 5. Medium Properties (requested layers only)
