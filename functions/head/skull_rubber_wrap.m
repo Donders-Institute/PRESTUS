@@ -1,0 +1,198 @@
+function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmented_img)
+    
+    % parameters | parameter structure
+    % BW | Binary skull mask
+    % medium_masks | medium mask (Note: originally differentiated segmentation)
+
+    disp('Using rubber wrap to fill potential local holes in skull layer...')
+
+    % ==============================================================================
+    % Nifti info (to save new niftis)
+    % ==============================================================================
+    
+    % Load the T1w input image as a reference
+    info = niftiinfo(fullfile(parameters.seg_path, parameters.t1_path_template));
+
+    % ==============================================================================
+    % CLEAN SKULL MASK
+    % ==============================================================================
+    
+    % Keep the largest connected skull component
+    
+    sz = size(BW);
+    CC = bwconncomp(BW, 26);
+    if CC.NumObjects == 0, error("Skull mask is empty."); end
+    sizes = cellfun(@numel, CC.PixelIdxList);
+    [~, iBig] = max(sizes);
+    BW1 = false(sz);
+    BW1(CC.PixelIdxList{iBig}) = true;
+
+    % ==============================================================================
+    % RUBBER WRAP AROUND SKULL = BALLOON MASK
+    % ==============================================================================
+
+    %% --- Rubber wrap parameters ---
+
+    if isfield(parameters, 'wrapradius') && ~isempty(parameters.wrapradius)
+        wrapRadius = parameters.wrapradius;
+    else
+        wrapRadius = 10; % skull rubber wrap radius [grid voxels];
+    end
+
+    se = strel("sphere", wrapRadius);
+
+    % "Shrink-wrap" / morphological hull:
+    % Bridge concavities that are smaller than wrapRadius (-> rubber won't go in).
+    BWwrap = imclose(BW1, se);
+
+    % Ensure that the wrap is a continuous, filled region
+    BWwrap = imfill(BWwrap, "holes");
+
+    % Optional: remove any stray bits and keep largest component again
+    CCw = bwconncomp(BWwrap, 26);
+    sizesw = cellfun(@numel, CCw.PixelIdxList);
+    [~, iw] = max(sizesw);
+    BWwrap2 = false(sz);
+    BWwrap2(CCw.PixelIdxList{iw}) = true;
+
+    % Choose balloon mask, ensure logical / uint8
+    BW = uint8(BWwrap2); clear BWwrap2;
+
+    % [debug] save balloon wrap mask
+    if parameters.debug == 1
+
+        outNii = fullfile(parameters.debug_dir, ...
+            sprintf('balloon_mask%s.nii', parameters.results_filename_affix));
+
+        infoOut = info;
+        infoOut.ImageSize = size(BW);
+        infoOut.PixelDimensions = repmat(parameters.grid_step_mm,1,numel(size(BW)));
+        infoOut.Datatype = 'uint8';
+        infoOut.BitsPerPixel = 8;
+        infoOut.Filename = outNii;
+        infoOut.Filemoddate = char(datetime("now"));
+
+        niftiwrite(BW, outNii, infoOut, 'Compressed', false);
+
+        gzip(outNii);
+        delete(outNii);   % remove uncompressed .nii
+    end
+
+    %% Manage layered head tissues
+
+    % Note: the final_tissue outputs are more fine-grained than the layered masks inside of PRESTUS.
+    % Currently, we use the latter.
+
+    T = medium_masks;
+
+    if ~isequal(size(BW), size(T))
+        error("Size mismatch: balloon %s vs tissues %s", mat2str(size(BW)), mat2str(size(T)));
+    end
+
+    GM_LABEL   = find(strcmp(fieldnames(parameters.layers), 'brain'));
+    SKIN_LABEL = find(strcmp(fieldnames(parameters.layers), 'skin'));
+
+    GM   = (T == GM_LABEL);
+    SKIN = (T == SKIN_LABEL);
+
+    %% "Touch" masks: balloon voxel touches GM if it lies within 1-voxel dilation of GM
+
+    touchRadius = 1;   % voxels: 1 = immediate neighbors (26-neighborhood)
+
+    se = strel("sphere", touchRadius);
+
+    GM_touch_region   = imdilate(GM,   se);
+    SKIN_touch_region = imdilate(SKIN, se);
+
+    % Keep balloon voxels that touch BOTH
+    B_touch_both =  BW & GM_touch_region & SKIN_touch_region;
+
+    % Remove overlap with GM from the remaining mask
+    B_out = B_touch_both & ~GM;
+
+    %% Include CSF/BLOOD voxels at the SKIN interface (strict 6-neigh), near B_out
+
+    % Here, we refer to the more detailed segmentation
+    MENINGES_LABEL = [getidx(parameters.seg_labels, {'csf', 'blood'})];
+
+    MEN  = (ismember(segmented_img, MENINGES_LABEL));
+    SKIN = (T == SKIN_LABEL);
+
+    % --- Strict 6-neighborhood kernel (faces only) ---
+    K6 = zeros(3,3,3,'logical');
+    K6(2,2,2) = true;
+    K6(1,2,2) = true; K6(3,2,2) = true;
+    K6(2,1,2) = true; K6(2,3,2) = true;
+    K6(2,2,1) = true; K6(2,2,3) = true;
+
+    % SKIN dilated by 6-neighborhood => voxels face-adjacent to SKIN
+    SKIN_touch_region_6 = convn(single(SKIN), single(K6), 'same') > 0;
+
+    % MEN voxels that touch SKIN (faces only)
+    MEN_touch_SKIN_6 = MEN & SKIN_touch_region_6;
+
+    fprintf("MEN voxels touching SKIN (6-neigh): %d\n", nnz(MEN_touch_SKIN_6));
+
+    % --- Restrict to MEN voxels near existing balloon mask ---
+    nearRadius = 2;                 % 1–2 suggested
+    seNear = strel("sphere", nearRadius);
+    nearBalloon = imdilate(B_out, seNear);
+
+    MEN_touch_SKIN_6_near = MEN_touch_SKIN_6 & nearBalloon;
+
+    fprintf("...of those, near existing B_out (r=%d): %d\n", nearRadius, nnz(MEN_touch_SKIN_6_near));
+
+    % --- Add MEN interface voxels to balloon mask ---
+    B_out2 = B_out | MEN_touch_SKIN_6_near;
+
+    % Keep your original constraint: no GM overlap
+    B_out2 = B_out2 & ~GM;
+
+    B_out = BW1 | B_out2;
+
+    %% Fill along Z where there is skull in front AND behind (same Y,X)
+
+    B0 = (B_out ~= 0);   % canonical logical
+
+    BWm1 = circshift(B0, [0 0  1]);
+    BWp1 = circshift(B0, [0 0 -1]);
+
+    BWm1(:,:,1)   = false;
+    BWp1(:,:,end) = false;
+
+    %% Collect final outputs
+
+    SKULL = BW1;
+    BALLOON = B0 & ~SKULL;      % balloon-approach voxels
+    ZADDED = ~B0 & BWm1 & BWp1;
+    SKULL_BALLON = B0 | ZADDED;   % final filled ballon mask (logical)
+
+    %% [DEBUG] Save as .nii.gz
+
+    if parameters.debug == 1
+
+        outNii = fullfile(parameters.debug_dir, ...
+            sprintf('balloon_mask_final%s.nii', parameters.results_filename_affix));
+
+        infoOut = info;
+        infoOut.ImageSize = size(SKULL_BALLON);
+        infoOut.PixelDimensions = repmat(parameters.grid_step_mm,1,numel(size(SKULL_BALLON)));
+        infoOut.Datatype = 'uint8';
+        infoOut.BitsPerPixel = 8;
+        infoOut.Filename = outNii;
+        infoOut.Filemoddate = char(datetime("now"));
+
+        niftiwrite(uint8(SKULL_BALLON), outNii, infoOut, 'Compressed', false);
+        gzip(outNii);
+        delete(outNii);
+
+        fprintf("Saved: %s.gz\n", outNii);
+    end
+
+    %% [DEBUG] Visualize the expanded skull
+
+    if parameters.debug == 1
+        skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON);
+    end
+
+end

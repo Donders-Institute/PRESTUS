@@ -55,12 +55,13 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     end
 
     % EXIT is no simulation is requested (= segmentation only)
-    if ~any([parameters.run_acoustic_sims, ...
+    if ~any([parameters.run_source_setup, ...
+            parameters.run_acoustic_sims, ...
             parameters.run_heating_sims, ...
             parameters.run_posthoc_water_sims])
         disp(newline)
         disp('No simulation requested...')
-        exit;
+        return;
     end
 
     % ====================================================================

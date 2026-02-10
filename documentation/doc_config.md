@@ -47,6 +47,8 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
 | `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
 | `smooth_window`                   | Number of voxels for smoothing (default: 4)                                                               |   |
+| `skullfillmethod`                 | Method for filling holes in the skull ['rubberwrap'(default)/'imclose']                                   |   |
+| `wrapradius`                      | Skull rubber wrap radius [grid voxels] (default: 10)   | Larger = tighter rubber that ignores bigger dents; recommended: 2-10  |
 
 ### Transducer specification
 

@@ -50,9 +50,15 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 
     % Ensure continuous skull (fill small holes, connect thin regions)
     skull = ismember(medium_masks, skull_i);
-    se = strel('sphere', 3);  % 3D ball for isotropic smoothing
-    skull_continuous = imclose(skull, se);  % Dilate then erode
-    skull_new = skull_continuous & ~skull;
+    if isfield(parameters, 'skullfillmethod') && strcmp(parameters.skullfillmethod, 'rubberwrap')
+        % Local skull filling with rubber expansion
+        skull_continuous = skull_rubber_wrap(parameters, skull, medium_masks, segmented_img);
+    else
+        % Isotropic dilation
+        se = strel('sphere', 3);  % 3D ball for isotropic smoothing
+        skull_continuous = imclose(skull, se);  % Dilate then erode
+    end
+    skull_new = skull_continuous & ~skull; % Identify voxels that were not part of the original skull mask
     medium_masks(skull_new) = skull_i(1);  % Only add new voxels as cortical bone (if differentiated)
 
     % [DEBUG] Plot skull expansion at focus y-slice
@@ -61,7 +67,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
         montage({1-squeeze(skull(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_new(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_continuous(:,focus_pos_grid(2),:))}, 'Size', [1 3]);
-        title('Skull (left), closed bone (center), continuous skull (right)');
+        title('Skull (left), added bone (center), continuous skull (right)');
         output_plot_filename = fullfile(parameters.debug_dir, ...
             sprintf('sub-%03d_%s_skull_expansion%s.png', ...
             parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));

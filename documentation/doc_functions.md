@@ -27,6 +27,18 @@ The following documents the functions provided in PRESTUS.
 | `changem_vectorized`                    | GROUP          | Replace multiple old values in array A with corresponding new values.                           |
 | `combine_plots_by_suffix`               | GROUP          | Combines subject-specific plots into a single montage image.                                    |
 | `create_group_MNI_plots`                | GROUP          | Generate group-level plots in MNI space for multiple subjects.                                  |
+| `head_smooth_and_crop`                  | HEAD           | Convert and smooth segmentations into medium map & crop grid for effiency                       |
+| `preproc_medium_mask`                   | HEAD           | Map segmentation indices onto the medium labels (in the config) [layered only]                  |
+| `preproc_align_to_focal_axis`           | HEAD           | Rotate input image and its grid coordinates to the transducer-focal axis (+Z)                   |
+| `preproc_crop_eCSF`                     | HEAD           | Expand CSF to define outer edges of layered medium.                                             |
+| `preproc_crop_grid`                     | HEAD           | Crop grid to head + transducer + PML.                                                           |
+| `preproc_head`                          | HEAD           | Preprocesses structural brain data for simulations (segmentation, alignment, cropping).         |
+| `preproc_segmentation`                  | HEAD           | Setup SimNIBS segmentation                                                                      |
+| `segmentation_run`                      | HEAD           | Submit SimNIBS segmentation                                                                     |
+| `skull_fill_holes`                      | HEAD           | Fill holes in skull segmentation and between skull and skin                                     |
+| `skull_rubber_wrap_visualize`           | HEAD           | Visualize results of skull rubber expansion                                                     |
+| `skull_rubber_wrap`                     | HEAD           | Inflate the skull layer to locally fill potential holes                                         |
+| `smooth_img`                            | HEAD           | Apply 3D smoothing                                                                              |
 | `check_availability`                    | HELPER         | Check file availability.                                                                        |
 | `confirm_overwriting`                   | HELPER         | Check overwriting (manual).                                                                     |
 | `confirmation_dlg`                      | HELPER         | Present confirmation dialogue.                                                                  |
@@ -73,16 +85,6 @@ The following documents the functions provided in PRESTUS.
 | `plot_t1_with_transducer`               | PLOT           | Creates a plot of a T1 slice oriented along the transducer's axis with overlays.                |
 | `show_3d_head`                          | PLOT           | Visualizes segmented brain images in 3D with transducer placement and target location.          |
 | `show_positioning_plots`                | PLOT           | Visualizes transducer positioning before and after preprocessing using segmented images.        |
-| `head_smooth_and_crop`                  | PREPROC        | Convert and smooth segmentations into medium map & crop grid for effiency                       |
-| `preproc_medium_mask`                   | PREPROC        | Map segmentation indices onto the medium labels (in the config) [layered only]                  |
-| `preproc_align_to_focal_axis`           | PREPROC        | Rotate input image and its grid coordinates to the transducer-focal axis (+Z)                   |
-| `preproc_crop_eCSF`                     | PREPROC        | Expand CSF to define outer edges of layered medium.                                             |
-| `preproc_crop_grid`                     | PREPROC        | Crop grid to head + transducer + PML.                                                           |
-| `preproc_head`                          | PREPROC        | Preprocesses structural brain data for simulations (segmentation, alignment, cropping).         |
-| `preproc_segmentation`                  | PREPROC        | Setup SimNIBS segmentation                                                                      |
-| `segmentation_run`                      | PREPROC        | Submit SimNIBS segmentation                                                                     |
-| `skull_fill_holes`                      | PREPROC        | Fill holes in skull segmentation and between skull and skin                                     |
-| `smooth_img`                            | PREPROC        | Apply 3D smoothing                                                                              |
 | `grid_axisymmetry`                      | SOURCE         | Convert grid to axisymmetry                                                                     |
 | `grid_tissue_setup`                     | SOURCE         | Set up grid dimensions, preprocess head (if modeled), and place in grid                         |
 | `grid_transducer_location`              | SOURCE         | Position transducer (and target) in simulation grid                                             |

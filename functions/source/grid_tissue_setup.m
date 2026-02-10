@@ -15,6 +15,7 @@ if contains(parameters.simulation_medium, {'layered'})
     % The original T1 positions are later transformed using the transf
     % matrix.
 
+    % Preprocess layered head
     [medium_masks, segmentation, ~, ~, planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
     
