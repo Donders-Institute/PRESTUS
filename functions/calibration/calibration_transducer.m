@@ -59,7 +59,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % Manage the submission setup
     sim_param.simulation_medium = 'water';
-    sim_param.save_mat = 0; % do not save full results
+    sim_param.savemat = 1; % always save water results
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
         sim_param.use_kwavearray = 1; % force to run with kwavearray setup
