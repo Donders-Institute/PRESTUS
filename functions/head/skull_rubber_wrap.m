@@ -110,12 +110,12 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % Remove overlap with GM from the remaining mask
     B_out = B_touch_both & ~GM;
 
-    %% Include CSF/BLOOD voxels at the SKIN interface (strict 6-neigh), near B_out
+    %% Include CSF voxels at the SKIN interface (strict 6-neigh), near B_out
 
     % Here, we refer to the more detailed segmentation
-    MENINGES_LABEL = [getidx(parameters.seg_labels, {'csf', 'blood'})];
+    CSF_LABEL = [getidx(parameters.seg_labels, {'csf'})];
 
-    MEN  = (ismember(segmented_img, MENINGES_LABEL));
+    CSF  = (ismember(segmented_img, CSF_LABEL));
     SKIN = (T == SKIN_LABEL);
 
     % --- Strict 6-neighborhood kernel (faces only) ---
@@ -128,22 +128,21 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % SKIN dilated by 6-neighborhood => voxels face-adjacent to SKIN
     SKIN_touch_region_6 = convn(single(SKIN), single(K6), 'same') > 0;
 
-    % MEN voxels that touch SKIN (faces only)
-    MEN_touch_SKIN_6 = MEN & SKIN_touch_region_6;
+    % CSF voxels that touch SKIN (faces only)
+    CSF_touch_SKIN_6 = CSF & SKIN_touch_region_6;
 
-    fprintf("MEN voxels touching SKIN (6-neigh): %d\n", nnz(MEN_touch_SKIN_6));
-
-    % --- Restrict to MEN voxels near existing balloon mask ---
+    % --- Restrict to CSF voxels near existing balloon mask ---
     nearRadius = 2;                 % 1–2 suggested
     seNear = strel("sphere", nearRadius);
     nearBalloon = imdilate(B_out, seNear);
 
-    MEN_touch_SKIN_6_near = MEN_touch_SKIN_6 & nearBalloon;
+    CSF_touch_SKIN_6_near = CSF_touch_SKIN_6 & nearBalloon;
 
-    fprintf("...of those, near existing B_out (r=%d): %d\n", nearRadius, nnz(MEN_touch_SKIN_6_near));
+    % fprintf("CSF voxels touching SKIN (6-neigh): %d\n", nnz(CSF_touch_SKIN_6));
+    % fprintf("...of those, near existing B_out (r=%d): %d\n", nearRadius, nnz(CSF_touch_SKIN_6_near));
 
     % --- Add MEN interface voxels to balloon mask ---
-    B_out2 = B_out | MEN_touch_SKIN_6_near;
+    B_out2 = B_out | CSF_touch_SKIN_6_near;
 
     % Keep your original constraint: no GM overlap
     B_out2 = B_out2 & ~GM;
@@ -186,12 +185,14 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         gzip(outNii);
         delete(outNii);
 
-        fprintf("Saved: %s.gz\n", outNii);
+        % fprintf("Saved: %s.gz\n", outNii);
     end
 
     %% [DEBUG] Visualize the expanded skull
-
-    if parameters.debug == 1
+    % Note: this seems computationally heavy on the HPC
+    % There are like;ly ways to optimize, but it will be inactive for now.
+    
+    if parameters.skullwrap_visualize == 1
         skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON);
     end
 

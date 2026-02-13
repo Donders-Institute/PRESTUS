@@ -14,242 +14,283 @@ function pct_create_pseudoCT()
     local path_matlab="$3"   # Path to MATLAB executable (e.g., "/opt/matlab/R2022b/bin/matlab")
     local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default)]
     local debug=${5:-"1"}    # Save intermediate images [yes: "1" (default); no: "0"]
-    local path_script="${6:-$(dirname "$(realpath "$0")")}"   # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
+    local path_fun="${6:-$(dirname "$(realpath "$0")")}" # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
+    local path_fun_pct="${path_fun}/pct"
+    local path_fun_head="${path_fun}/head"
 
-    # Display subject ID and SimNIBS path
-    echo "ID: $sub_id"
+    # shift simnibs path to sub-id
+    path_simnibs="${path_simnibs}/m2m_sub-${sub_id}"
+
+    # create dedicated pCT directory for intermediate backups under the SimNIBS path
+    path_pct="${path_simnibs}/pseudoCT"
+    if [ ! -d $path_pct ]; then
+        mkdir "$path_pct"
+    fi
+
+    # Create a log
+    exec > >(tee -a "${path_pct}/pct_create_${sub_id}_$(date +%Y%m%d_%H%M%S).log") 2>&1
+
+    echo "=== PCT Creation Log ==="
+    echo "Date: $(date)"
+    echo "Subject: $sub_id"
+    echo "Log dir: $log_date_dir"
+    echo "Starting pseudoCT creation"
     echo "SimNIBS path: $path_simnibs"
+    echo "pCT path: $path_pct"
     echo "MATLAB binary: $path_matlab"
-    echo "Function path: $path_script"
+    echo "Function path: $path_fun"
+    echo "Function PCT path: $path_fun_pct"
+    echo "Function Head path: $path_fun_head"
 
-    # The first step is to run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
+    # Key file names
+    segmentation="${path_simnibs}/final_tissues.nii.gz"
+    skull_mask="${path_pct}/skull_mask.nii.gz"
+    pCT="${path_pct}/pseudoCT.nii.gz"
+
+    # Temporary file names
+    t2w_reg="${path_simnibs}/T2_reg.nii.gz"
+    ute_reg="${path_simnibs}/UTE_reg.nii.gz"
+    ute_reg_thr0="${path_pct}/UTE_reg_thr0.nii.gz"
+    ute_reg_thr0_corr="${path_pct}/UTE_reg_thr0_corr.nii.gz"
+    ute_reg_bias="${path_pct}/UTE_thr0_BiasField.nii.gz"
+    ute_stnorm="${path_pct}/UTE_STnorm.nii.gz"
+
+    # Externaly run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
     # and instead of the T2 we use a PETRA UTE scan, so that the UTE will be registered to the T1
-    # Change directory to the SimNIBS segmentation folder for the subject
-    cd "${path_simnibs}/m2m_sub-${sub_id}/" || { echo "Directory not found"; exit 1; }
+
+    # Change directory to the pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 
     # Check if UTE_reg.nii.gz already exists. If it exists, skip renaming the file.
-    if [ -f "UTE_reg.nii.gz" ]; then
+    if [ -f $ute_reg ]; then
         echo "UTE_reg.nii.gz already exists. Skipping renaming."
     else
         # Rename T2_reg.nii.gz to UTE_reg.nii.gz to use the PETRA UTE image instead of T2
-        mv T2_reg.nii.gz UTE_reg.nii.gz
+        mv $t2w_reg $ute_reg
         echo "Renamed T2_reg.nii.gz to UTE_reg.nii.gz"
     fi
 
     # Create a binary skull mask from final_tissues, thresholding to include skull (value 7 or 8)
-    fslmaths final_tissues -thr 7 -uthr 8 -bin final_tissues_skull
+    fslmaths $segmentation -thr 7 -uthr 8 -bin $skull_mask
+
+    # Refine skull mask
+    echo "Running MATLAB script pct_skullexpand.m..."
+    cd "${path_fun_pct}" || { echo "Directory not found: $path_fun_pct"; exit 1; }
+    matlab_command="addpath(genpath('${path_fun}')); pct_skullexpand('${path_simnibs}', '${path_pct}'); exit"
+    "$path_matlab" -nodisplay -nosplash -batch "$matlab_command" || { echo "MATLAB pct_skullexpand failed"; exit 1; }
+    # Move back to pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+
+    ################################################################################
+    ##### pCT processing #####
+    ################################################################################
+
+    ################################################################################
+    ##### STEP 1: UTE THRESHOLD #####
+    ################################################################################
 
     # Apply a threshold to the UTE image at 0, eliminating negative values
-    fslmaths UTE_reg -thr 0 UTE_reg_thr0
+    fslmaths $ute_reg -thr 0 $ute_reg_thr0
+
+    ################################################################################
+    ##### STEP 2: UTE BIAS FIELD CORRECTION #####
+    ################################################################################
 
     # Perform bias field correction using ANTs' N4BiasFieldCorrection to remove intensity inhomogeneity
     # This step requires ANTs to be installed and available in the environment (e.g., module load ants)
-    if [ -f "UTE_reg_thr0_corr.nii.gz" ]; then
+    if [ -f $ute_reg_thr0_corr ]; then
         echo "N4BiasFieldCorrection already run; reusing estimates."
     else
         echo "Running N4BiasFieldCorrection."
         N4BiasFieldCorrection \
         --image-dimensionality 3 \
-        --input-image UTE_reg_thr0.nii.gz \
+        --input-image $ute_reg_thr0 \
         --convergence [50x50x50x50,0.0000001] \
         --bspline-fitting [180] \
-        --output [UTE_reg_thr0_corr.nii.gz,UTE_thr0_BiasField.nii.gz]
+        --output [$ute_reg_thr0_corr, $ute_reg_bias]
     fi
 
-    # create dedicated pCT directory for intermediate backups
-    if [ ! -d "pseudoCT" ]; then
-        mkdir "pseudoCT"
-    fi
-    path_pct="${path_simnibs}/m2m_sub-${sub_id}/pseudoCT"
+    ################################################################################
+    ##### STEP 3: UTE SOFT TISSUE NORMALISATION #####
+    ################################################################################
 
     # Create a file to store the soft tissue peak intensity value (for later normalization)
     touch ${path_pct}/pCT_soft_tissue_value.txt
 
     # Call MATLAB to run the soft_tissue_peak.m script to find the peak intensity of soft tissue
     echo "Running MATLAB script pct_soft_tissue_peak.m..."
-    cd "${path_script}" || { echo "Directory not found"; exit 1; }
-    matlab_command="pct_soft_tissue_peak(\"$sub_id\",\"$path_simnibs\")"
+    cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
+    matlab_command="addpath(genpath('${path_fun}')); pct_soft_tissue_peak(\"$path_simnibs\",\"$path_pct\"); exit"
     $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
+    # Move to pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 
-    # Check exit status of MATLAB command
-    # If MATLAB script completes successfully, proceed to normalization
-    if [ $? -eq 0 ]; then
-        echo "MATLAB function completed successfully."
-        # Move to simnibs folder
-        cd "${path_simnibs}/m2m_sub-${sub_id}" || { echo "Directory not found"; exit 1; }
+    # Read the soft tissue peak value from the file created by the MATLAB script
+    read peak_value < ${path_pct}/pCT_soft_tissue_value.txt
+    echo "The soft tissue peak value obtained from the Matlab code is: $peak_value"
 
-        # Read the soft tissue peak value from the file created by the MATLAB script
-        read peak_value < ${path_pct}/pCT_soft_tissue_value.txt
-        echo "The soft tissue peak value obtained from the Matlab code is: $peak_value"
+    # Normalize UTE image using the soft tissue peak value -> soft tissue peak = 1 
+    fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_stnorm
 
-        # Normalize UTE image using the soft tissue peak value -> soft tissue peak = 1 
-        fslmaths UTE_reg_thr0_corr -div "$peak_value" UTE_reg_thr0_corr_norm
-
-        # The skull fraction should now be between the noise/air peak (around 0) and the soft tissue peak (1).
-
-        # Create a file to store the skull mapping
-        touch ${path_pct}/pCT_skull_mapping.txt
-        # Linear mapping: map image intensities in skull to Hounsfield units (HU)
-        case "$skullmapping" in
-            "miscouridou")
-                echo "Mapping skull ~ miscouridou... pHU = −2085 UTE + 2329 "
-                fslmaths final_tissues_skull -mul UTE_reg_thr0_corr_norm -mul -2085 -add 2329 -mul final_tissues_skull pCT_skull
-                ;;
-            "carpino")
-                echo "Mapping skull ~ carpino... pHU = -2194 UTE + 2236"
-                fslmaths final_tissues_skull -mul UTE_reg_thr0_corr_norm -mul -2194 -add 2236 -mul final_tissues_skull pCT_skull
-                ;;
-            "wiesinger")
-                echo "Mapping skull ~ wiesinger... pHU = -2000 (UTE-1) + 42"
-                fslmaths final_tissues_skull -mul UTE_reg_thr0_corr_norm -add -1 -mul -2000 -add 42 -mul final_tissues_skull pCT_skull
-                ;;
-            "treeby")
-                echo "Mapping skull ~ treeby... pHU = -2929.6 UTE + 3247.9"
-                fslmaths final_tissues_skull -mul UTE_reg_thr0_corr_norm -mul -2929.6 -add 3247.9 -mul final_tissues_skull pCT_skull
-                ;;
-            "kosciessa")
-                echo "Mapping skull ~ kosciessa (default)... establishing linear skull mapping"
-                # Call MATLAB to run the pct_skullmapping.m script
-                echo "Running MATLAB script pct_skullmapping.m..."
-                cd "${path_script}" || { echo "Directory not found"; exit 1; }
-                matlab_command="pct_skullmapping(\"$sub_id\",\"$path_simnibs\")"
-                $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
-                # Move to SimNIBS m2m folder (if not there already)
-                cd "${path_simnibs}/m2m_sub-${sub_id}/" || { echo "Directory not found"; exit 1; }
-                # Read the mapping coefficients
-                if [ -f ${path_pct}/pCT_skull_mapping.txt ]; then
-                    read m1 <<< $(awk 'NR==1 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
-                    read m2 <<< $(awk 'NR==2 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
-                else
-                    echo "Error: File pCT_skull_mapping.txt does not exist."
-                    exit 1
-                fi
-                echo ""
-                echo "Processing kosciessa... pCT = $m1 UTE + $m2"
-                fslmaths final_tissues_skull -mul UTE_reg_thr0_corr_norm -mul $m1 -add $m2 -mul final_tissues_skull pCT_skull
-                ;;
-        esac
-        # Record which mapping variant has been used
-        echo "$skullmapping" >> ${path_pct}/pCT_skull_mapping.txt
-
-        # Correct partial volume effects in tissues
-        # Warning: some hard-coded labels (SimNibs 4 tissue labels)
-
-        # Dilate Skull Mask
-        fslmaths final_tissues_skull -dilF final_tissues_skull_dil
-        # Refine Soft Tissue Mask (subtract dilated skull)
-        fslmaths final_tissues -bin -sub final_tissues_skull_dil -mul final_tissues final_tissues_dil
-        # Label (7) [Dilated Skull]
-        fslmaths final_tissues_skull_dil -mul 7 -add final_tissues_dil final_tissues_dil
-        # Dilate All Tissues
-        fslmaths final_tissues_dil -bin -dilF final_tissues_dil_d
-        # Erode All Tissues
-        fslmaths final_tissues_dil -bin -ero final_tissues_dil_e
-        # Create Outer Head Mask (dilated minus eroded)
-        fslmaths final_tissues_dil_d -sub final_tissues_dil_e outer_head
-        # Refine Tissue Mask by Removing Outer Head
-        fslmaths final_tissues_dil -bin -sub outer_head -mul final_tissues_dil final_tissues_dil
-        # Label (11) [Outer Head]
-        fslmaths outer_head -mul 11 -add final_tissues_dil final_tissues_dil
-        # Create Blood/Muscle Mask
-        fslmaths final_tissues_dil -thr 9 -uthr 10 -bin final_tissues_blood_muscle_dil
-        # Create Skin Mask
-        fslmaths final_tissues_dil -thr 4 -uthr 5 -bin final_tissues_skin_dil
-        # Create Soft Tissue Mask
-        fslmaths final_tissues_dil -thr 1 -uthr 3 -add final_tissues_blood_muscle_dil -add final_tissues_skin_dil -bin final_tissues_soft_tissue_dil
-        # Create Air Mask
-        fslmaths final_tissues_dil -add 1 -uthr 1 -bin final_tissues_air_dil
-        # Refine Skull Mask [assign 3 to dilated skull, + outer head (dilated minus eroded)); threshold between 3 (skull) and 4(skull+dilated)]
-        fslmaths final_tissues_skull_dil -mul 3 -add outer_head -thr 3 -uthr 4 -bin final_tissues_skull_dil
-        # Refine Outer Head Mask [assign 3 to dilated skull, + outer head (dilated minus eroded)); select only label 1]
-        fslmaths final_tissues_skull_dil -mul 3 -add outer_head -thr 1 -uthr 1 outer_head
-        
-        # Mapping: Air Fraction = -1000 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
-        fslmaths final_tissues_air_dil -mul -1000 pCT_air_PV 
-        # Mapping: Soft-Tissue Fraction = 42 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
-        fslmaths final_tissues_soft_tissue_dil -mul 42 pCT_soft_tissues_PV 
-        # Mapping: Dilated Skull Fraction
-        case "$skullmapping" in 
-            "miscouridou")
-                fslmaths final_tissues_skull_dil -mul UTE_reg_thr0_corr_norm -mul -2085 -add 2329 -mul final_tissues_skull_dil pCT_skull_PV 
-                ;;
-            "carpino")
-                fslmaths final_tissues_skull_dil -mul UTE_reg_thr0_corr_norm -mul -2194 -add 2236 -mul final_tissues_skull_dil pCT_skull_PV 
-                ;;
-            "wiesinger")
-                fslmaths final_tissues_skull_dil -mul UTE_reg_thr0_corr_norm -add -1 -mul -2000 -add 42 -mul final_tissues_skull_dil pCT_skull_PV 
-                ;;
-            "treeby")
-                fslmaths final_tissues_skull_dil -mul UTE_reg_thr0_corr_norm -mul -2929.6 -add 3247.9 -mul final_tissues_skull_dil pCT_skull_PV 
-                ;;
-            "kosciessa")
-                fslmaths final_tissues_skull_dil -mul UTE_reg_thr0_corr_norm -mul $m1 -add $m2 -mul final_tissues_skull_dil pCT_skull_PV 
-                ;;
-        esac
-        
-        # Mapping: Outer Head Fraction: scale UTE_norm by 1389.333 and subtract 1000 (not documented)
-        fslmaths outer_head -mul UTE_reg_thr0_corr_norm -mul 1389.333 -sub 1000 -mul outer_head outer_head_PV
-        # Thresholds Outer Head Fraction to pHU ≥42
-        fslmaths outer_head_PV -thr 42 -bin -mul 42 outer_head1_PV
-        # Thresholds Outer Head Fraction to pHU ≤42
-        fslmaths outer_head_PV -uthr 42 outer_head2_PV
-
-        # Combine Tissue Maps into Final PseudoCT
-        fslmaths outer_head1_PV -add outer_head2_PV -add pCT_skull_PV -add pCT_air_PV -add pCT_soft_tissues_PV pCT_PV
+    # The skull fraction should now be between the noise/air peak (around 0) and the soft tissue peak (1).
     
-        # Smooting: kernel size = 3x3x3 voxels; smoothing factor = 0.8
-        SmoothImage 3 pCT_PV.nii.gz 0.8 pCT_PV_smooth.nii.gz 
-        
-        # Final processing to combine all masks and images into the final pseudoCT
-        fslmaths final_tissues_skull -add 1 -thr 1 -uthr 1 -mul pCT_PV_smooth -add pCT_skull pseudoCT
+    ################################################################################
+    ##### STEP 4: SEGMENTATION PARTIAL VOLUME CORRECTION #####
+    ################################################################################
 
-        # Create and store a final tissue mask for simulations
-        fslmaths final_tissues_dil -thr 1 -uthr 2 -bin -mul 2 brain_mask
-        fslmaths final_tissues_dil -thr 10 -uthr 10 -bin -add final_tissues_skin_dil -add outer_head -bin -mul 5 skin_mask
-        fslmaths final_tissues_skull_dil -bin -mul 7 skull_mask
-        fslmaths final_tissues_dil -thr 3 -uthr 3 -bin -mul 3 csf_mask
-        fslmaths brain_mask -add skin_mask -add skull_mask -add csf_mask tissues_mask
+    # Set filenames for intermediate pCT files
+    # Masks
+    skull_mask_inv="${path_pct}/skull_mask_inv.nii.gz"
+    skull_mask_7="${path_pct}/skull_mask_7.nii.gz"
+    skull_mask_PVC="${path_pct}/skull_mask_PVC.nii.gz"
+    soft_tissues_mask="${path_pct}/soft_tissues_mask.nii.gz"
+    air_mask="${path_pct}/air_mask.nii.gz"
+    segmentation_no_skull="${path_pct}/segmentation_no_skull.nii.gz"
+    segmentation_mask="${path_pct}/segmentation_mask.nii.gz"
+    segmentation_mask_no_dil_skull="${path_pct}/segmentation_mask_no_dil_skull.nii.gz"
+    segmentation_mask_no_dil_skull_final="${path_pct}/segmentation_mask_no_dil_skull_final.nii.gz"
 
-        # Copy pCT to backup directory
-        cp pseudoCT.nii.gz ${path_pct}
+    # Eroded/Dilated Masks
+    skull_mask_dil="${path_pct}/skull_mask_dil.nii.gz"
+    soft_tissues_mask_dil="${path_pct}/soft_tissues_mask_dil.nii.gz"
+    air_mask_dil="${path_pct}/air_mask_dil.nii.gz"
+    segmentation_mask_dil="${path_pct}/segmentation_mask_dil.nii.gz"
+    segmentation_mask_ero="${path_pct}/segmentation_mask_ero.nii.gz"
+    segmentation_mask_no_dil_skull="${path_pct}/segmentation_mask_no_dil_skull.nii.gz"
 
-        # Move intermediate files to backup directory
-        mv final_tissues_skull.nii.gz ${path_pct}
-        mv UTE_reg_thr0.nii.gz ${path_pct}
-        mv UTE_reg_thr0_corr.nii.gz ${path_pct}
-        mv UTE_thr0_BiasField.nii.gz ${path_pct}
-        mv final_tissues_dil.nii.gz ${path_pct}
-        mv final_tissues_skull_dil.nii.gz ${path_pct}
-        mv pCT_skull.nii.gz ${path_pct}
-        mv pCT_skull_PV.nii.gz ${path_pct}
-        mv pCT_PV.nii.gz ${path_pct}
-        mv pCT_PV_smooth.nii.gz ${path_pct}
-        mv skull_mask.nii.gz ${path_pct}
-        mv final_tissues_dil_d.nii.gz ${path_pct}
-        mv final_tissues_dil_e.nii.gz ${path_pct}
-        mv outer_head.nii.gz ${path_pct}
-        mv final_tissues_blood_muscle_dil.nii.gz ${path_pct}
-        mv final_tissues_soft_tissue_dil.nii.gz ${path_pct}
-        mv final_tissues_air_dil.nii.gz ${path_pct}
-        mv final_tissues_skin_dil.nii.gz ${path_pct}
-        mv pCT_air_PV.nii.gz ${path_pct}
-        mv pCT_soft_tissues_PV.nii.gz ${path_pct}
-        mv outer_head_PV.nii.gz ${path_pct}
-        mv outer_head1_PV.nii.gz ${path_pct}
-        mv outer_head2_PV.nii.gz ${path_pct}
-        mv brain_mask.nii.gz ${path_pct}
-        mv skin_mask.nii.gz ${path_pct}
-        mv csf_mask.nii.gz ${path_pct}
+    # Skull/Air INTERFACE
+    skull_air_interface="${path_pct}/skull_air_interface.nii.gz"
+    segmentation_skull_air_PVC="${path_pct}/segmentation_skull_air_PVC.nii.gz"
+    segmentation_skull_air_PVC_binv="${path_pct}/segmentation_skull_air_PVC_binv.nii.gz"
+    segmentation_skull_air_PVC_skin_air_PVC="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC.nii.gz"
+    segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6.nii.gz"
+    segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to10="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to10.nii.gz"
 
-        # If DEBUG=0, remove nifti images in pseudoCT folder
-        if [ "$debug" -eq 0 ]; then
-            echo "Cleanup: Removing nifti images in pseudoCT folder"
-            rm ${path_pct}/*.nii.gz
-        fi
+    # Outer Head
+    outer_head_contour="${path_pct}/outer_head_contour.nii.gz"
+    outer_head_contour_PVC_inside="${path_pct}/outer_head_contour_PVC_inside.nii.gz"
+    outer_head_contour_PVC_outside="${path_pct}/outer_head_contour_PVC_outside.nii.gz"
 
-        echo "Process complete. You can now run the simulation with the pseudoCT. Ensure both 'pseudoCT.nii.gz' and 'tissues_mask.nii.gz' are in the m2m segmentation subject folder."
-    else
-        echo "MATLAB function failed"
-        exit 1
+    # pCT variants
+    pCT_air="${path_pct}/pCT_air.nii.gz"
+    pCT_soft_tissues="${path_pct}/pCT_soft_tissues.nii.gz"
+    pCT_skull="${path_pct}/pCT_skull.nii.gz"
+    pCT_PVC="${path_pct}/pCT_PVC.nii.gz"
+    pCT_PV_smooth="${path_pct}/pCT_PV_smooth.nii.gz"
+
+    # Partial Volume Correction
+    # For the [1] skull/air and the [2] skin/air interface
+
+    # [1] SKUll/AIR INTERFACE
+    fslmaths $skull_mask -dilF -bin $skull_mask_dil
+    fslmaths $segmentation -bin $segmentation_mask
+    fslmaths $segmentation_mask -sub $skull_mask_dil $segmentation_mask_no_dil_skull
+    fslmaths $segmentation_mask_no_dil_skull -add 1 $segmentation_mask_no_dil_skull
+    fslmaths $segmentation_mask_no_dil_skull -binv -mul 7 $skull_air_interface
+    fslmaths $skull_mask -binv $skull_mask_inv
+    fslmaths $segmentation -mul $skull_mask_inv $segmentation_no_skull
+    fslmaths $skull_mask -mul 7 $skull_mask_7
+
+    fslmaths $skull_mask_7 -add $skull_air_interface -add $segmentation_no_skull $segmentation_skull_air_PVC
+
+    # [2] SKIN/AIR INTERFACE
+    fslmaths $segmentation_mask -bin -dilF $segmentation_mask_dil
+    fslmaths $segmentation_mask -bin -ero $segmentation_mask_ero
+    fslmaths $segmentation_mask_dil -sub $segmentation_mask_ero $outer_head_contour
+    fslmaths $segmentation_skull_air_PVC -binv $segmentation_skull_air_PVC_binv
+    fslmaths $outer_head_contour -mul $segmentation_skull_air_PVC_binv $outer_head_contour
+    fslmaths $outer_head_contour -mul 5 -add $segmentation_skull_air_PVC $segmentation_skull_air_PVC_skin_air_PVC
+    
+    # CREATE AIR MASK (value: 0)
+    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -binv $air_mask
+
+    # SOFT TISSUES MASK (values: 1,2,3,4,5,6,9,10)   
+    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 1 -uthr 198 -bin $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6
+    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 228 -uthr 256 -bin $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to10
+    fslmaths $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6 -add $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to10 $soft_tissues_mask
+
+    # SKULL MASK
+    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 7 -uthr 7 -bin $skull_mask_PVC
+
+    ################################################################################
+    ##### STEP 5: UTE-HU MAPPING #####
+    ################################################################################
+    # Mapping from intensities to pHU
+
+    pCT_soft_tissues_value="42"
+    pCT_air_value="-1000"
+
+    # Mapping: Air Fraction = -1000 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
+    fslmaths $air_mask -mul $pCT_air_value -uthr -1 $pCT_air -odt float  # -odt prevents int overflow
+
+    # Mapping: Soft-Tissue Fraction = 42 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
+    fslmaths $soft_tissues_mask -mul $pCT_soft_tissues_value $pCT_soft_tissues -odt float
+
+    # Mapping: Dilated Skull Fraction
+
+    # Create a file to store the skull mapping
+    touch ${path_pct}/pCT_skull_mapping.txt
+
+    # Linear mapping: map image intensities in skull to Hounsfield units (HU)
+    case "$skullmapping" in
+        "miscouridou")
+            echo "Mapping skull ~ miscouridou... pHU = -2085 UTE + 2329 "
+            fslmaths $ute_stnorm -mul -2085 -add 2329 -mul $skull_mask_PVC $pCT_skull
+            ;;
+        "carpino")
+            echo "Mapping skull ~ carpino... pHU = -2194 UTE + 2236"
+            fslmaths $ute_stnorm -mul -2194 -add 2236 -mul $skull_mask_PVC $pCT_skull
+            ;;
+        "wiesinger")
+            echo "Mapping skull ~ wiesinger... pHU = -2000 (UTE-1) + 42"
+            fslmaths $ute_stnorm -add -1 -mul -2000 -add 42 -mul $skull_mask_PVC $pCT_skull
+            ;;
+        "treeby")
+            echo "Mapping skull ~ treeby... pHU = -2929.6 UTE + 3247.9"
+            fslmaths $ute_stnorm -mul -2929.6 -add 3247.9 -mul $skull_mask_PVC $pCT_skull
+            ;;
+        "kosciessa")
+            echo "Mapping skull ~ kosciessa (default)... establishing linear skull mapping"
+            # Call MATLAB to run the pct_skullmapping.m script
+            echo "Running MATLAB script pct_skullmapping.m..."
+            cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
+            matlab_command="pct_skullmapping(\"$sub_id\",\"$path_simnibs\")"
+            $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
+            # Move to pCT folder (if not there already)
+            cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+            # Read the mapping coefficients
+            if [ -f ${path_pct}/pCT_skull_mapping.txt ]; then
+                read m1 <<< $(awk 'NR==1 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
+                read m2 <<< $(awk 'NR==2 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
+            else
+                echo "Error: File pCT_skull_mapping.txt does not exist."
+                exit 1
+            fi
+            echo ""
+            echo "Processing kosciessa... pCT = $m1 UTE + $m2"
+            fslmaths $ute_stnorm -mul $m1 -add $m2 -mul $skull_mask_PVC $pCT_skull
+            ;;
+    esac
+    # Record mapping variant
+    echo "$skullmapping" >> ${path_pct}/pCT_skull_mapping.txt
+
+    # Add up the different parts to create the initial PVE corrected pCT
+    fslmaths $pCT_skull -add $pCT_air -add $pCT_soft_tissues $pCT_PVC
+
+    # Smooting: kernel size = 3x3x3 voxels; smoothing factor = 0.8
+    SmoothImage 3 $pCT_PVC 0.8 $pCT_PV_smooth
+    
+    # Final processing to combine all masks and images into the final pseudoCT
+    fslmaths $skull_mask_PVC -add 1 -thr 1 -uthr 1 -mul $pCT_PV_smooth -add $pCT_skull $pCT
+
+    # Copy pCT to simnibs directory
+    cp $pCT ${path_simnibs}
+
+    # If DEBUG=0, remove nifti images in pseudoCT folder
+    if [ "$debug" -eq 0 ]; then
+        echo "Cleanup: Removing nifti images in pseudoCT folder"
+        rm ${path_pct}/*.nii.gz
     fi
+
+    echo "Process complete. You can now run the simulation with the pseudoCT. Ensure both 'pseudoCT.nii.gz' and 'tissues_mask.nii.gz' are in the m2m segmentation subject folder."
     }

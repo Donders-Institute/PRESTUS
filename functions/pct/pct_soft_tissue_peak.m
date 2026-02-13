@@ -1,4 +1,4 @@
-function pct_soft_tissue_peak(subject_id, base_path)
+function pct_soft_tissue_peak(simnibs_folder, path_pct)
 
 % PCT_SOFT_TISSUE_PEAK Identifies the soft tissue peak from a UTE image's intensity distribution.
 %
@@ -7,19 +7,18 @@ function pct_soft_tissue_peak(subject_id, base_path)
 % logarithmic distribution of intensity values and saves the result in a text file.
 %
 % Input:
-%   subject_id - String specifying the subject ID (e.g., '001').
-%   base_path  - String specifying the base path to the subject's m2m folder.
+%   simnibs_folder  - String specifying path of the subject's m2m folder.
+%   path_pct  - pCT processing folder.
 %
 % Output:
 %   None. The function saves histograms and the soft tissue peak value in the subject's folder.
 
     % Define paths to subject-specific files
-    subject_folder = fullfile(base_path, sprintf('m2m_sub-%03s', subject_id));
-    ute_file = fullfile(subject_folder, 'UTE_reg_thr0_corr.nii.gz');
+    ute_file = fullfile(path_pct, 'UTE_reg_thr0_corr.nii.gz');
     ute_corr = niftiread(ute_file);
 
     % Constrain analysis to grey matter (label 1) and white matter (label 2)
-    mask_file = fullfile(subject_folder, 'final_tissues.nii.gz');
+    mask_file = fullfile(simnibs_folder, 'final_tissues.nii.gz');
     mask_corr = niftiread(mask_file);
     mask_corr = logical(mask_corr == 1 | mask_corr == 2); % Hard-coded SimNIBS labels
     ute_corr = ute_corr(mask_corr); % Apply mask to UTE image
@@ -41,7 +40,7 @@ function pct_soft_tissue_peak(subject_id, base_path)
 
     % Save histogram visualization as an image
     figureName = 'pCT_histogram';
-    saveas(h, fullfile(subject_folder, 'pseudoCT', figureName), 'png');
+    saveas(h, fullfile(path_pct, figureName), 'png');
 
     % Extract soft tissue peak from logarithmic intensity distribution
     log_ute_corr = log(ute_corr);
@@ -56,7 +55,7 @@ function pct_soft_tissue_peak(subject_id, base_path)
     fprintf('The soft tissue peak is at the intensity %.2f \n', peak);
 
     % Save soft tissue peak value to a text file in the pseudoCT folder
-    txt_file = fopen(fullfile(subject_folder, 'pseudoCT', 'pCT_soft_tissue_value.txt'), 'w');
+    txt_file = fopen(fullfile(path_pct, 'pCT_soft_tissue_value.txt'), 'w');
     fprintf(txt_file, '%.2f\n', peak);
     fclose(txt_file);
 

@@ -249,6 +249,7 @@ smooth_window: 3 # Number of voxels for smoothing
 # Settings for shrinkwrap (if requested)
 skullfillmethod: 'imclose' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
 wrapradius: 10 # skull rubber wrap radius [grid voxels]; Bigger = tighter rubber that ignores bigger dents (recommendaton: 2 to 10)
+skullwrap_visualize: 0 # Visualize results of skullwrap? (Currently causes issues on HPC)
 
 #------------ Transducer placement (WIP)
 
