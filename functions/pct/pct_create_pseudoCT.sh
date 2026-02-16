@@ -306,7 +306,7 @@ function pct_create_pseudoCT()
     fslmaths $pCT_PVC -mas $boundary_smooth_region $pCT_boundary_smooth_temp
 
     # Smooth only boundary
-    SmoothImage 3 $pCT_boundary_smooth_temp 0.8 $pCT_PV_smooth 1 -mask $skull_boundary_mask
+    SmoothImage 3 $pCT_boundary_smooth_temp 0.8 $pCT_PV_smooth
 
     # === FINAL COMBINE ===
     # Raw interiors + boundary smooth + skull override
