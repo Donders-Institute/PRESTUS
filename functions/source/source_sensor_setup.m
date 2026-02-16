@@ -107,8 +107,14 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
             trans_pos = trans_pos_final;
             focus_pos = focus_pos_final;
         end
+        % Create the source matrix
         [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
-        save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
+        % Save the source matrix (unless otherwise requested)
+        if isfield(parameters, 'savemat') && parameters.savemat==0
+            disp("Not saving kwave source matrix ...")
+        else
+            save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
+        end
     else
         load(parameters.kwave_source_filename);
     end
