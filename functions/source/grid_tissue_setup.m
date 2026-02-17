@@ -22,6 +22,7 @@ if contains(parameters.simulation_medium, {'layered'})
     if isempty(medium_masks)
         return;
     end
+    
     parameters.grid_dims  = size(medium_masks);
     parameters.n_sim_dims = numel(parameters.grid_dims);
 
@@ -51,7 +52,8 @@ else
         % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
-        bone = [];
+        mask = tissuemask_binary(parameters, medium_masks);
+        bone = mask.skull;
     else % e.g., water
         % set up default grid dimensions
         assert(isfield(parameters, 'default_grid_dims'), ...
@@ -62,7 +64,7 @@ else
         % set up empty medium masks and segmentations
         medium_masks = [];
         segmentation = zeros(parameters.grid_dims);
-        bone = [];
+        bone = zeros(parameters.grid_dims);
     end
 
     % specify that no transformation was applied
