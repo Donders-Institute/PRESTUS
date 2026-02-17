@@ -241,10 +241,10 @@ source_limit_fraction: 0.9 # Fraction of the stability limit to use for time ste
 csf_mask_expansion_factor: 40
 
 # Thresholds for smoothing the skull and other masks
-smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'anisotropic'|'box']
-smooth_threshold_skull: 0.35 # (higher threshold means thinner mask, lower threshold means thicker mask)
-smooth_threshold_other: 0.5 # (higher threshold means thinner mask, lower threshold means thicker mask)
-smooth_window: 3 # Number of voxels for smoothing
+smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
+smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
+smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
+smooth_window: 5 # Number of voxels for smoothing
 
 # Settings for shrinkwrap (if requested)
 skullfillmethod: 'imclose' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
