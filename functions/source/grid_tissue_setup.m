@@ -1,4 +1,4 @@
-function [parameters, medium_masks, segmentation, planimg] = grid_tissue_setup(parameters)
+function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_setup(parameters)
 % GRID_TISSUE_SETUP sets up the computational grid and tissue masks
 % for ultrasound neuromodulation simulations, either by preprocessing a 
 % subject-specific head model (T1-weighted MRI) or loading phantom/alternative grids.
@@ -16,11 +16,10 @@ if contains(parameters.simulation_medium, {'layered'})
     % matrix.
 
     % Preprocess layered head
-    [medium_masks, segmentation, ~, ~, planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
+    [medium_masks, segmentation, bone, ~, ~, planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
     
     if isempty(medium_masks)
-        filename_output_table = '';
         return;
     end
     parameters.grid_dims  = size(medium_masks);
@@ -52,6 +51,7 @@ else
         % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
+        bone = [];
     else % e.g., water
         % set up default grid dimensions
         assert(isfield(parameters, 'default_grid_dims'), ...
@@ -62,6 +62,7 @@ else
         % set up empty medium masks and segmentations
         medium_masks = [];
         segmentation = zeros(parameters.grid_dims);
+        bone = [];
     end
 
     % specify that no transformation was applied

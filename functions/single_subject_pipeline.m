@@ -80,15 +80,15 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     parameters = focal_distance_calculation(parameters);
 
     % Set up grid by preprocessing the planning image or reading in phantom
-    [parameters, medium_masks, segmentation, planimg] = ...
+    [parameters, medium_masks, segmentation, bone, planimg] = ...
         grid_tissue_setup(parameters);
 
     % Position the transducer(s) in the grid
     [parameters] = grid_transducer_location(parameters, planimg);
 
     % Adapt grid to axisymmetry (if requested)
-    [parameters, segmentation, medium_masks] = ...
-        grid_axisymmetry(parameters, segmentation, medium_masks);
+    [parameters, segmentation, bone, medium_masks] = ...
+        grid_axisymmetry(parameters, segmentation, bone, medium_masks);
 
     % Extract variables for quick access
     trans_pos = parameters.transducer(1).trans_pos;
@@ -108,7 +108,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     log_timer('start','medium', parameters.output_dir);
 
     if parameters.usepseudoCT == 1
-        kwave_medium = medium_setup(parameters, medium_masks, segmentation);
+        kwave_medium = medium_setup(parameters, medium_masks, bone);
     else
         kwave_medium = medium_setup(parameters, medium_masks);
     end

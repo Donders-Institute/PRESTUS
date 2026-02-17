@@ -3,7 +3,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %
 % This function processes a 3D medium mask used in ultrasound brain stimulation simulations (e.g., k-Wave).
 % It ensures skull continuity by expanding the skull region using bone perimeter detection and filling 
-% small gaps between skull and skin, while preserving trabecular bone and excluding eyes from bone labeling.
+% gaps, while preserving trabecular bone and excluding eyes from bone labeling.
 % Debug plots are generated if enabled, showing changes at the focus position slice.
 %
 % Inputs:
@@ -74,31 +74,6 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
         saveas(h, output_plot_filename, 'png');
         close(h);
     end
-
-    % Fill gaps between skull and skin (if skin label exists)
-    if any(strcmp(labels, 'skin'))
-        skin_i = find(strcmp(labels, 'skin'));
-        skin = medium_masks == skin_i;
-        skull = ismember(medium_masks, skull_i);
-        % Combined envelope: skin-bounded skull + skin surface
-        skin_skull = skin | skull;
-        % IMFILL within this strict envelope
-        envelope_filled = imfill(skin_skull, 'holes');
-        % NEW skull voxels = filled envelope MINUS original skull
-        new_skull_voxels = envelope_filled & ~skull & ~skin;
-        % Preserve trabecular mask (if available)
-        if any(contains(labels, 'skull_trabecular'))
-            trabecular_i = find(strcmp(labels, 'skull_trabecular'));
-            trabecular_mask = medium_masks(medium_masks==trabecular_i);
-        end
-        % update medium mask (with cortical skull in differentiated case)
-        layer_holes = (new_skull_voxels) > 0;
-        medium_masks(layer_holes) = skull_i(1);
-        % re-insert trabecular mask (if available)
-        if any(contains(labels, 'skull_trabecular'))
-            medium_masks(trabecular_mask ~= 0) = trabecular_i;
-        end
-    end % skull-skin
 
     % Label eye layer as water
     if isfield(parameters.seg_labels, 'eye')

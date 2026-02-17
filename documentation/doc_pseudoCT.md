@@ -1,11 +1,9 @@
 # PseudoCT
 
-PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. 
-This is currently only supported for layered setups.
+PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 
 
 > [!WARNING]
 > (pseudo-)HU mapping is currently a beta feature in active development.
-
 
 ### Creating a pseudoCT from UTE scans
 
@@ -34,21 +32,16 @@ To run the code you will need to install (or load the following modules):
 
 The following steps are used to create the pseudoCT:
 
-- Threshold UTE image at 0
-- Bias field correction to remove inhomogeneity
-- (Identify soft tissue peak intensity value)
-- Normalization: Divide by soft tissue peak value, i.e., normalised UTE intensity = 1
-- Linear mapping: image intensities -> Hounsfield units (HU)
-    - Skull *(mask defined as SimNibs tissue layers 7+8)*: multiple mapping variants are available
-        - "miscouridou" | pHU = −2085 UTE + 2329
-        - "carpino" | pHU = -2194 UTE + 2236
-        - "wiesinger" | pHU = -2000 (UTE-1) + 42
-        - "treeby" | pHU = -2929.6 UTE + 3247.9
-        - "kosciessa" | individualized based on pHU_trabecular=300 and pHU_trabecular_cortical = 700
-    - Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
-    - Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
-- Thresholding/smoothing across various tissue masks
-    - Gaussian smoothing kernel (3x3x3 voxels) is applied at the skin-air and skull-air interfaces
+- UTE: Threshold at 0, apply bias field correction to remove inhomogeneity, normalize (divide by soft tissue peak value > i.e., normalised UTE intensity = 1)
+- pHU Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
+- pHU Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
+- pHU Skull: Linear mapping
+    - "miscouridou" | pHU = −2085 UTE + 2329
+    - "carpino" | pHU = -2194 UTE + 2236
+    - "wiesinger" | pHU = -2000 (UTE-1) + 42
+    - "treeby" | pHU = -2929.6 UTE + 3247.9
+    - "kosciessa" | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
+- 3D Gaussian smoothing (σ=0.8 voxels via ANTs’ SmoothImage) prevents abrupt tissue transitions in the simulation grid. To retain information in the skull layer, unsmoothed values are retained within an eroded skull mask that attempts to correct for partial volume effects.
 
 *References*
 - Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).
@@ -87,7 +80,7 @@ create_pseudoCT "$subject_id" "$m2m_path" "${scriptpath}"
 
 see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43)
 
-To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gi` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to inform skull tissue parameters. Note that this affects only the pCT-to-tissueproperty conversion, only the above described procedure to derive pCTs is currently supported.
+To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to inform skull tissue parameters. Note that this affects only the pCT-to-tissueproperty conversion, only the above described procedure to derive pCTs is currently supported.
 
 - `carpino` | (**default**) Algorithm described in Carpino et al. (2024). <br>
 

@@ -240,25 +240,26 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                         error("Specified pCT attenuation mapping is not supported.")
                 end
                 
-                % save plots for debugging
-                
-                h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
-                subplot(4,1,1); histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
-                title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
-                subplot(4,1,2); histogram(density(skull_idx)); xlabel("Density [kg/m3]")
-                % add lines for the fixed parameters
-                xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
-                xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
-                subplot(4,1,3); histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
-                xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
-                xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
-                subplot(4,1,4); histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
-                xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
-                xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
-                output_plot = fullfile(parameters.output_dir, 'debug', ...
-                    sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
-                saveas(h, output_plot, 'png')
-                close(h);
+                % [DEBUG] save pCT mapping overview
+                if parameters.debug == 1
+                    h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
+                    subplot(4,1,1); histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
+                    title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
+                    subplot(4,1,2); histogram(density(skull_idx)); xlabel("Density [kg/m3]")
+                    % add lines for the fixed parameters
+                    xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
+                    xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
+                    subplot(4,1,3); histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
+                    xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
+                    xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
+                    subplot(4,1,4); histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
+                    xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
+                    xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
+                    output_plot = fullfile(parameters.debug_dir, ...
+                        sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
+                    exportgraphics(h, output_plot, 'Resolution', 150);
+                    close(h);
+                end
 
                 clear skull_idx
             else
@@ -320,8 +321,8 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
 
     if parameters.debug == 1
         plot_fit = true;
-        if ~exist(fullfile(parameters.output_dir, 'debug'))
-            mkdir(parameters.output_dir, 'debug'); 
+        if ~exist(fullfile(parameters.debug_dir))
+            mkdir(parameters.debug_dir); 
         end
     else
         plot_fit = false;
@@ -342,7 +343,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
 
     % DEBUG mode: save plot of fitted attenuation values
     if parameters.debug == 1
-        fig_path = fullfile(parameters.output_dir, 'debug', ...
+        fig_path = fullfile(parameters.debug_dir, ...
         ['attenuation_fit', char(parameters.results_filename_affix), '.png']);
         saveas(gcf, fig_path);
         close(gcf);
@@ -366,26 +367,26 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
     % save images for debugging
     if parameters.debug == 1
         try
-            filename_density = fullfile(parameters.output_dir, 'debug', sprintf('matrix_density'));
+            filename_density = fullfile(parameters.debug_dir, sprintf('matrix_density'));
             niftiwrite(density, filename_density, 'Compressed',true);
             pause(0.1);
-            filename_sound_speed = fullfile(parameters.output_dir, 'debug', sprintf('matrix_sound_speed'));
+            filename_sound_speed = fullfile(parameters.debug_dir, sprintf('matrix_sound_speed'));
             niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true);
             pause(0.1);
-            filename_alpha_0_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_0_true'));
+            filename_alpha_0_true = fullfile(parameters.debug_dir, sprintf('matrix_alpha_0_true'));
             niftiwrite(alpha_0_true, filename_alpha_0_true, 'Compressed',true);
             pause(0.1);
-            filename_alpha_power_true = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_power'));
+            filename_alpha_power_true = fullfile(parameters.debug_dir, sprintf('matrix_alpha_power'));
             niftiwrite(alpha_power_true, filename_alpha_power_true, 'Compressed',true);
             pause(0.1);
-            filename_alpha_coeff = fullfile(parameters.output_dir, 'debug', sprintf('matrix_alpha_coeff'));
+            filename_alpha_coeff = fullfile(parameters.debug_dir, sprintf('matrix_alpha_coeff'));
             niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true);
             pause(0.1);
-            filename_perfusion = fullfile(parameters.output_dir, 'debug', sprintf('matrix_perfusion'));
+            filename_perfusion = fullfile(parameters.debug_dir, sprintf('matrix_perfusion'));
             niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true);
             pause(0.1);
-            filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
-            niftiwrite(absorption, filename_absorption, 'Compressed',true);
+            filename_absorption = fullfile(parameters.debug_dir, sprintf('matrix_absorption'));
+            niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true);
         catch
             warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
         end

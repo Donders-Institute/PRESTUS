@@ -1,4 +1,4 @@
-function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_final, ...
+function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, ...
     t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preproc_head(parameters)
 
 % PREPROC_HEAD Preprocessing of structural data for simulations.
@@ -14,7 +14,8 @@ function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_fina
 %
 % Output:
 %   medium_masks                - Processed masks for different tissue types.
-%   segmented_image_cropped     - Cropped segmented image after preprocessing.
+%   segmentation_crop           - Cropped segmented image after preprocessing.
+%   bone_crop                   - Cropped bone / pCT image after preprocessing.
 %   trans_pos_final             - Final transducer position after preprocessing.
 %   focus_pos_final             - Final focus position after preprocessing.
 %   t1_image                    - Original T1-weighted image.
@@ -281,7 +282,7 @@ function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_fina
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.output_dir);
         % postprocess skull segmentation
-        [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
+        [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
             head_smooth_and_crop(...
             parameters, segmented_img_rr, bone_img_rr, trans_pos_rescaled, focus_pos_rescaled);
 
@@ -303,12 +304,24 @@ function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_fina
             end
             clear segmented_file plotdata orig_hdr;
     
-            % save skull mask/pseudoCT
+            % save segmentation skull mask/pseudoCT
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
+            segmentation_file = fullfile(parameters.debug_dir, ...
+                sprintf('sub-%03d_segmentation_final', parameters.subject_id));
+            plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
+                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+            if ~isfile(segmentation_file)
+                niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
+            end
+            clear segmentation_file plotdata orig_hdr;
+
+            % save skull mask/pseudoCT
+            orig_hdr = t1_header; % header is based on original T1w (always present)
+            orig_hdr.Datatype = 'double';
             skull_mask_file = fullfile(parameters.debug_dir, ...
                 sprintf('sub-%03d_skull_final', parameters.subject_id));
-            plotdata = single(tformarray(uint8(segmented_image_cropped), inv_final_transformation_matrix, ...
+            plotdata = double(tformarray(bone_crop, inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
             if ~isfile(skull_mask_file)
                 niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
@@ -319,7 +332,8 @@ function [medium_masks, segmented_image_cropped, trans_pos_final, focus_pos_fina
         % save cropped and smoothed skull data
         save(filename_cropped_smoothed_skull_data, ...
             'medium_masks', ...
-            'segmented_image_cropped', ...
+            'segmentation_crop', ...
+            'bone_crop', ...
             'trans_pos_final', ...
             'focus_pos_final', ...
             'crop_translation_matrix',...

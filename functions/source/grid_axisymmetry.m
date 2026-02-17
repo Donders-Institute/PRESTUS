@@ -1,5 +1,5 @@
-function [parameters, segmentation, medium_masks] = ...
-    grid_axisymmetry(parameters, segmentation, medium_masks)
+function [parameters, segmentation, bone, medium_masks] = ...
+    grid_axisymmetry(parameters, segmentation, bone, medium_masks)
     % adapt grid dimensions to axisymmetry (if requested)
     % grid should be specified as [axial, radial x 2]
     if numel(parameters.transducer(1).focus_pos) == 2 && ...
@@ -16,6 +16,7 @@ function [parameters, segmentation, medium_masks] = ...
             trans_pos = fliplr(trans_pos);
             focus_pos = fliplr(focus_pos);
             segmentation = segmentation';
+            bone = bone';
             medium_masks = medium_masks';
         end
         % halve the grid along the radial axis
@@ -24,6 +25,7 @@ function [parameters, segmentation, medium_masks] = ...
         parameters.grid_dims(2) = Ny_half;
         parameters.default_grid_dims(2) = Ny_half;
         segmentation = segmentation(:,Ny_half+1:end);
+        bone = bone(:,Ny_half+1:end);
         medium_masks = medium_masks(:,Ny_half+1:end);
         % set transducer and focus position to the radial midline
         trans_pos(2) = 1; 
