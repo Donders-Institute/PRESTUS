@@ -243,16 +243,16 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                 % [DEBUG] save pCT mapping overview
                 if parameters.debug == 1
                     h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
-                    subplot(4,1,1); histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
+                    subplot(4,1,1); hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
                     title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
-                    subplot(4,1,2); histogram(density(skull_idx)); xlabel("Density [kg/m3]")
+                    subplot(4,1,2); hold on; histogram(density(skull_idx)); xlabel("Density [kg/m3]")
                     % add lines for the fixed parameters
                     xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
-                    subplot(4,1,3); histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
+                    subplot(4,1,3); hold on; histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
                     xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
-                    subplot(4,1,4); histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
+                    subplot(4,1,4); hold on; histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
                     xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
                     output_plot = fullfile(parameters.debug_dir, ...
