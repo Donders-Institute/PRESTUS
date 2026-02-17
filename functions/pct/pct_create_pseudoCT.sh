@@ -53,7 +53,11 @@ function pct_create_pseudoCT()
     ute_reg_thr0="${path_pct}/UTE_reg_thr0.nii.gz"
     ute_reg_thr0_corr="${path_pct}/UTE_reg_thr0_corr.nii.gz"
     ute_reg_bias="${path_pct}/UTE_thr0_BiasField.nii.gz"
-    ute_stnorm="${path_pct}/UTE_STnorm.nii.gz"
+    ute_norm="${path_pct}/UTE_STnorm.nii.gz"
+
+    # echo "========================================================================="
+    # echo "SEGMENTATION"
+    # echo "========================================================================="
 
     # Externaly run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
     # and instead of the T2 we use a PETRA UTE scan, so that the UTE will be registered to the T1
@@ -69,6 +73,10 @@ function pct_create_pseudoCT()
         mv $t2w_reg $ute_reg
         echo "Renamed T2_reg.nii.gz to UTE_reg.nii.gz"
     fi
+
+    echo "========================================================================="
+    echo "SKULL MASK"
+    echo "========================================================================="
 
     # Create a binary skull mask from final_tissues, thresholding to include skull (value 7 or 8)
     fslmaths $segmentation -thr 7 -uthr 8 -bin $skull_mask
@@ -88,6 +96,10 @@ function pct_create_pseudoCT()
     ################################################################################
     ##### STEP 1: UTE THRESHOLD #####
     ################################################################################
+    
+    echo "========================================================================="
+    echo "STEP 1: UTE THRESHOLD"
+    echo "========================================================================="
 
     # Apply a threshold to the UTE image at 0, eliminating negative values
     fslmaths $ute_reg -thr 0 $ute_reg_thr0
@@ -95,6 +107,10 @@ function pct_create_pseudoCT()
     ################################################################################
     ##### STEP 2: UTE BIAS FIELD CORRECTION #####
     ################################################################################
+    
+    echo "========================================================================="
+    echo "STEP 2: UTE BIAS FIELD CORRECTION"
+    echo "========================================================================="
 
     # Perform bias field correction using ANTs' N4BiasFieldCorrection to remove intensity inhomogeneity
     # This step requires ANTs to be installed and available in the environment (e.g., module load ants)
@@ -114,6 +130,10 @@ function pct_create_pseudoCT()
     ##### STEP 3: UTE SOFT TISSUE NORMALISATION #####
     ################################################################################
 
+    echo "========================================================================="
+    echo "STEP 3: UTE SOFT TISSUE NORMALISATION"
+    echo "========================================================================="
+
     # Create a file to store the soft tissue peak intensity value (for later normalization)
     touch ${path_pct}/pCT_soft_tissue_value.txt
 
@@ -130,190 +150,188 @@ function pct_create_pseudoCT()
     echo "The soft tissue peak value obtained from the Matlab code is: $peak_value"
 
     # Normalize UTE image using the soft tissue peak value -> soft tissue peak = 1 
-    fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_stnorm
+    fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_norm
 
     # The skull fraction should now be between the noise/air peak (around 0) and the soft tissue peak (1).
     
-    ################################################################################
-    ##### STEP 4: SEGMENTATION PARTIAL VOLUME CORRECTION #####
-    ################################################################################
-
-    # Set filenames for intermediate pCT files
-    # Masks
-    skull_mask_inv="${path_pct}/skull_mask_inv.nii.gz"
-    skull_mask_7="${path_pct}/skull_mask_7.nii.gz"
-    skull_mask_PVC="${path_pct}/skull_mask_PVC.nii.gz"
-    soft_tissues_mask="${path_pct}/soft_tissues_mask.nii.gz"
-    air_mask="${path_pct}/air_mask.nii.gz"
-    segmentation_no_skull="${path_pct}/segmentation_no_skull.nii.gz"
-    segmentation_mask="${path_pct}/segmentation_mask.nii.gz"
-    segmentation_mask_no_dil_skull="${path_pct}/segmentation_mask_no_dil_skull.nii.gz"
-    segmentation_mask_no_dil_skull_final="${path_pct}/segmentation_mask_no_dil_skull_final.nii.gz"
-
-    # Eroded/Dilated Masks
-    skull_mask_dil="${path_pct}/skull_mask_dil.nii.gz"
-    soft_tissues_mask_dil="${path_pct}/soft_tissues_mask_dil.nii.gz"
-    air_mask_dil="${path_pct}/air_mask_dil.nii.gz"
-    segmentation_mask_dil="${path_pct}/segmentation_mask_dil.nii.gz"
-    segmentation_mask_ero="${path_pct}/segmentation_mask_ero.nii.gz"
-    segmentation_mask_no_dil_skull="${path_pct}/segmentation_mask_no_dil_skull.nii.gz"
-
-    # Skull/Air INTERFACE
-    skull_air_interface="${path_pct}/skull_air_interface.nii.gz"
-    segmentation_skull_air_PVC="${path_pct}/segmentation_skull_air_PVC.nii.gz"
-    segmentation_skull_air_PVC_binv="${path_pct}/segmentation_skull_air_PVC_binv.nii.gz"
-    segmentation_skull_air_PVC_skin_air_PVC="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC.nii.gz"
-    segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6.nii.gz"
-    segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to13="${path_pct}/segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to13.nii.gz"
-
-    # Outer Head
-    outer_head_contour="${path_pct}/outer_head_contour.nii.gz"
-    outer_head_contour_PVC_inside="${path_pct}/outer_head_contour_PVC_inside.nii.gz"
-    outer_head_contour_PVC_outside="${path_pct}/outer_head_contour_PVC_outside.nii.gz"
-
-    # pCT variants
-    pCT_air="${path_pct}/pCT_air.nii.gz"
-    pCT_soft_tissues="${path_pct}/pCT_soft_tissues.nii.gz"
-    pCT_skull="${path_pct}/pCT_skull.nii.gz"
-    pCT_PVC="${path_pct}/pCT_PVC.nii.gz"
-    pCT_PV_smooth="${path_pct}/pCT_PV_smooth.nii.gz"
-
-    # Partial Volume Correction
-    # For the [1] skull/air and the [2] skin/air interface
-
-    # SimNIBS final_tissues.nii.gz labels (from m2m/charm LUT):
-    # 0=Air  1-4=WM/GM/CSF  5=Skin  6=Connective/CSF  7-8=Bone(Skull)  9-10=Vessels/CSF 11=L-eye 12=R-eye  13=Optic  >13=Custom
-
-    # [1] SKULL/AIR INTERFACE PVC
-    fslmaths $skull_mask -dilF -bin $skull_mask_dil                                    # Dilate skull (catch bone PVE)
-    fslmaths $segmentation -bin $segmentation_mask                                     # Binary head mask
-    fslmaths $segmentation_mask -sub $skull_mask_dil $segmentation_mask_no_dil_skull   # Head minus dilated skull
-    fslmaths $segmentation_mask_no_dil_skull -add 1 $segmentation_mask_no_dil_skull    # Non-skull head → 1+, skull→0
-    fslmaths $segmentation_mask_no_dil_skull -binv -mul 7 $skull_air_interface         # Skull PVE voxels=7
-    fslmaths $skull_mask -binv $skull_mask_inv                                         # Inverse skull
-    fslmaths $segmentation -mul $skull_mask_inv $segmentation_no_skull                 # Segmentation without skull
-    fslmaths $skull_mask -mul 7 $skull_mask_7                                          # Pure skull=7
-    fslmaths $skull_mask_7 -add $skull_air_interface -add $segmentation_no_skull $segmentation_skull_air_PVC  # Rebuild w/ skull PVE
-
-    # [2] SKIN/AIR INTERFACE PVC
-    fslmaths $segmentation_mask -bin -dilF $segmentation_mask_dil                      # Dilate head contour
-    fslmaths $segmentation_mask -bin -ero $segmentation_mask_ero                       # Erode head contour  
-    fslmaths $segmentation_mask_dil -sub $segmentation_mask_ero $outer_head_contour    # Outer head PVE ring
-    fslmaths $segmentation_skull_air_PVC -binv $segmentation_skull_air_PVC_binv        # Non-skullair mask
-    fslmaths $outer_head_contour -mul $segmentation_skull_air_PVC_binv $outer_head_contour  # Clean outer ring
-    fslmaths $outer_head_contour -mul 5 -add $segmentation_skull_air_PVC $segmentation_skull_air_PVC_skin_air_PVC  # Skin PVE=5
-
-    # === MASKS FOR HU MAPPING ===
-    # AIR (0 HU): Everything outside head
-    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -binv $air_mask
-
-    # SOFT TISSUES (~42 HU): ALL non-skull/non-air (WM/GM/CSF/Skin/Eyes/Vessels)
-    # NOTE: Includes 1-6 (brain/CSF/skin) + 9-13 (eyes/optic/vessels)
-    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 1 -uthr 6 -bin $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6
-    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 9 -uthr 13 -bin $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to13
-    fslmaths $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_1to6 -add $segmentation_skull_air_PVC_skin_air_PVC_SoftTissuesMask_9to13 $soft_tissues_mask
-
-    # SKULL: Pure cortical/trabecular bone
-    fslmaths $segmentation_skull_air_PVC_skin_air_PVC -thr 7 -uthr 7 -bin $skull_mask_PVC
-
-    ################################################################################
-    ##### STEP 5: UTE-HU MAPPING #####
-    ################################################################################
-    # Mapping from intensities to pHU
-
-    pCT_soft_tissues_value="42"
-    pCT_air_value="-1000"
-
-    # Mapping: Air Fraction = -1000 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
-    fslmaths $air_mask -mul $pCT_air_value -uthr -1 $pCT_air -odt float  # -odt prevents int overflow
-
-    # Mapping: Soft-Tissue Fraction = 42 HU (Wiesinger et al., 2016; Miscouridou et al., 2022)
-    fslmaths $soft_tissues_mask -mul $pCT_soft_tissues_value $pCT_soft_tissues -odt float
-
-    # Mapping: Dilated Skull Fraction
-
-    # Create a file to store the skull mapping
-    touch ${path_pct}/pCT_skull_mapping.txt
-
-    # Linear mapping: map image intensities in skull to Hounsfield units (HU)
-    case "$skullmapping" in
-        "miscouridou")
-            echo "Mapping skull ~ miscouridou... pHU = -2085 UTE + 2329 "
-            fslmaths $ute_stnorm -mul -2085 -add 2329 -mul $skull_mask_PVC $pCT_skull
-            ;;
-        "carpino")
-            echo "Mapping skull ~ carpino... pHU = -2194 UTE + 2236"
-            fslmaths $ute_stnorm -mul -2194 -add 2236 -mul $skull_mask_PVC $pCT_skull
-            ;;
-        "wiesinger")
-            echo "Mapping skull ~ wiesinger... pHU = -2000 (UTE-1) + 42"
-            fslmaths $ute_stnorm -add -1 -mul -2000 -add 42 -mul $skull_mask_PVC $pCT_skull
-            ;;
-        "treeby")
-            echo "Mapping skull ~ treeby... pHU = -2929.6 UTE + 3247.9"
-            fslmaths $ute_stnorm -mul -2929.6 -add 3247.9 -mul $skull_mask_PVC $pCT_skull
-            ;;
-        "kosciessa")
-            echo "Mapping skull ~ kosciessa (default)... establishing linear skull mapping"
-            # Call MATLAB to run the pct_skullmapping.m script
-            echo "Running MATLAB script pct_skullmapping.m..."
-            cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
-            matlab_command="pct_skullmapping(\"$sub_id\",\"$path_simnibs\")"
-            $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
-            # Move to pCT folder (if not there already)
-            cd "${path_pct}" || { echo "Directory not found"; exit 1; }
-            # Read the mapping coefficients
-            if [ -f ${path_pct}/pCT_skull_mapping.txt ]; then
-                read m1 <<< $(awk 'NR==1 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
-                read m2 <<< $(awk 'NR==2 {print $1}' ${path_pct}/pCT_skull_mapping.txt)
-            else
-                echo "Error: File pCT_skull_mapping.txt does not exist."
-                exit 1
-            fi
-            echo ""
-            echo "Processing kosciessa... pCT = $m1 UTE + $m2"
-            fslmaths $ute_stnorm -mul $m1 -add $m2 -mul $skull_mask_PVC $pCT_skull
-            ;;
-    esac
-    # Record mapping variant
-    echo "$skullmapping" >> ${path_pct}/pCT_skull_mapping.txt
-
-    # Add up the different parts to create the initial PVE corrected pCT
-    fslmaths $pCT_skull -add $pCT_air -add $pCT_soft_tissues $pCT_PVC
-
-    # Smooting: kernel size = 3x3x3 voxels; smoothing factor = 0.8
-    SmoothImage 3 $pCT_PVC 0.8 $pCT_PV_smooth
+    ###############################################################################
+    ##### STEP 4: ADVANCED PVC + MAPPING + BOUNDARY SMOOTHING BLOCK
+    # Purpose: Generate publication-quality pseudoCT for SimNIBS electromagnetic/acoustic simulations
+    # 
+    # WHY PARTIAL VOLUME CORRECTION (PVC) AT BOUNDARIES?
+    # Problem: SimNIBS segmentation has ca. 1mm³ voxels. At tissue interfaces (skull-CSF, 
+    #          skull-air, skin-air), MOST boundary voxels contain 30-70% mixed tissues.
+    # Impact:  Without PVC, these "half skull, half CSF" voxels can get mislabeled as 
+    #          PURE skull → wrong HU → 50-200% error in acoustic pressure/E-field.
+    # Solution: Dilate/erode operations detect PVE voxels, label them separately (5=skin-air, 
+    #           7=skull-air), then smooth ONLY these regions → smooth simulation gradients while 
+    #           preserving bulk tissue accuracy.
+    #
+    # ORDERING (PVC → mapping → boundary-smooth → final):
+    # 1. PVC: Correct skull-air + skin-air partial volume → PVC skull masks
+    # 2. Mapping: UTE intensity → HU (air/soft tissue/skull)
+    # 3. Smoothing of composite PCT (with a dilated skull mask)
+    # 4. Replace PCV skull mask values with unsmoothed values
+    ###############################################################################
+        
+    # Inputs
+    segmentation="${path_simnibs}/final_tissues.nii.gz"                 # SimNIBS labels 0-15
     
-    # Use smoothed mask at skull boundary
+    # PVC masks: skull-air + skin-air partial volume correction
+    skull_mask="${path_pct}/skull_mask.nii.gz"                          # Raw skull (labels 7+8)
+    skull_mask_dil="${path_pct}/skull_mask_dil.nii.gz"                  # Dilated skull (catches bone-air PVE voxels)
+    skull_mask_inv="${path_pct}/skull_mask_inv.nii.gz"                  # Non-skull voxels
+    skull_mask_7="${path_pct}/skull_mask_7.nii.gz"                      # Pure skull interior → label 7
+    segmentation_mask="${path_pct}/segmentation_mask.nii.gz"            # Binary head (non-zero labels)
+    segmentation_mask_no_dil_skull="${path_pct}/segmentation_mask_no_dil_skull.nii.gz"  # Head minus dilated skull
+    skull_air_interface="${path_pct}/skull_air_interface.nii.gz"        # Skull-air PVE boundary (label=7)
+    segmentation_no_skull="${path_pct}/segmentation_no_skull.nii.gz"    # Segmentation with no skull
+    seg_skull_air_PVC="${path_pct}/seg_skull_air_PVC.nii.gz"            # Segmentation with skull-air PVC applied
+    seg_skull_air_PVC_binv="${path_pct}/seg_skull_air_PVC_binv.nii.gz"  # Non-(skull+air) mask
+    seg_skull_air_skin_air_PVC="${path_pct}/seg_skull_air_skin_air_PVC.nii.gz"  # Full PVC (skull-air + skin-air, label=5)
+    segmentation_mask_dil="${path_pct}/segmentation_mask_dil.nii.gz"    # Dilated head contour
+    segmentation_mask_ero="${path_pct}/segmentation_mask_ero.nii.gz"    # Eroded head contour
+    outer_head_contour="${path_pct}/outer_head_contour.nii.gz"          # Skin-air PVE ring (1 voxel wide)
+    soft_tissues_mask_1to6="${path_pct}/soft_tissues_mask_1to6.nii.gz"  # Brain/CSF/skin/muscle (SimNIBS 1-6)
+    soft_tissues_mask_9to13="${path_pct}/soft_tissues_mask_9to13.nii.gz" # Eyes/optic/vessels (SimNIBS 9-13)
+    soft_tissues_mask="${path_pct}/soft_tissues_mask.nii.gz"            # Combined soft tissues (1-6 + 9-13)
+    air_mask="${path_pct}/air_mask.nii.gz"                              # Outside head (label=0)
+    skull_mask_PVC="${path_pct}/skull_mask_PVC.nii.gz"                  # PURE cortical/trabecular bone (PVC-corrected label=7)
+    skull_mask_PVC_dil="${path_pct}/skull_mask_PVC_dil.nii.gz"          # Dilated pure skull (outer surface)
 
-    # === BOUNDARY SMOOTHING VARS (add with others in STEP 4) ===
-    skull_mask_PVC_ero="${path_pct}/skull_mask_PVC_ero.nii.gz"
-    skull_mask_PVC_dil="${path_pct}/skull_mask_PVC_dil.nii.gz"
-    skull_boundary_mask="${path_pct}/skull_boundary_mask.nii.gz"
-    boundary_smooth_region="${path_pct}/boundary_smooth_region.nii.gz"
-    pCT_boundary_smooth_temp="${path_pct}/pCT_boundary_smooth_temp.nii.gz"
+    # pCT HU images
+    pCT_air="${path_pct}/pCT_air.nii.gz"                                # Air fraction → -1000 HU
+    pCT_soft_tissues="${path_pct}/pCT_soft_tissues.nii.gz"              # Soft tissues → 42 HU (literature)
+    pCT_skull="${path_pct}/pCT_skull.nii.gz"                            # UTE-calibrated skull → 200-1500 HU
+    pCT_PVC="${path_pct}/pCT_PVC.nii.gz"                                # Sum of pure tissue fractions (no smoothing)
+    pCT_PV_smooth="${path_pct}/pCT_PV_smooth.nii.gz"                    # Smoothed pCT
+    pCT="${path_pct}/pseudoCT.nii.gz"                                   # FINAL: bulk raw + boundaries smooth
 
-    # === BOUNDARY-ONLY SMOOTHING ===
-    echo "Creating skull boundary smoothing..."
+    echo "========================================================================="
+    echo "STEP 4.1: PARTIAL VOLUME CORRECTION - skull-air + skin-air interfaces"
+    echo "========================================================================="
+    echo "INTERFACES CORRECTED:"
+    echo "  1. Skull-air:"
+    echo "  2. Skull-CSF"
+    echo "  3. Skin-air"
+    echo ""
 
-    # TRUE 1-VOXEL BOUNDARY: Dilated(outer) - Eroded(inner) = symmetric shell
-    fslmaths $skull_mask_PVC -ero $skull_mask_PVC_ero
-    fslmaths $skull_mask_PVC -dilF $skull_mask_PVC_dil  
-    fslmaths $skull_mask_PVC_dil -sub $skull_mask_PVC_ero $skull_boundary_mask
+    cd "$path_pct" || { echo "ERROR: $path_pct not found"; exit 1; }
 
-    # Smooth buffer region (+1vox for kernel)
-    fslmaths $skull_boundary_mask -dilF $boundary_smooth_region
-    fslmaths $pCT_PVC -mas $boundary_smooth_region $pCT_boundary_smooth_temp
+    # ---------------------------------------------------------------------------
+    # STEP 4.1.1: Initial skull mask from SimNIBS segmentation
+    # ---------------------------------------------------------------------------
 
-    # Smooth only boundary
-    SmoothImage 3 $pCT_boundary_smooth_temp 0.8 $pCT_PV_smooth
+    fslmaths $segmentation -thr 7 -uthr 8 -bin "$skull_mask"
 
-    # === FINAL COMBINE ===
-    # Raw interiors + boundary smooth + skull override
-    fslmaths $skull_mask_PVC -add 1 -thr 1 -uthr 1 -mul $pCT_PVC -add $pCT_PV_smooth -add $pCT_skull $pCT
+    # ---------------------------------------------------------------------------
+    # STEP 4.1.2: SKULL-AIR INTERFACE PVC
+    # Problem: Voxels at skull outer/inner surface are mixed (bone+air, bone+CSF)
+    # Solution: Dilate skull by 1 voxel → captures all PVE boundary voxels,
+    #           then label them separately (value=7) for HU smoothing later
+    # ---------------------------------------------------------------------------
 
-    # Copy pCT to simnibs directory
-    cp $pCT ${path_simnibs}
+    fslmaths "$skull_mask" -dilF -bin "$skull_mask_dil"
+    fslmaths $segmentation -bin "$segmentation_mask"
+    fslmaths "$segmentation_mask" -sub "$skull_mask_dil" "$segmentation_mask_no_dil_skull"
+    fslmaths "$segmentation_mask_no_dil_skull" -add 1 "$segmentation_mask_no_dil_skull"
+    fslmaths "$segmentation_mask_no_dil_skull" -binv -mul 7 "$skull_air_interface"
+
+    fslmaths "$skull_mask" -binv "$skull_mask_inv"
+    fslmaths $segmentation -mul "$skull_mask_inv" "$segmentation_no_skull"
+    fslmaths "$skull_mask" -mul 7 "$skull_mask_7"
+    fslmaths "$skull_mask_7" -add "$skull_air_interface" -add "$segmentation_no_skull" "$seg_skull_air_PVC"
+
+    # ---------------------------------------------------------------------------
+    # STEP 4.1.3: SKIN-AIR INTERFACE PVC
+    # Problem: Scalp surface voxels are mixed (skin+air)
+    # Solution: Head contour (dilate-erode) = 1-voxel ring at scalp surface,
+    #           label these as skin-air PVE (value=5) for smooth HU transition
+    # Impact:  Prevents sharp skin(42 HU) → air(-1000 HU) jumps → realistic CT
+    # ---------------------------------------------------------------------------
+
+    fslmaths "$segmentation_mask" -bin -dilF "$segmentation_mask_dil"
+    fslmaths "$segmentation_mask" -bin -ero "$segmentation_mask_ero"
+    fslmaths "$segmentation_mask_dil" -sub "$segmentation_mask_ero" "$outer_head_contour"
+
+    fslmaths "$seg_skull_air_PVC" -binv "$seg_skull_air_PVC_binv"
+    fslmaths "$outer_head_contour" -mul "$seg_skull_air_PVC_binv" "$outer_head_contour"
+    fslmaths "$outer_head_contour" -mul 5 -add "$seg_skull_air_PVC" "$seg_skull_air_skin_air_PVC"
+
+    # ---------------------------------------------------------------------------
+    # STEP 4.1.4: PURE TISSUE MASKS (for accurate UTE→HU mapping)
+    # Now that PVE boundaries are separated, extract PURE tissue regions:
+    #   - air_mask = outside head
+    #   - soft_tissues_mask = brain/CSF/skin (non-PVE, non-skull)
+    #   - skull_mask_PVC = only 100% bone voxels (no PVE contamination)
+    # These pure masks ensure UTE intensity maps to correct physics (especially skull!)
+    # ---------------------------------------------------------------------------
+
+    fslmaths "$seg_skull_air_skin_air_PVC" -binv "$air_mask"
+    fslmaths "$seg_skull_air_skin_air_PVC" -thr 1 -uthr 6 -bin "$soft_tissues_mask_1to6"
+    fslmaths "$seg_skull_air_skin_air_PVC" -thr 9 -uthr 13 -bin "$soft_tissues_mask_9to13"
+    fslmaths "$soft_tissues_mask_1to6" -add "$soft_tissues_mask_9to13" "$soft_tissues_mask"
+    # Remove dilated skull from soft tissues to prevent dilated skull overlap in pCT_PVC
+    fslmaths "$soft_tissues_mask" -sub "$skull_mask_dil" -max 0 "$soft_tissues_mask"
+
+    # Create skull masks
+    fslmaths "$seg_skull_air_skin_air_PVC" -thr 7 -uthr 7 -bin "$skull_mask_PVC"
+    fslmaths "$skull_mask_PVC" -dilF "$skull_mask_PVC_dil"
+
+    echo "========================================================================="
+    echo "STEP 4.2: UTE→HU MAPPING on PVC-corrected pure tissue masks"
+    echo "========================================================================="
+
+    cd "$path_pct"
+    pCT_soft_val=42     # Literature: water-equivalent soft tissues (Wiesinger 2016, Miscouridou 2022)
+    pCT_air_val=-1000   # Standard air HU
+
+    fslmaths "$air_mask" -mul $pCT_air_val -uthr -1 "$pCT_air" -odt float
+    fslmaths "$soft_tissues_mask" -mul $pCT_soft_val "$pCT_soft_tissues" -odt float
+
+    # Skull: UTE→HU linear mapping (use dilated skull mask to avoid rough transitions!)
+    case "$skullmapping" in
+    miscouridou)
+        fslmaths "$ute_norm" -mul -2085 -add 2329 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    carpino)
+        fslmaths "$ute_norm" -mul -2194 -add 2236 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    wiesinger)
+        fslmaths "$ute_norm" -add -1 -mul -2000 -add 42 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    treeby)
+        fslmaths "$ute_norm" -mul -2929.6 -add 3247.9 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    kosciessa|*)
+        m1=$(awk 'NR==1{print $1}' "${path_pct}/pCTskullmapping.txt")
+        m2=$(awk 'NR==2{print $1}' "${path_pct}/pCTskullmapping.txt")
+        fslmaths "$ute_norm" -mul "$m1" -add "$m2" -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    esac
+
+    # Combine pure tissues (NO smoothing yet → sharp transitions at boundaries)
+    fslmaths "$pCT_air" -add "$pCT_soft_tissues" -add "$pCT_skull" "$pCT_PVC"
+
+    echo "========================================================================="
+    echo "STEP 4.3: SMOOTHING using ANTs: sigma=0.8 voxel "
+    echo "========================================================================="
+    echo ""
+
+    SmoothImage 3 "$pCT_PVC" 0.8 "$pCT_PV_smooth"
+
+    echo "========================================================================="
+    echo "STEP 4.4: FINAL COMPOSITION: smoothed everywhere except pure skull interior"
+    echo "========================================================================="
+    echo ""
+    echo "FINAL ASSEMBLY LOGIC:"
+    echo "  1. Smooth base"
+    echo "  2. Override ONLY skull_mask_PVC voxels with raw pCT_skull"
+    echo ""
+
+    fslmaths "$skull_mask_PVC" -binv tmp_non_skull_mask.nii.gz                              # Non PVC-skull mask
+    fslmaths "$pCT_PV_smooth" -mas tmp_non_skull_mask.nii.gz tmp_smooth_non_skull.nii.gz    # Use smoothed values in non-skull mask
+    fslmaths "$skull_mask_PVC" -mul "$pCT_skull" tmp_skull_raw.nii.gz                       # Use unsmoothed values in PVC skull mask
+    fslmaths tmp_smooth_non_skull.nii.gz -add tmp_skull_raw.nii.gz "$pCT" -odt float        # Final: smooth(non-skull) + raw(skull)
+    rm tmp_non_skull_mask.nii.gz tmp_smooth_non_skull.nii.gz tmp_skull_raw.nii.gz           # Cleanup
+
+    # Copy pCT to simnibs root
+    cp "$pCT" "${path_simnibs}/pseudoCT.nii.gz"
 
     # If DEBUG=0, remove nifti images in pseudoCT folder
     if [ "$debug" -eq 0 ]; then
@@ -322,4 +340,4 @@ function pct_create_pseudoCT()
     fi
 
     echo "Process complete. You can now run the simulation with the pseudoCT. Ensure both 'pseudoCT.nii.gz' and 'tissues_mask.nii.gz' are in the m2m segmentation subject folder."
-    }
+}
