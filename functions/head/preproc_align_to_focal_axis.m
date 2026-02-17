@@ -1,4 +1,5 @@
-function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
+function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
+    preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
 
 % preproc_align_to_focal_axis Aligns a 3D image to the focal axis and scales it.
 %
@@ -97,12 +98,19 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     %% Step 7: Transform image
     % Apply affine transformation to rotate and scale the image
+    if numel(unique(nii_image))<20 % if the image is a mask use nearest neighbor
+        parameters.interpolation = 'nearest';
+    else
+        parameters.interpolation = 'linear';
+    end
+
     rotated_img = tformarray(nii_image, maketform('affine', transformation_matrix), ...
-        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], newdims, [], 0);
+        makeresampler(parameters.interpolation, 'fill'), [1 2 3], [1 2 3], newdims, [], 0);
 
     %% Step 8: Update positions of transducer and focus
     % Transform transducer and focus positions using the affine transformation matrix
-    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], maketform('affine', transformation_matrix)));
+    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], ...
+        maketform('affine', transformation_matrix)));
     
     trans_pos_new = out_mat(1,:); % New transducer position
     focus_pos_new = out_mat(2,:); % New focus position
