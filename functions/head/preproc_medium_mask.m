@@ -17,11 +17,21 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
     labels = fieldnames(parameters.layers);
     medium_masks = zeros(size(segmented_img));
     
-    % Skip water and handle multi-layer skull specially if present
-    has_multiskull = any(strcmp(labels, 'skull_cortical'));
+    % Skip water
     loop_labels = labels(~ismember(labels, {'water'}));
-    if has_multiskull
-        loop_labels = loop_labels(~ismember(loop_labels, {'skull', 'skull_trabecular'}));
+    % Handle multi-layer skull specially if present
+    if parameters.usepseudoCT == 0
+        has_multiskull = any(strcmp(labels, 'skull_cortical'));
+        if has_multiskull
+            loop_labels = loop_labels(~ismember(loop_labels, {'skull', 'skull_trabecular'}));
+        end
+    else
+        % remove differentiated skull layer for pseudoCT
+        use_single_pct = any(strcmp(labels, 'skull_cortical'));
+        if use_single_pct
+            loop_labels = loop_labels(~ismember(loop_labels, {'skull_cortical', 'skull_trabecular'}));
+        end
+        has_multiskull = 0;
     end
     
     % Main loop: process non-special layers

@@ -108,21 +108,9 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     log_timer('start','medium', parameters.output_dir);
 
     if parameters.usepseudoCT == 1
-        kwave_medium = medium_setup(parameters, medium_masks, bone);
+        kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
     else
-        kwave_medium = medium_setup(parameters, medium_masks);
-    end
-    
-    % save images of assigned medium properties
-    if contains(parameters.simulation_medium, {'layered'}) && parameters.debug == 1
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_power')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'thermal_conductivity')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'specific_heat')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'perfusion_coeff')
-        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'absorption_fraction')
+        kwave_medium = medium_setup(parameters, medium_masks, planimg);
     end
 
     % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)

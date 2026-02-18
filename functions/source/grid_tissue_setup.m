@@ -16,7 +16,8 @@ if contains(parameters.simulation_medium, {'layered'})
     % matrix.
 
     % Preprocess layered head
-    [medium_masks, segmentation, bone, ~, ~, planimg.t1_image_orig, planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
+    [medium_masks, segmentation, bone, ~, ~, planimg.t1_image_orig, ...
+        planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
     
     if isempty(medium_masks)

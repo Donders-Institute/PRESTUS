@@ -1,4 +1,4 @@
-function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
+function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT)
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                         Setup k-wave medium                       %
@@ -52,6 +52,14 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
         temp_0 = parameters.thermal.temp_0 * grid_of_ones;
     end
 
+    % For pCT, indicate whether skull layer has already been mapped.
+    % This is required as PRESTUS allows a flexible layer specification.
+    % This enables multiple skull segmentations. 
+    % However, we want density etc. only to be mapped once.
+    if parameters.usepseudoCT == 1
+        skull_mapped = 0;
+    end
+
     % Changes the values of the acoustic and thermal properties in the
     % baseline_medium in the shape of the labelled mask
     if strcmp(parameters.simulation_medium, 'layered') || strcmp(parameters.simulation_medium, 'phantom')
@@ -62,10 +70,11 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
             if strcmp(label_name, 'water')
                continue % Loops to next label since the baseline medium is set to water
             end
-            if parameters.usepseudoCT == 1 && ...
-                    (strcmp(label_name, 'skull_cortical') || ...
-                    strcmp(label_name, 'skull_trabecular'))
-                skull_idx = find(medium_masks==label_i);
+            if parameters.usepseudoCT == 1 && contains(label_name, 'skull') && skull_mapped == 0
+                % collect any skull layers and unify under one skull compartment
+                label_name = 'skull';
+                skull_i = find(contains(labels, {'skull'}));
+                skull_idx = find(ismember(medium_masks,skull_i));
                 thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;                
                 specific_heat(skull_idx) = medium.(label_name).specific_heat_capacity;
                 if isfield(medium.(label_name), 'perfusion')
@@ -101,7 +110,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                     case 'marquet'
                         pct_skullmapping.density = 'marquet';
                         pct_skullmapping.soundspeed = 'marquet';
-                        pct_skullmapping.attenuation = 'marquet';
+                        pct_skullmapping.attenuation = 'k-plan';
                     case 'kosciessa'
                         pct_skullmapping.density = 'k-plan';
                         pct_skullmapping.soundspeed = 'marsac';
@@ -126,11 +135,23 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                         pseudoCT(skull_idx) = max(pseudoCT(skull_idx),0);
 
                         % estimate density
-                        density(skull_idx) = hounsfield2density(pseudoCT(skull_idx));
+                        density(skull_idx) = hounsfield2density(pseudoCT(skull_idx), 1);
+                        
+                        % plot the mapping
+                        if parameters.debug == 1
+                            output_plot = fullfile(parameters.debug_dir, ...
+                                sprintf('pCT_hounsfield-density_kwave.png'));
+                            exportgraphics(gcf, output_plot, 'Resolution', 150);
+                        end
+                        close(gcf);
+
                         % regularize minimum density to water density
                         density(skull_idx) = max(density(skull_idx),medium.water.density);
                         % regularize maximum density to rho_max
                         density(skull_idx) = min(density(skull_idx),rho_max);
+
+                        % remove initial offset
+                        pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
 
                     case 'marsac'
 
@@ -153,9 +174,6 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                         % note: the original code hard-codes HU_min as 0, which may have been an error
                         density(skull_idx) = rho_water + (rho_bone - rho_water) * ...
                             (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min);
-
-                        % remove initial offset
-                        pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
 
                     case 'marquet'
 
@@ -243,18 +261,22 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                 % [DEBUG] save pCT mapping overview
                 if parameters.debug == 1
                     h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
-                    subplot(4,1,1); hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
-                    title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
-                    subplot(4,1,2); hold on; histogram(density(skull_idx)); xlabel("Density [kg/m3]")
-                    % add lines for the fixed parameters
-                    xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
-                    subplot(4,1,3); hold on; histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
-                    xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
-                    subplot(4,1,4); hold on; histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
-                    xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
+                    subplot(4,1,1); 
+                        hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
+                        title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
+                    subplot(4,1,2); 
+                        hold on; histogram(density(skull_idx)); xlabel("Density [kg/m3]")
+                        % add lines for the fixed parameters
+                        xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
+                        xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
+                    subplot(4,1,3); 
+                        hold on; histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
+                        xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
+                        xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
+                    subplot(4,1,4); 
+                        hold on; histogram(alpha_0_true(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
+                        xline(medium.skull_trabecular.alpha_0_true, 'r', 'LineWidth', 2);
+                        xline(medium.skull_cortical.alpha_0_true, 'r', 'LineWidth', 2);
                     output_plot = fullfile(parameters.debug_dir, ...
                         sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
                     exportgraphics(h, output_plot, 'Resolution', 150);
@@ -262,6 +284,12 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
                 end
 
                 clear skull_idx
+
+                % indicate that skull values have been mapped
+                skull_mapped = 1;
+
+            elseif parameters.usepseudoCT == 1 && contains(label_name, 'skull') && skull_mapped == 1
+                disp(['pCT: ', label_name, ' requested, but skull is already mapped. Skipping...']);
             else
                 thermal_conductivity(medium_masks==label_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
                 specific_heat(medium_masks==label_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
@@ -317,36 +345,43 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
     % 'alpha_coeff' is rescaled to match the specified alpha_0_true and alpa_power_true for the center frequency
 
-    alpha_power_fixed = 2;
+    if ~isfield(parameters, 'fit_alpha_power')
+        parameters.fit_alpha_power = 1;
+    end
 
-    if parameters.debug == 1
-        plot_fit = true;
-        if ~exist(fullfile(parameters.debug_dir))
-            mkdir(parameters.debug_dir); 
+    if parameters.fit_alpha_power == 1
+        alpha_power_fixed = 2;
+    
+        if parameters.debug == 1
+            plot_fit = true;
+        else
+            plot_fit = false;
+        end
+    
+        if numel(unique([parameters.transducer.source_freq_hz])) > 1
+            warning('Multiple source frequencies not yet supported. Using %i Hz from first transducer.', ...
+                    parameters.transducer(1).source_freq_hz)
+        end
+        
+        alpha_coeff = fitPowerLawParamsMulti(...
+            alpha_0_true, ...
+            alpha_power_true, ...
+            sound_speed, ...
+            parameters.transducer(1).source_freq_hz, ...
+            alpha_power_fixed, ...
+            plot_fit);
+    
+        % DEBUG mode: save plot of fitted attenuation values
+        if parameters.debug == 1
+            fig_path = fullfile(parameters.debug_dir, ...
+            ['attenuation_fit', char(parameters.results_filename_affix), '.png']);
+            saveas(gcf, fig_path);
+            close(gcf);
         end
     else
-        plot_fit = false;
-    end
-
-    if numel(unique([parameters.transducer.source_freq_hz])) > 1
-        warning('Multiple source frequencies not yet supported. Using %i Hz from first transducer.', ...
-                parameters.transducer(1).source_freq_hz)
-    end
-    
-    alpha_coeff = fitPowerLawParamsMulti(...
-        alpha_0_true, ...
-        alpha_power_true, ...
-        sound_speed, ...
-        parameters.transducer(1).source_freq_hz, ...
-        alpha_power_fixed, ...
-        plot_fit);
-
-    % DEBUG mode: save plot of fitted attenuation values
-    if parameters.debug == 1
-        fig_path = fullfile(parameters.debug_dir, ...
-        ['attenuation_fit', char(parameters.results_filename_affix), '.png']);
-        saveas(gcf, fig_path);
-        close(gcf);
+        warning('Attenuation power-law is not remapped (as requested).')
+        alpha_coeff = alpha_0_true;
+        alpha_power_fixed = alpha_power_true;
     end
 
     % convert perfusion rate [mL/min/kg] into perfusion coefficient [1/s]
@@ -391,4 +426,23 @@ function kwave_medium = medium_setup(parameters, medium_masks, pseudoCT)
             warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
         end
     end
+
+    % save images of assigned medium properties
+    if contains(parameters.simulation_medium, {'layered'}) && parameters.debug == 1 && (exist('planimg') & ~isempty(planimg))
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_power')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'thermal_conductivity')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'specific_heat')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'perfusion_coeff')
+        medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'absorption_fraction')
+    end
+
+    % save a pCT if used
+    if parameters.usepseudoCT == 1 && parameters.debug == 1
+        filename_pct = fullfile(parameters.debug_dir, sprintf('pct%s', parameters.results_filename_affix));
+        niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
+    end
+
 end

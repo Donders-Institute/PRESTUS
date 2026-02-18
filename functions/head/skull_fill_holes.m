@@ -38,7 +38,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %   - Gap filling identifies largest non-skin-skull blob (likely CSF/air) and ignores it.
 %   - Eyes default to water (label 0) to avoid erroneous bone assignment.
 
-    if any(contains(labels, 'skull_cortical'))  
+    if parameters.usepseudoCT == 0 && any(contains(labels, 'skull_cortical'))  
         % treat cortical bone as the base layer
         skull_i = find(ismember(labels, {'skull_cortical'; 'skull_trabecular'}));
     else
