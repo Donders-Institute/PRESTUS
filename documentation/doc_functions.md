@@ -78,6 +78,7 @@ The following documents the functions provided in PRESTUS.
 | `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, soft/skull linear mapping (5 algorithms), partial volume correction, smoothing, and tissue masks.                                                                              |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
 | `pct_soft_tissue_peak`                  | PSEUDO-CT      | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
+| `fit_pairwiselinear`                    | PSEUDO-CT      | Perform a pairwise linear fit between HU and density values with optional plot.                 |
 | `plot_coronal_slices`                   | PLOT           | (DEPRECATED) Visualizes coronal slices of a 3D image with optional legends for labeled images.  |
 | `plot_median_montage`                   | PLOT           | (DEPRECATED) Creates a montage of central slices from a 3D T1 image.                            |
 | `plot_overlay_2d`                       | PLOT           | Overlays map on a background image slice with key positions highlighted.                        |

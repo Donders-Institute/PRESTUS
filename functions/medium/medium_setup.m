@@ -96,7 +96,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
                 switch pCT_variant
                     case 'carpino'
-                        pct_skullmapping.density = 'k-plan';
+                        pct_skullmapping.density = 'k-wave';
                         pct_skullmapping.soundspeed = 'k-plan';
                         pct_skullmapping.attenuation = 'yakuub';
                     case 'yakuub'
@@ -123,6 +123,23 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
                 switch pct_skullmapping.density
                     case 'k-plan'
+
+                        % define piece-wise linear mapping between HU and mass density in kg/m^3 hounsfieldUnits = [-990, 60, 1000, 1950]; 
+                        % see https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration
+                        hounsfieldUnits = [-990, 60, 1000, 1950]; 
+                        massDensity = [1.2, 1060, 1530, 2150]; 
+
+                        density(skull_idx) = fit_pairwiselinear(pseudoCT(skull_idx), hounsfieldUnits, massDensity, 1);
+
+                        % plot the mapping
+                        if parameters.debug == 1
+                            output_plot = fullfile(parameters.debug_dir, ...
+                                sprintf('pCT_hounsfield-density_kplan.png'));
+                            exportgraphics(gcf, output_plot, 'Resolution', 150);
+                        end
+                        close(gcf);
+
+                    case 'k-wave'
 
                         offset_HU   = 1000;
                         rho_max     = 2100;     % max. density in skull [kg/m3]
