@@ -15,7 +15,7 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
     
     % Extract and round phases and amplitudes
     opt_phases = round(parameters.transducer.source_phase_deg, 2);
-    source_amp = double(parameters.transducer.source_phase_deg(1));
+    source_amp = double(parameters.transducer.source_amp(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     
