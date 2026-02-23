@@ -64,7 +64,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             parameters.calibration.force_kwavearray == 1
         sim_param.use_kwavearray = 1; % force to run with kwavearray setup
     end
-    if strcmp(sim_param.submit_medium, 'matlab') == true
+    if strcmp(sim_param.submit_medium, 'matlab') == true && ~isfield(sim_param, 'use_matlab_gpu')
         sim_param.code_type = 'matlab_cpu';
     else
         sim_param.overwrite_files = 'always';
