@@ -75,7 +75,7 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_get_group_mean_mni`           | NEURONAV       | Compute group-level average MNI coordinates (both mm and voxel).                                |
 | `neuronav_select_and_average_localite`  | NEURONAV       | Select most recent Localite XML for a session.                                                  |
 | `position_transducer_localite`          | NEURONAV       | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
-| `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, soft/skull linear mapping (5 algorithms), partial volume correction, smoothing, and tissue masks.                                                                              |
+| `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                              |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
 | `pct_soft_tissue_peak`                  | PSEUDO-CT      | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
 | `fit_pairwiselinear`                    | PSEUDO-CT      | Perform a pairwise linear fit between HU and density values with optional plot.                 |

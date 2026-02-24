@@ -182,10 +182,10 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
                         % truncate CT HU (see Marsac et al., 2017)
                         % do not use pCT-based properties for presumed non-skull tissue
+                        % BUT: this is prone to create trabecular holes
                         skull_idx(pseudoCT(skull_idx) < HU_min) = [];
-                        % regularize upper HU to HU_max
-                        idx_HUtoohigh = pseudoCT(skull_idx) > HU_max;
-                        pseudoCT(skull_idx(idx_HUtoohigh)) = HU_max;
+                        % regularize maximum HU to HU_max
+                        pseudoCT(skull_idx) = min(pseudoCT(skull_idx),HU_max);
 
                         % estimate density from CT HU based on Marsac et al., 2017 & Bancel et al., 2021
                         % note: the original code hard-codes HU_min as 0, which may have been an error
