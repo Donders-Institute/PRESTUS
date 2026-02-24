@@ -121,17 +121,35 @@ end
 % Enable GPU mode if requested
 if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
     datacast = 'gpuArray-double';
+    % Check whether DataCast is supported by the current k-Wave version
+    try
+        info = arginfo('kWaveDiffusion');
+        supported_params = fieldnames(info.Varargin);
+        use_datacast = any(contains(supported_params, 'DataCast', 'IgnoreCase', true));
+        if use_datacast == false
+           warning('GPU support has been requested, but is not supported in the available version of kWaveDiffusion (introduced in kWave 1.4.1). Consider upgrading.');
+        end
+    catch
+        warning('GPU support has been requested, but support for it in kWaveDiffusion could not be verified. Continuing with the assumption that DataCast is supported...');
+        use_datacast = true; % If DataCast support cannot be validated, default to active.
+    end
 else
-    datacast = 'off';
+    use_datacast = false; % If no GPU is requested, do not pass data format
 end
 
+% Build final input args
+thermal_args = {'PlotSim', boolean(parameters.interactive)};
+if use_datacast
+    thermal_args = [thermal_args, {'DataCast', datacast}];
+end
+
+% Run simulation
 thermal_diff_obj = kWaveDiffusion(...
     kgrid, ...
     kwave_medium, ...
     source, ...
     sensor, ...
-    'PlotSim', boolean(parameters.interactive), ...
-    'DataCast', datacast);
+    thermal_args{:});
 
 % initialize field temperature
 if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
