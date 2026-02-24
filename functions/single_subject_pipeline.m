@@ -365,6 +365,11 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % indicate success
     disp('Pipeline finished successfully');
 
+    % Generate HTML simulation report (after all timers, before diary closes)
+    if isfield(parameters, 'generate_report') && parameters.generate_report
+        generate_simulation_report(parameters, results_acoustic, results_heating, highlighted_pos);
+    end
+
     % end logging
     diary('off')
 

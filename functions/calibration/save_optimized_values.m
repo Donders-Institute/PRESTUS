@@ -15,7 +15,7 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
     
     % Extract and round phases and amplitudes
     opt_phases = round(parameters.transducer.source_phase_deg, 2);
-    source_amp = double(parameters.transducer.source_phase_deg(1));
+    source_amp = double(parameters.transducer.source_amp(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     
@@ -75,7 +75,11 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
 
     % Save optimized transducer parameters to a YAML file for easy 
     % integration in PRESTUS config file
-    yaml_file = sprintf('%s-F%.0fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
+    if mod(focus_wrt_exit_plane,1) == 0
+       yaml_file = sprintf('%s-F%.0fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
+    else
+       yaml_file = sprintf('%s-F%.1fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
+    end
     yaml_path = fullfile(parameters.calibration.path_output_profiles, yaml_file);
 
     parameters.transducer.set_focus_wrt_exit_plane_mm = focus_wrt_exit_plane;
