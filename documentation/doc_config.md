@@ -31,11 +31,11 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
 | `run_heating_sims`                | Run heating simulations.                                                              | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
+| `generate_report`                 | Generate a self-contained HTML simulation report at the end of the pipeline?          | (`1 = yes, 0 = no`)  |
 | `n_sim_dims`                      | Simulation type (2D / 3D).                                             | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
 | `axisymmetric`                  | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).  | (`1 = yes, 0 = no`) see `doc_simulations-acoustic.md`.    |
 | `savemat`                         | Save outputs of acoustic and/or heating simulations as .mat files?                    | (`1 = yes, 0 = no`) For many parallel simulations, setting this to 0 saves disk space.    |
 | `debug`                         | Activate a more verbose debug mode in which more intermediate output plots and files are provided?   | (`1 = yes, 0 = no`) |
-
 
 ### Segmentation/Preprocessing
 

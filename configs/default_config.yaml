@@ -45,11 +45,11 @@ usepseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium prop
 pseudoCT_variant: kosciessa # pCT mapping algorithms (yaakub/carpino/k-plan/marquet/kosciessa [default])
 
 # Only run specific components of the pipeline?
-run_source_setup: 1       # Should we set up acoustic source? switch off to look at initial segmentation results only
-run_acoustic_sims: 1      # Should we run the acoustic simulations?
-run_heating_sims: 1       # Should we run the heating simulations? Run once acoustic simulation provides sensible results.
-run_posthoc_water_sims: 1 # Should we run the simulations in free water with exactly the same parameter? Verify that free-water intensity matches target.
-generate_report: 1        # Should we generate a self-contained HTML simulation report at the end of the pipeline?
+run_source_setup: 1       # Set up acoustic source? (switch off to look at initial segmentation results only)
+run_acoustic_sims: 1      # Run the acoustic simulations?
+run_heating_sims: 1       # Run the heating simulations? Run once acoustic simulation provides sensible results.
+run_posthoc_water_sims: 1 # Run the simulations in free water with exactly the same parameter? Verify that free-water intensity matches target.
+generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?
 
 # Select which k-Wave code to run (see 'run_simulations' for more documentation)
 #   MATLAB CPU code 'matlab_cpu'
