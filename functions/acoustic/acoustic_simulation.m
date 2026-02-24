@@ -34,20 +34,49 @@ input_args.PlotScale = [-1, 1] * parameters.transducer(1).source_amp(1);
 
 % Select submission based on code type
 switch parameters.code_type
-   case 'cpp_cpu'
+    case 'cpp_cpu'
 
       if parameters.n_sim_dims ~= 3
          error("C++ option only supported for 3D acoustic simulations. Please choose a different code_type.");
       end
-
+   
+      % Force single precision for C++ HDF5 compatibility
+      medium  = cast_struct(medium, 'single'); 
+      source  = cast_struct(source, 'single');
+      sensor  = cast_struct(sensor, 'single');
+   
+      % Pathname for the input and output files (used only for non-interactive computations)
+      input_args.SaveToDisk = fullfile(parameters.output_dir, ...
+         sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
+         parameters.simulation_medium, parameters.results_filename_affix));
+      
       input_args_cell = zip_fields(input_args);
       sensor_data = kspaceFirstOrder3DC(kgrid, medium, source, sensor, input_args_cell{:});
       
    case 'cpp_gpu'
 
       if parameters.n_sim_dims ~= 3
-         error("CUDA option only supported for 3D acoustic simulations. Please choose a different code_type.");
+         error("C++ GPU option only supported for 3D acoustic simulations. Please choose a different code_type.");
       end
+
+      % Force single precision for C++ HDF5 compatibility
+      medium  = cast_struct(medium, 'single'); 
+      source  = cast_struct(source, 'single');
+      sensor  = cast_struct(sensor, 'single');
+
+      % Pathname for the input and output files (used only for non-interactive computations)
+      input_args.SaveToDisk = fullfile(parameters.output_dir, ...
+        sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
+        parameters.simulation_medium, parameters.results_filename_affix));
+
+      input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.results_filename_affix);
+      input_args.DataPath = parameters.output_dir;
+      input_args.DeleteData = true;
+
+      gpu_id = str2double(getenv('SLURM_LOCALID'));
+      input_args.DeviceNum = gpu_id;
+      input_args.NumThreads = 1;
+
       input_args_cell = zip_fields(input_args);
       sensor_data = kspaceFirstOrder3DG(kgrid, medium, source, sensor, input_args_cell{:});
       
