@@ -102,7 +102,7 @@ function [parameters] = path_log_setup(parameters, prestus_path, subject_id)
     warning('off','MATLAB:prnRenderer:opengl');
     
     % display GPU information (if requested)
-    if strcmp(parameters.code_type, 'cuda') || strcmp(parameters.code_type, 'matlab_gpu')
+    if strcmp(parameters.code_type, 'cpp_gpu') || strcmp(parameters.code_type, 'matlab_gpu')
         fprintf('========================================\n');
         fprintf('GPU INFO \n');
         fprintf('========================================\n\n');

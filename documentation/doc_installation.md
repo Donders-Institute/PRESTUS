@@ -77,3 +77,7 @@ In PRESTUS, specify either in the config or directly in MATLAB both the path to 
 parameters.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.conda', 'envs', 'simnibs_env', 'bin');
 parameters.ld_library_path = "/opt/gcc/7.2.0/lib64";
 ```
+
+#### [Optional: Download C++ binaries]
+
+For the `cpp_cpu` and `cpp_gpu` modes, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them into `k-Wave/binaries/`; see also the instructions [here](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php).

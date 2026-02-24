@@ -53,9 +53,8 @@ run_posthoc_water_sims: 1 # Should we run the simulations in free water with exa
 # Select which k-Wave code to run (see 'run_simulations' for more documentation)
 #   MATLAB CPU code 'matlab_cpu'
 #   MATLAB GPU code 'matlab_gpu'
-#   C++ code (Interactive) 'cpp_interactive'
-#   C++ code (Non-Interactive) 'cpp_noninteractive'
-#   CUDA code 'cuda' (currently does not work at the Donders HPC, but 'matlab_gpu' works)
+#   C++ CPU code 'cpp_cpu'
+#   GPU code 'cpp_gpu'
 code_type: matlab_gpu 
 
 savemat: 0 # Save output matrices?

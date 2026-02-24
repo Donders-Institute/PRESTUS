@@ -74,7 +74,7 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
             ~strcmp(parameters.hpc_partition, '')
         fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
         request_gpu = 1;
-    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
         fprintf(fid, '#SBATCH --partition=gpu\n');
         request_gpu = 1;
     else
@@ -83,7 +83,7 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ...
             ~strcmp(parameters.hpc_gpu, '')
         fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
-    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
     if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation) && ...

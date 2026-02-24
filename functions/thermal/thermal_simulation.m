@@ -118,7 +118,8 @@ if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.r
     sensor = [];
 end
 
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+% Enable GPU mode if requested
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
     datacast = 'gpuArray-double';
 else
     datacast = 'off';
@@ -133,7 +134,7 @@ thermal_diff_obj = kWaveDiffusion(...
     'DataCast', datacast);
 
 % initialize field temperature
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
     thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
 end    
 T_max = thermal_diff_obj.T;
@@ -148,7 +149,7 @@ if isfield(parameters, 'adopted_cem43')
 else
     thermal_diff_obj.cem43 = zeros(size(thermal_diff_obj.T));
 end
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cuda')
+if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
     thermal_diff_obj.cem43 = gpuArray(thermal_diff_obj.cem43);
 end
 CEM43_max = thermal_diff_obj.cem43;

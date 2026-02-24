@@ -1,6 +1,6 @@
-### Usage on high-performance computing clusters
+### Usage on High-Performance Computing (HCP) setups
 
-The Donders provides access to a high-performance computing (HPC) cluster.High-performance computing (HPC) clusters are systems composed of interconnected computers (nodes) working together to solve complex computational problems. They enable parallel processing, allowing large-scale simulations, data analysis, and scientific research tasks to be completed more efficiently. Each node typically consists of multiple processors (CPUs/GPUs), memory, and storage.
+The Donders provides access to a high-performance computing (HPC) cluster. High-performance computing (HPC) clusters are systems composed of interconnected computers (nodes) working together to solve complex computational problems. They enable parallel processing, allowing large-scale simulations, data analysis, and scientific research tasks to be completed more efficiently. Each node typically consists of multiple processors (CPUs/GPUs), memory, and storage.
 
 PRESTUS is designed for HPC deployment: the most efficient way to run simulations is to start multiple simulations (e..g, for different individuals, target locations, or parameter setups) via parallel jobs. **PBS** (Portable Batch System) and **SLURM** ((Simple Linux Utility for Resource Management)) are tools that manage job scheduling, resource allocation, and execution in HPC systems. Both tools ensure efficient usage of cluster resources by managing multiple users and workloads. The Donders manages both PBS (historically) and SLURM (more recent) schedulers. To see current ressource usage, see https://grafana.dccn.nl/ (*intranet required*).
 
@@ -79,7 +79,7 @@ vncmanager - 2
 
 9. in `terminal` check `squeue`; for migrating other commands see [this documentation](https://hpc.dccn.nl/docs/cluster_howto/compute_slurm.html#migrating-from-torque-pbs-to-slurm)
 
-### Note on GPUs
+### GPU support
 
 TUS simulations are accelerated by GPUs, but requesting GPUs can lead to longer wait times as the current concurrent GPU limit per user is 4. To reduce wait times, it is possible to run acoustic simulations first (to confirm targeting) because these require less RAM) and then run thermal simulations with the final protocol. Avoid blanket simulations (e.g., circling through all participants with all permutations) especially for thermal simulations.
 

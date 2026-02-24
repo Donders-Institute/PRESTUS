@@ -12,14 +12,6 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     
     disp('Specifying and Starting acoustic simulations...')
 
-    % Pathname for the input and output files (used only for non-interactive computations)
-    parameters.kwave_input_filename  = fullfile(parameters.output_dir, ...
-        sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
-        parameters.simulation_medium, parameters.results_filename_affix));
-    parameters.kwave_output_filename = fullfile(parameters.output_dir, ...
-        sprintf('sub-%03d_%s_output%s.h5', parameters.subject_id, ...
-        parameters.simulation_medium, parameters.results_filename_affix));
-
     % Note: The edge of the simulation grid = the edge of the PML layer
     plminside = true;
 
