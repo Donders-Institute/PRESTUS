@@ -79,7 +79,7 @@ switch parameters.code_type
       
    otherwise
 
-      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu, parameters.code_type);
+      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu', parameters.code_type);
 
 end
 
