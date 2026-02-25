@@ -28,20 +28,7 @@
 
 ### choose a simulation type
 
-PRESTUS allows code deployment using different computing setups (`parameters.code_type`).
-
-- `matlab_cpu`
-    - `kspaceFirstOrder3D` | `kspaceFirstOrder2D` | `kspaceFirstOrderAS` 
-- `matlab_gpu`
-    - MATLAB with GPU acceleration via DataCast='gpuArray-single'.
-    - Requires Parallel Computing Toolbox
-- `cpp_cpu` (C++)
-    - `kspaceFirstOrder3DC` warps the C++ binary `kspaceFirstOrder-OMP`. 
-    - Requires the specific binary from [k-Wave downloads](http://www.k-wave.org/download.php). 
-- `cpp_gpu`
-    - `kspaceFirstOrder3DG` wraps the C++/CUDA binary `kspaceFirstOrder-CUDA`, offloading computation to NVIDIA GPUs.
-    - Requires a CUDA-capable Nvidia GPU and the specific binary from [k-Wave downloads](http://www.k-wave.org/download.php). 
-
+- see `doc_backend.md` 
 
 ### run the single_subject_pipeline
 - Ideally, the full pipeline only needs a subject id (a number consisting of no more than 3 digits).
