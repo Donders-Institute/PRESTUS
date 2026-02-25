@@ -5,7 +5,7 @@ PRESTUS allows code deployment using different computing setups (`parameters.cod
 - `matlab_cpu`
     - `kspaceFirstOrder3D` | `kspaceFirstOrder2D` | `kspaceFirstOrderAS` 
 - `matlab_gpu`
-    - MATLAB with GPU acceleration via `DataCast='gpuArray-single'`.
+    - MATLAB with GPU acceleration via `DataCast`.
     - Requires Parallel Computing Toolbox
 - `cpp_cpu` (C++)
     - `kspaceFirstOrder3DC` warps the C++ binary `kspaceFirstOrder-OMP`. 

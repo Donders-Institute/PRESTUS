@@ -40,10 +40,10 @@ switch parameters.code_type
          error("C++ option only supported for 3D acoustic simulations. Please choose a different code_type.");
       end
    
-      % Force single precision for C++ HDF5 compatibility
-      medium  = cast_struct(medium, 'single'); 
-      source  = cast_struct(source, 'single');
-      sensor  = cast_struct(sensor, 'single');
+      % Force precision for C++ HDF5 compatibility
+      medium  = cast_struct(medium, parameters.precision); 
+      source  = cast_struct(source, parameters.precision);
+      sensor  = cast_struct(sensor, parameters.precision);
    
       % Pathname for the input and output files (used only for non-interactive computations)
       input_args.SaveToDisk = fullfile(parameters.output_dir, ...
@@ -59,10 +59,10 @@ switch parameters.code_type
          error("C++ GPU option only supported for 3D acoustic simulations. Please choose a different code_type.");
       end
 
-      % Force single precision for C++ HDF5 compatibility
-      medium  = cast_struct(medium, 'single'); 
-      source  = cast_struct(source, 'single');
-      sensor  = cast_struct(sensor, 'single');
+      % Force precision for C++ HDF5 compatibility
+      medium  = cast_struct(medium, parameters.precision); 
+      source  = cast_struct(source, parameters.precision);
+      sensor  = cast_struct(sensor, parameters.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
       input_args.SaveToDisk = fullfile(parameters.output_dir, ...

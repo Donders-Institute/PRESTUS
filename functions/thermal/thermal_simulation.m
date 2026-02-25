@@ -118,23 +118,26 @@ if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.r
     sensor = [];
 end
 
-% Enable GPU mode if requested
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
-    datacast = 'gpuArray-double';
-    % Check whether DataCast is supported by the current k-Wave version
-    try
-        info = arginfo('kWaveDiffusion');
-        supported_params = fieldnames(info.Varargin);
-        use_datacast = any(contains(supported_params, 'DataCast', 'IgnoreCase', true));
-        if use_datacast == false
-           warning('GPU support has been requested, but is not supported in the available version of kWaveDiffusion (introduced in kWave 1.4.1). Consider upgrading.');
-        end
-    catch
-        warning('GPU support has been requested, but support for it in kWaveDiffusion could not be verified. Continuing with the assumption that DataCast is supported...');
-        use_datacast = true; % If DataCast support cannot be validated, default to active.
+% Check if DataCast is supported
+try
+    info = arginfo('kWaveDiffusion');
+    supported_params = fieldnames(info.Varargin);
+    use_datacast = any(contains(supported_params, 'DataCast', 'IgnoreCase', true));
+    if use_datacast == false
+        warning('MATLAB GPU support has been requested, but is not supported in the available version of kWaveDiffusion (introduced in kWave 1.4.1). Consider upgrading.');
     end
-else
-    use_datacast = false; % If no GPU is requested, do not pass data format
+catch
+    warning('GPU support has been requested, but support for it in kWaveDiffusion could not be verified. Continuing with the assumption that DataCast is supported...');
+    use_datacast = true; % If DataCast support cannot be validated, default to active.
+end
+
+% Set precision and enable GPU mode (if requested)
+if use_datacast == true
+    if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
+        datacast = ['gpuArray-', parameters.precision];
+    else
+        datacast = [parameters.precision];
+    end
 end
 
 % Build final input args
