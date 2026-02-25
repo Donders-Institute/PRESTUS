@@ -120,15 +120,13 @@ end
 
 % Check if DataCast is supported
 try
-    info = arginfo('kWaveDiffusion');
-    supported_params = fieldnames(info.Varargin);
-    use_datacast = any(contains(supported_params, 'DataCast', 'IgnoreCase', true));
-    if use_datacast == false
-        warning('MATLAB GPU support has been requested, but is not supported in the available version of kWaveDiffusion (introduced in kWave 1.4.1). Consider upgrading.');
+    use_datacast = any(regexp(fileread(which('kWaveDiffusion')), '''DataCast'''));
+    if ~use_datacast
+        warning('MATLAB GPU support requested but kWaveDiffusion lacks ''DataCast'' (kWave ≥1.4.1 required).');
     end
 catch
-    warning('GPU support has been requested, but support for it in kWaveDiffusion could not be verified. Continuing with the assumption that DataCast is supported...');
-    use_datacast = true; % If DataCast support cannot be validated, default to active.
+    warning('Cannot verify kWaveDiffusion DataCast support; assuming GPU-compatible version.');
+    use_datacast = true;
 end
 
 % Set precision and enable GPU mode (if requested)
