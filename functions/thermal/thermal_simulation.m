@@ -132,9 +132,9 @@ end
 % Set precision and enable GPU mode (if requested)
 if use_datacast == true
     if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
-        datacast = ['gpuArray-', parameters.precision];
+        datacast = ['gpuArray-', char(parameters.precision)];
     else
-        datacast = [parameters.precision];
+        datacast = char(parameters.precision);
     end
 end
 

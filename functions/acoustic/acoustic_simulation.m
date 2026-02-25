@@ -82,7 +82,7 @@ switch parameters.code_type
       
    case 'matlab_gpu'
 
-      input_args.DataCast = 'gpuArray-single';
+      input_args.DataCast = ['gpuArray-', char(parameters.precision)];
       input_args_cell = zip_fields(input_args);
       
       if parameters.n_sim_dims == 3
@@ -95,7 +95,7 @@ switch parameters.code_type
       
    case 'matlab_cpu'
 
-      input_args.DataCast = 'single';
+      input_args.DataCast = parameters.precision;
       input_args_cell = zip_fields(input_args);
       
       if parameters.n_sim_dims == 3
