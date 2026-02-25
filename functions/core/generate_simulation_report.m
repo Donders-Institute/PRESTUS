@@ -167,12 +167,12 @@ try
         html_parts{end+1} = section_error('Performance', ME);
     end
 
-    % Section 12: Log Excerpt (collapsed by default)
+    % Section 12: Log (collapsed by default)
     try
-        html_parts{end+1} = collapsible_section('Log Excerpt', ...
+        html_parts{end+1} = collapsible_section('Log', ...
             build_log_section(parameters, subject_id, medium, affix), false, 'log');
     catch ME
-        html_parts{end+1} = section_error('Log Excerpt', ME);
+        html_parts{end+1} = section_error('Log', ME);
     end
 
     % Footer
@@ -426,15 +426,16 @@ function html = build_medium_properties_section(parameters)
     % Define properties to display
     props = {'sound_speed', 'Sound speed', 'm/s'; ...
              'density', 'Density', 'kg/m³'; ...
-             'alpha_coeff', 'Attenuation coeff.', 'dB/(MHz^y·cm)'; ...
-             'alpha_power', 'Attenuation power', ''; ...
+             'alpha_0_true', 'Attenuation coeff.', 'dB/(MHz^y·cm)'; ...
+             'alpha_power_true', 'Attenuation power', ''; ...
              'thermal_conductivity', 'Thermal cond.', 'W/(m·K)'; ...
-             'specific_heat', 'Specific heat', 'J/(kg·K)'; ...
-             'perfusion_rate', 'Perfusion rate', 'kg/(m³·s)'};
+             'specific_heat_capacity', 'Specific heat', 'J/(kg·K)'; ...
+             'perfusion', 'Perfusion rate', 'kg/(m³·s)'; ...
+             'absorption_fraction', 'Absorption fracttion', 'Fraction'};
 
     % Define tissues to display
-    tissues = {'water', 'skin', 'skull_cortical', 'skull_trabecular', 'brain'};
-    tissue_labels = {'Water', 'Skin', 'Skull (cortical)', 'Skull (trabecular)', 'Brain'};
+    tissues = {'water', 'skin', 'skull', 'skull_cortical', 'skull_trabecular', 'brain'};
+    tissue_labels = {'Water', 'Skin', 'Skull', 'Skull (cortical)', 'Skull (trabecular)', 'Brain'};
 
     html = '<div class="table-wrapper"><table class="data-table">';
     html = [html '<thead><tr><th>Property</th><th>Unit</th>'];
@@ -641,7 +642,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     % Thermal images
     thermal_images = {
-        'sub-%03d_%s_maxT%s.png',           'Max temperature overlay';
+        'sub-%03d_%s_maxT%s.png',            'Max temperature overlay';
         'sub-%03d_%s_thermal%s.png',         'Temperature vs time (focal)';
         'sub-%03d_%s_thermalrise%s.png',     'Temperature rise vs time (focal)';
         'sub-%03d_%s_CEM%s.png',             'CEM43 vs time (focal)';
@@ -771,7 +772,7 @@ function html = build_log_section(parameters, subject_id, medium, affix)
         return
     end
 
-    % Read last 50 lines
+    % Read all lines in the log (beginning crucial for parameters)
     fid = fopen(log_path, 'r');
     if fid == -1
         html = '<p class="placeholder">Cannot read log file.</p>';
@@ -785,11 +786,11 @@ function html = build_log_section(parameters, subject_id, medium, affix)
     end
     fclose(fid);
 
-    n = min(50, length(lines));
+    n = length(lines);
     tail_lines = lines(end-n+1:end);
     log_text = strjoin(tail_lines, newline);
 
-    html = [html sprintf('<p class="note">Last %d lines of <code>%s</code></p>', ...
+    html = [html sprintf('<p class="note">Log: <code>%s</code></p>', ...
         n, html_escape(log_path))];
     html = [html '<pre class="log-block">' html_escape(log_text) '</pre>'];
 end
