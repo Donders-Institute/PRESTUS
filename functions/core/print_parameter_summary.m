@@ -70,7 +70,7 @@ else
     tissues = fieldnames(parameters.layers);
 end
 
-props = {'sound_speed', 'density', 'alpha_0_true', 'alpha_power_true', ...
+props = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
          'thermal_conductivity', 'specific_heat_capacity', 'perfusion', 'absorption_fraction'};
 labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz·cm)]', ...
           'Attn: Freq^Power [-]', 'Thermal Cond. [W/(m·K)]', 'Heat Cap. [J/(kg·K)]', ...
@@ -283,9 +283,9 @@ if contains(prop, 'sound_speed')
     unit = 'm/s';
 elseif contains(prop, 'density')
     unit = 'kg/m³';
-elseif contains(prop, 'alpha_0_true')
+elseif contains(prop, 'alpha_coeff')
     unit = 'dB/cm/MHz';
-elseif contains(prop, 'alpha_power_true')
+elseif contains(prop, 'alpha_power')
     unit = '(scalar)';
 elseif contains(prop, 'thermal_conductivity')
     unit = 'W/m/°C';
@@ -312,7 +312,7 @@ function print_tissue_props(params, tissue, props, labels)
             % Smart formatting
             if contains(prop, {'sound_speed','density','specific_heat_capacity','perfusion'})
                 fmt = '%.0f';
-            elseif strcmp(prop, 'alpha_0_true')
+            elseif strcmp(prop, 'alpha_coeff')
                 fmt = '%.4f';
             else
                 fmt = '%.3f';

@@ -162,8 +162,8 @@ medium:
   water:
     sound_speed: 1500
     density: 994
-    alpha_0_true: 2.17e-3
-    alpha_power_true: 2
+    alpha_coeff: 2.17e-3
+    alpha_power: 2
     thermal_conductivity: 0.60 # [W/m/°C]
     specific_heat_capacity: 4178 # [J/kg/°C]
     perfusion: 0
@@ -171,8 +171,8 @@ medium:
   skull: # (single skull layer only; mostly following cortical bone)
     sound_speed: 2800 # [m/s]
     density: 1850 # [kg/m^3]
-    alpha_0_true: 13.3
-    alpha_power_true: 1
+    alpha_coeff: 13.3
+    alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 1793 # [J/kg/°C]
     perfusion: 20
@@ -180,8 +180,8 @@ medium:
   brain:
     sound_speed: 1546 # [m/s]
     density: 1046 # [kg/m^3]
-    alpha_0_true: 0.59
-    alpha_power_true: 1.2
+    alpha_coeff: 0.59
+    alpha_power: 1.2
     thermal_conductivity: 0.51 # [W/m/°C]
     specific_heat_capacity: 3630 # [J/kg/°C]
     perfusion: 559
@@ -189,8 +189,8 @@ medium:
   skin:
     sound_speed: 1610 # [m/s]
     density: 1090 # [kg/m^3]
-    alpha_0_true: 0.4
-    alpha_power_true: 1
+    alpha_coeff: 0.4
+    alpha_power: 1
     thermal_conductivity: 0.37 # [W/m/°C]
     specific_heat_capacity: 3391 # [J/kg/°C]
     perfusion: 106
@@ -198,8 +198,8 @@ medium:
   skull_trabecular: # trabecular bone
     sound_speed: 2300 # [m/s]
     density: 1700 # [kg/m^3]
-    alpha_0_true: 13.3
-    alpha_power_true: 1
+    alpha_coeff: 13.3
+    alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 2274 # [J/kg/°C]
     perfusion: 30
@@ -207,8 +207,8 @@ medium:
   skull_cortical: # cortical bone
     sound_speed: 2800 # [m/s]
     density: 1850 # [kg/m^3]
-    alpha_0_true: 13.3
-    alpha_power_true: 1
+    alpha_coeff: 13.3
+    alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 1313 # [J/kg/°C]
     perfusion: 10

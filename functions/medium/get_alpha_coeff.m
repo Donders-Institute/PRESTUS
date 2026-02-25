@@ -17,7 +17,7 @@ function alpha_db_cm = get_alpha_coeff(medium, freq)
     medium = load_parameters().medium.(medium);
 
     % Compute the attenuation coefficient using tissue-specific parameters
-    % `alpha_0_true` and `alpha_power_true` define the scaling relationship
-    alpha_db_cm = medium.alpha_0_true * ((freq / 1e6) .^ medium.alpha_power_true); % [db / MHz cm]
+    % `alpha_coeff` and `alpha_power` define the scaling relationship
+    alpha_db_cm = medium.alpha_coeff * ((freq / 1e6) .^ medium.alpha_power); % [db / MHz cm]
 
 end
