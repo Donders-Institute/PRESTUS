@@ -216,8 +216,8 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                                  focus_vec);
         end
 
-        if axisymmetric
-            % axisymmetric branch unchanged from your current version
+        if axisymmetric == true
+
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
 
@@ -257,7 +257,8 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 source.p = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
             end
 
-            source_labels = sum(grid_weights_cropped > 0, 1) > 0;
+            % label sources at 50% weights
+            source_labels = sum(grid_weights_cropped > 0.5, 1) > 0;
             source_labels = squeeze(source_labels);
 
         else

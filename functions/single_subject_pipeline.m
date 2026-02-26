@@ -352,7 +352,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     clear acoustic_* heating_*
 
     % ====================================================================
-    %% END OF THIS SIMULATIN
+    %% END OF THIS SIMULATION
     % ====================================================================
 
     fprintf('========================================\n');
