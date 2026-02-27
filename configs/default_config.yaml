@@ -135,8 +135,8 @@ segmentation_software: charm
 layers:
   water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
   brain: [1, 2]
-  skull: [4]
   skin: [5]
+  skull: [4]
   skull_cortical: [7] 
   skull_trabecular: [8]
 
@@ -168,15 +168,6 @@ medium:
     specific_heat_capacity: 4178 # [J/kg/°C]
     perfusion: 0
     absorption_fraction: 1
-  skull: # (single skull layer only; mostly following cortical bone)
-    sound_speed: 2800 # [m/s]
-    density: 1850 # [kg/m^3]
-    alpha_coeff: 13.3
-    alpha_power: 1
-    thermal_conductivity: 0.32 # [W/m/°C]
-    specific_heat_capacity: 1793 # [J/kg/°C]
-    perfusion: 20
-    absorption_fraction: 0.28
   brain:
     sound_speed: 1546 # [m/s]
     density: 1046 # [kg/m^3]
@@ -195,6 +186,15 @@ medium:
     specific_heat_capacity: 3391 # [J/kg/°C]
     perfusion: 106
     absorption_fraction: 1
+  skull: # (single skull layer only; mostly following cortical bone)
+    sound_speed: 2800 # [m/s]
+    density: 1850 # [kg/m^3]
+    alpha_coeff: 13.3
+    alpha_power: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 1793 # [J/kg/°C]
+    perfusion: 20
+    absorption_fraction: 0.28
   skull_trabecular: # trabecular bone
     sound_speed: 2300 # [m/s]
     density: 1700 # [kg/m^3]
