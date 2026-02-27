@@ -45,7 +45,8 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
 
     % Compute crop bounds
     orig_dims = size(medium_masks);
-    combinedmask = (medium_masks ~= 0) | transducer_bowl;  % Logical union of medium mask and transducer bowl
+    i_water = find(strcmp(fieldnames(parameters.medium), 'water'));
+    combinedmask = (medium_masks ~= i_water) | transducer_bowl;  % Logical union of medium mask and transducer bowl
     [min_dims, max_dims, new_grid_dims] = get_crop_dims(double(combinedmask), crop_margin);
     clear combinedmask;
 
@@ -53,7 +54,7 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
     if any(min_dims < 1)
         pad_amount = abs(min(min_dims, [1 1 1]));
         segmentation = padarray(segmentation, pad_amount, 0, 'pre');
-        medium_masks = padarray(medium_masks, pad_amount, 0, 'pre');
+        medium_masks = padarray(medium_masks, pad_amount, i_water, 'pre');
         bone_img = padarray(bone_img, pad_amount, 0, 'pre');
         min_dims = max(min_dims, [1 1 1]);
         max_dims = max_dims + pad_amount;
@@ -70,7 +71,7 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
     if any(max_dims > size(medium_masks))
         pad_amount = max(max_dims, size(segmentation)) - size(segmentation);
         segmentation = padarray(segmentation, pad_amount, 0, 'post');
-        medium_masks = padarray(medium_masks, pad_amount, 0, 'post');
+        medium_masks = padarray(medium_masks, pad_amount, i_water, 'post');
         bone_img = padarray(bone_img, pad_amount, 0, 'post');
     end
 
