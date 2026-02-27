@@ -27,6 +27,13 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             parameters.transducer = parameters.transducer(1);
         end
 
+        % for water medium remove potential position specifications
+        % the grid has an arbitrary size that does not necessarily map onto the planning image
+        if strcmp(parameters.simulation_medium, 'water')
+            parameters.transducer.trans_pos = [];
+            parameters.transducer.focus_pos = [];
+        end
+
         if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...
                 || (~isfield(parameters.transducer, 'focus_pos')|| isempty(parameters.transducer.focus_pos))
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
