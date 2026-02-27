@@ -68,7 +68,7 @@ else
         parameters.n_sim_dims = length(parameters.default_grid_dims);
         sprintf('Using default %dD grid dimensions: [%d, %d, %d]', parameters.n_sim_dims, parameters.grid_dims);
         % set up empty medium masks and segmentations
-        medium_masks = [];
+        medium_masks = ones(parameters.grid_dims); % single water layer
         segmentation = zeros(parameters.grid_dims);
         bone = zeros(parameters.grid_dims);
         % update present layer (only water)
