@@ -8,7 +8,7 @@ function [medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmented_
         SE = strel('cube', expansion_voxels);
         csf_mask_expanded = imdilate(csf_mask, SE);
         % Mask out non-CSF-expanded regions (i.e., set to water layer)
-        medium_masks(~csf_mask_expanded) = find(strcmp((fieldnames(parameters.medium), 'water'));
+        medium_masks(~csf_mask_expanded) = find(strcmp(fieldnames(parameters.medium), 'water'));
         % [DEBUG] Visualize CSF expansion at transducer y-slice
         if parameters.debug == 1
             h = figure;
