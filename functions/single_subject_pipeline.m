@@ -379,7 +379,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % To check sonication parameters of the transducer in free water
 
     if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
-            contains(parameters.simulation_medium, {'layered'})
+            contains(parameters.simulation_medium, {'layered', 'phantom'})
 
         fprintf('POST-HOC ACOUSTIC WATER SIMULATION \n');
 
