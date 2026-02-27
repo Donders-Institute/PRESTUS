@@ -414,16 +414,41 @@ function val = csv_value(csv_table, col_name)
 end
 
 function html = build_medium_properties_section(parameters)
-% Table of tissue acoustic/thermal properties used in the simulation.
     html = '';
-    if ~isfield(parameters, 'medium')
-        html = '<p class="placeholder">No medium properties found in parameters.</p>';
+    if ~isfield(parameters, 'medium') || ~isfield(parameters, 'layers')
+        html = '<p class="placeholder">Missing medium or layers data.</p>';
         return
     end
 
     med = parameters.medium;
+    layer_names = fieldnames(parameters.layers);
+    
+    % === CORRECT FILTER: layers in BOTH parameters.layers AND parameters.medium ===
+    valid_tissues = {};
+    tissue_labels = {};
+    for i = 1:length(layer_names)
+        layer_name = layer_names{i};
+        if isfield(med, layer_name)  % Only include if medium has properties for this layer
+            valid_tissues{end+1} = layer_name;
+            
+            % Human-readable labels
+            switch layer_name
+                case 'skull_cortical'
+                    tissue_labels{end+1} = 'Skull (cortical)';
+                case 'skull_trabecular' 
+                    tissue_labels{end+1} = 'Skull (trabecular)';
+                otherwise
+                    tissue_labels{end+1} = strrep(layer_name, '_', ' ');
+            end
+        end
+    end
+    
+    if isempty(valid_tissues)
+        html = '<p class="placeholder">No matching layers found in medium properties.</p>';
+        return
+    end
 
-    % Define properties to display
+    % Rest unchanged...
     props = {'sound_speed', 'Sound speed', 'm/s'; ...
              'density', 'Density', 'kg/m³'; ...
              'alpha_coeff', 'Attenuation coeff.', 'dB/(MHz^y·cm)'; ...
@@ -431,42 +456,33 @@ function html = build_medium_properties_section(parameters)
              'thermal_conductivity', 'Thermal cond.', 'W/(m·K)'; ...
              'specific_heat_capacity', 'Specific heat', 'J/(kg·K)'; ...
              'perfusion', 'Perfusion rate', 'kg/(m³·s)'; ...
-             'absorption_fraction', 'Absorption fracttion', 'Fraction'};
-
-    % Define tissues to display
-    tissues = {'water', 'skin', 'skull', 'skull_cortical', 'skull_trabecular', 'brain'};
-    tissue_labels = {'Water', 'Skin', 'Skull', 'Skull (cortical)', 'Skull (trabecular)', 'Brain'};
+             'absorption_fraction', 'Absorption fraction', 'Fraction'};
 
     html = '<div class="table-wrapper"><table class="data-table">';
     html = [html '<thead><tr><th>Property</th><th>Unit</th>'];
-    for t = 1:length(tissues)
-        html = [html sprintf('<th>%s</th>', tissue_labels{t})];
+    for t = 1:length(valid_tissues)
+        html = [html sprintf('<th>%s</th>', html_escape(tissue_labels{t}))];
     end
     html = [html '</tr></thead><tbody>'];
 
     for p = 1:size(props, 1)
-        field = props{p, 1};
-        label = props{p, 2};
-        unit  = props{p, 3};
+        field = props{p, 1}; label = props{p, 2}; unit = props{p, 3};
         html = [html sprintf('<tr><td><strong>%s</strong></td><td>%s</td>', ...
             html_escape(label), html_escape(unit))];
-        for t = 1:length(tissues)
-            tissue = tissues{t};
-            if isfield(med, tissue) && isfield(med.(tissue), field)
-                val = med.(tissue).(field);
-                if isnumeric(val) && isscalar(val)
-                    html = [html sprintf('<td>%.4g</td>', val)];
-                else
-                    html = [html '<td>&mdash;</td>'];
-                end
+        for t = 1:length(valid_tissues)
+            tissue = valid_tissues{t};
+            if isfield(med.(tissue), field) && isnumeric(med.(tissue).(field)) && isscalar(med.(tissue).(field))
+                html = [html sprintf('<td>%.4g</td>', med.(tissue).(field))];
             else
                 html = [html '<td>&mdash;</td>'];
             end
         end
         html = [html '</tr>'];
     end
-
     html = [html '</tbody></table></div>'];
+    
+    html = [html sprintf('<p class="note"><strong>Active layers:</strong> %s</p>', ...
+        strjoin(tissue_labels, ', '))];
 end
 
 function html = build_config_summary(parameters)

@@ -18,11 +18,17 @@ PRESTUS supports various medium configurations. These can be specified with ```p
     - cortical skull bone 
     - trabecular skull bone
     
-    Tissue can be removed (or added if more detailed segmentations and tissue properties are included) via the ```layers``` and ```medium``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```).
-
+    Tissue can be removed (or added if more detailed segmentations and tissue properties are included) via the ```layers``` and ```medium``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```). This is a subtype of a layered simulation with a single skull layer.
+    
 - ```phantom```
 
     A 3D imaging-based simulation is not always necessary. For benchmarking, one may for instance externally design a 2D phantom, and run simulations in a well-defined space. As the 2D phantom is explicitly designed, no preprocessing (e.g., rotation, cropping, etc.) is necessary. Using the ```phantom``` flag allows the same tissue flexibility as the ```layered``` version, but maps segmentation files onto medium masks without any further image processing. The 2D segmentation phantom must be provided as a ```final_tissues.nii.gz``` file in a (dummy) SimNIBS output folder.
+
+PRESTUS allows for a flexible specification of segmentation layers to media to which acoustic properties are allocated. This is controlled by `parameters.layers`. If a segmentation for the requested layer is not available, requested layers will be removed from the specification. All segmentation ids that are not explicitly specified as other layers are automatically included in a water layer. 
+
+To specify a `phantom`, indicate artificial layers of a SimNIBS segmentation.
+
+Internally computed medium maps will contain indices corresponding to the layer position in the medium properties. This allows for flexibility in layer specifications with stable medium ids (unless `parameters.medium` is edited).
 
 ### Default medium properties
 

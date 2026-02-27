@@ -40,6 +40,7 @@ The following documents the functions provided in PRESTUS.
 | `skull_rubber_wrap`                     | HEAD           | Inflate the skull layer to locally fill potential holes                                         |
 | `smooth_img`                            | HEAD           | Apply 3D smoothing                                                                              |
 | `check_availability`                    | HELPER         | Check file availability.                                                                        |
+| `check_layers`                          | HELPER         | Match requested layers to those available in the segmentation. For (p)CT, homogenize multi-skull layer into a single `skull `layer.                                   |
 | `confirm_overwriting`                   | HELPER         | Check overwriting (manual).                                                                     |
 | `confirmation_dlg`                      | HELPER         | Present confirmation dialogue.                                                                  |
 | `find_min_factor`                       | HELPER         | Find the number with the smallest maximum factor in a range.                                    |

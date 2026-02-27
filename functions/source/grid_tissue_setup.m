@@ -19,7 +19,10 @@ if contains(parameters.simulation_medium, {'layered'})
     [medium_masks, segmentation, bone, ~, ~, planimg.t1_image_orig, ...
         planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
-    
+
+    % update present layers (following medium mask creation)
+    [parameters] = check_layers(parameters, segmentation);
+
     if isempty(medium_masks)
         return;
     end
@@ -55,6 +58,8 @@ else
         segmentation = segmented_img; clear segmented_img;
         mask = tissuemask_binary(parameters, medium_masks);
         bone = mask.skull;
+        % update present layers (following medium mask creation)
+        [parameters] = check_layers(parameters, segmentation);
     else % e.g., water
         % set up default grid dimensions
         assert(isfield(parameters, 'default_grid_dims'), ...
@@ -66,6 +71,8 @@ else
         medium_masks = [];
         segmentation = zeros(parameters.grid_dims);
         bone = zeros(parameters.grid_dims);
+        % update present layer (only water)
+        [parameters] = check_layers(parameters, segmentation);
     end
 
     % specify that no transformation was applied
