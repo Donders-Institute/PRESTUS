@@ -266,8 +266,6 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
             clear skull_idx
 
-        elseif parameters.usepseudoCT == 1 && contains(label_name, 'skull') && skull_mapped == 1
-            disp(['pCT: ', label_name, ' requested, but skull is already mapped. Skipping...']);
         else
             thermal_conductivity(medium_masks==medium_i) = medium.(label_name).thermal_conductivity;                 % [W/(m.K)]
             specific_heat(medium_masks==medium_i) = medium.(label_name).specific_heat_capacity;                      % [J/(kg.K)]
