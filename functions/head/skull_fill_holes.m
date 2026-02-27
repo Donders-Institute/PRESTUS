@@ -79,7 +79,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
     if isfield(parameters.seg_labels, 'eye')
         eye_i = parameters.seg_labels.eye;
         eye = segmented_img == eye_i;
-        i_water = find(strcmp((fieldnames(parameters.medium), 'water'));
+        i_water = find(strcmp(fieldnames(parameters.medium), 'water'));
         medium_masks(eye ~= 0) = i_water; % Default to water
     end
 

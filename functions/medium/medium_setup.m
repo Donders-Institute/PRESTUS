@@ -14,6 +14,9 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     % - pseudoCT is an optional input when using pseudoCTs              %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
+    % Set residual unmapped medium voxels to water
+    medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.medium), 'water'));
+    
     % Loads the medium settings from the config file
     medium = parameters.medium;
     
