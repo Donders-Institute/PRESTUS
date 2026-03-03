@@ -64,49 +64,28 @@ elseif isfield(parameters, 'expected_focal_distance_ep') && ~isempty(parameters.
     end
 end
 
-% 2) T1-based geometric derivation for unspecified distances
-needs_t1 = false;
+% 2) Rely on specification of transducer and target position
+
+warning('Expected focal distance not specified for all transducers, trying to get it from transducer and target positions ...')
+
+% Fill missing expected_focal_distance_bowl per transducer
 for ti = 1:numel(parameters.transducer)
     tr = parameters.transducer(ti);
     if ~isfield(tr, 'expected_focal_distance_bowl') || isempty(tr.expected_focal_distance_bowl)
-        needs_t1 = true;
-        break
-    end
-end
-
-if needs_t1
-    disp('Expected focal distance not specified for all transducers, trying to get it from positions on T1 grid')
-
-    % Load T1 header once
-    filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id)));
-    if isempty(filename_t1)
-        error('File does not exist for T1 (t1_path_template): %s', ...
-              fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id)));
-    end
-    filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name); % first match
-    t1_info = niftiinfo(filename_t1);
-    t1_grid_step_mm = t1_info.PixelDimensions(1);
-
-    % Fill missing expected_focal_distance_bowl per transducer
-    for ti = 1:numel(parameters.transducer)
-        tr = parameters.transducer(ti);
-        if ~isfield(tr, 'expected_focal_distance_bowl') || isempty(tr.expected_focal_distance_bowl)
-            if ~isfield(tr, 'trans_pos')  || isempty(tr.trans_pos) || ...
-               ~isfield(tr, 'focus_pos') || isempty(tr.focus_pos)
-                error('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
-            end
-            % calculate grid distance between transducer bowl and focus
-            focal_distance_t1 = norm(tr.focus_pos - tr.trans_pos);
-            % scale grid distance by grid step
-            parameters.transducer(ti).expected_focal_distance_bowl = focal_distance_t1 * t1_grid_step_mm;
-            % calculate focal distance offset (between transducer bowl and exit plane for annular arrays)
-            parameters.transducer(ti).focal_distance_offset = parameters.transducer(ti).curv_radius_mm - parameters.transducer(ti).dist_to_plane_mm;
-            % calculate focal distance (from exit plane)
-            parameters.transducer(ti).expected_focal_distance_ep = parameters.transducer(ti).expected_focal_distance_bowl-parameters.transducer(ti).focal_distance_offset;
-
+        if ~isfield(tr, 'trans_pos')  || isempty(tr.trans_pos) || ...
+           ~isfield(tr, 'focus_pos') || isempty(tr.focus_pos)
+            error('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
         end
-    end
+        % calculate grid distance between transducer bowl and focus
+        focal_distance = norm(tr.focus_pos - tr.trans_pos);
+        % scale grid distance by grid step to calculate mm
+        parameters.transducer(ti).expected_focal_distance_bowl = focal_distance * parameters.grid_step_mm;
+        % calculate focal distance offset (between transducer bowl and exit plane for annular arrays)
+        parameters.transducer(ti).focal_distance_offset = parameters.transducer(ti).curv_radius_mm - parameters.transducer(ti).dist_to_plane_mm;
+        % calculate focal distance (from exit plane)
+        parameters.transducer(ti).expected_focal_distance_ep = parameters.transducer(ti).expected_focal_distance_bowl-parameters.transducer(ti).focal_distance_offset;
 
-    clear filename_t1 t1_info t1_grid_step_mm focal_distance_t1
+    end
 end
+
 end
