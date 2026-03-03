@@ -55,7 +55,6 @@ function parameters = load_parameters(varargin)
            'MATLAB should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
 
     %% Transducer settings validation and derived calculations
-    
     parameters = load_transducer_parameters(parameters);
 
     %% Derived grid settings
