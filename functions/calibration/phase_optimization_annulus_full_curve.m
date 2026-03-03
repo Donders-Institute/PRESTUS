@@ -52,21 +52,18 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
 
     %% Generate weights if not provided
 
-    % The weights always scale to one.
     if weights == 0
         % UNIFORM: equal weight everywhere (optimize entire profile)
-        weights = ones(size(axial_position)) / length(axial_position);
-        
+        weights = ones(size(axial_position));
     elseif weights >= 1
         % FWHM GAUSSIAN: weights controls narrowness
         [~, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
         center_pos = axial_position(flhm_center_index);
         sigma = center_pos / weights;  % 1=wide FWHM, 10=narrow peak
-        
         weights = normpdf(axial_position, center_pos, sigma);
-        weights = weights / sum(weights);
     end
-
+    % Weights always sum to one.
+    weights = weights / sum(weights);
 
     %% Calculate error metric
     % Compute weighted squared error between computed and desired profiles

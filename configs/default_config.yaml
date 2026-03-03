@@ -47,7 +47,7 @@ pseudoCT_variant: kosciessa # pCT mapping algorithms (yaakub/carpino/k-plan/marq
 # Only run specific components of the pipeline?
 run_source_setup: 1       # Set up acoustic source? (switch off to look at initial segmentation results only)
 run_acoustic_sims: 1      # Run the acoustic simulations?
-run_heating_sims: 1       # Run the heating simulations? Run once acoustic simulation provides sensible results.
+run_heating_sims: 0       # Run the heating simulations? Run once acoustic simulation provides sensible results.
 run_posthoc_water_sims: 1 # Run the simulations in free water with exactly the same parameter? Verify that free-water intensity matches target.
 generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?
 
