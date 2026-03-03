@@ -73,6 +73,11 @@ function parameters = load_parameters(varargin)
                     parameters.transducer(t_i).dist_to_plane_mm);
         end
 
+        % Calculate distance between target and ep/bowl is not provided
+        if ~isfield(parameters, 'expected_focal_distance_bowl') || ~isfield(parameters, 'expected_focal_distance_ep')
+            parameters = focal_distance_calculation(parameters);
+        end
+
         % Ensure source amplitude matches number of transducer elements
         if length(parameters.transducer(t_i).source_amp) == 1 && parameters.transducer(t_i).n_elements > 1
             parameters.transducer(t_i).source_amp = repmat(parameters.transducer(t_i).source_amp, [1, parameters.transducer(t_i).n_elements]);
