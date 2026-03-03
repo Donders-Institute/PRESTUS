@@ -4,7 +4,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     focus_wrt_exit_plane, ...
     intens_data, ...
     equipment_name, ...
-    dist_from_tran)
+    dist_from_exit_plane)
 
     % Extracts or interpolates the intensity profile at a specific focal depth.
     %
@@ -16,7 +16,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     % - focus_wrt_exit_plane: Desired focal depth relative to the exit plane [mm].
     % - intens_data: Matrix containing intensity profiles for different focal depths.
     % - equipment_name: Name of the equipment for labeling plots.
-    % - dist_from_tran: Distance vector from the transducer [mm].
+    % - dist_from_exit_plane: Distance vector from the transducer [mm].
     %
     % Returns:
     % - profile_focus: Extracted or interpolated intensity profile at the desired focal depth.
@@ -54,12 +54,12 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         [~, idx1] = max(profile_1);
         [~, idx2] = max(profile_2);
 
-        x1_norm = dist_from_tran - dist_from_tran(idx1); % Align peak of profile 1 to 0
-        x2_norm = dist_from_tran - dist_from_tran(idx2); % Align peak of profile 2 to 0
+        x1_norm = dist_from_exit_plane - dist_from_exit_plane(idx1); % Align peak of profile 1 to 0
+        x2_norm = dist_from_exit_plane - dist_from_exit_plane(idx2); % Align peak of profile 2 to 0
 
         % Define normalized common x-array
         x_common_norm = linspace(min(min(x1_norm), min(x2_norm)), ...
-                                 max(max(x1_norm), max(x2_norm)), length(dist_from_tran));
+                                 max(max(x1_norm), max(x2_norm)), length(dist_from_exit_plane));
      
         % Interpolate profiles in normalized space
         y1_interp_norm = interp1(x1_norm, profile_1, x_common_norm, 'spline', 'extrap');
@@ -72,25 +72,25 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         % Interpolate the profiles with the weight alpha
         norm_profile_focus  = (1-alpha) * y1_interp_norm + alpha * y2_interp_norm;
 
-        % Map back to the original dist_from_tran
+        % Map back to the original dist_from_exit_plane
         x1_2_norm = x_common_norm + (alpha * x2_norm(idx2) + (1-alpha) * x1_norm(idx1));
 
         % Interpolate the final focused profile in the normalized space back to the original space
         mapped_profile_focus = interp1(x_common_norm, norm_profile_focus, x1_2_norm, 'spline', 0);
 
-        % Calculate the offset (max_loc) to align the profile focus with dist_from_tran
-        max_loc = abs(mean(x1_2_norm - dist_from_tran'));
+        % Calculate the offset (max_loc) to align the profile focus with dist_from_exit_plane
+        max_loc = abs(mean(x1_2_norm - dist_from_exit_plane'));
 
-        profile_focus = interp1(x1_2_norm + max_loc, mapped_profile_focus, dist_from_tran, 'spline', 0);
+        profile_focus = interp1(x1_2_norm + max_loc, mapped_profile_focus, dist_from_exit_plane, 'spline', 0);
 
         % Plot the profiles and the interpolated result
         figure;
-        plot(dist_from_tran, profile_1, '-x', 'DisplayName', ...
+        plot(dist_from_exit_plane, profile_1, '-x', 'DisplayName', ...
             ['Measurement 1, focus at ' num2str(focus_wrt_exit_plane_1)]);
         hold on;
-        plot(dist_from_tran, profile_2, '-x', 'DisplayName', ...
+        plot(dist_from_exit_plane, profile_2, '-x', 'DisplayName', ...
             ['Measurement 2, focus at ' num2str(focus_wrt_exit_plane_2)]);
-        plot(dist_from_tran, profile_focus, '-x', 'DisplayName', ...
+        plot(dist_from_exit_plane, profile_focus, '-x', 'DisplayName', ...
             ['Interpolated, focus at ' num2str(focus_wrt_exit_plane)]);
         legend;
         xlabel('Distance wrt exit plane [mm]');
@@ -103,7 +103,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 
         % Plot the exact profile
         figure;
-        plot(dist_from_tran, norm_profile_focus, '-o');
+        plot(dist_from_exit_plane, norm_profile_focus, '-o');
         xlabel('Distance wrt exit plane [mm]');
         ylabel('Intensity [W/cm^2]');
         title(['Axial Profile at Focus wrt Exit Plane: ' num2str(focus_wrt_exit_plane) ' [mm]']);
@@ -118,7 +118,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 
     % Determine the maximum intensity beyond the specified skip distance 
     % for scaling to prevent catching max peak in near field peak.
-    [~, closestIndex] = min(abs(dist_from_tran - parameters.calibration.skip_front_peak_mm));
+    [~, closestIndex] = min(abs(dist_from_exit_plane - parameters.calibration.skip_front_peak_mm));
     max_intens = max(norm_profile_focus(closestIndex:end));
     
 end

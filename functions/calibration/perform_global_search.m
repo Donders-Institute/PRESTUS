@@ -19,7 +19,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     end
 
     if ~isfield(parameters.calibration, 'weights') 
-        weights = 1;
+        weights = 0; % uniform weighting
     else
         weights = parameters.calibration.weights;
     end
@@ -43,8 +43,8 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
 
     % Define initial guess, bounds, and options for the optimization problem.
     initial_guess = [randi(360, [1, parameters.transducer.n_elements]) / 180 * pi, velocity];
-    lower_bounds = zeros(1, parameters.transducer.n_elements+1); % Lower bounds: [0 rad, 0 m/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), 0.2]; % Upper bounds: [2pi rad, 0.2 m/s]
+    lower_bounds = [zeros(1, parameters.transducer.n_elements), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
+    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), 0.05]; % Upper bounds: [2pi rad, 50 mm/s]
 
     if ~isfield(parameters.calibration, 'optmethod') || strcmp(parameters.calibration.optmethod, 'FEXminimize')
         % by default use FEXminimize
@@ -92,6 +92,11 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         1, ... % Enable plotting
         opt_limits, ...
         weights);
+
+    % Save the figure
+    fig_path = fullfile(parameters.outputs_folder, sprintf('GlobalSearch.png'));
+    saveas(gcf, fig_path);
+    close(gcf);
 
     % The left plot above shows the real and the fitted profiles along with the 
     % cost function used for fitting, while the right shows the error in fitting (the 

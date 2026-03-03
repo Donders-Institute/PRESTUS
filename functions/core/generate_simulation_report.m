@@ -514,7 +514,7 @@ function html = build_config_summary(parameters)
         html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td, 'curv_radius_mm', NaN)));
         html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td, 'source_amp', NaN)));
     end
-    focal = safe_field(parameters, 'expected_focal_distance_mm', NaN);
+    focal = safe_field(parameters, 'expected_focal_distance_bowl', NaN);
     if ~isnan(focal)
         html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
     end

@@ -23,7 +23,7 @@ Steps 2&3 are done simultaneously to avoid the need to interpolate the image twi
 The simulation grid is then created based on the segmented image size (with padding), and the transducer and the focus positions are computed based on the transformed coordinate system. 
 
 For water-only simulations:
-The simulation grid dimensions are taken from the parameter structure. The transducer and the focus positions are either taken from the same structure or, if they are missing there, computed so that transducer is at the z-axis and the focus is on the same axis with the distance based on the  expected_focal_distance_mm field in the parameters.
+The simulation grid dimensions are taken from the parameter structure. The transducer and the focus positions are either taken from the same structure or, if they are missing there, computed so that transducer is at the z-axis and the focus is on the same axis with the distance based on the `expected_focal_distance_bowl` field in the parameters.
 
 After that things are straightforward: k-Wave medium, source, grid, and sensor are set up and the simulations are started. When they are completed, the maximum ISPPA map is computed and the maximum pressure and intensity points are estimated for different masks. The heating simulations can be enabled by setting `thermal_simulation` to 1. If `run_posthoc_water_simulations` is set in parameters, then after the layered simulations, the same simulation parameters are used to run the simulations for water only.
 

@@ -1,4 +1,4 @@
-function adjusted_profile_focus = scale_real_intensity_profile(parameters, desired_intensity, profile_focus)
+function [adjusted_profile_focus, parameters] = scale_real_intensity_profile(parameters, desired_intensity, profile_focus)
     % Scale the real intensity profile to match the desired maximum intensity.
     %
     % Arguments:

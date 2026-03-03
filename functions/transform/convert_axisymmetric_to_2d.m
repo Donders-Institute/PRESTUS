@@ -24,11 +24,9 @@ focus_pos_final(2) = focus_pos_final(2)+parameters.grid_dims(2);
 
 % convert radial dimension size into diameter
 parameters.grid_dims(2) = parameters.grid_dims(2)*2;
-parameters.default_grid_dims(2) = parameters.default_grid_dims(2)*2;
 
 % shift radial to x dim
 parameters.grid_dims = fliplr(parameters.grid_dims);
-parameters.default_grid_dims = fliplr(parameters.default_grid_dims);
 trans_pos_final = fliplr(trans_pos_final);
 focus_pos_final = fliplr(focus_pos_final);
 segmentation = segmentation';

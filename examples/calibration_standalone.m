@@ -93,17 +93,6 @@ for i = 1:N_i
     dist_from_exit_plane = charac_data(3:end, 1);
     intens_data = charac_data(3:end, 2:end);
 
-    % Convert exit plane reference to mid-bowl reference
-    % Simulation results are w.r.t. mid-bowl of transducer
-    % Profiles are referenced to 0 = exit plane.
-    % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
-    if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
-        dist_tran_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
-    else
-        dist_tran_exit_plane = 0;
-    end
-    dist_from_tran = dist_from_exit_plane + dist_tran_exit_plane;
-
     % Ensure focal depths are specified. 
     % If no focal depths, perform the simulations for all available focal depths
     if isempty(parameters.calibration.focal_depths_wrt_exit_plane{i})
@@ -128,24 +117,18 @@ for i = 1:N_i
             continue;
         end
 
-        % [SIM] Set the expected focal distance to exit plane 
-        % Account for the potential distance between bowl (actual focal
-        % distance) and exit plane (axial profile definition)
-        parameters.expected_focal_distance_mm = focus_wrt_exit_plane;
-        parameters.expected_focal_distance_bowl_mm = focus_wrt_exit_plane + dist_tran_exit_plane;
-
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
         source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters);
         parameters.transducer.source_phase_deg = source_phase_deg; clear source_phase_deg;
 
         % Interpolate or select axial profile
-        [profile_focus, max_intens] = extract_real_intensity_profile(...
+        [profile_focus_ep, max_intens] = extract_real_intensity_profile(...
             parameters,...
             available_foci_wrt_exit_plane, ...
             focus_wrt_exit_plane, ...
             intens_data, ...
             equipment_name, ...
-            dist_from_tran);
+            dist_from_exit_plane);
 
         % Iterate across intensities
         N_k = length(parameters.calibration.desired_intensities{i});
@@ -155,31 +138,43 @@ for i = 1:N_i
             % assign a loop-specific simulation id
             sim_id = (i-1)*N_j*N_k + (j-1)*N_k + (k-1) + 1;
 
+            % By default, values are reported from the exit plane of the transducer
+            % For simulations, we need to implement the distance from the bowl
+
+            % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
+            if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
+                dist_bowl_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
+            else
+                dist_bowl_exit_plane = 0;
+            end
+            dist_bowl_focus = dist_from_exit_plane + dist_bowl_exit_plane;
+
+            % Set the expected focal distance to exit plane 
+            % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
+            parameters.expected_focal_distance_ep = focus_wrt_exit_plane;
+            parameters.expected_focal_distance_bowl = focus_wrt_exit_plane + dist_bowl_exit_plane;
+
             % if the original profiles are measured from the exit plane,
             % we do not model the space until the exit plane; this can lead
             % to suboptimal solutions; assume that the amplitude is zero in
             % that space (i.e., no strong near-field interference)
 
             % add distance values prior to the exit plane
-            parameters.calibration.interpolateToEP = 1;
-            if parameters.calibration.interpolateToEP == 1
-                Nvals = round(dist_from_tran(1)/(dist_from_tran(2)-dist_from_tran(1)));
-                dist_from_tran_tmp = cat(1, ...
-                    linspace(0, dist_from_tran(1), Nvals)',...
-                    dist_from_tran);
+            if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
+                Nvals = round(dist_bowl_focus(1)/(dist_bowl_focus(2)-dist_bowl_focus(1)));
+                dist_bowl_focus = cat(1, linspace(0, dist_bowl_focus(1), Nvals)',dist_bowl_focus);
                 % set those to initial value in amplitude profile
-                profile_focus_tmp = cat(1, repmat(profile_focus(1),Nvals,1), profile_focus');
+                profile_focus = cat(1, repmat(profile_focus_ep(1),Nvals,1), profile_focus_ep');
             else
-                dist_from_tran_tmp = dist_from_tran;
-                profile_focus_tmp = profile_focus;
+                profile_focus = profile_focus_ep;
             end
 
-            % [cleanup] regularize lower values to 0 [possible after interpolation]
-            profile_focus_tmp(profile_focus_tmp<0) = 0;
+            % regularize lower values to 0 [possible after interpolation]
+            profile_focus(profile_focus<0) = 0;
 
             % collect data on empirical profile
-            profile_empirical.profile_focus = profile_focus_tmp;
-            profile_empirical.dist_from_tran = dist_from_tran_tmp;
+            profile_empirical.profile_focus = profile_focus;
+            profile_empirical.dist_bowl_focus = dist_bowl_focus;
             profile_empirical.focus_wrt_exit_plane = focus_wrt_exit_plane;
 
             % convert from default 3D to 2D axisymmetric simulation (if requested)

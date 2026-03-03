@@ -100,7 +100,7 @@ function transducer_positioning(parameters, pn, subject_id, target_name, mni_tar
     % if the original transducer focus is too short.
         
     if ~isfield(parameters, 'min_focal_distance_mm')
-        parameters.min_focal_distance_mm = parameters.expected_focal_distance_mm;
+        parameters.min_focal_distance_mm = parameters.expected_focal_distance_bowl;
     end
     outer_sphere = [];
     while numel(find(outer_sphere)) < 1

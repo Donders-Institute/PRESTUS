@@ -56,7 +56,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ne
         % -- Compute the RAS mm position of the transducer surface
         transducer_ras(i,:) = ref_pos + reference_dist * ref_vec;
         % -- Compute the RAS mm position of the acoustic focal point (forward along vector)
-        target_ras(i,:) = ref_pos + parameters.expected_focal_distance_mm * ref_vec;
+        target_ras(i,:) = ref_pos + parameters.expected_focal_distance_bowl * ref_vec;
 
         % -- Convert these world (RAS mm) positions into MRI voxel index space
         transducer_pos(i,:) = ras_to_grid(transducer_ras(i,1:3)', t1_header);

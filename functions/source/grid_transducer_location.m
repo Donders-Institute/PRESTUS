@@ -64,7 +64,7 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             focus_pos = trans_pos;
             focus_pos(parameters.n_sim_dims) = ...
                 round(focus_pos(parameters.n_sim_dims) + ...
-                parameters.expected_focal_distance_mm/parameters.grid_step_mm);
+                parameters.expected_focal_distance_bowl/parameters.grid_step_mm);
         else
             focus_pos = parameters.transducer.focus_pos;
             % Adjust if the positions are transposed (2D only)

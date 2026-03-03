@@ -13,10 +13,9 @@
   save_in_calibration_folder: true          # Boolean flag to save outputs in general output folder or simulation-specific folder. If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten.
   skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
   optmethod: 'FEXminimize'                  # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
-  weights: 1                                # Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)
+  weights: 3                                # Weighting of the original profile during fitting (0 = equal weighting, >1 increasingly narrow Gaussian FWHM)
   seed: 251024                              # Random seed for optimization
   addEPdistance: 1                          # Append distance from transducer bowl to exit plane (if zero point in provided profiles = exit plane, != transducer bowl)
-  interpolateToEP: 1                        # Interpolate values between bowl and exit plane [default: add initial value in empirical measurements]
   force_kwavearray: 1                       # Force to run free-water simulations with kwavearray?
   axisymmetric2D: 0                         # [EXPERIMENTAL; default: 0] Convert (default; depends on study config) 3D free-water simulation setup to 2D axisymmetry for efficiency
 
