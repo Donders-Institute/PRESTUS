@@ -1,5 +1,5 @@
 function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = ...
-    compute_oneil_solution(parameters, pred_axial_pressure, dist_exit_plane, ...
+    compute_oneil_solution(parameters, pred_axial_pressure, dist_transducer, ...
     adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
     % Compute O'Neil solution and plot it along with comparisons
     %
@@ -7,9 +7,10 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     % - parameters: Structure containing simulation and transducer parameters.
     %   parameters.calibration.path_output: Directory for saving results and figures.
     % - pred_axial_pressure: Predicted pressure along the beam axis [Pa].
-    % - dist_exit_plane: Axial distance from the transducer exit plane [mm].
+    % - dist_transducer: Axial distance from the transducer exit plane [mm].
     % - adjusted_profile_focus: Adjusted intensity profile for the focus.
-    % - focus_wrt_exit_plane: Focal distance relative to the exit plane [mm].
+    % - focus_wrt_exit_plane: Focal distance relative to the exit plane
+    % [mm]. Will be used only for labelling.
     % - desired_intensity: Desired intensity at the focal point [W/cm^2].
     % - equipment_name: Name of the equipment for labeling results.
     %
@@ -24,6 +25,7 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
                (parameters.medium.water.density * parameters.medium.water.sound_speed);
     
     % Define the axial position vector [mm]
+    % Note: transducer will be placed at initial location in grid
     axial_position = (1:parameters.default_grid_dims(end)) * parameters.grid_step_mm;
     
     % Compute O'Neil analytical solution for pressure along the beam axis [Pa]
@@ -48,15 +50,19 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     hold on;
     plot(axial_position - (parameters.transducer.trans_pos(end) - 1) * parameters.grid_step_mm, pred_axial_intensity, ...
         '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
-    plot(dist_exit_plane, adjusted_profile_focus, ...
+    plot(dist_transducer, adjusted_profile_focus, ...
         'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
-    if isfield(parameters, 'expected_focal_distance_EP_mm')
-        xline(parameters.expected_focal_distance_EP_mm, '--', ...
-            'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from EP)');
+    if isfield(parameters, 'expected_focal_distance_bowl')
+        xline(parameters.expected_focal_distance_bowl, '--', ...
+            'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)');
+    end
+    if isfield(parameters, 'expected_focal_distance_ep') && isfield(parameters, 'expected_focal_distance_bowl')
+        yline(parameters.expected_focal_distance_ep-parameters.expected_focal_distance_bowl, '--', ...
+            'LineWidth', 1.2, 'DisplayName', 'Exit Plane');
     end
     hold off;
 
-    xlabel('Distance w.r.t. Exit Plane [mm]');
+    xlabel('Distance w.r.t. Transducer Bowl [mm]');
     ylabel('Intensity [W/cm^2]');
     legend('show');
     title('Intensity Along the Beam Axis');

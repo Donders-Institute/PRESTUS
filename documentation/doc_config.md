@@ -64,7 +64,8 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                            | Must be calibrated.   |
 | `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
 | `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).            | |
-| `expected_focal_distance_mm`      | Expected distance to the stimulation focus (in mm).                   | Transducer depth setting |
+| `expected_focal_distance_ep`      | Expected distance from the transducer exit plane to the stimulation focus (in mm).  | Transducer depth setting [Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or [`transducer.focus_pos` and `transducer.trans_pos`] have to be specified.] |
+| `expected_focal_distance_bowl`    | Expected distance from the transducer bowl to the stimulation focus (in mm).        | |
 | `transducer_from_localite`        | Load transducer position from Localite files?.                        | (`1 = yes, 0 = no` [default])   |
 | `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).             | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
 | `use_kWaveArray`                  | Use the kWaveArray class for modeling transducers.                    | (`1 = yes, 0 = no`) see k-Wave documentation.    |
@@ -205,10 +206,9 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `save_in_calibration_folder`    | `TRUE` (default): save in `path_output` ; `FALSE`: save outputs in `sim_path` (see regular config). |  Note: If TRUE calibration results are also appended to existing calibration for this equipment instead of overwritten. |
 | `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.         | Used only for calculating the peak distance and FWHM.  |
 | `optmethod`                     | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)         |   |
-| `weights`                       | Weighting of the original profile during fitting (towards 0 = narrower Gaussian; 1 = equal weighting)         |   |
+| `weights`                       | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with laregr weights)         |   |
 | `seed`                          | Random seed for optimization         |   |
-| `addEPdistance`                 | Append distance from transducer bowl to exit plane (set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl)         |   |
-| `interpolateToEP`               | Interpolate values between bowl and exit plane          | If active, the profile is padded (between bowl and exit plane) with the initial value available in the profile. This can stabilize the fitting procedure in the near field.  |
+| `addEPdistance`                 | Append distance from transducer bowl to exit plane (set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl). The profile is padded (between bowl and exit plane) with the initial value available in the profile. This can stabilize the fitting procedure in the near field.         |   |
 | `force_kwavearray`               | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.  |
 | `combinations`                  | Equipment combinations (must refer to equipment in `equipment_config.yaml`)         | Multiple combinations can be specified. Every [] specification will be performed for the corresponding (ordered) index equipment combination. Example: all foci within the first [] will be executed for the first equipment combination. If array is empty ([]), all focal depths of available characterization data will be used. |
 | `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.         | Multiple combinations can be specified. |

@@ -139,8 +139,8 @@ for t_i = 1:numel(parameters.transducer)
     print_if_field(tr, 'source_amp', '%.1f Pa');
     print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
     print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
-
-    print_if_field(parameters, 'expected_focal_distance_mm', '%.1f mm');
+	print_if_field(parameters, 'expected_focal_distance_ep', '%.1f');
+	print_if_field(parameters, 'expected_focal_distance_bowl', '%.1f');
 
     fprintf('\n');
 end

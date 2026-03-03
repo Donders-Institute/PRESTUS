@@ -51,14 +51,22 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
     i_axial_oneil = p_axial_oneil.^2 / (2 * parameters.medium.water.sound_speed * parameters.medium.water.density) * 1e-4;
 
     %% Generate weights if not provided
+
+    % The weights always scale to one.
     if weights == 0
-        % Find FLHM center and generate Gaussian weights around it
-        [flhm_center, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
-        weights = normpdf(axial_position, axial_position(flhm_center_index) + 0.5, axial_position(flhm_center_index) / 3);
+        % UNIFORM: equal weight everywhere (optimize entire profile)
+        weights = ones(size(axial_position)) / length(axial_position);
+        
+    elseif weights >= 1
+        % FWHM GAUSSIAN: weights controls narrowness
+        [~, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
+        center_pos = axial_position(flhm_center_index);
+        sigma = center_pos / weights;  % 1=wide FWHM, 10=narrow peak
+        
+        weights = normpdf(axial_position, center_pos, sigma);
+        weights = weights / sum(weights);
     end
 
-    % Normalize weights to sum to 1
-    weights = weights / sum(weights);
 
     %% Calculate error metric
     % Compute weighted squared error between computed and desired profiles
@@ -80,7 +88,6 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         hold off;
         legend(["fitted profile", "real profile", "cost function", "error"], 'Location', 'South');
         legend('boxoff')
-        ylim([-10 inf]);
 
         % Plot error values within optimization limits
         ax2 = subplot(1, 2, 2);

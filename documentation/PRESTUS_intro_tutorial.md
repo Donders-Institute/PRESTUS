@@ -204,7 +204,7 @@ hold on
 plot(axial_position-(parameters.transducer.trans_pos(3)-1)*0.5, pred_axial_pressure.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4,'--');
 plot(real_profile(:,1),real_profile(:,2))
 hold off
-xline(parameters.expected_focal_distance_mm, '--');
+xline(parameters.expected_focal_distance_bowl, '--');
 legend('Analytic solution','Simulated results','Real profile')
 title('Pressure along the beam axis')
 ```
@@ -235,7 +235,7 @@ So how to find the settings for the simulations that match the desired pressure 
 gs = GlobalSearch;
 %opt_velocity = desired_pressure/max_pressure*velocity;
 
-%optimize_phases = @(phases) phase_optimization_annulus(phases, parameters, velocity, axial_position, parameters.expected_focal_distance_mm);
+%optimize_phases = @(phases) phase_optimization_annulus(phases, parameters, velocity, axial_position, parameters.expected_focal_distance_bowl);
 optimize_phases = @(phases_and_velocity) phase_optimization_annulus_full_curve(phases_and_velocity(1:(parameters.transducer.n_elements - 1)), parameters, phases_and_velocity(parameters.transducer.n_elements),...
     real_profile(:,1), real_profile(:,2));
 
@@ -297,7 +297,7 @@ hold on
 plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 plot(real_profile(:,1),real_profile(:,2))
 hold off
-xline(parameters.expected_focal_distance_mm, '--');
+xline(parameters.expected_focal_distance_bowl, '--');
 yline(30, '--');
 legend('Original simulation', sprintf('Optimized to match the real profile'),'Real profile')
 title('Pressure along the beam axis')
@@ -395,10 +395,10 @@ plot(sim_res_axial_position, ...
     pred_axial_pressure_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 plot(real_profile(:,1),real_profile(:,2))
 hold off
-xline(opt_res.parameters.expected_focal_distance_mm, '--');
+xline(opt_res.parameters.expected_focal_distance_bowl, '--');
 yline(desired_intensity, '--');
-legend('Original simulation', sprintf('Optimized for %2.f mm distance, analytical', opt_res.parameters.expected_focal_distance_mm), ...
-    sprintf('Optimized for %2.f mm distance, simulated', opt_res.parameters.expected_focal_distance_mm),'Real profile','Location', 'best')
+legend('Original simulation', sprintf('Optimized for %2.f mm distance, analytical', opt_res.parameters.expected_focal_distance_bowl), ...
+    sprintf('Optimized for %2.f mm distance, simulated', opt_res.parameters.expected_focal_distance_bowl),'Real profile','Location', 'best')
 ```
 
 ![image](img/figure_5.png)

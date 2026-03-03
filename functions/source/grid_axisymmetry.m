@@ -12,7 +12,6 @@ function [parameters, segmentation, bone, medium_masks] = ...
         % ensure that radial(y) dim is shorter than axial (x) dim
         if parameters.grid_dims(2) > parameters.grid_dims(1)
             parameters.grid_dims = fliplr(parameters.grid_dims);
-            parameters.default_grid_dims = fliplr(parameters.default_grid_dims);
             trans_pos = fliplr(trans_pos);
             focus_pos = fliplr(focus_pos);
             segmentation = segmentation';
@@ -23,7 +22,6 @@ function [parameters, segmentation, bone, medium_masks] = ...
         % see http://www.k-wave.org/documentation/kspaceFirstOrderAS.php
         Ny_half = floor(parameters.grid_dims(2)/2);
         parameters.grid_dims(2) = Ny_half;
-        parameters.default_grid_dims(2) = Ny_half;
         segmentation = segmentation(:,Ny_half+1:end);
         bone = bone(:,Ny_half+1:end);
         medium_masks = medium_masks(:,Ny_half+1:end);
