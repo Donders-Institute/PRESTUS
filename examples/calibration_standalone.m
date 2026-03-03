@@ -22,7 +22,7 @@ format long; % Ensures accurate display of intensity values
 
 % Set up paths
 % Determine the current and main folder paths
-func_path = fileparts(mfilename('fullpath'), '..');
+func_path = fullfile(fileparts(mfilename('fullpath')), '..', '..');
 main_folder = fileparts(func_path);
 cd(main_folder); % Change directory to the main folder
 
@@ -99,16 +99,19 @@ for i = 1:N_i
         parameters.calibration.focal_depths_wrt_exit_plane{i} = available_foci_wrt_exit_plane;
     end
 
-    % Load default parameters incl. additional chosen parameters like transducer
-    parameters = load_parameters(parameters);
-
     fprintf('Equipment: transducer %s and driving system %s \n', [tran.name, ds.name])
 
     % Iterate across focal depths
     N_j = length(parameters.calibration.focal_depths_wrt_exit_plane{i});
     for j = 1:N_j
+
         focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
         fprintf('Focus: %.2f \n', focus_wrt_exit_plane)
+
+        parameters.expected_focal_distance_ep = focus_wrt_exit_plane;
+
+        % Load default parameters incl. additional chosen parameters like transducer
+        parameters = load_parameters(parameters);
 
         % Verify focal range
         if focus_wrt_exit_plane < tran.min_foc || focus_wrt_exit_plane > tran.max_foc
@@ -174,7 +177,7 @@ for i = 1:N_i
 
             % collect data on empirical profile
             profile_empirical.profile_focus = profile_focus;
-            profile_empirical.dist_bowl_focus = dist_bowl_focus;
+            profile_empirical.dist_from_tran = dist_bowl_focus;
             profile_empirical.focus_wrt_exit_plane = focus_wrt_exit_plane;
 
             % convert from default 3D to 2D axisymmetric simulation (if requested)

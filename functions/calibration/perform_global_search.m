@@ -44,7 +44,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     % Define initial guess, bounds, and options for the optimization problem.
     initial_guess = [randi(360, [1, parameters.transducer.n_elements]) / 180 * pi, velocity];
     lower_bounds = [zeros(1, parameters.transducer.n_elements), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), 0.05]; % Upper bounds: [2pi rad, 50 mm/s]
+    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), 0.25]; % Upper bounds: [2pi rad, 250 mm/s]
 
     if ~isfield(parameters.calibration, 'optmethod') || strcmp(parameters.calibration.optmethod, 'FEXminimize')
         % by default use FEXminimize
