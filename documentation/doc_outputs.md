@@ -69,21 +69,25 @@ Images are provided in subject-space (```_orig_coord_```) and in MNI-152 space (
 
 #### MATLAB structures
 
-PRESTUS saves an overview of the parameters used to run the simulation and by default saves structures from acoustic and heating simulations. If these are detected in the results folder (and overwriting is deactivated), they will be loaded instead of performing the calculation.
+PRESTUS saves an overview of the parameters used to run the simulation and by default saves structures from acoustic and heating simulations. If these are detected in the results folder (and overwriting is deactivated via `overwrite_files = never`), they will be loaded instead of performing the calculation. Matrix saving increases HDD space demands and can be globally deactivated via `savemat = 0`. Saving is automatically active as a part of free-water transducer calibration.
 
-| Output                                                | Description                                                               |
-|-------------------------------------------------------|---------------------------------------------------------------------------|
-| `sub-XXX_<simulation_medium>_parameters<affix>.mat`   | Unique identifier for the subject                                         |
-| `sub-XXX_<simulation_medium>_parameters<affix>.mat`   | Simulation parameters                                                     |
-| `sub-XXX_<simulation_medium>_kwave_source<affix>.mat` | k-Wave source \| parameters, kgrid, trans_pos_final, focus_pos_final      |
-| `sub-XXX_<simulation_medium>_results<affix>.mat`      | Acoustic simulation outputs [can be deactivated via `savemat = 0`]        |
-| `sub-XXX_<simulation_medium>_heating_res<affix>.mat`  | Thermal simulation outputs [can be deactivated via `savemat = 0`]         |
-
+| Output                                                | Description                           |
+|-------------------------------------------------------|---------------------------------------|
+| `sub-XXX_<simulation_medium>_parameters<affix>.mat`   | Simulation parameters [mandatory]     |
+| `sub-XXX_after_rotating_and_scaling<affix>.mat`       | Head after grid scaling               |
+| `sub-XXX_after_cropping_and_smoothing<affix>.mat`     | Cropped head incl. medium masks       |
+| `sub-XXX_<simulation_medium>_kwave_source<affix>.mat` | k-Wave source                         |
+| `sub-XXX_<simulation_medium>_results<affix>.mat`      | Acoustic simulation outputs           |
+| `sub-XXX_<simulation_medium>_heating_res<affix>.mat`  | Thermal simulation outputs            |
 
 #### Figures
 
-PRESTUS provides multiple figures for quick visual inspection and debugging.
+PRESTUS provides multiple figures for quick visual inspection and debugging. For example, an overview of estimated thermal effects:
+
+![PRESTUS_fig_example_thermal](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/thermal_fig_examples.png)
 
 #### HTML
 
 PRESTUS provides a summary HTML that provides safety-relevant parameters in a dashboard, summarizes parameters and medium-specific acoustic properties, prints the full log, and summarizes figures.
+
+![PRESTUS_html](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/html_report.png)
