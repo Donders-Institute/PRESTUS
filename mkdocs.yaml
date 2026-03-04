@@ -74,3 +74,5 @@ markdown_extensions:
   - tables                  # | tables |
   - pymdownx.highlight      # Code highlighting
   - pymdownx.superfences    # ``` fences with highlighting
+  - pymdownx.snippets:
+      basepath: ..  # Points to repo root!
