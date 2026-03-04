@@ -56,8 +56,8 @@ function parameters = load_parameters(varargin)
 
     %% Transducer settings validation and derived calculations
     parameters = load_transducer_parameters(parameters);
-
-    %% Derived grid settings
+    
+	%% Derived grid settings
 
     % Set simulation dimensions based on default grid dimensions or fallback to 3D
     if ~isfield(parameters, 'n_sim_dims')
