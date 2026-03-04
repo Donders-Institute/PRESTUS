@@ -24,11 +24,11 @@
 
 ### choose a simulation medium
 
-- see `doc_medium.md`
+- see [Medium Setup](doc_medium.md)
 
 ### choose a simulation type
 
-- see `doc_backend.md` 
+- see [Backend](doc_backend.md)
 
 ### run the single_subject_pipeline
 - Ideally, the full pipeline only needs a subject id (a number consisting of no more than 3 digits).
