@@ -80,4 +80,6 @@ PRESTUS saves an overview of the parameters used to run the simulation and by de
 
 PRESTUS provides multiple figures for quick visual inspection and debugging.
 
-TBD
+#### HTML
+
+PRESTUS provides a summary HTML that provides safety-relevant parameters in a dashboard, summarizes parameters and medium-specific acoustic properties, prints the full log, and summarizes figures.
