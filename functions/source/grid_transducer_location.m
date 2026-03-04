@@ -61,6 +61,9 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             % position focus at expected distance from transducer
             % index dimension depends on 2D/3D
             % this already accounts for PML size
+            if ~isfield(parameters, 'expected_focal_distance_bowl')
+                parameters = focal_distance_calculation(parameters);
+            end
             focus_pos = trans_pos;
             focus_pos(parameters.n_sim_dims) = ...
                 round(focus_pos(parameters.n_sim_dims) + ...
