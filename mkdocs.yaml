@@ -36,7 +36,7 @@ theme:
     code: Roboto Mono
 
 nav:
-  - 🏠 Home: index.md
+  # - 🏠 Home: index.md
   - 🚀 Getting Started:
     - Installation: doc_installation.md
     - Getting started: doc_simulations-getting-started.md
@@ -74,5 +74,3 @@ markdown_extensions:
   - tables                  # | tables |
   - pymdownx.highlight      # Code highlighting
   - pymdownx.superfences    # ``` fences with highlighting
-  - pymdownx.snippets:
-      base_path: ..  # Points to repo root!
