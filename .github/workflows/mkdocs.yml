@@ -1,33 +1,14 @@
 name: Deploy MkDocs
-on:
+on: 
   push:
     branches: [ main, development ]
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        pip install mkdocs-material
-    
-    - name: Build docs
-      run: mkdocs build -v
-    
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      if: github.ref == 'refs/heads/main'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./site
+    - uses: actions/setup-python@v4
+      with: python-version: '3.x'
+    - run: pip install mkdocs-material
+    - run: mkdocs build
+    - run: mkdocs gh-deploy --force
