@@ -1,6 +1,6 @@
-# Backend code implementation
+# Simulation backend
 
-PRESTUS allows code deployment using different computing setups (`parameters.code_type`). This will primarily affect acoustic simulations. With either of the below GPU variants, thermal simulations will also use GPU acceleration (if kWave 1.4.1 is provided).
+PRESTUS allows k-Wave deployment using different computing setups (`parameters.code_type`). This will primarily affect acoustic simulations. With either of the GPU variants, thermal simulations will also use GPU acceleration (if k-Wave 1.4.1 is provided).
 
 - `matlab_cpu`
     - `kspaceFirstOrder3D` | `kspaceFirstOrder2D` | `kspaceFirstOrderAS` 

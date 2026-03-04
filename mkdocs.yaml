@@ -50,7 +50,7 @@ nav:
   - 🔬 Simulations:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
-    - PseudoCT: doc_pseudoCT.md
+    - (pseudo)CT: doc_pseudoCT.md
   - 📚 References: 
     - Parameters: doc_config.md
     - Functions: doc_functions.md
@@ -58,7 +58,7 @@ nav:
     - Advanced Workflows: doc_advanced.md
     - Backend: doc_backend.md
     - HPC: doc_hpc.md
-    - Group Plots: doc_group.md
+    - Group: doc_group.md
   - 🆘 Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
     - Code of Conduct: CODE_OF_CONDUCT.md

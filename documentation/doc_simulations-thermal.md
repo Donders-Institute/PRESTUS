@@ -53,7 +53,7 @@ These parameters influence the underlying mechanisms of how the thermal simulati
 
 There are two implementations of thermal dose calculations:
 
-- By default, PRESTUS calculates CEM43 as implemented in kWave's kWaveDiffusion.
+- By default, PRESTUS calculates CEM43 as implemented in k-Wave's kWaveDiffusion.
 
 ```
 cem43 = cem43 + ...

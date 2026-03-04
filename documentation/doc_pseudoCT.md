@@ -1,4 +1,4 @@
-# PseudoCT
+# (pseudo-)CT
 
 PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 
 
@@ -7,14 +7,23 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
 
 ### Creating a pseudoCT from UTE scans
 
-1) Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2) as inputs. 
-    - You can either use the SimNIBS GUI or PRESTUS (**default**).
-2) Run in bash: `create_pseudoCT.sh`.
-    - functions/create_pseudoCT.sh calls the MATLAB function pct_soft_tissue_peak
+0. Acquire an MR sequence with detailed bone contrast 
+
+>**Example PETRA UTE parameters** (Carpino et al., 2023)
+- TR: 3.32 ms
+- TE: 0.07 ms
+- voxel size: 0.8 mm3
+- 352 sagittal slices
+- flip angle: 2°
+- FoV: 294 mm
+
+1. **SimNIBS segmentation**. Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2w) as inputs. You can either use the SimNIBS GUI or PRESTUS (**default**).
+2. **pCT creation**. Run `pct_create_pseudoCT.sh` in bash. This calls the MATLAB function `pct_soft_tissue_peak`
 
 The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
 
 To run the code you will need to install (or load the following modules):
+
 - SimNIBS
 - FSL
 - ANTs
@@ -36,11 +45,11 @@ The following steps are used to create the pseudoCT:
 - pHU Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
 - pHU Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
 - pHU Skull: Linear mapping
-    - "miscouridou" | pHU = −2085 UTE + 2329
-    - "carpino" | pHU = -2194 UTE + 2236
-    - "wiesinger" | pHU = -2000 (UTE-1) + 42
-    - "treeby" | pHU = -2929.6 UTE + 3247.9
-    - "kosciessa" | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
+    - `miscouridou` | pHU = −2085 UTE + 2329
+    - `carpino`     | pHU = -2194 UTE + 2236
+    - `wiesinger`   | pHU = -2000 (UTE-1) + 42
+    - `treeby`      | pHU = -2929.6 UTE + 3247.9
+    - `kosciessa`   | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
 - 3D Gaussian smoothing (σ=0.8 voxels via ANTs’ SmoothImage) prevents abrupt tissue transitions in the simulation grid. To retain information in the skull layer, unsmoothed values are retained within an eroded skull mask that attempts to correct for partial volume effects.
 
 *References*
@@ -48,35 +57,9 @@ The following steps are used to create the pseudoCT:
 - Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).
 - Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).
   
+An example script to create a pseudoCT is provided at `examples/createPseudoCT.sh`.
 
-The following is an example script that you can use for a `create_pseudoCT.sh` call.
-
-```
-#!/bin/bash
-
-rootpath="$(pwd)/.."
-rootpath=$(builtin cd $rootpath; pwd)
-
-# Load necessary modules
-module load ants
-module load matlab
-module load fsl
-
-# Change directory to the scripts directory
-scriptpath=${rootpath}/tools/PRESTUS/functions
-cd "${scriptpath}" || { echo "Directory not found"; exit 1; }
-
-# Source the script containing the function
-source ${scriptpath}/create_pseudoCT.sh
-
-subject_id="001" # 'sub-' will automatically be added
-m2m_path=${rootpath}/data/simnibs
-
-# Call the create_pseudoCT function
-create_pseudoCT "$subject_id" "$m2m_path" "${scriptpath}"
-```
-
-### Starting acoustic + thermal simulations using pseudoCT
+### Using (pseudo-)CTs to inform acoustic properties
 
 see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43)
 
