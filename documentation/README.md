@@ -4,6 +4,8 @@
 
 PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
 
+![PRESTUS logo](https://github.com/jkosciessa/PRESTUS_bin/blob/main/img/logo_PRESTUS.png){width="70%" .left}
+
 Key features include:
 
 - Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
