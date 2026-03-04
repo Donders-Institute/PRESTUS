@@ -91,3 +91,13 @@ PRESTUS provides multiple figures for quick visual inspection and debugging. For
 PRESTUS provides a summary HTML that provides safety-relevant parameters in a dashboard, summarizes parameters and medium-specific acoustic properties, prints the full log, and summarizes figures.
 
 ![PRESTUS_html](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/html_report.png)
+
+A full example report on a phantom can be found here:
+
+<iframe src="https://raw.githubusercontent.com/jkosciessa/PRESTUS_bin/main/examples/example_report.html" 
+        width="100%" height="800px" 
+        frameborder="0" 
+        style="border: 1px solid #ddd; border-radius: 8px;">
+</iframe>
+
+**Raw source:** [example_report.html](https://raw.githubusercontent.com/jkosciessa/PRESTUS_bin/main/examples/example_report.html)
