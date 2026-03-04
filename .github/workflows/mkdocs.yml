@@ -2,13 +2,18 @@ name: Deploy PRESTUS Docs
 on:
   push:
     branches: [ development, master ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -17,10 +22,23 @@ jobs:
       with:
         python-version: '3.x'
     
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+    
     - name: Install dependencies
       run: |
         pip install -U pip
         pip install mkdocs mkdocs-material
     
-    - name: Build & Deploy
-      run: mkdocs gh-deploy --force
+    - name: Build
+      run: mkdocs build --clean
+    
+    - uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./site
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
