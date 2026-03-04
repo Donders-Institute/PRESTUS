@@ -36,7 +36,7 @@ theme:
     code: Roboto Mono
 
 nav:
-  - 🏠 Home: README.md
+  - 🏠 Home: index.md
   - 🚀 Getting Started:
     - Installation: doc_installation.md
     - Getting started: doc_simulations-getting-started.md
