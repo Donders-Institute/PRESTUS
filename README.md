@@ -5,6 +5,7 @@
 PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
 
 Key features include:
+
 - Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
 - 2D / 3D grid setup.
 - Multi-layer medium property mapping (water, skin, multi-layer skull, and brain).
@@ -31,7 +32,7 @@ When working on the Donders High-Performance-Computing cluster, PRESTUS and its 
 
 Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
 
-For more information on HPC usage, see [doc_hpc](documentation/doc_hpc.md)
+For more information on HPC usage, see [doc_hpc](doc_hpc.md "documentation/doc_hpc.md").
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
 
@@ -41,7 +42,7 @@ cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
 
 ## Outside the Donders HPC
 
-Follow the [installation guide](documentation/doc_installation.md).
+Follow the [installation guide](doc_installation.md "documentation/doc_installation.md").
 
 # Reference
 

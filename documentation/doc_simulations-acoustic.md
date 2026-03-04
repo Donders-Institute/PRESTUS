@@ -7,6 +7,7 @@
 To model a 3D axisymmetric problem using a 2D computational grid (recommended), [kspaceFirstOrderAS](http://www.k-wave.org/documentation/kspaceFirstOrderAS.php) can be used (see [this example benchmark](https://github.com/ucl-bug/k-wave/blob/main/k-Wave/examples/example_at_focused_bowl_AS.m). It significantly reduces computational cost compared to a full 3D simulation. The input structures (`kgrid`, `medium`, `source`, and `sensor`) are defined similarly to 2D simulations but interpreted in the axisymmetric coordinate system. The function `kspaceFirstOrderAS` accounts for wave propagation in such axisymmetric media and is functionally similar to `kspaceFirstOrder2D` but adapted for axisymmetry. kspaceFirstOrderAS uses a 2D axisymmetric coordinate system with **axial and radial axes**. These are assumed to map onto the first and second dimensions of input matrices and coordinates, respectively.
 
 Multiple adjustments are made if axisymmetry is requested:
+
 - The grid should be specified as [radial x 2, axial].
 - It is assumed that the (2x) radial axis is shorter than the axial axis.
 - Internally, [radial x 2, axial] is remapped onto [axial radial]; only values from [half+1:end] are retained.

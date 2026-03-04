@@ -1,0 +1,76 @@
+site_name: PRESTUS - Ultrasound Simulation Toolbox
+docs_dir: documentation
+site_description: 'PREprocessing & Simulations Toolbox for transcranial Ultrasound neuromodulation'
+site_url: https://donders-institute.github.io/PRESTUS
+site_author: Donders Institute for Brain, Cognition and Behaviour
+
+repo_url: https://github.com/Donders-Institute/PRESTUS
+repo_name: Donders-Institute/PRESTUS
+
+theme:
+  name: material
+  icon:
+    logo: material/waves
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+  palette:
+    # Light mode toggle
+    - scheme: default
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+        
+    # Dark mode toggle  
+    - scheme: slate
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  fonts:
+    text: Roboto
+    code: Roboto Mono
+
+nav:
+  - 🏠 Home: README.md
+  - 🚀 Getting Started:
+    - Installation: doc_installation.md
+    - Getting started: doc_simulations-getting-started.md
+  - 📖 Documentation:
+    - Transducer Calibration: doc_calibration.md
+    - Medium Setup: doc_medium.md
+    - Transducer Placement: doc_heuristic-placement.md
+    - Neuronavigation: doc_neuronav.md
+    - Outputs: doc_outputs.md
+  - 🔬 Simulations:
+    - Acoustic: doc_simulations-acoustic.md
+    - Thermal: doc_simulations-thermal.md
+    - PseudoCT: doc_pseudoCT.md
+  - 📚 References: 
+    - Parameter Configuration: doc_config.md
+    - Functions: doc_functions.md
+  - 🖥️ Advanced:
+    - Advanced Workflows: doc_advanced.md
+    - Backend: doc_backend.md
+    - HPC: doc_hpc.md
+    - Group Plots: doc_group-plots.md
+  - 🆘 Troubleshooting: doc_troubleshooting.md
+  - 📋 Community:
+    - Code of Conduct: CODE_OF_CONDUCT.md
+    - Contributing: CONTRIBUTING.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr                    # Abbreviations
+  - admonition              # !!! note, !!! warning boxes
+  - toc:                    # Table of contents
+      permalink: true
+  - tables                  # | tables |
+  - pymdownx.highlight      # Code highlighting
+  - pymdownx.superfences    # ``` fences with highlighting
