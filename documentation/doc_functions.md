@@ -1,4 +1,4 @@
-## PRESTUS function documentation
+## PRESTUS functions
 
 The following documents the functions provided in PRESTUS.
 

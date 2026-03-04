@@ -1,10 +1,12 @@
+# Neuronavigation read-in
+
 Extracting neuronavigation coordinates for post-hoc ultrasound simulations is critical to verify and predict the focus of the realized stimulation sites during neuromodulation experiments. Neuronavigation systems provide spatial tracking of the ultrasound transducer position relative to the individual subject’s anatomy in real-time. 
 
 PRESTUS provides functions that aim to facilitate the read-in and preprocessing of positions recorded with the Localite system. Multiple triggers can be sent during stimulation to acquire updates to the transducer location over time. Recorded locations will be recorded by localite to files named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>'.
 
 Recorded locations will be averaged within a position (associated with a continuous time stamp stream). Multiple positions per recording session are supported. Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). The functions also facilitate standard-space definitons (experimental), e.g., to plot average transducer positions in standard space.
 
-To get started, see an example demo (wihtout provided data) in '/examples/demo_localite.m'.
+To get started, see an example demo (wihtout provided data) in `/examples/demo_localite.m`.
 
 ### Relevant spaces and coordinate systems
 

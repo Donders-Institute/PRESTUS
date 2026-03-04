@@ -1,4 +1,5 @@
 # Troubleshooting
+
 This document contains fixes to known usage issues. If you find and solve an issue not listed here, please add it with an elaborate explanation. If you stumble upon an error in the working of the pipeline, or have suggestions for improvement, please [open an issue on GitHub](https://github.com/Donders-Institute/PRESTUS/issues).
 
 ## Simulation errors
