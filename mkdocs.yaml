@@ -36,7 +36,7 @@ theme:
     code: Roboto Mono
 
 nav:
-  - 🏠 Home: !https://github.com/Donders-Institute/PRESTUS/blob/development/README.md
+  - 🏠 Home: https://github.com/Donders-Institute/PRESTUS/blob/development/README.md
   - 🚀 Getting Started:
     - Installation: doc_installation.md
     - Getting started: doc_simulations-getting-started.md
@@ -60,8 +60,8 @@ nav:
     - Group Plots: doc_group-plots.md
   - 🆘 Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
-    - Code of Conduct: !https://github.com/Donders-Institute/PRESTUS/blob/development/CODE_OF_CONDUCT.md
-    - Contributing: !https://github.com/Donders-Institute/PRESTUS/blob/development/CONTRIBUTING.md
+    - Code of Conduct: https://github.com/Donders-Institute/PRESTUS/blob/development/CODE_OF_CONDUCT.md
+    - Contributing: https://github.com/Donders-Institute/PRESTUS/blob/development/CONTRIBUTING.md
 
 plugins:
   - search
