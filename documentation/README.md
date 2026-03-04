@@ -25,6 +25,10 @@ A recent overview poster can be found [here](https://jkosciessa.github.io/downlo
 
 Follow the [installation guide](doc_installation.md).
 
+### Versions
+
+PRESTUS is under active development. The default `main` branch is considered more stable. The [`development` branch](https://github.com/Donders-Institute/PRESTUS/tree/development) may contain both new features and stability updates, but is subject to more dynamic changes. [Releases](https://github.com/Donders-Institute/PRESTUS/releases) bundle major updates and are associated with a version number. Starting in PRESTUS v0.5 logs will print the git hash when PRESTS has been cloned as a git repository.
+
 # License
 
 Released under GNU General Public License v3.0 (see LICENSE).
