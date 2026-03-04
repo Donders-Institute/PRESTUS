@@ -23,12 +23,6 @@ Configuration metadata must be fully specified in (a set of) config files (in th
 
 The `load_parameters.m` function imports the configuration. Multiple configurations can be read in sequentially to overwrite specific portions of the default configuration.
 
-### Specify a transducer and target location
-
-Specify locations via `parameters.transducer.trans_pos` and `parameters.transducer.focus_pos`. 
-
-See [Placement](doc_placement.md).
-
 ### Choose the Simulation Medium
 
 See [Medium Setup](doc_medium.md).
@@ -58,9 +52,15 @@ parameters.t1_path_template = fullfile(sprintf('m2m_sub-%03d', subject_id), "T1.
 parameters.t2_path_template = fullfile(sprintf('m2m_sub-%03d', subject_id), "T2_reg.nii.gz");
 ```
 
-### [Optional] Advance SimNIBS segmentation
+### Specify a transducer and target location
 
-It may be desirable to run an advance SimNIBS call prior to running the full pipeline incl. segmentation postprocessing, source setup, acoustic and thermal simulations. By default, existing segmentations will be reused and not overwritten unless explicitly requested with `overwrite_simnibs` (regardless of `overwrite_files`).
+For `layered` simulations, specify locations via `parameters.transducer.trans_pos` and `parameters.transducer.focus_pos`. 
+
+See [Placement](doc_placement.md).
+
+### [Optional] One-shot SimNIBS segmentation
+
+It may be desirable to run an intial SimNIBS call prior to running the full pipeline incl. segmentation postprocessing, source setup, acoustic and thermal simulations. By default, existing segmentations will be reused and not overwritten unless explicitly requested with `overwrite_simnibs` (regardless of `overwrite_files`).
 
 To this end, `run_source_setup`, `run_acoustic_sims`, `run_heating_sims`, and `run_posthoc_water_sims` can be deactivated. This separate step is required to inform the skull layer [using pseudoCTs](doc_pseudoCT.md).
 
