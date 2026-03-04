@@ -4,20 +4,20 @@
 
 # PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
 
-PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans and mapping of medium tissue properties (possibly informed for skull via (pseudo-)CT images) in a simulation grid, to the execution of acoustic and thermal simulations using the widely adopted k-Wave engine. High-performance computing (HPC) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate group reporting.
+PRESTUS (PREprocessing & Simulations for Transcranial Ultrasound Stimulation) is an open-source MATLAB toolbox that aims to streamline imaging-informed simulations of Transcanial Ultrasound Stimulation (TUS): from the segmentation of T1-weighted MRI head scans, [preprocessing](doc_preproc.md) of their tissue layers, and mapping of [acoustic tissue properties](doc_medium.md) (possibly informed for skull via [(pseudo-)CT](doc_pseudoCT.md) images) in a simulation grid, to the execution of [acoustic](doc_simulations-acoustic.md) and [thermal](doc_simulations-thermal.md) simulations using the widely adopted [k-Wave engine](doc_backend.md). High-performance computing ([HPC](doc_hpc.md)) support via SLURM and CentOS enables efficient parallelization, and large-scale analyses. Output 3D NifTI images are automatically mapped to a standard template (MNI) space to facilitate [group](doc_group.md) reporting.
 
-Key features include:
+Key features of the modular end-to-end pipeline include:
 
-- Automated MRI segmentation (using SimNIBS 4 charm) and preprocessing.
+- Automated MRI segmentation (using SimNIBS 4 charm) and [preprocessing](doc_preproc.md).
 - 2D / 3D grid setup.
-- Multi-layer medium property mapping (water, skin, multi-layer skull, and brain).
-- (pseudo-)CT-informed continuous skull mapping.
-- Virtual multi-element transducer calibration (free-water profile emulation).
-- Estimation of entry-target coordinates.
-- Flexible temporal protocol specification (e.g., including session breaks).
-- k-Wave integration for robust acoustic and heating simulations.
-- Support for high-performance computing.
-- 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
+- Multi-layer [medium property mapping](doc_medium.md) (water, skin, multi-layer skull, and brain).
+- [(pseudo-)CT](doc_pseudoCT.md)-informed continuous skull mapping.
+- Virtual multi-element [transducer calibration](doc_calibration.md) (free-water profile emulation).
+- Estimation of entry-target [coordinates](doc_placement.md) incl. [neuronavigation](doc_neuronav.md) read-in.
+- Flexible [temporal protocol specification](doc_simulations-thermal.md) (e.g., including breaks).
+- k-Wave integration for robust [acoustic](doc_simulations-acoustic.md) and [thermal](doc_simulations-thermal.md) simulations.
+- Support for [high-performance computing](doc_hpc.md).
+- 3D NifTI [outputs](doc_outputs.md) for major reporting metrics (in subject- & MNI-space).
 
 These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. PRESTUS is intended solely for basic research use in non-clinical applications.
 
