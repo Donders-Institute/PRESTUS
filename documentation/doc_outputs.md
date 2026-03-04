@@ -71,10 +71,13 @@ Images are provided in subject-space (```_orig_coord_```) and in MNI-152 space (
 
 PRESTUS saves an overview of the parameters used to run the simulation and by default saves structures from acoustic and heating simulations. If these are detected in the results folder (and overwriting is deactivated), they will be loaded instead of performing the calculation.
 
-- sub-XXX_<simulation_medium>_parameters<affix>.mat     | simulation parameters
-- sub-XXX_<simulation_medium>_kwave_source<affix>.mat   | k-Wave source | parameters, kgrid, trans_pos_final, focus_pos_final
-- sub-XXX_<simulation_medium>_results<affix>.mat        | acoustic simulation outputs [can be deactivated via ```savemat``` = 0]
-- sub-XXX_<simulation_medium>_heating_res<affix>.mat    | thermal simulation outputs [can be deactivated via ```savemat``` = 0]
+| Output                                                | Description                                                               |
+|-------------------------------------------------------|---------------------------------------------------------------------------|
+| sub-XXX_<simulation_medium>_parameters<affix>.mat     | Unique identifier for the subject                                         |
+| sub-XXX_<simulation_medium>_parameters<affix>.mat     | simulation parameters                                                     |
+| sub-XXX_<simulation_medium>_kwave_source<affix>.mat   | k-Wave source | parameters, kgrid, trans_pos_final, focus_pos_final       |
+| sub-XXX_<simulation_medium>_results<affix>.mat        | acoustic simulation outputs [can be deactivated via ```savemat``` = 0]    |
+| sub-XXX_<simulation_medium>_heating_res<affix>.mat    | thermal simulation outputs [can be deactivated via ```savemat``` = 0]     |
 
 #### Figures
 
