@@ -1,4 +1,4 @@
-## PRESTUS configuration documentation
+## PRESTUS configuration
 
 The following documents the parameters used in PRESTUS. The specification philosophy is the following: `default_config.yaml` provides a list of all parameters with default settings and will be read in first by the function `load_parameters`. This default configuration file should not be changed in standard applications to ensure that necessary fields are provided. 
 
@@ -24,8 +24,8 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `simulation_medium`               | Medium setup for simulation (`water` or `layered`).                                   | Mandatory.   |
-| ` `                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory.   |
+| `simulation_medium`               | Medium setup for simulation (`water`/`layered`/`phantom`).                                   | Mandatory.   |
+| `layers`                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory. This parameter allows adding or removing layers of interest (if the corresponding segmenation is available and `parameters.medium` has a corresponding label containing the acoustic properties).  |
 | `seg_labels`                      | Labels for segmentations, specifying indices for CSF, bone mask, and eye regions.     | Mandatory.  |
 | `run_source_setup`                | Set up acoustic sources.                                                              | (`1 = yes, 0 = no`)  |
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
@@ -62,6 +62,7 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).    |    |
 | `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                             | Must be calibrated.   |
 | `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                            | Must be calibrated.   |
+| `transducer.source_phase_rad`     | Phase of the acoustic source (in radians).                            | Must be calibrated.   |
 | `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
 | `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).            | |
 | `expected_focal_distance_ep`      | Expected distance from the transducer exit plane to the stimulation focus (in mm).  | Transducer depth setting [Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or [`transducer.focus_pos` and `transducer.trans_pos`] have to be specified.] |

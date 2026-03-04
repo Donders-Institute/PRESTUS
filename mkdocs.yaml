@@ -39,11 +39,12 @@ nav:
   - 🏠 Home: README.md
   - 🚀 Getting Started:
     - Installation: doc_installation.md
-    - Getting started: doc_simulations-getting-started.md
+    - Getting started: doc_getting-started.md
   - 📖 Documentation:
     - Transducer Calibration: doc_calibration.md
+    - Head preprocessing: doc_preprocessing.md
     - Medium Setup: doc_medium.md
-    - Transducer Placement: doc_heuristic-placement.md
+    - Transducer Placement: doc_placement.md
     - Neuronavigation: doc_neuronav.md
     - Outputs: doc_outputs.md
   - 🔬 Simulations:
@@ -57,7 +58,7 @@ nav:
     - Advanced Workflows: doc_advanced.md
     - Backend: doc_backend.md
     - HPC: doc_hpc.md
-    - Group Plots: doc_group-plots.md
+    - Group Plots: doc_group.md
   - 🆘 Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
     - Code of Conduct: CODE_OF_CONDUCT.md

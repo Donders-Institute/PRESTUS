@@ -249,7 +249,7 @@ smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
 smooth_window: 5 # Number of voxels for smoothing
 
 # Settings for shrinkwrap (if requested)
-skullfillmethod: 'imclose' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
+skullfillmethod: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
 wrapradius: 10 # skull rubber wrap radius [grid voxels]; Bigger = tighter rubber that ignores bigger dents (recommendaton: 2 to 10)
 skullwrap_visualize: 0 # Visualize results of skullwrap? (Currently causes issues on HPC)
 

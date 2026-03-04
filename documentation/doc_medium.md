@@ -1,12 +1,13 @@
-# Specifying homo- or heterogeneous medium properties
+# Medium properties
 
-### Choose a simulation medium
+### Specifying a simulation medium
 
-PRESTUS supports various medium configurations. These can be specified with ```parameter.simulation_medium```. The following options are supported out of the box.
+PRESTUS supports homo- and heterogeneous medium configurations. These can be specified with `parameter.simulation_medium`. The following options are supported out of the box.
 
 - ```water```
 
-    Places a transducer into homogeneous water tissue.
+    Places a transducer into homogeneous water tissue (at the inner edge of the requested PML layer).
+    <br>
 
 - ```layered```
 
@@ -18,24 +19,27 @@ PRESTUS supports various medium configurations. These can be specified with ```p
     - cortical skull bone 
     - trabecular skull bone
     
-    Tissue can be removed (or added if more detailed segmentations and tissue properties are included) via the ```layers``` and ```medium``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```). This is a subtype of a layered simulation with a single skull layer.
-    
+    Tissue can be removed (or added if more detailed segmentations and medium acoustic properties are included) via the ```layers``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```). The pCT implementation is a subtype of a `layered` simulation with a unified skull layer. If the segmentation for any requested layer is not available, requested layers will be removed from the specification. The output HTML provides an overview of which layers were modeled, along with their acoustic properties.
+    <n>
+    `Layered` media will be [preprocessed](doc_preproc.md) during grid setup.
+    <br>
+
 - ```phantom```
 
-    A 3D imaging-based simulation is not always necessary. For benchmarking, one may for instance externally design a 2D phantom, and run simulations in a well-defined space. As the 2D phantom is explicitly designed, no preprocessing (e.g., rotation, cropping, etc.) is necessary. Using the ```phantom``` flag allows the same tissue flexibility as the ```layered``` version, but maps segmentation files onto medium masks without any further image processing. The 2D segmentation phantom must be provided as a ```final_tissues.nii.gz``` file in a (dummy) SimNIBS output folder.
+    A 3D imaging-based simulation is not always necessary. For debugging and benchmarking, one may for instance externally design a 2D phantom, and run simulations in a well-defined space. As the 2D phantom is explicitly designed, no preprocessing (e.g., rotation, cropping, etc.) is necessary. Using the ```phantom``` flag allows the same tissue flexibility as the ```layered``` version, but maps segmentation files onto medium masks without any further image processing. The 2D segmentation phantom must be provided as a ```final_tissues.nii.gz``` file in a (dummy) SimNIBS output folder.
+    <n>
+    A `phantom` Nifti is expected to contain artificial layers of a SimNIBS segmentation, including the PML padding.
+    <br>
 
-PRESTUS allows for a flexible specification of segmentation layers to media to which acoustic properties are allocated. This is controlled by `parameters.layers`. If a segmentation for the requested layer is not available, requested layers will be removed from the specification. All segmentation ids that are not explicitly specified as other layers are automatically included in a water layer. 
+### Default acoustic properties
 
-To specify a `phantom`, indicate artificial layers of a SimNIBS segmentation.
+![acoustic_properties](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/acoustic_properties.png)
 
-Internally computed medium maps will contain indices corresponding to the layer position in the medium properties. This allows for flexibility in layer specifications with stable medium ids (unless `parameters.medium` is edited).
+Accurate modeling of wave propagation through heterogeneous media requires valid assignment of acoustic parameters such as speed of sound, density, and attenuation to the separate tissue media. PRESTUS provides defaults based on the literature, while providing flexibility to alter assigned parameter values, e.g., to implement more conservative or liberal assumptions. 
 
-### Default medium properties
+The following are the current default medium properties in a full layered simulation. Parameters are specified in the default_config.yaml file (see doc_config.md).
 
-The following are the current default medium properties in a full layered simualtion. Parameters are specified in the default_config.yaml file (see doc_config.md).
-When a homogeneous skull layer is requested, the default assumes the medium properties of cortical bone.
-
-| Tissue           | Density [kg/m³] | Sound Speed [m/s] | Attenuation Coefficient [dB/(cm·MHzy)]      | Attenuation Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption Fraction [Note1] |
+| Tissue           | Density [kg/m³] | Sound Speed [m/s] | Attenuation Coefficient [dB/(cm·MHzy)]      | Attenuation Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption Fraction [*Note1*] |
 |-----------------------|--------|----------|----------|-------|--------|------|-------|---|
 | Water                 | 994    | 1500     | 0.00217  | 2     | 0.6    | 4178 | 0     | 1 |
 | Brain                 | 1046   | 1546     | 0.59     | 1.2   | 0.51   | 3630 | 559   | 1 |
