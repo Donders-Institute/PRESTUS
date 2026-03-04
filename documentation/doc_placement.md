@@ -10,7 +10,7 @@ Suitable coordinates (x/y/z) may be identified in preferred imaging software bas
 
 ## Heuristic coordinate selection
 
-The function ```transducer_positioning``` identifies heuristic locations for transducer placement. 
+The function `transducer_positioning` identifies heuristic locations for transducer placement. 
 
 The function targets brain regions specified by MNI coordinates, converting them to subject-native space using SimNIBS tools. It aims to identify candidate transducer positions where the geometric focus aligns with a target within a user-defined focal distance range, while ensuring >50% aperture overlaps skull/skin and low variance in distances. For each position, it computes the intersection proportion between the transducer and skin, mean/variance distances to skin and skull, and geometric focus/exit plane positions to ensure efficient coupling while minimizing aberrations. Besides target MNI coordinates, the function does not require manual intervention, enabling automatic end-to-end workflows.
 

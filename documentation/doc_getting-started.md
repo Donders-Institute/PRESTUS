@@ -1,4 +1,4 @@
-# Getting started
+# Quick Start Guide
 
 ### Install packages 
 
