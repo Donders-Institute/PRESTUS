@@ -55,6 +55,8 @@ cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
 
 For the `cpp_cpu` and `cpp_gpu` modes, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them into `k-Wave/binaries/`; see also the instructions [here](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php).
 
+For more information on installing, (potentially) compiling, and specifying C++ binaries, see [the backend documentation](doc_backend.md).
+
 ## SimNIBS installation
 
 You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4): e.g., `simnibs_installer/install -s -t /home/USER/SimNIBS`.

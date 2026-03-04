@@ -1,3 +1,9 @@
+## Transducer definition
+
+![PRESTUS transducer distance definitions](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/transducer_distances.png){width="70%" .center}
+
+The figure shows canonical PRESTUS definitions for multi-element transducer calibration.
+
 ## Calibration of multi-element transducers
 
 To emulate the actual transducers for the use in simulations, we initially have to optimise the virtual transducers such that they match the output we obtain in free water. The acoustic profile will vary between different transducers, as well as for different focal depth settings for any given transducer. Additionally, the amplitude of stimulation that yields the desired output intensity needs to be estimated. As such, calibration of amplitude will also be specific to the desired free water ISPPA.
