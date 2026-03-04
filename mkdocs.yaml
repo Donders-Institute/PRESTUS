@@ -52,7 +52,7 @@ nav:
     - Thermal: doc_simulations-thermal.md
     - (pseudo)CT: doc_pseudoCT.md
   - 📚 References: 
-    - Parameters: doc_config.md
+    - Parameters: doc_parameters.md
     - Functions: doc_functions.md
   - 🖥️ Advanced:
     - Advanced Workflows: doc_advanced.md
