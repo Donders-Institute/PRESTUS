@@ -1,5 +1,7 @@
 # (pseudo-)CT
 
+![pct_ute_density](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ute_pct_density.png)
+
 PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 
 
 > [!WARNING]
