@@ -86,50 +86,11 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     initial_params = initial_res.acoustic_info.parameters;
     
-    %% Get maximum pressure
-
-    p_max = gather(initial_res.sensor_data.p_max_all); % transform from GPU array to normal array
+    %% Extract simulated pressure along the focal axis
+    [pred_axial_pressure] = extract_simulated_profile...
+        (initial_res, initial_params, profile_empirical, desired_intensity, equipment_name);
     
-    %% Plot 2D intensity map
-    
-    figure;
-    p_distance = (1:size(p_max, 1)) * initial_params.grid_step_mm;
-    p_width = (1:size(p_max, sim_param.n_sim_dims)) * initial_params.grid_step_mm;
-    if sim_param.n_sim_dims == 2
-        p_axialprofile = squeeze(p_max(:, :))';
-    elseif sim_param.n_sim_dims == 3
-        p_axialprofile = squeeze(p_max(:, initial_params.transducer.trans_pos(2), :))';
-    end
-    imagesc(p_distance, p_width, p_axialprofile);
-    clear p_distance p_width p_axialprofile;
-    axis image;
-    colormap(getColorMap);
-    xlabel('Lateral Position [mm]');
-    ylabel('Axial Position [mm]');
-    axis image;
-    cb = colorbar;
-    title('Pressure for the focal plane')
-    
-    % Save the intensity map
-    fig_path = fullfile(sim_param.outputs_folder, ...
-        strcat('Initial_Intensity_map_2D_at_F_', num2str(profile_empirical.focus_wrt_exit_plane), ...
-        '_at_I_', num2str(desired_intensity), '_', equipment_name, '.png'));
-    saveas(gcf, fig_path);
-    close(gcf);
-
     %% Optimization
-
-    % Extract simulated pressure along the focal axis
-    if sim_param.n_sim_dims == 2
-        i_x = initial_params.transducer.trans_pos(1);
-        pred_axial_pressure = squeeze(p_max(i_x,:));
-        clear i_x;
-    elseif sim_param.n_sim_dims == 3
-        i_x = initial_params.transducer.trans_pos(1);
-        i_y = initial_params.transducer.trans_pos(2);
-        pred_axial_pressure = squeeze(p_max(i_x, i_y,:));
-        clear i_x i_y;
-    end
 
     % Scale the profile to the desired intensity
     [profile_opt.adjusted_profile_focus, ~] = scale_real_intensity_profile(...
