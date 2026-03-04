@@ -19,13 +19,13 @@ Key features include:
 - Support for high-performance computing.
 - 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
 
-These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
+These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. PRESTUS is intended solely for basic research use in non-clinical applications.
 
 A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
 
 # Installation
 
-Follow the [installation guide](doc_installation.md).
+Follow the [Installation Guide](doc_installation.md) and continue with the [Quick Start Guide](doc_getting-started.md).
 
 ### Versions
 
