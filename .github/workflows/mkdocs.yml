@@ -1,17 +1,26 @@
-name: Deploy PRESTUS
+name: Deploy PRESTUS Docs
 on:
   push:
-    branches: [ master, development ]
-  workflow_dispatch:
+    branches: [ development, master ]
+  workflow_dispatch:  # Manual trigger
+
 permissions:
   contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
-    - run: pip install mkdocs-material
-    - run: mkdocs gh-deploy --force
+        python-version: '3.x'
+    
+    - name: Install dependencies
+      run: |
+        pip install -U pip
+        pip install mkdocs mkdocs-material
+    
+    - name: Build & Deploy
+      run: mkdocs gh-deploy --force
