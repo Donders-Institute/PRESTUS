@@ -32,7 +32,7 @@ When working on the Donders High-Performance-Computing cluster, PRESTUS and its 
 
 Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
 
-For more information on HPC usage, see the [HPC guide](doc_hpc.md "https://github.com/Donders-Institute/PRESTUS/blob/development/documentation/doc_hpc.md")
+For more information on HPC usage, see the [HPC guide](documentation/doc_hpc.md)
 
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
@@ -43,7 +43,7 @@ cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
 
 ## Outside the Donders HPC
 
-Follow the [installation guide](doc_installation.md "https://github.com/Donders-Institute/PRESTUS/blob/development/documentation/doc_installation.md").
+Follow the [installation guide](documentation/doc_installation.md).
 
 # Reference
 
