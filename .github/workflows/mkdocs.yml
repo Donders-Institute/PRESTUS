@@ -30,7 +30,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -U pip
-        pip install mkdocs mkdocs-material
+        pip install mkdocs mkdocs-material pymdown-extensions
     
     - name: Build
       run: mkdocs build --clean
