@@ -4,7 +4,7 @@ PRESTUS provides multiple outputs. Some of these outputs are optional (or can be
 
 #### Summary table
 
-Filename: sub-XXX_<simulation_medium>_output_table<affix>.csv
+Filename: `sub-XXX_<simulation_medium>_output_table<affix>.csv`
 
 This output table provides an overview of key metrics.
 
