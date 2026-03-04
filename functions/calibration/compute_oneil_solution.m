@@ -1,12 +1,13 @@
 function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = ...
     compute_oneil_solution(parameters, pred_axial_pressure, dist_transducer, ...
     adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
+
     % Compute O'Neil solution and plot it along with comparisons
     %
     % Arguments:
     % - parameters: Structure containing simulation and transducer parameters.
     %   parameters.calibration.path_output: Directory for saving results and figures.
-    % - pred_axial_pressure: Predicted pressure along the beam axis [Pa].
+    % - p_max: Predicted pressure [Pa].
     % - dist_transducer: Axial distance from the transducer exit plane [mm].
     % - adjusted_profile_focus: Adjusted intensity profile for the focus.
     % - focus_wrt_exit_plane: Focal distance relative to the exit plane
@@ -48,7 +49,9 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     plot(axial_position, i_axial_oneil, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'O''Neil Analytical Solution');
     hold on;
-    plot(axial_position - (parameters.transducer.trans_pos(end) - 1) * parameters.grid_step_mm, pred_axial_intensity, ...
+    % get the distance from the transducer bowl (i.e., trans_pos in PRESTUS)
+    axial_position_sim = axial_position - (parameters.transducer.trans_pos(end) - 1) * parameters.grid_step_mm;
+    plot(axial_position_sim, pred_axial_intensity, ...
         '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
     plot(dist_transducer, adjusted_profile_focus, ...
         'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
