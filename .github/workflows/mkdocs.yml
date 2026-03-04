@@ -2,6 +2,8 @@ name: Deploy MkDocs
 on: 
   push:
     branches: [ main development ]
+permissions:
+  contents: write
 jobs:
   deploy:
     runs-on: ubuntu-latest
