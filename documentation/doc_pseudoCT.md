@@ -5,43 +5,40 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
 > [!WARNING]
 > (pseudo-)HU mapping is currently a beta feature in active development.
 
-### Creating a pseudoCT from UTE scans
+### Creating pseudoCTs from UTE scans
 
-0. Acquire an MR sequence with detailed bone contrast 
+0. **MR acquisition** 
 
->**Example PETRA UTE parameters** (Carpino et al., 2023)
-- TR: 3.32 ms
-- TE: 0.07 ms
-- voxel size: 0.8 mm3
-- 352 sagittal slices
-- flip angle: 2°
-- FoV: 294 mm
+    Acquire an MR sequence with detailed bone contrast 
 
-1. **SimNIBS segmentation**. Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2w) as inputs. You can either use the SimNIBS GUI or PRESTUS (**default**).
-2. **pCT creation**. Run `pct_create_pseudoCT.sh` in bash. This calls the MATLAB function `pct_soft_tissue_peak`
+    >**Example PETRA UTE parameters** (Carpino et al., 2023)
+    TR: 3.32 ms
+    TE: 0.07 ms
+    voxel size: 0.8 mm3
+    352 sagittal slices
+    flip angle: 2°
+    FoV: 294 mm
 
-The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
+1. **SimNIBS segmentation**. 
 
-To run the code you will need to install (or load the following modules):
+    Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2w) as inputs. You can either use the SimNIBS GUI or PRESTUS (**default**).
+
+2. **pseudoCT generation**. 
+
+Run `pct_create_pseudoCT.sh` in bash. An example script to create a pseudoCT is provided at `examples/createPseudoCT.sh`. To run the code you will need to install (or load the following modules):
 
 - SimNIBS
 - FSL
 - ANTs
 
-**Note: Example PETRA UTE parameters** (Carpino et al., 2023)
+The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
 
-- TR: 3.32 ms
-- TE: 0.07 ms
-- voxel size: 0.8 mm3
-- 352 sagittal slices
-- flip angle: 2°
-- FoV: 294 mm
-
-#### Conceptual overview
+#### pseudoCT generation
 
 The following steps are used to create the pseudoCT:
 
 - UTE: Threshold at 0, apply bias field correction to remove inhomogeneity, normalize (divide by soft tissue peak value > i.e., normalised UTE intensity = 1)
+- Soft tissue value is identified with the MATLAB function `pct_soft_tissue_peak`
 - pHU Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
 - pHU Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
 - pHU Skull: Linear mapping
@@ -56,14 +53,15 @@ The following steps are used to create the pseudoCT:
 - Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).
 - Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).
 - Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).
-  
-An example script to create a pseudoCT is provided at `examples/createPseudoCT.sh`.
 
 ### Using (pseudo-)CTs to inform acoustic properties
 
-see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43)
+Hounsfield Units can be used to inform acoustic properties in the bone layer of a SimNIBS segmentation. This is a subtype of a `layered` medium.
 
-To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to inform skull tissue parameters. Note that this affects only the pCT-to-tissueproperty conversion, only the above described procedure to derive pCTs is currently supported.
+To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to optionally model density, speed of sounds, and attenuation in the skull bone.
+
+[!warning] The most suitable model remains an active area of research. All mappings should be treated as explorative. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43).
+
 
 - `carpino` | (**default**) Algorithm described in Carpino et al. (2024). <br>
 

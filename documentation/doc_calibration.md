@@ -4,7 +4,7 @@
 
 PRESTUS generally does not provide default transducer settings. Instead, it encourages users to set up transducers and optimize settings to match their empirical setup.
 
-See the full [parameter documentation](doc_config.md#transducer-specification).
+See the full [parameter documentation](doc_parameters.md#transducer-specification).
 
 #### Static parameters
 
