@@ -18,36 +18,16 @@ Key features include:
 - 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
 
 These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
-The ```documentation``` folder contains evolving documentation of the main workflows and parameters, alongside a tutorial on how to run the integrated pipeline.
-
 A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
 
-If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
+# Documentation
 
-# Installation
-
-## Donders Institute HPC Cluster
-
-When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
-
-Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
-
-For more information on HPC usage, see the [HPC guide](documentation/doc_hpc.md)
-
-
-If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
-
-```
-cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
-```
-
-## Outside the Donders HPC
-
-Follow the [installation guide](documentation/doc_installation.md).
+Please see the [PRESTUS documentation](https://donders-institute.github.io/PRESTUS/).
 
 # Reference
 
-Chetverikov, A.\*, Kosciessa, J. Q.\*, Cornelissen, M., Carpino, E., van der Zee, K., & Verhagen, L. (2025). PRESTUS (0.4.0). Zenodo. https://doi.org/10.5281/zenodo.15965832
+If you use this tool for publications, please cite:
+Kosciessa, J. Q.\*, Chetverikov, A.\*, Cornelissen, M., Carpino, E., van der Zee, K., & Verhagen, L. (2025). PRESTUS (0.5.0). Zenodo. https://doi.org/10.5281/zenodo.15965832
 
 # Contributors
 
@@ -76,6 +56,8 @@ Chetverikov, A.\*, Kosciessa, J. Q.\*, Cornelissen, M., Carpino, E., van der Zee
 <!-- prettier-ignore-end -->
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
+
+If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
 
 # License
 

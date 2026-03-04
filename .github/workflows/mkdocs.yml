@@ -1,7 +1,7 @@
 name: Deploy PRESTUS Docs
 on:
   push:
-    branches: [ development, master ]
+    branches: [ development, main ]
   workflow_dispatch:
 
 permissions:
