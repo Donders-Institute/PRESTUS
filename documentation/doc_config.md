@@ -1,4 +1,4 @@
-## PRESTUS configuration
+## PRESTUS parameters
 
 The following documents the parameters used in PRESTUS. The specification philosophy is the following: `default_config.yaml` provides a list of all parameters with default settings and will be read in first by the function `load_parameters`. This default configuration file should not be changed in standard applications to ensure that necessary fields are provided. 
 

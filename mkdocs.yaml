@@ -42,7 +42,7 @@ nav:
     - Getting started: doc_getting-started.md
   - 📖 Documentation:
     - Transducer Calibration: doc_calibration.md
-    - Head preprocessing: doc_preprocessing.md
+    - Head preprocessing: doc_preproc.md
     - Medium Setup: doc_medium.md
     - Transducer Placement: doc_placement.md
     - Neuronavigation: doc_neuronav.md
