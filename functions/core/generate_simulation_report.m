@@ -246,8 +246,6 @@ function limits = get_safety_limits_water()
     limits = struct();
     limits.max_Isppa = struct('label', 'ISPPA (global)',  'limit', Inf, 'unit', 'W/cm²');
     limits.max_pressure_Pa = struct('label', 'Max pressure', 'limit', Inf, 'unit', 'Pa');
-    limits.maxT  = struct('label', 'Max temperature', 'limit', 39.0, 'unit', [char(176) 'C']);
-    limits.maxCEM43 = struct('label', 'CEM43 (global)', 'limit', Inf, 'unit', 'min');
 end
 
 function color = safety_color(value, limit)
@@ -291,11 +289,17 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
 
         % Extract value from CSV
         value = NaN;
+        display_unit = info.unit;
         if ~isempty(csv_table) && ismember(name, csv_table.Properties.VariableNames)
             val = csv_table.(name);
             if isnumeric(val) && ~isempty(val)
                 value = val(end); % last row if multiple
             end
+        end
+
+        % Special handling for pressure: use dynamic unit scaling
+        if strcmp(name, 'max_pressure_Pa') && ~isnan(value)
+            [value, display_unit] = scale_pressure(value);
         end
 
         % Determine color
@@ -311,9 +315,9 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
         else
             html = [html sprintf('<div class="safety-value">%.3g</div>', value)];
             if isinf(info.limit)
-                html = [html sprintf('<div class="safety-limit">%s (informational)</div>', info.unit)];
+                html = [html sprintf('<div class="safety-limit">%s (informational)</div>', display_unit)];
             else
-                html = [html sprintf('<div class="safety-limit">Limit: %.3g %s</div>', info.limit, info.unit)];
+                html = [html sprintf('<div class="safety-limit">Limit: %.3g %s</div>', info.limit, display_unit)];
                 % Progress bar showing value as % of limit
                 pct = min(100, max(0, (value / info.limit) * 100));
                 html = [html sprintf('<div class="safety-bar-track"><div class="safety-bar" style="width:%.0f%%"></div></div>', pct)];
@@ -376,11 +380,12 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
         html = [html summary_card('ISPPA brain', csv_value(csv_table, 'max_Isppa_brain'), 'W/cm²')];
         html = [html summary_card('-6dB vol. brain', csv_value(csv_table, 'minus6dB_volume_brain_mm3'), 'mm³')];
     else
-        html = [html summary_card('Max pressure', csv_value(csv_table, 'max_pressure_Pa'), 'Pa')];
+        [p_val, p_unit] = scale_pressure(csv_value(csv_table, 'max_pressure_Pa'));
+        html = [html summary_card('Max pressure', p_val, p_unit)];
     end
 
     % Thermal summary if available
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
+    if is_layered && isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
         html = [html summary_card('Max temp.', csv_value(csv_table, 'maxT'), [char(176) 'C'])];
     end
 
@@ -400,6 +405,23 @@ function html = summary_card(label, value, unit)
     html = [html sprintf('<div class="summary-value">%s</div>', val_str)];
     html = [html sprintf('<div class="summary-unit">%s</div>', html_escape(unit))];
     html = [html '</div>'];
+end
+
+function [val, unit] = scale_pressure(val_Pa)
+% Auto-scale pressure value to Pa, kPa, or MPa for display.
+    if isnan(val_Pa)
+        val  = NaN;
+        unit = 'Pa';
+    elseif abs(val_Pa) >= 1e6
+        val  = val_Pa / 1e6;
+        unit = 'MPa';
+    elseif abs(val_Pa) >= 1e3
+        val  = val_Pa / 1e3;
+        unit = 'kPa';
+    else
+        val  = val_Pa;
+        unit = 'Pa';
+    end
 end
 
 function val = csv_value(csv_table, col_name)
@@ -593,6 +615,16 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             avail_cols = intersect(water_cols, csv_table.Properties.VariableNames, 'stable');
             if ~isempty(avail_cols)
                 sub_table = csv_table(:, avail_cols);
+                % Scale pressure values dynamically (Pa -> kPa/MPa based on magnitude)
+                if ismember('max_pressure_Pa', sub_table.Properties.VariableNames)
+                    pressure_vals = sub_table{:, 'max_pressure_Pa'};
+                    if ~all(isnan(pressure_vals))
+                        [scaled_vals, display_unit] = scale_pressure(pressure_vals);
+                        sub_table{:, 'max_pressure_Pa'} = scaled_vals;
+                        % Rename column header to reflect actual unit
+                        sub_table.Properties.VariableNames{'max_pressure_Pa'} = ['max_pressure_' display_unit];
+                    end
+                end
                 html = [html table2html(sub_table, struct(), {})];
             else
                 html = [html '<p class="placeholder">No acoustic columns found in CSV.</p>'];
