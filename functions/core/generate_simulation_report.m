@@ -615,6 +615,16 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             avail_cols = intersect(water_cols, csv_table.Properties.VariableNames, 'stable');
             if ~isempty(avail_cols)
                 sub_table = csv_table(:, avail_cols);
+                % Scale pressure values dynamically (Pa -> kPa/MPa based on magnitude)
+                if ismember('max_pressure_Pa', sub_table.Properties.VariableNames)
+                    pressure_vals = sub_table{:, 'max_pressure_Pa'};
+                    if ~all(isnan(pressure_vals))
+                        [scaled_vals, display_unit] = scale_pressure(pressure_vals);
+                        sub_table{:, 'max_pressure_Pa'} = scaled_vals;
+                        % Rename column header to reflect actual unit
+                        sub_table.Properties.VariableNames{'max_pressure_Pa'} = ['max_pressure_' display_unit];
+                    end
+                end
                 html = [html table2html(sub_table, struct(), {})];
             else
                 html = [html '<p class="placeholder">No acoustic columns found in CSV.</p>'];
