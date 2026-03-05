@@ -49,14 +49,13 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
         error('Unsupported simulation dimensionality: expected 2 or 3.');
     end
 
-    % location of the transducer
-    i_bowl = parameters.transducer.trans_pos(end);
-    i_ep = round(parameters.transducer.trans_pos(end)+...
-        (parameters.transducer.focal_distance_offset/parameters.grid_step_mm));
-    i_focus = round(parameters.transducer.trans_pos(end)+...
-        (parameters.transducer.expected_focal_distance_bowl/parameters.grid_step_mm)); % = parameters.transducer.focus_pos(end);
+    % Location of the transducer bowl, exit plane, and focus (in mm)
+    i_bowl = parameters.transducer.trans_pos(end)*parameters.grid_step_mm;
+    i_ep = round(parameters.transducer.trans_pos(end)*parameters.grid_step_mm+...
+        parameters.transducer.focal_distance_offset);
+    i_focus = parameters.transducer.focus_pos(end)*parameters.grid_step_mm;
 
-    % Plot the pressure map.
+    % Plot the pressure map
     imagesc(p_distance, p_width, p_axialprofile);
     axis image;
     hold on;
