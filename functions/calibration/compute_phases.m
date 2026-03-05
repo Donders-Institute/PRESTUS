@@ -1,10 +1,10 @@
-function phases = compute_phases(SOUND_SPEED_WATER, tran, focus_wrt_exit_plane, tran_ini_data)
+function phases = compute_phases(SOUND_SPEED_WATER, tran, desired_focal_distance_ep, tran_ini_data)
     % Computes the phases necessary to aim at the specified focal point.
     %
     % Arguments:
     % - SOUND_SPEED_WATER: Speed of sound in water [m/s].
     % - tran: Structure containing transducer parameters and element data.
-    % - focus_wrt_exit_plane: Focal depth relative to the transducer exit plane [mm].
+    % - desired_focal_distance_ep: Focal depth relative to the transducer exit plane [mm].
     % - tran_ini_data: Ini data structure containing transducer element positions.
     %
     % Returns:
@@ -18,7 +18,7 @@ function phases = compute_phases(SOUND_SPEED_WATER, tran, focus_wrt_exit_plane, 
     
     % Convert focal distance relative to the exit plane to relative to the mid-bowl
     dist_to_mid_bowl = tran.prestus.transducer.curv_radius_mm - tran.prestus.transducer.dist_to_plane_mm;
-    focus_wrt_mid_bowl = focus_wrt_exit_plane + dist_to_mid_bowl;
+    focus_wrt_mid_bowl = desired_focal_distance_ep + dist_to_mid_bowl;
 
     % Compute the target point in relation to the natural focus [mm]
     aim_wrt_natural_focus = tran.prestus.transducer.curv_radius_mm - focus_wrt_mid_bowl;

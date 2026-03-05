@@ -1,10 +1,10 @@
-function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, axial_position, adjusted_profile_focus, velocity)
+function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, profile_target, velocity)
     % Perform a global search to optimize transducer phases and particle velocity.
     %
     % Arguments:
     % - parameters: Structure containing simulation and transducer parameters.
-    % - axial_position: Distance vector for the intensity profile [mm from transducer bowl].
-    % - adjusted_profile_focus: Adjusted desired intensity profile [W/cm^2].
+    % - profile_target.axial_distance_bowl: Distance vector for the intensity profile [mm from transducer bowl].
+    % - profile_target.axial_intensity: Adjusted desired intensity profile [W/cm^2].
     % - velocity: Initial particle velocity estimate [m/s].
     %
     % Returns:
@@ -13,7 +13,11 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     % - min_err: Minimum error achieved during optimization.
     
     if ~isfield(parameters.calibration, 'opt_limits')
-        opt_limits = [1, max(axial_position)];
+        % By default set to min and max distance with non-NAN intensity
+        min_available = min(profile_target.axial_distance_bowl(~isnan(profile_target.axial_intensity)));
+        max_available = max(profile_target.axial_distance_bowl(~isnan(profile_target.axial_intensity)));
+        opt_limits = [min_available, max_available];
+
     else
         opt_limits = parameters.calibration.opt_limits;
     end
@@ -30,8 +34,8 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         phases_and_velocity(1:end-1), ... % Phases for transducer elements
         parameters, ... % Simulation and transducer parameters
         phases_and_velocity(end), ... % Particle velocity
-        axial_position, ... % Distance vector
-        adjusted_profile_focus,... % Desired intensity profile
+        profile_target.axial_distance_bowl, ... % Distance vector
+        profile_target.axial_intensity,... % Desired intensity profile
         0, ... % Disable plotting
         opt_limits, ...
         weights);
@@ -90,8 +94,8 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         opt_phases, ... % Optimized phases
         parameters, ... % Simulation and transducer parameters
         opt_velocity, ... % Optimized velocity
-        axial_position, ... % Distance vector
-        adjusted_profile_focus,... % Desired intensity profile
+        profile_target.axial_distance_bowl, ... % Distance vector
+        profile_target.axial_intensity,... % Desired intensity profile
         1, ... % Enable plotting
         opt_limits, ...
         weights);

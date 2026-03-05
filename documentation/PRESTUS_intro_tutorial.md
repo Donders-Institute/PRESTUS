@@ -189,7 +189,7 @@ axial_position   = (1:parameters.default_grid_dims(3))*0.5;       % [mm]
 % evaluate pressure analytically
 % focusedAnnulusONeil provides an analytic solution for the pressure at the
 % focal (beam) axis
-[p_axial_oneil] = focusedAnnulusONeil(parameters.transducer.curv_radius_mm/1e3, ...
+[profile_oneil.axial_intensity] = focusedAnnulusONeil(parameters.transducer.curv_radius_mm/1e3, ...
     [parameters.transducer.Elements_ID_mm; parameters.transducer.Elements_OD_mm]/1e3, repmat(velocity,1,parameters.transducer.n_elements), ...
     parameters.transducer.source_phase_rad, parameters.transducer.source_freq_hz, parameters.medium.water.sound_speed, ...
     parameters.medium.water.density, (axial_position-0.5)*1e-3);
@@ -197,7 +197,7 @@ axial_position   = (1:parameters.default_grid_dims(3))*0.5;       % [mm]
 % plot focal axis pressure
 figure('Position', [10 10 900 500]);
 
-plot(axial_position, p_axial_oneil .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+plot(axial_position, profile_oneil.axial_intensity .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 xlabel('Axial Position [mm]');
 ylabel('Intensity [W/cm^2]');
 hold on
@@ -213,7 +213,7 @@ title('Pressure along the beam axis')
 
 ```matlab:Code
 % what is distance to the maximum pressure?
-fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',axial_position(p_axial_oneil==max(p_axial_oneil)))
+fprintf('Estimated distance to the point of maximum pressure: %.2f mm\n',axial_position(profile_oneil.axial_intensity==max(profile_oneil.axial_intensity)))
 ```
 
 ```text:Output
@@ -224,7 +224,7 @@ We want the simulated results to match the real profile as closely as possible, 
 
 ```matlab:Code
 % compute the approximate adjustment from simulated (on a grid) to analytic solution
-simulated_grid_adj_factor = max(pred_axial_pressure(:))/max(p_axial_oneil(:));
+simulated_oneil_scaling = max(pred_axial_pressure(:))/max(profile_oneil.axial_intensity(:));
 ```
 
 # Optimize for a given distance and pressure
@@ -290,7 +290,7 @@ opt_velocity = opt_phases_and_velocity(parameters.transducer.n_elements);
     parameters.medium.water.density, (axial_position-0.5)*1e-3);
 
 figure('Position', [10 10 900 500]);
-plot(axial_position, p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+plot(axial_position, profile_oneil.axial_intensity.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 xlabel('Axial Position [mm]');
 ylabel('Intensity [W/cm^2]');
 hold on
@@ -328,7 +328,7 @@ Estimated distance to the center of half-maximum range: 68.25 mm
 Now we will redo the simulations with new parameters. We copy the configuration, update the settings with the optimized parameters, and rerun the simulations. 
 
 ```matlab:Code
-opt_source_amp = round(opt_velocity/velocity*parameters.transducer.source_amp/simulated_grid_adj_factor);
+opt_source_amp = round(opt_velocity/velocity*parameters.transducer.source_amp/simulated_oneil_scaling);
 
 opt_parameters = load_parameters('tutorial_config.yaml'); 
 opt_parameters.transducer.source_amp = opt_source_amp;
@@ -385,7 +385,7 @@ pred_axial_pressure_opt = squeeze(p_max(opt_res.parameters.transducer.trans_pos(
 
 figure('Position', [10 10 900 500]);
 hold on
-plot(axial_position, p_axial_oneil.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
+plot(axial_position, profile_oneil.axial_intensity.^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);
 xlabel('Axial Position [mm]');
 ylabel('Intensity [W/cm^2]');
 plot(axial_position, p_axial_oneil_opt .^2/(2*parameters.medium.water.sound_speed*parameters.medium.water.density) .* 1e-4);

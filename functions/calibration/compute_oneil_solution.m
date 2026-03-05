@@ -1,66 +1,58 @@
-function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = ...
-    compute_oneil_solution(parameters, pred_axial_pressure, dist_transducer, ...
-    adjusted_profile_focus, focus_wrt_exit_plane, desired_intensity, equipment_name)
+function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(parameters, profile_sim, profile_target)
 
     % Compute O'Neil solution and plot it along with comparisons
     %
     % Arguments:
     % - parameters: Structure containing simulation and transducer parameters.
-    %   parameters.calibration.path_output: Directory for saving results and figures.
-    % - p_max: Predicted pressure [Pa].
-    % - dist_transducer: Axial distance from the transducer exit plane [mm].
-    % - adjusted_profile_focus: Adjusted intensity profile for the focus.
-    % - focus_wrt_exit_plane: Focal distance relative to the exit plane
-    % [mm]. Will be used only for labelling.
-    % - desired_intensity: Desired intensity at the focal point [W/cm^2].
-    % - equipment_name: Name of the equipment for labeling results.
+    %       .calibration.path_output: Directory for saving results and figures.
+    %       .calibration.desired_focal_distance_ep: Focal distance relative to the exit plane [mm]. Will be used only for labelling.
+    %       .calibration.desired_intensity: Desired intensity at the focal point [W/cm^2].
+    %       .calibration.equipment_name: Name of the equipment for labeling results.
+    % - profile_sim.axial_intensity: Simulated axial intensity [W/cm2].
+    % - profile_sim.axial_distance_bowl: Axial distance of simulated pressure [mm from bowl]
+    % - profile_sim.velocity: Particle profile_sim.velocity [m/s].
+    % - profile_target.axial_intensity: Adjusted intensity profile for the focus.
     %
     % Returns:
-    % - p_axial_oneil: Computed O'Neil solution for pressure along the beam axis [Pa].
-    % - simulated_grid_adj_factor: Adjustment factor to align simulated pressure with analytical solution.
-    % - velocity: Particle velocity [m/s].
-    % - axial_position: Axial position vector [mm].
-
-    % Compute particle velocity [m/s]
-    velocity = parameters.transducer.source_amp(1) / ...
-               (parameters.medium.water.density * parameters.medium.water.sound_speed);
+    % - profile_oneil.axial_intensity: Computed O'Neil solution for pressure along the beam axis [Pa].
+    % - profile_oneil.axial_distance_bowl: Axial position vector [mm from bowl].
+    % - simulated_oneil_scaling: Adjustment factor to align simulated intensity with analytical solution.
     
     % Define the axial position vector [mm]
-    % Note: transducer will be placed at initial location in grid
-    axial_position = (1:parameters.default_grid_dims(end)) * parameters.grid_step_mm;
+    axial_position = profile_sim.axial_distance_bowl;
+
+    % Flip the desired profile
+    profile_target.axial_intensity = profile_target.axial_intensity';
     
     % Compute O'Neil analytical solution for pressure along the beam axis [Pa]
     p_axial_oneil = focusedAnnulusONeil(...
         parameters.transducer.curv_radius_mm / 1e3, ... % Convert radius to meters
         [parameters.transducer.Elements_ID_mm; parameters.transducer.Elements_OD_mm] / 1e3, ... % Element dimensions in meters
-        repmat(velocity, 1, parameters.transducer.n_elements), ... % Velocity array
+        repmat(profile_sim.velocity, 1, parameters.transducer.n_elements), ... % Velocity array
         parameters.transducer.source_phase_rad, ... % Source phases [radians]
         parameters.transducer.source_freq_hz, ... % Source frequency [Hz]
         parameters.medium.water.sound_speed, ... % Sound speed in water [m/s]
         parameters.medium.water.density, ... % Water density [kg/m^3]
         (axial_position - 0.5) * 1e-3); % Axial positions (adjusted, in meters)
     
-    % Convert pressures to intensities [W/cm^2]
+    % Convert pressure to intensities [W/cm^2]
     i_axial_oneil = p_axial_oneil .^ 2 / (2 * parameters.medium.water.sound_speed * parameters.medium.water.density) * 1e-4;
-    pred_axial_intensity = pred_axial_pressure .^ 2 / (2 * parameters.medium.water.sound_speed * parameters.medium.water.density) * 1e-4;
 
     % Plot intensity along the beam axis
     figure('Position', [10, 10, 900, 500]);
     plot(axial_position, i_axial_oneil, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'O''Neil Analytical Solution');
     hold on;
-    % get the distance from the transducer bowl (i.e., trans_pos in PRESTUS)
-    axial_position_sim = axial_position - (parameters.transducer.trans_pos(end) - 1) * parameters.grid_step_mm;
-    plot(axial_position_sim, pred_axial_intensity, ...
+    plot(axial_position, profile_sim.axial_intensity, ...
         '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
-    plot(dist_transducer, adjusted_profile_focus, ...
+    plot(axial_position, profile_target.axial_intensity, ...
         'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
     if isfield(parameters, 'expected_focal_distance_bowl')
         xline(parameters.expected_focal_distance_bowl, '--', ...
-            'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)');
+            'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)', 'Color', [1 0 0]);
     end
     if isfield(parameters, 'expected_focal_distance_ep') && isfield(parameters, 'expected_focal_distance_bowl')
-        yline(parameters.expected_focal_distance_ep-parameters.expected_focal_distance_bowl, '--', ...
+        xline(parameters.transducer.focal_distance_offset, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Exit Plane');
     end
     hold off;
@@ -71,19 +63,23 @@ function [p_axial_oneil, simulated_grid_adj_factor, velocity, axial_position] = 
     title('Intensity Along the Beam Axis');
     grid on;
     ylim([0 inf]);
-    xlim([-5 inf]);
+    xlim([0 inf]);
 
     % Save the figure
     fig_path = fullfile(parameters.outputs_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
-        focus_wrt_exit_plane, desired_intensity, equipment_name));
+        parameters.calibration.desired_focal_distance_ep, parameters.calibration.desired_intensity, parameters.calibration.equipment_name));
     saveas(gcf, fig_path);
     close(gcf);
 
-    % Report the estimated distance to the point of maximum pressure
-    [~, max_idx] = max(p_axial_oneil);
-    fprintf('Estimated distance to maximum pressure: %.2f mm\n', axial_position(max_idx));
+    % Report the estimated distance to the point of maximum intensity
+    [~, max_idx] = max(i_axial_oneil);
+    fprintf('Estimated distance to maximum intensity: %.2f mm\n', axial_position(max_idx));
 
-    % Compute adjustment factor to align simulated and analytical pressures
-    simulated_grid_adj_factor = max(pred_axial_pressure(:)) / max(p_axial_oneil(:));
+    % Compute adjustment factor to align simulated and analytical intensities
+    simulated_oneil_scaling = max(profile_sim.axial_intensity(:)) / max(i_axial_oneil(:));
+
+    %% Collect outputs
+    profile_oneil.axial_intensity = i_axial_oneil;
+    profile_oneil.axial_distance_bowl = axial_position;
     
 end

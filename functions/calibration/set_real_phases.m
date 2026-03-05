@@ -1,10 +1,10 @@
-function source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters)
+function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters)
     % Set the manufacturer-specified phases of the transducer for a given focal depth.
     %
     % Arguments:
     % - phase_table: Additional data for phase calculations.
     % - tran: Transducer structure containing manufacturer and element details.
-    % - focus_wrt_exit_plane: Desired focal depth with respect to the transducer exit plane [mm].
+    % - focal_distance_ep: Desired focal depth with respect to the transducer exit plane [mm].
     % - parameters
     %       .medium.water.sound_speed: Speed of sound in water [m/s].
     %
@@ -17,11 +17,11 @@ function source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_pl
         distance = phase_table.Distance;
         phases = phase_table(:, 2:end-1); % Remove non-phase columns
         
-        foc_index = find(distance == focus_wrt_exit_plane, 1);
+        foc_index = find(distance == focal_distance_ep, 1);
         init_phases = table2array(phases(foc_index, :));
     elseif isequal(tran.manufact, "Imasonic")
         % Compute phases based on the focal depth
-        init_phases = compute_phases(parameters.medium.water.sound_speed, tran, focus_wrt_exit_plane, phase_table);
+        init_phases = compute_phases(parameters.medium.water.sound_speed, tran, focal_distance_ep, phase_table);
     else
         error('Unsupported transducer manufacturer: %s', tran.manufact);
     end
