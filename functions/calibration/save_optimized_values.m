@@ -1,12 +1,12 @@
-function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensity, equipment_name)
+function save_optimized_values(parameters)
     % Save optimized phases and amplitude values to a CSV file.
     %
     % Arguments:
     % - parameters: Structure containing optimized parameters, including transducer values.
-    %   parameters.calibration.path_output: Path to the output for saving optimized values.
-    % - focus_wrt_exit_plane: Target focal distance with respect to the exit plane [mm].
-    % - desired_intensity: Target intensity for optimization [W/cm^2].
-    % - equipment_name: Serial number of the driving system & transducer.
+    %   .calibration.path_output: Path to the output for saving optimized values.
+    %   .calibration.desired_focal_distance_ep: Target focal distance with respect to the exit plane [mm].
+    %   .calibration.desired_intensity: Target intensity for optimization [W/cm^2].
+    %   .calibration.equipment_name: Serial number of the driving system & transducer.
     
     disp('Saving optimized values to CSV file...');
 
@@ -27,19 +27,19 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
         prestus_int = cell2mat(virtual_data(2:end, 1));
 
         % Find or add the focal distance column
-        col_index_foc = find(prestus_foci_wrt_exit_plane == focus_wrt_exit_plane, 1);
+        col_index_foc = find(prestus_foci_wrt_exit_plane == parameters.calibration.desired_focal_distance_ep, 1);
         if isempty(col_index_foc)
             col_index_foc = size(virtual_data, 2) + 1;
-            virtual_data{1, col_index_foc} = focus_wrt_exit_plane;
+            virtual_data{1, col_index_foc} = parameters.calibration.desired_focal_distance_ep;
         else
             col_index_foc = col_index_foc + 1; % Adjust for header row
         end
 
         % Find or add the desired intensity row
-        row_index_int = find(prestus_int == desired_intensity, 1);
+        row_index_int = find(prestus_int == parameters.calibration.desired_intensity, 1);
         if isempty(row_index_int)
             row_index_int = size(virtual_data, 1) + 1;
-            virtual_data{row_index_int, 1} = desired_intensity;
+            virtual_data{row_index_int, 1} = parameters.calibration.desired_intensity;
         else
             row_index_int = row_index_int + 1; % Adjust for header row
         end
@@ -66,8 +66,8 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
     else
         % Create a new file
         virtual_data = {
-            'Desired Intensity [W/cm^2] - Focus wrt Exit Plane [mm]', focus_wrt_exit_plane;
-            desired_intensity, mat2str([opt_phases, source_amp])
+            'Desired Intensity [W/cm^2] - Focus wrt Exit Plane [mm]', parameters.calibration.desired_focal_distance_ep;
+            parameters.calibration.desired_intensity, mat2str([opt_phases, source_amp])
         };
 
         writecell(virtual_data, output_file_path, 'FileType', 'text');
@@ -75,15 +75,17 @@ function save_optimized_values(parameters, focus_wrt_exit_plane, desired_intensi
 
     % Save optimized transducer parameters to a YAML file for easy 
     % integration in PRESTUS config file
-    if mod(focus_wrt_exit_plane,1) == 0
-       yaml_file = sprintf('%s-F%.0fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
+    if mod(parameters.calibration.desired_focal_distance_ep,1) == 0
+        yaml_file = sprintf('%s-F%.0fmm-I%.0fwpercm2.yaml', parameters.calibration.equipment_name, ...
+            parameters.calibration.desired_focal_distance_ep, parameters.calibration.desired_intensity);
     else
-       yaml_file = sprintf('%s-F%.1fmm-I%.0fwpercm2.yaml', equipment_name, focus_wrt_exit_plane, desired_intensity);
+        yaml_file = sprintf('%s-F%.1fmm-I%.0fwpercm2.yaml', parameters.calibration.equipment_name, ...
+            parameters.calibration.desired_focal_distance_ep, parameters.calibration.desired_intensity);
     end
     yaml_path = fullfile(parameters.calibration.path_output_profiles, yaml_file);
 
-    parameters.transducer.set_focus_wrt_exit_plane_mm = focus_wrt_exit_plane;
-    parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
+    parameters.transducer.set_focus_wrt_exit_plane_mm = parameters.calibration.desired_focal_distance_ep;
+    parameters.transducer.set_intensity_w_per_cm2 = parameters.calibration.desired_intensity;
 
     % Wrap transducer parameters in a parent structure for YAML
     data = struct('transducer', parameters.transducer);

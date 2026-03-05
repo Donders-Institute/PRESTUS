@@ -104,9 +104,9 @@ Function: `calibration_transducer`
     - Calibration should be performed dynamically as part of a simulation loop (e.g., for sweeping an amplitude-distance parameter space)
 
 - Prerequisites:
-    - `profile_empirical.profile_focus`        - Desired intensity profile along focal beam axis
-    - `profile_empirical.dist_from_tran`       - Distance (mm from transducer bowl)
-    - `profile_empirical.focus_wrt_exit_plane` - Requested focal distance (mm from transducer exit plane)
+    - `profile_empirical.axial_intensity`      - Desired intensity profile along focal beam axis
+    - `profile_empirical.axial_distance_bowl`  - Distance (mm from transducer bowl)
+    - `desired_focal_distance_ep`               - Requested focal distance (mm from transducer exit plane)
 
 ### Steps:
 

@@ -105,38 +105,41 @@ for i = 1:N_i
     N_j = length(parameters.calibration.focal_depths_wrt_exit_plane{i});
     for j = 1:N_j
 
-        focus_wrt_exit_plane = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
-        fprintf('Focus: %.2f \n', focus_wrt_exit_plane)
+        focal_distance_ep = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
+        fprintf('Focus from exit plane: %.2f \n', focal_distance_ep)
 
-        parameters.expected_focal_distance_ep = focus_wrt_exit_plane;
+        parameters.expected_focal_distance_ep = focal_distance_ep;
 
         % Load default parameters incl. additional chosen parameters like transducer
         parameters = load_parameters(parameters);
 
         % Verify focal range
-        if focus_wrt_exit_plane < tran.min_foc || focus_wrt_exit_plane > tran.max_foc
+        if focal_distance_ep < tran.min_foc || focal_distance_ep > tran.max_foc
             warning('Focus %.2f mm is outside the range [%.2f, %.2f] mm. Skipping.\n', ...
-                focus_wrt_exit_plane, tran.min_foc, tran.max_foc);
+                focal_distance_ep, tran.min_foc, tran.max_foc);
             continue;
         end
 
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
-        source_phase_deg = set_real_phases(phase_table, tran, focus_wrt_exit_plane, parameters);
+        source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters);
         parameters.transducer.source_phase_deg = source_phase_deg; clear source_phase_deg;
 
         % Interpolate or select axial profile
         [profile_focus_ep, max_intens] = extract_real_intensity_profile(...
             parameters,...
             available_foci_wrt_exit_plane, ...
-            focus_wrt_exit_plane, ...
+            focal_distance_ep, ...
             intens_data, ...
             equipment_name, ...
             dist_from_exit_plane);
+
+        % figure; plot(dist_from_exit_plane, profile_focus_ep); hold on; xline(focal_distance_ep)
 
         % Iterate across intensities
         N_k = length(parameters.calibration.desired_intensities{i});
         for k = 1:N_k
             desired_intensity = parameters.calibration.desired_intensities{i}{k};
+            desired_focal_distance_ep = focal_distance_ep;
             
             % assign a loop-specific simulation id
             sim_id = (i-1)*N_j*N_k + (j-1)*N_k + (k-1) + 1;
@@ -154,8 +157,8 @@ for i = 1:N_i
 
             % Set the expected focal distance to exit plane 
             % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
-            parameters.expected_focal_distance_ep = focus_wrt_exit_plane;
-            parameters.expected_focal_distance_bowl = focus_wrt_exit_plane + dist_bowl_exit_plane;
+            parameters.expected_focal_distance_ep = focal_distance_ep;
+            parameters.expected_focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
 
             % if the original profiles are measured from the exit plane,
             % we do not model the space until the exit plane; this can lead
@@ -166,8 +169,8 @@ for i = 1:N_i
             if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
                 Nvals = round(dist_bowl_focus(1)/(dist_bowl_focus(2)-dist_bowl_focus(1)));
                 dist_bowl_focus = cat(1, linspace(0, dist_bowl_focus(1), Nvals)',dist_bowl_focus);
-                % set those to initial value in amplitude profile
-                profile_focus = cat(1, repmat(profile_focus_ep(1),Nvals,1), profile_focus_ep');
+                % set those to zero in amplitude profile
+                profile_focus = cat(1, repmat(0, Nvals,1), profile_focus_ep');
             else
                 profile_focus = profile_focus_ep;
             end
@@ -176,9 +179,11 @@ for i = 1:N_i
             profile_focus(profile_focus<0) = 0;
 
             % collect data on empirical profile
-            profile_empirical.profile_focus = profile_focus;
-            profile_empirical.dist_from_tran = dist_bowl_focus;
-            profile_empirical.focus_wrt_exit_plane = focus_wrt_exit_plane;
+            profile_empirical.axial_intensity = profile_focus;
+            profile_empirical.axial_distance_bowl = dist_bowl_focus;
+
+            % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus); 
+            % hold on; xline(parameters.expected_focal_distance_bowl)
 
             % convert from default 3D to 2D axisymmetric simulation (if requested)
             if isfield(parameters.calibration, 'axisymmetric2D') && ...
@@ -192,13 +197,14 @@ for i = 1:N_i
 
             % Show current iteration
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
-                ' F ', num2str(profile_empirical.focus_wrt_exit_plane), ' I ', num2str(desired_intensity)])
+                ' F ', num2str(desired_focal_distance_ep), ' I ', num2str(desired_intensity)])
 
             % perform the calibration
             calibration_transducer(...
                 profile_empirical, ...
                 equipment_name, ...
                 desired_intensity, ...
+                desired_focal_distance_ep,...
                 parameters,...
                 sim_id)
 

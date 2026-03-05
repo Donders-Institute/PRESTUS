@@ -1,7 +1,7 @@
 function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     parameters,...
     available_foci_wrt_exit_plane, ...
-    focus_wrt_exit_plane, ...
+    desired_focal_distance_ep, ...
     intens_data, ...
     equipment_name, ...
     dist_from_exit_plane)
@@ -13,7 +13,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     %   parameters.calibration.skip_front_peak_mm: Distance to skip near-field peaks when finding the maximum intensity [mm].
     %   parameters.calibration.path_output_profiles: Directory path for saving results.
     % - available_foci_wrt_exit_plane: Array of available focal depths relative to the exit plane [mm].
-    % - focus_wrt_exit_plane: Desired focal depth relative to the exit plane [mm].
+    % - desired_focal_distance_ep: Desired focal depth relative to the exit plane [mm].
     % - intens_data: Matrix containing intensity profiles for different focal depths.
     % - equipment_name: Name of the equipment for labeling plots.
     % - dist_from_exit_plane: Distance vector from the transducer [mm].
@@ -23,15 +23,15 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     % - max_intens: Maximum intensity in the profile beyond the specified skip distance.
 
     % Check if the exact focal depth is available
-    col_index = find(available_foci_wrt_exit_plane == focus_wrt_exit_plane);
+    col_index = find(available_foci_wrt_exit_plane == desired_focal_distance_ep);
 
     if isempty(col_index)
         % Perform linear interpolation if the exact focus is not available
-        [~, closestIndex] = min(abs(available_foci_wrt_exit_plane - focus_wrt_exit_plane));
+        [~, closestIndex] = min(abs(available_foci_wrt_exit_plane - desired_focal_distance_ep));
         closest_foci_wrt_exit_plane = available_foci_wrt_exit_plane(closestIndex);
 
         % Determine neighboring focal depths for interpolation
-        if closest_foci_wrt_exit_plane > focus_wrt_exit_plane
+        if closest_foci_wrt_exit_plane > desired_focal_distance_ep
             closestIndex2 = closestIndex; % Higher focus
             closestIndex1 = closestIndex2 - 1; % Lower focus
         else
@@ -66,7 +66,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         y2_interp_norm = interp1(x2_norm, profile_2, x_common_norm, 'spline', 'extrap');
         
         % Calculate weight (alpha) for interpolation based on the relative focal depths
-        alpha = (focus_wrt_exit_plane - focus_wrt_exit_plane_1) / ...
+        alpha = (desired_focal_distance_ep - focus_wrt_exit_plane_1) / ...
                 (focus_wrt_exit_plane_2 - focus_wrt_exit_plane_1);
 
         % Interpolate the profiles with the weight alpha
@@ -91,7 +91,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         plot(dist_from_exit_plane, profile_2, '-x', 'DisplayName', ...
             ['Measurement 2, focus at ' num2str(focus_wrt_exit_plane_2)]);
         plot(dist_from_exit_plane, profile_focus, '-x', 'DisplayName', ...
-            ['Interpolated, focus at ' num2str(focus_wrt_exit_plane)]);
+            ['Interpolated, focus at ' num2str(desired_focal_distance_ep)]);
         legend;
         xlabel('Distance wrt exit plane [mm]');
         ylabel('Intensity [W/cm^2]');
@@ -106,13 +106,13 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         plot(dist_from_exit_plane, norm_profile_focus, '-o');
         xlabel('Distance wrt exit plane [mm]');
         ylabel('Intensity [W/cm^2]');
-        title(['Axial Profile at Focus wrt Exit Plane: ' num2str(focus_wrt_exit_plane) ' [mm]']);
+        title(['Axial Profile at Focus wrt Exit Plane: ' num2str(desired_focal_distance_ep) ' [mm]']);
     end
     % Create output profile if it does not yet exist
     if ~exist(parameters.calibration.path_output_profiles); mkdir(parameters.calibration.path_output_profiles); end
     % Save the plot to the specified directory
     fig_path = fullfile(parameters.calibration.path_output_profiles, ...
-        strcat('Interpolation_at_F_', num2str(focus_wrt_exit_plane), '_', equipment_name, '.png'));
+        strcat('Interpolation_at_F_', num2str(desired_focal_distance_ep), '_', equipment_name, '.png'));
     saveas(gcf, fig_path);
     close(gcf);
 
