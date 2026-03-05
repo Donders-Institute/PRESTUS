@@ -1,4 +1,4 @@
-function plot_opt_sim_results(opt_param, sim_id, profile_target, profile_oneil, profile_oneil_opt, profile_sim, profile_sim_opt, min_err)
+function plot_opt_sim_results(opt_param, profile_target, profile_oneil, profile_oneil_opt, profile_sim, profile_sim_opt, min_err)
     % Plot optimized simulation results and compare with desired profiles
     %
     % Arguments:
@@ -9,7 +9,6 @@ function plot_opt_sim_results(opt_param, sim_id, profile_target, profile_oneil, 
     %       .calibration.desired_intensity: Target intensity for optimization [W/cm^2].
     %       .calibration.equipment_name: Name of the equipment used.
     %       .outputs_folder: Directory containing output simulation results.
-    % - sim_id: Simulation ID for loading specific results.
     % - profile_target
     %       .axial_distance_bowl: Axial position vector [mm from bowl].
     %       .axial_intensity: Adjusted desired intensity profile [W/cm^2].
@@ -43,15 +42,15 @@ function plot_opt_sim_results(opt_param, sim_id, profile_target, profile_oneil, 
     hold off;
 
     % Add focus and intensity reference lines
-    xline(focus_wrt_mid_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
-    yline(desired_intensity, '--', 'DisplayName', 'Desired Intensity');
+    xline(parameters.expected_focal_distance_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
+    yline(parameters.calibration.desired_intensity, '--', 'DisplayName', 'Desired Intensity');
 
     xlabel('Distance wrt Mid-Bowl of Transducer [mm]');
     ylabel('Intensity [W/cm^2]');
     legend('Location', 'best');
     title(sprintf('Desired vs Optimized Profiles - Optimization Error: %.4f', min_err));
     ylim([0 inf]);
-    xlim([-5 inf]);
+    xlim([0 inf]);
     
     % Save the profile comparison figure
     fig_path = fullfile(opt_param.outputs_folder, ...

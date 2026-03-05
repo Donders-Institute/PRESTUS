@@ -80,10 +80,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             parameters.calibration.force_kwavearray == 1
         sim_param.use_kwavearray = 1; % force to run with kwavearray setup
     end
-    sim_param.overwrite_files = 'always';
     sim_param.interactive = 0;
     
-    Run the simulation based on the submission method
+    % Run the simulation based on the submission method
     switch sim_param.submit_medium
         case 'qsub'
             single_subject_pipeline_with_qsub(sim_id, sim_param, true);

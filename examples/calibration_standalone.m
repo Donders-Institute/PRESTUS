@@ -199,6 +199,9 @@ for i = 1:N_i
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
                 ' F ', num2str(desired_focal_distance_ep), ' I ', num2str(desired_intensity)])
 
+            % Set to always overwrite existing calibration files
+            parameters.overwrite_files = 'always';
+
             % perform the calibration
             calibration_transducer(...
                 profile_empirical, ...
