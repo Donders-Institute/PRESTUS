@@ -246,8 +246,6 @@ function limits = get_safety_limits_water()
     limits = struct();
     limits.max_Isppa = struct('label', 'ISPPA (global)',  'limit', Inf, 'unit', 'W/cm²');
     limits.max_pressure_Pa = struct('label', 'Max pressure', 'limit', Inf, 'unit', 'Pa');
-    limits.maxT  = struct('label', 'Max temperature', 'limit', 39.0, 'unit', [char(176) 'C']);
-    limits.maxCEM43 = struct('label', 'CEM43 (global)', 'limit', Inf, 'unit', 'min');
 end
 
 function color = safety_color(value, limit)
@@ -376,11 +374,12 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
         html = [html summary_card('ISPPA brain', csv_value(csv_table, 'max_Isppa_brain'), 'W/cm²')];
         html = [html summary_card('-6dB vol. brain', csv_value(csv_table, 'minus6dB_volume_brain_mm3'), 'mm³')];
     else
-        html = [html summary_card('Max pressure', csv_value(csv_table, 'max_pressure_Pa'), 'Pa')];
+        [p_val, p_unit] = scale_pressure(csv_value(csv_table, 'max_pressure_Pa'));
+        html = [html summary_card('Max pressure', p_val, p_unit)];
     end
 
     % Thermal summary if available
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
+    if is_layered && isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
         html = [html summary_card('Max temp.', csv_value(csv_table, 'maxT'), [char(176) 'C'])];
     end
 
@@ -400,6 +399,23 @@ function html = summary_card(label, value, unit)
     html = [html sprintf('<div class="summary-value">%s</div>', val_str)];
     html = [html sprintf('<div class="summary-unit">%s</div>', html_escape(unit))];
     html = [html '</div>'];
+end
+
+function [val, unit] = scale_pressure(val_Pa)
+% Auto-scale pressure value to Pa, kPa, or MPa for display.
+    if isnan(val_Pa)
+        val  = NaN;
+        unit = 'Pa';
+    elseif abs(val_Pa) >= 1e6
+        val  = val_Pa / 1e6;
+        unit = 'MPa';
+    elseif abs(val_Pa) >= 1e3
+        val  = val_Pa / 1e3;
+        unit = 'kPa';
+    else
+        val  = val_Pa;
+        unit = 'Pa';
+    end
 end
 
 function val = csv_value(csv_table, col_name)
