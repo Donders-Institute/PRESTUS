@@ -83,17 +83,17 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param.overwrite_files = 'always';
     sim_param.interactive = 0;
     
-    % Run the simulation based on the submission method
-    % switch sim_param.submit_medium
-    %     case 'qsub'
-    %         single_subject_pipeline_with_qsub(sim_id, sim_param, true);
-    %     case 'slurm'
-    %         single_subject_pipeline_with_slurm(sim_id, sim_param, true);
-    %     case 'matlab'
-    %         single_subject_pipeline(sim_id, sim_param);
-    %     otherwise
-    %         error('Submit medium does not correspond to available options.');
-    % end
+    Run the simulation based on the submission method
+    switch sim_param.submit_medium
+        case 'qsub'
+            single_subject_pipeline_with_qsub(sim_id, sim_param, true);
+        case 'slurm'
+            single_subject_pipeline_with_slurm(sim_id, sim_param, true);
+        case 'matlab'
+            single_subject_pipeline(sim_id, sim_param);
+        otherwise
+            error('Submit medium does not correspond to available options.');
+    end
 
     %% Load initial results
 
@@ -104,7 +104,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     initial_params.calibration.prefix = 'Initial_';
     
     %% Extract simulated intensity along the focal axis
-    
+
     [profile_sim] = extract_simulated_profile(initial_res, initial_params);
     
     %% Optimization
