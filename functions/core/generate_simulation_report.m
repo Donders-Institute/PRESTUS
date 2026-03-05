@@ -289,11 +289,17 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
 
         % Extract value from CSV
         value = NaN;
+        display_unit = info.unit;
         if ~isempty(csv_table) && ismember(name, csv_table.Properties.VariableNames)
             val = csv_table.(name);
             if isnumeric(val) && ~isempty(val)
                 value = val(end); % last row if multiple
             end
+        end
+
+        % Special handling for pressure: use dynamic unit scaling
+        if strcmp(name, 'max_pressure_Pa') && ~isnan(value)
+            [value, display_unit] = scale_pressure(value);
         end
 
         % Determine color
@@ -309,9 +315,9 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
         else
             html = [html sprintf('<div class="safety-value">%.3g</div>', value)];
             if isinf(info.limit)
-                html = [html sprintf('<div class="safety-limit">%s (informational)</div>', info.unit)];
+                html = [html sprintf('<div class="safety-limit">%s (informational)</div>', display_unit)];
             else
-                html = [html sprintf('<div class="safety-limit">Limit: %.3g %s</div>', info.limit, info.unit)];
+                html = [html sprintf('<div class="safety-limit">Limit: %.3g %s</div>', info.limit, display_unit)];
                 % Progress bar showing value as % of limit
                 pct = min(100, max(0, (value / info.limit) * 100));
                 html = [html sprintf('<div class="safety-bar-track"><div class="safety-bar" style="width:%.0f%%"></div></div>', pct)];
