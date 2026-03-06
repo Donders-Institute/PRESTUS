@@ -51,7 +51,7 @@ function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(param
         xline(parameters.expected_focal_distance_bowl, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)', 'Color', [1 0 0]);
     end
-    if isfield(parameters, 'expected_focal_distance_ep') && isfield(parameters, 'expected_focal_distance_bowl')
+    if isfield(parameters.transducer, 'focal_distance_offset')
         xline(parameters.transducer.focal_distance_offset, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Exit Plane');
     end
