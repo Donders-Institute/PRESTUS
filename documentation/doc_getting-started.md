@@ -1,10 +1,12 @@
 # Quick Start Guide
 
-### Install packages 
+### Install PRESTUS and depencencies 
 
 See [Installation](doc_installation.md).
 
-### [DEPRECATED] Run the tutorial (documentation/PRESTUS_intro_tutorial.md)
+### [Deprecated] Run the tutorial 
+
+- `documentation/PRESTUS_intro_tutorial.md`
 - The acoustic profile is derived from the manufacturers measurements and adjusted to more closely match the actual characteristics of the transducer.
 - The structural data is segemented with SimNIBS 4's charm.
 - The segmented data is translated to a matrix of acoustic properties.
@@ -64,7 +66,7 @@ It may be desirable to run an intial SimNIBS call prior to running the full pipe
 
 To this end, `run_source_setup`, `run_acoustic_sims`, `run_heating_sims`, and `run_posthoc_water_sims` can be deactivated. This separate step is required to inform the skull layer [using pseudoCTs](doc_pseudoCT.md).
 
-### Run the single_subject_pipeline
+### Run the single_subject_pipeline (and iterate)
 
 When the configuration is fully specified, the full pipeline only needs a subject id (a number consisting of no more than 3 digits). To run multiple subjects or setups in parallel, the `single_subject_pipeline` can be submitted using high performance computing jobs (see [HPC documentation](doc_hpc.md)).
 
