@@ -71,15 +71,29 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;
-    sim_param.submit_medium = parameters.calibration.submit_medium;
-
-    % Manage the submission setup
+    % Overwrite calibration submission medium (if specified)
+    if isfield(parameters.calibration, 'submit_medium')
+        sim_param.submit_medium = parameters.calibration.submit_medium;
+    end
+    % Force water medium
     sim_param.simulation_medium = 'water';
-    sim_param.savemat = 1; % always save water results
+    % Force save result matrices
+    sim_param.savemat = 1;
+    % Overwrite transducer kwavearray modeling (if specified)
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
         sim_param.use_kwavearray = 1; % force to run with kwavearray setup
     end
+    % Convert from default 3D to 2D axisymmetric simulation (if requested)
+    if isfield(parameters.calibration, 'axisymmetric2D') && ...
+            parameters.calibration.axisymmetric2D == 1
+        parameters.n_sim_dims = 2;
+        parameters.axisymmetric = 1;
+        if numel(parameters.default_grid_dims)==3
+            parameters.default_grid_dims(2) = [];
+        end
+    end
+    % Force deactivate interactive mode
     sim_param.interactive = 0;
     
     % Run the simulation based on the submission method
@@ -108,8 +122,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     
     %% Optimization
     
-    % Compute O'Neil solution and scaling factor to simulated intensity
-    [profile_oneil, simulated_oneil_scaling] = ...
+    % Compute analytical O'Neil solution and scaling factor to simulated intensity
+    [profile_oneil, simulated_analytical_scaling] = ...
         compute_oneil_solution(...
         initial_params, ...
         profile_sim, ...
@@ -134,7 +148,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Calculate optimized source amplitude
     opt_source_amp = round(opt_velocity / profile_sim.velocity * ...
         initial_params.transducer.source_amp / ...
-        simulated_oneil_scaling);
+        simulated_analytical_scaling);
 
     % Collect phases
     opt_source_phase_rad = opt_phases;

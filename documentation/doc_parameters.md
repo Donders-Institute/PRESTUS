@@ -195,22 +195,23 @@ see doc_hpc.md
 
 For transducer calibration, a separate `calibration_config.yaml` applies that should be loaded as `parameters.calibration`.
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `path_input_axial`              | Directory containing axial profiles         |   |
-| `path_input_phase`              | Directory containing phase data        |   |
-| `path_output`                   | Directory for saving free-water simulation results         |   |
-| `path_output_profiles`          | Directory for saving optimized profile data         |   |
-| `filename_calibrated_CSV`       | Filename of calibrated CSV data         | Mandatory only when not generated within standalone script based on equipment name.  |
-| `submit_medium`                 | Simulation submit mode         | `slurm` (recommended), `matlab` (debug; doesn't overwrite), `qsub`  |
-| `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.         | (`1 = yes, 0 = no`)  |
+| **Parameter**                   | **Description**                                         | **Comments**                          |
+|---------------------------------|---------------------------------------------------------|---------------------------------------|
+| `path_input_axial`              | Directory containing axial profiles                     |                                       |
+| `path_input_phase`              | Directory containing phase data                         |                                       |
+| `path_output`                   | Directory for saving free-water simulation results      |                                       |
+| `path_output_profiles`          | Directory for saving optimized profile data             |                                       |
+| `filename_calibrated_CSV`       | Filename of calibrated CSV data                         | Mandatory only when not generated within standalone script based on equipment name.  |
 | `save_in_calibration_folder`    | `TRUE` (default): save in `path_output` ; `FALSE`: save outputs in `sim_path` (see regular config). |  Note: If TRUE calibration results are also appended to existing calibration for this equipment instead of overwritten. |
-| `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.         | Used only for calculating the peak distance and FWHM.  |
-| `optmethod`                     | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)         |   |
-| `weights`                       | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with laregr weights)         |   |
-| `seed`                          | Random seed for optimization         |   |
-| `addEPdistance`                 | Append distance from transducer bowl to exit plane (set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl). The profile is padded (between bowl and exit plane) with the initial value available in the profile. This can stabilize the fitting procedure in the near field.         |   |
-| `force_kwavearray`               | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.  |
-| `combinations`                  | Equipment combinations (must refer to equipment in `equipment_config.yaml`)         | Multiple combinations can be specified. Every [] specification will be performed for the corresponding (ordered) index equipment combination. Example: all foci within the first [] will be executed for the first equipment combination. If array is empty ([]), all focal depths of available characterization data will be used. |
-| `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.         | Multiple combinations can be specified. |
-| `desired_intensities`           | Desired free-water intensities [W/cm^2]          | Multiple combinations can be specified. |
+| `combinations`                  | Equipment combinations (must refer to equipment in `equipment_config.yaml`) | Multiple combinations can be specified. Every [] specification will be performed for the corresponding (ordered) index equipment combination. Example: all foci within the first [] will be executed for the first equipment combination. If array is empty ([]), all focal depths of available characterization data will be used. |
+| `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.       | Multiple combinations can be specified. |
+| `desired_intensities`           | Desired free-water intensities [W/cm^2]                 | Multiple combinations can be specified. |
+| `addEPdistance`                 | Append distance from transducer bowl to exit plane (set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl). The profile is padded (between bowl and exit plane) with the initial value available in the profile. This can stabilize the fitting procedure in the near field. |   |
+| `submit_medium`                 | Simulation submit mode                                  | `slurm` (recommended), `matlab` (debug; doesn't overwrite), `qsub`  |
+| `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.   | (`1 = yes, 0 = no`)  |
+| `force_kwavearray`              | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.            |
+| `opt_method`                    | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)    |   |
+| `opt_limits`                    | Distance limits for optimization [mm]   |   |
+| `opt_weights`                   | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with larger weights) |   |
+| `opt_seed`                      | Random seed for optimization                            |   |
+| `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.  | Used only for calculating the peak distance and FWHM.  |

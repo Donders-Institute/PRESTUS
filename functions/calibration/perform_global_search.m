@@ -12,7 +12,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     % - opt_velocity: Optimized particle velocity [m/s].
     % - min_err: Minimum error achieved during optimization.
     
-    if ~isfield(parameters.calibration, 'opt_limits')
+    if ~isfield(parameters.calibration, 'opt_limits') || isempty(parameters.calibration.opt_limits)
         % By default set to min and max distance with non-NAN intensity
         min_available = min(profile_target.axial_distance_bowl(~isnan(profile_target.axial_intensity)));
         max_available = max(profile_target.axial_distance_bowl(~isnan(profile_target.axial_intensity)));
@@ -22,10 +22,10 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         opt_limits = parameters.calibration.opt_limits;
     end
 
-    if ~isfield(parameters.calibration, 'weights') 
+    if ~isfield(parameters.calibration, 'opt_weights') 
         weights = 0; % uniform weighting
     else
-        weights = parameters.calibration.weights;
+        weights = parameters.calibration.opt_weights;
     end
 
     % Define the objective function for optimization.
@@ -41,19 +41,19 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         weights);
     
     % Set a random seed for reproducibility.
-    if isfield(parameters.calibration, 'seed') 
-        rng(parameters.calibration.seed, 'twister');
+    if isfield(parameters.calibration, 'opt_seed') 
+        rng(parameters.calibration.opt_seed, 'twister');
     end
 
     % Define initial guess, bounds, and options for the optimization problem.
-    if ~isfield(parameters.calibration, 'gs_upper_velocity') || isempty(parameters.calibration.gs_upper_velocity)
-        parameters.calibration.gs_upper_velocity = 0.2; % set default for upper velocity to 20 mm/s;
+    if ~isfield(parameters.calibration, 'opt_upper_velocity') || isempty(parameters.calibration.opt_upper_velocity)
+        parameters.calibration.opt_upper_velocity = 0.2; % set default for upper velocity to 20 mm/s;
     end
     initial_guess = [randi(360, [1, parameters.transducer.n_elements]) / 180 * pi, velocity];
     lower_bounds = [zeros(1, parameters.transducer.n_elements), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), parameters.calibration.gs_upper_velocity]; % Upper bounds: [2pi rad, 200 mm/s]
+    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), parameters.calibration.opt_upper_velocity]; % Upper bounds: [2pi rad, 200 mm/s]
 
-    if ~isfield(parameters.calibration, 'optmethod') || strcmp(parameters.calibration.optmethod, 'FEXminimize')
+    if ~isfield(parameters.calibration, 'opt_method') || strcmp(parameters.calibration.opt_method, 'FEXminimize')
         % by default use FEXminimize
         func = optimize_phases;
         options = setoptimoptions('popsize', 5000, 'FinDiffType', 'central', 'TolCon', 1e-8);
@@ -70,7 +70,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
             upper_bounds, ...
             [], ...
             options);
-    elseif strcmp(parameters.calibration.optmethod, 'GlobalSearch')
+    elseif strcmp(parameters.calibration.opt_method, 'GlobalSearch')
         % The GlobalSearch functionality is part of MATLAB's Global Optimization Toolbox.
         % Initialize a GlobalSearch object to perform the optimization.
         gs = GlobalSearch;
