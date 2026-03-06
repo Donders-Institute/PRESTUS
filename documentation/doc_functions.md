@@ -56,6 +56,7 @@ The following documents the functions provided in PRESTUS.
 | `mergeStructure`                        | HELPER         | Merges multiple scalar structures into one.                                                     |
 | `read_ini_file`                         | HELPER         | Read an INI file into MATLAB                                                                    |
 | `round_if_integer`                      | HELPER         | Rounds values if they are sufficiently close to integers; otherwise raises an error.            |
+| `simnibs_version`                       | HELPER         | Get SimNIBS version of segmentation from HTML, print, allocate to `parameters`.                 |
 | `subset_fields`                         | HELPER         | Copy designated structure field to new structure.                                               |
 | `tissuemask_binary`                     | HELPER         | Extract binary tissue segmentation masks (for indexing)                                         |
 | `upsample_to_grid`                      | HELPER         | Upsamples a 3D image to a higher resolution grid.                                               |

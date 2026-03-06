@@ -48,7 +48,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
 
     if contains(parameters.simulation_medium, {'layered'})
         log_timer('start','segmentation', parameters.seg_path);
-        preproc_segmentation(parameters)
+        parameters = preproc_segmentation(parameters);
         log_timer('stop','segmentation');
     else
         disp('No head segmentation necessary...')
