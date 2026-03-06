@@ -148,7 +148,7 @@ for i = 1:N_i
             % For simulations, we need to implement the distance from the bowl
 
             % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
-            if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
+            if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
                 dist_bowl_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
             else
                 dist_bowl_exit_plane = 0;
@@ -166,7 +166,7 @@ for i = 1:N_i
             % that space (i.e., no strong near-field interference)
 
             % add distance values prior to the exit plane
-            if isfield(parameters.calibration, 'addEPdistance') && parameters.calibration.addEPdistance == 1
+            if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
                 Nvals = round(dist_bowl_focus(1)/(dist_bowl_focus(2)-dist_bowl_focus(1)));
                 dist_bowl_focus = cat(1, linspace(0, dist_bowl_focus(1), Nvals)',dist_bowl_focus);
                 % set those to zero in amplitude profile

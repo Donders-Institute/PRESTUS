@@ -89,18 +89,45 @@ Transducer calibration relies on an additional config (`calibration_config`) tha
 
 #### Prerequisites
 
-- Manufacturer-provided phase tables
-- Measured/estimated axial profiles
-    
+- Measured/estimated axial profiles (`path_input_axial`)
+- Manufacturer-provided phase tables (`path_input_phase`)
+- Entries in the equipment configuration (`PRESTUS/configs/equipment/equipment_config.yaml`)
+
 For the Donders, the empirical profiles (steering tables) can be found on the [FUSInitiative OneDrive](https://radbouduniversiteit.sharepoint.com/:f:/r/sites/FUSInitiative-SHAREDResearchinformation/Shared%20Documents/Software/PRESTUS/Acoustic%20profiling/)
-    
+
+Requested calibrations for unique TPO-transducer & focal depth & intensity combinations can be specified in `calibration_config.yaml` via `combinations`, `focal_depths_wrt_exit_plane`, and `desired_intensities`.
+
+Each line in the configuration corresponds to a unique TPO-transducer setup. In the following example specification, an IGT transducer with ID `PCD15287_01001` would be emulated for two focal depths of 40 and 50 mm from the exit plane, each for free-water intensities of 30 and 60 W/cm2 respectively. For a second transducer (`PCD15473_01001`), emulated phases and amplitudes would be provided for a depth of 40 mm at an intensity of 30 W/cm2. 
+
+> This example fits a 32-channel transducer with 10 artificial channels. The number of emulated channels can impact the stability of the fitting solution. It is governed by the setup in `equipment_config.yaml`.
+
+Transducer-TPO setups to be characterized:
+```
+  combinations:
+    - IS_PCD15287_01001_IGT_32_ch_comb_10_ch
+    - IS_PCD15473_01001_IGT_32_ch_comb_10_ch
+```
+List of focal depths (in mm) to be characterized:
+```
+  focal_depths_wrt_exit_plane:
+    - [40, 50]
+    - [40]
+```
+List of intensities (in free-water W/cm2) to be characterized:
+
+```
+  desired_intensities:
+    - [30, 60]
+    - [30]
+```
+
 #### Steps
 
 - Define and initialize the simulation environment by setting paths and loading configuration files with equipment and user calibration data.
 - Automatically load Donders-specific transducer information: Identify specific equipment combinations and extract associated transducer and driving system parameters, setting default initial amplitudes and phases.
 - Set initial simulation to manufacturer data: Load measured characterization data of the actual transducer’s acoustic field including axial intensity profiles and phase information provided by manufacturers.
 - Interpolate requested distance from multiple empirically measured distances
-- Add Focal Distance Offset (FDO; via `addEPdistance`): Translate measured focal depths relative to the transducer exit plane into simulation-relevant coordinates centered on the transducer’s mid-bowl. Missing distances are zero-interpolated.
+- Add Focal Distance Offset (FDO; via `add_FDO`): Translate measured focal depths relative to the transducer exit plane into simulation-relevant coordinates centered on the transducer’s mid-bowl. Missing distances are zero-interpolated.
 - Select or interpolate the axial intensity profiles for the specified focal depth.
 - Call `calibration_transducer`
 
@@ -133,7 +160,7 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
     - `submit_medium`   
     Simulation submit mode: `slurm` (recommended), `matlab`, `qsub`
     - `axisymmetric2D`  
-    [*Experimental*] Overwrite default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no (default)).
+    Overwrite default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no (default)).
     - `force_kwavearray`    
     Force run free-water simulations with kwavearray (recommended)?  If set to `0`, simulations use the setting in the default or study-specific config.
 
@@ -182,7 +209,7 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
     | ![calibration_initial_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_initial_intensity.png) | ![calibration_opt_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_opt_intensity.png) |
     | Visualized in Step 3. | Visualized in Step 9. |
 
-    Note: The black line indicates the position of the **transducer bowl**, the red line indicated the position of the **transducer exit plane**, the white line indicates the maximum estimated **(focal) intensity**.
+    Note: The black line indicates the position of the **transducer bowl**, the red line indicated the position of the **transducer exit plane**, the white line indicates the maximum estimated **(focal) intensity** (see [distance definitions](#target-distance-parameters)).
     <br>
 
 10. Plot comparison between original and optimized results (analytical and simulated)
