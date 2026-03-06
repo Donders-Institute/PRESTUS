@@ -41,12 +41,13 @@ nav:
     - Installation: doc_installation.md
     - Getting started: doc_getting-started.md
   - 📖 Documentation:
+    - Transducer Setup: doc_transducer.md
     - Transducer Calibration: doc_calibration.md
-    - Head preprocessing: doc_preproc.md
-    - Medium Setup: doc_medium.md
     - Transducer Placement: doc_placement.md
-    - Neuronavigation: doc_neuronav.md
+    - Head Processing: doc_preproc.md
+    - Medium Setup: doc_medium.md
     - Outputs: doc_outputs.md
+    - Neuronavigation Placement: doc_neuronav.md
   - 🔬 Simulations:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
