@@ -21,14 +21,14 @@ Outer diameter of each transducer element (in mm).
 `transducer.curv_radius_mm`  
 Radius of curvature of the transducer bowl (in mm).
 
-`transducer.dist_to_plane_mm`. 
+`transducer.dist_to_plane_mm`   
 Distance from the geometric focus to the transducer plane (in mm).
 
 #### Dynamic parameters: amplitude and focus
 
 These parameters are traditionally calibrated in free-water simulations (see below).
 
-`transducer.source_amp` 
+`transducer.source_amp`     
 Amplitude of the acoustic source (in Pa). [**CALIBRATED**]
 
 `transducer.source_phase_deg`   
@@ -55,10 +55,10 @@ The figure shows PRESTUS definitions for annular transducer distances.
 
 PRESTUS expects one either of the following to be specified (or it will attempt a geometric distance calculation based on `trans_pos` and `focus_pos`, if specified).
 
-`expected_focal_distance_ep`
+`expected_focal_distance_ep`    
 Expected distance from the transducer exit plane to the stimulation focus (mm). This often corresponds to the focal depth setting of the driving system - transducer calibration.
 
-`expected_focal_distance_bowl`
+`expected_focal_distance_bowl`  
 Expected distance from the transducer bowl to the stimulation focus (mm). Will be internally calculated based on `expected_focal_distance_ep`, `dist_to_plane_mm`, and `curv_radius_mm`.
 
 ## Transducer modeling
