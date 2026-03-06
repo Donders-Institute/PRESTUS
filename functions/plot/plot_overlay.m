@@ -188,37 +188,8 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     
     % draw transducer
     if ~isempty(trans_pos)
-        focal_slope = (trans_pos-focus_pos)/norm(trans_pos-focus_pos);
-        focal_angle = atan2(focal_slope(2),focal_slope(1));
-        
-        grid_step = options.grid_step;
-        ex_plane_pos = trans_pos - (parameters.transducer(1).curv_radius_mm-parameters.transducer(1).dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
-        geom_focus_pos = trans_pos - (parameters.transducer(1).curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
-        max_od = max(parameters.transducer(1).Elements_OD_mm);
-        dist_to_ep = 0.5*sqrt(4*parameters.transducer(1).curv_radius_mm^2-max_od^2)/grid_step;
-        ex_plane_pos_trig = geom_focus_pos + dist_to_ep *[cos(focal_angle), sin(focal_angle)];
-        ort_angle = atan(-focal_slope(1)/focal_slope(2));
-
-        arc_halfangle = atan(max_od/2/dist_to_ep/grid_step);
-
-        r = max(parameters.transducer(1).Elements_OD_mm)/2/grid_step;
-
-        hold on
-        lineWidth = 1;
-
-        boxColor = [235, 185, 47]/255*(1-overlay_weight) + overlay_color*overlay_weight;
-        LineSmoothing = 'on';
-
-        trans_full_depth = 16/grid_step;
-        trans_back = ex_plane_pos_trig+trans_full_depth*focal_slope;
-        line([trans_back(2)-r*sin(ort_angle), trans_back(2) + r*sin(ort_angle)], [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth, 'Color', boxColor,'LineSmoothing',LineSmoothing )
-        line([ex_plane_pos_trig(2), trans_back(2)]-r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]-r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing  )
-        line([ex_plane_pos_trig(2), trans_back(2)]+r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]+r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing )
-        % exit plane
-        line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
-        % transducer curvature
-        [arc_x, arc_y] = get_arc(geom_focus_pos, parameters.transducer(1).curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
-        plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
+        options.grid_step = parameters.grid_step_mm;
+        plot_transducer_overlay(trans_pos, focus_pos, max_data_pos, parameters, options,  0.3, [0.2 0.6 1])
     end
     
     if options.overlay_segmented
@@ -258,20 +229,6 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     
     if options.show_rectangles 
         rect_size = options.rect_size;
-        if ~isempty(trans_pos)
-            rectangle('Position', [trans_pos(2)-1-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',2,'LineStyle','-')
-            text(trans_pos(2)-1, trans_pos(1)+10, [num2str(round((trans_pos(2)-1)*parameters.grid_step_mm))], 'Color', 'w')
-            % the following plots the onset of the grid; note: grid is in voxels, not mm
-            rectangle('Position', [trans_pos(2)-parameters.transducer(1).trans_pos(3)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'w', 'LineWidth',1,'LineStyle',':')
-            rectangle('Position', [parameters.grid_dims(3)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', 'w', 'LineWidth',1,'LineStyle',':')
-            % exit plane
-            dist_to_exit_plane = parameters.transducer(1).curv_radius_mm-parameters.transducer(1).dist_to_plane_mm;
-            % convert to voxels
-            dist_to_exit_plane_vox = round(dist_to_exit_plane*(1/parameters.grid_step_mm));
-            rectangle('Position', [(trans_pos(2)-1+dist_to_exit_plane_vox)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',1,'LineStyle',':')
-            %rectangle('Position', [(ex_plane_pos(4)-1)-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',1,'LineStyle',':')
-            text(trans_pos(2)-1+dist_to_exit_plane_vox, trans_pos(1)+10, [num2str(round((trans_pos(2)-1+dist_to_exit_plane_vox)*parameters.grid_step_mm)), 'mm'], 'Color', 'w')
-        end
         rectangle('Position', [focus_pos(2)-rect_size/2 focus_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
         rectangle('Position', [max_data_pos(2)-rect_size/2 max_data_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'b', 'LineWidth',1,'LineStyle','-')
         text(max_data_pos(2), max_data_pos(1)+10, [num2str(round(max_data_pos(2)*parameters.grid_step_mm)), 'mm'], 'Color', 'w')
