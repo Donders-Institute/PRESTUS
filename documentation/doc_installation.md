@@ -39,12 +39,16 @@ Ensure that the paths and subfolders are added in MATLAB. See `simple_main.m` fo
 
 #### Donders Institute HPC Cluster
 
-When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. 
+When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. Note that this may not be the most recent version of either the `main` or `development` branch.
 
-Type ``module load simnibs/4.0.0`` (or add the command to your .bashrc so that it is executed automatically once you login) and add ``addpath('/opt/prestus/dev')`` to your matlab path. This will use the most up-to-date version of PRESTUS (i.e., the current development branch). If you want to use an older version you can also use ``addpath('/opt/prestus/0.2.0')``, or older versions. Now you can start matlab R2022b.
+Type `module load simnibs/4.0.0` (or add the command to your .bashrc so that it is executed automatically once you login) and add `addpath('/opt/prestus/dev')` to your matlab path. If you want to use an older version you can also use `addpath('/opt/prestus/0.2.0')`, or older versions. Now you can start matlab R2022b.
+
+> `simnibs/4.0.0` and `simnibs/4.1.0` are currently available on the Donders HPC.
+
+> `/opt/prestus/0.1.0`, `/opt/prestus/0.2.0`, and (an outdated) `/opt/prestus/dev` are currently available on the Donders HPC.
+
 
 For more information on HPC usage, see the [HPC guide](doc_hpc.md)
-
 
 If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
 
@@ -61,27 +65,65 @@ For more information on installing, (potentially) compiling, and specifying C++ 
 ## SimNIBS installation
 
 You additionally need to install SimNIBS (https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4): e.g., `simnibs_installer/install -s -t /home/USER/SimNIBS`.
-We recommend installing SimNIBS within an **anaconda environment** (especially on HPC clusters that often constrict individual user permissions).
+We recommend installing SimNIBS within an **anaconda environment** (especially on HPC clusters that often constrict individual user permissions). This allows for the flexible installation of multiple SimNIBS versions.
 You can follow the [official installation guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
 
-The following is a step-by-step guide to install SIMNIBS on the computing cluster. Some steps and filepaths may differ between computing environments.
+The following is a step-by-step guide to install SIMNIBS on the Linus computing cluster. Some steps and filepaths may differ between computing environments.
 
 1. Log in to the cluster
 2. Open terminal
-3. Start an interactive session to come into another execution node (change walltime and memory as needed): `qsub -I -X -N 'simnibs' -l walltime=01:00:00,mem=8g`
-4. Download the evironment for SIMNIBS: `wget https://github.com/simnibs/simnibs/releases/latest/download/environment_linux.yml`
-5. Copy the generated environment file to your home directory (i.e., /home/neuromod/USER)
-6. Navigate to your home directory (i.e., `cd ~`)
-7. Load the anaconda environment (e.g., `module load anaconda3/2020.07`)
-8. Create the anaconda environment: `conda env create -f ~/environment_linux.yml`
-9. Activate the simnibs environment: `source activate simnibs_env`
-10. Install the latest version of SIMNIBS: `pip install -f https://github.com/simnibs/simnibs/releases/latest simnibs`
-11. [Optional] To setup menu icons, file association, the MATLAB library, and add SimNIBS to the system path, run the postinstall_simnibs script
+3. Start an interactive session to come into another execution node (change walltime and memory as needed)  
+    
+    QSUB: `qsub -I -X -N 'simnibs' -l walltime=01:00:00,mem=8g` 
+    SLURM (Donders default): `srun --pty --x11 -J simnibs -t 1:00:00 --mem=8G bash` 
 
-```
-mkdir $HOME/SimNIBS
-postinstall_simnibs --setup-links -d $HOME/SimNIBS
-```
+4. Download the environment for the desired SIMNIBS version to your home directory (i.e., `/home/neuromod/USER`)
+
+    `wget https://github.com/simnibs/simnibs/releases/download/v4.6.0/environment_linux.yml -O ~/environment_linux_v4.6.0.yml`. This includes dependencies such as Python, MATLAB Runtime, and other prerequisites.
+
+    > **SimNIBS environment versions**
+    Multiple SimNIBS 4+ environment versions are available:
+    https://github.com/simnibs/simnibs/releases/download/v4.0.0/environment_linux.yml
+    https://github.com/simnibs/simnibs/releases/download/v4.1.0/environment_linux.yml
+    https://github.com/simnibs/simnibs/releases/download/v4.5.0/environment_linux.yml
+    https://github.com/simnibs/simnibs/releases/download/v4.6.0/environment_linux.yml
+    To download the latest environment, select the following:
+    https://github.com/simnibs/simnibs/releases/latest/download/environment_linux.yml
+
+5. Navigate to your home directory (i.e., `cd ~`)
+6. Load the anaconda environment    
+
+    e.g., `module load anaconda3/2020.07`   
+
+7. Create the anaconda environment
+
+    `conda env create -f ~/environment_linux_v4.6.0.yml -n simnibs_v4.6.0`
+    
+    This will create an environment in `~/.conda/envs/`.    
+
+8. Activate the simnibs environment 
+
+    `source activate simnibs_v4.6.0`    
+
+9. Install the desired SimNIBS version
+
+    `pip install https://github.com/simnibs/simnibs/releases/download/v4.6.0/simnibs-4.6.0-cp311-cp311-linux_x86_64.whl` 
+
+    > **SimNIBS versions**
+    Multiple SimNIBS 4+ LINUX versions are available:
+    https://github.com/simnibs/simnibs/releases/download/v4.0.0/simnibs-4.0.0-cp39-cp39-linux_x86_64.whl
+    https://github.com/simnibs/simnibs/releases/download/v4.1.0/simnibs-4.1.0-cp39-cp39-linux_x86_64.whl
+    https://github.com/simnibs/simnibs/releases/download/v4.5.0/simnibs-4.5.0-cp311-cp311-linux_x86_64.whl
+    https://github.com/simnibs/simnibs/releases/download/v4.6.0/simnibs-4.6.0-cp311-cp311-linux_x86_64.whl
+    To download the latest environment, select the following:
+    https://github.com/simnibs/simnibs/releases/latest
+
+10. [Optional] To setup menu icons, file association, the MATLAB library, and add SimNIBS to the system path, run the postinstall_simnibs script
+
+    ```
+    mkdir $HOME/SimNIBS
+    postinstall_simnibs --setup-links -d $HOME/SimNIBS
+    ```
 
 #### [Optional: Starting SimNIBS after first installation]
 
@@ -91,7 +133,7 @@ Exit out of everything and following the steps below for starting SimNIBS after 
 2. `module load anaconda3/2020.07`
 3. `source activate simnibs_env`
 4. `simnibs_gui`
-5. To close the virtual SimNIBS environment: conda deactivate
+5. To close the virtual SimNIBS environment: `conda deactivate`
 
 #### Specifying SimNIBS paths in PRESTUS
 
