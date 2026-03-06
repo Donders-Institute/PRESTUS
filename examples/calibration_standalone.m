@@ -185,16 +185,6 @@ for i = 1:N_i
             % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus); 
             % hold on; xline(parameters.expected_focal_distance_bowl)
 
-            % convert from default 3D to 2D axisymmetric simulation (if requested)
-            if isfield(parameters.calibration, 'axisymmetric2D') && ...
-                    parameters.calibration.axisymmetric2D == 1
-                parameters.n_sim_dims = 2;
-                parameters.axisymmetric = 1;
-                if numel(parameters.default_grid_dims)==3
-                    parameters.default_grid_dims(2) = [];
-                end
-            end
-
             % Show current iteration
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
                 ' F ', num2str(desired_focal_distance_ep), ' I ', num2str(desired_intensity)])
