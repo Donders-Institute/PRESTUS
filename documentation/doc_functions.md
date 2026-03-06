@@ -77,7 +77,7 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_get_group_mean_mni`           | NEURONAV       | Compute group-level average MNI coordinates (both mm and voxel).                                |
 | `neuronav_select_and_average_localite`  | NEURONAV       | Select most recent Localite XML for a session.                                                  |
 | `position_transducer_localite`          | NEURONAV       | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
-| `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                              |
+| `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                                       |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
 | `pct_soft_tissue_peak`                  | PSEUDO-CT      | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
 | `fit_pairwiselinear`                    | PSEUDO-CT      | Perform a pairwise linear fit between HU and density values with optional plot.                 |
@@ -86,6 +86,7 @@ The following documents the functions provided in PRESTUS.
 | `plot_overlay_2d`                       | PLOT           | Overlays map on a background image slice with key positions highlighted.                        |
 | `plot_overlay`                          | PLOT           | Visualizes map overlaid on a 2D slice of a 3D background image with advanced options.           |
 | `plot_t1_with_transducer`               | PLOT           | Creates a plot of a T1 slice oriented along the transducer's axis with overlays.                |
+| `plot_transducer_overlay`               | PLOT           | Visualize curved transducer geometry with exit plane.                                           |
 | `show_3d_head`                          | PLOT           | Visualizes segmented brain images in 3D with transducer placement and target location.          |
 | `show_positioning_plots`                | PLOT           | Visualizes transducer positioning before and after preprocessing using segmented images.        |
 | `grid_axisymmetry`                      | SOURCE         | Convert grid to axisymmetry                                                                     |
@@ -97,7 +98,7 @@ The following documents the functions provided in PRESTUS.
 | `thermal_parameters`                    | THERMAL        | Checks and converts protocol timing setup for thermal estimation                                |
 | `thermal_plot_protocol`                 | THERMAL        | Visualize the requested protocol timing                                                         |
 | `thermal_plot_sim`                      | THERMAL        | Visualizes heating simulation results over time (temperature, rise, CEM43). Optional video      |
-| `thermal_simulation`                    | THERMAL        | Simulate ultrasound-induced heating and thermal dose (CEM43) using k-Wave’s kWaveDiffusion from acoustic pressure data across pulsed train repetitions.                                                                                                               |
+| `thermal_simulation`                    | THERMAL        | Simulate ultrasound-induced heating and thermal dose (CEM43) using k-Wave’s kWaveDiffusion from acoustic pressure data across pulsed train repetitions.                                                                                                                                                 |
 | `focal_distance_calculation`            | TRANSDUCER     | Compute expected focal distances for (multi-)transducer setup.                                  |
 | `get_arc`                               | TRANSDUCER     | Generates the coordinates of an arc in 2D space.                                                |
 | `get_trans_pos_from_trigger_markers`    | TRANSDUCER     | Determines transducer and target positions using Localite trigger marker files.                 |
@@ -107,8 +108,8 @@ The following documents the functions provided in PRESTUS.
 | `transducer_positioning`                | TRANSDUCER     |  Determines heuristic transducer placement for a given target.                                  |
 | `transducer_setup`                      | TRANSDUCER     | Create a transducer mask and label matrix for a computational grid.                             |
 | `convert_2d_to_axisymmetric`            | TRANSFORM      | Converts 2D k-Wave simulation grid, medium properties, and source to axisymmetric form by halving the shorter dimension (right half from center).                                                                                                                  |
-| `convert_axisymmetric_to_2d`            | TRANSFORM      | Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions.                                                                                                     |
-| `convert_axisymmetric_to_3d`            | TRANSFORM      | Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry.                                                                                                             |
+| `convert_axisymmetric_to_2d`            | TRANSFORM      | Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions.                                                                                                                                                   |
+| `convert_axisymmetric_to_3d`            | TRANSFORM      | Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry.                                                                                                                                                    |
 | `convert_final_to_MNI_matlab`           | TRANSFORM      | Converts an image from subject space to MNI space using MATLAB.                                 |
 | `convert_final_to_MNI_simnibs`          | TRANSFORM      | Converts an image to MNI space using SimNIBS.                                                   |
 | `mni2subject_coords_LDfix`              | TRANSFORM      | Transforms a set of coordinates in MNI space to subject space.                                  |

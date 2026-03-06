@@ -40,6 +40,25 @@ function parameters = focal_distance_calculation(parameters)
 %
 
 % 1) Implement provided expected focal distance
+
+% Update everything if expected_focal_distance_ep is specified
+if isfield(parameters, 'expected_focal_distance_ep') && ~isempty(parameters.expected_focal_distance_ep)
+    for ti = 1:numel(parameters.transducer)
+        if ~isfield(parameters.transducer(ti), 'expected_focal_distance_ep') || ...
+                isempty(parameters.transducer(ti).expected_focal_distance_ep)
+            parameters.transducer(ti).expected_focal_distance_ep = parameters.expected_focal_distance_ep;
+            % calculate focal distance offset (between transducer bowl and exit plane for annular arrays)
+            parameters.transducer(ti).focal_distance_offset = parameters.transducer(ti).curv_radius_mm - parameters.transducer(ti).dist_to_plane_mm;
+            % calculate focal distance (from bowl)
+            parameters.transducer(ti).expected_focal_distance_bowl = parameters.transducer(ti).expected_focal_distance_ep+parameters.transducer(ti).focal_distance_offset;
+        end
+    end
+    % copy to parameters main structure (for first transducer)
+    if ~isfield(parameters, 'expected_focal_distance_bowl') || isempty(parameters.expected_focal_distance_bowl)
+        parameters.expected_focal_distance_bowl = parameters.transducer(1).expected_focal_distance_bowl;
+    end
+end
+
 if isfield(parameters, 'expected_focal_distance_bowl') && ~isempty(parameters.expected_focal_distance_bowl)
     for ti = 1:numel(parameters.transducer)
         if ~isfield(parameters.transducer(ti), 'expected_focal_distance_bowl') || ...
@@ -51,22 +70,16 @@ if isfield(parameters, 'expected_focal_distance_bowl') && ~isempty(parameters.ex
             parameters.transducer(ti).expected_focal_distance_ep = parameters.transducer(ti).expected_focal_distance_bowl-parameters.transducer(ti).focal_distance_offset;
         end
     end
-elseif isfield(parameters, 'expected_focal_distance_ep') && ~isempty(parameters.expected_focal_distance_ep)
-    for ti = 1:numel(parameters.transducer)
-        if ~isfield(parameters.transducer(ti), 'expected_focal_distance_ep') || ...
-                isempty(parameters.transducer(ti).expected_focal_distance_ep)
-            parameters.transducer(ti).expected_focal_distance_ep = parameters.expected_focal_distance_ep;
-            % calculate focal distance offset (between transducer bowl and exit plane for annular arrays)
-            parameters.transducer(ti).focal_distance_offset = parameters.transducer(ti).curv_radius_mm - parameters.transducer(ti).dist_to_plane_mm;
-            % calculate focal distance (from bowl)
-            parameters.transducer(ti).expected_focal_distance_bowl = parameters.transducer(ti).expected_focal_distance_ep+parameters.transducer(ti).focal_distance_offset;
-        end
+    % copy to parameters main structure (for first transducer)
+    if ~isfield(parameters, 'expected_focal_distance_ep') || isempty(parameters.expected_focal_distance_ep)
+        parameters.expected_focal_distance_ep = parameters.transducer(1).expected_focal_distance_ep;
     end
 end
 
 % 2) Rely on specification of transducer and target position
-
-warning('Expected focal distance not specified for all transducers, trying to get it from transducer and target positions ...')
+if ~isfield(parameters, 'expected_focal_distance_ep') || ~isfield(parameters, 'expected_focal_distance_bowl')
+    warning('Expected focal distance not specified for all transducers, trying to get it from transducer and target positions ...')
+end
 
 % Fill missing expected_focal_distance_bowl per transducer
 for ti = 1:numel(parameters.transducer)
