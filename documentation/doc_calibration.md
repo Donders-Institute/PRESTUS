@@ -21,30 +21,30 @@ Outer diameter of each transducer element (in mm).
 `transducer.curv_radius_mm`  
 Radius of curvature of the transducer bowl (in mm).
 
-`transducer.dist_to_plane_mm`  
+`transducer.dist_to_plane_mm`. 
 Distance from the geometric focus to the transducer plane (in mm).
 
 #### Dynamic parameters: amplitude and focus
 
 These parameters are traditionally calibrated in free-water simulations (see below).
 
-`transducer.source_amp`
+`transducer.source_amp` 
 Amplitude of the acoustic source (in Pa). [**CALIBRATED**]
 
-`transducer.source_phase_deg`
+`transducer.source_phase_deg`   
 Phase of the acoustic source (in degrees). [**CALIBRATED**]
 
-`transducer.source_phase_rad`
+`transducer.source_phase_rad`   
 Phase of the acoustic source (in radians). [**CALIBRATED**]
 
 #### Placement parameters
 
 See also [transducer placement](doc_placement.md). In `water` simulations, the placement will be automatically determined based on the edge of the PML layer.
 
-`transducer.trans_pos`
+`transducer.trans_pos`  
 Position of transducer bowl (XYZ, T1 grid voxel space).
 
-`transducer.focus_pos`
+`transducer.focus_pos`  
 Position of stimulation target (XYZ, T1 grid voxel space).
 
 #### Target distance parameters
@@ -115,9 +115,12 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
 
 #### Prerequisites
 
-- `profile_empirical.axial_intensity`      | Desired intensity profile along focal beam axis
-- `profile_empirical.axial_distance_bowl`  | Distance (mm from transducer bowl)
-- `desired_focal_distance_ep`              | Requested focal distance (mm from transducer exit plane)
+- `profile_empirical.axial_intensity`   
+    Desired intensity profile along focal beam axis
+- `profile_empirical.axial_distance_bowl`   
+    Distance (mm from transducer bowl)
+- `desired_focal_distance_ep`   
+    Requested focal distance (mm from transducer exit plane)
 
 #### Steps
 
@@ -127,11 +130,11 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
     How simulations will be run will largely be determined by the main `parameters` (e.g., `parameters.code_type`). 
     However, additional settings in `parameters.calibration` can overwrite default behaviour:
 
-    - `submit_medium`
+    - `submit_medium`   
     Simulation submit mode: `slurm` (recommended), `matlab`, `qsub`
-    - `axisymmetric2D`
+    - `axisymmetric2D`  
     [*Experimental*] Overwrite default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no (default)).
-    - `force_kwavearray`
+    - `force_kwavearray`    
     Force run free-water simulations with kwavearray (recommended)?  If set to `0`, simulations use the setting in the default or study-specific config.
 
 3. Extract simulated intensity along the focal axis
@@ -142,18 +145,20 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
 5. Optimize the virtual transducer’s element velocity and phases
 
     Goal: match settings such that analytical profile corresponds to scaled empirical profile
+
     Multiple parameters configure the calibration:
-    - `opt_method`
+
+    - `opt_method`  
     Optimization backend to use: `FEXminimize` (open source subtoolbox, default) | `GlobalSearch` (MATLAB's Global Optimization Toolbox)
-    - `opt_weights`
+    - `opt_weights  
     Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM). 
         - Uniform (`opt_weights == 0`): Equal weighting across entire profile—optimizes global shape.
         - Gaussian (`opt_weights >= 1`): FWHM-centered Gaussian peaking at focal maximum to emphasize near-focus optimization. Higher weights yield narrower Gaussians (sigma = focus_pos / weights).
-    - `opt_limits`
+    - `opt_limits`  
     Distance limits for optimization [mm]
-    - `opt_seed`
+    - `opt_seed`    
     Random seed for optimization. Specifying a seed increases reproducibility.
-    - `opt_upper_velocity`
+    - `opt_upper_velocity`  
     Upper velocity to use in global search.
     
     <br>
