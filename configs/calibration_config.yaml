@@ -1,26 +1,12 @@
 # The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
 
-  # Simulation paths (note: specific for calibration) [Change to your directories...]
+  ## Parameters for standalone calibration (using Donders equipment)
+
+  # Simulation paths (no defaults; change to your directories...)
   path_input_axial: '//home/common/matlab/PRESTUS/Axial_profiles/'  # Base path for axial profiles
-  path_input_phase: '//home/common/matlab/PRESTUS/Phase_tables/'  # Base path for phase data
-  path_output: '/project/2425122.01/calibration/data/calibration/'  # Folder path for saving simulation results
-  path_output_profiles: '/project/2425122.01/calibration/data/PRESTUS_virtual_parameters/'  # Folder for saving optimized profile data
-  filename_calibrated_CSV: '' # Filename of calibrated CSV data (default: standalone script generates name based on equipment)
+  path_input_phase: '//home/common/matlab/PRESTUS/Phase_tables/'    # Base path for phase data
 
-  # Internal settings
-  
-  save_in_calibration_folder: true          # Boolean flag to save outputs in general output folder or simulation-specific folder. If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten.
-  submit_medium: 'slurm'                    # Simulation submit mode: matlab (debug; doesn't overwrite; force cpu mode), slurm (recommended), or qsub
-  force_kwavearray: 1                       # Force to run free-water simulations with kwavearray?
-  axisymmetric2D: 0                         # [EXPERIMENTAL; default: 0] Convert (default; depends on study config) 3D free-water simulation setup to 2D axisymmetry for efficiency
-  addEPdistance: 1                          # Append distance from transducer bowl to exit plane (if zero point in provided profiles = exit plane, != transducer bowl)
-  skip_front_peak_mm: 10                    # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts
-  opt_method: 'FEXminimize'                 # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
-  opt_weights: 0                            # Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM)
-  opt_seed: 251024                              # Random seed for optimization
-  opt_upper_velocity: 0.2                    # Upper velocity in global search
-
-  # List combinations of setups (e.g., transducer-TPO) and calibration targets.
+  # List combinations of setups (e.g., transducer-TPO) and calibration targets (no defaults)
   # Every [] specification will be performed for the corresponding (ordered) index equipment combination. 
   # Example: all foci within the first [] will be executed for the first equipment combination. 
   # If array is empty ([]), all focal depths of available characterization data will be used.
@@ -35,12 +21,27 @@
     - [35, 83]
     - [35, 83]
 
-  # Example for multiple equipment-depth-intensity combinations:
-  # combinations:
-  #   - IS_PCD15287_01001_IGT_128_ch_comb_10_ch
-  #   - IS_PCD15287_01002_IGT_128_ch_comb_10_ch
-  # focal_depths_wrt_exit_plane:
-  #   - [85]
-  #   - [30, 50]
-  # desired_intensities: 
-  #   - [30]
+  # For curved transducers: are distances in empirical profiles provided from the exit plane?
+  add_FDO: 1   # Append Focal Distance Offset (distance from transducer bowl to exit plane). Use if zero point in provided profiles = exit plane, != transducer bowl.
+
+  ## Parameters for calibration function
+
+  # I/O
+  path_output: '/project/2425122.01/calibration/data/calibration/'                          # Folder for saving simulation results [Change to your directories...]
+  path_output_profiles: '/project/2425122.01/calibration/data/PRESTUS_virtual_parameters/'  # Folder for saving optimized profile data [Change to your directories...]
+  save_in_calibration_folder: true  # Boolean flag to save outputs in general output folder or simulation-specific folder (`parameters.calibration.path_output`). If TRUE, simulations are run in calibration output directory; results are appended to existing calibration for this equipment instead of overwritten.
+  filename_calibrated_CSV: ''       # Filename of calibrated CSV data (default: standalone script generates name based on equipment)
+
+  # Simulation submission overrrides
+  submit_medium: 'slurm'            # Simulation submit mode: matlab (debug; doesn't overwrite; force cpu mode), slurm (recommended), or qsub
+  force_kwavearray: 1               # Force to run free-water simulations with kwavearray?
+  axisymmetric2D: 0                 # Convert (default; depends on study config) 3D free-water simulation setup to 2D axisymmetry for efficiency
+  
+  # Optimization
+  opt_method: 'FEXminimize'         # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)
+  opt_weights: 0                    # Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM)
+  opt_seed: 251024                  # Random seed for optimization
+  opt_upper_velocity: 0.2           # Upper velocity in global search
+  
+  # Other
+  skip_front_peak_mm: 10            # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts in reporting
