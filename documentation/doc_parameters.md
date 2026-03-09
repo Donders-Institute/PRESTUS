@@ -28,7 +28,9 @@ see [doc_preproc.md](doc_preproc.md)
 | `simulation_medium`               | Medium setup for simulation (`water`/`layered`/`phantom`).                                   | Mandatory.   |
 | `layers`                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory. This parameter allows adding or removing layers of interest (if the corresponding segmenation is available and `parameters.medium` has a corresponding label containing the acoustic properties).  |
 | `seg_labels`                      | Labels for segmentations, specifying indices for CSF, bone mask, and eye regions.     | Mandatory.  |
-| `run_source_setup`                | Set up acoustic sources.                                                              | (`1 = yes, 0 = no`)  |
+| `run_grid_setup`                  | Setup grid and run head processing? Mandatory for simulations.                        | (`1 = yes, 0 = no`)  |
+| `run_medium_setup`                | Map medium acoustic properties? Mandatory for simulations.                            | (`1 = yes, 0 = no`)  |
+| `run_source_setup`                | Set up acoustic source? Mandatory for simulations.                                    | (`1 = yes, 0 = no`)  |
 | `run_acoustic_sims`               | Run acoustic simulations.                                                             | (`1 = yes, 0 = no`)  |
 | `run_heating_sims`                | Run heating simulations.                                                              | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
@@ -154,9 +156,9 @@ see [doc_pseudoCT.md](doc_pseudoCT.md)
 | **Parameter**                     | **Description**                                                   | **Comments**         |
 |-----------------------------------|-------------------------------------------------------------------|----------------------|
 | `use_pseudoCT`                    | Use (pseudo-)CT based mapping?  (`1` = yes / `0` = no (default))  |  Map (pseudo-)HU to tissue properties in the skull layer? |
-| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)/`k-wave`/`marsac`/`aubry`) | see [documentation](doc_pseudoCT.md#mapping-skull-density)  |
-| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan`/`marsac`/`aubry`)     | see [documentation](doc_pseudoCT.md#mapping-skull-sound-speed)  |
-| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan`/`mueller`/`aubry`)    | see [documentation](doc_pseudoCT.md#mapping-skull-attenuation)  |
+| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)/`k-wave`/`marsac`/`aubry`/`none`) | see [documentation](doc_pseudoCT.md#mapping-skull-density)  |
+| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan`(default)/`marsac`/`aubry`/`none`)     | see [documentation](doc_pseudoCT.md#mapping-skull-sound-speed)  |
+| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan`(default)/`mueller`/`aubry`/`none`)    | see [documentation](doc_pseudoCT.md#mapping-skull-attenuation)  |
 
 
 ### Sequence timing and baseline temperature for heating simulations
