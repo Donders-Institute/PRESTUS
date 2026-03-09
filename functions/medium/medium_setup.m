@@ -180,6 +180,46 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
         alpha_power_fixed = alpha_power;
     end
 
+    %% smooth medium masks
+
+    if isfield(parameters, 'smooth_properties') && parameters.smooth_properties == true
+        disp("Smoothing acoustic proprty maps ...");
+
+        tmp_density = density; % keep unsmoothed image for figure
+
+        sound_speed = smooth_img(sound_speed, parameters.smooth_window, 0, parameters.smooth_method);
+        density = smooth_img(density, parameters.smooth_window, 0, parameters.smooth_method);
+        alpha_coeff_fixed = smooth_img(alpha_coeff_fixed, parameters.smooth_window, 0, parameters.smooth_method);
+        thermal_conductivity = smooth_img(thermal_conductivity, parameters.smooth_window, 0, parameters.smooth_method);
+        specific_heat = smooth_img(specific_heat, parameters.smooth_window, 0, parameters.smooth_method);
+        perfusion_coeff = smooth_img(perfusion_coeff, parameters.smooth_window, 0, parameters.smooth_method);
+        absorption_fraction = smooth_img(absorption_fraction, parameters.smooth_window, 0, parameters.smooth_method);
+        temp_0 = smooth_img(temp_0, parameters.smooth_window, 0, parameters.smooth_method);
+    
+        % [DEBUG] Plot unsmoothed and smoothed density
+        if parameters.debug == 1
+            h = figure('Position', [100 100 800 400]);
+            if numel(size(density))==3
+                density_pre = squeeze(tmp_density(:,round(size(tmp_density,2)/2),:));
+                density_post = squeeze(density(:,round(size(density,2)/2),:));
+            else
+                density_pre = squeeze(tmp_density);
+                density_post = squeeze(density);
+            end
+            subplot(1,2,1); imagesc(density_pre); title('Original density')
+            subplot(1,2,2); imagesc(density_post); title('Smoothed density')
+            output_plot_filename = fullfile(parameters.debug_dir, ...
+                sprintf('sub-%03d_%s_density_smoothing_changes%s.png', ...
+                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            saveas(h, output_plot_filename, 'png')
+            close(h);
+            clear density_pre density_post;
+        end; clear tmp_density;
+    else
+        disp('No smoothing applied to acoustic property maps ...')
+    end
+
+
     %% specify the medium as a kWave-compatible structure 
     % Note: absorption_fraction and temp_0 need to be removed later)
     kwave_medium = struct('sound_speed', sound_speed, ...

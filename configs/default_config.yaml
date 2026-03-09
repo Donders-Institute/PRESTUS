@@ -241,7 +241,8 @@ grid_max_expand: 40 # Prime number grid expansion size to (potentially) speed up
 smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
 smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
 smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
-smooth_window: 5 # Number of voxels for smoothing
+smooth_window: 2 # Smoothing FWHM [grid voxels]
+smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
 
 # Settings for shrinkwrap (if requested)
 skullfillmethod: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
