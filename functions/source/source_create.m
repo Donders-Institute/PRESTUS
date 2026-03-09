@@ -193,30 +193,38 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                            'UpsamplingRate', 10, ...
                            'BLIType', 'sinc');
 
-        % Set focus position and transducer position vectors in physical coordinates
-        if parameters.n_sim_dims == 3
-            % 3D annular array
-            pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
-            focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
+        switch tp.array_shape.type
+            case 'annular'
+                % Set focus position and transducer position vectors in physical coordinates
+                if parameters.n_sim_dims == 3
+                    % 3D annular array
+                    pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
+                    focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
+        
+                    karray.addAnnularArray(pos_vec, ...
+                                           tp.curv_radius_mm * 1e-3, ...
+                                           [tp.Elements_ID_mm; tp.Elements_OD_mm] * 1e-3, ...
+                                           focus_vec);
+        
+                elseif parameters.n_sim_dims == 2 && axisymmetric == false
+        
+                    % 2D arc-shaped element
+                    pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
+                    focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
+        
+                    karray.addArcElement(pos_vec, ...
+                                         tp.curv_radius_mm * 1e-3, ...
+                                         tp.Elements_OD_mm * 1e-3, ...
+                                         focus_vec);
+                end
+            case 'matrix'
+                % implement matrix
 
-            karray.addAnnularArray(pos_vec, ...
-                                   tp.curv_radius_mm * 1e-3, ...
-                                   [tp.Elements_ID_mm; tp.Elements_OD_mm] * 1e-3, ...
-                                   focus_vec);
-
-        elseif parameters.n_sim_dims == 2 && axisymmetric == false
-
-            % 2D arc-shaped element
-            pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
-            focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
-
-            karray.addArcElement(pos_vec, ...
-                                 tp.curv_radius_mm * 1e-3, ...
-                                 tp.Elements_OD_mm * 1e-3, ...
-                                 focus_vec);
+            otherwise
+                error('Array shape %s is unknown or not implemented.', tp.array_shape.type)
         end
 
-        if axisymmetric == true
+        if axisymmetric == true && strcmp(tp.array_shape.type, 'annular')
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
@@ -224,7 +232,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             x_offset     = (trans_pos_1(1)-1) * (1/parameters.grid_step_mm);
             position_base = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
             focus_pos_full = [0, 0+eps];
-
+            
             for el_i = 1:tp.n_elements
                 el_OD_m = tp.Elements_OD_mm(el_i) * 1e-3;
                 y_shift = (el_i - (tp.n_elements+1)/2) * el_OD_m;
@@ -305,6 +313,8 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
             source.p_mask = binary_mask;
             source.p      = distributed_source_signal;
+
+            show_binary_mask_transducer(karray, kgrid, parameters);
         end
 
     end
