@@ -45,24 +45,14 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('SEGMENTATION \n');
     fprintf('========================================\n\n');
+    log_timer('start','segmentation', parameters.seg_path);
 
     if contains(parameters.simulation_medium, {'layered'})
-        log_timer('start','segmentation', parameters.seg_path);
         parameters = preproc_segmentation(parameters);
-        log_timer('stop','segmentation');
     else
         disp('No head segmentation necessary...')
     end
-
-    % EXIT is no simulation is requested (= segmentation only)
-    if ~any([parameters.run_source_setup, ...
-            parameters.run_acoustic_sims, ...
-            parameters.run_heating_sims, ...
-            parameters.run_posthoc_water_sims])
-        disp(newline)
-        disp('No simulation requested...')
-        return;
-    end
+    log_timer('stop','segmentation');
 
     % ====================================================================
     %% GRID: PREPROCESS structural MRI & POSITION transducer + target
@@ -73,59 +63,63 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('GRID SETUP & HEAD PREPROC \n');
     fprintf('========================================\n\n');
-
     log_timer('start','preproc', parameters.output_dir);
 
-    % Focal distance calculation (if not specified)
-    parameters = focal_distance_calculation(parameters);
-
-    % Set up grid by preprocessing the planning image or reading in phantom
-    [parameters, medium_masks, segmentation, bone, planimg] = ...
-        grid_tissue_setup(parameters);
-
-    % Position the transducer(s) in the grid
-    [parameters] = grid_transducer_location(parameters, planimg);
-
-    % Adapt grid to axisymmetry (if requested)
-    [parameters, segmentation, bone, medium_masks] = ...
-        grid_axisymmetry(parameters, segmentation, bone, medium_masks);
-
-    % Extract variables for quick access
-    trans_pos = parameters.transducer(1).trans_pos;
-    focus_pos = parameters.transducer(1).focus_pos;
-
+    if ~isfield(parameters, 'run_grid_setup') || parameters.run_grid_setup==1
+        % Focal distance calculation (if not specified)
+        parameters = focal_distance_calculation(parameters);
+    
+        % Set up grid by preprocessing the planning image or reading in phantom
+        [parameters, medium_masks, segmentation, bone, planimg] = ...
+            grid_tissue_setup(parameters);
+    
+        % Position the transducer(s) in the grid
+        [parameters] = grid_transducer_location(parameters, planimg);
+    
+        % Adapt grid to axisymmetry (if requested)
+        [parameters, segmentation, bone, medium_masks] = ...
+            grid_axisymmetry(parameters, segmentation, bone, medium_masks);
+    
+        % Extract variables for quick access
+        trans_pos = parameters.transducer(1).trans_pos;
+        focus_pos = parameters.transducer(1).focus_pos;    
+    else
+        disp('No grid setup requested...no simulations will be performed.')
+    end
     log_timer('stop','preproc');
     
     % ====================================================================
     %% SETUP MEDIUM
     % ====================================================================
     % For more documentation, see 'medium_setup'
-    
+
     fprintf('========================================\n');
     fprintf('MEDIUM PROPERTY MAPPING \n');
     fprintf('========================================\n\n');
-
     log_timer('start','medium', parameters.output_dir);
 
-    if parameters.use_pseudoCT == 1
-        kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
+    if ~isfield(parameters, 'run_medium_setup') || parameters.run_medium_setup==1
+        if parameters.use_pseudoCT == 1
+            kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
+        else
+            kwave_medium = medium_setup(parameters, medium_masks, planimg);
+        end
+    
+        % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
+        if isfield(parameters, 'adopted_heatmap') && parameters.adopted_heatmap == 1 && isfile(parameters.adopted_heatmap)
+            heatmap_image = niftiread(parameters.adopted_heatmap);
+            fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.adopted_heatmap)
+            medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
+                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+        else
+            medium_plus.temp_0 = kwave_medium.temp_0;
+        end
+        kwave_medium = rmfield(kwave_medium, 'temp_0');
+        medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
+        kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
     else
-        kwave_medium = medium_setup(parameters, medium_masks, planimg);
+        disp('No medium mapping requested...no simulations will be performed.')
     end
-
-    % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
-    if isfield(parameters, 'adopted_heatmap') && parameters.adopted_heatmap == 1 && isfile(parameters.adopted_heatmap)
-        heatmap_image = niftiread(parameters.adopted_heatmap);
-        fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.adopted_heatmap)
-        medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
-            makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
-    else
-        medium_plus.temp_0 = kwave_medium.temp_0;
-    end
-    kwave_medium = rmfield(kwave_medium, 'temp_0');
-    medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
-    kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
-
     log_timer('stop','medium');
 
     % ====================================================================
@@ -137,10 +131,9 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('K-WAVE SOURCE SETUP \n');
     fprintf('========================================\n\n');
+    log_timer('start','source', parameters.output_dir);
 
-    if parameters.run_source_setup
-        log_timer('start','source', parameters.output_dir);
-
+    if ~isfield(parameters, 'run_source_setup') || parameters.run_source_setup==1
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
             source_sensor_setup(...
@@ -161,10 +154,10 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
                 [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
             end
         end
-        log_timer('stop', 'source');
     else
-        disp('No source setup requested... no simulations will be performed.')
+        disp('No source setup requested...no simulations will be performed.')
     end
+    log_timer('stop', 'source');
 
     % ====================================================================
     %% ACOUSTIC SIMULATION
@@ -174,7 +167,6 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC SIMULATION \n');
     fprintf('========================================\n\n');
-
     log_timer('start','acoustic', parameters.output_dir);
 
     filename_sensor_data = fullfile(parameters.output_dir, ...
@@ -207,7 +199,6 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     else
         parameters.acoustics_available = 0;
     end
-
     log_timer('stop', 'acoustic');
 
     % =========================================================================
@@ -217,14 +208,11 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC ANALYSIS \n');
     fprintf('========================================\n\n');
+    log_timer('start','acoustic_analysis', parameters.output_dir);
 
     if parameters.acoustics_available == 1
-        log_timer('start','acoustic_analysis', parameters.output_dir);
-
-        % perform acoustic analysis
         [results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels);
-        log_timer('stop', 'acoustic_analysis');
     else
         disp('No acoustic simulation results available. Skipping analysis...')
         results_acoustic = [];
@@ -233,6 +221,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         acoustic_pressure = [];
         highlighted_pos = [];
     end
+    log_timer('stop', 'acoustic_analysis');
 
     % =========================================================================
     %% THERMAL SIMULATIONS
@@ -241,7 +230,6 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL SIMULATIONS \n');
     fprintf('========================================\n\n');
-
     log_timer('start','thermal', parameters.output_dir);
 
     parameters.heating_available = 0;
@@ -321,15 +309,15 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL ANALYSIS \n');
     fprintf('========================================\n\n');
+    log_timer('start','thermal_analysis', parameters.output_dir);
 
     if parameters.heating_available == 1
-        log_timer('start','thermal_analysis', parameters.output_dir);
         thermal_analysis(parameters, results_heating, time_status_seq, ...
             medium_masks, highlighted_pos, segmentation);
-        log_timer('stop','thermal_analysis');
     else
         disp('No heating simulation results available. Skipping thermal analysis...')
     end
+    log_timer('stop','thermal_analysis');
 
     % ================================================================
     %% CREATE NIFTI IMAGES
@@ -339,7 +327,6 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('NIFTI IMAGES \n');
     fprintf('========================================\n\n');
-    
     log_timer('start','nifti', parameters.output_dir);
 
     simulation_nifti(parameters, planimg, results_acoustic, ...
