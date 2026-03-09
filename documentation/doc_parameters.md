@@ -6,24 +6,25 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 
 ### I/O management
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                 |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `data_path`                       | Absolute path to structural input data location.      | [string] Mandatory |
-| `seg_path`                        | Absolute path to SimNIBS segmentations.               | [string] Mandatory |
-| `sim_path`                        | Absolute path to the simulation output.               | [string] Mandatory |
-| `simnibs_bin_path`                | Absolute path to SimNIBS binaries.                    | [string] Mandatory |
+| **Parameter**                     | **Description**                                       | **Comments**         |
+|-----------------------------------|-------------------------------------------------------|----------------------|
+| `data_path`                       | Absolute path to structural input data location.      | [string] Mandatory   |
+| `seg_path`                        | Absolute path to SimNIBS segmentations.               | [string] Mandatory   |
+| `sim_path`                        | Absolute path to the simulation output.               | [string] Mandatory   |
+| `simnibs_bin_path`                | Absolute path to SimNIBS binaries.                    | [string] Mandatory   |
 | `paths_to_add`                    | Toolbox paths to add with addpath().                  | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subpaths_to_add`                 | Toolbox paths to add with addpath(genpath()).         | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subject_subfolder`               | Manage outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
 | `results_filename_affix`          | Affix for result file names                           | [string] Can be used to differentiate simulation outputs for the same subject-transducer combination(e.g., different intensities and/or targets.)  |
-| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                                                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
-| `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).                                | (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
+| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
+| `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).| (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
 | `overwrite_simnibs`               | Overwrite SimNIBS segmentation results?               | (`1 = yes, 0 = no` [default]) |
 
 ### Simulation type
+see [doc_preproc.md](doc_preproc.md)      
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `simulation_medium`               | Medium setup for simulation (`water`/`layered`/`phantom`).                                   | Mandatory.   |
 | `layers`                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory. This parameter allows adding or removing layers of interest (if the corresponding segmenation is available and `parameters.medium` has a corresponding label containing the acoustic properties).  |
 | `seg_labels`                      | Labels for segmentations, specifying indices for CSF, bone mask, and eye regions.     | Mandatory.  |
@@ -32,18 +33,19 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `run_heating_sims`                | Run heating simulations.                                                              | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
 | `generate_report`                 | Generate a self-contained HTML simulation report at the end of the pipeline?          | (`1 = yes, 0 = no`)  |
-| `n_sim_dims`                      | Simulation type (2D / 3D).                                             | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
-| `axisymmetric`                  | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).  | (`1 = yes, 0 = no`) see `doc_simulations-acoustic.md`.    |
+| `n_sim_dims`                      | Simulation type (2D / 3D).                                                            | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
+| `axisymmetric`                    | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).                          | (`1 = yes, 0 = no`) see [doc_simulations-acoustic.md](doc_simulations-acoustic.md).    |
 | `savemat`                         | Save outputs of acoustic and/or heating simulations as .mat files?                    | (`1 = yes, 0 = no`) For many parallel simulations, setting this to 0 saves disk space.    |
-| `debug`                         | Activate a more verbose debug mode in which more intermediate output plots and files are provided?   | (`1 = yes, 0 = no`) |
+| `debug`                           | Activate a more verbose debug mode in which more intermediate output plots and files are provided?   | (`1 = yes, 0 = no`) |
 
 ### Segmentation/Preprocessing
+see [doc_preproc.md](doc_preproc.md)      
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `segmentation_software`           | Segmentation software used (`headreco` or `charm`).                                                       | Use of the former `headreco` may result in errors (e.g., when creating pseudoCTs) due to the assumption of charm-based tissue labels in parts of the codebase.    |
-| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [mm]    |   |
-| `smooth_method`                   | Smoothing filter type ['gaussian'(default)|'box']                                           |   |
+| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [mm]               |   |
+| `smooth_method`                   | Smoothing filter type [`gaussian`(default) / `box`]                                                       |   |
 | `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
 | `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
 | `smooth_window`                   | Number of voxels for smoothing (default: 3)                                                               |   |
@@ -51,36 +53,37 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `wrapradius`                      | Skull rubber wrap radius [grid voxels] (default: 10)   | Larger = tighter rubber that ignores bigger dents; recommended: 2-10  |
 
 ### Transducer specification
+see [doc_transducer.md](doc_transducer.md)      
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `transducer.source_freq_hz`       | Central frequency of the acoustic source (in Hz).                     |    |
-| `transducer.n_elements`           | Number of elements in the transducer.                                 |    |
-| `transducer.Elements_ID_mm`       | Inner diameter of each transducer element (in mm).                    |    |
-| `transducer.Elements_OD_mm`       | Outer diameter of each transducer element (in mm).                    |    |
-| `transducer.curv_radius_mm`       | Radius of curvature of the transducer bowl (in mm).                   |    |
-| `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).    |    |
-| `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                             | Must be calibrated.   |
-| `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                            | Must be calibrated.   |
-| `transducer.source_phase_rad`     | Phase of the acoustic source (in radians).                            | Must be calibrated.   |
-| `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).               | |
-| `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).            | |
-| `expected_focal_distance_ep`      | Expected distance from the transducer exit plane to the stimulation focus (in mm).  | Transducer depth setting [Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or [`transducer.focus_pos` and `transducer.trans_pos`] have to be specified.] |
-| `expected_focal_distance_bowl`    | Expected distance from the transducer bowl to the stimulation focus (in mm).        | |
-| `transducer_from_localite`        | Load transducer position from Localite files?.                        | (`1 = yes, 0 = no` [default])   |
-| `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).             | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
-| `use_kWaveArray`                  | Use the kWaveArray class for modeling transducers.                    | (`1 = yes, 0 = no`) see k-Wave documentation.    |
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
+| `transducer.source_freq_hz`       | Central frequency of the acoustic source (in Hz).                                 |                      |
+| `transducer.n_elements`           | Number of elements in the transducer.                                             |                      |
+| `transducer.Elements_ID_mm`       | Inner diameter of each transducer element (in mm).                                |                      |
+| `transducer.Elements_OD_mm`       | Outer diameter of each transducer element (in mm).                                |                      |
+| `transducer.curv_radius_mm`       | Radius of curvature of the transducer bowl (in mm).                               |                      |
+| `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).                |                      |
+| `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                                         | Must be calibrated.  |
+| `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                                        | Must be calibrated.  |
+| `transducer.source_phase_rad`     | Phase of the acoustic source (in radians).                                        | Must be calibrated.  |
+| `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).                           |                      |
+| `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).                        |                      |
+| `expected_focal_distance_ep`      | Expected distance from the transducer exit plane to the stimulation focus (in mm).  | Transducer depth setting [Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or [`transducer.focus_pos` and `transducer.trans_pos`] have to be specified.]    |
+| `expected_focal_distance_bowl`    | Expected distance from the transducer bowl to the stimulation focus (in mm).      |                      |
+| `transducer_from_localite`        | Load transducer position from Localite files?.                                    | (`1 = yes, 0 = no` [default])   |
+| `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).                         | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
+| `use_kWaveArray`                  | Use the kWaveArray class for modeling transducers.                                | (`1 = yes, 0 = no`) see k-Wave documentation.    |
 
 ### Target specification
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).                                          | Default: 5 mm|
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
+| `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).       | Default: 5 mm        |
 
 ### Simulation grid
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                                                     | |
 | `default_grid_dims`               | Default dimensions of the simulation grid `[Nx, Ny, Nz]`.                                                            | |
 | `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
@@ -88,12 +91,13 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `source_ppw`                      | Points Per Wavelength [default: calculated internally]                                                               | |
 | `source_cfl`                      | Courant-Friedrichs-Lewy fraction                                                                                     | |
 | `source_limit_fraction`           | Fraction of the stability limit to use for time step (0 = do not use stability limit)                                | |
-| `precision`                       | Computational precision for both acoustic and thermal simulations                                                    | 'single' (default) | 'double' (more precise, but more computationally demanding).|
+| `precision`                       | Computational precision for both acoustic and thermal simulations                                                    | `single` (default) / `double` (more precise, but more computationally demanding).|
 
 ### Medium properties
+see [doc_medium.md](doc_medium.md)    
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| **Parameter**                                     | **Description**                                                                   | **Comments**         |
+|---------------------------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `medium.water.sound_speed`                        | Speed of sound in water (in m/s).                                                 | ITRUSST benchmarks.  |
 | `medium.water.density`                            | Density of water (in kg/m³).                                                      | Tissue Properties DB.|
 | `medium.water.alpha_coeff`                        | Attenuation coefficient for water (in dB/cm/MHz).                                 | k-Plan documentation.|
@@ -145,31 +149,31 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 
 
 ### pseudoCT mapping to skull properties
-see doc_pseudoCT.md
+see [doc_pseudoCT.md](doc_pseudoCT.md)
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `use_pseudoCT`                    | Use (pseudo-)CT based mapping?  (`1` = yes | `0` = no (default))  |  Map (pseudo-)HU to tissue properties in the skull layer? |
-| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)| `k-wave` | `marsac` | `aubry`) | see [pCT documentation](doc_pseudoCT.md#mapping-density)  |
-| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan` | `marsac` | `aubry`)     | [pCT documentation](doc_pseudoCT.md#mapping-skull-density)  |
-| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan` | `mueller` | `aubry`)    | [pCT documentation](doc_pseudoCT.md#mapping-attenuation)  |
+| **Parameter**                     | **Description**                                                   | **Comments**         |
+|-----------------------------------|-------------------------------------------------------------------|----------------------|
+| `use_pseudoCT`                    | Use (pseudo-)CT based mapping?  (`1` = yes / `0` = no (default))  |  Map (pseudo-)HU to tissue properties in the skull layer? |
+| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)/ `k-wave` / `marsac` | `aubry`) | see [pCT documentation](doc_pseudoCT.md#mapping-density)  |
+| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan` / `marsac` / `aubry`)     | [pCT documentation](doc_pseudoCT.md#mapping-skull-density)  |
+| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan` / `mueller` / `aubry`)    | [pCT documentation](doc_pseudoCT.md#mapping-attenuation)  |
 
 
 ### Sequence timing and baseline temperature for heating simulations
-see doc_thermal-simulations.md
+see [doc_simulations-acoustic.md](doc_simulations-thermal.md)   
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `thermal.pd`                      | Pulse Duration (PD) [seconds]  | Duty cycle (DC) inside a Pulse Train [%] is internally calculated as `pd`/`pri`.                       |   |
-| `thermal.pri`                     | Pulse Repetition Interval (PRI) [seconds] (i.e., an on/off cycle during stimulation).    | Pulse Repetition Frequency (PRF) is internally calculated as 1/`pri`.   |
-| `thermal.ptd`                     | Pulse Train Duration (PTD) [seconds]                                             |   |
-| `thermal.pt_timestep`             | Modeling time steps inside a PT [seconds]                           |   |
-| `thermal.ptri`                    | Pulse Train Repetition Interval (PTRI) [seconds]                         | Duration of OFF period within a PTRI is internally calculated as `ptri`-`ptd`.  |
-| `thermal.ptrd`                    | Pulse Train Repetition Duration (PTRD) [seconds]                          |   |
-| `thermal.post_ptri_dur`           | Post-PTRI Steady-state Duration [seconds]                         |   |
-| `thermal.post_pt_timestep`        | Modeling time steps following PT & PTRI [seconds]                         |   |
+| **Parameter**                     | **Description**                                                                   | **Comments**         |
+|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
+| `thermal.pd`                      | Pulse Duration (PD) [seconds]  | Duty cycle (DC) inside a Pulse Train [%] is internally calculated as `pd`/`pri`. |   |
+| `thermal.pri`                     | Pulse Repetition Interval (PRI) [seconds] (i.e., an on/off cycle during stimulation).    | Pulse Repetition Frequency (PRF) is internally calculated as 1/`pri`.|
+| `thermal.ptd`                     | Pulse Train Duration (PTD) [seconds]                                                                          |   |
+| `thermal.pt_timestep`             | Modeling time steps inside a PT [seconds]                                                                     |   |
+| `thermal.ptri`                    | Pulse Train Repetition Interval (PTRI) [seconds]                                                              | Duration of OFF period within a PTRI is internally calculated as `ptri`-`ptd`.  |
+| `thermal.ptrd`                    | Pulse Train Repetition Duration (PTRD) [seconds]                                                              |   |
+| `thermal.post_ptri_dur`           | Post-PTRI Steady-state Duration [seconds]                                                                     |   |
+| `thermal.post_pt_timestep`        | Modeling time steps following PT & PTRI [seconds]                                                             |   |
 | `thermal.equal_step_duration`     | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
-| `thermal.cem43_iso`               | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                        |   |
+| `thermal.cem43_iso`               | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                                          |   |
 | `thermal.temp_0.water`            | Initial temperature of water medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.skull`            | Initial temperature of skull medium before simulation (in °C).                                                |   |
 | `thermal.temp_0.brain`            | Initial temperature of brain medium before simulation (in °C).                                                |   |
@@ -182,18 +186,19 @@ see doc_thermal-simulations.md
 
 
 ### GPU/HPC options
-see doc_hpc.md
+see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)    
 
-| **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
-|-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_cpu`, or `cpp_gpu`).         |   |
-| `hpc_submit_medium`               | Simulation submit mode         | `slurm` (recommended), `matlab`, `qsub`      |
-| `hpc_gpu`                         | Request a specific GPU. [Optional]                                                                                   |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
-| `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                                                        | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
-| `hpc_reservation`                  | Request a reserved cue. [Optional]                                                                                  | |
-| `ld_library_path`                 | Path to LD_LIBRARY used during SimNIBS installation. [Optional]                                     |  If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, specify the LD_LIBRARY location e.g., `/opt/gcc/7.2.0/lib64` [torque] or ```/home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux``` [slurm] |
+| **Parameter**                     | **Description**                                                                           | **Comments**         |
+|-----------------------------------|-------------------------------------------------------------------------------------------|----------------------|
+| `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_cpu`, or `cpp_gpu`).         | See [doc_backend.md](doc_backend.md). |
+| `hpc_submit_medium`               | Simulation submit mode                                                                    | `slurm` (recommended), `matlab`, `qsub`      |
+| `hpc_gpu`                         | Request a specific GPU. [Optional]                                                        |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
+| `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                             | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
+| `hpc_reservation`                 | Request a reserved cue. [Optional]                                                        |                       |
+| `ld_library_path`                 | Path to LD_LIBRARY used during SimNIBS installation. [Optional]                           |  If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, specify the LD_LIBRARY location e.g., `/opt/gcc/7.2.0/lib64` [torque] or ```/home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux``` [slurm] |
 
 ### Transducer calibration
+see [doc_calibration.md](doc_calibration.md)    
 
 For transducer calibration, a separate `calibration_config.yaml` applies that should be loaded as `parameters.calibration`.
 
@@ -213,7 +218,7 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.   | (`1 = yes, 0 = no`)  |
 | `force_kwavearray`              | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.            |
 | `opt_method`                    | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)    |   |
-| `opt_limits`                    | Distance limits for optimization [mm]   |   |
+| `opt_limits`                    | Distance limits for optimization [mm]                   |   |
 | `opt_weights`                   | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with larger weights) |   |
 | `opt_seed`                      | Random seed for optimization                            |   |
 | `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.  | Used only for calculating the peak distance and FWHM.  |

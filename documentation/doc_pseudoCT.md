@@ -65,7 +65,7 @@ Hounsfield Units can be used to inform acoustic properties in the bone layer of 
 
 To inform skull properties by pCTs in simulations, set `parameters.use_pseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose the desired acoustic parameter mapping algorithms. The current code supports the following mappings optionally model density, speed of sounds, and attenuation in the skull bone. When set to `"none"` or when the parameter field is deleted/missing, each property will revert to the uniform `skull` value. The defaults highlighted below are the ones specified in the `default_config.yaml`. 
 
->[!warning] The most suitable model remains an active area of research. All mappings should be treated as explorative. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will be applied to the uniform skull mask.
+>[!warning] The most suitable mapping remains an active area of research. All mappings should therefore be treated as experimental. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will exclusively be applied within the uniform skull mask.
 
 #### Mapping skull density
 
