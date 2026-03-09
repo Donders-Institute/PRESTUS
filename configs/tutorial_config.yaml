@@ -63,7 +63,7 @@ transducer:
               n_elem_row: 9
               n_elem_col: 9
               
-              # Element spacing in each direction [mm].
+              # Element spacing in each direction [mm], defined as edge-to-edge.
               elem_spacing_height_mm: 0.5
               elem_spacing_width_mm: 0.5
               
@@ -96,6 +96,7 @@ transducer:
           # Optionally project the current element layout onto a new radius of curvature (ROC).
           # Note: results may become unrealistic or unfeasible when, for example, spacing between elements decreases with an increasing ROC.
           project_on_new_ROC: false 
+          ROC_projection:
             new_ROC_mm: 100 # [mm]
   
   depth_mm: 16 # depth of transducer used for visualization purposes 
