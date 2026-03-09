@@ -307,14 +307,8 @@ medium:
 #------------ Simulation grid
 
 grid_step_mm: 0.5  # Grid resolution (must be isotropic) [mm]
-
-# These only need to be set manually if the simulations are done for water only
-default_grid_dims: [144, 144, 400] # [points per dimension]
-
-# select PML size, the default one for 3D is 10 (PML is the layer used in
-# kWaves to absorb waves reaching the end of the computational grid,
-# http://www.k-wave.org/documentation/example_na_controlling_the_pml.php)
-pml_size: 10
+default_grid_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
+pml_size: 10 # Perfectly Matched Layer (PML) size [3D recommendation: 10]
 
 source_ppw: [] # Points Per Wavelength [default: calculated internally]
 source_cfl: 0.15 # Courant-Friedrichs-Lewy fraction

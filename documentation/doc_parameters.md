@@ -90,7 +90,7 @@ see [doc_transducer.md](doc_transducer.md)
 |-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                  |                      |
 | `default_grid_dims`               | Default dimensions of the simulation grid for free-water simulations.             |                      |
-| `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
+| `pml_size`                        | Perfectly Matched Layer (PML) size to absorb waves at grid boundaries.            | See [k-Wave documentation](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). Default: `10` (recommended for 3D grids)|
 | `source_ppw`                      | Points Per Wavelength [default: calculated internally]                            |                      |
 | `source_cfl`                      | Courant-Friedrichs-Lewy fraction                                                  |                      |
 | `source_limit_fraction`           | Fraction of the stability limit to use for time step                              | `0`: do not use stability limit |
