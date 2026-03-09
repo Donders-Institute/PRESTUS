@@ -63,7 +63,7 @@ Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala
 
 Hounsfield Units can be used to inform acoustic properties in the bone layer of a SimNIBS segmentation. This is a subtype of a `layered` medium.
 
-To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to optionally model density, speed of sounds, and attenuation in the skull bone.
+To inform skull properties by pCTs in simulations, set `parameters.use_pseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to optionally model density, speed of sounds, and attenuation in the skull bone.
 
 >[!warning] The most suitable model remains an active area of research. All mappings should be treated as explorative. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will be applied to the uniform skull mask.
 
@@ -71,7 +71,7 @@ To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT =
 
 Mapping algorithm is goverened by `pct_mapping_density`.
 
-- `k-plan` | (**default**) 4-part piecewise linear fit based on k-Plan defaults <br>
+- `k-plan` | 4-part piecewise linear fit based on k-Plan defaults (**default**) <br>
 
     **Acoustic simulations**    
     Piece-wise linear mapping between HU and mass density in kg/m^3 using k-Plan default calibration [see k-Plan documentation](https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration):
@@ -183,7 +183,7 @@ Mapping algorithm is goverened by `pct_mapping_soundspeed`.
 
 Mapping algorithm is goverened by `pct_mapping_attenuation`.
 
-- `k-Plan` | Uniform fixed (**default**)
+- `k-plan` | Uniform fixed (**default**)
 
     $$ \alpha_\text{skull} = \alpha_\text{coeff} $$
 

@@ -65,7 +65,7 @@ sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_di
 % skull bone density is fixed for thermal simulation
 % (note that downstream metrics such as sound speed contribute to pressure, but are not input to kWaveDiffusion)
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-if parameters.usepseudoCT ==1 && ...
+if parameters.use_pseudoCT ==1 && ...
     (~isfield(parameters, "pct_mapping_density") || strcmp(parameters.pct_mapping_density, 'k-plan'))
     skull_i = find(ismember(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
     % [k-Plan] use fixed density for thermal simulation

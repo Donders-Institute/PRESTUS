@@ -107,7 +107,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
 
     log_timer('start','medium', parameters.output_dir);
 
-    if parameters.usepseudoCT == 1
+    if parameters.use_pseudoCT == 1
         kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
     else
         kwave_medium = medium_setup(parameters, medium_masks, planimg);

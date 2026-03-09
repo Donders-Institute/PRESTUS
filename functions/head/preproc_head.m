@@ -59,7 +59,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         t1_header = niftiinfo(filename_t1_simnibs);
     end
 
-    if parameters.usepseudoCT == 1
+    if parameters.use_pseudoCT == 1
         % Load pseudoCT
         filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
@@ -179,7 +179,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         
         %% [bone mask/pCT]
 
-        if parameters.usepseudoCT == 1
+        if parameters.use_pseudoCT == 1
             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = ...
                 preproc_align_to_focal_axis(...
                 pseudoCT_image, ...
