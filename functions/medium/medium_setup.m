@@ -42,205 +42,51 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
         medium_i = find(strcmp(medium_labels, label_name));
         if parameters.usepseudoCT == 1 && strcmp(label_name, 'skull')
             skull_idx = find(ismember(medium_masks,medium_i));
-            thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;                
+
+            % set skull thermal conductivity
+            thermal_conductivity(skull_idx) = medium.(label_name).thermal_conductivity;
+
+            % set skull heat capacity     
             specific_heat(skull_idx) = medium.(label_name).specific_heat_capacity;
+
+            % set skull perfusion
             if isfield(medium.(label_name), 'perfusion')
                 perfusion(skull_idx) = medium.(label_name).perfusion;
             end
+
+            % set skull absorption fraction
             if isfield(medium.(label_name), 'absorption_fraction')
                 absorption_fraction(skull_idx) = medium.(label_name).absorption_fraction;
             end
+
+            % set skull starting temperature
             if isfield(parameters.thermal.temp_0, label_name)
                 temp_0(skull_idx) = parameters.thermal.temp_0.(label_name);
             end
 
-            % define default pCT-to-tissue conversion variant
-            if isfield(parameters, "pseudoCT_variant")
-                pCT_variant = parameters.pseudoCT_variant;
+            % map skull bone density with the desired algorithm
+            if isfield(parameters, "pct_mapping_density")
+                pct_mapping_density = parameters.pct_mapping_density;
             else
-                pCT_variant = "kosciessa";
+                pct_mapping_density = 'none';
             end
+            [density] = medium_pct_density(parameters, medium, density, pseudoCT, skull_idx, pct_mapping_density);
 
-            switch pCT_variant
-                case 'carpino'
-                    pct_skullmapping.density = 'k-wave';
-                    pct_skullmapping.soundspeed = 'k-plan';
-                    pct_skullmapping.attenuation = 'yakuub';
-                case 'yakuub'
-                    pct_skullmapping.density = 'marsac';
-                    pct_skullmapping.soundspeed = 'marsac';
-                    pct_skullmapping.attenuation = 'yakuub';
-                case 'k-plan'
-                    pct_skullmapping.density = 'k-plan';
-                    pct_skullmapping.soundspeed = 'k-plan';
-                    pct_skullmapping.attenuation = 'k-plan';
-                case 'marquet'
-                    pct_skullmapping.density = 'marquet';
-                    pct_skullmapping.soundspeed = 'marquet';
-                    pct_skullmapping.attenuation = 'k-plan';
-                case 'kosciessa'
-                    pct_skullmapping.density = 'k-plan';
-                    pct_skullmapping.soundspeed = 'marsac';
-                    pct_skullmapping.attenuation = 'yakuub';
-                otherwise
-                    pct_skullmapping.density = parameters.pct_skullmapping.density;
-                    pct_skullmapping.soundspeed = parameters.pct_skullmapping.soundspeed;
-                    pct_skullmapping.attenuation = parameters.pct_skullmapping.attenuation;
+            % map skull bone sound speed with the desired algorithm
+            if isfield(parameters, "pct_mapping_soundspeed")
+                pct_mapping_soundspeed = parameters.pct_mapping_soundspeed;
+            else
+                pct_mapping_soundspeed = 'none';
             end
-
-            switch pct_skullmapping.density
-                case 'k-plan'
-
-                    % define piece-wise linear mapping between HU and mass density in kg/m^3 hounsfieldUnits = [-990, 60, 1000, 1950]; 
-                    % see https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration
-                    hounsfieldUnits = [-990, 60, 1000, 1950]; 
-                    massDensity = [1.2, 1060, 1530, 2150]; 
-
-                    density(skull_idx) = fit_pairwiselinear(pseudoCT(skull_idx), hounsfieldUnits, massDensity, 1);
-
-                    % plot the mapping
-                    if parameters.debug == 1
-                        output_plot = fullfile(parameters.debug_dir, ...
-                            sprintf('pCT_hounsfield-density_kplan.png'));
-                        exportgraphics(gcf, output_plot, 'Resolution', 150);
-                    end
-                    close(gcf);
-
-                case 'k-wave'
-
-                    offset_HU   = 1000;
-                    rho_max     = 2100;     % max. density in skull [kg/m3]
-
-                    % Preprocess pCT values
-                    % Offset CT values to use housfield2density
-                    pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
-
-                    % set minimum to air tissue (pHU=-1000, pHU_scaled = 0)
-                    pseudoCT(skull_idx) = max(pseudoCT(skull_idx),0);
-
-                    % estimate density
-                    density(skull_idx) = hounsfield2density(pseudoCT(skull_idx), 1);
-                    
-                    % plot the mapping
-                    if parameters.debug == 1
-                        output_plot = fullfile(parameters.debug_dir, ...
-                            sprintf('pCT_hounsfield-density_kwave.png'));
-                        exportgraphics(gcf, output_plot, 'Resolution', 150);
-                    end
-                    close(gcf);
-
-                    % regularize minimum density to water density
-                    density(skull_idx) = max(density(skull_idx),medium.water.density);
-                    % regularize maximum density to rho_max
-                    density(skull_idx) = min(density(skull_idx),rho_max);
-
-                    % remove initial offset
-                    pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
-
-                case 'marsac'
-
-                    HU_min 	      = 300;	  % minimum HU considered as skull
-                    HU_max 	      = 2000;	  % maximum skull HU for regularization
-                    rho_water     = 996;      % density [kg/m^3] [Baumgartner et al., 2024]
-                    rho_bone      = 2100;     % max. skull density [kg/m3] [Baumgartner et al., 2024]
-
-                    % if observed max HU is lower than threshold, set HU_max to actual max
-                    HU_max = min(max(pseudoCT(skull_idx),[],'all'), HU_max);
-
-                    % truncate CT HU (see Marsac et al., 2017)
-                    % do not use pCT-based properties for presumed non-skull tissue
-                    % BUT: this is prone to create trabecular holes
-                    skull_idx(pseudoCT(skull_idx) < HU_min) = [];
-                    % regularize maximum HU to HU_max
-                    pseudoCT(skull_idx) = min(pseudoCT(skull_idx),HU_max);
-
-                    % estimate density from CT HU based on Marsac et al., 2017 & Bancel et al., 2021
-                    % note: the original code hard-codes HU_min as 0, which may have been an error
-                    density(skull_idx) = rho_water + (rho_bone - rho_water) * ...
-                        (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min);
-
-                case 'marquet'
-
-                    rho_water = 1000;
-                    rho_bone = 2200;
-
-                    phi(skull_idx) = 1-(pseudoCT(skull_idx)/1000);
-                    density(skull_idx) = rho_water * phi(skull_idx) + ...
-                        rho_bone * (1-phi(skull_idx));
-
-                otherwise
-                    error("Specified CT density mapping is not supported.")
+            [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, pseudoCT, skull_idx, pct_mapping_soundspeed);
+            
+            % map skull bone attenuation with the desired algorithm
+            if isfield(parameters, "pct_mapping_attenuation")
+                pct_mapping_attenuation = parameters.pct_mapping_attenuation;
+            else
+                pct_mapping_attenuation = 'none';
             end
-
-            switch pct_skullmapping.soundspeed
-                case 'k-plan'
-
-                    sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
-
-                case 'marsac'
-
-                    c_water       = 1500;     % sound speed [m/s]
-                    c_skull       = 3360;     % max. speed of sound in skull [m/s] [Baumgartner et al., 2024]
-                    rho_water     = 996;      % density [kg/m^3] [Baumgartner et al., 2024]
-                    rho_bone      = 2100;     % max. skull density [kg/m3] [Baumgartner et al., 2024]
-
-                    sound_speed(skull_idx) = c_water + (c_skull - c_water) * ...
-                        (density(skull_idx) - rho_water) / (rho_bone - rho_water);
-                    
-                case 'marquet'
-
-                    c_water = 1500;
-                    if strcmp(label_name, 'skull_cortical')
-                        c_bone = 3100;
-                    else
-                        c_bone = 2200;
-                    end
-
-                    phi(skull_idx) = 1-(pseudoCT(skull_idx)/1000);
-                    sound_speed(skull_idx) = c_water * phi(skull_idx) + ...
-                        c_bone * (1-phi(skull_idx));
-                    % regularize sound speed to a minimum of water
-                    sound_speed(skull_idx) = max(sound_speed(skull_idx),c_water);
-
-                otherwise
-                    error("Specified CT sound speed mapping is not supported.")
-            end
-
-            switch pct_skullmapping.attenuation
-                case 'k-plan'
-
-                    kPlan_alpha = 13.3; % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-                    kPlan_alpha_power = 1;
-                    % Note that we allow different values to be specified in the config.
-                    % If replication of k-Wave is the goal, the above values should be specified.
-                    % Throw a warning in the case of deviations.
-                    if medium.(label_name).alpha_coeff ~= kPlan_alpha || ...
-                        medium.(label_name).alpha_power ~= kPlan_alpha_power
-                        warning('Specified attenuation varies from k-Plan setup.')
-                    end
-                    alpha_coeff(skull_idx) = medium.(label_name).alpha_coeff;
-                    alpha_power(skull_idx) = medium.(label_name).alpha_power;
-
-                case 'yakuub'
-
-                    alpha_min     = 4;        % cortical bone at 500 kHz [dB/cm] [Aubry et al., 2022] 
-                    alpha_max     = 8.7;      % bone at 500 kHz [dB/cm] [Fry 1978]
-
-                    % Finds maximum and minimum values
-                    HU_min = min(pseudoCT(skull_idx));
-                    HU_max = max(pseudoCT(skull_idx));
-
-                    % estimate attenuation based on (pseudo-)HU
-                    alpha_pseudoCT(skull_idx) = alpha_min + (alpha_max - alpha_min) * ...
-                        (1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;
-                    alpha_power(skull_idx) = medium.(label_name).alpha_power;
-                    % convert alpha at 500 kHz into prefactor alpha0 (dB/MHz/cm) according to specified alpha_power
-                    % (definition of lower and upper attenuation bounds is derived from 500kHz)
-                    alpha_coeff(skull_idx) = alpha_pseudoCT(skull_idx)./(0.5^medium.(label_name).alpha_power);
-
-                otherwise
-                    error("Specified pCT attenuation mapping is not supported.")
-            end
+            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, medium, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation);
             
             % [DEBUG] save pCT mapping overview
             if parameters.debug == 1
