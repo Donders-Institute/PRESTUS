@@ -19,8 +19,8 @@ Segmentations are mapped onto the requested layer medium masks (to later assign 
 Each layer is smoothed using one of the algorithms below. The size of smoothing kernels refer to the grid size of the medium mask, NOT the original dimensions of the planning image. If a multi-layer skull model is requested, both cortical and trabecular layers are initially combined into a skull segment and smoothed. Subsequently, the trabecular bone layer is smoothed and added.
 
 Multiple smoothing algorithms are available:  
-- `box` applies a uniform convolution, which is fastest, but also blocky and prone to skull holes at low binarization thresholds (default: 5-voxel kernel)
-- `gaussian` (default) uses smooth3 for isotropic blurring, yielding smooth gradients and moderate edge erosion (default: 5-voxel kernel)
+- `gaussian` (default) uses smooth3 for isotropic blurring, yielding smooth gradients and moderate edge erosion (default: 2-voxel FWHM kernel)
+- `box` applies a uniform convolution, which is fastest, but also blocky and prone to skull holes at low binarization thresholds (default: 2-voxel kernel)
 
 Different binarization thresholds can be defined for skull (default: 50%) and other tissues (default: 50%). 
 
@@ -35,3 +35,9 @@ All image transformations are concatenated to update transducer and target posit
 ### Acoustic property mapping
 
 See [acoustic property mapping](doc_medium.md).
+
+### Smoothing of acoustic property maps
+
+Sharp transitions in the acoustic properties of adjacent media can result in substantial wave reflections. To smoothen tissue transitions, acoustic property maps can be smoothed prior to the simulation. This is governed by `smooth_properties`. Identical smoothing will be applied to all acoustic property maps. This smoothing is deactivated by default, in part to allow users to set the desired smoothing kernel at the intended  grid size. If set to `true`, this will apply the same smoothing parameters as used during the creation of the medium maps (by default 2 voxel FWHM).
+
+> pCT. If pCTs are generated using PRESTUS, they automatically have smoothing applied at the skull edges ([see the pCT documentation](doc_pseudoCT.md)). If acoustic properties are mapped from pCTs, smoothing of the resulting acoustic property maps may not be intended. Recommended settings are an active area of investigation. 

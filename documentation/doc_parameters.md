@@ -52,9 +52,10 @@ see [doc_preproc.md](doc_preproc.md)
 | `smooth_method`                   | Smoothing filter type [`gaussian`(default) / `box`]                                                       |   |
 | `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
 | `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
-| `smooth_window`                   | Number of voxels for smoothing (default: 3)                                                               |   |
+| `smooth_window`                   | FWHM of smoothing `gaussian` or `box` with (default: 2) [voxel]                                           |   |
 | `skullfillmethod`                 | Method for filling holes in the skull ['rubberwrap'(default)/'imclose']                                   |   |
 | `wrapradius`                      | Skull rubber wrap radius [grid voxels] (default: 10)   | Larger = tighter rubber that ignores bigger dents; recommended: 2-10  |
+| `smooth_properties`               | Apply smoothing with parameters above to acoustic property maps?                                          | `false`(default)/`true`   |
 
 ### Transducer specification
 see [doc_transducer.md](doc_transducer.md)      
