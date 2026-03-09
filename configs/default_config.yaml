@@ -42,7 +42,10 @@ overwrite_simnibs: 0
 simulation_medium: layered
 
 usepseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium properties
-pseudoCT_variant: kosciessa # pCT mapping algorithms (yaakub/carpino/k-plan/marquet/kosciessa [default])
+pct_mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
+pct_mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
+pct_mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
+
 
 # Only run specific components of the pipeline?
 run_source_setup: 1       # Set up acoustic source? (switch off to look at initial segmentation results only)

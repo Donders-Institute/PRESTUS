@@ -69,6 +69,9 @@ The following documents the functions provided in PRESTUS.
 | `get_alpha_coeff`                       | MEDIUM         | Computes the amplitude attenuation coefficient for a given medium and frequency.                |
 | `medium_properties_nifti`               | MEDIUM         | Save NifTi image of the specified medium property map.                                          |
 | `medium_setup`                          | MEDIUM         | Set up medium                                                                                   |
+| `medium_pct_density`                    | MEDIUM         | Skull: pCT-informed density mapping                                                             |
+| `medium_pct_soundspeed`                 | MEDIUM         | Skull: pCT-informed sound speed mapping                                                         |
+| `medium_pct_attenuation`                | MEDIUM         | Skull: pCT-informed attenuation mapping                                                         |
 | `neuronav_compute_series_statistics`    | NEURONAV       | Compute mean position and variability over stimulus train                                       |
 | `neuronav_convert_MNI_to_native`        | NEURONAV       | Transform coordinates from MNI space to native subject space                                    |
 | `neuronav_convert_native_to_MNI`        | NEURONAV       | Convert native RAS coordinates to MNI space                                                     |

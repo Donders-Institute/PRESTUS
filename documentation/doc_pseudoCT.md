@@ -5,7 +5,7 @@
 PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 
 
 > [!WARNING]
-> (pseudo-)HU mapping is currently a beta feature in active development.
+> (pseudo-)HU mapping is an experimental feature in active development.
 
 ### Creating pseudoCTs from UTE scans
 
@@ -51,10 +51,13 @@ The following steps are used to create the pseudoCT:
     - `kosciessa`   | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
 - 3D Gaussian smoothing (σ=0.8 voxels via ANTs’ SmoothImage) prevents abrupt tissue transitions in the simulation grid. To retain information in the skull layer, unsmoothed values are retained within an eroded skull mask that attempts to correct for partial volume effects.
 
-*References*
-- Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).
-- Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).
-- Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).
+<span style="font-size:11px;">
+**References:**    
+Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).    
+Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).  
+Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).    
+Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.   
+</span>
 
 ### Using (pseudo-)CTs to inform acoustic properties
 
@@ -62,55 +65,164 @@ Hounsfield Units can be used to inform acoustic properties in the bone layer of 
 
 To inform skull properties by pCTs in simulations, set `parameters.usepseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose `parameters.pseudoCT_variant`. The current code supports the following variants to use pCTs to optionally model density, speed of sounds, and attenuation in the skull bone.
 
-[!warning] The most suitable model remains an active area of research. All mappings should be treated as explorative. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43).
+>[!warning] The most suitable model remains an active area of research. All mappings should be treated as explorative. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will be applied to the uniform skull mask.
 
+#### Mapping skull density
 
-- `carpino` | (**default**) Algorithm described in Carpino et al. (2024). <br>
+Mapping algorithm is goverened by `pct_mapping_density`.
 
-    All subsequent steps are only applied inside the skull mask.
+- `k-plan` | (**default**) 4-part piecewise linear fit based on k-Plan defaults <br>
 
-    ```
-    ρ_skull = hounsfield2density(HU+1000)
-    c_skull = 1.33 * ρ_skull + 167
-    α_skull = α_bone_min + (α_bone_max − α_bone_min) * (1 − (HU − HU_min) / (HU_max − HU_min))^0.5 [Mueller et al., 2017]
-    ```
-
-    - The k-Wave function hounsfield2density converts pseudo-HUs to density. Original pseudoCT values are initially shifted by 1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php). 
-    - Resulting density values are regularized to a minimum of the specified water density, and a maximum density of 2100 kg/m3. 
-    - The sound speed c is calculated from density 𝜌 using the linear relationship: c = 1.33𝜌 + 167. This is identical to the [k-Plan estimation](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#evaluating-plans). Note that due to the density regularization, sound speed is implicitly regularized.
-    - The absorption coefficient 𝛼 is derived from HU values according to formula (3) in Yaakub et al., with `α_bone_min` = 4 and `α_bone_max` = 8.7. For both `carpino` and `yakuub` variants, these 𝛼 bounds are based on estimates made at 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require ```alpha_0``` in ```𝛼(f) = alpha_0 x f[MHz] ^ y```. We therefore estimate ```alpha_0 = 𝛼(f)/0.5^y``` with  ```y``` being the specified ```alpha_power```for the skull tissue. 
-
-    *Reference:* Adapted from Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.
-
-- `yaakub` | Algorithm specified in Yaakub et al. (2023). <br>
-
-    ```
-    ρ_skull = ρ_water + (ρ_bone − ρ_water) * (HU − HU_min) / (HU_max − HU_min) [Marsac et al., 2017]
-    c_skull = c_water + (c_bone − c_water) * (ρ_skull − ρ_water) / (ρ_bone − ρ_water) [Marsac et al., 2017]
-    α_skull = α_bone_min + (α_bone_max − α_bone_min) * (1 − (HU − HU_min) / (HU_max − HU_min))^0.5 [Mueller et al., 2017]
-    ```
-
-    *References:* 
-    - Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023). 
-    - Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017).
-    - Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).
-
-- `k-plan` | Algorithm described in Carpino et al. (2024) with more fixed skull properties <br>
-
-    ```
-    ρ_skull = hounsfield2density(HU+1000)
-    c_skull = 1.33 * ρ_skull + 167
-    α_skull = alpha_0
-    ```
-
-    k-Plan fixes the absorption coeff. to `13.3` and power law to `1`. To allow more flexibility, this variant reads in the alpha power values specified for the respective bone segmentation (`trabecular` or `cortical`) from the current config. To replicate k-Plan's setup, specify `alpha_coeff = 13.3` and `alpha_power = 1` in the configuration of all bone segmentations.
+    **Acoustic simulations**    
+    Piece-wise linear mapping between HU and mass density in kg/m^3 using k-Plan default calibration [see k-Plan documentation](https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration):
     
-    Heating simulations will initially run the acoustic simulation as specified above, and then overwrite bone density (= `1850`) and sound speed (= `1.33 x 1850 + 166.7`) prior to starting the heating simulation.
-
+    $$ \rho_\text{skull} = \text{fit_pairwiselinear}(\text{HU}, \text{density}) $$
     ```
-    ρ_skull = 1850
-    c_skull = 1.33 * ρ_skull + 167
-    α_skull = alpha_0
+    HU = [-990, 60, 1000, 1950]
+    density = [1.2, 1060, 1530, 2150]
     ```
 
+    **Thermal simulations**     
+    Overwrite bone density prior to the thermal simulation:
+   
+    $$ \rho_\text{skull} = 1850 \, \text{kg/m}^3 $$
 
+    <br>
+
+- `k-wave` |  4-part piecewise linear fit based on Schneider et al. (1996) <br>
+
+    PseudoCT values are initially shifted by +1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php).   
+
+    $$ \rho_\text{skull} = \text{hounsfield2density}(\text{HU} + 1000) $$
+
+    Density estimates are regularized at the minimum to the water density specified in the configuration, and a max. skull density `rho_bone = 2100` kg/m3.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Schneider, U., Pedroni, E., and Lomax A., "The calibration of CT Hounsfield units for radiotherapy treatment planning," Phys. Med. Biol., 41, pp. 111-124 (1996).
+    </span>
+    <br>
+
+- `marsac` | Marsac et al. (2017) <br>
+
+    This algorithm initially regularizes skull pHU to a range of `HU_min = 300` and `HU_max = 2000`. Note that in contrast to Marsac et al., 2017, PRESTUS regularizes pHU values instead of excluding pHU < HU_min from the skull mask as the latter is prone to create skull holes.
+
+    $$ \rho_\text{skull} = \rho_\text{water} + (\rho_\text{bone} - \rho_\text{water}) \cdot \frac{\text{HU} - \text{HU}_\text{min}}{\text{HU}_\text{max} - \text{HU}_\text{min}} $$
+
+    with max. skull density `rho_bone = 2100` kg/m3.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017). <br>
+    </span>
+    <br>
+
+- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003) <br>
+
+    This algorithm first estimates the porosity as:
+
+    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
+
+    This uses the max. skull HU denominator from Guo et al., 2019.  
+    Skull density is then estimated as the mixture of bone and water density composites:
+    
+    $$ \rho_\text{skull} = \rho_\text{water} \cdot \phi_\text{skull} + \rho_\text{bone} \cdot (1 - \phi_\text{skull}) $$
+
+    Respective tissue sound speed properties are extracted from the configuration.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
+    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
+    </span>
+    <br>
+    
+#### Mapping skull sound speed
+
+Mapping algorithm is goverened by `pct_mapping_soundspeed`.
+
+- `k-plan` | Density-based mapping (**default**) <br>
+
+    Implements [the k-Plan mapping](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#converting-the-primary-planning-image-to-material-properties):
+
+    $$ c_\text{skull} = 1.33 \cdot \rho_\text{skull} + 167 $$
+
+- `marsac` | Density-based mapping according to Marsac et al. (2017) <br>
+    
+    $$ c_\text{skull} = c_\text{water} + (c_\text{bone} - c_\text{water}) \cdot \frac{\rho_\text{skull} - \rho_\text{water}}{\rho_\text{bone} - \rho_\text{water}} $$
+
+    with max. speed of sound in skull `c_skull = 3360` m/s and max. skull density `rho_bone = 2100` kg/m3. Respective water properties are extracted from the configuration.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017). <br>
+    </span>
+    <br>
+
+- `aubry` | "Porosity"-based mapping based on Aubry et al. (2003) <br>
+
+    This algorithm first estimates the porosity as:
+
+    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
+
+    This uses the max. skull HU denominator from Guo et al., 2019.  
+    Skull sound speed is then estimated as the mixture of bone and water sound speed composites:
+    
+    $$ c_\text{skull} = c_\text{water} \cdot \phi_\text{skull} + c_\text{bone} \cdot (1 - \phi_\text{skull}) $$
+
+    Respective tissue sound speed properties are extracted from the configuration.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
+    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).
+    </span>
+    <br>
+
+#### Mapping skull attenuation
+
+Mapping algorithm is goverened by `pct_mapping_attenuation`.
+
+- `k-Plan` | Uniform fixed (**default**)
+
+    $$ \alpha_\text{skull} = \alpha_\text{coeff} $$
+
+    k-Plan fixes the attenuation coeff. to `13.3` and frequency power law to `1`. To allow more flexibility, this variant reads in the alpha power values specified for the respective bone segmentation (`trabecular` or `cortical`) from the current config. To replicate k-Plan's setup, specify `alpha_coeff = 13.3` and `alpha_power = 1` in the skull bone medium configuration.
+
+    <br>
+
+- `mueller` | Algorithm specified in Mueller et al. (2017). <br>
+
+    $$ \alpha_\text{skull} = \alpha_\text{min} + (\alpha_\text{max} - \alpha_\text{min}) \left(1 - \frac{\text{HU} - \text{HU}_\text{min}}{\text{HU}_\text{max} - \text{HU}_\text{min}}\right)^{0.5} $$
+
+    with `α_min` = 4 and `α_max` = 8.7 (see Yakuub et al., 2023).     
+    
+    These 𝛼 estimates are based on 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require `alpha_0` in `𝛼(f) = alpha_0 x f[MHz] ^ y`. We therefore estimate `alpha_0 = 𝛼(f)/0.5^y` with  `y` being the specified `alpha_power`for the skull tissue.
+    
+    <span style="font-size: 12px;">
+    **References:**    
+    Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave modelsa).  J. Acoust. Soc. Am. 152, 1003–1019 (2022).  
+    Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).  
+    Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023).
+    </span>     
+    <br>
+
+- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003) <br>
+
+    This algorithm first estimates the porosity as:
+
+    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
+
+    This uses the max. skull HU denominator from Guo et al., 2019.  
+    Skull attenuation is then estimated as:
+    
+    $$ \alpha_\text{skull} = \alpha_\text{min} + (\alpha_\text{max} - \alpha_\text{min}) \cdot \phi_\text{skull}^{0.5} $$
+
+    with `α_min = 0.2` and `α_max = 8` (Aubry et al., 2003).
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
+    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
+    </span>
+    <br>

@@ -61,14 +61,15 @@ if length(size(parameters.grid_dims))>2
 end
 sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
-% [(pseudo-)CT] if 'k-plan' setup is used:
-% density and sound speed in bone are fixed for heating estimation
+% [(pseudo-)CT] if 'k-plan' mapping is used for density:
+% skull bone density is fixed for thermal simulation
+% (note that downstream metrics such as sound speed contribute to pressure, but are not input to kWaveDiffusion)
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-if parameters.usepseudoCT ==1 && strcmp(parameters.pseudoCT_variant, 'k-plan')
+if parameters.usepseudoCT ==1 && ...
+    (~isfield(parameters, "pct_mapping_density") || strcmp(parameters.pct_mapping_density, 'k-plan'))
     skull_i = find(ismember(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
+    % [k-Plan] use fixed density for thermal simulation
     kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
-    kwave_medium.sound_speed(ismember(medium_masks,skull_i)) = ...
-        1.33*kwave_medium.density(ismember(medium_masks,skull_i))+167; 
     clear skull_i;
 end
 
