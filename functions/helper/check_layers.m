@@ -9,7 +9,7 @@ function [parameters] = check_layers(parameters, segmentation)
     parameters.layers.water = seg_values;
 
     % [pCT] combine cortical and trabecular layers (if specified)
-    if parameters.usepseudoCT
+    if parameters.use_pseudoCT
         % Collect ALL skull layer indices
         skull_layers = [];
         if isfield(parameters.layers, 'skull')

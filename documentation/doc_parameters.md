@@ -149,8 +149,10 @@ see doc_pseudoCT.md
 
 | **Parameter**                     | **Description**                                                                                                      | **Comments**                                                                  |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `usepseudoCT`                     | Use (pseudo-)CT based mapping?  (`1 = yes, 0 = no`)               |  Maps (pseudo-)HU to tissue properties in the trabecular and cortical skull layer. |
-| `pseudoCT_variant`                | Mapping algorithm (`yaakub`/`carpino`/`k-plan`/`marquet`)         | see doc_pseudoCT.md  |
+| `use_pseudoCT`                    | Use (pseudo-)CT based mapping?  (`1` = yes | `0` = no (default))  |  Map (pseudo-)HU to tissue properties in the skull layer? |
+| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)| `k-wave` | `marsac` | `aubry`) | see [pCT documentation](doc_pseudoCT.md#mapping-density)  |
+| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan` | `marsac` | `aubry`)     | [pCT documentation](doc_pseudoCT.md#mapping-skull-density)  |
+| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan` | `mueller` | `aubry`)    | [pCT documentation](doc_pseudoCT.md#mapping-attenuation)  |
 
 
 ### Sequence timing and baseline temperature for heating simulations

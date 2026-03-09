@@ -41,7 +41,7 @@ overwrite_simnibs: 0
 # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
 simulation_medium: layered
 
-usepseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium properties
+use_pseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium properties
 pct_mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
 pct_mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
 pct_mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller

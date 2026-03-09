@@ -123,8 +123,8 @@ function parameters = load_parameters(varargin)
 
     %% Default: deactivate pseudoCT unless specified
 
-    if ~isfield(parameters, 'usepseudoCT')
-        parameters.usepseudoCT = 0;
+    if ~isfield(parameters, 'use_pseudoCT')
+        parameters.use_pseudoCT = 0;
     end
     
     %% Convert additional paths into cell arrays for processing

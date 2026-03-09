@@ -40,7 +40,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     for label_i = 1:length(layer_labels)
         label_name = layer_labels{label_i};
         medium_i = find(strcmp(medium_labels, label_name));
-        if parameters.usepseudoCT == 1 && strcmp(label_name, 'skull')
+        if parameters.use_pseudoCT == 1 && strcmp(label_name, 'skull')
             skull_idx = find(ismember(medium_masks,medium_i));
 
             % set skull thermal conductivity
@@ -233,7 +233,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     end
 
     % save a pCT if used
-    if parameters.usepseudoCT == 1 && parameters.debug == 1
+    if parameters.use_pseudoCT == 1 && parameters.debug == 1
         filename_pct = fullfile(parameters.debug_dir, sprintf('pct%s', parameters.results_filename_affix));
         niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
     end
