@@ -46,7 +46,9 @@ see [doc_preproc.md](doc_preproc.md)
 | **Parameter**                     | **Description**                                                                   | **Comments**         |
 |-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
 | `segmentation_software`           | Segmentation software used (`headreco` or `charm`).                                                       | Use of the former `headreco` may result in errors (e.g., when creating pseudoCTs) due to the assumption of charm-based tissue labels in parts of the codebase.    |
-| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [mm]               |   |
+| `pad_mm`                          | Size of symmetric padding to apply to grid prior to transducer + PML setup [mm; default: `0`]             |   |
+| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [grid voxels]      |   |
+| `grid_max_expand`                 | Maximum expansion [mm] for computational grid to optimize prime numbers and speed up computations.        |   |
 | `smooth_method`                   | Smoothing filter type [`gaussian`(default) / `box`]                                                       |   |
 | `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
 | `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
@@ -86,14 +88,13 @@ see [doc_transducer.md](doc_transducer.md)
 
 | **Parameter**                     | **Description**                                                                   | **Comments**         |
 |-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                                                     | |
-| `default_grid_dims`               | Default dimensions of the simulation grid `[Nx, Ny, Nz]`.                                                            | |
+| `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                  |                      |
+| `default_grid_dims`               | Default dimensions of the simulation grid for free-water simulations.             |                      |
 | `pml_size`                        | Size of the Perfectly Matched Layer (PML) used to absorb waves at the grid boundaries (default is 10 for 3D grids).  | see k-Wave documentation.|
-| `grid_max_expand`                 | Maximum expansion [mm] for computational grid to optimize prime numbers and speed up computations.                   | |
-| `source_ppw`                      | Points Per Wavelength [default: calculated internally]                                                               | |
-| `source_cfl`                      | Courant-Friedrichs-Lewy fraction                                                                                     | |
-| `source_limit_fraction`           | Fraction of the stability limit to use for time step (0 = do not use stability limit)                                | |
-| `precision`                       | Computational precision for both acoustic and thermal simulations                                                    | `single` (default) / `double` (more precise, but more computationally demanding).|
+| `source_ppw`                      | Points Per Wavelength [default: calculated internally]                            |                      |
+| `source_cfl`                      | Courant-Friedrichs-Lewy fraction                                                  |                      |
+| `source_limit_fraction`           | Fraction of the stability limit to use for time step                              | `0`: do not use stability limit |
+| `precision`                       | Computational precision for both acoustic and thermal simulations                 | `single` (default) / `double` (more precise, but more computationally demanding).|
 
 ### Medium properties
 see [doc_medium.md](doc_medium.md)    

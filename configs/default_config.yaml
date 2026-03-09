@@ -316,9 +316,6 @@ default_grid_dims: [144, 144, 400] # [points per dimension]
 # http://www.k-wave.org/documentation/example_na_controlling_the_pml.php)
 pml_size: 10
 
-# To what extent the computational grid can be expanded in order to get lower prime numbers to (potentially) speed up computations
-grid_max_expand: 40
-
 source_ppw: [] # Points Per Wavelength [default: calculated internally]
 source_cfl: 0.15 # Courant-Friedrichs-Lewy fraction
 source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
@@ -327,10 +324,9 @@ precision: 'single' # Computational precision for both acoustic and thermal simu
 
 #------------ Segmentation / Head preprocessing
 
-# Expansion factor for the cerebro-spinal fluid brain mask;
-# if the mask ends up being too big, try reducing it
-# (40 is the conservative default; the mask is dilated with csf_mask_expansion_factor/voxel_size_mm cubic kernel)
-csf_mask_expansion_factor: 40
+pad_mm: 0 # Apply symmetric padding to grid prior to transducer + PML setup?
+csf_mask_expansion_factor: 40 # Expansion factor for the cerebro-spinal fluid brain mask to capture head areas of interest in simulation
+grid_max_expand: 40 # Prime number grid expansion size to (potentially) speed up computations
 
 # Thresholds for smoothing the skull and other masks
 smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
