@@ -33,6 +33,13 @@ addpath(genpath('toolboxes'));
 
 %% Load configuration settings
 
+config_folder = ""; % [optional] specify a application-specific config folder
+if strcmp(config_folder, "")
+    warning("Using configurations in PRESTUS config folder. It is recommended that you work with a local copy instead...");
+else
+    cd(config_folder) % move to local folder containing configs
+end
+
 % Load equipment parameters from the YAML configuration file
 equip_param = yaml.loadFile('equipment_config.yaml', 'ConvertToArray', true);
 % Equipment information (by default Donders-specific)
