@@ -65,17 +65,18 @@ function profile_oneil_opt = recompute_oneil_solution(parameters, profile_oneil,
 
     % exclude the near-field if requested
     i_axial_oneil_opt_summary = i_axial_oneil_opt;
+    axial_position_adj = axial_position;
     if parameters.calibration.skip_front_peak_mm ~=0
-        i_remove = axial_position <= parameters.calibration.skip_front_peak_mm;
-        axial_position(i_remove) = [];
+        i_remove = axial_position_adj <= parameters.calibration.skip_front_peak_mm;
+        axial_position_adj(i_remove) = [];
         i_axial_oneil_opt_summary(i_remove) = [];
     end
 
     fprintf('Estimated distance to the point of maximum intensity: %.2f mm\n', ...
-        axial_position(i_axial_oneil_opt_summary == max(i_axial_oneil_opt_summary)))
+        axial_position_adj(i_axial_oneil_opt_summary == max(i_axial_oneil_opt_summary)))
     try
         fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', ...
-            get_flhm_center_position(axial_position, i_axial_oneil_opt_summary))
+            get_flhm_center_position(axial_position_adj, i_axial_oneil_opt_summary))
     catch
         warning('Could not estimated distance to the center of half-maximum range');
     end
