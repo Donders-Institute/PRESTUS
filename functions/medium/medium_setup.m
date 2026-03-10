@@ -93,22 +93,25 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                 h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
                 subplot(4,1,1); 
                     hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
-                    title(['pseudoCT tissue property ranges: ', parameters.pseudoCT_variant]);
+                    title(['pseudoCT tissue property ranges']);
                 subplot(4,1,2); 
                     hold on; histogram(density(skull_idx)); xlabel("Density [kg/m3]")
                     % add lines for the fixed parameters
                     xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
+                    title(sprintf('Density mapping: %s', pct_mapping_density))
                 subplot(4,1,3); 
                     hold on; histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
                     xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
+                    title(sprintf('Sound speed mapping: %s', pct_mapping_soundspeed))
                 subplot(4,1,4); 
                     hold on; histogram(alpha_coeff(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
                     xline(medium.skull_trabecular.alpha_coeff, 'r', 'LineWidth', 2);
                     xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 2);
+                    title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
                 output_plot = fullfile(parameters.debug_dir, ...
-                    sprintf('pCT_histograms_%s.png',parameters.pseudoCT_variant));
+                    sprintf('pCT_histograms%s.png',parameters.results_filename_affix));
                 exportgraphics(h, output_plot, 'Resolution', 150);
                 close(h);
             end
