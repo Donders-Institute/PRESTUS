@@ -11,12 +11,9 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     % This function turns the original `layered` segmentations into medium masks such
     % that the setup_medium.m function can fill in the tissue-dependent parameters.
-
-    % Note that tissue masks will assume the labels specified in parameters.layers.
+    % Tissue masks will contain IDs according to the order of tissues in parameters.medium.
 
     grid_step_mm = parameters.grid_step_mm;
-
-    labels = fieldnames(parameters.layers);
    
     % Segmentations will be postprocessed. 
     % Incl. smoothing layer transitions & filling potential skull segmentation gaps. 
@@ -28,9 +25,10 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     log_timer('stop','preproc_medium_mask');
 
     % Fill gaps in skull mask
-    if any(contains(labels, 'skull'))        
+    requested_layers = fieldnames(parameters.layers);
+    if any(contains(requested_layers, 'skull'))        
         [medium_masks, ~] = skull_fill_holes(parameters, ...
-            medium_masks, labels, focus_pos_grid, segmentation);
+            medium_masks, focus_pos_grid, segmentation);
     end
 
     % [DEBUG] Plot segmentation and smoothed medium mask
