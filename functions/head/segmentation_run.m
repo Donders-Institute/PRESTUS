@@ -114,6 +114,34 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         display(out);
         
         fprintf('Now wait for the job with the id listed above to finish')
+
+    elseif strcmp(parameters.hpc_submit_medium, 'matlab')
+        fprintf('Running segmentation locally:\n%s\n', segment_call);
+        
+        if ~isfield(parameters, 'simnibs_bin_path') || isempty(parameters.simnibs_bin_path)
+            error('simnibs_bin_path required for local execution');
+        end
+        
+        % Use FULL PATH to charm/headreco (don't rely on PATH)
+        full_segment_call = sprintf('%s/%s', parameters.simnibs_bin_path, segment_call);
+        fprintf('Full command: %s\n', full_segment_call);
+        
+        orig_dir = pwd;
+        try
+            cd(parameters.seg_path);
+            [res, out] = system(full_segment_call);
+            cd(orig_dir);
+            
+            if res == 0
+                fprintf('Segmentation completed successfully.\n');
+            else
+                error('Segmentation failed (exit code %d):\n%s', res, out);
+            end
+        catch ME
+            cd(orig_dir);
+            rethrow(ME);
+        end
+
     else
         fprintf('To get segmented head files, you need to run the segmentation software with a command: \n%s\n The script will stop for now, rerun it when the segmentation has finished.\n', segment_call)
         error('Submission medium %s is not available for automatic segmentation.', parameters.hpc_submit_medium);
