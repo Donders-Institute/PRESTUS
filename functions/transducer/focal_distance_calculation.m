@@ -87,7 +87,7 @@ for ti = 1:numel(parameters.transducer)
     if ~isfield(tr, 'expected_focal_distance_bowl') || isempty(tr.expected_focal_distance_bowl)
         if ~isfield(tr, 'trans_pos')  || isempty(tr.trans_pos) || ...
            ~isfield(tr, 'focus_pos') || isempty(tr.focus_pos)
-            error('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
+            warning('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
         end
         % calculate grid distance between transducer bowl and focus
         focal_distance = norm(tr.focus_pos - tr.trans_pos);
