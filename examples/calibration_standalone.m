@@ -52,6 +52,11 @@ available_combos = fieldnames(equip_param.combos);
 disp('Available Equipment Combinations:');
 disp(available_combos);
 
+% Create output folder (if not yet available)
+if ~exist(parameters.calibration.path_output)
+    mkdir(parameters.calibration.path_output);
+end
+
 %% Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
 for i = 1:N_i
