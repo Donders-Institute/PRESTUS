@@ -62,7 +62,7 @@ function [trans_ras_seg, ...
     % Note: the planning and segmentation images have the same size,
     % but with different headers / location systems
 
-    t1plan_info = niftiinfo(fullfile(pn.data_prelocalite, sprintf('%s_T1_forneuronav.nii.gz',sub_id)));
+    t1plan_info = niftiinfo(fullfile(pn.data_prelocalite, sprintf('%s_T1*.nii*',sub_id)));
     t1seg_info = niftiinfo(fullfile(pn.data_seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
     mni_info = niftiinfo(fullfile(pn.data_seg, sprintf('m2m_%s', sub_id), 'toMNI', 'final_tissues_MNI.nii.gz'));
     

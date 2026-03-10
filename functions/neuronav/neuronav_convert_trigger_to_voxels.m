@@ -1,12 +1,13 @@
-function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = neuronav_convert_trigger_to_voxels(sub_id, sides, outputStruct, parameters, pn)
+function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ...
+    neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters, pn)
 % NEURONAV_CONVERT_TRIGGER_TO_VOXELS - Convert Localite trigger positions to voxel (image) coordinates.
 %
 % USAGE:
-%   [transducers, targets, t1_image] = neuronav_convert_trigger_to_voxels(subject_id, sides, outputStruct, parameters, pn)
+%   [transducers, targets, t1_image] = neuronav_convert_trigger_to_voxels(subject_id, positions, outputStruct, parameters, pn)
 %
 % INPUT:
 %   sub_id       - String subject if (e.g., sub-001)
-%   sides        - Array of stimulation sides (1:2 for left/right)
+%   positions    - Array of stimulation positions (e.g., 1:2 for left/right)
 %   outputStruct - Struct containing averaged Localite (trigger) matrices for each side
 %   parameters   - Simulation configuration struct, including hardware geometry
 %   pn           - Struct containing path configuration for all data locations
@@ -34,7 +35,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ne
 %   For group analysis or reporting in standard space, do spatial normalization post hoc.
 
     % --- STEP 1: Locate and load T1 MRI and header/info
-    t1_file = dir(fullfile(pn.data_prelocalite, sprintf('%s_*T1*.nii.gz',sub_id)));
+    t1_file = dir(fullfile(pn.data_prelocalite, sprintf('%s_*T1*.nii*',sub_id)));
     t1_header = niftiinfo(fullfile(t1_file.folder, t1_file.name));
     t1_image = niftiread(fullfile(t1_file.folder, t1_file.name));
 
@@ -42,10 +43,10 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ne
     reference_dist = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
 
     % --- STEP 3: For each stimulation side, extract the averaged transformation matrix and compute positions
-    for i = sides
+    for i = positions
         % Extract 4x4 transformation from Matrix4D fields
-        matrix_flat = struct2cell(outputStruct.TriggerMarker(i).Matrix4D);
-        coord_matrix = reshape(cell2mat(matrix_flat)', [4, 4])';  % Transpose to match MATLAB layout
+        matrix_flat = squeeze(outputStruct{i}.matrix4d_mean);
+        coord_matrix = reshape((matrix_flat)', [4, 4])';  % Transpose to match MATLAB layout
 
         % -- Extract and interpret Localite coordinate system:
         %   - coord_matrix(:,4): the position (origin) in RAS mm
@@ -56,8 +57,12 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ne
         % -- Compute the RAS mm position of the transducer surface
         transducer_ras(i,:) = ref_pos + reference_dist * ref_vec;
         % -- Compute the RAS mm position of the acoustic focal point (forward along vector)
-        target_ras(i,:) = ref_pos + parameters.expected_focal_distance_bowl * ref_vec;
-
+        parameters = focal_distance_calculation(parameters);
+        if isfield(parameters, 'expected_focal_distance_bowl')
+            target_ras(i,:) = ref_pos + parameters.expected_focal_distance_bowl * ref_vec;
+        elseif isfield(parameters.transducer(1), 'expected_focal_distance_bowl')
+            target_ras(i,:) = ref_pos + parameters.transducer(1).expected_focal_distance_bowl * ref_vec;
+        end
         % -- Convert these world (RAS mm) positions into MRI voxel index space
         transducer_pos(i,:) = ras_to_grid(transducer_ras(i,1:3)', t1_header);
         target_pos(i,:) = ras_to_grid(target_ras(i,1:3)', t1_header);
