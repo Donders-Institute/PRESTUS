@@ -4,20 +4,13 @@
 
 See [Installation](doc_installation.md).
 
-### [Deprecated] Run the tutorial 
-
-- `documentation/PRESTUS_intro_tutorial.md`
-- The acoustic profile is derived from the manufacturers measurements and adjusted to more closely match the actual characteristics of the transducer.
-- The structural data is segemented with SimNIBS 4's charm.
-- The segmented data is translated to a matrix of acoustic properties.
-- k-wave performs acoustic and thermal simulations.
-- Select outputs are plotted.
-
 ### [Optional] Explore demos
 
-A simplified 2D benchmarking example can be found [here](https://github.com/jkosciessa/PRESTUS_2D_demo). It is a lightweight example that is designed to run on local CPU ressources.
+A simplified 2D benchmarking example can be found [here](https://github.com/jkosciessa/PRESTUS_2D_demo). It is a lightweight example that is designed to run on local CPU ressources.   
 
-A 3D demo using SimNIBS' Ernie template is provided as a [DataLad dataset](https://gin.g-node.org/PRESTUS/sim_ernie/). [Note: This example is based on a prior PRESTUS version. It still has to be updated, but provides a practical example of a possible data management scheme.]
+A 3D demo using SimNIBS' Ernie template is provided as a [DataLad dataset](https://gin.g-node.org/PRESTUS/sim_ernie/). [Note: This example is based on a prior PRESTUS version. It still has to be updated, but provides a practical example of a possible data management scheme.]     
+
+A (currently outdated) demo that focuses on transducer calibration can be found [here](https://github.com/jkosciessa/PRESTUS_bin/blob/main/tutorial/PRESTUS_intro_tutorial.md).
 
 ### Create a study-specific config file
 
