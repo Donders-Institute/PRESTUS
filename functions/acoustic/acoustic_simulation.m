@@ -42,12 +42,12 @@ switch parameters.code_type
       sensor  = cast_struct(sensor, parameters.precision);
    
       % Pathname for the input and output files (used only for non-interactive computations)
-      input_args.SaveToDisk = fullfile(parameters.output_dir, ...
+      input_args.SaveToDisk = char(fullfile(parameters.output_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
-         parameters.simulation_medium, parameters.results_filename_affix));
+         parameters.simulation_medium, parameters.results_filename_affix)));
       
       input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.results_filename_affix);
-      input_args.DataPath = parameters.output_dir;
+      input_args.DataPath = char(parameters.output_dir);
       input_args.DeleteData = true;
 
       if parameters.n_sim_dims == 3
@@ -69,12 +69,12 @@ switch parameters.code_type
       sensor  = cast_struct(sensor, parameters.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      input_args.SaveToDisk = fullfile(parameters.output_dir, ...
+      input_args.SaveToDisk = char(fullfile(parameters.output_dir, ...
         sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
-        parameters.simulation_medium, parameters.results_filename_affix));
+        parameters.simulation_medium, parameters.results_filename_affix)));
 
       input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.results_filename_affix);
-      input_args.DataPath = parameters.output_dir;
+      input_args.DataPath = char(parameters.output_dir);
       input_args.DeleteData = true;
 
       if parameters.n_sim_dims == 3
