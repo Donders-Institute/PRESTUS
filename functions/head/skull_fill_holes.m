@@ -1,4 +1,4 @@
-function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, labels, focus_pos_grid, segmented_img)
+function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
 % skull_fill_holes Expands skull mask and fills gaps to skin.
 %
 % This function processes a 3D medium mask used in ultrasound brain stimulation simulations (e.g., k-Wave).
@@ -17,7 +17,6 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %                     - results_filename_affix     (string) Affix for output filenames.
 %                     - seg_labels.eye             (optional int) Label index for eye tissue.
 %   medium_masks    - 3D array of initial medium labels (updated in-place and returned).
-%   labels          - Cell array of tissue label names (e.g., {'skin', 'skull_cortical'}).
 %   focus_pos_grid  - 1x3 vector [x,y,z] indices of focus position for debug slice (y-slice used).
 %   segmented_img   - 3D array of original segmentation labels.
 %
@@ -30,7 +29,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %   - Image Processing Toolbox: imerode, strel, imfill, bwlabeln, regionprops, label2rgb, imshowpair, montage.
 %
 % Example:
-%   medium_masks = skull_fill_holes(params, medium_masks, labels, 2, bone_img, focus_pos, seg_img, trab_mask, 3);
+%   medium_masks = skull_fill_holes(params, medium_masks, 2, bone_img, focus_pos, seg_img, trab_mask, 3);
 %
 % Notes:
 %   - Assumes voxel-based 3D head model from neuroimaging (e.g., CT/MRI segmentation).
@@ -38,11 +37,14 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, la
 %   - Gap filling identifies largest non-skin-skull blob (likely CSF/air) and ignores it.
 %   - Eyes default to water (label 0) to avoid erroneous bone assignment.
 
-    if parameters.use_pseudoCT == 0 && any(contains(labels, 'skull_cortical'))  
+    labels_medium = fieldnames(parameters.medium);
+    labels_requested = fieldnames(parameters.layers);
+
+    if parameters.use_pseudoCT == 0 && any(contains(labels_requested, 'skull_cortical'))  
         % treat cortical bone as the base layer
-        skull_i = find(ismember(labels, {'skull_cortical'; 'skull_trabecular'}));
+        skull_i = find(ismember(labels_medium, {'skull_cortical'; 'skull_trabecular'}));
     else
-        skull_i = find(strcmp(labels,  'skull'));
+        skull_i = find(strcmp(labels_medium, 'skull'));
     end
 
     % Retain pre-fill medium mask for later plotting
