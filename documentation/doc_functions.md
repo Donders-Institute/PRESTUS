@@ -76,10 +76,9 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_convert_MNI_to_native`        | NEURONAV       | Transform coordinates from MNI space to native subject space                                    |
 | `neuronav_convert_native_to_MNI`        | NEURONAV       | Convert native RAS coordinates to MNI space                                                     |
 | `neuronav_convert_trigger_to_voxels`    | NEURONAV       | Convert Localite trigger positions to voxel (image) coordinates.                                |
-| `neuronav_create_marker_average`        | NEURONAV       | Build an averaged Localite-trigger structure for export.                                        |
 | `neuronav_export_session_csv`           | NEURONAV       | Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions.          |
 | `neuronav_get_group_mean_mni`           | NEURONAV       | Compute group-level average MNI coordinates (both mm and voxel).                                |
-| `neuronav_select_and_average_localite`  | NEURONAV       | Select most recent Localite XML for a session.                                                  |
+| `neuronav_select_localite`              | NEURONAV       | Select most recent Localite XML for a session.                                                  |
 | `position_transducer_localite`          | NEURONAV       | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
 | `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                                       |
 | `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
