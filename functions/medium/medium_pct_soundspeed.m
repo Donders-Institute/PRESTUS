@@ -1,4 +1,4 @@
-function [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, pseudoCT, skull_idx, algorithm)
+function [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, density, pseudoCT, skull_idx, algorithm)
 
 switch algorithm
     case 'k-plan'

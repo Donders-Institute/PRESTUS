@@ -78,7 +78,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             else
                 pct_mapping_soundspeed = 'none';
             end
-            [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, pseudoCT, skull_idx, pct_mapping_soundspeed);
+            [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, density, pseudoCT, skull_idx, pct_mapping_soundspeed);
             
             % map skull bone attenuation with the desired algorithm
             if isfield(parameters, "pct_mapping_attenuation")
