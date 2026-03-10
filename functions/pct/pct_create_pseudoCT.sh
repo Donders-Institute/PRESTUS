@@ -56,102 +56,102 @@ function pct_create_pseudoCT()
     ute_reg_bias="${path_pct}/UTE_thr0_BiasField.nii.gz"
     ute_norm="${path_pct}/UTE_STnorm.nii.gz"
 
-    # # echo "========================================================================="
-    # # echo "SEGMENTATION"
-    # # echo "========================================================================="
-
-    # # Externaly run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
-    # # and instead of the T2 we use a PETRA UTE scan, so that the UTE will be registered to the T1
-
-    # # Change directory to the pCT folder
-    # cd "${path_pct}" || { echo "Directory not found"; exit 1; }
-
-    # # Check if UTE_reg.nii.gz already exists. If it exists, skip renaming the file.
-    # if [ -f $ute_reg ]; then
-    #     echo "UTE_reg.nii.gz already exists. Skipping renaming."
-    # else
-    #     # Rename T2_reg.nii.gz to UTE_reg.nii.gz to use the PETRA UTE image instead of T2
-    #     mv $t2w_reg $ute_reg
-    #     echo "Renamed T2_reg.nii.gz to UTE_reg.nii.gz"
-    # fi
-
     # echo "========================================================================="
-    # echo "SKULL MASK"
+    # echo "SEGMENTATION"
     # echo "========================================================================="
 
-    # # Create a binary skull mask from final_tissues, thresholding to include skull (value 7 or 8)
-    # fslmaths th -thr 7 -uthr 8 -bin $skull_mask
+    # Externaly run a segmentation using SimNIBS (charm) where the T1 is a normal weighted T1 
+    # and instead of the T2 we use a PETRA UTE scan, so that the UTE will be registered to the T1
 
-    # # Refine skull mask
-    # echo "Running MATLAB script pct_skullexpand.m..."
-    # cd "${path_fun_pct}" || { echo "Directory not found: $path_fun_pct"; exit 1; }
-    # matlab_command="addpath(genpath('${path_fun}')); pct_skullexpand('${path_simnibs}', '${path_pct}'); exit"
-    # "$path_matlab" -nodisplay -nosplash -batch "$matlab_command" || { echo "MATLAB pct_skullexpand failed"; exit 1; }
-    # # Move back to pCT folder
-    # cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+    # Change directory to the pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 
-    # ################################################################################
-    # ##### pCT processing #####
-    # ################################################################################
+    # Check if UTE_reg.nii.gz already exists. If it exists, skip renaming the file.
+    if [ -f $ute_reg ]; then
+        echo "UTE_reg.nii.gz already exists. Skipping renaming."
+    else
+        # Rename T2_reg.nii.gz to UTE_reg.nii.gz to use the PETRA UTE image instead of T2
+        mv $t2w_reg $ute_reg
+        echo "Renamed T2_reg.nii.gz to UTE_reg.nii.gz"
+    fi
 
-    # ################################################################################
-    # ##### STEP 1: UTE THRESHOLD #####
-    # ################################################################################
+    echo "========================================================================="
+    echo "SKULL MASK"
+    echo "========================================================================="
+
+    # Create a binary skull mask from final_tissues, thresholding to include skull (value 7 or 8)
+    fslmaths th -thr 7 -uthr 8 -bin $skull_mask
+
+    # Refine skull mask
+    echo "Running MATLAB script pct_skullexpand.m..."
+    cd "${path_fun_pct}" || { echo "Directory not found: $path_fun_pct"; exit 1; }
+    matlab_command="addpath(genpath('${path_fun}')); pct_skullexpand('${path_simnibs}', '${path_pct}'); exit"
+    "$path_matlab" -nodisplay -nosplash -batch "$matlab_command" || { echo "MATLAB pct_skullexpand failed"; exit 1; }
+    # Move back to pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+
+    ################################################################################
+    ##### pCT processing #####
+    ################################################################################
+
+    ################################################################################
+    ##### STEP 1: UTE THRESHOLD #####
+    ################################################################################
     
-    # echo "========================================================================="
-    # echo "STEP 1: UTE THRESHOLD"
-    # echo "========================================================================="
+    echo "========================================================================="
+    echo "STEP 1: UTE THRESHOLD"
+    echo "========================================================================="
 
-    # # Apply a threshold to the UTE image at 0, eliminating negative values
-    # fslmaths $ute_reg -thr 0 $ute_reg_thr0
+    # Apply a threshold to the UTE image at 0, eliminating negative values
+    fslmaths $ute_reg -thr 0 $ute_reg_thr0
 
-    # ################################################################################
-    # ##### STEP 2: UTE BIAS FIELD CORRECTION #####
-    # ################################################################################
+    ################################################################################
+    ##### STEP 2: UTE BIAS FIELD CORRECTION #####
+    ################################################################################
     
-    # echo "========================================================================="
-    # echo "STEP 2: UTE BIAS FIELD CORRECTION"
-    # echo "========================================================================="
+    echo "========================================================================="
+    echo "STEP 2: UTE BIAS FIELD CORRECTION"
+    echo "========================================================================="
 
-    # # Perform bias field correction using ANTs' N4BiasFieldCorrection to remove intensity inhomogeneity
-    # # This step requires ANTs to be installed and available in the environment (e.g., module load ants)
-    # if [ -f $ute_reg_thr0_corr ]; then
-    #     echo "N4BiasFieldCorrection already run; reusing estimates."
-    # else
-    #     echo "Running N4BiasFieldCorrection."
-    #     N4BiasFieldCorrection \
-    #     --image-dimensionality 3 \
-    #     --input-image $ute_reg_thr0 \
-    #     --convergence [50x50x50x50,0.0000001] \
-    #     --bspline-fitting [180] \
-    #     --output [$ute_reg_thr0_corr, $ute_reg_bias]
-    # fi
+    # Perform bias field correction using ANTs' N4BiasFieldCorrection to remove intensity inhomogeneity
+    # This step requires ANTs to be installed and available in the environment (e.g., module load ants)
+    if [ -f $ute_reg_thr0_corr ]; then
+        echo "N4BiasFieldCorrection already run; reusing estimates."
+    else
+        echo "Running N4BiasFieldCorrection."
+        N4BiasFieldCorrection \
+        --image-dimensionality 3 \
+        --input-image $ute_reg_thr0 \
+        --convergence [50x50x50x50,0.0000001] \
+        --bspline-fitting [180] \
+        --output [$ute_reg_thr0_corr, $ute_reg_bias]
+    fi
 
-    # ################################################################################
-    # ##### STEP 3: UTE SOFT TISSUE NORMALISATION #####
-    # ################################################################################
+    ################################################################################
+    ##### STEP 3: UTE SOFT TISSUE NORMALISATION #####
+    ################################################################################
 
-    # echo "========================================================================="
-    # echo "STEP 3: UTE SOFT TISSUE NORMALISATION"
-    # echo "========================================================================="
+    echo "========================================================================="
+    echo "STEP 3: UTE SOFT TISSUE NORMALISATION"
+    echo "========================================================================="
 
-    # # Create a file to store the soft tissue peak intensity value (for later normalization)
-    # touch ${path_pct}/pCT_soft_tissue_value.txt
+    # Create a file to store the soft tissue peak intensity value (for later normalization)
+    touch ${path_pct}/pCT_soft_tissue_value.txt
 
-    # # Call MATLAB to run the soft_tissue_peak.m script to find the peak intensity of soft tissue
-    # echo "Running MATLAB script pct_soft_tissue_peak.m..."
-    # cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
-    # matlab_command="addpath(genpath('${path_fun}')); pct_soft_tissue_peak(\"$path_simnibs\",\"$path_pct\"); exit"
-    # $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
-    # # Move to pCT folder
-    # cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+    # Call MATLAB to run the soft_tissue_peak.m script to find the peak intensity of soft tissue
+    echo "Running MATLAB script pct_soft_tissue_peak.m..."
+    cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
+    matlab_command="addpath(genpath('${path_fun}')); pct_soft_tissue_peak(\"$path_simnibs\",\"$path_pct\"); exit"
+    $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
+    # Move to pCT folder
+    cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 
-    # # Read the soft tissue peak value from the file created by the MATLAB script
-    # read peak_value < ${path_pct}/pCT_soft_tissue_value.txt
-    # echo "The soft tissue peak value obtained from the Matlab code is: $peak_value"
+    # Read the soft tissue peak value from the file created by the MATLAB script
+    read peak_value < ${path_pct}/pCT_soft_tissue_value.txt
+    echo "The soft tissue peak value obtained from the Matlab code is: $peak_value"
 
-    # # Normalize UTE image using the soft tissue peak value -> soft tissue peak = 1 
-    # fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_norm
+    # Normalize UTE image using the soft tissue peak value -> soft tissue peak = 1 
+    fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_norm
 
     # The skull fraction should now be between the noise/air peak (around 0) and the soft tissue peak (1).
     
