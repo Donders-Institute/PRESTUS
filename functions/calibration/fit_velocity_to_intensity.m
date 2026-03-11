@@ -1,17 +1,22 @@
 function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_intensity(...
-    parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity)
+    parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity, simulated_analytical_scaling)
 % fit_velocity_to_intensity - Correct velocity so peak intensity matches desired intensity.
 %
 % After global search optimizes profile shape (phases + velocity), the peak
 % intensity may not exactly equal desired_intensity. Since I ∝ v², we can
 % analytically correct velocity: v_new = v_old * sqrt(I_desired / I_peak).
 %
+% Because opt_source_amp divides by simulated_analytical_scaling, the
+% analytical target must be desired_intensity * scaling so that the final
+% simulation's max_Isppa equals desired_intensity.
+%
 % Arguments:
-%   parameters        - Structure with transducer and medium parameters.
-%   profile_oneil     - Structure with .axial_distance_bowl (mm from bowl).
-%   opt_phases        - Optimized phases for each element [rad].
-%   opt_velocity      - Optimized particle velocity from global search [m/s].
-%   desired_intensity - Target peak intensity [W/cm^2].
+%   parameters                   - Structure with transducer and medium parameters.
+%   profile_oneil                - Structure with .axial_distance_bowl (mm from bowl).
+%   opt_phases                   - Optimized phases for each element [rad].
+%   opt_velocity                 - Optimized particle velocity from global search [m/s].
+%   desired_intensity            - Target peak intensity [W/cm^2].
+%   simulated_analytical_scaling - Ratio of simulated to analytical peak intensity.
 %
 % Returns:
 %   corrected_velocity - Velocity adjusted to yield desired peak intensity [m/s].
@@ -54,10 +59,14 @@ function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_int
         return;
     end
 
-    % Correct velocity analytically: I ∝ v² => v_new = v_old * sqrt(I_desired / I_peak)
-    correction_factor = sqrt(desired_intensity / I_peak_before);
+    % Analytical target accounts for scaling: simulation divides velocity by
+    % scaling, so analytical peak must overshoot by that factor.
+    analytical_target = desired_intensity * simulated_analytical_scaling;
+
+    % Correct velocity analytically: I ∝ v² => v_new = v_old * sqrt(I_target / I_peak)
+    correction_factor = sqrt(analytical_target / I_peak_before);
     corrected_velocity = opt_velocity * correction_factor;
-    I_peak_after = desired_intensity;
+    I_peak_after = analytical_target;
 
     % Warn if corrected velocity exceeds upper bound
     if isfield(parameters.calibration, 'opt_upper_velocity') && ...
@@ -68,7 +77,8 @@ function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_int
 
     fprintf('Velocity correction: %.4f -> %.4f m/s (factor: %.4f)\n', ...
         opt_velocity, corrected_velocity, correction_factor);
-    fprintf('Peak intensity: %.2f -> %.2f W/cm^2 (desired: %.2f)\n', ...
-        I_peak_before, I_peak_after, desired_intensity);
+    fprintf('Analytical target: %.2f W/cm^2 (desired_intensity * scaling = %.2f * %.4f)\n', ...
+        analytical_target, desired_intensity, simulated_analytical_scaling);
+    fprintf('Expected max_Isppa in simulation: %.2f W/cm^2\n', desired_intensity);
 
 end
