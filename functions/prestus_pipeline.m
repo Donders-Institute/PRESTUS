@@ -298,6 +298,7 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
             warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
             parameters.heating_available = 0;
             parameters.run_thermal_analysis = 0;
+            results_heating = [];
         end
     else
         parameters.heating_available = 0;
