@@ -17,14 +17,14 @@ Since each config is a structure, you can easily place multiple configs in one s
 Let's say you have config_1, config_2 and config_3 and you want to run them in sequence.
 
 If you want the heatmaps to not carry over, you would run your pipeline like this:
-`single_subject_pipeline(subject_id, config_1)`   
-`single_subject_pipeline(subject_id, config_2)`   
-`single_subject_pipeline(subject_id, config_3)`   
+`prestus_pipeline_start(subject_id, config_1)`   
+`prestus_pipeline_start(subject_id, config_2)`   
+`prestus_pipeline_start(subject_id, config_3)`   
 
 But now, you will also feed it the configs for each subsequent simulation:
 `sequential_configs.config_2 = config_2`  
 `sequential_configs.config_3 = config_3`  
-`single_subject_pipeline(subject_id, config_1, 'sequential_configs', sequential_configs)`   
+`prestus_pipeline_start(subject_id, config_1, 'sequential_configs', sequential_configs)`   
 
 Please note that you have to use the names `config_x` in the sequential_configs, and that you have to use integers. So names like `config_-5`, `config_0`, `config_1234` and `config_007`.
 

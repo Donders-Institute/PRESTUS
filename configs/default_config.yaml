@@ -71,10 +71,13 @@ debug: 1 # Activate a debug mode in which more intermediate outputs are provided
 
 #------------ High-performance computing
 
-hpc_submit_medium: 'matlab' # slurm (recommended) | qsub | matlab (default)
+hpc_submit_medium: 'auto' # auto (recommended) | slurm | qsub | matlab (recommended for debugging)
 hpc_gpu: ''
 hpc_partition: ''
 hpc_reservation: ''
+hpc_wait_for_job: false
+hpc_timelimit: '04:00:00'
+hpc_memorylimit: 20
 
 # An optional path to LD_LIBRARY used during SimNIBS installation
 # If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location

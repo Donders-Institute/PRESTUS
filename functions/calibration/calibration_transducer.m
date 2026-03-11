@@ -97,16 +97,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param.interactive = 0;
     
     % Run the simulation based on the submission method
-    switch sim_param.submit_medium
-        case 'qsub'
-            single_subject_pipeline_with_qsub(sim_id, sim_param, true);
-        case 'slurm'
-            single_subject_pipeline_with_slurm(sim_id, sim_param, true);
-        case 'matlab'
-            single_subject_pipeline(sim_id, sim_param);
-        otherwise
-            error('Submit medium does not correspond to available options.');
-    end
+    sim_param.hpc_wait_for_completion = true;
+    prestus_pipeline_start(sim_id, sim_param, true);
 
     %% Load initial results
 
@@ -164,16 +156,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_param.transducer.source_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
-    switch sim_param.submit_medium
-        case 'qsub'
-            single_subject_pipeline_with_qsub(sim_id, opt_param, true);
-        case 'slurm'
-            single_subject_pipeline_with_slurm(sim_id, opt_param, true);
-        case 'matlab'
-            single_subject_pipeline(sim_id, opt_param);
-        otherwise
-            error('Submit medium does not correspond to available options.');
-    end
+    sim_param.hpc_wait_for_completion = true;
+    prestus_pipeline_start(sim_id, sim_param, true);
 
     %% Load optimized simulation results    
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...

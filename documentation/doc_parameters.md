@@ -2,7 +2,7 @@
 
 The following documents the parameters used in PRESTUS. The specification philosophy is the following: `default_config.yaml` provides a list of all parameters with default settings and will be read in first by the function `load_parameters`. This default configuration file should not be changed in standard applications to ensure that necessary fields are provided. 
 
-To set up a specific application, an additional `config_<STUDY>.yaml` should be provided. This file should contain exclusively the fields where defaults should be overwritten (e.g., to provide specific transducer settings). Alternatively, parameters can be specified prior to calling the `single_subject_pipeline` in MATLAB. This allows dynamic iterations over parameters of interest.
+To set up a specific application, an additional `config_<STUDY>.yaml` should be provided. This file should contain exclusively the fields where defaults should be overwritten (e.g., to provide specific transducer settings). Alternatively, parameters can be specified prior to calling the `prestus_pipeline` in MATLAB. This allows dynamic iterations over parameters of interest.
 
 ### I/O management
 

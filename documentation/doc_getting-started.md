@@ -66,8 +66,8 @@ To this end, `run_grid_setup`, `run_medium_setup`, `run_source_setup`, `run_acou
 
 See [pseudoCT](doc_pseudoCT.md).
 
-### Run the single_subject_pipeline | [Optional] iterate across parameters
+### Run the prestus_pipeline | [Optional] iterate across parameters
 
-When the configuration is fully specified, the full pipeline only needs a subject id (a number consisting of no more than 3 digits). To run multiple subjects or setups in parallel, the `single_subject_pipeline` can be submitted using high performance computing jobs (see [HPC documentation](doc_hpc.md)).
+When the configuration is fully specified, the full pipeline only needs a subject id (a number consisting of no more than 3 digits). To run multiple subjects or setups in parallel, the `prestus_pipeline` can be submitted using high performance computing jobs as a part of `prestus_pipeline_start` (see [HPC documentation](doc_hpc.md)).
 
 PRESTUS can be parallelized across-subject and within-subject across treatment setups, e.g., by iterating across different transducers, transducer placement and target coordinates, or amplitudes and/or focal depth settings (requiring either dynamic [recalibration](doc_calibration.md) using `transducer_calibration` or a precomputed lookup table) via custom MATLAB scripts.
