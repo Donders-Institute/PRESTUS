@@ -141,7 +141,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             parameters.calibration.fit_velocity_to_intensity
         [opt_velocity, ~, ~] = fit_velocity_to_intensity(...
             initial_params, profile_oneil, opt_phases, opt_velocity, ...
-            parameters.calibration.desired_intensity);
+            parameters.calibration.desired_intensity, simulated_analytical_scaling);
     end
 
     % Recalculate analytical solution with optimized phases and velocity
