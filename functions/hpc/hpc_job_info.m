@@ -1,11 +1,11 @@
-function display_info = hpc_job_info(submit_medium, job_id, job_name, subject_id, ...
+function display_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
     memory_gb, timelimit, log_dir, visualize)
 %% HPC_JOB_INFO  Generate formatted job display information
 %
 %   Creates structured display info for job submission feedback.
 %
 %   Inputs:
-%     submit_medium - 'slurm' or 'qsub'
+%     platform      - 'slurm' or 'qsub'
 %     job_id        - Raw job ID from submission
 %     job_name      - Job name string
 %     subject_id    - Subject number
@@ -18,7 +18,7 @@ function display_info = hpc_job_info(submit_medium, job_id, job_name, subject_id
 %     display_info  - Struct with all formatted display fields
 
     % Format job ID
-    if strcmp(submit_medium, 'slurm') && isnumeric(job_id)
+    if strcmp(platform, 'slurm') && isnumeric(job_id)
         display_info.id = sprintf('%d', job_id);
         display_info.check_cmd = sprintf('squeue -u $USER | grep %s', job_name);
         display_info.detail_cmd = sprintf('sacct -j %s', display_info.id);

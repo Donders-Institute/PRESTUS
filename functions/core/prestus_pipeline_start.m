@@ -7,7 +7,7 @@ function prestus_pipeline_start(subject_id, parameters, options)
 %
 %   Inputs:
 %     subject_id  - Subject number (double)
-%     parameters  - Struct with sim_path, submit_medium, hpc_* settings
+%     parameters  - Struct with sim_path, platform, hpc_* settings
 %     options     - Struct with sequential_configs (default: empty)
 
     arguments
@@ -23,24 +23,24 @@ function prestus_pipeline_start(subject_id, parameters, options)
     end
 
     % ========== STEP 1: PLATFORM AUTO-DETECTION ==========
-    if ~isfield(parameters, 'submit_medium') || strcmp(parameters.submit_medium, 'auto')
-        submit_medium = hpc_detect_system();
-        parameters.submit_medium = submit_medium;
-        fprintf('➤ auto-detected: %s\n', upper(submit_medium));
+    if ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
+        platform = hpc_detect_system();
+        parameters.platform = platform;
+        fprintf('➤ auto-detected: %s\n', upper(platform));
     else
-        submit_medium = parameters.submit_medium;
-        fprintf('➤ deploying: %s\n', upper(submit_medium));
+        platform = parameters.platform;
+        fprintf('➤ deploying: %s\n', upper(platform));
     end
     
     % ========== DISPATCH EXECUTION ==========
-    switch parameters.submit_medium
+    switch parameters.platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
             prestus_pipeline(subject_id, parameters, options);
             
         case {'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
-            hpc_validate_parameters(parameters, submit_medium);
+            hpc_validate_parameters(parameters, platform);
             [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters, subject_id);
             
@@ -49,20 +49,20 @@ function prestus_pipeline_start(subject_id, parameters, options)
             hpc_matlab_pipeline(temp_m_path, temp_data_path, path_to_pipeline, options);
             
             % Job name
-            job_name = hpc_job_name(submit_medium, parameters, subject_id);
+            job_name = hpc_job_name(platform, parameters, subject_id);
             
             % Submit job
-            job_id = hpc_submit_job(submit_medium, temp_m_file, parameters, subject_id, log_dir);
+            job_id = hpc_submit_job(platform, temp_m_file, parameters, subject_id, log_dir);
             
             % Display job info
-            job_info = hpc_job_info(submit_medium, job_id, job_name, subject_id, ...
+            job_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
                 parameters.hpc_memorylimit, parameters.hpc_timelimit, log_dir, true);
             
             % Optional wait
             if isfield(parameters, 'hpc_wait_for_job') && parameters.hpc_wait_for_job
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
-                hpc_wait_for_completion(job_id, submit_medium);
+                hpc_wait_for_completion(job_id, platform);
                 fprintf('✅ Job %s completed\n\n', job_id_display);
             else
                 fprintf('➡️  Continuing in MATLAB ...\n\n');
@@ -72,7 +72,7 @@ function prestus_pipeline_start(subject_id, parameters, options)
             parameters.job_id = job_id;
             
         otherwise
-            error('Unknown submit_medium: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
-                parameters.submit_medium);
+            error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
+                parameters.platform);
     end
 end

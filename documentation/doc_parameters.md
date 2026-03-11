@@ -198,7 +198,7 @@ see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)
 | **Parameter**                     | **Description**                                                                           | **Comments**         |
 |-----------------------------------|-------------------------------------------------------------------------------------------|----------------------|
 | `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_cpu`, or `cpp_gpu`).         | See [doc_backend.md](doc_backend.md). |
-| `hpc_submit_medium`               | Simulation submit mode                                                                    | `slurm` (recommended), `matlab`, `qsub`      |
+| `platform`                        | Simulation submit mode                                                                    | `slurm` (recommended), `matlab`, `qsub`      |
 | `hpc_gpu`                         | Request a specific GPU. [Optional]                                                        |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
 | `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                             | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
 | `hpc_reservation`                 | Request a reserved cue. [Optional]                                                        |                       |
@@ -221,7 +221,6 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.       | Multiple combinations can be specified. |
 | `desired_intensities`           | Desired free-water intensities [W/cm^2]                 | Multiple combinations can be specified. |
 | `add_FDO`                        | Append Focal Distance Offset (distance from transducer bowl to exit plane). Set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl. | The profile is padded (between bowl and exit plane) with zero. This can stabilize the fitting procedure in the near field.  |
-| `submit_medium`                 | Simulation submit mode                                  | `slurm` (recommended), `matlab` (debug; doesn't overwrite), `qsub`  |
 | `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.   | (`1 = yes, 0 = no`)  |
 | `force_kwavearray`              | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.            |
 | `opt_method`                    | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)    |   |

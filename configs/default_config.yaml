@@ -71,7 +71,7 @@ debug: 1 # Activate a debug mode in which more intermediate outputs are provided
 
 #------------ High-performance computing
 
-hpc_submit_medium: 'auto' # auto (recommended) | slurm | qsub | matlab (recommended for debugging)
+platform: 'auto' # auto (recommended) | slurm | qsub | matlab (recommended for debugging)
 hpc_gpu: ''
 hpc_partition: ''
 hpc_reservation: ''

@@ -54,7 +54,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     end
     
     % if not running on a qsub or slurm HPC, the job will stop to run the segmentation manually
-	if strcmp(parameters.hpc_submit_medium, 'qsub')
+	if strcmp(parameters.platform, 'qsub')
         qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
         ['simnibs-', subj_id_string], ...
             fullfile(log_dir, sprintf('%s_qsub_segment_output_$timestamp.log', subj_id_string)),...
@@ -74,7 +74,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         
         fprintf('Now wait for the job with the id listed above to finish')
 
-    elseif strcmp(parameters.hpc_submit_medium, 'slurm')
+    elseif strcmp(parameters.platform, 'slurm')
 
         % Create a temporary SLURM batch script file
         temp_slurm_file = tempname(log_dir);
@@ -115,7 +115,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         
         fprintf('Now wait for the job with the id listed above to finish')
 
-    elseif strcmp(parameters.hpc_submit_medium, 'matlab')
+    elseif strcmp(parameters.platform, 'matlab')
         fprintf('Running segmentation locally:\n%s\n', segment_call);
         
         if ~isfield(parameters, 'simnibs_bin_path') || isempty(parameters.simnibs_bin_path)
@@ -144,7 +144,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
 
     else
         fprintf('To get segmented head files, you need to run the segmentation software with a command: \n%s\n The script will stop for now, rerun it when the segmentation has finished.\n', segment_call)
-        error('Submission medium %s is not available for automatic segmentation.', parameters.hpc_submit_medium);
+        error('Submission medium %s is not available for automatic segmentation.', parameters.platform);
     end 
 
 end

@@ -71,10 +71,6 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;
-    % Overwrite calibration submission medium (if specified)
-    if isfield(parameters.calibration, 'submit_medium')
-        sim_param.submit_medium = parameters.calibration.submit_medium;
-    end
     % Force water medium
     sim_param.simulation_medium = 'water';
     % Force save result matrices
