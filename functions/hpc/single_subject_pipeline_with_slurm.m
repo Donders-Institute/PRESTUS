@@ -2,176 +2,213 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     arguments
         subject_id double
         parameters struct
-        wait_for_job logical = false % boolean for waiting for job to finish before continuing the code
-        timelimit string = "04:00:00" % time limit for a job in seconds (4 hours by default)
-        memorylimit (1,1) double = 40 % memory limit for a job in Gb (40 Gb by default)
+        wait_for_job logical = false
+        timelimit string = "04:00:00"
+        memorylimit (1,1) double = 40
         options.sequential_configs struct = struct()
     end
 
-    % Save that this parameter set is using slurm for further branching
+    % Setup and validation
     parameters.submit_medium = 'slurm';
-
-    if parameters.interactive
-        warning('Processing is set to interactive mode, this is not supported when running jobs with qsub, switching off interactive mode.')
-        parameters.interactive = 0;
+    validate_slurm_parameters(parameters);
+    [log_dir, path_to_pipeline] = setup_output_directory(parameters, subject_id);
+    
+    % Generate consistent temp filenames
+    [temp_data_path, temp_m_path, temp_slurm_path, temp_m_file] = generate_temp_files(log_dir);
+    
+    % Create data file and MATLAB script
+    save(temp_data_path, 'subject_id', 'parameters');
+    write_matlab_script(temp_m_path, temp_data_path, path_to_pipeline, options.sequential_configs);
+    
+    % Create and submit SLURM job
+    write_slurm_script(temp_slurm_path, parameters, subject_id, timelimit, memorylimit, temp_m_file, log_dir);
+    job_id = submit_slurm_job(temp_slurm_path, log_dir, parameters, subject_id);
+    
+    % Wait for completion if requested
+    if wait_for_job
+        wait_for_job_completion(job_id);
     end
-    assert(matches(parameters.overwrite_files,["always","never"]), "When running jobs with qsub, it is not possible to create dialog windows to ask for a confirmation when a file already exists. Set parameters.overwrite_files to 'always' or 'never'");
+    
+    disp('Continuing with the MATLAB script...');
+end
 
-    % Make subfolder (if enabled) and check if directory exists
-    % This ensures that log files are saved in the subject subdirectory
-    if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
+%% Helper functions
+
+function validate_slurm_parameters(parameters)
+    if parameters.interactive
+        warning('Interactive mode disabled for SLURM jobs.');
+        parameters.interactive = false;
+    end
+    assert(matches(parameters.overwrite_files, ["always", "never"]), ...
+        'overwrite_files must be "always" or "never" for SLURM jobs.');
+end
+
+function [log_dir, path_to_pipeline] = setup_output_directory(parameters, subject_id)
+    if isfield(parameters, 'subject_subfolder') && parameters.subject_subfolder
         output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
     else
-        output_dir = fullfile(parameters.sim_path);
+        output_dir = parameters.sim_path;
     end
     
-    if ~isfolder(output_dir)
-        mkdir(output_dir);
-    end    
-
+    if ~isfolder(output_dir), mkdir(output_dir); end
     log_dir = fullfile(output_dir, 'batch_job_logs');
-    if ~exist(log_dir, 'dir' )
-        mkdir(log_dir)
-    end
-
-    [path_to_pipeline, ~, ~] = fileparts(which('single_subject_pipeline'));
+    if ~isfolder(log_dir), mkdir(log_dir); end
     
-    subj_id_string = sprintf('sub-%03d', subject_id);
+    [path_to_pipeline, ~, ~] = fileparts(which('single_subject_pipeline'));
+end
 
-    % save inputs in the temp file
-    temp_data_path = tempname(log_dir);
-    [tempdir,tempfile] = fileparts(temp_data_path);
-    tempfile = [tempfile '.mat'];
-    temp_data_path = [temp_data_path '.mat'];
-    save(temp_data_path, "subject_id", "parameters");
+function [temp_data_path, temp_m_path, temp_slurm_path, temp_m_file] = generate_temp_files(log_dir)
+    % get timestamp
+    timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+    temp_base = tempname(log_dir);
+    
+    % get temporary id (to avoid competing parallel calls)
+    [~, temp_base_name] = fileparts(temp_base);
+    temp_base_name = temp_base_name(end-7:end);  % Last 8 chars only
 
-    temp_m_file = tempname(log_dir);
-    fid = fopen([temp_m_file '.m'], 'w+');
+    % .mat
+    temp_data_path = fullfile(log_dir, sprintf('temp_data_%s_%s.mat', timestamp, temp_base_name));
+    % .m
+    temp_m_file = sprintf('temp_matlab_%s_%s', timestamp, temp_base_name);
+    temp_m_path = fullfile(log_dir, [temp_m_file, '.m']);
+    % .sh
+    temp_slurm_file = sprintf('temp_slurm_%s_%s.sh', timestamp, temp_base_name);
+    temp_slurm_path = fullfile(log_dir, temp_slurm_file);
+end
 
-    % Depending on the input, determine what to save and what to submit to the pipeline
-    if ~isempty(fieldnames(options.sequential_configs))
-        sequential_configs = options.sequential_configs;
-        save(temp_data_path, "subject_id", "parameters", "sequential_configs");
-        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters, 'sequential_configs', sequential_configs); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
+function write_matlab_script(temp_m_path, temp_data_path, path_to_pipeline, sequential_configs)
+    fid = fopen(temp_m_path, 'w+');
+    
+    if ~isempty(fieldnames(sequential_configs))
+        save(temp_data_path, 'sequential_configs', '-append');
+        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters, 'sequential_configs', sequential_configs); delete '%s'; delete '%s';", ...
+            temp_data_path, path_to_pipeline, temp_data_path, temp_m_path);
     else
-        save(temp_data_path, "subject_id", "parameters");
-        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters); delete '%s'; delete '%s';", temp_data_path, path_to_pipeline, temp_data_path, [temp_m_file '.m']);
+        fprintf(fid, "load '%s'; cd '%s'; single_subject_pipeline(subject_id, parameters); delete '%s'; delete '%s';", ...
+            temp_data_path, path_to_pipeline, temp_data_path, temp_m_path);
     end
     fclose(fid);
-    [~,temp_m_file_name,~] = fileparts(temp_m_file);
+end
 
-    if ~isfield(parameters, 'slurm_job_prefix')
-        parameters.slurm_job_prefix = 'PRESTUS';
-    end
-
-    % Create a temporary SLURM batch script file
-    temp_slurm_file = tempname(log_dir);
-    job_name = [parameters.slurm_job_prefix '_' subj_id_string];
-    fid = fopen([temp_slurm_file '.sh'], 'w+');
-    fprintf(fid, '#!/bin/bash\n');
-    fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
-    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition) && ...
-            ~strcmp(parameters.hpc_partition, '')
-        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
-        request_gpu = 1;
-    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
-        fprintf(fid, '#SBATCH --partition=gpu\n');
-        request_gpu = 1;
-    else
-        request_gpu = 0;
-    end
-    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ...
-            ~strcmp(parameters.hpc_gpu, '')
-        fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
-    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
-        fprintf(fid, '#SBATCH --gres=gpu:1\n');
-    end
-    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation) && ...
-            ~strcmp(parameters.hpc_reservation, '')
-        fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
-    end
-    fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
-    fprintf(fid, '#SBATCH --time=%s\n', timelimit);
-    fprintf(fid, '#SBATCH --output=%s\n', sprintf('%s_slurm_output_%%j.log', subj_id_string));
-    fprintf(fid, '#SBATCH --error=%s\n', sprintf('%s_slurm_error_%%j.log', subj_id_string));
-    fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
-    if request_gpu == 1
+function write_slurm_script(temp_slurm_path, parameters, subject_id, timelimit, memorylimit, temp_m_file, log_dir)
+    subj_id_string = sprintf('sub-%03d', subject_id);
+    job_name = get_job_name(parameters, subj_id_string);
+    
+    fid = fopen(temp_slurm_path, 'w+');
+    fprintf_slurm_header(fid, job_name, parameters, subj_id_string, log_dir, timelimit, memorylimit);
+    if get_gpu_request(parameters)
         fprintf(fid, 'nvidia-smi\n');
     end
     fprintf(fid, 'module load matlab/R2023b\n');
-    fprintf(fid, 'matlab -batch "%s"\n', temp_m_file_name);
+    fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
+end
 
-    % Create the full command to submit the batch script
-    sbatch_call = sprintf('sbatch %s.sh', temp_slurm_file);
-
-    % Execute the full command
+function job_id = submit_slurm_job(temp_slurm_path, log_dir, parameters, subject_id)
+    sbatch_call = sprintf('sbatch %s', temp_slurm_path);
     full_cmd = sprintf('cd %s; %s', log_dir, sbatch_call);
-	fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s in case there are errors. \n', full_cmd, log_dir)
+    
+    subj_id_string = sprintf('sub-%03d', subject_id);
+    job_name = get_job_name(parameters, subj_id_string);
+    
+    fprintf('Submitted the job to the cluster with a command \n%s \nSee logs in %s\n', full_cmd, log_dir);
     [status, out] = system(full_cmd);
-
-    job_id = regexp(out, '\d+', 'match');
-    try % there are instances where the system returns no job id but a warning, show this
-        job_id = str2double(job_id{1});
-        fprintf('Job name: %s; job ID: %i\n', job_name, job_id)
-    catch
-        disp(out);
+    
+    if status ~= 0
+        error('SLURM submission failed: %s', out);
     end
     
-    if status == 0
-        disp('Job submitted successfully');
+    job_ids = regexp(out, '\d+', 'match');
+    if isempty(job_ids)
+        disp(out);
+        error('No job ID returned from SLURM');
+    end
+    job_id = str2double(job_ids{1});
+    fprintf('Job "%s" (ID: %i) submitted successfully\n', job_name, job_id);
+end
+
+function wait_for_job_completion(job_id)
+    disp('User has chosen to wait until job is finished...');
+    job_completed = false;
+    
+    while ~job_completed
+        check_cmd = sprintf('sacct -j %i -o State --noheader | tail -n 1', job_id);
+        [status_check, out] = system(check_cmd);
         
-        % Polling for job status
-        job_completed = true;
-        if wait_for_job
-            disp('User has chosen to wait until job is finished...');
-            job_completed = false;
-        end
-    
-        while ~job_completed
-            % SLURM equivalent of qstat to check job state
-            check_cmd = sprintf('sacct -j %i -o State --noheader | tail -n 1', job_id);
-            [status, out] = system(check_cmd);
+        n_sec = 20;
+        if status_check == 0
+            job_state = strtrim(out);
+            disp(['Job status: ', job_state]);
             
-            n_sec = 20; % Pause for n seconds before checking again
-            if status == 0
-                % Extract the job state (e.g., "RUNNING", "PENDING", "COMPLETED")
-                job_state = strtrim(out);
-                
-                if strcmp(job_state, 'RUNNING') == true
-                    disp('Job is still running...');
-                    pause(n_sec); % Pause for n seconds before checking again
-                elseif strcmp(job_state, 'PENDING') == true
-                    disp('Job is still queued...');
-                    pause(n_sec); % Pause for n seconds before checking again
-                elseif strcmp(job_state, 'COMPLETED') == true
-                    disp('Job completed successfully.');
-                    job_completed = true;
-                else
-                    disp(['Job status: ', job_state]);
-                    pause(n_sec); % Pause for n seconds before checking again
-                    % Additional states: "FAILED", "CANCELLED", etc.
-                end
+            if strcmp(job_state, 'RUNNING')
+                pause(n_sec);
+            elseif strcmp(job_state, 'PENDING')
+                pause(n_sec);
+            elseif strcmp(job_state, 'COMPLETED')
+                disp('Job completed successfully.');
+                job_completed = true;
             else
-                disp('Failed to check job status.');
-                disp(out);
-    
-                % Handle case where job might have completed and dropped from squeue
-                check_cmd = sprintf('scontrol show job %s', job_id);
-                [status, out] = system(check_cmd);
-                if status ~= 0
-                    disp('Job is no longer listed in squeue. Assuming it completed.');
-                    job_completed = true;
-                else
-                    break;
-                end
+                pause(n_sec);
+            end
+        else
+            disp('Failed to check job status.');
+            disp(out);
+            check_cmd = sprintf('scontrol show job %s', job_id);
+            [status_check, ~] = system(check_cmd);
+            if status_check ~= 0
+                disp('Job is no longer listed. Assuming it completed.');
+                job_completed = true;
+            else
+                break;
             end
         end
+    end
+end
+
+function job_name = get_job_name(parameters, subj_id_string)
+    if ~isfield(parameters, 'slurm_job_prefix')
+        parameters.slurm_job_prefix = 'PRESTUS';
+    end
+    job_name = [parameters.slurm_job_prefix '_' subj_id_string];
+end
+
+function request_gpu = get_gpu_request(parameters)
+    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition) && ~strcmp(parameters.hpc_partition, '')
+        request_gpu = true;
+    elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
+        request_gpu = true;
     else
-        disp('Command failed to submit the job.');
-        disp(out); % Display the error message
+        request_gpu = false;
+    end
+end
+
+function fprintf_slurm_header(fid, job_name, parameters, subj_id_string, log_dir, timelimit, memorylimit)
+    fprintf(fid, '#!/bin/bash\n');
+    fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
+    
+    % Partition
+    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition) && ~strcmp(parameters.hpc_partition, '')
+        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
+    elseif get_gpu_request(parameters)
+        fprintf(fid, '#SBATCH --partition=gpu\n');
     end
     
-    % Continue with MATLAB script
-    disp('Continuing with the MATLAB script...');
+    % GPU resources
+    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ~strcmp(parameters.hpc_gpu, '')
+        fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
+    elseif get_gpu_request(parameters)
+        fprintf(fid, '#SBATCH --gres=gpu:1\n');
+    end
+    
+    % Reservation
+    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation) && ~strcmp(parameters.hpc_reservation, '')
+        fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
+    end
+    
+    % Resources
+    fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
+    fprintf(fid, '#SBATCH --time=%s\n', timelimit);
+    fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
+    fprintf(fid, '#SBATCH --error=%s_slurm_error_%%j.log\n', subj_id_string);
+    fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
 end
