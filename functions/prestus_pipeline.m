@@ -1,13 +1,12 @@
-function [parameters] = single_subject_pipeline(subject_id, parameters, options)
+function [parameters] = prestus_pipeline(subject_id, parameters, options)
     arguments
         subject_id 
         parameters struct
-        options.adopted_heatmap (:,:,:) = []
-        options.sequential_configs struct = struct()
+        options struct = struct()
     end
 
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                       Single subject pipeline                     %
+    %                       PRESTUS pipeline                            %
     %                                                                   %
     % This serves as the main pipeline for simulating the sonication    %
     % effects on the bone and neural tissue of individual subjects.     %
@@ -20,7 +19,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     % run the pipeline.                                                 %
     %                                                                   %
     % Some notes:                                                       %
-    % - Matlab 2022b+, SimNIBS 4.0, and k-Wave 1.4 have been tested     %
+    % - Matlab 2023b*, SimNIBS 4, and k-Wave 1.4.1 have been tested     %
     % - 'subject_id' must be a number.                                  %
     % - 'parameters' is a structure (see default_config for options)    %
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -356,7 +355,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n\n');
 
     % capture time, RAM, & GB load of pipeline
-    log_timer('stop','single_subject_pipeline')
+    log_timer('stop','prestus_pipeline')
 
     % indicate success
     disp('Pipeline finished successfully');
@@ -396,12 +395,10 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
             water_parameters.output_dir = fileparts(water_parameters.output_dir);
         end
         % inherit submit medium from main pipeline
-        switch parameters.hpc_submit_medium
-            case 'slurm'
-                single_subject_pipeline_with_slurm(subject_id, water_parameters, 0);
-            case 'matlab'
-                single_subject_pipeline(parameters.subject_id, water_parameters);
-        end
+        water_parameters.hpc_timelimit = '05:00:00';
+        water_parameters.hpc_memorylimit = 40;
+        water_parameters.hpc_wait_for_job = false;
+        prestus_pipeline_start(parameters.subject_id, water_parameters);
         clear water_parameters;
     end
 
@@ -409,7 +406,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     %% FOLLOW-UP SIMULATION WITH IDENTICAL MEDIUM
     % ====================================================================
 
-    if ~isempty(fieldnames(options.sequential_configs))
+    if any(strcmp(fieldnames(options), 'sequential_configs'))
         fprintf('========================================\n');
         fprintf('FOLLOW-UP SIMULATION WITH IDENTICAL MEDIUM \n');
         fprintf('========================================\n\n');
@@ -427,12 +424,12 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         sequential_parameters.adopted_cem43 = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
                 parameters.subject_id, 'CEM43_end', parameters.results_filename_affix));
         fprintf('Running subsequent heating simulation on %s\n', lowestField);
-        % Limitation: currently only support SLURM
         if ~isempty(fieldnames(sequential_configs))
-            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64, 'sequential_configs', sequential_configs);
+            options.sequential_configs = sequential_configs;
         else
-            single_subject_pipeline_with_slurm(parameters.subject_id, sequential_parameters, false, '24:00:00', 64);
+            options = rmfield(options, 'sequential_configs');
         end
+        prestus_pipeline_start(subject_id, parameters, options)
     end
 
 end

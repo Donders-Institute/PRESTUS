@@ -111,4 +111,4 @@ function [parameters] = path_log_setup(parameters, prestus_path, subject_id)
     end
 
     % set initial time, RAM, GB state
-    log_timer('start','single_subject_pipeline', parameters.output_dir);
+    log_timer('start','prestus_pipeline', parameters.output_dir);

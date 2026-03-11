@@ -61,8 +61,6 @@ The following documents the functions provided in PRESTUS.
 | `tissuemask_binary`                     | HELPER         | Extract binary tissue segmentation masks (for indexing)                                         |
 | `upsample_to_grid`                      | HELPER         | Upsamples a 3D image to a higher resolution grid.                                               |
 | `zip_fields`                            | HELPER         | Convert a structure's fields and values into a cell array.                                      |
-| `single_subject_pipeline_with_qsub`     | HPC            | HPC call of pipeline with QSUB.                                                                 |
-| `single_subject_pipeline_with_slurm`    | HPC            | HPC call of pipeline with SLURM.                                                                |
 | `transducer_positioning_with_qsub`      | HPC            | Submits transducer positioning jobs to Qsub cluster using batch scripts.                        |
 | `transducer_positioning_with_slurm`     | HPC            | Submits transducer positioning jobs to SLURM cluster using batch scripts.                       |
 | `fitPowerLawParamsMulti`                | MEDIUM         | Fit power law absorption parameters for highly absorbing media.                                 |
