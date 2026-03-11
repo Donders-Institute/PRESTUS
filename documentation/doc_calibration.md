@@ -84,8 +84,6 @@ List of intensities (in free-water W/cm2) to be characterized:
     How simulations will be run will largely be determined by the main `parameters` (e.g., `parameters.code_type`). 
     However, additional settings in `parameters.calibration` can overwrite default behaviour:
 
-    - `submit_medium`   
-    Simulation submit mode: `slurm` (recommended), `matlab`, `qsub`
     - `axisymmetric2D`  
     Overwrite default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no (default)).
     - `force_kwavearray`    

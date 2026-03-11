@@ -33,7 +33,6 @@
   filename_calibrated_CSV: ''       # Filename of calibrated CSV data (default: standalone script generates name based on equipment)
 
   # Simulation submission overrrides
-  submit_medium: 'slurm'            # Simulation submit mode: matlab (debug; doesn't overwrite; force cpu mode), slurm (recommended), or qsub
   force_kwavearray: 1               # Force to run free-water simulations with kwavearray?
   axisymmetric2D: 0                 # Convert (default; depends on study config) 3D free-water simulation setup to 2D axisymmetry for efficiency
   
