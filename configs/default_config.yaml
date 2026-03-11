@@ -322,11 +322,11 @@ pad_mm: 0 # Apply symmetric padding to grid prior to transducer + PML setup?
 csf_mask_expansion_factor: 40 # Expansion factor for the cerebro-spinal fluid brain mask to capture head areas of interest in simulation
 grid_max_expand: 40 # Prime number grid expansion size to (potentially) speed up computations
 
-# Thresholds for smoothing the skull and other masks
+# Thresholds for smoothing masks (and acoustic properties)
 smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
 smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
 smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
-smooth_window: 2 # Smoothing FWHM [grid voxels]
+smooth_fwhm_mm: 1 # Smoothing FWHM [mm]
 smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
 
 # Settings for shrinkwrap (if requested)

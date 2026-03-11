@@ -186,18 +186,22 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     %% smooth medium masks
 
     if isfield(parameters, 'smooth_properties') && parameters.smooth_properties == true
-        disp("Smoothing acoustic proprty maps ...");
+        disp("Smoothing acoustic property maps ...");
 
         tmp_density = density; % keep unsmoothed image for figure
 
-        sound_speed = smooth_img(sound_speed, parameters.smooth_window, 0, parameters.smooth_method);
-        density = smooth_img(density, parameters.smooth_window, 0, parameters.smooth_method);
-        alpha_coeff_fixed = smooth_img(alpha_coeff_fixed, parameters.smooth_window, 0, parameters.smooth_method);
-        thermal_conductivity = smooth_img(thermal_conductivity, parameters.smooth_window, 0, parameters.smooth_method);
-        specific_heat = smooth_img(specific_heat, parameters.smooth_window, 0, parameters.smooth_method);
-        perfusion_coeff = smooth_img(perfusion_coeff, parameters.smooth_window, 0, parameters.smooth_method);
-        absorption_fraction = smooth_img(absorption_fraction, parameters.smooth_window, 0, parameters.smooth_method);
-        temp_0 = smooth_img(temp_0, parameters.smooth_window, 0, parameters.smooth_method);
+        fwhm_mm = parameters.smooth_fwhm_mm;
+        grid_mm = parameters.grid_step_mm;
+        smooth_method = parameters.smooth_method;
+
+        sound_speed = smooth_img(sound_speed, fwhm_mm, grid_mm, 0, smooth_method);
+        density = smooth_img(density, fwhm_mm, grid_mm, 0, smooth_method);
+        alpha_coeff_fixed = smooth_img(alpha_coeff_fixed, fwhm_mm, grid_mm, 0, smooth_method);
+        thermal_conductivity = smooth_img(thermal_conductivity, fwhm_mm, grid_mm, 0, smooth_method);
+        specific_heat = smooth_img(specific_heat, fwhm_mm, grid_mm, 0, smooth_method);
+        perfusion_coeff = smooth_img(perfusion_coeff, fwhm_mm, grid_mm, 0, smooth_method);
+        absorption_fraction = smooth_img(absorption_fraction, fwhm_mm, grid_mm, 0, smooth_method);
+        temp_0 = smooth_img(temp_0, fwhm_mm, grid_mm, 0, smooth_method);
     
         % [DEBUG] Plot unsmoothed and smoothed density
         if parameters.debug == 1

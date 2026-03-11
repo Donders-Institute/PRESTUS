@@ -46,7 +46,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
             threshold = parameters.smooth_threshold_other;
         end
         
-        layer_mask_smoothed = smooth_img(layer_mask, parameters.smooth_window, ...
+        layer_mask_smoothed = smooth_img(layer_mask, parameters.smooth_fwhm_mm, parameters.grid_step_mm, ...
                                         threshold, parameters.smooth_method);
         % assign tissue-specific medium ID
         medium_masks(layer_mask_smoothed ~= 0) = find(strcmp(medium_labels, label_name));
@@ -59,14 +59,14 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
         cortical_i = find(strcmp(medium_labels, 'skull_cortical'));
         skull_base_layers = getidx(parameters.layers, {'skull', 'skull_cortical'});
         layer_mask = ismember(segmented_img, skull_base_layers);
-        layer_mask_smoothed = smooth_img(layer_mask, parameters.smooth_window, ...
+        layer_mask_smoothed = smooth_img(layer_mask, parameters.smooth_fwhm_mm, parameters.grid_step_mm, ...
                                         parameters.smooth_threshold_skull, parameters.smooth_method);
         medium_masks(layer_mask_smoothed ~= 0) = cortical_i;
         
         % Step 2: Overlay trabecular on top
         trabecular_i = find(strcmp(medium_labels, 'skull_trabecular'));
         trabecular_mask = ismember(segmented_img, getidx(parameters.layers, 'skull_trabecular'));
-        trabecular_mask_smoothed = smooth_img(trabecular_mask, parameters.smooth_window, ...
+        trabecular_mask_smoothed = smooth_img(trabecular_mask, parameters.smooth_fwhm_mm, parameters.grid_step_mm, ...
                                              parameters.smooth_threshold_skull, parameters.smooth_method);
         medium_masks(trabecular_mask_smoothed ~= 0) = trabecular_i;
     end

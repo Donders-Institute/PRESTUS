@@ -8,8 +8,6 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %
 % Inputs:
 %   parameters      - Struct with simulation parameters:
-%                     - smooth_window              (numeric) Window size for smoothing bone image.
-%                     - smooth_threshold_skull     (numeric) Threshold for skull smoothing.
 %                     - debug                      (1/0) Enable debug plots.
 %                     - debug_dir                  (string) Directory for saving debug images.
 %                     - subject_id                 (numeric) Subject ID for filename.
@@ -25,7 +23,6 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %   skull_i         - Integer label value for skull tissue.
 %
 % Dependencies:
-%   - smooth_img (custom function): Smooths bone image.
 %   - Image Processing Toolbox: imerode, strel, imfill, bwlabeln, regionprops, label2rgb, imshowpair, montage.
 %
 % Example:
