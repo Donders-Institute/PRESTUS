@@ -76,12 +76,12 @@ hpc_reservation: ''
 
 # Smallest possible allocation (https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660209/Snellius+partitions+and+accounting)
 snellius:
-  a100:
+  gpu_a100:
     cores: 18
     memorylimit: 120
     timelimit: "120:00:00" # max wall time of 120 h
     n_gpu: 1
-  h100:
+  gpu_h100:
     cores: 16
     memorylimit: 180
     timelimit: "120:00:00" # max wall time of 120 h
