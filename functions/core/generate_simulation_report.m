@@ -1186,6 +1186,11 @@ function html = build_toc(parameters, is_layered)
         html = [html '<a href="#medium">Medium</a>'];
     end
 
+    % pCT (pCT only)
+    if isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+        html = [html '<a href="#pseudoCT">pseudo-CT</a>'];
+    end
+
     html = [html '<a href="#positioning">Positioning</a>'];
     html = [html '<a href="#acoustic">Acoustic</a>'];
 
