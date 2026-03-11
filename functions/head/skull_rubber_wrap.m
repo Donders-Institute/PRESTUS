@@ -89,34 +89,43 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         error("Size mismatch: balloon %s vs tissues %s", mat2str(size(BW)), mat2str(size(T)));
     end
 
-    GM_LABEL   = find(strcmp(fieldnames(parameters.layers), 'brain'));
-    SKIN_LABEL = find(strcmp(fieldnames(parameters.layers), 'skin'));
+    tissues_available = fieldnames(parameters.layers);
+    medium_labels = fieldnames(parameters.medium);
 
-    GM   = (T == GM_LABEL);
-    SKIN = (T == SKIN_LABEL);
+    if ismember(tissues_available, 'brain')
+        BRAIN_LABEL   = find(strcmp(medium_labels, 'brain'));
+        BRAIN = (T == BRAIN_LABEL);
+    else
+        BRAIN = zeros(size(T));
+    end
+    
+    if ismember(tissues_available, 'brain')
+        SKIN_LABEL = find(strcmp(medium_labels, 'skin'));
+        SKIN = (T == SKIN_LABEL);
+    else
+        SKIN = zeros(size(T));
+    end
 
-    %% "Touch" masks: balloon voxel touches GM if it lies within 1-voxel dilation of GM
+    %% "Touch" masks: balloon voxel touches BRAIN if it lies within 1-voxel dilation of BRAIN
 
     touchRadius = 1;   % voxels: 1 = immediate neighbors (26-neighborhood)
 
     se = strel("sphere", touchRadius);
 
-    GM_touch_region   = imdilate(GM,   se);
+    GM_touch_region   = imdilate(BRAIN,   se);
     SKIN_touch_region = imdilate(SKIN, se);
 
     % Keep balloon voxels that touch BOTH
     B_touch_both =  BW & GM_touch_region & SKIN_touch_region;
 
-    % Remove overlap with GM from the remaining mask
-    B_out = B_touch_both & ~GM;
+    % Remove overlap with BRAIN from the remaining mask
+    B_out = B_touch_both & ~BRAIN;
 
     %% Include CSF voxels at the SKIN interface (strict 6-neigh), near B_out
 
     % Here, we refer to the more detailed segmentation
     CSF_LABEL = [getidx(parameters.seg_labels, {'csf'})];
-
     CSF  = (ismember(segmented_img, CSF_LABEL));
-    SKIN = (T == SKIN_LABEL);
 
     % --- Strict 6-neighborhood kernel (faces only) ---
     K6 = zeros(3,3,3,'logical');
@@ -144,8 +153,8 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % --- Add MEN interface voxels to balloon mask ---
     B_out2 = B_out | CSF_touch_SKIN_6_near;
 
-    % Keep your original constraint: no GM overlap
-    B_out2 = B_out2 & ~GM;
+    % Keep your original constraint: no BRAIN overlap
+    B_out2 = B_out2 & ~BRAIN;
 
     B_out = BW1 | B_out2;
 
