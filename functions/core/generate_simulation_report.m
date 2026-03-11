@@ -1,4 +1,4 @@
-function report_path = generate_simulation_report(parameters, results_acoustic, results_heating, highlighted_pos)
+function report_path = generate_simulation_report(parameters)
 % GENERATE_SIMULATION_REPORT creates a self-contained HTML report consolidating
 % all PRESTUS simulation outputs (CSV data, images, logs) into a single portable file.
 %
@@ -7,24 +7,15 @@ function report_path = generate_simulation_report(parameters, results_acoustic, 
 %
 % Use as:
 %   report_path = generate_simulation_report(parameters)
-%   report_path = generate_simulation_report(parameters, results_acoustic)
-%   report_path = generate_simulation_report(parameters, results_acoustic, results_heating)
-%   report_path = generate_simulation_report(parameters, results_acoustic, results_heating, highlighted_pos)
 %
 % Inputs:
 %   parameters       - PRESTUS parameters struct (required)
-%   results_acoustic - Acoustic simulation results (optional)
-%   results_heating  - Thermal simulation results (optional)
-%   highlighted_pos  - Highlighted position coordinates (optional)
 %
 % Output:
 %   report_path      - Path to the generated HTML file
 
 arguments
     parameters      struct
-    results_acoustic = []
-    results_heating  = []
-    highlighted_pos  = []
 end
 
 report_path = '';
@@ -113,7 +104,18 @@ try
         end
     end
 
-    % Section 6: Positioning (open by default)
+    % Section 6: pseudoCT [Optional] (collapsed by default)
+    try
+        if isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+            html_parts{end+1} = collapsible_section('pseudo-CT', ...
+                build_pseudoCT_section(parameters), ...
+                false, 'pseudoCT');
+        end
+    catch ME
+        html_parts{end+1} = section_error('pseudo-CT', ME);
+    end
+
+    % Section 7: Positioning (open by default)
     try
         html_parts{end+1} = collapsible_section('Transducer Positioning', ...
             build_positioning_section(parameters, subject_id, affix), true, 'positioning');
@@ -121,7 +123,7 @@ try
         html_parts{end+1} = section_error('Positioning', ME);
     end
 
-    % Section 7: Acoustic Results (open by default)
+    % Section 8: Acoustic Results (open by default)
     try
         html_parts{end+1} = collapsible_section('Acoustic Results', ...
             build_acoustic_section(csv_table, parameters, subject_id, medium, affix, is_layered), true, 'acoustic');
@@ -129,7 +131,7 @@ try
         html_parts{end+1} = section_error('Acoustic Results', ME);
     end
 
-    % Section 8: Thermal Results (open by default, conditional)
+    % Section 9: Thermal Results (open by default, conditional)
     try
         if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
             html_parts{end+1} = collapsible_section('Thermal Results', ...
@@ -139,7 +141,7 @@ try
         html_parts{end+1} = section_error('Thermal Results', ME);
     end
 
-    % Section 9: Debug Information (collapsed by default, layered only)
+    % Section 10: Debug Information (collapsed by default, layered only)
     try
         if isfield(parameters, 'debug') && parameters.debug && is_layered
             html_parts{end+1} = collapsible_section('Debug Information', ...
@@ -149,7 +151,7 @@ try
         html_parts{end+1} = section_error('Debug Information', ME);
     end
 
-    % Section 10: Post-hoc Water Simulation (collapsed by default, layered only)
+    % Section 11: Post-hoc Water Simulation (collapsed by default, layered only)
     if is_layered
         try
             html_parts{end+1} = collapsible_section('Post-hoc Water Simulation', ...
@@ -159,7 +161,7 @@ try
         end
     end
 
-    % Section 11: Performance (collapsed by default)
+    % Section 12: Performance (collapsed by default)
     try
         html_parts{end+1} = collapsible_section('Performance', ...
             build_performance_section(parameters, subject_id, medium, affix), false, 'performance');
@@ -167,7 +169,7 @@ try
         html_parts{end+1} = section_error('Performance', ME);
     end
 
-    % Section 12: Log (collapsed by default)
+    % Section 13: Log (collapsed by default)
     try
         html_parts{end+1} = collapsible_section('Log', ...
             build_log_section(parameters, subject_id, medium, affix), false, 'log');
@@ -349,7 +351,9 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     end
     html = [html '<table class="info-table">'];
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
-    if is_layered
+    if is_layered && isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+        html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span> <span class="badge badge-gray">pseudo-CT (Continuous Skull)</span></td></tr>', html_escape(medium))];
+    elseif is_layered
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span></td></tr>', html_escape(medium))];
     else
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-blue">Water / Free-field</span></td></tr>', html_escape(medium))];
@@ -841,6 +845,84 @@ function html = build_log_section(parameters, subject_id, medium, affix)
     html = [html sprintf('<p class="note">Log: <code>%s</code></p>', ...
         n, html_escape(log_path))];
     html = [html '<pre class="log-block">' html_escape(log_text) '</pre>'];
+end
+
+function html = build_pseudoCT_section(parameters)
+    html = '';
+    
+    % Extract from parameters
+    debug_dir = parameters.output_dir;
+    affix = '';
+    if isfield(parameters, 'results_filename_affix')
+        affix = parameters.results_filename_affix;
+    end
+    debug_path = fullfile(debug_dir, 'debug');
+    
+    % 1. MAPPING ALGORITHMS TABLE FIRST
+    html = [html, '<dl class="mapping-list">'];
+    fields = {'pct_mapping_density', 'pct_mapping_soundspeed', 'pct_mapping_attenuation'};
+    labels = {'Density', 'Sound speed', 'Attenuation'};
+    
+    for i = 1:3
+        if isfield(parameters, fields{i})
+            val = html_escape(char(parameters.(fields{i})));
+            html = [html, sprintf('<dt class="inline-dt">%s mapping: <code>%s</code></dt>', labels{i}, val)];
+        end
+    end
+    html = [html, '</dl>'];
+    
+    % NEW LINE BEFORE IMAGES
+    html = [html, '<div style="height: 20px;"></div>'];
+    
+    % 2. pCT histograms
+    pct_hist_path = fullfile(debug_path, sprintf('pCT_histograms%s.png', affix));
+    if isfile(pct_hist_path)
+        rel_path = sprintf('debug/pCT_histograms%s.png', affix);
+        html = [html, sprintf('<div class="image-row"><figure class="image-container">')];
+        html = [html, sprintf('<img src="%s" alt="pCT histograms" ', rel_path)];
+        html = [html, sprintf('onclick="openLightbox(%d)" style="max-width: 400px; height: auto;">', 1)];
+        html = [html, sprintf('<figcaption>pCT histograms [%s]</figcaption></figure></div>', affix)];
+        
+        % NEW LINE AFTER histogram image
+        html = [html, '<div style="height: 15px;"></div>'];
+    end
+    
+    % 3. KPLAN mapping - ONLY when pct_mapping_density == 'k-plan'
+    lightbox_idx = 2;
+    if isfield(parameters, 'pct_mapping_density') && strcmp(parameters.pct_mapping_density, 'k-plan')
+        kplan_path = fullfile(debug_path, 'pCT_hounsfield-density_kplan.png');
+        if isfile(kplan_path)
+            html = [html, sprintf('<div class="image-row"><figure class="image-container">')];
+            html = [html, sprintf('<img src="debug/pCT_hounsfield-density_kplan.png" alt="KPLAN mapping" ')];
+            html = [html, sprintf('onclick="openLightbox(%d)" style="max-width: 400px; height: auto;">', lightbox_idx)];
+            html = [html, sprintf('<figcaption>Hounsfield → Density (KPLAN)</figcaption></figure></div>')];
+            lightbox_idx = lightbox_idx + 1;
+            
+            % NEW LINE AFTER KPLAN image
+            html = [html, '<div style="height: 15px;"></div>'];
+        end
+    end
+    
+    % 4. k-Wave mapping - ONLY when pct_mapping_density == 'k-wave'
+    if isfield(parameters, 'pct_mapping_density') && strcmp(parameters.pct_mapping_density, 'k-wave')
+        kwave_path = fullfile(debug_path, 'pCT_hounsfield-density_kwave.png');
+        if isfile(kwave_path)
+            html = [html, sprintf('<div class="image-row"><figure class="image-container">')];
+            html = [html, sprintf('<img src="debug/pCT_hounsfield-density_kwave.png" alt="k-Wave mapping" ')];
+            html = [html, sprintf('onclick="openLightbox(%d)" style="max-width: 400px; height: auto;">', lightbox_idx)];
+            html = [html, sprintf('<figcaption>Hounsfield → Density (k-Wave)</figcaption></figure></div>')];
+            
+            % NEW LINE AFTER k-Wave image
+            html = [html, '<div style="height: 15px;"></div>'];
+        end
+    end
+    
+    % Fallback if no images
+    if isempty(strtrim(html)) && ~any(ismember(fields, fieldnames(parameters)))
+        html = '<p class="placeholder">No pCT configuration or images found</p>';
+    end
+    
+    html = [html, '<p class="note"><strong>pCT:</strong> Hounsfield → acoustic properties via mappings</p>'];
 end
 
 %% ========================================================================
