@@ -81,7 +81,7 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_select_localite`              | NEURONAV       | Select most recent Localite XML for a session.                                                  |
 | `position_transducer_localite`          | NEURONAV       | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
 | `pct_create_pseudoCT`                   | PSEUDO-CT      | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                                       |
-| `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.               |
+| `pct_skullmapping`                      | PSEUDO-CT      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug]               |
 | `pct_soft_tissue_peak`                  | PSEUDO-CT      | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
 | `fit_pairwiselinear`                    | PSEUDO-CT      | Perform a pairwise linear fit between HU and density values with optional plot.                 |
 | `plot_coronal_slices`                   | PLOT           | (DEPRECATED) Visualizes coronal slices of a 3D image with optional legends for labeled images.  |
