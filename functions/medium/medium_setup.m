@@ -70,7 +70,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             else
                 pct_mapping_density = 'none';
             end
-            [density] = medium_pct_density(parameters, medium, density, pseudoCT, skull_idx, pct_mapping_density);
+            [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, pct_mapping_density);
 
             % map skull bone sound speed with the desired algorithm
             if isfield(parameters, "pct_mapping_soundspeed")
@@ -78,7 +78,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             else
                 pct_mapping_soundspeed = 'none';
             end
-            [sound_speed] = medium_pct_soundspeed(parameters, medium, sound_speed, density, pseudoCT, skull_idx, pct_mapping_soundspeed);
+            [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density, pseudoCT, skull_idx, pct_mapping_soundspeed);
             
             % map skull bone attenuation with the desired algorithm
             if isfield(parameters, "pct_mapping_attenuation")
@@ -86,7 +86,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             else
                 pct_mapping_attenuation = 'none';
             end
-            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, medium, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation);
+            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation);
             
             % [DEBUG] save pCT mapping overview
             if parameters.debug == 1
@@ -97,18 +97,21 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                 subplot(4,1,2); 
                     hold on; histogram(density(skull_idx)); xlabel("Density [kg/m3]")
                     % add lines for the fixed parameters
-                    xline(medium.skull_trabecular.density, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.density, 'r', 'LineWidth', 2);
+                    xline(medium.skull_trabecular.density, 'r', 'LineWidth', 1);
+                    xline(medium.skull_cortical.density, 'r', 'LineWidth', 1);
+                    xline(medium.skull.density, 'k', 'LineWidth', 2);
                     title(sprintf('Density mapping: %s', pct_mapping_density))
                 subplot(4,1,3); 
                     hold on; histogram(sound_speed(skull_idx)); xlabel("Sound speed [m/s]")
-                    xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 2);
+                    xline(medium.skull_trabecular.sound_speed, 'r', 'LineWidth', 1);
+                    xline(medium.skull_cortical.sound_speed, 'r', 'LineWidth', 1);
+                    xline(medium.skull.sound_speed, 'k', 'LineWidth', 2);
                     title(sprintf('Sound speed mapping: %s', pct_mapping_soundspeed))
                 subplot(4,1,4); 
                     hold on; histogram(alpha_coeff(skull_idx)); xlabel("Attenuation [dB/(cm.MHzy)]")
-                    xline(medium.skull_trabecular.alpha_coeff, 'r', 'LineWidth', 2);
-                    xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 2);
+                    xline(medium.skull_trabecular.alpha_coeff, 'r', 'LineWidth', 1);
+                    xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 1);
+                    xline(medium.skull.alpha_coeff, 'k', 'LineWidth', 2);
                     title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
                 output_plot = fullfile(parameters.debug_dir, ...
                     sprintf('pCT_histograms%s.png',parameters.results_filename_affix));
