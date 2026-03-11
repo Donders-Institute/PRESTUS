@@ -1,11 +1,11 @@
-function plot_transducer_overlay(trans_pos, focus_pos, max_data_pos, parameters, options, overlay_weight, overlay_color)
+function plot_transducer_overlay(parameters, trans_pos, focus_pos, max_data_pos, options, overlay_weight, overlay_color)
 %PLOT_TRANSDUCER_OVERLAY Complete transducer visualization with rectangles and labels
 % Inputs:
+%   parameters     - Struct with .transducer(1).{curv_radius_mm, dist_to_plane_mm, 
+%                    Elements_OD_mm, grid_step_mm, trans_pos, grid_dims}
 %   trans_pos      - [2x1] Transducer center position (grid units)  
 %   focus_pos      - [2x1] Acoustic focus position (grid units)
 %   max_data_pos   - [2x1] Max data position for visualization context
-%   parameters     - Struct with .transducer(1).{curv_radius_mm, dist_to_plane_mm, 
-%                    Elements_OD_mm, grid_step_mm, trans_pos, grid_dims}
 %   options        - Struct with .grid_step, .show_rectangles, .rect_size
 %   overlay_weight - [0,1] Blend weight for overlay_color
 %   overlay_color  - [1x3] RGB color for blending
