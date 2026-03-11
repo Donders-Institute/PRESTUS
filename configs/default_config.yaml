@@ -46,13 +46,15 @@ pct_mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-
 pct_mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
 pct_mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
 
-# Only run specific components of the pipeline?
+# Run specific modules?
 
 run_grid_setup: 1         # Setup grid and run head processing? Mandatory for simulations.
 run_medium_setup: 1       # Map medium acoustic properties Mandatory for simulations.
 run_source_setup: 1       # Set up acoustic source? Mandatory for simulations.
 run_acoustic_sims: 1      # Run acoustic simulations?
-run_heating_sims: 0       # Run heating simulations? Run once acoustic simulation provides sensible results.
+run_acoustic_analysis: 1  # Run acoustic analysis?
+run_heating_sims: 0       # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
+run_thermal_analysis: 1   # Run thermal analysis?
 run_nifti_creation: 1     # Run nifti creation?
 run_posthoc_water_sims: 1 # Run simulations in free water with identical setup?
 generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?

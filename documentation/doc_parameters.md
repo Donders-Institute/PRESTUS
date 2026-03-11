@@ -32,8 +32,10 @@ see [doc_preproc.md](doc_preproc.md)
 | `run_medium_setup`                | Map medium acoustic properties? Mandatory for simulations.                            | (`1 = yes, 0 = no`)  |
 | `run_source_setup`                | Set up acoustic source? Mandatory for simulations.                                    | (`1 = yes, 0 = no`)  |
 | `run_acoustic_sims`               | Run acoustic simulations?                                                             | (`1 = yes, 0 = no`)  |
-| `run_heating_sims`                | Run heating simulations?                                                              | (`1 = yes, 0 = no`)  |
-| `run_nifti_creation`              | Run Nifti creation?                                                              | (`1 = yes, 0 = no`)  |
+| `run_acoustic_analysis`           | Run acoustic analysis?                                                                | (`1 = yes, 0 = no`)  |
+| `run_heating_sims`                | Run thermal simulations?                                                              | (`1 = yes, 0 = no`)  |
+| `run_thermal_analysis`            | Run thermal analysis?                                                                 | (`1 = yes, 0 = no`)  |
+| `run_nifti_creation`              | Run Nifti creation?                                                                   | (`1 = yes, 0 = no`)  |
 | `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
 | `generate_report`                 | Generate a self-contained HTML simulation report at the end of the pipeline?          | (`1 = yes, 0 = no`)  |
 | `n_sim_dims`                      | Simulation type (2D / 3D).                                                            | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
