@@ -6,6 +6,8 @@ PRESTUS by default supports 3D simulations using `kspaceFirstOrder3D`.
 
 See the available [simulation backends](doc_backend.md).
 
+> **Turning off acoustic simulations.** PRESTUS uses the `run_acoustic_sims` flag to indicate whether to run simulations. If set to `false`, PRESTUS will first check for existing files and check whether `overwrite_files` is set to off to load the existing matrices. This is intended to make this more intuitive for workflows in which acoustic simulations are "turned off" to run follow-up thermal simulations. This behaviour is unique for this module (turning off other modules may not run the step at all incl. loading existing data).
+
 ## Axisymmetric simulations
 
 For debugging, it can be useful to specify and model symmetric 2D tissues (e.g, 2D `phantom` or `water` media). However, [`kspaceFirstOrder2D`](http://www.k-wave.org/documentation/kspaceFirstOrder2D.php) models an infinite cylinder, not a focusing shell. It uses a 2D Cartesian grid with **X and Y axes**. These are assumed to map onto the second and first dimensions of input matrices and coordinates (i.e., [y, x]), respectively. This may at first may seem unintuitive, but it is designed to facilitate the mapping to 3D image space voxel coordinates [i,j,k], which traditionally map onto [Y,X,Z]. In the future, this could also be resolved by assuming a XY mapping for k-Wave, and introducing a remapping of voxel space coordinates.

@@ -174,10 +174,10 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
     
     parameters.acoustics_available = 0;
-    if parameters.run_acoustic_sims && ...
-            confirm_overwriting(filename_sensor_data, parameters) && ...
-            (parameters.interactive == 0 || ...
-            confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
+    if isfield(parameters, 'run_acoustic_sims') && parameters.run_acoustic_sims &&...
+        confirm_overwriting(filename_sensor_data, parameters) && ...
+        (parameters.interactive == 0 || ...
+        confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
 
         [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
             acoustic_wrapper(...
@@ -192,12 +192,15 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
             source_labels);
 
         parameters.acoustics_available = 1;
+
     elseif exist(filename_sensor_data, 'file')
         disp('Skipping acoustic simulation, loading existing output file.')
         load(filename_sensor_data);
         parameters.acoustics_available = 1;
     else
+        disp('No acoustic simulation available or requested ... skipping analysis')
         parameters.acoustics_available = 0;
+        parameters.run_acoustic_analysis = 0;
     end
     log_timer('stop', 'acoustic');
 
@@ -210,11 +213,11 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n\n');
     log_timer('start','acoustic_analysis', parameters.output_dir);
 
-    if parameters.acoustics_available == 1
+    if (~isfield(parameters, 'run_acoustic_analysis') || parameters.run_acoustic_analysis)
         [results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels);
     else
-        disp('No acoustic simulation results available. Skipping analysis...')
+        disp('No acoustic simulation results available (or requested). Skipping analysis...')
         results_acoustic = [];
         acoustic_isppa = [];
         acoustic_MI = [];
@@ -295,6 +298,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
         else 
             warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
             parameters.heating_available = 0;
+            parameters.run_thermal_analysis = 0;
         end
     else
         parameters.heating_available = 0;
@@ -311,11 +315,12 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n\n');
     log_timer('start','thermal_analysis', parameters.output_dir);
 
-    if parameters.heating_available == 1
+    if parameters.heating_available == 1 && ...
+            (~isfield(parameters, 'run_thermal_analysis') || parameters.run_thermal_analysis)
         thermal_analysis(parameters, results_heating, time_status_seq, ...
             medium_masks, highlighted_pos, segmentation);
     else
-        disp('No heating simulation results available. Skipping thermal analysis...')
+        disp('No heating simulation results available (or requested). Skipping thermal analysis...')
     end
     log_timer('stop','thermal_analysis');
 
