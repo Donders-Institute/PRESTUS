@@ -186,10 +186,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     axis image;
     axis off;
     
-    % draw transducer
-    if ~isempty(trans_pos)
+    % draw transducer (if grid was properly set up)
+    if ~isempty(trans_pos) && parameters.run_grid_setup == 1
         options.grid_step = parameters.grid_step_mm;
-        plot_transducer_overlay(trans_pos, focus_pos, max_data_pos, parameters, options,  0.3, [0.2 0.6 1])
+        plot_transducer_overlay(parameters, trans_pos, focus_pos, max_data_pos, options,  0.3, [0.2 0.6 1])
     end
     
     if options.overlay_segmented

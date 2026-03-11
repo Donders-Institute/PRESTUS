@@ -329,9 +329,13 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
     fprintf('========================================\n\n');
     log_timer('start','nifti', parameters.output_dir);
 
-    simulation_nifti(parameters, planimg, results_acoustic, ...
-                            acoustic_isppa, acoustic_MI, acoustic_pressure, ...
-                            medium_masks, results_heating, kwave_medium, highlighted_pos)
+    if ~isfield(parameters, 'run_nifti_creation') || parameters.run_nifti_creation==1
+        simulation_nifti(parameters, planimg, results_acoustic, ...
+                                acoustic_isppa, acoustic_MI, acoustic_pressure, ...
+                                medium_masks, results_heating, kwave_medium, highlighted_pos)
+    else
+        disp('No nifti creation requested...')
+    end
 
     log_timer('stop','nifti');
 
@@ -354,7 +358,7 @@ function [parameters] = single_subject_pipeline(subject_id, parameters, options)
 
     % Generate HTML simulation report (after all timers, before diary closes)
     if isfield(parameters, 'generate_report') && parameters.generate_report
-        generate_simulation_report(parameters, results_acoustic, results_heating, highlighted_pos);
+        generate_simulation_report(parameters);
     end
 
     % end logging

@@ -60,7 +60,7 @@ See [Placement](doc_placement.md).
 
 It may be desirable to run an intial SimNIBS call prior to running the full pipeline incl. segmentation postprocessing, source setup, acoustic and thermal simulations. By default, existing segmentations will be reused and not overwritten unless explicitly requested with `overwrite_simnibs` (regardless of `overwrite_files`).
 
-To this end, `run_grid_setup`, `run_medium_setup`, `run_source_setup`, `run_acoustic_sims`, `run_heating_sims`, and `run_posthoc_water_sims` can be deactivated (set to `0`). This separate step is required to inform the skull layer [using pseudoCTs](doc_pseudoCT.md).
+To this end, `run_grid_setup`, `run_medium_setup`, `run_source_setup`, `run_acoustic_sims`, `run_heating_sims`, `run_nifti_creation`, and `run_posthoc_water_sims` can be deactivated (set to `0`). This separate step is required to inform the skull layer [using pseudoCTs](doc_pseudoCT.md).
 
 ### [Optional] Create a pseudoCT
 
