@@ -42,6 +42,7 @@
   opt_weights: 0                    # Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM)
   opt_seed: 251024                  # Random seed for optimization
   opt_upper_velocity: 0.2           # Upper velocity in global search
+  fit_velocity_to_intensity: true   # Correct velocity after global search to match desired peak intensity
   
   # Other
   skip_front_peak_mm: 10            # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts in reporting
