@@ -10,15 +10,16 @@
 
 #------------ I/O management
 
-# Paths to the data location (please use full paths)
-data_path: NA
+data_path: ''   # Location of the the input data [full path]
+sim_path: ''    # Location of the the simulation outputs [full paths or folder name in data_path]
+sig_path: ''    # Location of the the segmentation directories (containing m2m folders) [full path]
+
+# Should simulation outputs be ordered based on subject id?
+subject_subfolder: 1
 
 # Paths to T1 and T2 relative to data_path; all string substitutions will be done using subject_id
-# t1_path_template: sub-%1$03d_orig_T1w.nii.gz 
-# t2_path_template: sub-%1$03d_orig_T2w.nii.gz
-
-# Should output be ordered based on subject id?
-subject_subfolder: 1
+#t1_path_template: '' # e.g. 'sub-%1$03d_T1w.nii*'
+#t2_path_template: '' # e.g., 'sub-%1$03d_T2w.nii*''
 
 # Optional affix for result files names
 results_filename_affix: ''

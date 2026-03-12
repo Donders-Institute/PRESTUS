@@ -35,12 +35,12 @@ switch hpc_type
         error('Unsupported HPC type: %s', hpc_type);
 end
 
-fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(hpc_type, parameters, subject_id), sprintf('%d', job_id));
+fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters, subject_id), sprintf('%d', job_id));
 
 % ========== LOCAL FUNCTIONS ==========
 function write_slurm_script(temp_slurm_path, parameters, subject_id, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', subject_id);
-    job_name = hpc_job_name('slurm', parameters, subject_id);
+    job_name = hpc_job_name(parameters, subject_id);
     
     fid = fopen(temp_slurm_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
@@ -92,7 +92,7 @@ end
 
 function write_qsub_script(temp_qsub_path, parameters, subject_id, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', subject_id);
-    job_name = hpc_job_name('qsub', parameters, subject_id);
+    job_name = hpc_job_name(parameters, subject_id);
     
     fid = fopen(temp_qsub_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');

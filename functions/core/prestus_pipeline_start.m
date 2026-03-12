@@ -49,7 +49,7 @@ function prestus_pipeline_start(subject_id, parameters, options)
             hpc_matlab_pipeline(temp_m_path, temp_data_path, path_to_pipeline, options);
             
             % Job name
-            job_name = hpc_job_name(platform, parameters, subject_id);
+            job_name = hpc_job_name(parameters, subject_id);
             
             % Submit job
             job_id = hpc_submit_job(platform, temp_m_file, parameters, subject_id, log_dir);
