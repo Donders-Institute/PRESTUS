@@ -21,8 +21,11 @@ else
     output_dir = parameters.sim_path;
 end
 if ~isfolder(output_dir), mkdir(output_dir); end
+
+% Setup batch/log directory
 log_dir = fullfile(output_dir, 'batch_job_logs');
 if ~isfolder(log_dir), mkdir(log_dir); end
+
 [path_to_pipeline, ~, ~] = fileparts(which('prestus_pipeline'));
 
 % Generate temp files
@@ -34,4 +37,5 @@ temp_base_name = temp_base_name(end-7:end);
 temp_data_path = fullfile(log_dir, sprintf('temp_data_%s_%s.mat', timestamp, temp_base_name));
 temp_m_file = sprintf('temp_matlab_%s_%s', timestamp, temp_base_name);
 temp_m_path = fullfile(log_dir, [temp_m_file, '.m']);
+
 end

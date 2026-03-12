@@ -1,25 +1,10 @@
-function prestus_pipeline_start(subject_id, parameters, options)
-%% PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher
-%
-%   prestus_pipeline_start(subject_id, parameters, options)
-%
-%   Auto-detects platform and handles direct MATLAB, SLURM, or qsub execution.
-%
-%   Inputs:
-%     subject_id  - Subject number (double)
-%     parameters  - Struct with sim_path, platform, hpc_* settings
-%     options     - Struct with sequential_configs (default: empty)
-
+function transducer_positioning_start(subject_id, parameters, pn, target_name, mni_targets)
     arguments
         subject_id double
         parameters struct
-        options struct = struct()
-    end
-
-    % Ensure helper functions are accessible
-    helpers_path = fileparts(mfilename('fullpath'));
-    if ~contains(path, helpers_path)
-        addpath(helpers_path);
+        pn struct
+        target_name string
+        mni_targets struct
     end
 
     % ========== PLATFORM SELECTION ==========
@@ -31,41 +16,41 @@ function prestus_pipeline_start(subject_id, parameters, options)
         platform = parameters.platform;
         fprintf('➤ deploying: %s\n', upper(platform));
     end
-    
+
     % ========== DISPATCH EXECUTION ==========
     switch parameters.platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
-            prestus_pipeline(subject_id, parameters, options);
+            transducer_positioning(parameters, pn, subject_id, target_name, mni_targets);
             
         case {'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
-            hpc_validate_parameters(parameters, platform);
+            hpc_validate_parameters(parameters, platform)
+
             [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters, subject_id);
             
-            % Create job files
-            save(temp_data_path, 'subject_id', 'parameters');
-            hpc_matlab_pipeline(temp_m_path, temp_data_path, path_to_pipeline, options);
-            
-            % Job name
-            job_name = hpc_job_name(platform, parameters, subject_id);
-            
-            % Submit job
+            % populate temp data
+            save(temp_data_path, "subject_id", "parameters", "pn", "target_name", "mni_targets");
+        
+            fid = fopen(temp_m_path, 'w');
+            fprintf(fid, 'load(''%s'');\n', temp_data.file_data);
+            fprintf(fid, 'cd(''%s'');\n', path_to_pipeline);
+            fprintf(fid, 'transducer_positioning(parameters, pn, subject_id, target_name, mni_targets);\n');
+            fprintf(fid, 'delete(''%s'');\n', temp_data.file_data);
+            fprintf(fid, 'delete(''%s'');\n', temp_script.file_data);
+            fclose(fid);
+        
+            job_name = hpc_job_name(parameters, 'tusim_tp', subject_id);
             job_id = hpc_submit_job(platform, temp_m_file, parameters, subject_id, log_dir);
-            
-            % Display job info
             job_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
-                parameters.hpc_memorylimit, parameters.hpc_timelimit, log_dir, true);
-            
-            % Optional wait
+                parameters.hpc_memorylimit, parameters.hpc_timelimit, log_dir, 1);
+        
             if isfield(parameters, 'hpc_wait_for_job') && parameters.hpc_wait_for_job
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
                 hpc_wait_for_completion(job_id, platform);
                 fprintf('✅ Job %s completed\n\n', job_id_display);
-            else
-                fprintf('➡️  Continuing in MATLAB ...\n\n');
             end
             
             % Save job ID for chaining
@@ -75,4 +60,6 @@ function prestus_pipeline_start(subject_id, parameters, options)
             error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
                 parameters.platform);
     end
+
+
 end
