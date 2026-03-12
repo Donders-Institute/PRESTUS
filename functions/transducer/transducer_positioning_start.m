@@ -35,7 +35,7 @@ function transducer_positioning_start(subject_id, parameters, pn, target_name, m
         
             fid = fopen(temp_m_path, 'w');
             fprintf(fid, 'load(''%s'');\n', temp_data_path);
-            fprintf(fid, 'cd(''%s'');\n', path_to_pipeline);
+            fprintf(fid, 'addpath(genpath(''%s''));\n', path_to_pipeline);
             fprintf(fid, 'transducer_positioning(parameters, pn, subject_id, target_name, mni_targets);\n');
             fprintf(fid, 'delete(''%s'');\n', temp_data_path);
             fprintf(fid, 'delete(''%s'');\n', temp_m_path);

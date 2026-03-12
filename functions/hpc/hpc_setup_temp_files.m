@@ -1,4 +1,4 @@
-function [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] = ...
+function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
     hpc_setup_temp_files(parameters, subject_id)
 %% HPC_SETUP_TEMP_FILES  Setup directories and generate temporary files
 %
@@ -6,8 +6,8 @@ function [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] =
 %   for MATLAB data and script.
 %
 %   Outputs:
-%     log_dir        - Path to batch_job_logs directory
-%     path_to_pipeline - Directory containing prestus_pipeline.m
+%     log_dir         - Path to batch_job_logs directory
+%     prestus_path    - PRESTUS path
 %     temp_data_path  - Path for temporary .mat data file
 %     temp_m_path     - Path for temporary .m script file  
 %     temp_m_file     - Basename of MATLAB script (no path)
@@ -26,7 +26,7 @@ if ~isfolder(output_dir), mkdir(output_dir); end
 log_dir = fullfile(output_dir, 'batch_job_logs');
 if ~isfolder(log_dir), mkdir(log_dir); end
 
-[path_to_pipeline, ~, ~] = fileparts(which('prestus_pipeline'));
+prestus_path = get_prestus_path;
 
 % Generate temp files
 timestamp = datestr(now, 'yyyymmdd_HHMMSS');
