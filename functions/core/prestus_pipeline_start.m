@@ -41,12 +41,12 @@ function prestus_pipeline_start(subject_id, parameters, options)
         case {'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
             hpc_validate_parameters(parameters, platform);
-            [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] = ...
+            [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters, subject_id);
             
             % Create job files
             save(temp_data_path, 'subject_id', 'parameters');
-            hpc_matlab_pipeline(temp_m_path, temp_data_path, path_to_pipeline, options);
+            hpc_matlab_pipeline(temp_m_path, temp_data_path, prestus_path, options);
             
             % Job name
             job_name = hpc_job_name(parameters, subject_id);
