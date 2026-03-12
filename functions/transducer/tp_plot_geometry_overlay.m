@@ -1,26 +1,65 @@
-function tp_plot_geometry_overlay(img, target, trans_pos, pixel_size, parameters, subject_id, target_name, t1_x, t1_y, t1_z)
-    max_od_mm = max(parameters.transducer.Elements_OD_mm); % Largest element diameter (mm) - defines transducer aperture
-    % Sagitta/2: distance from geometric focus to exit plane
-    % Derivation: h = R - sqrt(R^2-(D/2)^2) where R=curv_radius, D=max_od_mm
-    % Exit plane = h/2 from sphere center = 0.5*sqrt(4R^2-D^2)
-    dist_gf_to_ep_mm = 0.5*sqrt(4*parameters.transducer.curv_radius_mm^2-max_od_mm^2);
-    norm_v = (trans_pos-target)/norm(target-trans_pos); % Unit normal vector pointing from transducer → target
-    geom_focus_pos = trans_pos - norm_v*(parameters.transducer.curv_radius_mm)/pixel_size;
-    ex_plane_pos = geom_focus_pos+norm_v*dist_gf_to_ep_mm/pixel_size;
-    max_od_grid = max_od_mm/pixel_size;
-    d = sum(norm_v.*ex_plane_pos);
-    orth_plane_disk = abs(t1_x*norm_v(1)+t1_y*norm_v(2)+t1_z*norm_v(3)-d)<0.5 & ...
-        sqrt((t1_x-ex_plane_pos(1)).^2+(t1_y-ex_plane_pos(2)).^2+(t1_z-ex_plane_pos(3)).^2) < max_od_grid/2;
-    
-    skin_only = uint8(img==5); skin_only(orth_plane_disk)=2; skin_only(find(outer_sphere_3d))=3;
+function tp_plot_geometry_overlay(img, target_pos, trans_pos, pixel_size, parameters, subject_id, target_name, outer_sphere_3d)
+%% TP_PLOT_GEOMETRY_OVERLAY Visualize transducer geometry on skin segmentation slice
+%  Overlays transducer positions, geometric focus, exit plane, and ray path
+%  on central Y-slice through target for positioning validation
 
-    h = figure; imagesc(squeeze(skin_only(:,target(2),:))); hold on;
-    trans_xz = trans_pos([1,3]); target_xz = target([1,3]);
-    rectangle('Position',[flip(trans_xz)-2, 4, 4],'Curvature',[0,0],'EdgeColor','b','LineWidth',2);
-    rectangle('Position',[flip(geom_focus_pos([1,3]))-2, 4, 4],'Curvature',[0,0],'EdgeColor','yellow','LineWidth',2);
-    rectangle('Position',[flip(ex_plane_pos([1,3]))-2, 4, 4],'Curvature',[0,0],'EdgeColor','white','LineWidth',2);
-    rectangle('Position',[flip(target_xz)-2, 4, 4],'Curvature',[0,0],'EdgeColor','r','LineWidth',2);
-    line([trans_xz(2) target_xz(2)], [trans_xz(1) target_xz(1)], 'Color', 'white');
-    get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
-    saveas(h, fullfile(parameters.output_dir,sprintf('sub-%03d_geometry_%s.png', subject_id, target_name)), 'png'); close(h);
+disp("[TP] Generating and visualizing geometric overlay ...")
+
+sz = size(img);  % Get image dimensions [Nx Ny Nz] - overrides input sz
+[t1_x, t1_y, t1_z] = ndgrid(1:sz(1), 1:sz(2), 1:sz(3));  % 3D voxel coordinate grids (X,Y,Z)
+
+% Transducer geometry parameters (physical → voxel space)
+max_od_mm = max(parameters.transducer.Elements_OD_mm); % Largest element diameter (mm) - aperture size
+% Sagitta calculation: distance from geometric focus to exit plane
+% h = R - sqrt(R^2 - (D/2)^2) where R=curvature radius, D=aperture diameter
+% Exit plane lies at h/2 from sphere center along optical axis
+dist_gf_to_ep_mm = 0.5 * sqrt(4*parameters.transducer.curv_radius_mm^2 - max_od_mm^2);
+
+% Unit normal vector: direction from transducer → target (propagation axis)
+norm_v = (trans_pos - target_pos) / norm(target_pos - trans_pos); 
+
+% Geometric focus: sphere center (curvature radius along normal from trans_pos)
+geom_focus_pos = trans_pos - norm_v * (parameters.transducer.curv_radius_mm / pixel_size);
+
+% Exit plane: halfway between geometric focus and aperture plane
+ex_plane_pos = geom_focus_pos + norm_v * (dist_gf_to_ep_mm / pixel_size);
+
+% Aperture disk radius in voxel units
+max_od_grid = max_od_mm / pixel_size;
+
+% Define exit plane disk: orthogonal to propagation axis, centered at ex_plane_pos
+d = sum(norm_v .* ex_plane_pos);  % Plane equation: n·x = d
+orth_plane_disk = abs(t1_x*norm_v(1) + t1_y*norm_v(2) + t1_z*norm_v(3) - d) < 0.5 & ...
+                  sqrt((t1_x-ex_plane_pos(1)).^2 + (t1_y-ex_plane_pos(2)).^2 + (t1_z-ex_plane_pos(3)).^2) < max_od_grid/2;
+
+% Create visualization mask: skin(5)=skin, disk=2, sphere_intersection=3
+skin_only = uint8(img == 5);  % Extract skin surface only
+skin_only(orth_plane_disk) = 2;  % Mark exit plane aperture
+skin_only(find(outer_sphere_3d)) = 3;  % Mark skull intersection sphere (from tp_find_candidate_positions)
+
+%% Plot central Y-slice through target
+
+h = figure; 
+imagesc(squeeze(skin_only(:, target_pos(2), :))); hold on;  % X-Z slice at target Y
+colormap(gray);  % Monochrome for segmentation clarity
+
+% Extract X,Z coordinates for 2D overlay (flip for imagesc convention)
+trans_xz = trans_pos([1,3]); target_xz = target_pos([1,3]);
+
+% Draw position markers (4-voxel boxes)
+rectangle('Position', [flip(trans_xz)-2, 4, 4], 'Curvature', [0,0], 'EdgeColor', 'b', 'LineWidth', 2);     % Transducer (blue)
+rectangle('Position', [flip(geom_focus_pos([1,3]))-2, 4, 4], 'Curvature', [0,0], 'EdgeColor', 'yellow', 'LineWidth', 2);  % Geo focus (yellow)
+rectangle('Position', [flip(ex_plane_pos([1,3]))-2, 4, 4], 'Curvature', [0,0], 'EdgeColor', 'white', 'LineWidth', 2);     % Exit plane (white)  
+rectangle('Position', [flip(target_xz)-2, 4, 4], 'Curvature', [0,0], 'EdgeColor', 'r', 'LineWidth', 2);     % Target (red)
+
+% Draw propagation path (white line)
+line([trans_xz(2) target_xz(2)], [trans_xz(1) target_xz(1)], 'Color', 'white', 'LineWidth', 2);
+
+% Add 3D transducer bowl visualization
+get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
+
+% Save geometry validation plot
+saveas(h, fullfile(parameters.output_dir, sprintf('sub-%03d_geometry_%s.png', subject_id, target_name)), 'png'); 
+close(h);
+
 end
