@@ -6,7 +6,7 @@ function [grid_pos] = ras_to_grid(ras_pos, nii_header)
 % to grid (voxel) coordinates using the transformation matrix from a NIfTI header.
 %
 % Input:
-%   ras_pos    - [3x1] array specifying the position in RAS coordinates.
+%   ras_pos    - [3x1 | 1x3] array specifying the position in RAS coordinates.
 %   nii_header - Struct containing the NIfTI header, including the transformation matrix.
 %
 % Output:
@@ -20,5 +20,5 @@ function [grid_pos] = ras_to_grid(ras_pos, nii_header)
     grid_pos = round(nii_header.Transform.T' \ [ras_pos; 1]);
 
     % Extract x, y, z components (ignore homogeneous coordinate)
-    grid_pos = grid_pos(1:3);
+    grid_pos = grid_pos(1:3)';
 end

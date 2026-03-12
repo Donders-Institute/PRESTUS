@@ -1,7 +1,7 @@
-function tp_visualize_optimal_transducer(tpos_pars, img_orig, img_info, parameters, pixel_size, target_name, subject_id)
-% TP_VISUALIZE_OPTIMAL_TRANSDUCER Create 6-panel visualization of optimal transducer placement
+function tp_plot_heuristic_transducer(tpos_pars, img_orig, img_info, parameters, pixel_size, target_name, subject_id)
+% TP_PLOT_HEURISTIC_TRANSDUCER Create visualization of heuristic transducer placement
 %
-% Selects optimal position based on intersection, skull/skin distance criteria. Creates comprehensive
+% Selects heuristic transducer position based on intersection, skull/skin distance criteria. Creates comprehensive
 % 6-panel figure showing aligned anatomy, geometric properties, 3D rendering, and validation plots.
 %
 % INPUT
@@ -14,7 +14,7 @@ function tp_visualize_optimal_transducer(tpos_pars, img_orig, img_info, paramete
 %   subject_id   - Scalar subject ID
 %
 % OUTPUT
-%   Saves: sub-XXX_optimal_TARGET.png (6-panel figure)
+%   Saves: sub-XXX_optimal_TARGET.png
 
 % Select optimal position (original multi-step criteria)
 tppf = tpos_pars(tpos_pars.prop_intersect<0.05,:);
