@@ -129,16 +129,16 @@ function parameters = load_parameters(varargin)
     end
 
     % Set output directory based on absolute or relative path
-    if isfield(parameters, 'output_location')
-        javaFileObj = java.io.File(parameters.output_location); % Check path type (absolute/relative)
+    if isfield(parameters, 'sim_path') && ~strcmp(parameters.sim_path, '')
+        javaFileObj = java.io.File(parameters.sim_path); % Check path type (absolute/relative)
         if javaFileObj.isAbsolute()
-            parameters.sim_path = fullfile(parameters.output_location);
+            parameters.sim_path = fullfile(parameters.sim_path);
         else
-            parameters.sim_path = fullfile(parameters.data_path, parameters.output_location);
+            parameters.sim_path = fullfile(parameters.data_path, parameters.sim_path);
         end
     else
         % Default output directory within data path
-        parameters.sim_path = fullfile(parameters.data_path, 'sim_outputs/');
+        parameters.sim_path = fullfile(parameters.data_path, 'tussim');
     end
  
     %% Validate paths for required libraries and binaries
@@ -160,7 +160,7 @@ function parameters = load_parameters(varargin)
 
     %% Default segmentation path fallback
 
-    if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path)
+    if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path) || strcmp(parameters.seg_path, '')
         parameters.seg_path = parameters.data_path;
     end
 

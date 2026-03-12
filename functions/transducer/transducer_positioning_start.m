@@ -34,14 +34,15 @@ function transducer_positioning_start(subject_id, parameters, pn, target_name, m
             save(temp_data_path, "subject_id", "parameters", "pn", "target_name", "mni_targets");
         
             fid = fopen(temp_m_path, 'w');
-            fprintf(fid, 'load(''%s'');\n', temp_data.file_data);
+            fprintf(fid, 'load(''%s'');\n', temp_data_path);
             fprintf(fid, 'cd(''%s'');\n', path_to_pipeline);
             fprintf(fid, 'transducer_positioning(parameters, pn, subject_id, target_name, mni_targets);\n');
-            fprintf(fid, 'delete(''%s'');\n', temp_data.file_data);
-            fprintf(fid, 'delete(''%s'');\n', temp_script.file_data);
+            fprintf(fid, 'delete(''%s'');\n', temp_data_path);
+            fprintf(fid, 'delete(''%s'');\n', temp_m_path);
             fclose(fid);
         
-            job_name = hpc_job_name(parameters, 'tusim_tp', subject_id);
+            parameters.job_prefix = 'TP';
+            job_name = hpc_job_name(parameters, subject_id);
             job_id = hpc_submit_job(platform, temp_m_file, parameters, subject_id, log_dir);
             job_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
                 parameters.hpc_memorylimit, parameters.hpc_timelimit, log_dir, 1);
