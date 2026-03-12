@@ -27,7 +27,7 @@ function transducer_positioning_start(subject_id, parameters, pn, target_name, m
             % ========== HPC EXECUTION ==========
             hpc_validate_parameters(parameters, platform)
 
-            [log_dir, path_to_pipeline, temp_data_path, temp_m_path, temp_m_file] = ...
+            [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters, subject_id);
             
             % populate temp data
@@ -35,7 +35,7 @@ function transducer_positioning_start(subject_id, parameters, pn, target_name, m
         
             fid = fopen(temp_m_path, 'w');
             fprintf(fid, 'load(''%s'');\n', temp_data_path);
-            fprintf(fid, 'addpath(genpath(''%s''));\n', path_to_pipeline);
+            fprintf(fid, 'addpath(genpath(''%s''));\n', prestus_path);
             fprintf(fid, 'transducer_positioning(parameters, pn, subject_id, target_name, mni_targets);\n');
             fprintf(fid, 'delete(''%s'');\n', temp_data_path);
             fprintf(fid, 'delete(''%s'');\n', temp_m_path);
