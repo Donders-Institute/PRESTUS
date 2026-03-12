@@ -6,11 +6,15 @@ function [grid_pos] = ras_to_grid(ras_pos, nii_header)
 % to grid (voxel) coordinates using the transformation matrix from a NIfTI header.
 %
 % Input:
-%   ras_pos    - [1x3] array specifying the position in RAS coordinates.
+%   ras_pos    - [3x1] array specifying the position in RAS coordinates.
 %   nii_header - Struct containing the NIfTI header, including the transformation matrix.
 %
 % Output:
 %   grid_pos   - [1x3] array specifying the position in grid (voxel) coordinates.
+
+    if size(ras_pos, 2) == 3 && size(ras_pos, 1) == 1
+        ras_pos = ras_pos';  % Convert 1x3 → 3x1
+    end
 
     % Apply the inverse transformation matrix from the NIfTI header
     grid_pos = round(nii_header.Transform.T' \ [ras_pos; 1]);
