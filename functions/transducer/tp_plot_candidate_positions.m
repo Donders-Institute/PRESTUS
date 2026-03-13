@@ -1,4 +1,4 @@
-function tp_plot_candidate_positions(target, trans_candidate, ...
+function tp_plot_candidate_positions(img, target, trans_candidate, ...
     pixel_size, parameters, subject_id, target_name)
     % TP_PLOT_CANDIDATE_POSITIONS Plot transducer candidate positions on skull surface slice
     %
@@ -6,6 +6,7 @@ function tp_plot_candidate_positions(target, trans_candidate, ...
     % and search sphere intersection with skull surface.
     %
     % INPUT
+    %   img             - 3D tissue segmentation image
     %   target          - 1x3 target coordinates [x,y,z]
     %   trans_candidate - Structure with info on transducer candidate
     %   pixel_size      - Voxel size (mm)
