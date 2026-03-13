@@ -30,13 +30,30 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
         plot_options.slice_ind (1,1) double = 0 % Default slice index (transducer position)
     end
 
+    %% Pad T1 image to ensure it includes transducer/focus position (Negative/Pre-padding)
+    min_coords = min([1 1 1; trans_pos_grid; focus_pos_grid]);
+    if any(min_coords < 1)
+        pad_amount = ceil(1 - min_coords); % Amount to shift to make min 1
+        % Pad at the beginning (pre)
+        t1_image = padarray(t1_image, pad_amount, 0, 'pre');
+        
+        % Shift coordinates
+        trans_pos_grid = trans_pos_grid + pad_amount;
+        focus_pos_grid = focus_pos_grid + pad_amount;
+        
+        % Shift slice index if provided
+         if ~isempty(plot_options.slice_ind) && plot_options.slice_ind ~= 0
+             plot_options.slice_ind = plot_options.slice_ind + pad_amount(plot_options.slice_dim);
+         end
+    end
+
     %% Determine slice index if not provided
     if isempty(plot_options.slice_ind) || plot_options.slice_ind == 0
         plot_options.slice_ind = trans_pos_grid(plot_options.slice_dim); % Use transducer position as default slice index
     end
 
-    %% Pad T1 image to ensure it includes transducer position
-    im_size = max(size(t1_image), trans_pos_grid); % Determine required image size based on transducer position
+    %% Pad T1 image to ensure it includes transducer position (Positive/Post-padding)
+    im_size = max([size(t1_image); trans_pos_grid; focus_pos_grid]);
     if ~isequal(im_size, size(t1_image))
         t1_image = padarray(t1_image, im_size - size(t1_image), 'post'); % Pad image to include transducer position
     end
