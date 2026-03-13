@@ -1,4 +1,4 @@
-function tp_plot_candidate_positions(segm_img_slice, target, trans_candidate, ...
+function tp_plot_candidate_positions(target, trans_candidate, ...
     pixel_size, parameters, subject_id, target_name)
     % TP_PLOT_CANDIDATE_POSITIONS Plot transducer candidate positions on skull surface slice
     %
@@ -6,7 +6,6 @@ function tp_plot_candidate_positions(segm_img_slice, target, trans_candidate, ..
     % and search sphere intersection with skull surface.
     %
     % INPUT
-    %   segm_img_slice  - RGB slice through target(y) with sphere highlighted
     %   target          - 1x3 target coordinates [x,y,z]
     %   trans_candidate - Structure with info on transducer candidate
     %   pixel_size      - Voxel size (mm)
@@ -20,10 +19,14 @@ function tp_plot_candidate_positions(segm_img_slice, target, trans_candidate, ..
     disp("[TP] Plotting initial candidate position ...")
 
     trans_xz = trans_candidate.trans_xz;
+    target_xyz = trans_candidate.trans_pos;
+
+    % Get image slice
+    img_slice = ind2rgb(squeeze(img(:,target_xyz(2),:)), viridis(max(img(:))+1));
 
     h = figure;
     colormap([0.3 0.3 0.3; lines(12)])
-    imagesc(segm_img_slice); axis image; hold on;
+    imagesc(img_slice); axis image; hold on;
 
     % Target (red rectangle)
     target_xz = target([1,3]);

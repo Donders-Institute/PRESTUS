@@ -1,4 +1,4 @@
-function [trans_candidate, outer_sphere_3d, img_slice, parameters] = ...
+function [trans_candidate, outer_sphere_3d, parameters] = ...
     tp_find_initial_candidate(img, target, pixel_size, parameters)
 
 % TP_FIND_INITIAL_CANDIDATE Find candidate transducer positions on skull surface
@@ -16,7 +16,7 @@ function [trans_candidate, outer_sphere_3d, img_slice, parameters] = ...
 % OUTPUT
 %   trans_candidate - Initial random transducer position [x,y,z]
 %   outer_sphere_3d - 3D logical mask of valid transducer positions on skull surface
-%   img_slice       - RGB slice through target(y) with search sphere highlighted
+%   parameters      - Parameters with updated min_focal_distance_mm
 
 disp("[TP] Finding candidate position via intersection of skull with expanding sphere ...")
 
