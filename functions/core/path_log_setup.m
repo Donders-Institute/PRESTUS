@@ -52,11 +52,21 @@ function [parameters] = path_log_setup(parameters, prestus_path, subject_id)
     % return to PRESTUS path
     cd(prestus_path);
 
-    % Make subfolder (if enabled) and check if directory exists
+    % [SIMULATION OUTPUT] Make subfolder (if enabled) and check if directory exists
     if isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
         parameters.output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
+        if ~exist(parameters.output_dir); mkdir(parameters.output_dir); end;
     else 
         parameters.output_dir = parameters.sim_path;
+    end
+
+    % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
+    if (isfield(parameters, 'localite_path') && ~isempty(parameters.localite_path)) && ...
+        isfield(parameters,'subject_subfolder') && parameters.subject_subfolder == 1
+        parameters.localite_path = fullfile(parameters.localite_path, sprintf('sub-%03d', subject_id));
+        if ~exist(parameters.localite_path); mkdir(parameters.localite_path); end;
+    else 
+        parameters.localite_path = parameters.localite_path;
     end
 
     % specify dedicated subfolder for debugging contents

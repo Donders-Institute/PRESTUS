@@ -11,10 +11,11 @@ To set up a specific application, an additional `config_<STUDY>.yaml` should be 
 | `data_path`                       | Absolute path to structural input data location.      | [string] Mandatory   |
 | `seg_path`                        | Absolute path to SimNIBS segmentations.               | [string] Mandatory   |
 | `sim_path`                        | Absolute path to the simulation output.               | [string] Mandatory   |
+| `localite_path`                   | Absolute path to localite planning.                   | [string] Optional    |
 | `simnibs_bin_path`                | Absolute path to SimNIBS binaries.                    | [string] Mandatory   |
 | `paths_to_add`                    | Toolbox paths to add with addpath().                  | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
 | `subpaths_to_add`                 | Toolbox paths to add with addpath(genpath()).         | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
-| `subject_subfolder`               | Manage outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
+| `subject_subfolder`               | Manage simulation (and optionally localite planning) outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
 | `results_filename_affix`          | Affix for result file names                           | [string] Can be used to differentiate simulation outputs for the same subject-transducer combination(e.g., different intensities and/or targets.)  |
 | `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
 | `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).| (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
@@ -228,3 +229,14 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `opt_weights`                   | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with larger weights) |   |
 | `opt_seed`                      | Random seed for optimization                            |   |
 | `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.  | Used only for calculating the peak distance and FWHM.  |
+
+### Heuristic transducer placement
+
+| **Parameter**                   | **Description**                                         | **Comments**                          |
+|---------------------------------|---------------------------------------------------------|---------------------------------------|
+| `tp_dist_close`                 | Distance from target considered sufficiently close [mm] |                                       |
+| `tp_ear_radius`                 | Radius of the nogo zone [mm]                            | [Optional] for ear exclusion          |
+| `tp_left_ear_center`            | Approximate coordinates for left ear [img voxels]       | [Optional] for ear exclusion          |
+| `tp_right_ear_center`           | Approximate coordinates for right ear [img voxels]      | [Optional] for ear exclusion          |
+| `tp_criterion_intersection`     | Heuristic placement criterion: intersection             | Default: `0.05` (5%)                  |
+| `tp_save_localiteT1`            | Save localite T1                                        | [Optional] Requires `localite_path`   |
