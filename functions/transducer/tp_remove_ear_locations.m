@@ -8,6 +8,9 @@ if isfield(parameters, {'tp_ear_radius', 'tp_left_ear_center', 'tp_right_ear_cen
     % Validate complete specification
     if ~isempty(parameters.tp_ear_radius) && ~isempty(parameters.tp_left_ear_center) && ~isempty(parameters.tp_right_ear_center)
         
+        % keep copy of original positions
+        locs_original = locs;
+
         % Define nogo zone spheres
         ear_radius = parameters.tp_ear_radius;
         left_ear_center = parameters.tp_left_ear_center;

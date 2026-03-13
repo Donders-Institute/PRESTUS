@@ -1,5 +1,5 @@
-function output_pos = map_coordsystems(parameters, input_pos, input_cs, output_cs, nii_hdr)
-% MAP_COORDSYSTEMS Coord mapper with explicit varargin requirements.
+function output_pos = transform_coordinates(parameters, input_pos, input_cs, output_cs, nii_hdr)
+% TRANSFORM_COORDINATES Transform input coordinates between coordinate systems
 %
 % Coord systems: 'mni' | 'ras_plus' | 'grid'
 % Required varargin:
@@ -28,7 +28,7 @@ function output_pos = map_coordsystems(parameters, input_pos, input_cs, output_c
             if strcmp(output_cs, 'ras_plus')
                 output_pos = ras_pos;
             elseif strcmp(output_cs, 'grid')
-                output_pos = map_coordsystems(parameters, ras_pos, 'ras_plus', 'grid', nii_hdr);
+                output_pos = transform_coordinates(parameters, ras_pos, 'ras_plus', 'grid', nii_hdr);
             else
                 error('MNI output_cs: ''ras_plus'' or ''grid'' only');
             end

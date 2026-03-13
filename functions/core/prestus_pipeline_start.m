@@ -46,7 +46,22 @@ function prestus_pipeline_start(subject_id, parameters, options)
             
             % Create job files
             save(temp_data_path, 'subject_id', 'parameters');
-            hpc_matlab_pipeline(temp_m_path, temp_data_path, prestus_path, options);
+
+            % Generate MATLAB call
+            fid = fopen(temp_m_path, 'w+');
+            fprintf(fid, 'load(''%s'');\n', temp_data_path);
+            fprintf(fid, 'addpath(genpath(''%s''));\n', prestus_path);
+            if ismember(fieldnames(options), 'sequential_configs')
+                sequential_configs = options.sequential_configs;
+                save(temp_data_path, 'sequential_configs', '-append');
+                fprintf(fid, 'prestus_pipeline(subject_id, parameters, options);\n');
+            else
+                fprintf(fid, 'prestus_pipeline(subject_id, parameters);\n');
+            end
+            fprintf(fid, 'delete(''%s'');\n', temp_data_path);
+            fprintf(fid, 'delete(''%s'');\n', temp_m_path);
+            fclose(fid);
+            end
             
             % Job name
             job_name = hpc_job_name(parameters, subject_id);
