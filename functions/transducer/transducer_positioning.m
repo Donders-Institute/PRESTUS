@@ -46,35 +46,35 @@ tpos_output_file = fullfile(parameters.output_dir, ...
 
 if confirm_overwriting(tpos_output_file, parameters)
 
-    %% 3. Convert target from MNI (mm) to subject grid space (voxels)
+    %% Convert target from MNI (mm) to subject grid space (voxels)
 
     fprintf('➤ Target: %s\n', target_name);
     target_mni = mni_targets.(target_name);
     target_vox = transform_coordinates(...
         parameters, target_mni, 'mni', 'grid', img_info);
 
-    %% 5. Find candidate transducer positions on skull (expanding sphere)
+    %% Find candidate transducer positions on skull (expanding sphere)
 
     [trans_candidate, outer_sphere_3d, parameters] = ...
     tp_find_initial_candidate(img, target_vox, voxel_size, parameters);
 
-    %% 6. Plot initial candidate
+    %% Plot initial candidate
 
     tp_plot_candidate_positions(...
         target_vox, trans_candidate, ...
         voxel_size, parameters, subject_id, target_name);
 
-    %% 7. Plot geometry
+    %% Plot geometry
 
     tp_plot_geometry_overlay(img, target_vox, trans_candidate.trans_pos, ...
         voxel_size, parameters, subject_id, target_name, outer_sphere_3d);
 
-    %% 8. Evaluate candidate according to criteria
+    %% Evaluate candidate according to criteria
 
     tpos = tp_evaluate_candidate_positions(...
         img, target_vox, parameters, voxel_size);
 
-    %% 9. Save results table
+    %% Save results table
 
     writetable(tpos, tpos_output_file, 'Delimiter', ',');
 
@@ -83,7 +83,7 @@ else
     tpos = readtable(tpos_output_file, 'Delimiter', ',');
 end
 
-%% [Optional] Convert positions to RAS & MNI
+%% [Optional] Convert positions to RAS
 
 % TO DO
 
@@ -104,7 +104,7 @@ tp_plot_heuristic_position(...
 fprintf('Heuristic transducer placement: %s (sub-%03d) → %s\n', ...
     target_name, subject_id, tpos_output_file);
 
-%% [optional] save T1w image with localite-ready header
+%% [Optional] Save T1w image with localite-ready header
 
 if isfield(parameters, 'tp_save_localiteT1') && parameters.tp_save_localiteT1 && ...
     isfield(parameters, 'localite_path') && ~isempty(parameters.localite_path)

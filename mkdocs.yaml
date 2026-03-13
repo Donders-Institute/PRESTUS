@@ -44,6 +44,7 @@ nav:
     - Transducer Setup: doc_transducer.md
     - Transducer Calibration: doc_calibration.md
     - Transducer Placement: doc_placement.md
+    - Transducer Placement (Heuristic): doc_placement_heuristic.md
     - Head Processing: doc_preproc.md
     - Medium Setup: doc_medium.md
     - Outputs: doc_outputs.md

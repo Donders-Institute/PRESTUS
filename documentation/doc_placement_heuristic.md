@@ -1,0 +1,66 @@
+# Heuristic Transducer Placement
+
+The function `transducer_positioning` identifies heuristic locations for transducer placement. It can be called with `transducer_positioning_start`.
+
+The function targets brain regions specified by MNI coordinates, converting them to subject-native space using SimNIBS tools. It aims to identify candidate transducer positions where the geometric focus aligns with a target within a user-defined focal distance range. For each position, it computes the intersection proportion between the transducer and skin, mean/variance distances to skin and skull, and geometric focus/exit plane positions. It (optionally removes) areas including ears and selects a heuristic position based on user-defined criteria. Besides target MNI coordinates, the function does not require manual intervention, enabling automatic end-to-end workflows.
+
+For parameters, see the [overview](doc_parameters.md#heuristic-transducer-placement).
+
+### Candidate positions
+
+- Convert target from MNI (mm) to subject grid space (voxels)
+- Find candidate transducer positions on skull (expanding sphere)
+- Calculate criteria for each location: target distance, intersection with skin, mean distance to skull, variance in distance to skin & skull
+
+#### Table: Candidate Coordinates
+
+The `tpars_sub-XXX_target.csv` table contains transducer position candidates with the following columns. This information can be used to select a suitable candidate (e.g., by selecting a position with low intersection of the transducer and head tissue (prop_intersect < 0.05) and minimal Euclidean distance to the target; often supported by visual inspection).
+
+| Column          | Description                                    |
+|-----------------|------------------------------------------------|
+| idx             | index                                          |
+| trans_x         | Transducer x-coordinate (voxels)               |
+| trans_y         | Transducer y-coordinate (voxels)               |
+| trans_z         | Transducer z-coordinate (voxels)               |
+| targ_x          | Target x-coordinate (voxels)                   |
+| targ_y          | Target y-coordinate (voxels)                   |
+| targ_z          | Target z-coordinate (voxels)                   |
+| dist_to_target  | Euclidean distance transducer-to-target (voxels)|
+| prop_intersect  | Proportion of transducer volume intersecting head |
+| meandistskin    | Mean distance to skin surface in aperture plane (voxels) |
+| vardistskin     | Variance of distances to skin (voxels²)        |
+| meandistskull   | Mean distance to skull surface in aperture plane (voxels)|
+| vardistskull    | Variance of distances to skull (voxels²)       |
+
+### Remove ear locations
+
+**[Optional]**  
+
+For practical reasons, transducer locations overlapping with the ears are not desired. Possible locations that overlap with ear positions can optionally be removed within an  `tp_ear_radius` (Radius of the nogo zone, mm) around `tp_left_ear_center` (approximate coordinates for left ear, voxels) and `tp_right_ear_center`.
+
+### Select heuristic transducer position
+
+The desired criterion for intersection with the skin can be defined via `tp_criterion_intersection`. If no placement is found wihtin this criterion, the intersection will be iteratively expanded by 1% until a match is identified.
+
+> Other criteria are not currently implemented. e.g.:
+```
+%tppf = tppf(tppf.mean_dist_skull <= quantile(tppf.mean_dist_skull, 0.5) & ...
+%           tppf.var_dist_skull <= quantile(tppf.var_dist_skull, 0.1),:);
+%tppf = tppf(tppf.var_dist_skin==min(tppf.var_dist_skin),:);
+```
+
+Amongst locations fulfilling the above criteria, the location with a minimum distance to the target is selected.
+
+### Plot heuristic transducer position
+
+PRESTUS generates an overview of the selected transducer placement:
+
+![ex_heuristic_placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ex_heuristic_placement.png)
+
+If `parameters.localite_path` is specified, it will also deposit a copy of the plot there.
+
+### Save T1w with localite-ready header 
+
+**[Optional]**  
+
+ Localite can struggle with canonical T1 header affine matrices. PRESTUS offers the optional step (`tp_save_localiteT1`) of depositing a header-adjusted T1 planning image for localite (based on the `T1.nii.gz` in the SimNIBS output m2m directory). For this `parameters.localite_path` has to be specified.
