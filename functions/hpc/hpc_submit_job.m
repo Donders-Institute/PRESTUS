@@ -50,19 +50,19 @@ function write_slurm_script(temp_slurm_path, parameters, subject_id, temp_m_file
     needs_gpu = isfield(parameters, 'hpc_partition') || ...
                 (isfield(parameters, 'code_type') && any(strcmp(parameters.code_type, {'matlab_gpu', 'cpp_gpu'})));
     
-    if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition)
-        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
+    if isfield(parameters, 'hpc_partition') && ~isempty(strtrim(char(parameters.hpc_partition)))
+        fprintf(fid, '#SBATCH --partition=%s\n', strtrim(char(parameters.hpc_partition)));
     elseif needs_gpu
         fprintf(fid, '#SBATCH --partition=gpu\n');
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
     
-    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu)
-        fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
+    if isfield(parameters, 'hpc_gpu') && ~isempty(strtrim(char(parameters.hpc_gpu)))
+        fprintf(fid, '#SBATCH --gres=%s\n', strtrim(char(parameters.hpc_gpu)));
     end
-    
-    if isfield(parameters, 'hpc_reservation') && ~isempty(parameters.hpc_reservation)
-        fprintf(fid, '#SBATCH --reservation=%s\n', parameters.hpc_reservation);
+
+    if isfield(parameters, 'hpc_reservation') && ~isempty(strtrim(char(parameters.hpc_reservation)))
+        fprintf(fid, '#SBATCH --reservation=%s\n', strtrim(char(parameters.hpc_reservation)));
     end
     
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc_memorylimit);
