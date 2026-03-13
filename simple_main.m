@@ -12,6 +12,7 @@ subject_id = 1; % subject number, if none, choose 1
 % add paths
 addpath(genpath('functions'))
 addpath(genpath('toolboxes')) 
+addpath(genpath('configs')) 
 
 parameters = load_parameters('tutorial_config.yaml'); % load the configuration file
 

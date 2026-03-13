@@ -9,7 +9,7 @@ use_forceqform: 0
 
 transducer: 
   array_shape:
-    type: annular # 'annular' (Annular array transducer) or 'matrix' (Matrix array transducer)
+    type: matrix # 'annular' (Annular array transducer) or 'matrix' (Matrix array transducer)
     
     annular:
       n_elements: 4 # number of elements in the transducer
@@ -19,7 +19,7 @@ transducer:
       dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus
       source_phase_deg: [0, 0, 0, 274] # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
  
-     matrix:
+    matrix:
       steering: 3D # 1D (Axial steering) or 3D (Volumetric steering)
       
       # Element shape options:
@@ -55,6 +55,7 @@ transducer:
           # Type of element grid distribution:
           #   rect → Rectangular grid
           #   fibonacci → Fibonacci grid
+          #   fermat → bowl points are calculated using Fermat's spiral (Kwave makeCartBowl)
           grid_shape: 
             type: fibonacci
              
@@ -72,9 +73,13 @@ transducer:
             fibonacci:
               # Total number of elements for Fibonacci grid.
               n_elements: 64   
+            
+            fermat:
+              # Total number of elements for Fermat's spiral grid.
+              n_elements: 64   
 
         extract_from_file:
-          file_path: tr2Clover_R100_106.xlsx # Path to the file containing x, y, z coordinates of the elements
+          file_path: example_coord_file.xlsx # Path to the file containing x, y, z coordinates of the elements
           
           # First row and column containing x, y, z element coordinates.
           # Note: MATLAB may ignore the first Excel row if it contains headers.
@@ -109,10 +114,10 @@ default_grid_dims: [144, 144, 256]
 
 thermal:
   pd: 0.3
-  pri: 0.6  
+  pri: 0.6
   ptd: 0.6
   pt_timestep: 0.1
-  ptri: 1.2
+  ptri: 1.6
   ptrd: 14.4
   post_ptri_dur: 15
   post_pt_timestep: 1

@@ -38,9 +38,9 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
     switch matrix_tr.steering
         case '1D'
-            tr.align_transducer_with_focus = true;
+            matrix_tr.align_transducer_with_focus = true;
         case '3D'
-            tr.align_transducer_with_focus = false;
+            matrix_tr.align_transducer_with_focus = false;
         otherwise
             error('Transducer %i; Steering option "%s" is not implemented.', ...
                 t_i, matrix_tr.steering);
@@ -49,7 +49,6 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     % Initialize element phases to zero degrees by default.
     % Phase delays are later adjusted based on the defined focus.
     matrix_tr.source_phase_deg = 0;
-    tr.source_phase_deg = matrix_tr.source_phase_deg;
 
     % ---------------------------------------------------------------------
     % Element geometry
@@ -63,9 +62,6 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
     assert(isfield(matrix_tr, 'elem_width_mm'), ...
         'Transducer %i; Missing elem_width parameter. Please specify to define width of each element.', t_i);
-
-    tr.elem_height_mm   = matrix_tr.elem_height_mm;
-    tr.elem_width_mm    = matrix_tr.elem_width_mm;
 
     % Validate outer diameter
     assert(isfield(matrix_tr, 'outer_diameter_mm'), ...
@@ -81,30 +77,35 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
         'Transducer %i; Missing is_curved field for matrix transducer. Please specify.', t_i);
 
     if matrix_tr.is_curved
-        assert(isfield(matrix_tr.is_curved, 'curv_radius_mm'), ...
+        assert(isfield(matrix_tr.curved, 'curv_radius_mm'), ...
             'Transducer %i; Missing curv_radius_mm field for matrix transducer. Please specify radius of curvature.', t_i);
 
-        assert(isfield(matrix_tr.is_curved, 'dist_to_plane_mm'), ...
-            'Transducer %i; Missing dist_to_plane_mm field for matrix transducer. Please specify distance from exit plane to geometric focus.', t_i);
+        % Calculate distance to transducer plane if not provided
+        if ~isfield(matrix_tr.curved, 'dist_to_plane_mm')
+            assert(matrix_tr.curved.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
+                'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 
-        tr.curv_radius_mm = matrix_tr.is_curved.curv_radius_mm;
-        tr.dist_to_plane_mm = matrix_tr.is_curved.dist_to_plane_mm;
+            matrix_tr.curved.dist_to_plane_mm = sqrt(matrix_tr.curved.curv_radius_mm^2 - ...
+                (matrix_tr.outer_diameter_mm / 2)^2);
+
+            fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
+                t_i, matrix_tr.curved.dist_to_plane_mm);
+        end
 
     else
-        tr.curv_radius_mm = 0;
+        matrix_tr.curv_radius_mm = 0;
 
         % For a flat transducer the distance to the focal plane approaches
         % infinity. A finite value is assigned here for visualization purposes.
-        tr.dist_to_plane_mm = 70;
+        matrix_tr.dist_to_plane_mm = 70;
     end
 
     % ---------------------------------------------------------------------
     % Optional Clover multi-aperture configuration
     % ---------------------------------------------------------------------
     if isfield(matrix_tr, 'is_clover_setup')
-        tr.is_clover_setup = matrix_tr.is_clover_setup;
 
-        if tr.is_clover_setup
+        if matrix_tr.is_clover_setup
             assert(isfield(matrix_tr, 'clover'), ...
                 'Transducer %i; Missing additional information of Clover setup.', t_i);
 
@@ -113,13 +114,10 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
             assert(isfield(matrix_tr.clover, 'ROC_parent'), ...
                 'Transducer %i; Missing additional information of Clover setup. Define ROC of parent.', t_i);
-
-            tr.n_leaves = matrix_tr.clover.n_leaves;
-            tr.ROC_parent = matrix_tr.clover.ROC_parent;
         end
     else
         % Clover array configuration not provided; skip Clover setup
-        tr.is_clover_setup = false;
+        matrix_tr.is_clover_setup = false;
     end
 
     % ---------------------------------------------------------------------
@@ -169,21 +167,21 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(rect_grid.elem_spacing_width_mm > 0)
 
                     % Total physical span of the array
-                    tran_width = (rect_grid.n_elem_width * tr.elem_width_mm) + ...
+                    tran_width = (rect_grid.n_elem_width * matrix_tr.elem_width_mm) + ...
                         ((rect_grid.n_elem_width - 1) * rect_grid.elem_spacing_width_mm);
 
-                    tran_height = (rect_grid.n_elem_height * tr.elem_height_mm) + ...
+                    tran_height = (rect_grid.n_elem_height * matrix_tr.elem_height_mm) + ...
                         ((rect_grid.n_elem_height - 1) * rect_grid.elem_spacing_height_mm);
 
                     % Distance of the array side from the center
                     grid_radius = max(tran_width/2, tran_height/2);
 
-                    aperture_radius = tr.outer_diameter_mm / 2;
+                    aperture_radius = matrix_tr.outer_diameter_mm / 2;
 
                     assert(grid_radius <= aperture_radius, ...
                         ['Transducer %i; Rectangular grid exceeds outer_diameter_mm. ' ...
                         'Grid span: %.2f x %.2f mm, aperture diameter: %.2f mm.'], ...
-                        t_i, tran_width, tran_height, tr.outer_diameter_mm);
+                        t_i, tran_width, tran_height, matrix_tr.outer_diameter_mm);
 
                     assert(isfield(rect_grid, 'sparsity_factor'), ...
                             'Transducer %i; Missing sparsity_factor parameter for grid. Please specify to define % of used elements.', t_i);
@@ -194,17 +192,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     n_elem_row = rect_grid.n_elem_row;
                     n_elem_col = rect_grid.n_elem_col;
 
-                    % Store element dimensions in standard location
-                    tr.n_elem_row = n_elem_row;
-                    tr.n_elem_col = n_elem_col;
-
                     % Calculate initial element count (will be adjusted later for circular cutout)
-                    tr.n_elements = n_elem_col * n_elem_row;
-
-                    tr.elem_spacing_height_mm = rect_grid.elem_spacing_height_mm;
-                    tr.elem_spacing_width_mm = rect_grid.elem_spacing_width_mm;
-
-                    tr.sparsity_factor = rect_grid.sparsity_factor;
+                    matrix_tr.n_elements = n_elem_col * n_elem_row;
 
                 case 'fibonacci'
                     % Sparse spiral grid configuration
@@ -212,13 +201,24 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     % Validate required parameters for sparser grid
                     assert(isfield(grid_shape, 'fibonacci'), ...
                         'Transducer %i; Missing fibonacci field in grid_shape for sparser grid configuration.', t_i);
-                    
-                    fibo_grid = grid_shape.fibonacci;
-
-                    assert(isfield(fibo_grid, 'n_elements'), ...
+                 
+                    assert(isfield(grid_shape.fibonacci, 'n_elements'), ...
                        'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
 
-                    tr.n_elements = fibo_grid.n_elements;
+                    matrix_tr.n_elements = grid_shape.fibonacci.n_elements;
+
+                case 'fermat'
+                    % Sparse spiral grid configuration
+
+                    % Validate required parameters for sparser grid
+                    assert(isfield(grid_shape, 'fermat'), ...
+                        'Transducer %i; Missing fermat field in grid_shape for sparser grid configuration.', t_i);
+
+                    assert(isfield(grid_shape.fermat, 'n_elements'), ...
+                        'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
+                    
+                    matrix_tr.n_elements = grid_shape.fermat.n_elements;
+
                 otherwise
                     error('Transducer %i; Grid shape type "%s" is not implemented.', ...
                         t_i, grid_shape.type);
@@ -235,10 +235,10 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
             file_path = extract_shape_from_file.file_path;
 
-            assert(isfile(file_path), ...
-                'Transducer %i; File "%s" does not exist or is not readable.', t_i, file_path);
+            resolved_path = which(file_path);
 
-            tr.file_path = file_path;
+            assert(~isempty(resolved_path), ...
+                'Transducer %i; File "%s" does not exist or is not on the MATLAB path.', t_i, file_path);
 
             assert(isfield(extract_shape_from_file, 'start_row'), ...
                 'Transducer %i; Missing start_row parameter. Please specify start row of element positions.', t_i);
@@ -246,18 +246,14 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             assert(isfield(extract_shape_from_file, 'start_col'), ...
                 'Transducer %i; Missing start_col parameter. Please specify start column of element positions.', t_i);
 
-            tr.start_row = extract_shape_from_file.start_row;
-            tr.start_col = extract_shape_from_file.start_col;
-
             assert(isfield(extract_shape_from_file, 'n_elements'), ...
                 'Transducer %i; Missing n_elements. Please specify number of elements.', t_i);
 
-            tr.n_elements = extract_shape_from_file.n_elements;
+            matrix_tr.n_elements = extract_shape_from_file.n_elements;
 
             if isfield(extract_shape_from_file, 'select_random_subset')
 
-                tr.select_random_subset = extract_shape_from_file.select_random_subset;
-                if tr.select_random_subset
+                if extract_shape_from_file.select_random_subset
                     assert(isfield(extract_shape_from_file, 'subset'), ...
                         'Transducer %i; Missing subset parameters. Please specify subset properties.', t_i);
 
@@ -267,36 +263,32 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(extract_shape_from_file.subset, 'subset_n_elements'), ...
                         'Transducer %i; Missing subset_n_element parameter. Please specify subset size.', t_i);
 
-                    tr.random_seed = extract_shape_from_file.subset.random_seed;
-                    tr.subset_n_elements = extract_shape_from_file.subset.subset_n_elements;
                 end
             else
                 % Random element subset not specified; use full element set
-                tr.select_random_subset = false;
+                extract_shape_from_file.select_random_subset = false;
             end
 
             if isfield(extract_shape_from_file, 'project_on_new_ROC')
-                tr.project_on_new_ROC = extract_shape_from_file.project_on_new_ROC;
 
-                if tr.project_on_new_ROC
+                if extract_shape_from_file.project_on_new_ROC
                     assert(isfield(extract_shape_from_file, 'ROC_projection'), ...
                         'Transducer %i; Missing ROC_projection parameters. Please specify to define ROC to project on.', t_i);
 
                     assert(isfield(extract_shape_from_file.ROC_projection, 'new_ROC_mm'), ...
                         'Transducer %i; Missing new_ROC_mm parameter. Please specify new desired ROC.', t_i);
 
-                    tr.new_ROC_mm = extract_shape_from_file.new_ROC_mm;
-
                 end
             else
                 % No projection configuration provided; element positions remain unchanged
-                tr.project_on_new_ROC = false;
+                extract_shape_from_file.project_on_new_ROC = false;
             end
 
         otherwise
             error('Transducer %i; Matrix shape option "%s" is not implemented.', ...
                 t_i, matrix_tr.matrix_shape.type);
     end
+    matrix_tr.matrix_shape.extract_from_file = extract_shape_from_file;
 
     % ---------------------------------------------------------------------
     % Derived visualization parameters
@@ -305,9 +297,11 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     transducer_diameter_mm = matrix_tr.outer_diameter_mm;
 
     % Calculate inner and outer diameters for elements
-    [id, od] = calc_elements_id_od_mm(transducer_diameter_mm, tr.n_elements);
+    [id, od] = calc_elements_id_od_mm(transducer_diameter_mm, matrix_tr.n_elements);
 
     % Store element dimensions in standard location for visualization compatibility
-    tr.Elements_ID_mm = id;
-    tr.Elements_OD_mm = od;
+    matrix_tr.Elements_ID_mm = id;
+    matrix_tr.Elements_OD_mm = od;
+
+    tr.array_shape.matrix = matrix_tr;
 end
