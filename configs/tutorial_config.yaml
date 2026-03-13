@@ -73,6 +73,7 @@ transducer:
             fibonacci:
               # Total number of elements for Fibonacci grid.
               n_elements: 64   
+              kerf_mm: 0.5
             
             fermat:
               # Total number of elements for Fermat's spiral grid.

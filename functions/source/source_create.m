@@ -165,6 +165,8 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
     else
         disp('Setting up kWaveArray (might take a bit of time)');
 
+        % Note: Both `parameters` and `tp` are passed to this function to
+        % allow support for multiple transducers in future implementations.
         tp = transducer_pars(1);  % use first (and only) transducer here
 
         % 3D/2D positions for kWaveArray are taken from the first row
@@ -218,7 +220,47 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                                          focus_vec);
                 end
             case 'matrix'
-                % implement matrix
+                matrix_tp = tp.array_shape.matrix;
+                
+                switch matrix_tp.matrix_shape.type
+                    case 'define_here'
+                        [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters);
+                        transducer_pars(1) = tp;
+                    case 'extract_from_file'               
+                        elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos);
+                    otherwise 
+                        error('Matrix shape %s is unknown or not implemented.', matrix_tp.matrix_shape.type)
+                end
+
+                % Convert positions to mm for plotting
+                elem_pos_mm = elem_pos_m' * 1e3;
+
+                % Plot 3D scatter
+                h = figure;
+                scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
+                axis equal
+                xlabel('X [mm]')
+                ylabel('Y [mm]')
+                zlabel('Z [mm]')
+                view([0 90])
+                title('Transducer Element Distribution')
+                grid on
+
+                % Build filenames
+                fig_filename = fullfile(parameters.debug_dir, ...
+                    sprintf('sub-%03d_%s_transducer_element_distribution%s.fig', ...
+                    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+
+                png_filename = fullfile(parameters.debug_dir, ...
+                    sprintf('sub-%03d_%s_transducer_element_distribution%s.png', ...
+                    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+
+                % Save outputs
+                saveas(h, fig_filename, 'fig')
+                saveas(h, png_filename, 'png')
+                close(h)
+
+                karray = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_mm, trans_pos, focus_pos);
 
             otherwise
                 error('Array shape %s is unknown or not implemented.', tp.array_shape.type)

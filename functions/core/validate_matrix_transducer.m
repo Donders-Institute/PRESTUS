@@ -93,11 +93,11 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
         end
 
     else
-        matrix_tr.curv_radius_mm = 0;
+        matrix_tr.curved.curv_radius_mm = inf;
 
         % For a flat transducer the distance to the focal plane approaches
         % infinity. A finite value is assigned here for visualization purposes.
-        matrix_tr.dist_to_plane_mm = 70;
+        matrix_tr.curved.dist_to_plane_mm = 70;
     end
 
     % ---------------------------------------------------------------------
@@ -204,6 +204,9 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                  
                     assert(isfield(grid_shape.fibonacci, 'n_elements'), ...
                        'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
+
+                    assert(isfield(grid_shape.fibonacci, 'kerf_mm'), ...
+                       'Transducer %i; Missing kerf_mm parameter for grid. Please specify.', t_i);
 
                     matrix_tr.n_elements = grid_shape.fibonacci.n_elements;
 
