@@ -16,38 +16,40 @@ For parameters, see the [overview](doc_parameters.md#heuristic-transducer-placem
 
 The `tpars_sub-XXX_target.csv` table contains transducer position candidates with the following columns. This information can be used to select a suitable candidate (e.g., by selecting a position with low intersection of the transducer and head tissue (prop_intersect < 0.05) and minimal Euclidean distance to the target; often supported by visual inspection).
 
-| Column          | Description                                    |
-|-----------------|------------------------------------------------|
-| idx             | index                                          |
-| trans_x         | Transducer x-coordinate (voxels)               |
-| trans_y         | Transducer y-coordinate (voxels)               |
-| trans_z         | Transducer z-coordinate (voxels)               |
-| targ_x          | Target x-coordinate (voxels)                   |
-| targ_y          | Target y-coordinate (voxels)                   |
-| targ_z          | Target z-coordinate (voxels)                   |
-| dist_to_target  | Euclidean distance transducer-to-target (voxels)|
-| prop_intersect  | Proportion of transducer volume intersecting head |
-| meandistskin    | Mean distance to skin surface in aperture plane (voxels) |
-| vardistskin     | Variance of distances to skin (voxels²)        |
-| meandistskull   | Mean distance to skull surface in aperture plane (voxels)|
-| vardistskull    | Variance of distances to skull (voxels²)       |
+| Metric          | Description                                    | Interpretation  |
+|-----------------|------------------------------------------------|-----------------|
+|`idx`            | index                                          | |
+|`trans_x`        | Transducer x-coordinate (voxels)               | |
+|`trans_y`        | Transducer y-coordinate (voxels)               | |
+|`trans_z`        | Transducer z-coordinate (voxels)               | |
+|`targ_x`         | Target x-coordinate (voxels)                   | |
+|`targ_y`         | Target y-coordinate (voxels)                   | |
+|`targ_z`         | Target z-coordinate (voxels)                   | |
+|`dist_to_target` | Euclidean distance transducer-to-target (voxels)| |
+|`prop_intersect` | Fraction of voxels in the transducer’s orthogonal plane that intersect with the skull mask. | Low values (≈ 0) indicate minimal skull obstruction; high values (> 0.3) indicate significant bone interference. |
+|`mean_dist_skin` | Mean distance from **non‑intersecting** voxels to the skin boundary. | Indicates average proximity of the plane to the skin surface. |
+|`var_dist_skin`  | Variance of distances from non‑intersecting voxels to the skin boundary. | Higher variance → surface curvature or oblique intersection. |
+|`mean_dist_skull`| Mean distance from **all** voxels in the plane to the nearest skull boundary. | Shows average clearance between the plane and skull. |
+|`var_dist_skull` | Variance of distances to the skull boundary. | Quantifies irregularity of skull spacing within the beam footprint. |
+
 
 ### Remove ear locations
 
 **[Optional]**  
 
-For practical reasons, transducer locations overlapping with the ears are not desired. Possible locations that overlap with ear positions can optionally be removed within an  `tp_ear_radius` (Radius of the nogo zone, mm) around `tp_left_ear_center` (approximate coordinates for left ear, voxels) and `tp_right_ear_center`.
+For practical reasons, transducer locations overlapping with the ears are not desired. Possible locations that overlap with ear positions can optionally be removed within an `tp_ear_radius` (Radius of the nogo zone, mm) around `tp_left_ear_center` (approximate coordinates for left ear, voxels) and `tp_right_ear_center`.
 
 ### Select heuristic transducer position
 
-The desired criterion for intersection with the skin can be defined via `tp_criterion_intersection`. If no placement is found wihtin this criterion, the intersection will be iteratively expanded by 1% until a match is identified.
+The desired criterion for intersection with the skin can be defined via `tp_criterion_intersection`. If no placement is found within this criterion, the intersection will be iteratively expanded by `tp_expand_step` (default: 1%) until a match is identified.
 
-> Other criteria are not currently implemented. e.g.:
-```
-%tppf = tppf(tppf.mean_dist_skull <= quantile(tppf.mean_dist_skull, 0.5) & ...
-%           tppf.var_dist_skull <= quantile(tppf.var_dist_skull, 0.1),:);
-%tppf = tppf(tppf.var_dist_skin==min(tppf.var_dist_skin),:);
-```
+| Criterion | Default | Explanation |
+|:----------|---------------|-------------|
+| `tp_criterion_intersect` | < 0.05 | [Fraction] Reduce skull traversal |
+| `tp_criterion_skin_mean` | NaN  | [Quantile] Short EP distance to skin |
+| `tp_criterion_skull_mean` | NaN | [Quantile] Short EP distance to skull |
+| `tp_criterion_skin_var` | NaN | [Quantile] Coherent transducer exit plane toward skin (e.g., little curvature) |
+| `tp_criterion_skull_var` | NaN | [Quantile] Coherent transducer exit plane toward skull surface (Irregular bone → phase distortion → incoherent wavefront) |
 
 Amongst locations fulfilling the above criteria, the location with a minimum distance to the target is selected.
 

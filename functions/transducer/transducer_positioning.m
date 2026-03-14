@@ -22,8 +22,8 @@ m2m_folder = fullfile(pn.seg_path, sprintf('m2m_sub-%03d', subject_id));
 filename = fullfile(m2m_folder, 'final_tissues.nii.gz');
 img = niftiread(filename);
 img = gather(img); % Ensure img is on CPU
-img_info = niftiinfo(filename);
-voxel_size = mean(img_info.PixelDimensions);
+img_header = niftiinfo(filename);
+voxel_size = mean(img_header.PixelDimensions);
 
 % [DEBUG] plot the segmentation
 if parameters.debug
@@ -52,7 +52,7 @@ if confirm_overwriting(tpos_output_file, parameters)
     fprintf('➤ Target: %s\n', target_name);
     target_mni = mni_targets.(target_name);
     target_vox = transform_coordinates(...
-        parameters, target_mni, 'mni', 'grid', img_info);
+        parameters, target_mni, 'mni', 'grid', img_header);
 
     %% Find candidate transducer positions on skull (expanding sphere)
 
@@ -84,10 +84,6 @@ else
     tpos = readtable(tpos_output_file, 'Delimiter', ',');
 end
 
-%% [Optional] Convert positions to RAS
-
-% TO DO
-
 %% [Optional] Remove ear locations
 
 [tpos] = tp_remove_ear_locations(parameters, tpos);
@@ -95,12 +91,12 @@ end
 %% Select heuristic transducer position
 
 [trans_pos, target_pos, ~] = ...
-    tp_select_heuristic_position(tpos, voxel_size, subject_id, target_name, parameters);
+    tp_select_heuristic_position(tpos, subject_id, target_name, parameters, img_header);
 
 %% Plot heuristic transducer position
 
 tp_plot_heuristic_position(...
-    trans_pos, target_pos, img, img_info, parameters, voxel_size, target_name, subject_id);
+    trans_pos, target_pos, img, img_header, parameters, voxel_size, target_name, subject_id);
 
 fprintf('Heuristic transducer placement: %s (sub-%03d) → %s\n', ...
     target_name, subject_id, tpos_output_file);

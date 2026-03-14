@@ -37,9 +37,9 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
 
             if strcmp(output_cs, 'grid')
                 disp("Mapping RAS+ to subject grid...")
-                output_pos = ras_to_grid(input_pos, nii_hdr);
+                output_pos = round(transformPointsInverse(nii_hdr.Transform, input_pos));
                 % alternative:
-                % output_pos = round(transformPointsInverse(nii_hdr.Transform, input_pos));
+                % output_pos = ras_to_grid(input_pos, nii_hdr);
             else
                 error('RAS+ input, output_cs: ''grid'' only');
             end
@@ -49,8 +49,10 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
             if strcmp(output_cs, 'ras_plus')
                 % Voxel -> RAS+ (forward affine)
                 disp("Mapping subject grid to subject RAS+...")
-                tmp = nii_hdr.Transform.T * [input_pos(:); 1];
-                output_pos = tmp(1:3)';
+                output_pos = transformPointsForward(nii_hdr.Transform, input_pos);
+                % alternative:
+                % tmp = nii_hdr.Transform.T * [input_pos(:); 1];
+                % output_pos = tmp(1:3)';
             else
                 error('grid voxel input, output_cs: ''ras_plus'' only');
             end

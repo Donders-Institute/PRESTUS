@@ -256,9 +256,23 @@ skullfillmethod: 'rubberwrap' # Method for filling holes in the skull ['rubberwr
 wrapradius: 10 # skull rubber wrap radius [grid voxels]; Bigger = tighter rubber that ignores bigger dents (recommendaton: 2 to 10)
 skullwrap_visualize: 0 # Visualize results of skullwrap? (Currently causes issues on HPC)
 
-#------------ Transducer placement (WIP)
+#------------ Transducer Placement (Localite)
 
 # Should the script position_transducer_localite be used?
 transducer_from_localite: 0
 # Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane
 reference_transducer_distance_mm: 15 # (can only be used with the function 'transducer_from_localite')
+
+#------------ Transducer Placement (Heuristic)
+
+tp_dist_close: []
+tp_ear_radius: 35
+tp_left_ear_center: []
+tp_right_ear_center: []
+tp_criterion_intersection: 0.05
+tp_criterion_skin_mean: []
+tp_criterion_skull_mean: []
+tp_criterion_skin_var: []
+tp_criterion_skull_var: []
+tp_expand_step: 0.01
+tp_save_localiteT1: true
