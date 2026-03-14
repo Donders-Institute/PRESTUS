@@ -45,10 +45,11 @@ nav:
     - Transducer Calibration: doc_calibration.md
     - Transducer Placement: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
+    - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
+    - Coordinate Systems: doc_coordinate_systems.md
     - Head Processing: doc_preproc.md
     - Medium Setup: doc_medium.md
     - Outputs: doc_outputs.md
-    - Neuronavigation Placement: doc_neuronav.md
   - 🔬 Simulations:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
