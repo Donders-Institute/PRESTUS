@@ -13,7 +13,7 @@ Key features of the modular end-to-end pipeline include:
 - Multi-layer [medium property mapping](doc_medium.md) (water, skin, multi-layer skull, and brain).
 - [(pseudo-)CT](doc_pseudoCT.md)-informed continuous skull mapping.
 - Virtual multi-element [transducer calibration](doc_calibration.md) (free-water profile emulation).
-- Estimation of entry-target [coordinates](doc_placement.md) incl. [neuronavigation](doc_neuronav.md) read-in.
+- Estimation of entry-target [coordinates](doc_placement.md) incl. [heuristic placement](doc_placement_heuristic.md) and [neuronavigation](doc_placement_neuronav.md) read-in.
 - Flexible [temporal protocol specification](doc_simulations-thermal.md) (e.g., including breaks).
 - k-Wave integration for robust [acoustic](doc_simulations-acoustic.md) and [thermal](doc_simulations-thermal.md) simulations.
 - Support for [high-performance computing](doc_hpc.md).
