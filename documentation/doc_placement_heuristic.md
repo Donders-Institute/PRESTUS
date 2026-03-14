@@ -53,6 +53,45 @@ The desired criterion for intersection with the skin can be defined via `tp_crit
 
 Amongst locations fulfilling the above criteria, the location with a minimum distance to the target is selected.
 
+An an output, this function will create a table that contains the coordinates in **voxel (grid space)**, **mm (Localite space)**, and **mm (RAS+ space)** (based on the image header of the segmentation image).
+
+> IMPORTANT: Localite mm coordinates assume that Localite planning image has `canonical_affine_transform` applied (see [below](#save-localite-planning-image))! The Localite coordinates are simply rescaled by the specified voxel sizes in the header assuming no affine transformations. Always visually verify coordinates ...
+
+**Example coordinate output table**:
+<style> .small-code {font-size: 0.85em; line-height: 1;}</style>
+<div class="small-code">
+
+trans_x	161
+trans_y	138
+trans_z	246
+targ_x	117
+targ_y	139
+targ_z	161
+
+<...>
+
+LOCALITE_Transducer_mm	Inf
+loc_trans_x_mm	144.9
+loc_trans_y_mm	123.09
+loc_trans_z_mm	221.02
+
+LOCALITE_Target_mm	Inf
+loc_targ_x_mm	105.3
+loc_targ_y_mm	124.88
+loc_targ_z_mm	144.65
+
+RAS_Transducer_mm	Inf
+ras_trans_x_mm	43.35
+ras_trans_y_mm	-16.17
+ras_trans_z_mm	82.3
+
+RAS_Target_mm	Inf
+ras_targ_x_mm	5.45
+ras_targ_y_mm	-20.71
+ras_targ_z_mm	5.19
+
+</div>
+
 ### Plot heuristic transducer position
 
 PRESTUS generates an overview of the selected transducer placement:
@@ -61,8 +100,8 @@ PRESTUS generates an overview of the selected transducer placement:
 
 If `parameters.localite_path` is specified, it will also deposit a copy of the plot there.
 
-### Save T1w with localite-ready header 
+### Save Localite planning image
 
 **[Optional]**  
 
- Localite can struggle with canonical T1 header affine matrices. PRESTUS offers the optional step (`tp_save_localiteT1`) of depositing a header-adjusted T1 planning image for localite (based on the `T1.nii.gz` in the SimNIBS output m2m directory). For this `parameters.localite_path` has to be specified.
+ Localite can struggle with images that contain affine matrices in the image header. PRESTUS offers the optional step (`tp_save_localiteT1`) of depositing a header-adjusted T1 planning image for Localite (based on the `T1.nii.gz` in the SimNIBS output m2m directory). For this, `parameters.localite_path` has to be specified.
