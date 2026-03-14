@@ -21,6 +21,7 @@ addpath(genpath(fullfile(currentLoc, '..')));
 m2m_folder = fullfile(pn.seg_path, sprintf('m2m_sub-%03d', subject_id));
 filename = fullfile(m2m_folder, 'final_tissues.nii.gz');
 img = niftiread(filename);
+img = gather(img); % Ensure img is on CPU
 img_info = niftiinfo(filename);
 voxel_size = mean(img_info.PixelDimensions);
 
