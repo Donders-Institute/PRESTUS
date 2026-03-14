@@ -5,6 +5,9 @@ switch algorithm
 
         sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
 
+        % regularize minimum to sound speed in water
+        sound_speed(skull_idx) = max(parameters.medium.water.sound_speed, sound_speed(skull_idx));
+
     case 'marsac'
 
         c_water       = parameters.medium.water.sound_speed;     % sound speed [m/s]
