@@ -58,24 +58,22 @@ An an output, this function will create a table that contains the coordinates in
 > IMPORTANT: Localite mm coordinates assume that Localite planning image has `canonical_affine_transform` applied (see [below](#save-localite-planning-image))! The Localite coordinates are simply rescaled by the specified voxel sizes in the header assuming no affine transformations. Always visually verify coordinates ...
 
 **Example coordinate output table**:
-<style> .small-code {font-size: 0.85em; line-height: 1;}</style>
-<div class="small-code">
+<pre style="font-size: 0.75em; line-height: 1;">
+trans_x	161     
+trans_y	138     
+trans_z	246     
+targ_x	117     
+targ_y	139     
+targ_z	161     
 
-trans_x	161
-trans_y	138
-trans_z	246
-targ_x	117
-targ_y	139
-targ_z	161
+<...>       
 
-<...>
+LOCALITE_Transducer_mm	Inf       
+loc_trans_x_mm	144.9       
+loc_trans_y_mm	123.09      
+loc_trans_z_mm	221.02      
 
-LOCALITE_Transducer_mm	Inf
-loc_trans_x_mm	144.9
-loc_trans_y_mm	123.09
-loc_trans_z_mm	221.02
-
-LOCALITE_Target_mm	Inf
+LOCALITE_Target_mm	Inf     
 loc_targ_x_mm	105.3
 loc_targ_y_mm	124.88
 loc_targ_z_mm	144.65
@@ -89,8 +87,7 @@ RAS_Target_mm	Inf
 ras_targ_x_mm	5.45
 ras_targ_y_mm	-20.71
 ras_targ_z_mm	5.19
-
-</div>
+</pre>
 
 ### Plot heuristic transducer position
 
