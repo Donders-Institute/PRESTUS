@@ -82,6 +82,8 @@ Mapping algorithm is goverened by `pct_mapping_density`.
     density = [1.2, 1060, 1530, 2150]
     ```
 
+    > Note: k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularized data ranges. Such density regularization is not currently enforced in PRESTUS...
+
     **Thermal simulations**     
     Overwrite bone density prior to the thermal simulation:
    
