@@ -121,6 +121,9 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     %% Step 7: Transform image
     % Apply affine transformation to rotate and scale the image
+    % Ensure image is on CPU (tformarray does not support gpuArray)
+    nii_image = gather(nii_image);
+
     if numel(unique(nii_image))<20 % if the image is a mask use nearest neighbor
         parameters.interpolation = 'nearest';
     else
