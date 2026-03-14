@@ -238,5 +238,10 @@ For transducer calibration, a separate `calibration_config.yaml` applies that sh
 | `tp_ear_radius`                 | Radius of the nogo zone [mm]                            | [Optional] for ear exclusion          |
 | `tp_left_ear_center`            | Approximate coordinates for left ear [img voxels]       | [Optional] for ear exclusion          |
 | `tp_right_ear_center`           | Approximate coordinates for right ear [img voxels]      | [Optional] for ear exclusion          |
-| `tp_criterion_intersection`     | Heuristic placement criterion: intersection             | Default: `0.05` (5%)                  |
+| `tp_criterion_intersection`     | Criterion: intersection with skin [fraction]            | Default: `0.05` (5%)                  |
+| `tp_criterion_skin_mean`        | Criterion: mean distance of EP voxels from skin [quantile]     | Default: `NaN`                 |
+| `tp_criterion_skull_mean`       | Criterion: mean distance of EP voxels from skull [quantile]    | Default: `NaN`                 |
+| `tp_criterion_skin_var`         | Criterion: variance of EP voxel distance from skin [quantile]  | Default: `NaN`                 |
+| `tp_criterion_skull_var`        | Criterion: variance of EP voxel distance from skull [quantile] | Default: `NaN`                 |
+| `tp_expand_step`                | Expansion step for skin intersection                    | Default: `0.01` (1%)                  |
 | `tp_save_localiteT1`            | Save localite T1                                        | [Optional] Requires `localite_path`   |

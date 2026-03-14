@@ -34,21 +34,24 @@ norm_v             = mesh.norm_v;
 ex_plane           = mesh.ex_plane;
 all_masks_idx      = mesh.all_masks_idx;
 max_od_grid        = mesh.max_od_grid;
+trans_pos          = mesh.trans_pos;
 
 %% Parallel evaluation of all candidate positions
+
 N_cand = length(close_enough_idx);
 [prop_intersect, mean_dts, var_dts, mean_dist_skull, var_dist_skull] = ...
     arrayfun(@(x) transducer_analyze_position_fast(x, norm_v, ex_plane, coord_mesh, ...
     all_masks_idx, skin_coords, skull_coords, max_od_grid), 1:N_cand);
 
 %% Assemble results table (CPU)
+
 % Ensure all components are on CPU before table assembly
 close_enough_idx = gather(close_enough_idx);
-shifted_trans_pos_coords = gather(shifted_trans_pos_coords);
+trans_pos = gather(trans_pos);
 metrics = gather([prop_intersect; mean_dts; var_dts; mean_dist_skull; var_dist_skull]');
-dist_to_target = gather(pdist2(shifted_trans_pos_coords, target));
+dist_to_target = gather(pdist2(trans_pos, target));
 
-tpos_pars = array2table([close_enough_idx, shifted_trans_pos_coords, ...
+tpos_pars = array2table([close_enough_idx, trans_pos, ...
     repmat(target, N_cand, 1), ...
     dist_to_target, ...
     metrics], ...

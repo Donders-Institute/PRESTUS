@@ -1,11 +1,11 @@
-function tp_plot_heuristic_position(trans_pos, target_pos, img, img_info, parameters, pixel_size, target_name, subject_id)
+function tp_plot_heuristic_position(trans_pos, target_pos, img, img_header, parameters, pixel_size, target_name, subject_id)
 % TP_PLOT_HEURISTIC_POSITION Create visualization of heuristic transducer placement
 %
 % INPUT
 %   trans_pos   - Heuristic Transducer position (xyz) [grid]
 %   target_pos  - Target position (xyz) [grid]
 %   img         - Segmented head image
-%   img_info    - NIfTI header info  
+%   img_header  - NIfTI header info  
 %   parameters  - Parameters struct
 %   pixel_size  - Scalar voxel size in mm
 %   target_name - String target identifier
@@ -23,7 +23,7 @@ coord_mesh.xyz = [reshape(t1_x,[],1), reshape(t1_y,[],1), reshape(t1_z,[],1)];
 
 [img_rotated, trans_xyz_rotated, target_xyz_rotated, transformation_matrix, ~, ~, ~, ~] = ...
     preproc_align_to_focal_axis(...
-    img, img_info, round(trans_xyz)', target_xyz', 1, parameters);
+    img, img_header, round(trans_xyz)', target_xyz', 1, parameters);
 
 %% Visualization
 
