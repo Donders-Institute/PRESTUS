@@ -61,7 +61,6 @@ function prestus_pipeline_start(subject_id, parameters, options)
             fprintf(fid, 'delete(''%s'');\n', temp_data_path);
             fprintf(fid, 'delete(''%s'');\n', temp_m_path);
             fclose(fid);
-            end
             
             % Job name
             job_name = hpc_job_name(parameters, subject_id);

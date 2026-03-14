@@ -11,8 +11,9 @@ function tp_plot_heuristic_position(trans_pos, target_pos, img, img_info, parame
 %   target_name - String target identifier
 %   subject_id  - Scalar subject ID
 
-trans_xyz = trans_pos;
-target_xyz = target_pos;
+trans_xyz = gather(trans_pos);
+target_xyz = gather(target_pos);
+img = gather(img);
 
 sz = size(img);
 [t1_x, t1_y, t1_z] = ndgrid(1:sz(1), 1:sz(2), 1:sz(3));

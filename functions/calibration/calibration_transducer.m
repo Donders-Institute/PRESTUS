@@ -94,7 +94,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     
     % Run the simulation based on the submission method
     sim_param.hpc_wait_for_completion = true;
-    prestus_pipeline_start(sim_id, sim_param, true);
+    prestus_pipeline_start(sim_id, sim_param);
 
     %% Load initial results
 
@@ -160,8 +160,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_param.transducer.source_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
-    sim_param.hpc_wait_for_completion = true;
-    prestus_pipeline_start(sim_id, sim_param, true);
+    opt_param.hpc_wait_for_completion = true;
+    prestus_pipeline_start(sim_id, opt_param);
 
     %% Load optimized simulation results    
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...

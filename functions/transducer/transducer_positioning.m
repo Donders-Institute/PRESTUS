@@ -21,6 +21,7 @@ addpath(genpath(fullfile(currentLoc, '..')));
 m2m_folder = fullfile(pn.seg_path, sprintf('m2m_sub-%03d', subject_id));
 filename = fullfile(m2m_folder, 'final_tissues.nii.gz');
 img = niftiread(filename);
+img = gather(img); % Ensure img is on CPU
 img_info = niftiinfo(filename);
 voxel_size = mean(img_info.PixelDimensions);
 
@@ -61,7 +62,7 @@ if confirm_overwriting(tpos_output_file, parameters)
     %% Plot initial candidate
 
     tp_plot_candidate_positions(...
-        target_vox, trans_candidate, ...
+        img, target_vox, trans_candidate, ...
         voxel_size, parameters, subject_id, target_name);
 
     %% Plot geometry

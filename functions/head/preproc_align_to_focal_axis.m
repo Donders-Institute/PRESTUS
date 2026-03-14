@@ -48,6 +48,11 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         parameters struct
     end
 
+    % Ensure inputs are on CPU (tformarray and other image processing functions don't support gpuArray)
+    nii_image = gather(nii_image);
+    trans_pos_grid = gather(trans_pos_grid);
+    focus_pos_grid = gather(focus_pos_grid);
+
     %% Step 1: Compute focal axis
     % The focal axis is defined as a vector from `trans_pos_grid` to `focus_pos_grid`.
     focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
@@ -81,14 +86,37 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     rotation_and_scale_matrix = rotation_matrix * scale_matrix;
 
     %% Step 5: Compute new image dimensions
-    % Determine new image dimensions after applying transformations
-    TF = maketform('affine', rotation_and_scale_matrix');
-    newdims = ceil(diff(findbounds(TF, [0 0 0; size(nii_image)])));
-
-    %% Step 6: Center transformations around image center
+    % Determine new image dimensions after applying transformations.
+    % We must ensure the new grid is large enough to contain the image AND the transducer/focus,
+    % while keeping the image center at the center of the new grid.
+    
     % Translate image center to origin before applying transformations
     rotation_center = (size(nii_image) + 1) / 2;
     forward = makehgtform('translate', -rotation_center);
+
+    % Create the transform that centers the input, then rotates/scales
+    % forward: translates input center to origin
+    % rotation_and_scale_matrix: rotates/scales around origin
+    T_centered = forward' * rotation_and_scale_matrix';
+    TF_centered = maketform('affine', T_centered);
+    
+    % Get bounds of the transformed image corners
+    img_bounds = findbounds(TF_centered, [0 0 0; size(nii_image)]);
+    
+    % Get transformed positions of transducer and focus
+    tp_trans = tformfwd(trans_pos_grid, TF_centered);
+    fp_trans = tformfwd(focus_pos_grid, TF_centered);
+    
+    % Combine all points to find the maximum extent from the center
+    all_points = [img_bounds; tp_trans; fp_trans];
+    max_abs = max(abs(all_points), [], 1);
+    
+    % Calculate symmetric dimensions to keep the image centered while fitting everything
+    % Factor of 2 ensures coverage from -max to +max
+    newdims = ceil(2 * max_abs) + 2; % +2 margin for safety
+
+    %% Step 6: Center transformations around image center
+    % (forward is already calculated above)
 
     % Translate back to center of new dimensions after transformations
     backward = makehgtform('translate', (newdims + 1) / 2);
@@ -98,6 +126,8 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     %% Step 7: Transform image
     % Apply affine transformation to rotate and scale the image
+    % (nii_image already ensured to be on CPU)
+
     if numel(unique(nii_image))<20 % if the image is a mask use nearest neighbor
         parameters.interpolation = 'nearest';
     else
