@@ -147,6 +147,8 @@ Mapping algorithm is goverened by `pct_mapping_soundspeed`.
 
     $$ c_\text{skull} = 1.33 \cdot \rho_\text{skull} + 167 $$
 
+    The minimum sound speed in skull bone is regularized to water sound speed.  
+
 - `marsac` | Density-based mapping according to Marsac et al. (2017) <br>
     
     $$ c_\text{skull} = c_\text{water} + (c_\text{bone} - c_\text{water}) \cdot \frac{\rho_\text{skull} - \rho_\text{water}}{\rho_\text{bone} - \rho_\text{water}} $$
