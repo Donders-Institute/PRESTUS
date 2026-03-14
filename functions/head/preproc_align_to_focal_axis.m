@@ -48,6 +48,11 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         parameters struct
     end
 
+    % Ensure inputs are on CPU (tformarray and other image processing functions don't support gpuArray)
+    nii_image = gather(nii_image);
+    trans_pos_grid = gather(trans_pos_grid);
+    focus_pos_grid = gather(focus_pos_grid);
+
     %% Step 1: Compute focal axis
     % The focal axis is defined as a vector from `trans_pos_grid` to `focus_pos_grid`.
     focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
@@ -121,8 +126,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     %% Step 7: Transform image
     % Apply affine transformation to rotate and scale the image
-    % Ensure image is on CPU (tformarray does not support gpuArray)
-    nii_image = gather(nii_image);
+    % (nii_image already ensured to be on CPU)
 
     if numel(unique(nii_image))<20 % if the image is a mask use nearest neighbor
         parameters.interpolation = 'nearest';
