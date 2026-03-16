@@ -95,6 +95,8 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
 
     %% Display summary
 
+    parameters = focal_distance_calculation(parameters);
+
     max_intensity_index = find(profile_sim_opt.axial_intensity == max(profile_sim_opt.axial_intensity), 1);
     fprintf('Expected distance from bowl to the point of maximum intensity: %.2f mm\n', ...
         parameters.expected_focal_distance_bowl);
