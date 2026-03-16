@@ -5,9 +5,9 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         parameters.seg_path = data_path;
     end
 
-    % Create log directory if it does not exist
+    % Create log directory in segmentaion folder (if it does not exist)
     
-    log_dir = fullfile(parameters.sim_path, 'batch_job_logs');
+    log_dir = fullfile(parameters.seg_path, 'batch_job_logs');
     if ~isfolder(log_dir)
         mkdir(log_dir)
     end
@@ -53,14 +53,23 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         end
     end
     
-    % if not running on a qsub or slurm HPC, the job will stop to run the segmentation manually
+    % Platform selection
+    if strcmp(parameters.platform, 'auto')
+        platform = hpc_detect_system();
+        parameters.platform = platform;
+        fprintf('➤ auto-detected: %s\n', upper(platform));
+    else
+        platform = parameters.platform;
+        fprintf('➤ deploying: %s\n', upper(platform));
+    end
+
+    % Deploy on selected platform
 	if strcmp(parameters.platform, 'qsub')
         qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
-        ['simnibs-', subj_id_string], ...
+            ['simnibs-', subj_id_string], ...
             fullfile(log_dir, sprintf('%s_qsub_segment_output_$timestamp.log', subj_id_string)),...
-        fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
+            fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
             parameters.seg_path);
-        
 
         % execute simnibs call in segmentation directory
         full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', ...
