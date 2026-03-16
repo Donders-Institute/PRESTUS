@@ -34,11 +34,10 @@ norm_v             = mesh.norm_v;
 ex_plane           = mesh.ex_plane;
 all_masks_idx      = mesh.all_masks_idx;
 max_od_grid        = mesh.max_od_grid;
-<<<<<<< HEAD
 trans_pos          = mesh.trans_pos;
-=======
 shifted_trans_pos_coords = mesh.trans_pos;
->>>>>>> 8b6478b (shifted_trans_pos_coords was never derived from the mesh variable)
+=======
+
 
 %% Parallel evaluation of all candidate positions
 
