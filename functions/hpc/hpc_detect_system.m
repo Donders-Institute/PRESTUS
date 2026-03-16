@@ -3,8 +3,6 @@ function hpc_type = hpc_detect_system()
 %
 %   Detects available HPC scheduler by checking for sbatch (SLURM) or qsub.
 %   Returns 'slurm', 'qsub', or throws error if neither found.
-%
-%   See also HPC_SUBMIT_JOB, HPC_WAIT_FOR_COMPLETION.
 
 [sbatch_out, sbatch_path] = system('which sbatch');
 [qsub_out, qsub_path] = system('which qsub');

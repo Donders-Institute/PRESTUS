@@ -93,7 +93,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param.interactive = 0;
     
     % Run the simulation based on the submission method
-    sim_param.hpc_wait_for_completion = true;
+    sim_param.hpc_wait_for_job = true;
     prestus_pipeline_start(sim_id, sim_param);
 
     %% Load initial results
@@ -160,7 +160,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_param.transducer.source_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
-    opt_param.hpc_wait_for_completion = true;
+    opt_param.hpc_wait_for_job = true;
     prestus_pipeline_start(sim_id, opt_param);
 
     %% Load optimized simulation results    

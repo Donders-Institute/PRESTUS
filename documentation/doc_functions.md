@@ -99,7 +99,7 @@ The following documents the functions provided in PRESTUS.
 | `hpc_setup_temp_files`                  | Setup directories and generate temporary files.                                                 |
 | `hpc_submit_job`                        | Submit HPC batch job (SLURM or qsub).                                                           |
 | `hpc_validate_parameters`               | Validate HPC job parameters.                                                                    |
-| `hpc_wait_for_completion`               | Monitor HPC job until completion.                                                               |
+| `hpc_wait_for_job`                      | Monitor HPC job until completion.                                                               |
 
 #### MEDIUM
 
