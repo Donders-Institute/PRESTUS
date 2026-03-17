@@ -88,9 +88,9 @@ end
 
 elapsed = toc(tic_start);
 if ~job_completed
-    warning('TIMEOUT job %s after %.1f min (%d checks)', job_id, elapsed/60, checks);
+    warning('TIMEOUT job %s after %.1f min (%d checks)', job_id_str, elapsed/60, checks);
 else
-    fprintf('✓ Job %s (%s) complete after %.1f min (%d checks)\n', job_id, hpc_type, elapsed/60, checks);
+    fprintf('✓ Job %s (%s) complete after %.1f min (%d checks)\n', job_id_str, hpc_type, elapsed/60, checks);
 end
 
 end
