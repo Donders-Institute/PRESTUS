@@ -6,8 +6,8 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
-| `acoustic_analysis`                     | Compute acoustic safety metrics (Isppa, MI, max pressure) from sensor data, extract tissue-specific maxima, focal distances, and generate overlaid ISPPA plots on segmentation                                                                                               |
-| `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels.       |
+| `acoustic_analysis`                     | Compute acoustic safety metrics (Isppa, MI, max pressure) from sensor data, extract tissue-specific maxima, focal distances, and generate overlaid ISPPA plots on segmentation. |
+| `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_simulation`                   | Set up acoustic simulation                                                                      |
 | `acoustic_wrapper`                      | Set up acoustic simulation                                                                      |
 
@@ -16,19 +16,19 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `calc_virtual_elem`                     | (STANDALONE) Calculate additional virtual elements                                              |
-| `calibration_transducer`                | Run water simulations to optimize transducer source amplitude and element phases matching a target intensity profile via O’Neil analytical solution, global search, and re-simulation.                                                                                      |
-| `compute_oneil_solution`                | Compute analytical O’Neil pressure along the beam axis for focused annular transducers in water, derives particle velocity and grid adjustment factor, and plots comparisons with simulated/desired intensities.                                                           |
-| `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane.                                                                          |
-| `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results.                                                                                          |
+| `calibration_transducer`                | Run water simulations to optimize transducer source amplitude and element phases matching a target intensity profile via O’Neil analytical solution, global search, and re-simulation. |
+| `compute_oneil_solution`                | Compute analytical O’Neil pressure along the beam axis for focused annular transducers in water, derives particle velocity and grid adjustment factor, and plots comparisons with simulated/desired intensities. |
+| `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
+| `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
 | `extract_simulated_profile`             | Extract and visualize simulated acoustic pressure data.                                         |
-| `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles.                                                                             |
+| `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |
 | `phase_optimization_annulus`            | Optimizes the phase profile by calculating focal distance error for an annular transducer.      |
-| `plot_opt_sim_results`                  | Load optimized k-Wave results, generate 2D focal plane intensity maps and axial profile comparisons (simulated vs. analytical O’Neil vs. desired), and save annotated plots.                                                                                              |
-| `recompute_oneil_solution`              | Recompute O’Neil analytical pressure profile using optimized phases/velocity, convert to intensity, plot comparisons with original/desired profiles (skipping near-field), and report focal metrics.                                                                  |
-| `save_optimized_values`                 | Append optimized transducer phases and amplitudes into a CSV table (indexed by intensity/focus) and save parameters as YAML for PRESTUS config integration.                                                                                                                 |
-| `scale_real_intensity_profile`          | Linearly scale measured focal intensity profile and update transducer source amplitude (via acoustic impedance) to match desired peak Isppa (W/cm²).                                                                                                                         |
-| `set_real_phases`                       | Load or compute manufacturer-specific (Sonic Concepts/Imasonic) transducer element phases for given focal depth (wrt exit plane), interpolate/unwrap for virtual elements, and return phase degrees.                                                                  |
+| `plot_opt_sim_results`                  | Load optimized k-Wave results, generate 2D focal plane intensity maps and axial profile comparisons (simulated vs. analytical O’Neil vs. desired), and save annotated plots.  |
+| `recompute_oneil_solution`              | Recompute O’Neil analytical pressure profile using optimized phases/velocity, convert to intensity, plot comparisons with original/desired profiles (skipping near-field), and report focal metrics.  |
+| `save_optimized_values`                 | Append optimized transducer phases and amplitudes into a CSV table (indexed by intensity/focus) and save parameters as YAML for PRESTUS config integration. |
+| `scale_real_intensity_profile`          | Linearly scale measured focal intensity profile and update transducer source amplitude (via acoustic impedance) to match desired peak Isppa (W/cm²). |
+| `set_real_phases`                       | Load or compute manufacturer-specific (Sonic Concepts/Imasonic) transducer element phases for given focal depth (wrt exit plane), interpolate/unwrap for virtual elements, and return phase degrees.  |
 
 #### CORE
 
@@ -131,7 +131,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `fit_pairwiselinear`                    | Perform a pairwise linear fit between HU and density values with optional plot.                 |
-| `pct_create_pseudoCT`                   | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks.                                                                                                    |
+| `pct_create_pseudoCT`                   | Generate Hounsfield pseudoCT from SimNIBS PETRA-UTE (replacing T2) via N4 bias correction, linear skull mapping, partial volume correction, smoothing, and tissue masks. |
 | `pct_skullexpand`                       | Load SimNIBS NIfTIs + headers, run skull rubber wrap, save output.                              |
 | `pct_skullmapping`                      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug]  |
 | `pct_soft_tissue_peak`                  | Identifies the soft tissue peak from UTE intensity distribution histograms.                     |
@@ -157,7 +157,7 @@ The following documents the functions provided in PRESTUS.
 | `grid_tissue_setup`                     | Set up grid dimensions, preprocess head (if modeled), and place in grid                         |
 | `grid_transducer_location`              | Position transducer (and target) in simulation grid                                             |
 | `source_create`                         | Creates ultrasound source signals and masks for k-Wave simulations based on transducer geometry.|
-| `source_sensor_setup`                   | Configure a k-Wave simulation grid, transducer sources, and sensor mask based on input parameters for recording pressure fields in 2D or 3D ultrasonic neuromodulation setups.                                                                                     |
+| `source_sensor_setup`                   | Configure a k-Wave simulation grid, transducer sources, and sensor mask based on input parameters for recording pressure fields in 2D or 3D ultrasonic neuromodulation setups. |
 
 #### THERMAL
 
@@ -195,13 +195,13 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
-| `convert_2d_to_axisymmetric`            | Converts 2D k-Wave simulation grid, medium properties, and source to axisymmetric form by halving the shorter dimension (right half from center).                                                                                                                  |
-| `convert_axisymmetric_to_2d`            | Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions.                                                                                                                                                   |
-| `convert_axisymmetric_to_3d`            | Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry.                                                                                                                                                    |
+| `convert_2d_to_axisymmetric`            | Converts 2D k-Wave simulation grid, medium properties, and source to axisymmetric form by halving the shorter dimension (right half from center). |
+| `convert_axisymmetric_to_2d`            | Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions. |
+| `convert_axisymmetric_to_3d`            | Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry. |
 | `convert_final_to_MNI_matlab`           | Converts an image from subject space to MNI space using MATLAB.                                 |
 | `convert_final_to_MNI_simnibs`          | Converts an image to MNI space using SimNIBS.                                                   |
 | `mni2subject_coords_LDfix`              | Transforms a set of coordinates in MNI space to subject space.                                  |
 | `radialExpand2DTo3D`                    | Radially expands 2D axisymmetric data into 3D Cartesian volume.                                 |
 | `ras_to_grid`                           | Converts RAS coordinates to voxel (grid) coordinates using NIfTI header transformation matrix.  |
 | `subject2mni_coords_LDfix`              | Transforms a set of coordinates in MNI space to subject space.                                  |
-| `transform_coordinates`                 | Transform input coordinates between coordinate systems (wrapper) space.                                  |
+| `transform_coordinates`                 | Transform input coordinates between coordinate systems (wrapper) space.                         |

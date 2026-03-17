@@ -77,7 +77,6 @@ function prestus_pipeline_start(subject_id, parameters, options)
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
                 hpc_wait_for_completion(job_id, platform);
-                fprintf('✅ Job %s completed\n\n', job_id_display);
             else
                 fprintf('➡️  Continuing in MATLAB ...\n\n');
             end
