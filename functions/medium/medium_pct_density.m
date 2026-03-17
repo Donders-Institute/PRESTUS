@@ -18,6 +18,9 @@ switch algorithm
         end
         close(gcf);
 
+        % regularize minimum to density in water
+        density(skull_idx) = max(parameters.medium.water.density, density(skull_idx));
+
     case 'k-wave'
 
         offset_HU   = 1000;
@@ -46,9 +49,6 @@ switch algorithm
 
         % regularize maximum density to rho_max
         density(skull_idx) = min(density(skull_idx),rho_max);
-
-        % remove initial offset
-        pseudoCT(skull_idx) = pseudoCT(skull_idx)-offset_HU;
 
     case 'marsac'
 
