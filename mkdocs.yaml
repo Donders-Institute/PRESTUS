@@ -57,6 +57,7 @@ nav:
   - 📚 References: 
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
+    - Modules: doc_modules.md
   - 🖥️ Advanced:
     - Advanced Workflows: doc_advanced.md
     - Backend: doc_backend.md
