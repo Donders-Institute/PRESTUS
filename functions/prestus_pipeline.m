@@ -52,6 +52,13 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','segmentation');
 
+    if isfield(parameters.modules, 'segmentation_only') && parameters.modules.segmentation_only
+        fprintf('Only segmentation requested: finishing.\n');
+        log_timer('stop','prestus_pipeline')
+        diary('off')
+        return;
+    end
+
     % ====================================================================
     %% GRID: PREPROCESS structural MRI & POSITION transducer + target
     % ====================================================================

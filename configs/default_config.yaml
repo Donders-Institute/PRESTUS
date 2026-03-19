@@ -66,6 +66,7 @@ modules:
   run_nifti_creation: 1     # Run nifti creation?
   run_posthoc_water_sims: 1 # Run simulations in free water with identical setup?
   generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?
+  segmentation_only: 0      # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
 
 #------------ High-performance computing
 
