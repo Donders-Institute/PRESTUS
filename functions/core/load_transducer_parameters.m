@@ -93,6 +93,9 @@ function parameters = load_transducer_parameters(parameters)
 
                 annular_tr = tr.array_shape.annular;
 
+                % 3D steering unavailable for annular arrays → align with focus
+                tr.align_transducer_with_focus = true;
+
                 assert(numel(annular_tr.Elements_ID_mm) == annular_tr.n_elements, ...
                     'Transducer %i; Elements_ID_mm length must match n_elements.', t_i);
                 

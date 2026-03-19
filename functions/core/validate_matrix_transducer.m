@@ -38,9 +38,9 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
     switch matrix_tr.steering
         case '1D'
-            matrix_tr.align_transducer_with_focus = true;
+            tr.align_transducer_with_focus = true;
         case '3D'
-            matrix_tr.align_transducer_with_focus = false;
+            tr.align_transducer_with_focus = false;
         otherwise
             error('Transducer %i; Steering option "%s" is not implemented.', ...
                 t_i, matrix_tr.steering);

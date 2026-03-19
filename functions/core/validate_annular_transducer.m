@@ -33,5 +33,4 @@ function validate_annular_transducer(tr, t_i)
     % Validate source phase definition
     assert(isfield(annular_tr, 'source_phase_deg'), ...
         'Transducer %i;: Missing source_phase_deg field for annular transducer. Please specify phases.', t_i);
-    
 end
