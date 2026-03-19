@@ -130,72 +130,75 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     transducer_pars.source_phase_rad = source_phase_rad;
     transducer_pars.source_phase_deg = rad2deg(source_phase_rad);
 
-    h = figure;
-    hold on;
-    axis equal;
-
-    scatter3(elem_pos_m(1,:), elem_pos_m(2,:), elem_pos_m(3,:), 'b.');
-    scatter3(natural_focus_pos_m(1,:), natural_focus_pos_m(2,:), natural_focus_pos_m(3,:), 'r.');
-    plot3(focus_pos_m(1), focus_pos_m(2), focus_pos_m(3), 'go', 'MarkerFaceColor', 'g');
-
-    for ind = 1:transducer_pars.n_elements
-        el_pos = elem_pos_m(:, ind);
-
-        % --- Ground truth direction (element -> focus)
-        vec_truth = focus_pos_m - el_pos;
-        vec_truth = vec_truth / norm(vec_truth);
-
-        % --- Euler angles (degrees -> radians)
-        roll  = deg2rad(tx(ind));
-        pitch = deg2rad(ty(ind));
-        yaw   = deg2rad(tz(ind));
-
-        % --- Rotation matrix (extrinsic ZYX)
-        Rz = [cos(yaw) -sin(yaw) 0;
-            sin(yaw)  cos(yaw) 0;
-            0         0        1];
-
-        Ry = [cos(pitch) 0 sin(pitch);
-            0          1 0;
-            -sin(pitch) 0 cos(pitch)];
-
-        Rx = [1 0 0;
-            0 cos(roll) -sin(roll);
-            0 sin(roll)  cos(roll)];
-
-        R = Rz * Ry * Rx;
-
-        % --- Predicted element normal
-        vec_pred = R * [0; 0; 1];
-
-        % --- Scale vectors for visualization
-        scale = norm(focus_pos_m - el_pos);
-        vec_pred  = vec_pred  * scale;
-        vec_truth = vec_truth * scale;
-
-        % --- Plot vectors
-        quiver3(el_pos(1), el_pos(2), el_pos(3), ...
-            vec_pred(1), vec_pred(2), vec_pred(3), ...
-            0, 'r', 'LineWidth', 1.5);
-
-        quiver3(el_pos(1), el_pos(2), el_pos(3), ...
-            vec_truth(1), vec_truth(2), vec_truth(3), ...
-            0, 'g--', 'LineWidth', 1.2);
-
+    % [DEBUG] visualize matrix element orientation
+    if parameters.debug == 1
+        h = figure;
+        hold on;
+        axis equal;
+    
+        scatter3(elem_pos_m(1,:), elem_pos_m(2,:), elem_pos_m(3,:), 'b.');
+        scatter3(natural_focus_pos_m(1,:), natural_focus_pos_m(2,:), natural_focus_pos_m(3,:), 'r.');
+        plot3(focus_pos_m(1), focus_pos_m(2), focus_pos_m(3), 'go', 'MarkerFaceColor', 'g');
+    
+        for ind = 1:transducer_pars.n_elements
+            el_pos = elem_pos_m(:, ind);
+    
+            % --- Ground truth direction (element -> focus)
+            vec_truth = focus_pos_m - el_pos;
+            vec_truth = vec_truth / norm(vec_truth);
+    
+            % --- Euler angles (degrees -> radians)
+            roll  = deg2rad(tx(ind));
+            pitch = deg2rad(ty(ind));
+            yaw   = deg2rad(tz(ind));
+    
+            % --- Rotation matrix (extrinsic ZYX)
+            Rz = [cos(yaw) -sin(yaw) 0;
+                sin(yaw)  cos(yaw) 0;
+                0         0        1];
+    
+            Ry = [cos(pitch) 0 sin(pitch);
+                0          1 0;
+                -sin(pitch) 0 cos(pitch)];
+    
+            Rx = [1 0 0;
+                0 cos(roll) -sin(roll);
+                0 sin(roll)  cos(roll)];
+    
+            R = Rz * Ry * Rx;
+    
+            % --- Predicted element normal
+            vec_pred = R * [0; 0; 1];
+    
+            % --- Scale vectors for visualization
+            scale = norm(focus_pos_m - el_pos);
+            vec_pred  = vec_pred  * scale;
+            vec_truth = vec_truth * scale;
+    
+            % --- Plot vectors
+            quiver3(el_pos(1), el_pos(2), el_pos(3), ...
+                vec_pred(1), vec_pred(2), vec_pred(3), ...
+                0, 'r', 'LineWidth', 1.5);
+    
+            quiver3(el_pos(1), el_pos(2), el_pos(3), ...
+                vec_truth(1), vec_truth(2), vec_truth(3), ...
+                0, 'g--', 'LineWidth', 1.2);
+    
+        end
+    
+        view(0, 0);
+        xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
+        title('Element Orientation Validation (Red = Euler, Green = Ground Truth)')
+        grid on
+    
+        legend({'Element Position','Natural Focus','Focus','From Euler Angles','Ground Truth'})
+    
+        base_name = sprintf('sub-%03d_%s_transducer_element_orientation%s', ...
+            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix);
+    
+        saveas(h, fullfile(parameters.debug_dir, [base_name '.fig']))
+        saveas(h, fullfile(parameters.debug_dir, [base_name '.png']))
+    
+        close(h)
     end
-
-    view(0, 0);
-    xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
-    title('Element Orientation Validation (Red = Euler, Green = Ground Truth)')
-    grid on
-
-    legend({'Element Position','Natural Focus','Focus','From Euler Angles','Ground Truth'})
-
-    base_name = sprintf('sub-%03d_%s_transducer_element_orientation%s', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix);
-
-    saveas(h, fullfile(parameters.debug_dir, [base_name '.fig']))
-    saveas(h, fullfile(parameters.debug_dir, [base_name '.png']))
-
-    close(h)
 end

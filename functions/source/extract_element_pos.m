@@ -108,30 +108,32 @@ function elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos)
         R_fit = sqrt(xc^2 + yc^2 + zc^2 + c);
         fprintf('Best-fit radius = %.6f m\n', R_fit);
     
-        % Create figure
-        h = figure('Name', 'Transducer Element Distribution');
-        hold on; grid on;
-    
-        % Plot original element positions
-        scatter3(x, y, z, 50, 'b', 'filled', 'DisplayName', 'Original positions');
-    
-        % Plot projected element positions
-        scatter3(x, y, new_z, 50, 'r', 'filled', 'DisplayName', 'Projected positions');
-    
-        axis equal;
-        xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
-        title('Transducer Element Distribution (3D)');
-        legend('Location', 'best');
-        view([90 0]); % Top-down view
-    
-        % Save figure
-        fig_name = sprintf('sub-%03d_%s_transducer_redone_element_distribution%s', ...
-            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix);
-    
-        saveas(h, fullfile(parameters.debug_dir, [fig_name '.fig']));
-        saveas(h, fullfile(parameters.debug_dir, [fig_name '.png']));
-    
-        close(h);
+        % [DEBUG] visualize grid
+        if parameters.debug == 1
+            h = figure('Name', 'Transducer Element Distribution');
+            hold on; grid on;
+
+            % Plot original element positions
+            scatter3(x, y, z, 50, 'b', 'filled', 'DisplayName', 'Original positions');
+
+            % Plot projected element positions
+            scatter3(x, y, new_z, 50, 'r', 'filled', 'DisplayName', 'Projected positions');
+
+            axis equal;
+            xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
+            title('Transducer Element Distribution (3D)');
+            legend('Location', 'best');
+            view([90 0]); % Top-down view
+
+            % Save figure
+            fig_name = sprintf('sub-%03d_%s_transducer_redone_element_distribution%s', ...
+                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix);
+
+            saveas(h, fullfile(parameters.debug_dir, [fig_name '.fig']));
+            saveas(h, fullfile(parameters.debug_dir, [fig_name '.png']));
+
+            close(h);
+        end
 
     end
 

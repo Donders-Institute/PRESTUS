@@ -235,31 +235,33 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 % Convert positions to mm for plotting
                 elem_pos_mm = elem_pos_m' * 1e3;
 
-                % Plot 3D scatter
-                h = figure;
-                scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
-                axis equal
-                xlabel('X [mm]')
-                ylabel('Y [mm]')
-                zlabel('Z [mm]')
-                view([0 90])
-                title('Transducer Element Distribution')
-                grid on
+                % [DEBUG] visualize element distribution
+                if parameters.debug == 1
+                    h = figure;
+                    scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
+                    axis equal
+                    xlabel('X [mm]')
+                    ylabel('Y [mm]')
+                    zlabel('Z [mm]')
+                    view([0 90])
+                    title('Transducer Element Distribution')
+                    grid on
 
-                % Build filenames
-                fig_filename = fullfile(parameters.debug_dir, ...
-                    sprintf('sub-%03d_%s_transducer_element_distribution%s.fig', ...
-                    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+                    % Build filenames
+                    fig_filename = fullfile(parameters.debug_dir, ...
+                        sprintf('sub-%03d_%s_transducer_element_distribution%s.fig', ...
+                        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
-                png_filename = fullfile(parameters.debug_dir, ...
-                    sprintf('sub-%03d_%s_transducer_element_distribution%s.png', ...
-                    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+                    png_filename = fullfile(parameters.debug_dir, ...
+                        sprintf('sub-%03d_%s_transducer_element_distribution%s.png', ...
+                        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
 
-                % Save outputs
-                saveas(h, fig_filename, 'fig')
-                saveas(h, png_filename, 'png')
-                close(h)
-
+                    % Save outputs
+                    saveas(h, fig_filename, 'fig')
+                    saveas(h, png_filename, 'png')
+                    close(h)
+                end
+                
                 karray = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_mm, trans_pos, focus_pos);
 
             otherwise

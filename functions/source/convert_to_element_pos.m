@@ -134,23 +134,25 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
             Y = Y + kgrid.y_vec(trans_pos(2));
             Z = kgrid.z_vec(trans_pos(3)) * ones(size(X));
 
-            % Debug plot: full grid
-            h = figure;
-            scatter(X(:), Y(:), 60, 'filled')
-            axis equal
-            xlabel('X [m]')
-            ylabel('Y [m]')
-            title('Grid - Element Center Positions')
-            grid on
+            % [DEBUG] visualize grid
+            if parameters.debug == 1
+                h = figure;
+                scatter(X(:), Y(:), 60, 'filled')
+                axis equal
+                xlabel('X [m]')
+                ylabel('Y [m]')
+                title('Grid - Element Center Positions')
+                grid on
 
-            output_plot_filename = fullfile(parameters.debug_dir,...
-                sprintf('sub-%03d_%s_transducer_grid%s.png',...
-                parameters.subject_id,...
-                parameters.simulation_medium,...
-                parameters.results_filename_affix));
+                output_plot_filename = fullfile(parameters.debug_dir,...
+                    sprintf('sub-%03d_%s_transducer_grid%s.png',...
+                    parameters.subject_id,...
+                    parameters.simulation_medium,...
+                    parameters.results_filename_affix));
 
-            saveas(h,output_plot_filename,'png')
-            close(h)
+                saveas(h,output_plot_filename,'png')
+                close(h)
+            end
 
             % Restrict to circular aperture
             dx = X(:) - kgrid.x_vec(trans_pos(1));
@@ -170,17 +172,19 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
             tp.source_amp = tp.source_amp(1) * ...
                 ones(1,tp.array_shape.matrix.n_elements);
 
-            % Debug plot: circular aperture
-            h = figure;
-            scatter(elem_pos_m(:,1)*1e3,elem_pos_m(:,2)*1e3,60,'filled')
-            axis equal
-            xlabel('X [mm]')
-            ylabel('Y [mm]')
-            title('Circular Aperture - Element Center Positions')
-            grid on
+            % [DEBUG] visualize circular aperture
+            if parameters.debug == 1
+                h = figure;
+                scatter(elem_pos_m(:,1)*1e3,elem_pos_m(:,2)*1e3,60,'filled')
+                axis equal
+                xlabel('X [mm]')
+                ylabel('Y [mm]')
+                title('Circular Aperture - Element Center Positions')
+                grid on
 
-            saveas(h,output_plot_filename,'png')
-            close(h)
+                saveas(h,output_plot_filename,'png')
+                close(h)
+            end
 
             % Apply curvature (spherical cap)
             if matrix_tp.is_curved

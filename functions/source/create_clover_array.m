@@ -67,11 +67,15 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     elem_all = [];
     h_leaves = gobjects(1, matrix_tp.clover.n_leaves);  % handles for each leaf
 
-    h = figure;
-    hold on; 
-    axis equal;
-    colors = lines(n_leaves);
-    legend_entries = strings(1, n_leaves);
+
+    % [DEBUG] visualize leaf orientation
+    if parameters.debug == 1
+        h = figure;
+        hold on;
+        axis equal;
+        colors = lines(n_leaves);
+        legend_entries = strings(1, n_leaves);
+    end
 
     % --------------------------------------------------------------------
     % Generate each clover leaf
@@ -115,14 +119,17 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
         % Distance to parent center (sanity check)
         dist_focus = norm(parent_center_mm' - apex);
 
-        legend_entries(i+1) = sprintf('Leaf %d (dist: %.2f mm)', i+1, dist_focus);
+        % [DEBUG] visualize leaf orientation
+        if parameters.debug == 1
+            legend_entries(i+1) = sprintf('Leaf %d (dist: %.2f mm)', i+1, dist_focus);
 
-        scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
-            15, colors(i+1,:), 'filled');
+            scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
+                15, colors(i+1,:), 'filled');
 
-        h_leaves(i) = plot3([apex(1), parent_center_mm(1)], ...
-            [apex(2), parent_center_mm(2)], ...
-            [apex(3), parent_center_mm(3)], 'k--');
+            h_leaves(i) = plot3([apex(1), parent_center_mm(1)], ...
+                [apex(2), parent_center_mm(2)], ...
+                [apex(3), parent_center_mm(3)], 'k--');
+        end
 
         % --- Store ---
         elem_all = [elem_all; elems_rot];
@@ -136,36 +143,39 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % --------------------------------------------------------------------
     % Debug plot
     % --------------------------------------------------------------------
-    h_parent = scatter3(parent_center_mm(1), parent_center_mm(2), ...
-        parent_center_mm(3), 100, 'r', 'filled');
-    h_focus  = scatter3(focus_pos_m(1)*1e3, focus_pos_m(2)*1e3, focus_pos_m(3)*1e3, 100, 'b', 'filled');
-    h_center = scatter3(trans_pos_m(1)*1e3, trans_pos_m(2)*1e3, trans_pos_m(3)*1e3, 100, 'g', 'filled');
+    % [DEBUG] visualize leaf orientation
+    if parameters.debug == 1
+        h_parent = scatter3(parent_center_mm(1), parent_center_mm(2), ...
+            parent_center_mm(3), 100, 'r', 'filled');
+        h_focus  = scatter3(focus_pos_m(1)*1e3, focus_pos_m(2)*1e3, focus_pos_m(3)*1e3, 100, 'b', 'filled');
+        h_center = scatter3(trans_pos_m(1)*1e3, trans_pos_m(2)*1e3, trans_pos_m(3)*1e3, 100, 'g', 'filled');
 
-    % Combine handles for legend
-    legend_handles = [h_leaves, h_parent, h_focus, h_center];
+        % Combine handles for legend
+        legend_handles = [h_leaves, h_parent, h_focus, h_center];
 
-    % Labels
-    par_bowl_label = "Middle of parent bowl, ROC " + sprintf('%.2f', ...
-        ROC_parent) + " mm";
-    legend_labels = [legend_entries, ...
-       par_bowl_label, "Focus", "Transducer center"];
+        % Labels
+        par_bowl_label = "Middle of parent bowl, ROC " + sprintf('%.2f', ...
+            ROC_parent) + " mm";
+        legend_labels = [legend_entries, ...
+            par_bowl_label, "Focus", "Transducer center"];
 
-    legend(legend_handles, legend_labels);
+        legend(legend_handles, legend_labels);
 
-    xlabel('X [mm]');
-    ylabel('Y [mm]');
-    zlabel('Z [mm]');
-    title(sprintf('Clover Array (%d leaves) ROC sub-arrray %.1f mm', n_leaves, ROC_leaf));
+        xlabel('X [mm]');
+        ylabel('Y [mm]');
+        zlabel('Z [mm]');
+        title(sprintf('Clover Array (%d leaves) ROC sub-arrray %.1f mm', n_leaves, ROC_leaf));
 
-    grid on;
-    view([20 25 30]);
+        grid on;
+        view([20 25 30]);
 
-    output_file = fullfile(parameters.debug_dir, ...
-        sprintf('sub-%03d_%s_clover%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, ...
-        parameters.results_filename_affix));
+        output_file = fullfile(parameters.debug_dir, ...
+            sprintf('sub-%03d_%s_clover%s.png', ...
+            parameters.subject_id, parameters.simulation_medium, ...
+            parameters.results_filename_affix));
 
-    saveas(h, output_file);
-    close(h);
+        saveas(h, output_file);
+        close(h);
+    end
 
 end
