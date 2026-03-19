@@ -15,13 +15,13 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Set residual unmapped medium voxels to water
-    medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.medium), 'water'));
+    medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.simulation.medium), 'water'));
     
     % Loads the medium settings from the config file
-    medium = parameters.medium;
+    medium = parameters.simulation.medium;
     
     % Create empty matrices for medium properties
-    empty_grid = NaN(parameters.grid_dims);
+    empty_grid = NaN(parameters.grid.dims);
     sound_speed = empty_grid; 
     density = empty_grid;
     alpha_coeff = empty_grid;
@@ -29,18 +29,18 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     thermal_conductivity = empty_grid;
     specific_heat = empty_grid;
     perfusion = empty_grid;
-    absorption_fraction = ones(parameters.grid_dims); % default: convert 100% of attenuation into absorption
+    absorption_fraction = ones(parameters.grid.dims); % default: convert 100% of attenuation into absorption
     temp_0 = empty_grid;
 
     % Get layer and medium labels
     layer_labels = fieldnames(parameters.layers);
-    medium_labels = fieldnames(parameters.medium);
+    medium_labels = fieldnames(parameters.simulation.medium);
 
     % Iterate through each layer & assign medium ID to create medium mask
     for label_i = 1:length(layer_labels)
         label_name = layer_labels{label_i};
         medium_i = find(strcmp(medium_labels, label_name));
-        if parameters.use_pseudoCT == 1 && strcmp(label_name, 'skull')
+        if parameters.pct.enabled == 1 && strcmp(label_name, 'skull')
             skull_idx = find(ismember(medium_masks,medium_i));
 
             % set skull thermal conductivity
@@ -65,31 +65,31 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             end
 
             % map skull bone density with the desired algorithm
-            if isfield(parameters, "pct_mapping_density")
-                pct_mapping_density = parameters.pct_mapping_density;
+            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_density')
+                pct_mapping_density = parameters.pct.mapping_density;
             else
                 pct_mapping_density = 'none';
             end
             [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, pct_mapping_density);
 
             % map skull bone sound speed with the desired algorithm
-            if isfield(parameters, "pct_mapping_soundspeed")
-                pct_mapping_soundspeed = parameters.pct_mapping_soundspeed;
+            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_soundspeed')
+                pct_mapping_soundspeed = parameters.pct.mapping_soundspeed;
             else
                 pct_mapping_soundspeed = 'none';
             end
             [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density, pseudoCT, skull_idx, pct_mapping_soundspeed);
-            
+
             % map skull bone attenuation with the desired algorithm
-            if isfield(parameters, "pct_mapping_attenuation")
-                pct_mapping_attenuation = parameters.pct_mapping_attenuation;
+            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_attenuation')
+                pct_mapping_attenuation = parameters.pct.mapping_attenuation;
             else
                 pct_mapping_attenuation = 'none';
             end
             [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation);
             
             % [DEBUG] save pCT mapping overview
-            if parameters.debug == 1
+            if parameters.simulation.debug == 1
                 h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
                 subplot(4,1,1); 
                     hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
@@ -113,8 +113,8 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                     xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 1);
                     xline(medium.skull.alpha_coeff, 'k', 'LineWidth', 2);
                     title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
-                output_plot = fullfile(parameters.debug_dir, ...
-                    sprintf('pCT_histograms%s.png',parameters.results_filename_affix));
+                output_plot = fullfile(parameters.io.debug_dir, ...
+                    sprintf('pCT_histograms%s.png',parameters.io.output_affix));
                 exportgraphics(h, output_plot, 'Resolution', 150);
                 close(h);
             end
@@ -154,7 +154,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     if parameters.fit_alpha_power == 1
         alpha_power_fixed = 2;
     
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             plot_fit = true;
         else
             plot_fit = false;
@@ -174,9 +174,9 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             plot_fit);
     
         % DEBUG mode: save plot of fitted attenuation values
-        if parameters.debug == 1
-            fig_path = fullfile(parameters.debug_dir, ...
-            ['attenuation_fit', char(parameters.results_filename_affix), '.png']);
+        if parameters.simulation.debug == 1
+            fig_path = fullfile(parameters.io.debug_dir, ...
+            ['attenuation_fit', char(parameters.io.output_affix), '.png']);
             saveas(gcf, fig_path);
             close(gcf);
         end
@@ -188,14 +188,14 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
     %% smooth medium masks
 
-    if isfield(parameters, 'smooth_properties') && parameters.smooth_properties == true
+    if isfield(parameters.headmodel, 'smooth_properties') && parameters.headmodel.smooth_properties == true
         disp("Smoothing acoustic property maps ...");
 
         tmp_density = density; % keep unsmoothed image for figure
 
-        fwhm_mm = parameters.smooth_fwhm_mm;
-        grid_mm = parameters.grid_step_mm;
-        smooth_method = parameters.smooth_method;
+        fwhm_mm = parameters.headmodel.smooth_fwhm_mm;
+        grid_mm = parameters.grid.resolution_mm;
+        smooth_method = parameters.headmodel.smooth_method;
 
         sound_speed = smooth_img(sound_speed, fwhm_mm, grid_mm, 0, smooth_method);
         density = smooth_img(density, fwhm_mm, grid_mm, 0, smooth_method);
@@ -207,7 +207,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
         temp_0 = smooth_img(temp_0, fwhm_mm, grid_mm, 0, smooth_method);
     
         % [DEBUG] Plot unsmoothed and smoothed density
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             h = figure('Position', [100 100 800 400]);
             if numel(size(density))==3
                 density_pre = squeeze(tmp_density(:,round(size(tmp_density,2)/2),:));
@@ -218,9 +218,9 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             end
             subplot(1,2,1); imagesc(density_pre); title('Original density')
             subplot(1,2,2); imagesc(density_post); title('Smoothed density')
-            output_plot_filename = fullfile(parameters.debug_dir, ...
+            output_plot_filename = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_%s_density_smoothing_changes%s.png', ...
-                parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
             close(h);
             clear density_pre density_post;
@@ -243,29 +243,29 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                           'temp_0', temp_0);
     
     %% [debug] save acoustic property images
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         % save raw medium matrices as niftis
         try
-            filename_density = fullfile(parameters.debug_dir, sprintf('matrix_density'));
+            filename_density = fullfile(parameters.io.debug_dir, sprintf('matrix_density'));
             niftiwrite(density, filename_density, 'Compressed',true); pause(0.1);
-            filename_sound_speed = fullfile(parameters.debug_dir, sprintf('matrix_sound_speed'));
+            filename_sound_speed = fullfile(parameters.io.debug_dir, sprintf('matrix_sound_speed'));
             niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff = fullfile(parameters.debug_dir, sprintf('matrix_alpha_coeff'));
+            filename_alpha_coeff = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_coeff'));
             niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true); pause(0.1);
-            filename_alpha_power = fullfile(parameters.debug_dir, sprintf('matrix_alpha_power'));
+            filename_alpha_power = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_power'));
             niftiwrite(alpha_power, filename_alpha_power, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff_fixed = fullfile(parameters.debug_dir, sprintf('matrix_alpha_coeff_fixed'));
+            filename_alpha_coeff_fixed = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_coeff_fixed'));
             niftiwrite(alpha_coeff_fixed, filename_alpha_coeff_fixed, 'Compressed',true); pause(0.1);
-            filename_perfusion = fullfile(parameters.debug_dir, sprintf('matrix_perfusion'));
+            filename_perfusion = fullfile(parameters.io.debug_dir, sprintf('matrix_perfusion'));
             niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
-            filename_absorption = fullfile(parameters.debug_dir, sprintf('matrix_absorption'));
+            filename_absorption = fullfile(parameters.io.debug_dir, sprintf('matrix_absorption'));
             niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
         catch
             warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
         end
 
         % save images of assigned medium properties with proper headers
-        if contains(parameters.simulation_medium, {'layered'}) && (exist('planimg') & ~isempty(planimg))
+        if contains(parameters.simulation.medium, {'layered'}) && (exist('planimg') & ~isempty(planimg))
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
@@ -277,8 +277,8 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
         end
 
         % save a pCT (if used)
-        if parameters.use_pseudoCT == 1
-            filename_pct = fullfile(parameters.debug_dir, sprintf('pct%s', parameters.results_filename_affix));
+        if parameters.pct.enabled == 1
+            filename_pct = fullfile(parameters.io.debug_dir, sprintf('pct%s', parameters.io.output_affix));
             niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
         end
     end

@@ -24,7 +24,7 @@ Multiple smoothing algorithms are available:
 
 Different binarization thresholds can be defined for skull (default: 50%) and other tissues (default: 50%). 
 
-PRESTUS attempts to enforce skull continuity (i.e., absence of holes) either by applying a 'rubberwrap' skull inflation algorithm (default) or 'imclose' to the skull layer. This is conrolled by `skullfillmethod`. Potential holes are converted to (cortical) skull. 
+PRESTUS attempts to enforce skull continuity (i.e., absence of holes) either by applying a 'rubberwrap' skull inflation algorithm (default) or 'imclose' to the skull layer. This is controlled by `headmodel.skull_fill_method`. Potential holes are converted to (cortical) skull. 
 
 ### Cropping
 

@@ -56,50 +56,50 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % Run all simulations in calibration folder (default)
     if parameters.calibration.save_in_calibration_folder
-        parameters.data_path = parameters.calibration.path_output;
-        parameters.seg_path = parameters.calibration.path_output;
-        parameters.sim_path = parameters.calibration.path_output;
+        parameters.path.anat = parameters.calibration.path_output;
+        parameters.path.seg = parameters.calibration.path_output;
+        parameters.path.sim = parameters.calibration.path_output;
     end
-    disp(['Saving free-water calibration in ', parameters.sim_path]);
+    disp(['Saving free-water calibration in ', parameters.path.sim]);
 
     % if a subfolder is requested, move outputs to subfolders
-    if parameters.subject_subfolder
-        parameters.outputs_folder = sprintf('%s/sub-%03d', parameters.sim_path, sim_id);
+    if parameters.path.subject_subfolder
+        parameters.outputs_folder = sprintf('%s/sub-%03d', parameters.path.sim, sim_id);
     else
-        parameters.outputs_folder = sprintf('%s', parameters.sim_path);
+        parameters.outputs_folder = sprintf('%s', parameters.path.sim);
     end
 
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;
     % Force water medium
-    sim_param.simulation_medium = 'water';
+    sim_param.simulation.medium = 'water';
     % Force save result matrices
-    sim_param.savemat = 1;
+    sim_param.io.save_matrices = 1;
     % Overwrite transducer kwavearray modeling (if specified)
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
-        sim_param.use_kwavearray = 1; % force to run with kwavearray setup
+        sim_param.grid.use_kWaveArray = 1; % force to run with kwavearray setup
     end
     % Convert from default 3D to 2D axisymmetric simulation (if requested)
     if isfield(parameters.calibration, 'axisymmetric2D') && ...
             parameters.calibration.axisymmetric2D == 1
-        parameters.n_sim_dims = 2;
-        parameters.axisymmetric = 1;
-        if numel(parameters.default_grid_dims)==3
-            parameters.default_grid_dims(2) = [];
+        parameters.grid.axisymmetric = 1;
+        if numel(parameters.grid.default_dims)==3
+            parameters.grid.default_dims(2) = [];
         end
     end
     % Force deactivate interactive mode
-    sim_param.interactive = 0;
+    sim_param.simulation.interactive = 0;
     
     % Run the simulation based on the submission method
-    sim_param.hpc_wait_for_job = true;
-    prestus_pipeline_start(sim_id, sim_param);
+    sim_param.subject_id = sim_id;
+    sim_param.hpc.wait_for_job = true;
+    prestus_pipeline_start(sim_param);
 
     %% Load initial results
 
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        sim_param.outputs_folder, sim_id, sim_param.results_filename_affix));
+        sim_param.outputs_folder, sim_id, sim_param.io.output_affix));
 
     initial_params = initial_res.acoustic_info.parameters;
     initial_params.calibration.prefix = 'Initial_';
@@ -160,8 +160,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_param.transducer.source_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
-    opt_param.hpc_wait_for_job = true;
-    prestus_pipeline_start(sim_id, opt_param);
+    opt_param.subject_id = sim_id;
+    opt_param.hpc.wait_for_job = true;
+    prestus_pipeline_start(opt_param);
 
     %% Load optimized simulation results    
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...

@@ -37,15 +37,15 @@ fclose( fid );
 fn_out = [tempname,'.csv'];
 
 % include LD fix
-if isfield(parameters,'ld_library_path')
-    ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.ld_library_path);
+if isfield(parameters.hpc,'ld_library_path')
+    ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.hpc.ld_library_path);
 else
     ld_command = '';
 end
 
 % Run mni2subject_coords
 [status,result] = system(sprintf('%s%s/subject2mni_coords -m %s -s %s -o %s -t %s;', ...
-    ld_command, parameters.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
+    ld_command, parameters.startup.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
 
 % Check if call was successefull
 if status ~= 0

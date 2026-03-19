@@ -16,10 +16,10 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     plminside = true;
 
     kwave_input_args = struct('PMLInside', plminside, ...
-        'PMLSize', parameters.pml_size, ...
+        'PMLSize', parameters.grid.pml_size, ...
         'PlotPML', true);
 
-    if contains(parameters.simulation_medium, {'layered'}) && ...
+    if contains(parameters.simulation.medium, {'layered'}) && ...
             any(ismember(fieldnames(parameters.layers), {'skull'}))
         % Extract the skull edge ...
         mask = tissuemask_binary(parameters, medium_masks);
@@ -28,7 +28,7 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
         kwave_input_args.DisplayMask = skull_edge;
     end
 
-    if parameters.run_source_setup==0
+    if parameters.modules.run_source_setup==0
         error('Source setup not requested. Not able to proceed with acoustic simulation.')
     end
 
@@ -36,9 +36,9 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
 
     % convert media and results to 2D/3D (if axisymmetry was used)
-    if parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+    if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
         % if using axisymmetric settings and requesting heating simulations, reshape output to 3D
-        if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims==1
+        if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims==1
             % when follow-up thermal simulation is requested, expand axisymmetric to 3D
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
                 convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels);
@@ -54,7 +54,7 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     acoustic_info.parameters = parameters;
     acoustic_info.kwave_input_args = kwave_input_args;
 
-    if isfield(parameters, 'savemat') && parameters.savemat==0
+    if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
         disp("Not saving acoustic output matrices ...")
     else
         % keep 'parameters' as a copy so not to confuse future runs

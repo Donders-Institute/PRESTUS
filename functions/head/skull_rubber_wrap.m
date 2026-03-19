@@ -11,7 +11,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % ==============================================================================
     
     % Load the T1w input image as a reference
-    info = niftiinfo(fullfile(parameters.seg_path, parameters.t1_path_template));
+    info = niftiinfo(fullfile(parameters.path.seg, parameters.path.t1_pattern));
 
     % ==============================================================================
     % CLEAN SKULL MASK
@@ -33,8 +33,8 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     %% --- Rubber wrap parameters ---
 
-    if isfield(parameters, 'wrapradius') && ~isempty(parameters.wrapradius)
-        wrapRadius = parameters.wrapradius;
+    if isfield(parameters.headmodel, 'skull_wrap_radius') && ~isempty(parameters.headmodel.skull_wrap_radius)
+        wrapRadius = parameters.headmodel.skull_wrap_radius;
     else
         wrapRadius = 10; % skull rubber wrap radius [grid voxels];
     end
@@ -59,14 +59,14 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     BW = uint8(BWwrap2); clear BWwrap2;
 
     % [debug] save balloon wrap mask
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
 
-        outNii = fullfile(parameters.debug_dir, ...
-            sprintf('balloon_mask%s.nii', parameters.results_filename_affix));
+        outNii = fullfile(parameters.io.debug_dir, ...
+            sprintf('balloon_mask%s.nii', parameters.io.output_affix));
 
         infoOut = info;
         infoOut.ImageSize = size(BW);
-        infoOut.PixelDimensions = repmat(parameters.grid_step_mm,1,numel(size(BW)));
+        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(BW)));
         infoOut.Datatype = 'uint8';
         infoOut.BitsPerPixel = 8;
         infoOut.Filename = outNii;
@@ -90,7 +90,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     end
 
     tissues_available = fieldnames(parameters.layers);
-    medium_labels = fieldnames(parameters.medium);
+    medium_labels = fieldnames(parameters.simulation.medium);
 
     if ismember(tissues_available, 'brain')
         BRAIN_LABEL   = find(strcmp(medium_labels, 'brain'));
@@ -124,7 +124,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     %% Include CSF voxels at the SKIN interface (strict 6-neigh), near B_out
 
     % Here, we refer to the more detailed segmentation
-    CSF_LABEL = [getidx(parameters.seg_labels, {'csf'})];
+    CSF_LABEL = charm_seg_labels().csf;
     CSF  = (ismember(segmented_img, CSF_LABEL));
 
     % --- Strict 6-neighborhood kernel (faces only) ---
@@ -177,14 +177,14 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     %% [DEBUG] Save as .nii.gz
 
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
 
-        outNii = fullfile(parameters.debug_dir, ...
-            sprintf('balloon_mask_final%s.nii', parameters.results_filename_affix));
+        outNii = fullfile(parameters.io.debug_dir, ...
+            sprintf('balloon_mask_final%s.nii', parameters.io.output_affix));
 
         infoOut = info;
         infoOut.ImageSize = size(SKULL_BALLON);
-        infoOut.PixelDimensions = repmat(parameters.grid_step_mm,1,numel(size(SKULL_BALLON)));
+        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(SKULL_BALLON)));
         infoOut.Datatype = 'uint8';
         infoOut.BitsPerPixel = 8;
         infoOut.Filename = outNii;
@@ -201,7 +201,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % Note: this seems computationally heavy on the HPC
     % There are like;ly ways to optimize, but it will be inactive for now.
     
-    if parameters.skullwrap_visualize == 1
+    if parameters.headmodel.skull_wrap_visualize == 1
         skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON);
     end
 

@@ -10,7 +10,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
 %   localite_instr_file - Path to the Localite instrument markers XML file.
 %   mri_hdr             - Header of the MRI file containing the world-to-voxel transformation matrix.
 %   parameters          - Struct containing additional parameters:
-%                         * reference_transducer_distance_mm: Distance between reference point and transducer (in mm).
+%                         * placement.localite.reference_distance_mm: Distance between reference point and transducer (in mm).
 %                         * expected_focal_distance_bowl: Distance between transducer bowl and focus point (in mm).
 %
 % Output:
@@ -22,7 +22,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
     %% Notes on Inputs and Coordinate Systems
     % - 'localite_instr_file' contains the path to the Localite instrument markers XML file.
     % - 'mri_hdr' is the header of the MRI file that provides world-to-voxel transformation matrix.
-    % - 'reference_transducer_distance_mm' is the distance between neuronavigation reference point and transducer (mm).
+    % - 'placement.localite.reference_distance_mm' is the distance between neuronavigation reference point and transducer (mm).
     % - 'expected_focal_distance_bowl' is the distance between transducer bowl and focus point (mm).
     %
     % The Localite coordinates are provided in RAS format. For details on NIFTI coordinate systems, refer to:
@@ -50,7 +50,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
 
     %% Compute Transducer and Focus Positions in RAS Space
     % Calculate transducer position relative to reference point.
-    trans_pos_ras = reference_pos + parameters.reference_transducer_distance_mm * reference_center_to_head;
+    trans_pos_ras = reference_pos + parameters.placement.localite.reference_distance_mm * reference_center_to_head;
 
     % Calculate focus position relative to transducer position.
     focus_pos_ras = trans_pos_ras + parameters.expected_focal_distance_bowl * reference_center_to_head;

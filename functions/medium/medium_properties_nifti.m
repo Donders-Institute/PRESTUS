@@ -10,7 +10,7 @@ function medium_properties_nifti(parameters, kwave_medium, inv_final_transformat
     orig_hdr = t1_header; % header based on original T1w
     orig_hdr.Datatype = 'single';
 
-    file_name = fullfile(parameters.debug_dir, property);
+    file_name = fullfile(parameters.io.debug_dir, property);
     
     if ~isfield(kwave_medium, property)
         warning('Missing field: %s', property);

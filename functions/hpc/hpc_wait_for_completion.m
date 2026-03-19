@@ -1,10 +1,12 @@
-function hpc_wait_for_completion(job_id, hpc_type)
+function hpc_wait_for_completion(job_id, hpc_type, max_checks)
 %% HPC_WAIT_FOR_COMPLETION  Monitor HPC job until completion
 %  Fixed for Donders/DCCN SLURM cluster format
 
+if nargin < 3 || isempty(max_checks)
+    max_checks = 540;  % default: ~3 hours at 1 check/20s
+end
 disp('User has chosen to wait until job is finished...');
 job_completed = false;
-max_checks = 540;  % 3 hours
 checks = 0;
 tic_start = tic;
 

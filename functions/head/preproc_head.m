@@ -28,15 +28,11 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     disp('Checking inputs for head preprocessing ...');
     
     % Define path to T1 image (user-specified)
-    filename_t1 = fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id));
+    filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
 
     % Define path to segmentation results
-    segmentation_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', parameters.subject_id));
-    if strcmp(parameters.segmentation_software, 'charm')
-        filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
-    else 
-        filename_segmented = fullfile(segmentation_folder, sprintf('sub-%03d_final_contr.nii.gz', parameters.subject_id));
-    end
+    segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+    filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
 
     % Define path to T1 image (simnibs; aligned with segmentation space)
     filename_t1_simnibs = fullfile(segmentation_folder, 'T1.nii.gz');
@@ -51,7 +47,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     disp('Loading images...');
 
-    if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
+    if isfield(parameters.placement,'localite') && isfield(parameters.placement.localite,'enabled') && parameters.placement.localite.enabled
         t1_image = niftiread(filename_t1);
         t1_header = niftiinfo(filename_t1);
     else
@@ -59,7 +55,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         t1_header = niftiinfo(filename_t1_simnibs);
     end
 
-    if parameters.use_pseudoCT == 1
+    if parameters.pct.enabled == 1
         % Load pseudoCT
         filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
@@ -80,7 +76,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     % Note: localite coordinates may refer to different header than e.g., simnibs segmentation
     % [Multi-transducer] the preprocessing will be based on the first transducer
 
-    if isfield(parameters,'transducer_from_localite') && parameters.transducer_from_localite
+    if isfield(parameters.placement,'localite') && isfield(parameters.placement.localite,'enabled') && parameters.placement.localite.enabled
         % Validate existence of localite file
         check_availability({localite_file})
         % Determine transducer position [experimental]
@@ -106,26 +102,26 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     disp('Rotating images to focal axis and rescaling to grid resolution ...')
 
-    % If the headreco process was not successful, it will stop preprocessing
+    % If the segmentation process was not successful, it will stop preprocessing
     assert(exist(filename_segmented,'file') > 0, ...
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
             filename_segmented, segmentation_folder)
 
     % Defines output file location and name
-    filename_reoriented_scaled_data = fullfile(parameters.debug_dir, ...
+    filename_reoriented_scaled_data = fullfile(parameters.io.debug_dir, ...
         sprintf('sub-%03d_after_rotating_and_scaling%s.mat', ...
-        parameters.subject_id, parameters.results_filename_affix));
+        parameters.subject_id, parameters.io.output_affix));
 
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
-        log_timer('start','preproc_rotscale', parameters.output_dir);
+        log_timer('start','preproc_rotscale', parameters.io.output_dir);
 
         %% [Planning image] (rotation matrix will be established for planning image)
 
         % Note: This primarily serves plotting purposes.
         if t1_header.ImageSize(3) > 1
             % rescale the image to the desired grid resolution
-            scale_factor_t1 = t1_header.PixelDimensions(1)/parameters.grid_step_mm;
+            scale_factor_t1 = t1_header.PixelDimensions(1)/parameters.grid.resolution_mm;
             [t1_img_rr, trans_pos_rescaled, focus_pos_rescaled, ...
             scale_rotate_recenter_matrix, rotation_matrix, ~, ~, t1_rr_img_montage] = ...
                 preproc_align_to_focal_axis(...
@@ -137,13 +133,13 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 parameters);
 
             % [DEBUG] visualize original and rotated planning image
-            if parameters.debug == 1
+            if parameters.simulation.debug == 1
                 h = figure;
                 imshow(t1_rr_img_montage)
                 title('Original (left) and rotated (right) planning image');
-                output_plot_filename = fullfile(parameters.debug_dir, ...
+                output_plot_filename = fullfile(parameters.io.debug_dir, ...
                     sprintf('sub-%03d_t1_after_rotating_and_scaling%s.png', ...
-                    parameters.subject_id, parameters.results_filename_affix));
+                    parameters.subject_id, parameters.io.output_affix));
                 saveas(h, output_plot_filename, 'png');
                 close(h);
             end; clear t1_rr_img_montage;
@@ -154,7 +150,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         
         %% [Tissue segmentation]
 
-        scale_factor_seg = tissues_mask_header.PixelDimensions(1)/parameters.grid_step_mm;
+        scale_factor_seg = tissues_mask_header.PixelDimensions(1)/parameters.grid.resolution_mm;
         [segmented_img_rr, ~, ~, ...
             ~, ~, ~, ~, segm_img_montage] = ...
             preproc_align_to_focal_axis(...
@@ -166,61 +162,51 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             parameters);
         
         % [DEBUG] visualize original and rotated segmentation image
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             h = figure;
             imshow(segm_img_montage)
             title('Original (left) and rotated (right) tissue segmentation');
-            output_plot_filename = fullfile(parameters.debug_dir, ...
+            output_plot_filename = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_segmented_after_rotating_and_scaling%s.png', ...
-                parameters.subject_id, parameters.results_filename_affix));
+                parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png');
             close(h);
         end;  clear segm_img_montage;
         
         %% [bone mask/pCT]
 
-        if parameters.use_pseudoCT == 1
+        if parameters.pct.enabled == 1
             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = ...
                 preproc_align_to_focal_axis(...
                 pseudoCT_image, ...
                 pseudoCT_header, ...
                 trans_pos_grid, ...
                 focus_pos_grid, ...
-                pseudoCT_header.PixelDimensions(1)/parameters.grid_step_mm, ...
+                pseudoCT_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
                 parameters);
         else
-            if strcmp(parameters.segmentation_software, 'charm') 
-                % create filled bone mask as charm doesn't make it itself
-                if isfield(parameters, 'seg_labels') && any(strcmp(fieldnames(parameters.seg_labels), 'bonemask'))
-                    bone_img = ismember(tissues_mask_image,getidx(parameters.seg_labels,'bonemask'));
-                else
-                    bone_img = tissues_mask_image>0&(tissues_mask_image<=4|tissues_mask_image>=7);
-                    warning("Using hardcoded labels for bonemask...");
-                end
-            else % load bone mask created by simnibs
-                filename_bone_headreco = fullfile(segmentation_folder, 'bone.nii.gz');
-                bone_img = niftiread(filename_bone_headreco);
-            end
+            % create filled bone mask (charm doesn't produce one directly)
+            bone_img = ismember(tissues_mask_image, charm_seg_labels().bonemask);
             [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = ...
                 preproc_align_to_focal_axis(...
                 bone_img, ...
                 tissues_mask_header, ...
                 trans_pos_grid, ...
                 focus_pos_grid, ...
-                tissues_mask_header.PixelDimensions(1)/parameters.grid_step_mm, ...
+                tissues_mask_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
                 parameters);
         end
 
         % [DEBUG] visualize original and rotated bone mask image
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             h = figure;
             imshow(bone_img_montage)
             title('Original (left) and rotated (right) original bone mask');
-            output_plot_filename = fullfile(parameters.debug_dir, ...
+            output_plot_filename = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png', ...
-                parameters.subject_id, parameters.results_filename_affix));
+                parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
-            close(h); 
+            close(h);
         end; clear bone_img_montage;
 
         assert(isequal(size(trans_pos_rescaled(1:2)),size(focus_pos_rescaled(1:2))),...
@@ -243,7 +229,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     
     %% [DEBUG] Plot the skin & skull from the segmented image and an overlay for comparison
 
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         % Create a T1 slice for comparison to SimNIBS segmented data
         t1_slice = repmat(mat2gray(squeeze(t1_img_rr(:,trans_pos_rescaled(2),:))), [1 1 3]);
         % Create slices of segmented SimNIBS data
@@ -261,8 +247,8 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         montage(cat(4,t1_slice*255 ,skin_skull_img*255 ,...
             imfuse(mat2gray(t1_slice), skin_skull_img,'blend')) ,'size',[1 NaN]);
         title('T1 and SimNIBS skin (green) and skull (blue) masks');
-        output_plot_filename = fullfile(parameters.debug_dir,...
-            sprintf('sub-%03d_t1_skin_skull%s.png',parameters.subject_id, parameters.results_filename_affix));
+        output_plot_filename = fullfile(parameters.io.debug_dir,...
+            sprintf('sub-%03d_t1_skin_skull%s.png',parameters.subject_id, parameters.io.output_affix));
         saveas(h ,output_plot_filename ,'png')
         close(h);
 
@@ -275,12 +261,12 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     disp('Creating layered medium by smoothing and cropping the head segmentation...')
 
     % Defines output file location and name
-    filename_cropped_smoothed_skull_data = fullfile(parameters.debug_dir, ...
+    filename_cropped_smoothed_skull_data = fullfile(parameters.io.debug_dir, ...
         sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
     
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
-        log_timer('start','preproc_skullsmooth', parameters.output_dir);
+        log_timer('start','preproc_skullsmooth', parameters.io.output_dir);
         % postprocess skull segmentation
         [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
             head_smooth_and_crop(...
@@ -291,11 +277,11 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
 
         % [DEBUG] save transformed medium mask and skull to debug dir
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             % save medium mask
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
-            segmented_file = fullfile(parameters.debug_dir, ...
+            segmented_file = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
             plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -307,7 +293,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             % save segmentation skull mask/pseudoCT
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
-            segmentation_file = fullfile(parameters.debug_dir, ...
+            segmentation_file = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_segmentation_final', parameters.subject_id));
             plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -319,7 +305,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             % save skull mask/pseudoCT
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'double';
-            skull_mask_file = fullfile(parameters.debug_dir, ...
+            skull_mask_file = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_skull_final', parameters.subject_id));
             plotdata = double(tformarray(bone_crop, inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -368,7 +354,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     %% Plot placement of up to 2 Transducers
 
     % Update the parameters (for plottign below only)  
-    parameters.grid_dims = size(medium_masks);
+    parameters.grid.dims = size(medium_masks);
 
     max_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > max_plots
@@ -394,25 +380,25 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             fpos_sim = pts_sim(2,:);
         end
 
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             % [DEBUG] Plot brain segmentation
             [seg_with_trans_img, ~] = plot_t1_with_transducer(...
-                medium_masks, parameters.grid_step_mm, tpos_sim, fpos_sim, parameters);
-            
+                medium_masks, parameters.grid.resolution_mm, tpos_sim, fpos_sim, parameters);
+
             h = figure;
             imshow(seg_with_trans_img);
             title('Segmentation with transducer');
-            output_plot_filename = fullfile(parameters.debug_dir, ...
+            output_plot_filename = fullfile(parameters.io.debug_dir, ...
                 sprintf('sub-%03d_%s_segmented_brain_final_T%02d%s.png', ...
-                parameters.subject_id, parameters.simulation_medium, ti, parameters.results_filename_affix));
+                parameters.subject_id, parameters.simulation.medium, ti, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
             close(h);
         end
-        
+
         % Plot positioning of transducer on segmentation
-        output_plot_filename = fullfile(parameters.output_dir, ...
+        output_plot_filename = fullfile(parameters.io.output_dir, ...
             sprintf('sub-%03d_positioning_T%02d%s.png', ...
-            parameters.subject_id, ti, parameters.results_filename_affix));
+            parameters.subject_id, ti, parameters.io.output_affix));
 
         % Subplot 1: Original segmentation with initial transducer and focus positions
         % Subplot 2: Original segmentation with slice cap applied

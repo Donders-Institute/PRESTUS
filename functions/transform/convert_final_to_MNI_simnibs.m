@@ -29,15 +29,15 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
     end
 
     % Check if LD_LIBRARY_PATH is specified and construct the export command if needed
-    if isfield(parameters, 'ld_library_path')
-        ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.ld_library_path);
+    if isfield(parameters.hpc, 'ld_library_path')
+        ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.hpc.ld_library_path);
     else
         ld_command = ''; % No library linking required
     end
 
     % Run SimNIBS `subject2mni` command to transform the image to MNI space
     system(sprintf('%s%s/subject2mni --in %s --out %s --m2mpath %s --interpolation_order %d;', ...
-        ld_command, parameters.simnibs_bin_path, path_to_input_img, path_to_output_img, m2m_folder, options.interpolation_order));
+        ld_command, parameters.startup.simnibs_bin_path, path_to_input_img, path_to_output_img, m2m_folder, options.interpolation_order));
 
     % Handle unnecessary affix added by SimNIBS to the output filename
     if ~matches(path_to_output_img, '_MNI.nii.gz') 

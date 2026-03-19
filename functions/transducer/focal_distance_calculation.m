@@ -28,7 +28,7 @@ function parameters = focal_distance_calculation(parameters)
 %
 % NOTES:
 %   - Requires subject_id in scope for T1 loading (closure variable)
-%   - T1 grid computation: ||focus_pos - trans_pos|| × t1_grid_step_mm
+%   - T1 grid computation: ||focus_pos - trans_pos|| × t1_grid.resolution_mm
 %   - Multi-transducer aware: handles heterogeneous focal distances across array
 %   - No modification to existing valid values (preserves transducer-specific overrides)
 %
@@ -92,7 +92,7 @@ for ti = 1:numel(parameters.transducer)
         % calculate grid distance between transducer bowl and focus
         focal_distance = norm(tr.focus_pos - tr.trans_pos);
         % scale grid distance by grid step to calculate mm
-        parameters.transducer(ti).expected_focal_distance_bowl = focal_distance * parameters.grid_step_mm;
+        parameters.transducer(ti).expected_focal_distance_bowl = focal_distance * parameters.grid.resolution_mm;
         % calculate focal distance offset (between transducer bowl and exit plane for annular arrays)
         parameters.transducer(ti).focal_distance_offset = parameters.transducer(ti).curv_radius_mm - parameters.transducer(ti).dist_to_plane_mm;
         % calculate focal distance (from exit plane)

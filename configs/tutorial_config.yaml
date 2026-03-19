@@ -1,13 +1,16 @@
-data_path: /home/.../Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
-simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
+path:
+  anat: /home/.../Ernie_T1_T2/ # the folder with either a) t1 & t2 images, or b) t1 image and the segmentation results, e.g., Ernie subject from SimNIBS
+  t1_pattern: ernie_T1.nii.gz # path to T1 relative to path.anat; all string substitutions will be done using subject_id
+  t2_pattern: ernie_T2.nii.gz # path to T2 relative to path.anat
 
-t1_path_template: ernie_T1.nii.gz # path to T1 relative to data_path; all string substitutions will be done using subject_id
-t2_path_template: ernie_T2.nii.gz # path to T2 relative to data_path; all string substitutions will be done using subject_id
+startup:
+  simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
 
-# If you encounter the error "The qform and sform of do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
-use_forceqform: 0
+segmentation:
+  # If you encounter the error "The qform and sform do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
+  use_qform: 0
 
-transducer: 
+transducer:
   n_elements: 4 # number of elements in the transducer
   Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]
   Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
@@ -19,11 +22,12 @@ transducer:
   trans_pos: [128, 139, 15] # position on T1 grid 
   focus_pos: [128, 142, 75] # stimulation target on T1 grid
 
-default_grid_dims: [144, 144, 256]
+grid:
+  default_dims: [144, 144, 256]
 
-thermal:
+timing:
   pd: 0.3
-  pri: 0.6  
+  pri: 0.6
   ptd: 0.6
   pt_timestep: 0.1
   ptri: 1.2

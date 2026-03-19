@@ -1,5 +1,5 @@
 function [transducer_mask, source_label, transducer_pars] = ...
-    transducer_setup(transducer_pars, trans_pos, focus_pos, grid_dims, grid_step_mm)
+    transducer_setup(transducer_pars, trans_pos, focus_pos, grid_dims, grid.resolution_mm)
 
 % TRANSDUCER_SETUP Creates a transducer mask and label matrix for a computational grid.
 %
@@ -27,7 +27,7 @@ function [transducer_mask, source_label, transducer_pars] = ...
 %
 %   grid_dims         - [Nx, Ny, Nz] array defining the dimensions of the computational grid.
 %
-%   grid_step_mm      - Scalar specifying the step size of the computational grid (in mm).
+%   grid.resolution_mm      - Scalar specifying the step size of the computational grid (in mm).
 %
 % Output:
 %   transducer_mask   - Binary matrix of size `grid_dims`. Non-zero values represent 
@@ -55,14 +55,14 @@ function [transducer_mask, source_label, transducer_pars] = ...
     end
 
     % Convert element diameters from millimeters to grid points and ensure they are odd integers
-    transducer_pars.Elements_OD = 2*floor(transducer_pars.Elements_OD_mm / grid_step_mm / 2) + 1; % Outer diameter in grid points
-    transducer_pars.Elements_ID = 2*floor(transducer_pars.Elements_ID_mm / grid_step_mm / 2) + 1; % Inner diameter in grid points
+    transducer_pars.Elements_OD = 2*floor(transducer_pars.Elements_OD_mm / grid.resolution_mm / 2) + 1; % Outer diameter in grid points
+    transducer_pars.Elements_ID = 2*floor(transducer_pars.Elements_ID_mm / grid.resolution_mm / 2) + 1; % Inner diameter in grid points
 
     % Handle cases where inner diameter is zero (e.g., for flat elements)
     transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
 
     % Convert the curvature radius from millimeters to grid points
-    transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_step_mm); % Radius in grid points
+    transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid.resolution_mm); % Radius in grid points
 
     % Initialize computational grids for the transducer mask and source label matrix
     transducer_mask = zeros(grid_dims); % Binary mask representing active transducer regions

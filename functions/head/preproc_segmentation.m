@@ -9,8 +9,8 @@ function parameters = preproc_segmentation(parameters)
     disp('Checking inputs...');
     
     % Define paths to T1 and T2 images
-    filename_t1 = fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id));
-    filename_t2 = fullfile(parameters.data_path, sprintf(parameters.t2_path_template, parameters.subject_id));
+    filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    filename_t2 = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
 
     % Validate existence of files
     files_to_check = {filename_t1, filename_t2};
@@ -21,25 +21,20 @@ function parameters = preproc_segmentation(parameters)
     disp('Starting segmentation...');
     
     % Define output folder for segmentation results
-    segmentation_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', parameters.subject_id));
+    segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 
-    if strcmp(parameters.segmentation_software, 'charm')
-        filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
-    else 
-        filename_segmented = fullfile(segmentation_folder, ...
-            sprintf('sub-%03d_final_contr.nii.gz', parameters.subject_id));
-    end
+    filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
 
     % Run segmentation (if necessary)
     if confirm_overwriting(filename_segmented, parameters) && ...
-       (~isfield(parameters,'overwrite_simnibs') || parameters.overwrite_simnibs || ~exist(filename_segmented,'file'))
-        if parameters.use_pseudoCT == 1
+       (~isfield(parameters,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ~exist(filename_segmented,'file'))
+        if parameters.pct.enabled == 1
             % Note: This could be improved by allowing to specify a UTE/CT path in the config...
             warning("SimNIBS integration not supported when requesting pseudoCT. Please ensure SimNIBS has been run.");
         end
 
-        if parameters.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
-            segmentation_run(parameters.data_path, parameters.subject_id, filename_t1, filename_t2, parameters);
+        if parameters.simulation.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
+            segmentation_run(parameters.path.anat, parameters.subject_id, filename_t1, filename_t2, parameters);
             parameters = simnibs_version(segmentation_folder, parameters);
             return;
         end

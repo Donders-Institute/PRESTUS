@@ -77,13 +77,13 @@ subplot(1,3,3);
     view([-175,0])
 
 % save figure in output directory 
-output_plot = fullfile(parameters.output_dir,...
+output_plot = fullfile(parameters.io.output_dir,...
     sprintf('sub-%03d_heuristic_%s.png', subject_id, target_name));
 saveas(h, output_plot, 'png')
 
 %% [Optional] Save copy in localite directory
-if isfield(parameters, 'localite_path') && ~isempty(parameters.localite_path)
-    saveas(h, fullfile(parameters.localite_path, ...
+if isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
+    saveas(h, fullfile(parameters.path.localite, ...
         sprintf("sub-%03.0f_%s", subject_id, target_name)), 'png');
 end
 

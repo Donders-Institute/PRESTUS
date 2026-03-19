@@ -202,7 +202,7 @@ for i = 1:N_i
                 ' F ', num2str(desired_focal_distance_ep), ' I ', num2str(desired_intensity)])
 
             % Set to always overwrite existing calibration files
-            parameters.overwrite_files = 'always';
+            parameters.io.overwrite_files = 'always';
 
             % perform the calibration
             calibration_transducer(...

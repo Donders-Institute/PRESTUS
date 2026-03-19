@@ -1,56 +1,39 @@
 function segmentation_run(data_path, subject_id, filename_t1, filename_t2, parameters)
 
     % set segmentation path to data_path if no specific seg_path is defined
-    if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path)
-        parameters.seg_path = data_path;
+    if ~isfield(parameters, 'path') || ~isfield(parameters.path, 'seg') || isempty(parameters.path.seg)
+        parameters.path.seg = data_path;
     end
 
     % Create log directory in segmentaion folder (if it does not exist)
     
-    log_dir = fullfile(parameters.seg_path, 'batch_job_logs');
+    log_dir = fullfile(parameters.path.seg, 'batch_job_logs');
     if ~isfolder(log_dir)
         mkdir(log_dir)
     end
     
     subj_id_string = sprintf('sub-%03d', subject_id);
 
-    % If no segmentation software is specified, default to SimNIBS' charm
-    if ~isfield(parameters, 'segmentation_software')
-        parameters.segmentation_software = 'charm';
+    % Check if the last file produced in the charm pipeline exists. If
+    % other files are missing charm will produce the '--forcerun has to
+    % be set' error. Setting 'overwrite_simnibs' to 1 will resolve this.
+    result_simnibs = sprintf('%sm2m_sub-%03d/final_tissues.nii.gz', parameters.path.seg, subject_id);
+    if ~exist(result_simnibs, 'file')
+        parameters.io.overwrite_simnibs = 1;
     end
-
-    if strcmp(parameters.segmentation_software, 'charm')
-        % Check if the last file produced in the charm pipeline exists. If
-        % other files are missing Charm will produce the '--forcerun has to 
-        % be set' error. Setting 'overwrite_simnibs' to 1 will resolve this.
-        result_simnibs = sprintf('%sm2m_sub-%03d/final_tissues.nii.gz', parameters.seg_path, subject_id);
-        if ~exist(result_simnibs, 'file')
-            parameters.overwrite_simnibs = 1;
-        end
-        if ~isempty(filename_t2)
-            segment_call = sprintf('charm %s %s %s',...
-                subj_id_string,filename_t1,filename_t2);
-        else
-            segment_call = sprintf('charm %s %s',...
-                subj_id_string,filename_t1);
-        end
-        if isfield(parameters, 'overwrite_simnibs') && parameters.overwrite_simnibs == 1
-            segment_call = [segment_call ' --forcerun'];
-        end
-        if isfield(parameters, 'use_forceqform') && parameters.use_forceqform == 1
-            segment_call = [segment_call ' --forceqform'];
-        end
-        if isfield(parameters, 'charm_debug') && parameters.charm_debug == 1
-            segment_call = [segment_call ' --debug'];
-        end
+    if ~isempty(filename_t2)
+        segment_call = sprintf('charm %s %s %s', subj_id_string, filename_t1, filename_t2);
     else
-        if ~isempty(filename_t2)
-            segment_call = sprintf('headreco all %s %s %s -d no-conform',...
-                subj_id_string, filename_t1, filename_t2);
-        else
-            segment_call = sprintf('headreco all %s %s -d no-conform',...
-                subj_id_string, filename_t1);
-        end
+        segment_call = sprintf('charm %s %s', subj_id_string, filename_t1);
+    end
+    if isfield(parameters, 'overwrite_simnibs') && parameters.io.overwrite_simnibs == 1
+        segment_call = [segment_call ' --forcerun'];
+    end
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'use_qform') && parameters.segmentation.use_qform == 1
+        segment_call = [segment_call ' --forceqform'];
+    end
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'debug') && parameters.segmentation.debug == 1
+        segment_call = [segment_call ' --debug'];
     end
     
     % Platform selection
@@ -64,16 +47,16 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     end
 
     % Deploy on selected platform
-	if strcmp(parameters.platform, 'qsub')
+    if strcmp(parameters.platform, 'qsub')
         qsub_call = sprintf('qsub -N %s -l "nodes=1:ppn=1,mem=20Gb,walltime=24:00:00" -v MANPATH -o %s -e %s -d %s', ...
             ['simnibs-', subj_id_string], ...
             fullfile(log_dir, sprintf('%s_qsub_segment_output_$timestamp.log', subj_id_string)),...
             fullfile(log_dir, sprintf('%s_qsub_segment_error_$timestamp.log', subj_id_string)), ...
-            parameters.seg_path);
+            parameters.path.seg);
 
         % execute simnibs call in segmentation directory
         full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', ...
-            parameters.seg_path, parameters.simnibs_bin_path, segment_call, qsub_call);
+            parameters.path.seg, parameters.startup.simnibs_bin_path, segment_call, qsub_call);
         
         % 3) submit segmentation job
         fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -101,13 +84,13 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         
         % Add environment setup
         fprintf(fid, 'source /etc/profile\n'); % load system-wide environment variable setups and shell initialization commands
-        fprintf(fid, 'export PATH=%s:$PATH\n', parameters.simnibs_bin_path);
-        fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.ld_library_path);
+        fprintf(fid, 'export PATH=%s:$PATH\n', parameters.startup.simnibs_bin_path);
+        fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.hpc.ld_library_path);
         
         % Add segmentation call
-        fprintf(fid, 'cd %s\n', parameters.seg_path);
+        fprintf(fid, 'cd %s\n', parameters.path.seg);
         fprintf(fid, 'charm --version\n');
-        fprintf(fid, '%s\n', [parameters.simnibs_bin_path, '/', segment_call]);
+        fprintf(fid, '%s\n', [parameters.startup.simnibs_bin_path, '/', segment_call]);
         fclose(fid);
     
         % Ensure script is executable
@@ -127,17 +110,17 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     elseif strcmp(parameters.platform, 'matlab')
         fprintf('Running segmentation locally:\n%s\n', segment_call);
         
-        if ~isfield(parameters, 'simnibs_bin_path') || isempty(parameters.simnibs_bin_path)
+        if ~isfield(parameters.startup, 'simnibs_bin_path') || isempty(parameters.startup.simnibs_bin_path)
             error('simnibs_bin_path required for local execution');
         end
         
-        % Use FULL PATH to charm/headreco (don't rely on PATH)
-        full_segment_call = sprintf('%s/%s', parameters.simnibs_bin_path, segment_call);
+        % Use FULL PATH to charm (don't rely on PATH)
+        full_segment_call = sprintf('%s/%s', parameters.startup.simnibs_bin_path, segment_call);
         fprintf('Full command: %s\n', full_segment_call);
         
         orig_dir = pwd;
         try
-            cd(parameters.seg_path);
+            cd(parameters.path.seg);
             [res, out] = system(full_segment_call);
             cd(orig_dir);
             

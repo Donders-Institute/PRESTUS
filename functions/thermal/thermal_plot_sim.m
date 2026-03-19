@@ -22,12 +22,12 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 %   transducer, not the maximum of observed values!
 
     %% Define output file paths for plots
-    output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermal%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plot_rise = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermalrise%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plot_CEM = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_CEM%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermal%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    output_plot_rise = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermalrise%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    output_plot_CEM = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
     %% Convert GPU arrays to CPU if necessary
     if gpuDeviceCount == 0
@@ -204,12 +204,12 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 
     %% Plot timeseries for maximum in medium
 
-    output_plot = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermal_max%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plot_rise = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_thermalrise_max%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    output_plot_CEM = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_CEM_max%s.png', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_plot = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermal_max%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    output_plot_rise = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermalrise_max%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    output_plot_CEM = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_max%s.png', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
     % [layer-max] temperature over time
 
@@ -298,27 +298,27 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 
     %% Save values for post-hoc group analysis
 
-    output_HEAT = fullfile(parameters.output_dir, sprintf('sub-%03d_%s_HEAT%s.mat', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    output_HEAT = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_HEAT%s.mat', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
     save(output_HEAT, 'HEAT', 'timeseries');
 
     %% Create a video of sagittal in-plane heating (if requested)
 
-    if ~isfield(parameters, 'heatingvideo')
-        parameters.heatingvideo = 1; % default: create & save video
+    if ~isfield(parameters.io, 'save_heatingvideo')
+        parameters.io.save_heatingvideo = 1; % default: create & save video
     end
-    if parameters.heatingvideo == 1
+    if parameters.io.save_heatingvideo == 1
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
         if ndims(medium_masks) == 3
             brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.trans_pos(2),:)));
         elseif ndims(medium_masks) == 2
             brain_slice = mat2gray(squeeze(medium_masks));
         end
-        output_video_name = fullfile(parameters.output_dir,...
+        output_video_name = fullfile(parameters.io.output_dir,...
             sprintf('sub-%03d_%s_heating_animation%s.avi', ...
             parameters.subject_id, ...
-            parameters.simulation_medium, ...
-            parameters.results_filename_affix));
+            parameters.simulation.medium, ...
+            parameters.io.output_affix));
         v = VideoWriter(output_video_name,'Uncompressed AVI');
         v.FrameRate = 2; % frames per second
         % Create a video writer object for the output video file and open the object for writing.

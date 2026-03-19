@@ -23,21 +23,21 @@ report_path = '';
 try
     %% Determine output path
     subject_id = parameters.subject_id;
-    medium = parameters.simulation_medium;
+    medium = parameters.simulation.medium;
     is_layered = contains(medium, {'layered', 'phantom'});
     affix = '';
-    if isfield(parameters, 'results_filename_affix')
-        affix = parameters.results_filename_affix;
+    if isfield(parameters.io, 'output_affix')
+        affix = parameters.io.output_affix;
     end
 
     report_filename = sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix);
-    report_path = fullfile(parameters.output_dir, report_filename);
+    report_path = fullfile(parameters.io.output_dir, report_filename);
 
     %% Load CSV data if available
     csv_table = [];
-    if isfield(parameters, 'filename_output_table') && isfile(parameters.filename_output_table)
+    if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_output_table)
         try
-            csv_table = readtable(parameters.filename_output_table, 'VariableNamingRule', 'preserve');
+            csv_table = readtable(parameters.io.filename_output_table, 'VariableNamingRule', 'preserve');
         catch
             csv_table = [];
         end
@@ -106,7 +106,7 @@ try
 
     % Section 6: pseudoCT [Optional] (collapsed by default)
     try
-        if isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+        if isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
             html_parts{end+1} = collapsible_section('pseudo-CT', ...
                 build_pseudoCT_section(parameters), ...
                 false, 'pseudoCT');
@@ -133,7 +133,7 @@ try
 
     % Section 9: Thermal Results (open by default, conditional)
     try
-        if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
+        if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
             html_parts{end+1} = collapsible_section('Thermal Results', ...
                 build_thermal_section(csv_table, parameters, subject_id, medium, affix, is_layered), true, 'thermal');
         end
@@ -143,7 +143,7 @@ try
 
     % Section 10: Debug Information (collapsed by default, layered only)
     try
-        if isfield(parameters, 'debug') && parameters.debug && is_layered
+        if isfield(parameters.simulation, 'debug') && parameters.simulation.debug && is_layered
             html_parts{end+1} = collapsible_section('Debug Information', ...
                 build_debug_section(parameters, subject_id, medium, affix), false, 'debug');
         end
@@ -351,7 +351,7 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     end
     html = [html '<table class="info-table">'];
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
-    if is_layered && isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+    if is_layered && isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span> <span class="badge badge-gray">pseudo-CT (Continuous Skull)</span></td></tr>', html_escape(medium))];
     elseif is_layered
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span></td></tr>', html_escape(medium))];
@@ -363,7 +363,7 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     end
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     if isfield(parameters, 'output_dir')
-        html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_escape(parameters.output_dir))];
+        html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_escape(parameters.io.output_dir))];
     end
     html = [html '</table>'];
     html = [html '</section>'];
@@ -389,7 +389,7 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
     end
 
     % Thermal summary if available
-    if is_layered && isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
+    if is_layered && isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
         html = [html summary_card('Max temp.', csv_value(csv_table, 'maxT'), [char(176) 'C'])];
     end
 
@@ -446,10 +446,10 @@ function html = build_medium_properties_section(parameters)
         return
     end
 
-    med = parameters.medium;
+    med = parameters.simulation.medium;
     layer_names = fieldnames(parameters.layers);
     
-    % === CORRECT FILTER: layers in BOTH parameters.layers AND parameters.medium ===
+    % === CORRECT FILTER: layers in BOTH parameters.layers AND parameters.simulation.medium ===
     valid_tissues = {};
     tissue_labels = {};
     for i = 1:length(layer_names)
@@ -515,19 +515,19 @@ function html = build_config_summary(parameters)
     html = '<table class="config-table">';
 
     % Simulation type
-    html = config_row(html, 'Simulation medium', safe_field(parameters, 'simulation_medium', 'N/A'));
-    html = config_row(html, 'Dimensions', sprintf('%dD', safe_field(parameters, 'n_sim_dims', 3)));
+    html = config_row(html, 'Simulation medium', safe_field(parameters, 'medium', 'N/A'));
+    html = config_row(html, 'Dimensions', sprintf('%dD', safe_field(parameters.grid, 'n_dims', 3)));
 
     % Grid
-    grid_step = safe_field(parameters, 'grid_step_mm', NaN);
+    grid_step = safe_field(parameters.grid, 'resolution_mm', NaN);
     if ~isnan(grid_step)
         html = config_row(html, 'Grid step', sprintf('%.2f mm', grid_step));
     end
-    grid_dims = safe_field(parameters, 'default_grid_dims', []);
+    grid_dims = safe_field(parameters.grid, 'default_dims', []);
     if ~isempty(grid_dims)
         html = config_row(html, 'Grid dims', sprintf('[%s]', strtrim(sprintf('%g ', grid_dims))));
     end
-    pml = safe_field(parameters, 'pml_size', NaN);
+    pml = safe_field(parameters.grid, 'pml_size', NaN);
     if ~isnan(pml)
         html = config_row(html, 'PML size', sprintf('%d', pml));
     end
@@ -588,7 +588,7 @@ function html = build_positioning_section(parameters, subject_id, affix)
     found_any = false;
     html = [html '<div class="image-grid image-grid--wide">'];
     for t = 1:n_trans
-        img_path = fullfile(parameters.output_dir, ...
+        img_path = fullfile(parameters.io.output_dir, ...
             sprintf('sub-%03d_positioning_T%02d%s.png', subject_id, t, affix));
         img_html = embed_image(img_path, sprintf('Positioning T%02d', t), ...
             sprintf('Transducer %d positioning', t));
@@ -647,7 +647,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
     html = [html '<div class="image-grid">'];
     for t = 1:n_trans
         % ISPPA on segmentation
-        img_path = fullfile(parameters.output_dir, ...
+        img_path = fullfile(parameters.io.output_dir, ...
             sprintf('sub-%03d_%s_isppa_T%02d%s.png', subject_id, medium, t, affix));
         img_html = embed_image(img_path, sprintf('ISPPA on segmentation T%02d', t), ...
             sprintf('ISPPA overlay (segmentation) — T%02d', t));
@@ -656,7 +656,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         end
 
         % ISPPA on T1
-        img_path = fullfile(parameters.output_dir, ...
+        img_path = fullfile(parameters.io.output_dir, ...
             sprintf('sub-%03d_%s_isppa_t1_T%02d%s.png', subject_id, medium, t, affix));
         img_html = embed_image(img_path, sprintf('ISPPA on T1 T%02d', t), ...
             sprintf('ISPPA overlay (T1) — T%02d', t));
@@ -706,7 +706,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     html = [html '<div class="image-grid">'];
     for i = 1:size(thermal_images, 1)
-        img_path = fullfile(parameters.output_dir, ...
+        img_path = fullfile(parameters.io.output_dir, ...
             sprintf(thermal_images{i,1}, subject_id, medium, affix));
         img_html = embed_image(img_path, thermal_images{i,2}, thermal_images{i,2});
         if ~isempty(img_html)
@@ -716,7 +716,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
     html = [html '</div>'];
 
     % Note about heating animation
-    avi_path = fullfile(parameters.output_dir, ...
+    avi_path = fullfile(parameters.io.output_dir, ...
         sprintf('sub-%03d_%s_heating_animation%s.avi', subject_id, medium, affix));
     if isfile(avi_path)
         html = [html sprintf('<p class="note">Heating animation available: <code>%s</code></p>', ...
@@ -730,7 +730,7 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
 
     debug_dir = '';
     if isfield(parameters, 'debug_dir')
-        debug_dir = parameters.debug_dir;
+        debug_dir = parameters.io.debug_dir;
     end
     if isempty(debug_dir) || ~isfolder(debug_dir)
         html = '<p class="placeholder">Debug directory not found.</p>';
@@ -781,7 +781,7 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
 end
 
 function html = build_posthoc_section(parameters)
-    if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims
+    if isfield(parameters.modules, 'run_posthoc_water_sims') && parameters.modules.run_posthoc_water_sims
         html = '<span class="badge badge-green">Requested</span>';
     else
         html = '<span class="badge badge-gray">Not requested</span>';
@@ -851,21 +851,21 @@ function html = build_pseudoCT_section(parameters)
     html = '';
     
     % Extract from parameters
-    debug_dir = parameters.output_dir;
+    debug_dir = parameters.io.output_dir;
     affix = '';
-    if isfield(parameters, 'results_filename_affix')
-        affix = parameters.results_filename_affix;
+    if isfield(parameters.io, 'output_affix')
+        affix = parameters.io.output_affix;
     end
     debug_path = fullfile(debug_dir, 'debug');
     
     % 1. MAPPING ALGORITHMS TABLE FIRST
     html = [html, '<dl class="mapping-list">'];
-    fields = {'pct_mapping_density', 'pct_mapping_soundspeed', 'pct_mapping_attenuation'};
+    seg_fields = {'density', 'soundspeed', 'attenuation'};
     labels = {'Density', 'Sound speed', 'Attenuation'};
-    
+
     for i = 1:3
-        if isfield(parameters, fields{i})
-            val = html_escape(char(parameters.(fields{i})));
+        if isfield(parameters, 'pct') && isfield(parameters.pct, ['mapping_' seg_fields{i}])
+            val = html_escape(char(parameters.pct.(['mapping_' seg_fields{i}])));
             html = [html, sprintf('<dt class="inline-dt">%s mapping: <code>%s</code></dt>', labels{i}, val)];
         end
     end
@@ -889,7 +889,7 @@ function html = build_pseudoCT_section(parameters)
     
     % 3. KPLAN mapping - ONLY when pct_mapping_density == 'k-plan'
     lightbox_idx = 2;
-    if isfield(parameters, 'pct_mapping_density') && strcmp(parameters.pct_mapping_density, 'k-plan')
+    if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_density') && strcmp(parameters.pct.mapping_density, 'k-plan')
         kplan_path = fullfile(debug_path, 'pCT_hounsfield-density_kplan.png');
         if isfile(kplan_path)
             html = [html, sprintf('<div class="image-row"><figure class="image-container">')];
@@ -904,7 +904,7 @@ function html = build_pseudoCT_section(parameters)
     end
     
     % 4. k-Wave mapping - ONLY when pct_mapping_density == 'k-wave'
-    if isfield(parameters, 'pct_mapping_density') && strcmp(parameters.pct_mapping_density, 'k-wave')
+    if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_density') && strcmp(parameters.pct.mapping_density, 'k-wave')
         kwave_path = fullfile(debug_path, 'pCT_hounsfield-density_kwave.png');
         if isfile(kwave_path)
             html = [html, sprintf('<div class="image-row"><figure class="image-container">')];
@@ -1062,12 +1062,12 @@ end
 function log_path = find_log_file(parameters, subject_id, medium, affix)
 % Find the most recent diary log file.
     log_path = '';
-    if ~isfield(parameters, 'output_dir') || ~isfolder(parameters.output_dir)
+    if ~isfield(parameters, 'output_dir') || ~isfolder(parameters.io.output_dir)
         return
     end
 
     pattern = sprintf('sub-%03d_%s%s_*.txt', subject_id, medium, affix);
-    files = dir(fullfile(parameters.output_dir, pattern));
+    files = dir(fullfile(parameters.io.output_dir, pattern));
     if isempty(files), return; end
 
     [~, idx] = max([files.datenum]);
@@ -1142,8 +1142,8 @@ function html = build_toc(parameters, is_layered)
     % Safety status dot: determine worst-case color
     worst = 'green';
     try
-        if isfield(parameters, 'filename_output_table') && isfile(parameters.filename_output_table)
-            csv_table = readtable(parameters.filename_output_table, 'VariableNamingRule', 'preserve');
+        if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_output_table)
+            csv_table = readtable(parameters.io.filename_output_table, 'VariableNamingRule', 'preserve');
             if is_layered
                 limits = get_safety_limits();
             else
@@ -1187,7 +1187,7 @@ function html = build_toc(parameters, is_layered)
     end
 
     % pCT (pCT only)
-    if isfield(parameters, 'use_pseudoCT') && parameters.use_pseudoCT
+    if isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
         html = [html '<a href="#pseudoCT">pseudo-CT</a>'];
     end
 
@@ -1195,10 +1195,10 @@ function html = build_toc(parameters, is_layered)
     html = [html '<a href="#acoustic">Acoustic</a>'];
 
     % Conditional links
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims
+    if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
         html = [html '<a href="#thermal">Thermal</a>'];
     end
-    if isfield(parameters, 'debug') && parameters.debug && is_layered
+    if isfield(parameters.simulation, 'debug') && parameters.simulation.debug && is_layered
         html = [html '<a href="#debug">Debug</a>'];
     end
     if is_layered

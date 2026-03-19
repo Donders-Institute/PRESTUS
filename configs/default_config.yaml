@@ -8,114 +8,188 @@
 # Defaults should be overwritten (where sensible or necessary) in a separate <simulation-X>config.yaml file.
 #------------------------------------------------
 
+#------------ General
+
+subject_id: 0    # Participant ID (integer, used for path substitution in path.t1_pattern and path.t2_pattern) 
+platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matlab (recommended for debugging)
+
+#------------ Simulation type & execution
+
+simulation:
+  medium: layered     # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+  code_type: matlab_gpu # Select which k-Wave code to run:
+                        #   MATLAB CPU code 'matlab_cpu'
+                        #   MATLAB GPU code 'matlab_gpu'
+                        #   C++ CPU code 'cpp_cpu'
+                        #   C++ GPU code 'cpp_gpu'
+  precision: 'single' # Computational precision for both acoustic and thermal simulations
+  interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
+  debug: 1            # Activate debug mode with additional intermediate outputs?
+
+#------------ Paths
+
+path:
+  anat: ''              # Location of the structural input data [full path]
+  sim: ''               # Location of the simulation outputs [full path or folder name in path.anat]
+  seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
+  t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
+  t2_pattern: 'sub-%1$03d_T2w.nii*' # T2 image path template relative to path.anat
+  localite: ''          # Path to Localite neuronavigation output folder
+  subject_subfolder: 1  # Should each participant's output be stored in a separate folder?
+
+#------------ Startup (environment & toolbox paths)
+
+startup:
+  simnibs_bin_path: ''  # Path to the SimNIBS environment (please use full paths)
+  paths_to_add: []      # Additional paths to add with addpath()
+  subpaths_to_add: []   # Paths to add recursively with addpath(genpath()); relative to config file location
+
 #------------ I/O management
 
-data_path: ''   # Location of the the input data [full path]
-sim_path: ''    # Location of the the simulation outputs [full paths or folder name in data_path]
-sig_path: ''    # Location of the the segmentation directories (containing m2m folders) [full path]
+io:
+  output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
+  overwrite_files: always   # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+  overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
+  save_matrices: 0          # Save output matrices?
+  save_heatingvideo: 0      # Save a video of incremental heating?
 
-# Should simulation outputs be ordered based on subject id?
-subject_subfolder: 1
+#------------ Module execution
 
-# Paths to T1 and T2 relative to data_path; all string substitutions will be done using subject_id
-#t1_path_template: '' # e.g. 'sub-%1$03d_T1w.nii*'
-#t2_path_template: '' # e.g., 'sub-%1$03d_T2w.nii*''
-
-# Optional affix for result files names
-results_filename_affix: ''
-
-# This allows you to add additional paths and subpaths while running the pipeline
-paths_to_add: []
-subpaths_to_add: []
-simnibs_bin_path: '' # Path to the SimNIBS environment (please use full paths)
-
-# In interactive mode (1), the figures are shown and confirmation dialogs appear (the latter of which will halt the pipeline until confirmation)
-# In non-interactive mode (0), no plots are shown and no confirmation dialogs will 
-interactive: 0
-# Needs to be included if running in a non-interactive mode
-overwrite_files: always # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
-# By default, SimNIBS segmentation results are not overwritten, unless enabled here
-overwrite_simnibs: 0
-
-#------------ Simulation type
-
-# select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
-simulation_medium: layered
-
-use_pseudoCT: 0 # [Optional] use (p)CT (if available) to inform skull medium properties
-pct_mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
-pct_mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
-pct_mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
-
-# Run specific modules?
-
-run_grid_setup: 1         # Setup grid and run head processing? Mandatory for simulations.
-run_medium_setup: 1       # Map medium acoustic properties Mandatory for simulations.
-run_source_setup: 1       # Set up acoustic source? Mandatory for simulations.
-run_acoustic_sims: 1      # Run acoustic simulations?
-run_acoustic_analysis: 1  # Run acoustic analysis?
-run_heating_sims: 0       # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
-run_thermal_analysis: 1   # Run thermal analysis?
-run_nifti_creation: 1     # Run nifti creation?
-run_posthoc_water_sims: 1 # Run simulations in free water with identical setup?
-generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?
-
-# Select which k-Wave code to run (see 'run_simulations' for more documentation)
-#   MATLAB CPU code 'matlab_cpu'
-#   MATLAB GPU code 'matlab_gpu'
-#   C++ CPU code 'cpp_cpu'
-#   GPU code 'cpp_gpu'
-code_type: matlab_gpu 
-
-savemat: 0 # Save output matrices?
-debug: 1 # Activate a debug mode in which more intermediate outputs are provided?
+modules:
+  run_grid_setup: 1         # Setup grid and run head processing? Mandatory for simulations.
+  run_medium_setup: 1       # Map medium acoustic properties? Mandatory for simulations.
+  run_source_setup: 1       # Set up acoustic source? Mandatory for simulations.
+  run_acoustic_sims: 1      # Run acoustic simulations?
+  run_acoustic_analysis: 1  # Run acoustic analysis?
+  run_heating_sims: 0       # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
+  run_thermal_analysis: 1   # Run thermal analysis?
+  run_nifti_creation: 1     # Run nifti creation?
+  run_posthoc_water_sims: 1 # Run simulations in free water with identical setup?
+  generate_report: 1        # Generate a self-contained HTML simulation report at the end of the pipeline?
 
 #------------ High-performance computing
 
-platform: 'auto' # auto (recommended) | slurm | qsub | matlab (recommended for debugging)
-hpc_gpu: ''
-hpc_partition: ''
-hpc_reservation: ''
-hpc_wait_for_job: false
-hpc_timelimit: '04:00:00'
-hpc_memorylimit: 20
+hpc:
+  gpu: ''
+  partition: ''
+  reservation: ''
+  wait_for_job: false
+  timelimit: '04:00:00'
+  memorylimit: 20
+  ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+  job_prefix: 'PRESTUS' # Prefix for HPC job names
+  max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
 
-# An optional path to LD_LIBRARY used during SimNIBS installation
-# If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
-ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+#------------ Target analysis
 
-#------------ Target specification
-
-focus_area_radius: 5 # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+analysis:
+  focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
 
 #------------ Transducer specification  (no defaults)
+
 transducer:
   n_elements: []        # Number of elements in the transducer [#]
   Elements_ID_mm: []    # Inner diameter of each element [mm]
   Elements_OD_mm: []    # Outer diameter of each element [mm]
   curv_radius_mm: []    # Radius of curvature of the bowl [mm]
   dist_to_plane_mm: []  # Distance to the transducer plane from the geometric focus [mm]
-  source_amp: []        # Pressure amplitude [Pa] 
-  source_phase_deg: []  # Source phase [deg] 
+  source_amp: []        # Pressure amplitude [Pa]
+  source_phase_deg: []  # Source phase [deg]
   source_freq_hz: []    # Fundamental frequency [Hz]
   trans_pos: []         # Transducer position [T1 grid space]
   focus_pos: []         # Stimulation target position[T1 grid space]
 
-# Use the kwaveArray class for transducer modeling?
-use_kWaveArray: 1
+#------------ Transducer Placement
 
-#------------ Thermal parameters (no defaults for temporal protocol)
+placement:
+  localite:
+    enabled: 0        # Should the script position_transducer_localite be used?
+    reference_distance_mm: 15 # Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane (can only be used with the function 'transducer_from_localite')
+  heuristic:
+    dist_close: []
+    ear_radius: 35
+    save_localite_t1: false # Save Localite-aligned T1 output for header correction?
+    left_ear_center: []
+    right_ear_center: []
+    criterion_intersection: 0.05
+    criterion_skin_mean: []
+    criterion_skull_mean: []
+    criterion_skin_var: []
+    criterion_skull_var: []
+    expand_step: 0.01
+
+#------------ Simulation grid
+
+grid:
+  resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
+  default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
+  pml_size: 10        # Perfectly Matched Layer (PML) size [3D recommendation: 10]
+  source_ppw: []      # Points Per Wavelength [default: calculated internally]
+  source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction
+  source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
+  max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
+  use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
+  axisymmetric: 0     # Use 2D axisymmetric simulation mode?
+
+#------------ Head model / Segmentation processing
+
+headmodel:
+  head_pad_mm: 0      # Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]
+  csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [grid voxels]
+  # Thresholds for smoothing masks (and acoustic properties)
+  smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
+  smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
+  smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
+  smooth_fwhm_mm: 1   # Smoothing FWHM [mm]
+  smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
+  # Settings for skull hole-filling
+  skull_fill_method: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
+  skull_wrap_radius: 10 # Rubber-wrap radius [grid voxels]; larger = tighter rubber ignoring bigger dents (recommendation: 2–10)
+  skull_wrap_visualize: 0 # Visualize rubber-wrap result? (Currently causes issues on HPC)
+
+#------------ Segmentation
+
+segmentation:
+  use_qform: 0      # Force qform reorientation before charm segmentation? Set to 1 if charm reports qform/sform mismatch.
+  debug: 0          # Pass --debug flag to charm segmentation for verbose output?
+
+#------------ (pseudo-)CT skull property mapping
+
+pct:
+  enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
+  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
+  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
+  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
+
+#------------ Simulation layers
+# Assign tissue compartments to model, with their SimNIBS segmentation label indices.
+# You can remove or add layers. If you want a skull-only simulation, remove brain and skin for example.
+
+layers:
+  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
+  brain: [1, 2]
+  skin: [5]
+  skull: [4]
+  skull_cortical: [7]
+  skull_trabecular: [8]
+
+
+#------------ Sonication timing protocol (no defaults - must be specified for thermal simulations)
+
+timing:
+  pd: 0            # Pulse Duration (PD) [s]
+  pri: 0           # Pulse Repetition Interval (PRI) [s]; PRF = 1/pri
+  ptd: 0           # Pulse Train Duration (PTD) [s]
+  pt_timestep: 0.02   # Modelling time step within a pulse train [s]
+  ptri: 0          # Pulse Train Repetition Interval (PTRI) [s]
+  ptrd: 0          # Pulse Train Repetition Duration (PTRD) [s]
+  post_ptri_dur: 0 # Post-PTRI steady-state duration [s]
+  post_pt_timestep: 1 # Modelling time step following PT & PTRI [s]
+  equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
+
+#------------ Thermal parameters
+
 thermal:
-  pd: 0
-  pri: 0  
-  ptd: 0
-  pt_timestep: 0.02 
-  ptri: 0
-  ptrd: 0
-  post_ptri_dur: 0
-  post_pt_timestep: 1
-  equal_step_duration: 0
-  # Optional parameters:
   cem43_iso: 0
   temp_0: #[deg C] initial temperature
     water: 37
@@ -126,46 +200,6 @@ thermal:
     skull_cortical: 37
   sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
-
-heatingvideo: 0 # Save a video of incremental heating? 
-
-#------------------------------------------------
-#------------ INTERNAL --------------------------
-#------------------------------------------------
-
-#------------ Head segmentation
-
-# Segmentation software ('charm' is recommended, 'headreco' is deprecated)
-segmentation_software: charm
-
-# Labels for layered simulation, assuming for now the SimNIBS masks indices;
-# Note that the labels are applied in the order specified here, so the skull should normally be the last as it matters the most
-# This labeling scheme assumes the outputs of charm in SimNIBS
-# You can remove or add layers. If you want a skull-only simulation, you can remove brain and skin for example.
-
-# Assign multi-layer compartments to model, and indicate SimNIBS segmentation ids
-layers:
-  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
-  brain: [1, 2]
-  skin: [5]
-  skull: [4]
-  skull_cortical: [7] 
-  skull_trabecular: [8]
-
-# Provide SimNIBS segmentation labels
-seg_labels:
-  bonemask: [1,2,3,4,7,8,9] # include all media within the skull mask
-  external: [0]
-  wm: [1]
-  gm: [2]
-  csf: [3]
-  skull: [4]
-  skin: [5]
-  eye: [6]
-  skull_cortical: [7] 
-  skull_trabecular: [8]
-  blood: [9]
-  muscle: [10]
 
 #------------  Medium properties
 # References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
@@ -225,54 +259,3 @@ medium:
     specific_heat_capacity: 1313 # [J/kg/°C]
     perfusion: 10
     absorption_fraction: 0.28
-
-#------------ Simulation grid
-
-grid_step_mm: 0.5  # Grid resolution (must be isotropic) [mm]
-default_grid_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
-pml_size: 10 # Perfectly Matched Layer (PML) size [3D recommendation: 10]
-
-source_ppw: [] # Points Per Wavelength [default: calculated internally]
-source_cfl: 0.15 # Courant-Friedrichs-Lewy fraction
-source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
-
-precision: 'single' # Computational precision for both acoustic and thermal simulations
-
-#------------ Segmentation / Head preprocessing
-
-pad_mm: 0 # Apply symmetric padding to grid prior to transducer + PML setup?
-csf_mask_expansion_factor: 40 # Expansion factor for the cerebro-spinal fluid brain mask to capture head areas of interest in simulation
-grid_max_expand: 40 # Prime number grid expansion size to (potentially) speed up computations
-
-# Thresholds for smoothing masks (and acoustic properties)
-smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
-smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
-smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
-smooth_fwhm_mm: 1 # Smoothing FWHM [mm]
-smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
-
-# Settings for shrinkwrap (if requested)
-skullfillmethod: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
-wrapradius: 10 # skull rubber wrap radius [grid voxels]; Bigger = tighter rubber that ignores bigger dents (recommendaton: 2 to 10)
-skullwrap_visualize: 0 # Visualize results of skullwrap? (Currently causes issues on HPC)
-
-#------------ Transducer Placement (Localite)
-
-# Should the script position_transducer_localite be used?
-transducer_from_localite: 0
-# Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane
-reference_transducer_distance_mm: 15 # (can only be used with the function 'transducer_from_localite')
-
-#------------ Transducer Placement (Heuristic)
-
-tp_dist_close: []
-tp_ear_radius: 35
-tp_left_ear_center: []
-tp_right_ear_center: []
-tp_criterion_intersection: 0.05
-tp_criterion_skin_mean: []
-tp_criterion_skull_mean: []
-tp_criterion_skin_var: []
-tp_criterion_skull_var: []
-tp_expand_step: 0.01
-tp_save_localiteT1: true

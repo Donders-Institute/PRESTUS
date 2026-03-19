@@ -1,24 +1,25 @@
 function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
-    hpc_setup_temp_files(parameters, subject_id)
+    hpc_setup_temp_files(parameters)
 %% HPC_SETUP_TEMP_FILES  Setup directories and generate temporary files
 %
 %   Creates output directory, log directory, and timestamped temporary files
 %   for MATLAB data and script.
+%   Subject ID is read from parameters.subject_id.
 %
 %   Outputs:
 %     log_dir         - Path to batch_job_logs directory
 %     prestus_path    - PRESTUS path
 %     temp_data_path  - Path for temporary .mat data file
-%     temp_m_path     - Path for temporary .m script file  
+%     temp_m_path     - Path for temporary .m script file
 %     temp_m_file     - Basename of MATLAB script (no path)
 %
-%   See also HPC_WRITE_MATLAB_SCRIPT, HPC_SUBMIT_JOB.
+%   See also HPC_SUBMIT_JOB.
 
 % Setup output directory
-if isfield(parameters, 'subject_subfolder') && parameters.subject_subfolder
-    output_dir = fullfile(parameters.sim_path, sprintf('sub-%03d', subject_id));
+if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder
+    output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', parameters.subject_id));
 else
-    output_dir = parameters.sim_path;
+    output_dir = parameters.path.sim;
 end
 if ~isfolder(output_dir), mkdir(output_dir); end
 

@@ -24,19 +24,22 @@ function [trans_pos_grid, target_pos_grid, best_trans_pos] = ...
 
 % Default parameter values if not provided
 defaults = struct( ...
-    'tp_criterion_intersect',    0.05, ...
-    'tp_criterion_skin_mean',    NaN,  ... 
-    'tp_criterion_skull_mean',   NaN,  ...  
-    'tp_criterion_skin_var',     NaN,   ...
-    'tp_criterion_skull_var',    NaN,  ...  
-    'tp_expand_step',            0.01 ...
+    'criterion_intersection',    0.05, ...
+    'criterion_skin_mean',    NaN,  ...
+    'criterion_skull_mean',   NaN,  ...
+    'criterion_skin_var',     NaN,   ...
+    'criterion_skull_var',    NaN,  ...
+    'expand_step',            0.01 ...
 );
 
 % Fill in missing parameter fields
+if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'heuristic')
+    parameters.placement.heuristic = struct();
+end
 fields = fieldnames(defaults);
 for k = 1:numel(fields)
-    if ~isfield(parameters, fields{k}) || isempty(parameters.(fields{k}))
-        parameters.(fields{k}) = defaults.(fields{k});
+    if ~isfield(parameters.placement.heuristic, fields{k}) || isempty(parameters.placement.heuristic.(fields{k}))
+        parameters.placement.heuristic.(fields{k}) = defaults.(fields{k});
         fprintf('[TP_HEURISTIC] Using default %s = %.3f\n', ...
                 fields{k}, defaults.(fields{k}));
     end
@@ -44,12 +47,12 @@ end
 
 %% STEP 1 — Intersection (adaptive expansion)
 
-if ~isnan(parameters.tp_criterion_intersect)
-    criterion = parameters.tp_criterion_intersect;
+if ~isnan(parameters.placement.heuristic.criterion_intersection)
+    criterion = parameters.placement.heuristic.criterion_intersection;
     tppf = locs(locs.prop_intersect < criterion, :);
-    
+
     while isempty(tppf) && criterion < 0.3
-        criterion = criterion + parameters.tp_expand_step;
+        criterion = criterion + parameters.placement.heuristic.expand_step;
         tppf = locs(locs.prop_intersect < criterion, :);
     end
 else
@@ -57,9 +60,9 @@ else
 end
 
 %% STEP 2 — Skin proximity
-if ~isnan(parameters.tp_criterion_skin_mean) && ~isempty(tppf)
+if ~isnan(parameters.placement.heuristic.criterion_skin_mean) && ~isempty(tppf)
     % Use quantile
-    skin_lim = quantile(tppf.mean_dist_skin, parameters.tp_criterion_skin_mean);
+    skin_lim = quantile(tppf.mean_dist_skin, parameters.placement.heuristic.criterion_skin_mean);
     tmp = tppf(tppf.mean_dist_skin <= skin_lim, :);
     if ~isempty(tmp), tppf = tmp;
     else, fprintf('[TP_HEURISTIC] Skipping skin_mean criterion.\n'); end
@@ -67,27 +70,27 @@ end
 
 %% STEP 3 — Skull variance
 
-if ~isnan(parameters.tp_criterion_skull_var) && ~isempty(tppf)
+if ~isnan(parameters.placement.heuristic.criterion_skull_var) && ~isempty(tppf)
     % Use quantile
-    skull_var_lim = quantile(tppf.var_dist_skull, parameters.tp_criterion_skull_var);
+    skull_var_lim = quantile(tppf.var_dist_skull, parameters.placement.heuristic.criterion_skull_var);
     tmp = tppf(tppf.var_dist_skull <= skull_var_lim, :);
     if ~isempty(tmp), tppf = tmp;
     else, fprintf('[TP_HEURISTIC] Skipping skull_var criterion.\n'); end
 end
 
 %% STEP 4 — Skull mean distance (always applied)
-if ~isnan(parameters.tp_criterion_skull_mean) && ~isempty(tppf)
+if ~isnan(parameters.placement.heuristic.criterion_skull_mean) && ~isempty(tppf)
     % Use quantile
-    skull_mean_lim = quantile(tppf.mean_dist_skull, parameters.tp_criterion_skull_mean);
+    skull_mean_lim = quantile(tppf.mean_dist_skull, parameters.placement.heuristic.criterion_skull_mean);
     tmp = tppf(tppf.mean_dist_skull <= skull_mean_lim, :);
     if ~isempty(tmp), tppf = tmp;
     else, fprintf('[TP_HEURISTIC] Skipping skull_mean criterion.\n'); end
 end
 
 %% STEP 5 — Skin variance
-if ~isnan(parameters.tp_criterion_skin_var) && ~isempty(tppf)
+if ~isnan(parameters.placement.heuristic.criterion_skin_var) && ~isempty(tppf)
     % Use quantile
-    skin_var_lim = quantile(tppf.var_dist_skin, parameters.tp_criterion_skin_var);
+    skin_var_lim = quantile(tppf.var_dist_skin, parameters.placement.heuristic.criterion_skin_var);
     tmp = tppf(tppf.var_dist_skin <= skin_var_lim, :);
     if ~isempty(tmp)
         tppf = tmp;
@@ -159,13 +162,13 @@ best_trans_pos.ras_targ_z_mm = target_pos_ras(3);
 
 table_formatted = rows2vars(best_trans_pos);
 
-table_path = fullfile(parameters.output_dir, sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
+table_path = fullfile(parameters.io.output_dir, sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
 writetable(table_formatted, table_path, 'Delimiter', 'tab', 'WriteVariableNames', false);
 fprintf('[TP_HEURISTIC] Saved heuristic position: %s\n', table_path);
 
 %% [Optional] Save copy in localite directory
-if isfield(parameters, 'localite_path') && ~isempty(parameters.localite_path)
-    localite_path = fullfile(parameters.localite_path,...
+if isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
+    localite_path = fullfile(parameters.path.localite,...
         sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
     writetable(table_formatted, localite_path, 'Delimiter', 'tab', 'WriteVariableNames', false);
     fprintf('[TP_HEURISTIC] Additional Localite copy saved: %s\n', localite_path);

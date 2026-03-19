@@ -7,8 +7,8 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
 % - Reduces rendering load: no edges, no gouraud, optional point cap
 %
 % Inputs:
-%   parameters.debug_dir
-%   parameters.results_filename_affix
+%   parameters.io.debug_dir
+%   parameters.io.output_affix
 %   SKULL, ZADDED, BALLOON : 3-D logical or numeric masks (same size)
 %   downsample_factor      : (optional) integer >=1
 
@@ -153,8 +153,8 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
 
     %% Fast raster export (avoid slow vector pipeline)
 
-    output_png = fullfile(parameters.debug_dir, ...
-        sprintf('skull_visualization%s.png', parameters.results_filename_affix));
+    output_png = fullfile(parameters.io.debug_dir, ...
+        sprintf('skull_visualization%s.png', parameters.io.output_affix));
 
     drawnow limitrate;
     fr = getframe(fig);

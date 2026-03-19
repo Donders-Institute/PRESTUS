@@ -60,7 +60,7 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     coord_rel_to_targ = outer_coords - target;
     distances_to_target = sqrt(sum(coord_rel_to_targ.^2, 2));
 
-    close_enough_idx = outer_idx(distances_to_target < (parameters.tp_dist_close / pixel_size));
+    close_enough_idx = outer_idx(distances_to_target < (parameters.placement.heuristic.dist_close / pixel_size));
     trans_pos_coords = coord_mesh.xyz(close_enough_idx, :);  % [N_cand x 3]
 
     %--- Transducer axis + geometry --------------------------------------

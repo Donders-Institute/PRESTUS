@@ -2,7 +2,7 @@ function [tpos_pars, mesh] = tp_evaluate_candidate_positions(img, target, parame
 %% TP_EVALUATE_CANDIDATE_POSITIONS Evaluate candidate transducer positions
 %  SEARCH CRITERIA:
 %  1. Skull exterior surface points (img==0 → imdilate gradient)
-%  2. Within parameters.tp_dist_close mm Euclidean distance from target
+%  2. Within parameters.placement.heuristic.dist_close mm Euclidean distance from target
 %  3. Exit aperture intersects skin surface (>0% overlap required)
 %  4. Scores: skin_distance uniformity, skull_distance uniformity, intersection fraction
 %

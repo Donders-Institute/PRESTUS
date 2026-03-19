@@ -34,10 +34,10 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %   - Gap filling identifies largest non-skin-skull blob (likely CSF/air) and ignores it.
 %   - Eyes default to water (label 0) to avoid erroneous bone assignment.
 
-    labels_medium = fieldnames(parameters.medium);
+    labels_medium = fieldnames(parameters.simulation.medium);
     labels_requested = fieldnames(parameters.layers);
 
-    if parameters.use_pseudoCT == 0 && any(contains(labels_requested, 'skull_cortical'))  
+    if parameters.pct.enabled == 0 && any(contains(labels_requested, 'skull_cortical'))  
         % treat cortical bone as the base layer
         skull_i = find(ismember(labels_medium, {'skull_cortical'; 'skull_trabecular'}));
     else
@@ -49,7 +49,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 
     % Ensure continuous skull (fill small holes, connect thin regions)
     skull = ismember(medium_masks, skull_i);
-    if isfield(parameters, 'skullfillmethod') && strcmp(parameters.skullfillmethod, 'rubberwrap')
+    if isfield(parameters.headmodel, 'skull_fill_method') && strcmp(parameters.headmodel.skull_fill_method, 'rubberwrap')
         % Local skull filling with rubber expansion
         skull_continuous = skull_rubber_wrap(parameters, skull, medium_masks, segmented_img);
     else
@@ -61,38 +61,39 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
     medium_masks(skull_new) = skull_i(1);  % Only add new voxels as cortical bone (if differentiated)
 
     % [DEBUG] Plot skull expansion at focus y-slice
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         h = figure;
         montage({1-squeeze(skull(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_new(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_continuous(:,focus_pos_grid(2),:))}, 'Size', [1 3]);
         title('Skull (left), added bone (center), continuous skull (right)');
-        output_plot_filename = fullfile(parameters.debug_dir, ...
+        output_plot_filename = fullfile(parameters.io.debug_dir, ...
             sprintf('sub-%03d_%s_skull_expansion%s.png', ...
-            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         saveas(h, output_plot_filename, 'png');
         close(h);
     end
 
     % Label eye layer as water
-    if isfield(parameters.seg_labels, 'eye')
-        eye_i = parameters.seg_labels.eye;
+    seg_labels = charm_seg_labels();
+    if isfield(seg_labels, 'eye')
+        eye_i = seg_labels.eye;
         eye = segmented_img == eye_i;
-        i_water = find(strcmp(fieldnames(parameters.medium), 'water'));
+        i_water = find(strcmp(fieldnames(parameters.simulation.medium), 'water'));
         medium_masks(eye ~= 0) = i_water; % Default to water
     end
 
     % [DEBUG] Plot before/after gap filling at focus y-slice
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         medium_mask_updates = double(medium_masks-medium_with_gaps);
         medium_mask_updates(medium_mask_updates ~=0) = 1; % indicate where changes occured
         h = figure;
         imshowpair(label2rgb(squeeze(medium_mask_updates(:,focus_pos_grid(2),:)), 'parula'), ...
             label2rgb(squeeze(medium_masks(:,focus_pos_grid(2),:)), 'parula'), 'montage');
         title('Updated (left) and closed off (right) segmented images');
-        output_plot_filename = fullfile(parameters.debug_dir, ...
+        output_plot_filename = fullfile(parameters.io.debug_dir, ...
             sprintf('sub-%03d_%s_segmented_img_closing_gaps_changes%s.png', ...
-            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         saveas(h, output_plot_filename, 'png');
         close(h);
     end

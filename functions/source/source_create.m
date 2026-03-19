@@ -19,15 +19,15 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
     nT = numel(parameters.transducer);
 
-    if parameters.use_kWaveArray ~= 0 && nT > 1
+    if parameters.grid.use_kWaveArray ~= 0 && nT > 1
         error(['Multiple transducers with kWaveArray (use_kWaveArray ~= 0) ' ...
                'are not implemented yet. Use use_kWaveArray == 0 or a single transducer.']);
     end
 
     %% Validate / broadcast positions
 
-    if isequal(size(trans_pos), [parameters.n_sim_dims 1]), trans_pos = trans_pos'; end
-    if isequal(size(focus_pos), [parameters.n_sim_dims 1]), focus_pos = focus_pos'; end
+    if isequal(size(trans_pos), [numel(parameters.grid.dims) 1]), trans_pos = trans_pos'; end
+    if isequal(size(focus_pos), [numel(parameters.grid.dims) 1]), focus_pos = focus_pos'; end
 
     if size(trans_pos,1) == 1,  trans_pos  = repmat(trans_pos,  nT, 1); end
     if size(focus_pos,1) == 1,  focus_pos  = repmat(focus_pos, nT, 1); end
@@ -35,23 +35,23 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
     if size(trans_pos,1) ~= nT || size(focus_pos,1) ~= nT
         error('trans_pos and focus_pos must have one row per transducer.');
     end
-    if size(trans_pos,2) ~= parameters.n_sim_dims || size(focus_pos,2) ~= parameters.n_sim_dims
-        error('trans_pos and focus_pos columns must match parameters.n_sim_dims.');
+    if size(trans_pos,2) ~= numel(parameters.grid.dims) || size(focus_pos,2) ~= numel(parameters.grid.dims)
+        error('trans_pos and focus_pos columns must match numel(parameters.grid.dims).');
     end
 
     %% Convert element diameters from mm to grid points (for all transducers)
 
     transducer_pars = parameters.transducer;
-    grid_step_mm    = parameters.grid_step_mm;
+    grid.resolution_mm    = parameters.grid.resolution_mm;
 
     for it = 1:nT
         tp = transducer_pars(it);
 
-        tp.Elements_OD = 2 * floor(tp.Elements_OD_mm / grid_step_mm / 2) + 1;
-        tp.Elements_ID = 2 * floor(tp.Elements_ID_mm / grid_step_mm / 2) + 1;
+        tp.Elements_OD = 2 * floor(tp.Elements_OD_mm / grid.resolution_mm / 2) + 1;
+        tp.Elements_ID = 2 * floor(tp.Elements_ID_mm / grid.resolution_mm / 2) + 1;
         tp.Elements_ID(tp.Elements_ID_mm == 0) = 0;
 
-        tp.radius_grid = round(tp.curv_radius_mm / grid_step_mm);
+        tp.radius_grid = round(tp.curv_radius_mm / grid.resolution_mm);
 
         if it == 1
             % initialise struct array with full field set of tp
@@ -65,7 +65,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
     %% Branch 1: Custom element geometry (non-kWaveArray setup, multi-transducer)
 
-    if parameters.use_kWaveArray == 0
+    if parameters.grid.use_kWaveArray == 0
 
         % --- per-transducer CW signals (per-element) ---
 
@@ -96,7 +96,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
         % --- geometry: per-element bowls, numeric source_labels = global element index ---
 
-        grid_dims       = parameters.grid_dims;
+        grid_dims       = parameters.grid.dims;
         transducer_mask = false(grid_dims);
         source_labels   = zeros(grid_dims);
         
@@ -109,17 +109,17 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 global_el = offsets(it) + el_i;  % 1..n_elements_total
         
                 % outer element aperture
-                if parameters.n_sim_dims == 3
+                if numel(parameters.grid.dims) == 3
                     bowl = makeBowl(grid_dims, trans_pos_i, tp.radius_grid, ...
                                     tp.Elements_OD(el_i), focus_pos_i);
                 else
                     bowl = makeArc(grid_dims, trans_pos_i, tp.radius_grid, ...
                                    tp.Elements_OD(el_i), focus_pos_i);
                 end
-        
+
                 % subtract inner aperture if applicable
                 if tp.Elements_ID(el_i) > 0
-                    if parameters.n_sim_dims == 3
+                    if numel(parameters.grid.dims) == 3
                         bowl = bowl - makeBowl(grid_dims, trans_pos_i, ...
                                                tp.radius_grid, tp.Elements_ID(el_i), focus_pos_i);
                     else
@@ -179,8 +179,8 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             tp.source_phase_rad);   % [n_elements x Nt]
 
         % Determine if axisymmetric mode should be enabled
-        if parameters.n_sim_dims == 2 && ...
-                isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+        if numel(parameters.grid.dims) == 2 && ...
+                isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
             axisymmetric = true;
             disp("Using axisymmetric setup for 2D input...");
         else
@@ -194,7 +194,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                            'BLIType', 'sinc');
 
         % Set focus position and transducer position vectors in physical coordinates
-        if parameters.n_sim_dims == 3
+        if numel(parameters.grid.dims) == 3
             % 3D annular array
             pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
             focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
@@ -204,7 +204,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                                    [tp.Elements_ID_mm; tp.Elements_OD_mm] * 1e-3, ...
                                    focus_vec);
 
-        elseif parameters.n_sim_dims == 2 && axisymmetric == false
+        elseif numel(parameters.grid.dims) == 2 && axisymmetric == false
 
             % 2D arc-shaped element
             pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
@@ -221,7 +221,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
 
-            x_offset     = (trans_pos_1(1)-1) * (1/parameters.grid_step_mm);
+            x_offset     = (trans_pos_1(1)-1) * (1/parameters.grid.resolution_mm);
             position_base = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
             focus_pos_full = [0, 0+eps];
 

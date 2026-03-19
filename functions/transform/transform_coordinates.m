@@ -19,7 +19,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
     
     switch input_cs
         case 'mni'
-            m2m_path = fullfile(parameters.seg_path, sprintf('m2m_sub-%03i', parameters.subject_id));
+            m2m_path = fullfile(parameters.path.seg, sprintf('m2m_sub-%03i', parameters.subject_id));
             
             % MNI -> subject RAS+
             disp("Mapping MNI to subject RAS+...")
