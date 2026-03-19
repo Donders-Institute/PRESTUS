@@ -32,11 +32,11 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     elem_pos_m = elem_pos_m + trans_pos_m;
 
     % Apply Clover setup if requested
-    if transducer_pars.is_clover
-        [elem_pos_m, n_elements_total] = replicate_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
-    else
-        n_elements_total = size(elem_pos_m, 2);
+    if transducer_pars.is_clover_setup
+        elem_pos_m = create_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
     end
+    
+    n_elements_total = size(elem_pos_m, 2);
 
     % Calculate inner and outer diameters for elements based on total diameter and count
     [id, od] = calc_elements_id_od_mm(matrix_tp.Elements_OD_mm(end), n_elements_total);
