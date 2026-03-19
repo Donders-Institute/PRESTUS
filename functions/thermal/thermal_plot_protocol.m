@@ -149,9 +149,9 @@ subplot(2,1,2);
         'FontSize', 15, 'FontWeight', 'bold');
 
 % save plot
-output_plot_filename = fullfile(parameters.output_dir,...
+output_plot_filename = fullfile(parameters.io.output_dir,...
     sprintf('sub-%03d_%s_thermal_protocol%s.png',...
-    parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+    parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 saveas(h, output_plot_filename, 'png')
 close(h);
 

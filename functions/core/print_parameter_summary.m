@@ -18,30 +18,31 @@ fprintf('========================================\n\n');
 %% 1. I/O Management
 
 fprintf('📁 I/O MANAGEMENT\n');
-print_if_field(parameters, 'data_path', '%s');
-print_if_field(parameters, 'seg_path', '%s');
-print_if_field(parameters, 'sim_path', '%s');
-print_if_field(parameters, 'simnibs_bin_path', '%s');
-print_if_field(parameters, 'results_filename_affix', '%s');
-print_overwrite_pair(parameters);
+print_if_field(parameters.io, 'data_path', '%s');
+print_if_field(parameters.io, 'seg_path', '%s');
+print_if_field(parameters.io, 'sim_path', '%s');
+print_if_field(parameters.io, 'simnibs_bin_path', '%s');
+print_if_field(parameters.io, 'results_filename_affix', '%s');
+print_overwrite_pair(parameters.io);
 fprintf('\n');
 
 %% 2. Simulation Type
 
 fprintf('⚙️ SIMULATION TYPE\n');
-print_if_field(parameters, 'simulation_medium', '%s');
-print_if_field(parameters, 'n_sim_dims', '%dD');
-print_flag(parameters, 'axisymmetric');
-print_modules(parameters);
+print_if_field(parameters, 'medium', '%s');
+print_if_field(parameters.grid, 'n_dims', '%dD');
+print_flag(parameters.grid, 'axisymmetric');
+print_modules(parameters.modules);
 fprintf('\n');
 
 %% 3. Simulation Grid
 
 fprintf('📐 SIMULATION GRID\n');
-print_if_field(parameters, 'grid_step_mm', '%.2f mm');
-print_if_field(parameters, 'default_grid_dims', '%s');
-print_if_field(parameters, 'pml_size', '%d');
-print_if_field(parameters, 'grid_max_expand', '%.1f');
+grid = get_struct_or_default(parameters, 'grid');
+print_if_field(grid, 'resolution_mm', '%.2f mm');
+print_if_field(grid, 'default_dims', '%s');
+print_if_field(grid, 'pml_size', '%d');
+print_if_field(grid, 'max_expand', '%.1f');
 print_if_field(parameters, 'precision', '%s');
 fprintf('\n');
 
@@ -50,7 +51,7 @@ fprintf('🎯 TRANSDUCER SPECIFICATION\n');
 
 % Loop over all transducers (support multiple transducers)
 for t_i = 1:numel(parameters.transducer)
-    tr = parameters.transducer(t_i);
+	tr = parameters.transducer(t_i);
 
     % Determine type
     tr_type = tr.array_shape.type;
@@ -139,8 +140,8 @@ for t_i = 1:numel(parameters.transducer)
     print_if_field(tr, 'source_amp', '%.1f Pa');
     print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
     print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
-	print_if_field(parameters, 'expected_focal_distance_ep', '%.1f');
-	print_if_field(parameters, 'expected_focal_distance_bowl', '%.1f');
+	print_if_field(parameters, 'expected_focal_distance_ep', '%.1f mm');
+	print_if_field(parameters, 'expected_focal_distance_bowl', '%.1f mm');
 
     fprintf('\n');
 end
@@ -168,7 +169,7 @@ for t_idx = 1:length(tissues)
     
     % Handle 'tissues' wildcard → all tissue props
     if strcmp(tissue, 'tissues')
-        tissue_fields = fieldnames(parameters.medium);
+        tissue_fields = fieldnames(parameters.simulation.medium);
         tissue_list = tissue_fields(startsWith(tissue_fields, 'tissue_') | ...
                                    startsWith(tissue_fields, 'brain') | ...
                                    startsWith(tissue_fields, 'csf'));
@@ -184,23 +185,25 @@ end
 
 %% 6. Thermal Sequence
 
-if isfield(parameters, 'thermal') && parameters.run_heating_sims == 1
+if isfield(parameters, 'thermal') && parameters.modules.run_heating_sims == 1
     fprintf('🔥 THERMAL SEQUENCE\n');
-    th = parameters.thermal;
-    print_if_field(th, 'pd', '%.3fs', 'Pulse Duration');
-    print_if_field(th, 'pri', '%.3fs', 'Pulse Repetition Interval');
-    print_if_field(th, 'ptd', '%.3fs', 'Pulse Train Duration');
-    print_if_field(th, 'ptri', '%.3fs', 'Pulse Train Repetition Interval');
-    print_if_field(th, 'ptrd', '%.3fs', 'Pulse Train Repetition Duration');
-    print_if_field(th, 'post_ptri_dur', '%.3fs', 'Steady-State Duration');
+    tm = get_struct_or_default(parameters, 'timing');
+    print_if_field(tm, 'pd', '%.3fs', 'Pulse Duration');
+    print_if_field(tm, 'pri', '%.3fs', 'Pulse Repetition Interval');
+    print_if_field(tm, 'ptd', '%.3fs', 'Pulse Train Duration');
+    print_if_field(tm, 'ptri', '%.3fs', 'Pulse Train Repetition Interval');
+    print_if_field(tm, 'ptrd', '%.3fs', 'Pulse Train Repetition Duration');
+    print_if_field(tm, 'post_ptri_dur', '%.3fs', 'Steady-State Duration');
     fprintf('\n');
 end
 
 %% 7. HPC/GPU
 
 fprintf('💻 HPC/GPU OPTIONS\n');
+print_if_field(parameters, 'platform', '%s');
 print_if_field(parameters, 'code_type', '%s');
-print_if_field(parameters, 'hpc_partition', '%s');
+hpc = get_struct_or_default(parameters, 'hpc');
+print_if_field(hpc, 'partition', '%s');
 fprintf('\n');
 
 fprintf('========================================\n');
@@ -221,7 +224,7 @@ function print_if_field(s, field, fmt, alternate_name)
         val = s.(field);
         
         % SPECIAL HANDLING: Vector dimensions
-        if strcmp(field, 'default_grid_dims') || strcmp(field, 'grid_dims')
+        if strcmp(field, 'default_dims') || strcmp(field, 'grid_dims')
             if ~isempty(val) && all(isfinite(val(:))) && ~any(isnan(val(:)))
                 if length(val) <= 10
                     grid_str = sprintf('%g ', val);
@@ -309,17 +312,17 @@ function print_flag(s, field)
 end
 
 function print_modules(s)
-    modules = {
+    mod_list = {
         'run_source_setup',    'Source';
-        'run_acoustic_sims',   'Acoustic'; 
+        'run_acoustic_sims',   'Acoustic';
         'run_heating_sims',    'Thermal';
         'run_posthoc_water_sims', 'Post-water'
     };
-    
+
     fprintf('\n🔧 MODULES\n');
-    for i = 1:size(modules, 1)
-        mod_field = modules{i, 1};
-        mod_label = modules{i, 2};
+    for i = 1:size(mod_list, 1)
+        mod_field = mod_list{i, 1};
+        mod_label = mod_list{i, 2};
         status = getfield_or_default(s, mod_field, 0);
         if status
             mark = ' ✓';

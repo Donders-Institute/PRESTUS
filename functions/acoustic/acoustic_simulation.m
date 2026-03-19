@@ -20,7 +20,7 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 %   4: C++ GPU code 'cpp_gpu'
 
 % Only actively plot each timepoint of the simulations if it is interactive
-if ~parameters.interactive 
+if ~parameters.simulation.interactive
    input_args.PlotSim = false;
 end
 
@@ -33,26 +33,26 @@ medium = rmfield(medium,'perfusion_coeff');
 input_args.PlotScale = [-1, 1] * parameters.transducer(1).source_amp(1);
 
 % Select submission based on code type
-switch parameters.code_type
+switch parameters.simulation.code_type
     case 'cpp_cpu'
 
       % Force precision for C++ HDF5 compatibility
-      medium  = cast_struct(medium, parameters.precision); 
-      source  = cast_struct(source, parameters.precision);
-      sensor  = cast_struct(sensor, parameters.precision);
-   
+      medium  = cast_struct(medium, parameters.simulation.precision);
+      source  = cast_struct(source, parameters.simulation.precision);
+      sensor  = cast_struct(sensor, parameters.simulation.precision);
+
       % Pathname for the input and output files (used only for non-interactive computations)
-      input_args.SaveToDisk = char(fullfile(parameters.output_dir, ...
+      input_args.SaveToDisk = char(fullfile(parameters.io.output_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
-         parameters.simulation_medium, parameters.results_filename_affix)));
-      
-      input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.results_filename_affix);
-      input_args.DataPath = char(parameters.output_dir);
+         parameters.simulation.medium, parameters.io.output_affix)));
+
+      input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.io.output_affix);
+      input_args.DataPath = char(parameters.io.output_dir);
       input_args.DeleteData = true;
 
-      if parameters.n_sim_dims == 3
+      if numel(parameters.grid.dims) == 3
          input_args.FunctionName = 'kspaceFirstOrder3D';
-      elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+      elseif numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          input_args.FunctionName = 'kspaceFirstOrderAS';
       else
          input_args.FunctionName = 'kspaceFirstOrder2D';
@@ -64,22 +64,22 @@ switch parameters.code_type
    case 'cpp_gpu'
 
       % Force precision for C++ HDF5 compatibility
-      medium  = cast_struct(medium, parameters.precision); 
-      source  = cast_struct(source, parameters.precision);
-      sensor  = cast_struct(sensor, parameters.precision);
+      medium  = cast_struct(medium, parameters.simulation.precision);
+      source  = cast_struct(source, parameters.simulation.precision);
+      sensor  = cast_struct(sensor, parameters.simulation.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      input_args.SaveToDisk = char(fullfile(parameters.output_dir, ...
+      input_args.SaveToDisk = char(fullfile(parameters.io.output_dir, ...
         sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
-        parameters.simulation_medium, parameters.results_filename_affix)));
+        parameters.simulation.medium, parameters.io.output_affix)));
 
-      input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.results_filename_affix);
-      input_args.DataPath = char(parameters.output_dir);
+      input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.io.output_affix);
+      input_args.DataPath = char(parameters.io.output_dir);
       input_args.DeleteData = true;
 
-      if parameters.n_sim_dims == 3
+      if numel(parameters.grid.dims) == 3
          input_args.FunctionName = 'kspaceFirstOrder3D';
-      elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+      elseif numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          input_args.FunctionName = 'kspaceFirstOrderAS';
       else
          input_args.FunctionName = 'kspaceFirstOrder2D';
@@ -94,12 +94,12 @@ switch parameters.code_type
       
    case 'matlab_gpu'
 
-      input_args.DataCast = ['gpuArray-', char(parameters.precision)];
+      input_args.DataCast = ['gpuArray-', char(parameters.simulation.precision)];
       input_args_cell = zip_fields(input_args);
       
-      if parameters.n_sim_dims == 3
+      if numel(parameters.grid.dims) == 3
          sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
-      elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+      elseif numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:}, 'RadialSymmetry', 'WSWA-FFT');
       else % 2D simulation
          sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
@@ -107,12 +107,12 @@ switch parameters.code_type
       
    case 'matlab_cpu'
 
-      input_args.DataCast = char(parameters.precision);
+      input_args.DataCast = char(parameters.simulation.precision);
       input_args_cell = zip_fields(input_args);
       
-      if parameters.n_sim_dims == 3
+      if numel(parameters.grid.dims) == 3
          sensor_data = kspaceFirstOrder3D(kgrid, medium, source, sensor, input_args_cell{:});
-      elseif parameters.n_sim_dims == 2 && isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+      elseif numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, input_args_cell{:}, 'RadialSymmetry', 'WSWA-FFT');
       else % 2D simulation
          sensor_data = kspaceFirstOrder2D(kgrid, medium, source, sensor, input_args_cell{:});
@@ -120,7 +120,7 @@ switch parameters.code_type
       
    otherwise
 
-      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu', parameters.code_type);
+      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu', parameters.simulation.code_type);
 
 end
 

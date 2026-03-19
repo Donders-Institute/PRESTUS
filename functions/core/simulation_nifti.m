@@ -18,20 +18,20 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 %   - results_heating.CEM43 (array) - Cumulative Equivalent Minutes at 43°C
 %   - kwave_medium (struct) - k-Wave medium (for temp_0)
 
-    if contains(parameters.simulation_medium, {'layered'; 'phantom'})
+    if contains(parameters.simulation.medium, {'layered'; 'phantom'})
 
         data_types = "medium_masks";
-        if parameters.acoustics_available == 1 
+        if parameters.state.acoustics_available == 1 
             data_types  = [data_types, "isppa","MI","pressure"];
         end
-        if parameters.heating_available == 1
+        if parameters.state.heating_available == 1
             data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end"];
         end
         for data_type = data_types
-            orig_file = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, data_type, parameters.results_filename_affix));
-            mni_file  = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz',...
-                parameters.subject_id, data_type, parameters.results_filename_affix));
+            orig_file = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                parameters.subject_id, data_type, parameters.io.output_affix));
+            mni_file  = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz',...
+                parameters.subject_id, data_type, parameters.io.output_affix));
 
             if strcmp(data_type, "medium_masks")
                 data = medium_masks;
@@ -57,7 +57,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
             if confirm_overwriting(orig_file_with_ext, parameters)
-                if ~strcmp(parameters.simulation_medium, 'phantom')
+                if ~strcmp(parameters.simulation.medium, 'phantom')
                     % Transforms the data to original T1 image dimensions and orientation
                     orig_hdr = planimg.t1_header;
     
@@ -109,7 +109,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                 data_backtransf = niftiread(orig_file_with_ext);
             end
 
-            if strcmp(data_type, "isppa") && ~strcmp(parameters.simulation_medium, 'phantom')
+            if strcmp(data_type, "isppa") && ~strcmp(parameters.simulation.medium, 'phantom')
             
                 max_plots = min(2, numel(parameters.transducer));
                 if numel(parameters.transducer) > max_plots
@@ -157,36 +157,28 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                         'overlay_threshold_high', max_val, ...
                         'rotation', 0); % rotation = 90 not implemented for transducer overlay
             
-                    output_plot_filename = fullfile(parameters.output_dir, ...
+                    output_plot_filename = fullfile(parameters.io.output_dir, ...
                         sprintf('sub-%03d_%s_isppa_t1_T%02d%s.png', ...
-                        parameters.subject_id, parameters.simulation_medium, ti, ...
-                        parameters.results_filename_affix));
+                        parameters.subject_id, parameters.simulation.medium, ti, ...
+                        parameters.io.output_affix));
                     saveas(h, output_plot_filename, 'png')
                     close(h);
                 end
             end
             
-            m2m_folder= fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', parameters.subject_id));
+            m2m_folder= fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
             
             % transform outputs to MNI space (using SimNibs or applying transformation matrix)
-            if ~confirm_overwriting(mni_file, parameters) || strcmp(parameters.simulation_medium, 'phantom')
+            if ~confirm_overwriting(mni_file, parameters) || strcmp(parameters.simulation.medium, 'phantom')
                 continue
             end
-            if strcmp(parameters.segmentation_software, 'headreco')
-                if strcmp(data_type, "medium_masks")
-                   convert_final_to_MNI_matlab(data, m2m_folder, planimg.inv_transf, parameters, 'nifti_filename', mni_file,  'nifti_data_type', 'uint8', 'BitsPerPixel', 8);
-                else
-                   convert_final_to_MNI_matlab(data, m2m_folder, planimg.inv_transf, parameters, 'nifti_filename', mni_file);
-                end
-            elseif strcmp(parameters.segmentation_software, 'charm')
-                convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters, 'interpolation_order', 0);
-            end
+            convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters, 'interpolation_order', 0);
 
             clear data;
         end
         
         % Since charm does not transform the T1 into MNI space, one is manually created here
-        if strcmp(parameters.segmentation_software, 'charm') && ~strcmp(parameters.simulation_medium, 'phantom')
+        if ~strcmp(parameters.simulation.medium, 'phantom')
             path_to_input_img = fullfile(m2m_folder,'T1.nii.gz');
             path_to_output_img = fullfile(m2m_folder,'toMNI','T1_to_MNI_post-hoc.nii.gz');
 

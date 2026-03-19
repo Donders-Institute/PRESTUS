@@ -92,7 +92,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     for_caps = segmented_img_ds;
     % discard segmentation layers that are not GM/WM/CSF/bone
     availableLayers = unique(for_caps);
-    relevantLayers = getidx(parameters.seg_labels, {'wm'; 'gm'; 'csf'; 'skull'});
+    relevantLayers = getidx(charm_seg_labels(), {'wm'; 'gm'; 'csf'; 'skull'});
     discardedLayers = availableLayers(~ismember(availableLayers, relevantLayers));
     for_caps(ismember(for_caps, discardedLayers)) = 0;
     cap_surf = isocaps(for_caps*10,4);

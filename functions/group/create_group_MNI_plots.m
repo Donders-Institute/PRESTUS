@@ -10,8 +10,8 @@ function create_group_MNI_plots(subject_list, parameters, options)
 % masking and statistical operations (e.g. FWHM, ROI overlap) are applied.
 %
 % Supported features:
-% - Wildcard support in filenames using `parameters.results_filename_affix`
-% - Optional use of subfolders per subject (`parameters.subject_subfolder`)
+% - Wildcard support in filenames using `parameters.io.output_affix`
+% - Optional use of subfolders per subject (`parameters.path.subject_subfolder`)
 % - Heatmap plotting, FWHM mask logic, ROI overlays and statistics
 %
 % INPUTS
@@ -21,11 +21,10 @@ function create_group_MNI_plots(subject_list, parameters, options)
 %     - temp_output_dir [string]               : Path to output folder for subject images
 %     - layers.brain [array]             : Label values of brain tissue (for binary mask)
 %     - layers.water [array]             : Label values of water tissue (mask heating)
-%     - segmentation_software [string]         : 'headreco' or 'simnibs' (for T1 path)
-%     - results_filename_affix [string/wildcard]: e.g., '_ses-*'. 
+%     - results_filename_affix [string/wildcard]: e.g., '_ses-*'.
 %     - simulation_medium [string]             : Used in table filenames
 %     - subject_subfolder [bool, optional]     : If files are in subfolders like sub-001/sub-001_...
-%     - seg_path / data_path [string]          : Path to segmentation (headreco) data
+%     - seg_path / data_path [string]          : Path to SimNIBS m2m segmentation data
 %     - thermal.temp_0 [scalar or struct]      : Baseline temp, or struct with .skin and .water
 %
 %   options : struct with additional parameters, including:
@@ -91,7 +90,7 @@ for subject_i = 1:length(full_subject_list)
     subject_id = full_subject_list(subject_i);
 
     % -- Setup subject-specific directory and prefix logic --
-    if isfield(parameters, 'subject_subfolder') && parameters.subject_subfolder == 1
+    if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
         subject_dir    = sprintf('sub-%03d', subject_id);
         file_base      = sprintf('sub-%03d', subject_id);
         data_dir       = fullfile(outputs_path, subject_dir);
@@ -102,19 +101,19 @@ for subject_i = 1:length(full_subject_list)
 
     fprintf('Subject %i, first pass\n', subject_id)
 
-    % -- Determine headreco folder for T1 reference --
-    if isfield(parameters, 'seg_path') && ~isempty(parameters.seg_path)
-        headreco_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
+    % -- Determine m2m folder for T1 reference --
+    if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
+        m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
     else
-        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+        m2m_folder = fullfile(parameters.path.anat, sprintf('m2m_sub-%03d', subject_id));
     end
 
     % -- Construct filename patterns (with possible wildcards) --
-    pattern_isppa      = fullfile(data_dir, sprintf('%s_final_isppa_MNI%s.nii.gz',              file_base, parameters.results_filename_affix));
-    pattern_segmented  = fullfile(data_dir, sprintf('%s_final_medium_masks_MNI%s.nii.gz',        file_base, parameters.results_filename_affix));
-    pattern_pressure   = fullfile(data_dir, sprintf('%s_final_pressure_MNI%s.nii.gz',            file_base, parameters.results_filename_affix));
-    pattern_output_tbl = fullfile(data_dir, sprintf('%s_%s_output_table%s.csv',                  file_base, parameters.simulation_medium, parameters.results_filename_affix));
-    pattern_heating    = fullfile(data_dir, sprintf('%s_final_heating_MNI%s.nii.gz',             file_base, parameters.results_filename_affix));
+    pattern_isppa      = fullfile(data_dir, sprintf('%s_final_isppa_MNI%s.nii.gz',              file_base, parameters.io.output_affix));
+    pattern_segmented  = fullfile(data_dir, sprintf('%s_final_medium_masks_MNI%s.nii.gz',        file_base, parameters.io.output_affix));
+    pattern_pressure   = fullfile(data_dir, sprintf('%s_final_pressure_MNI%s.nii.gz',            file_base, parameters.io.output_affix));
+    pattern_output_tbl = fullfile(data_dir, sprintf('%s_%s_output_table%s.csv',                  file_base, parameters.simulation.medium, parameters.io.output_affix));
+    pattern_heating    = fullfile(data_dir, sprintf('%s_final_heating_MNI%s.nii.gz',             file_base, parameters.io.output_affix));
 
     % -- Find files matching patterns --
     files_isppa     = dir(pattern_isppa);
@@ -124,11 +123,7 @@ for subject_i = 1:length(full_subject_list)
     files_heating   = dir(pattern_heating);
 
     % -- T1 anatomical reference, not wildcard --
-    if strcmp(parameters.segmentation_software, 'headreco')
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
-    else
-        t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
-    end
+    t1_mni_file = fullfile(m2m_folder, 'toMNI','final_tissues_MNI.nii.gz');
     
     files_to_check = {t1_mni_file};
     if isempty(files_isppa),     files_to_check{end+1} = pattern_isppa; end
@@ -235,7 +230,7 @@ subject_list(isnan(subject_list)) = [];
 for subject_i = 1:length(subject_list)
     subject_id = subject_list(subject_i);
 
-    if isfield(parameters, 'subject_subfolder') && parameters.subject_subfolder == 1
+    if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
         subject_dir    = sprintf('sub-%03d', subject_id);
         file_base      = sprintf('sub-%03d', subject_id);
         data_dir       = fullfile(outputs_path, subject_dir);
@@ -246,19 +241,19 @@ for subject_i = 1:length(subject_list)
 
     fprintf('Subject %i, second pass\n', subject_id)
 
-    if isfield(parameters, 'seg_path') && ~isempty(parameters.seg_path)
-        headreco_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', subject_id));
+    if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
+        m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
     else
-        headreco_folder = fullfile(parameters.data_path, sprintf('m2m_sub-%03d', subject_id));
+        m2m_folder = fullfile(parameters.path.anat, sprintf('m2m_sub-%03d', subject_id));
     end
 
     % -- Patterns for batch processing, as before --
-    pattern_isppa         = fullfile(data_dir, sprintf('%s_final_isppa_MNI%s.nii.gz',              file_base, parameters.results_filename_affix));
-    pattern_segmented     = fullfile(data_dir, sprintf('%s_final_medium_masks_MNI%s.nii.gz',        file_base, parameters.results_filename_affix));
-    pattern_pressure      = fullfile(data_dir, sprintf('%s_final_pressure_MNI%s.nii.gz',            file_base, parameters.results_filename_affix));
-    pattern_output_tbl    = fullfile(data_dir, sprintf('%s_%s_output_table%s.csv',                  file_base, parameters.simulation_medium, parameters.results_filename_affix));
-    pattern_output_tbl_roi= fullfile(data_dir, sprintf('%s_%s_output_table_with_ROI_analysis%s.csv',file_base, parameters.simulation_medium, parameters.results_filename_affix));
-    pattern_heating       = fullfile(data_dir, sprintf('%s_final_heating_MNI%s.nii.gz',             file_base, parameters.results_filename_affix));
+    pattern_isppa         = fullfile(data_dir, sprintf('%s_final_isppa_MNI%s.nii.gz',              file_base, parameters.io.output_affix));
+    pattern_segmented     = fullfile(data_dir, sprintf('%s_final_medium_masks_MNI%s.nii.gz',        file_base, parameters.io.output_affix));
+    pattern_pressure      = fullfile(data_dir, sprintf('%s_final_pressure_MNI%s.nii.gz',            file_base, parameters.io.output_affix));
+    pattern_output_tbl    = fullfile(data_dir, sprintf('%s_%s_output_table%s.csv',                  file_base, parameters.simulation.medium, parameters.io.output_affix));
+    pattern_output_tbl_roi= fullfile(data_dir, sprintf('%s_%s_output_table_with_ROI_analysis%s.csv',file_base, parameters.simulation.medium, parameters.io.output_affix));
+    pattern_heating       = fullfile(data_dir, sprintf('%s_final_heating_MNI%s.nii.gz',             file_base, parameters.io.output_affix));
 
     files_isppa     = dir(pattern_isppa);
     files_segmented = dir(pattern_segmented);
@@ -290,11 +285,7 @@ for subject_i = 1:length(subject_list)
             heating_data_mni_file = fullfile(data_dir, files_heating(min(fidx, numel(files_heating))).name);
         end
 
-        if strcmp(parameters.segmentation_software, 'headreco')
-            t1_mni_file = fullfile(headreco_folder, 'toMNI','T1fs_nu_12DOF_MNI.nii.gz');
-        else
-            t1_mni_file = fullfile(headreco_folder, 'toMNI','final_tissues_MNI.nii.gz');
-        end
+        t1_mni_file = fullfile(m2m_folder, 'toMNI','final_tissues_MNI.nii.gz');
         if ~exist(t1_mni_file, 'file')
             if options.skip_missing
                 fprintf('Missing T1 file for subject %d; skipping this subject\n', subject_id);
@@ -427,7 +418,7 @@ for subject_i = 1:length(subject_list)
             visboundaries(imrotate(mask_im, current_rotation), 'Color', 'white','LineStyle', '--','LineWidth',0.5,'EnhanceVisibility',0);
         end
 
-        export_fig(fullfile(data_dir, sprintf('%s_final_isppa_MNI%s%s', file_base, parameters.results_filename_affix, options.outputs_suffix)),'-silent','-r320');
+        export_fig(fullfile(data_dir, sprintf('%s_final_isppa_MNI%s%s', file_base, parameters.io.output_affix, options.outputs_suffix)),'-silent','-r320');
         close
 
         if isfield(options,'plot_heating') && options.plot_heating == 1 && exist('heating_data_mni_file','var')
@@ -441,7 +432,7 @@ for subject_i = 1:length(subject_list)
                 visboundaries(imrotate(mask_im, current_rotation))
             end
             export_fig(fullfile(data_dir, sprintf('%s_maxT_MNI%s%s',...
-                    file_base, parameters.results_filename_affix, options.outputs_suffix)),'-silent','-r320');
+                    file_base, parameters.io.output_affix, options.outputs_suffix)),'-silent','-r320');
             close
         end
     end
@@ -449,10 +440,10 @@ end
 
 % --- Assemble output images into montages ---
 if isfield(options,'plot_heating') && options.plot_heating == 1
-    suffix_list = {sprintf('maxT_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix),...
-        sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)};
+    suffix_list = {sprintf('maxT_MNI%s%s', parameters.io.output_affix, options.outputs_suffix),...
+        sprintf('final_isppa_MNI%s%s', parameters.io.output_affix, options.outputs_suffix)};
 else
-    suffix_list = {sprintf('final_isppa_MNI%s%s', parameters.results_filename_affix, options.outputs_suffix)};
+    suffix_list = {sprintf('final_isppa_MNI%s%s', parameters.io.output_affix, options.outputs_suffix)};
 end
 
 for suffix_cell = suffix_list

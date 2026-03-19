@@ -8,8 +8,8 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
 % Optimizes grid dimensions for FFT performance. Computes skull edges and adjustments.
 %
 % Inputs:
-%   parameters      - Struct with .pad_mm (symmetric padding mm), .grid_step_mm, .pml_size,
-%                     .csf_mask_expansion_factor, .grid_max_expand, .debug, etc.
+%   parameters      - Struct with .headmodel.head_pad_mm (symmetric padding mm), .grid.resolution_mm, .pml_size,
+%                     .headmodel.csf_expansion, .grid.max_expand, .simulation.debug, etc.
 %   medium_masks    - 3D array: Current medium labels (non-CSF regions zeroed).
 %   segmentation    - 3D array: Original segmentation/pseudoCT.
 %   bone_img        - 3D array: Bone property image.
@@ -27,10 +27,10 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
 %
 
 % === USER SYMMETRIC PADDING (BOTH SIDES) ===
-if ~isfield(parameters, 'pad_mm') || isempty(parameters.pad_mm)
-    parameters.pad_mm = 0;  % mm
+if ~isfield(parameters.headmodel, 'head_pad_mm') || isempty(parameters.headmodel.head_pad_mm)
+    parameters.headmodel.head_pad_mm = 0;  % mm
 end
-pad_voxels = round(parameters.pad_mm / parameters.grid_step_mm);
+pad_voxels = round(parameters.headmodel.head_pad_mm / parameters.grid.resolution_mm);
 pad_pre_post = [pad_voxels, pad_voxels, pad_voxels];  % Symmetric BOTH sides
 
 % Track TOTAL pre-padding offset for translation matrix
@@ -48,19 +48,15 @@ if any(pad_pre_post > 0)
 end
 
 % Expand CSF mask to crop the layered medium
-if isfield(parameters, 'seg_labels') && any(strcmp(fieldnames(parameters.seg_labels), 'csf'))
-    [medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmentation, trans_pos_grid);
-else
-    warning("CSF layer not specified or unknown ... will not use expanded CSF mask...");
-end
+[medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmentation, trans_pos_grid);
 
 % Set PML buffer as crop margin
-crop_margin = parameters.pml_size + 1;
+crop_margin = parameters.grid.pml_size + 1;
 
 % Include transducer bowl geometry (safe with padding)
-i_water = find(strcmp(fieldnames(parameters.medium), 'water'));
+i_water = find(strcmp(fieldnames(parameters.simulation.medium), 'water'));
 transducer_bowl = transducer_setup(parameters.transducer(1), trans_pos_grid, ...
-    focus_pos_grid, size(segmentation), parameters.grid_step_mm);
+    focus_pos_grid, size(segmentation), parameters.grid.resolution_mm);
 
 % Compute crop bounds
 orig_dims = size(medium_masks);
@@ -83,9 +79,9 @@ if any(min_dims < 1)
 end
 
 % Optimize dimensions for FFT
-new_grid_dims(1) = find_min_factor(new_grid_dims(1), new_grid_dims(1) + parameters.grid_max_expand);
-new_grid_dims(2) = find_min_factor(new_grid_dims(2), new_grid_dims(2) + parameters.grid_max_expand);
-new_grid_dims(3) = find_min_factor(new_grid_dims(3), new_grid_dims(3) + parameters.grid_max_expand);
+new_grid_dims(1) = find_min_factor(new_grid_dims(1), new_grid_dims(1) + parameters.grid.max_expand);
+new_grid_dims(2) = find_min_factor(new_grid_dims(2), new_grid_dims(2) + parameters.grid.max_expand);
+new_grid_dims(3) = find_min_factor(new_grid_dims(3), new_grid_dims(3) + parameters.grid.max_expand);
 max_dims = min_dims + new_grid_dims - 1;
 
 % === CONDITIONAL POST-PADDING if FFT expansion exceeds padding ===
@@ -103,7 +99,7 @@ segmentation_crop = segmentation(min_dims(1):max_dims(1), min_dims(2):max_dims(2
 bone_crop = bone_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
 
 % Update parameters
-parameters.grid_dims = size(medium_masks);
+parameters.grid.dims = size(medium_masks);
 
 % Final positions in cropped grid coordinates
 trans_pos_final = trans_pos_grid - min_dims + 1;
@@ -115,9 +111,9 @@ focus_pos_final = focus_pos_grid - min_dims + 1;
 translation_matrix = makehgtform('translate', total_pre_offset + (1-min_dims));
 
 % Display summary
-fprintf('Grid: [%dx%dx%d] → [%dx%dx%d]\n', orig_dims, parameters.grid_dims);
+fprintf('Grid: [%dx%dx%d] → [%dx%dx%d]\n', orig_dims, parameters.grid.dims);
 fprintf('  User padding: %.1fmm = [%d %d %d] voxels\n', ...
-        parameters.pad_mm, pad_pre_post);
+        parameters.headmodel.head_pad_mm, pad_pre_post);
 fprintf('  Total pre-offset: [%d %d %d] voxels\n', total_pre_offset);
 fprintf('  Crop bounds: min=[%d %d %d], max=[%d %d %d]\n', min_dims, max_dims);
 

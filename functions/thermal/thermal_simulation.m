@@ -52,12 +52,12 @@ heating_window_dims = ones(2,3);
 for i = 1:2
     heating_window_dims(:,i) = [...
         max(1, -parameters.thermal.sensor_xy_halfsize + parameters.transducer(1).trans_pos(i)), ...
-        min(parameters.grid_dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer(1).trans_pos(i))];
+        min(parameters.grid.dims(i), parameters.thermal.sensor_xy_halfsize + parameters.transducer(1).trans_pos(i))];
 end
 
 % Define a simulation window
-if length(size(parameters.grid_dims))>2
-    heating_window_dims(2,3) = parameters.grid_dims(3);
+if length(size(parameters.grid.dims))>2
+    heating_window_dims(2,3) = parameters.grid.dims(3);
 end
 sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
@@ -65,8 +65,8 @@ sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_di
 % skull bone density is fixed for thermal simulation
 % (note that downstream metrics such as sound speed contribute to pressure, but are not input to kWaveDiffusion)
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-if parameters.use_pseudoCT ==1 && ...
-    (~isfield(parameters, "pct_mapping_density") || strcmp(parameters.pct_mapping_density, 'k-plan'))
+if parameters.pct.enabled ==1 && ...
+    (~isfield(parameters, 'pct') || ~isfield(parameters.pct, 'mapping_density') || strcmp(parameters.pct.mapping_density, 'k-plan'))
     skull_i = find(ismember(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
     % [k-Plan] use fixed density for thermal simulation
     kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
@@ -88,9 +88,9 @@ clear w a0_np;
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (parameters.transducer.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
 
 % save absorption coefficient [Np] for debugging
-if contains(parameters.simulation_medium, {'layered', 'phantom'}) && parameters.debug == 1
+if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.simulation.debug == 1
     try
-        filename_absorption = fullfile(parameters.output_dir, 'debug', sprintf('matrix_absorption'));
+        filename_absorption = fullfile(parameters.io.output_dir, 'debug', sprintf('matrix_absorption'));
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
     catch
         warning("Error with saving absorption debug image...")
@@ -132,15 +132,15 @@ end
 
 % Set precision and enable GPU mode (if requested)
 if use_datacast == true
-    if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
-        datacast = ['gpuArray-', char(parameters.precision)];
+    if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
+        datacast = ['gpuArray-', char(parameters.simulation.precision)];
     else
-        datacast = char(parameters.precision);
+        datacast = char(parameters.simulation.precision);
     end
 end
 
 % Build final input args
-thermal_args = {'PlotSim', boolean(parameters.interactive)};
+thermal_args = {'PlotSim', boolean(parameters.simulation.interactive)};
 if use_datacast
     thermal_args = [thermal_args, {'DataCast', datacast}];
 end
@@ -154,22 +154,22 @@ thermal_diff_obj = kWaveDiffusion(...
     thermal_args{:});
 
 % initialize field temperature
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
+if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
     thermal_diff_obj.T = gpuArray(thermal_diff_obj.T);
-end    
+end
 T_max = thermal_diff_obj.T;
 
 % initialize field for cem43
 if isfield(parameters, 'adopted_cem43')
-    cumulative_heat_image = niftiread(parameters.adopted_cem43);
-    fprintf('\nAdopting CEM43 heatmap %s from previous simulation\n', parameters.adopted_cem43)
+    cumulative_heat_image = niftiread(parameters.io.adopted_cem43);
+    fprintf('\nAdopting CEM43 heatmap %s from previous simulation\n', parameters.io.adopted_cem43)
     thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, ...
         maketform("affine", transf), ...
         makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
 else
     thermal_diff_obj.cem43 = zeros(size(thermal_diff_obj.T));
 end
-if strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
+if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
     thermal_diff_obj.cem43 = gpuArray(thermal_diff_obj.cem43);
 end
 CEM43_max = thermal_diff_obj.cem43;

@@ -1,4 +1,4 @@
-function display_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
+function display_info = hpc_job_info(platform, job_id, job_name, ...
     memory_gb, timelimit, log_dir, visualize)
 %% HPC_JOB_INFO  Generate formatted job display information
 %
@@ -7,8 +7,7 @@ function display_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
 %   Inputs:
 %     platform      - 'slurm' or 'qsub'
 %     job_id        - Raw job ID from submission
-%     job_name      - Job name string
-%     subject_id    - Subject number
+%     job_name      - Job name string (encodes subject ID)
 %     memory_gb     - Memory allocation (GB)
 %     timelimit     - Time limit string
 %     log_dir       - Log directory path
@@ -30,7 +29,6 @@ function display_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
     
     % Common fields
     display_info.name = job_name;
-    display_info.subject_id = subject_id;
     display_info.memory_gb = memory_gb;
     display_info.timelimit = timelimit;
     display_info.log_dir = log_dir;
@@ -40,7 +38,7 @@ function display_info = hpc_job_info(platform, job_id, job_name, subject_id, ...
         fprintf('═════════════════════════════\n');
         fprintf('Job ID:       %s\n', display_info.id);
         fprintf('Job name:     %s\n', display_info.name);
-        fprintf('Subject:      sub-%03d\n', display_info.subject_id);
+        fprintf('Subject:      %s\n', job_name);
         fprintf('Memory:       %.0f GB\n', display_info.memory_gb);
         fprintf('Time limit:   %s\n', display_info.timelimit);
         fprintf('Log dir:      %s\n', display_info.log_dir);

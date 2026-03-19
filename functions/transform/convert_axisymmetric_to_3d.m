@@ -18,22 +18,20 @@ end
 
 %% convert positions from 2d radial to 3d 
 
-parameters.n_sim_dims = 3;
-
 % shift positions to diameter location
 trans_pos_final = parameters.transducer(1).trans_pos;
 focus_pos_final = parameters.transducer(1).focus_pos;
 
-trans_pos_final(2) = trans_pos_final(2)+parameters.grid_dims(2);
-focus_pos_final(2) = focus_pos_final(2)+parameters.grid_dims(2);
+trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
+focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
 
 % convert: radial x axial -> diameter x diameter x axial
-parameters.grid_dims(2) = parameters.grid_dims(2)*2;
-parameters.grid_dims = parameters.grid_dims';
-parameters.grid_dims = [...
-    parameters.grid_dims(2), ...
-    parameters.grid_dims(2), ...
-    parameters.grid_dims(1)];
+parameters.grid.dims(2) = parameters.grid.dims(2)*2;
+parameters.grid.dims = parameters.grid.dims';
+parameters.grid.dims = [...
+    parameters.grid.dims(2), ...
+    parameters.grid.dims(2), ...
+    parameters.grid.dims(1)];
 
 % convert: transducer and focus positions
 trans_pos_final = fliplr(trans_pos_final);
@@ -46,18 +44,18 @@ parameters.transducer.trans_pos = trans_pos_final;
 parameters.transducer.focus_pos = focus_pos_final;
 
 %% set up 3D kgrid for follow-up heating simulations
-kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
-          parameters.grid_dims(2), parameters.grid_step_mm/1e3, ...
-          parameters.grid_dims(3), parameters.grid_step_mm/1e3);
+kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...
+          parameters.grid.dims(2), parameters.grid.resolution_mm/1e3, ...
+          parameters.grid.dims(3), parameters.grid.resolution_mm/1e3);
 
 %% DEBUG: visually inspect
 
 % % plot center of transducer
-% figure; imagesc(squeeze(sensor_data.p_max_all(:,floor(parameters.grid_dims(1)/2),:)))
+% figure; imagesc(squeeze(sensor_data.p_max_all(:,floor(parameters.grid.dims(1)/2),:)))
 % 
 % % plot each slice along the axial dimension
 % figure;
-% for index = 1:parameters.grid_dims(3)
+% for index = 1:parameters.grid.dims(3)
 %     imagesc(squeeze(sensor_data.p_max_all(:,:,index)))
 %     pause(0.5)
 % end

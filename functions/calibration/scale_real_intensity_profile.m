@@ -37,7 +37,7 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
     profile_target.axial_distance_bowl = profile_empirical.axial_distance_bowl';
 
     % Calculate size of the simulation domain
-    sim_axis_mm = (parameters.default_grid_dims(end)-parameters.pml_size-1)*parameters.grid_step_mm;
+    sim_axis_mm = (parameters.grid.default_dims(end)-parameters.grid.pml_size-1)*parameters.grid.resolution_mm;
 
     % Dynamically truncate or pad to match simulation domain
     if profile_empirical.axial_distance_bowl(end) > sim_axis_mm
@@ -47,10 +47,10 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
         profile_target.axial_intensity = profile_target.axial_intensity(valid_idx);
     else
         % Case 2: Pad with NaN to simulation length
-        pad_length = round((sim_axis_mm - profile_target.axial_distance_bowl(end)) / parameters.grid_step_mm);
+        pad_length = round((sim_axis_mm - profile_target.axial_distance_bowl(end)) / parameters.grid.resolution_mm);
         if pad_length > 0
             pad_dist = profile_target.axial_distance_bowl(end) + ...
-                       (1:pad_length) * parameters.grid_step_mm;
+                       (1:pad_length) * parameters.grid.resolution_mm;
             profile_target.axial_distance_bowl = [profile_target.axial_distance_bowl, pad_dist];
             profile_target.axial_intensity = [profile_target.axial_intensity, NaN(1, pad_length)];
         end

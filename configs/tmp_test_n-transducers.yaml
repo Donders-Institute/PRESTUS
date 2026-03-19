@@ -51,4 +51,4 @@ subject_subfolder: 1
 results_filename_affix: 'tmp_test_n-transducers'
 
 # Grid resolution (must be isotropic)
-grid_step_mm: 0.9  # [mm]
+grid.resolution_mm: 0.9  # [mm]

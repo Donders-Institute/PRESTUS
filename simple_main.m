@@ -6,19 +6,18 @@
 % Set medium, submit medium, subject number and configuration file 
 clear; close all;
 
-subject_id = 1; % subject number, if none, choose 1
-
 % add paths
 addpath(genpath('functions'))
-addpath(genpath('toolboxes')) 
 addpath(genpath('configs')) 
+addpath(genpath('toolboxes'))
 
 parameters = load_parameters('tutorial_config.yaml'); % load the configuration file
 
-parameters.simulation_medium = 'layered';   % water or layered
-parameters.code_type = 'matlab_cpu';
-parameters.hpc_submit_medium = 'matlab';    % or 'auto'
-parameters.interactive = 1;                 % for interactive debugging
-parameters.overwrite_files = 'always';      % overwrite?
+parameters.subject_id = 1;                      % subject number
+parameters.simulation.medium = 'layered';       % water or layered
+parameters.simulation.code_type = 'matlab_cpu';
+parameters.simulation.interactive = 1;          % for interactive debugging
+parameters.platform = 'matlab';                 % or 'auto'
+parameters.io.overwrite_files = 'always';       % overwrite?
 
-prestus_pipeline_start(subject_id, parameters)
+prestus_pipeline_start(parameters)

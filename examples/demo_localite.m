@@ -36,10 +36,10 @@ pn.tuSIM_tools = fullfile(pn.tuSIM, 'toolboxes');            % PRESTUS toolboxes
 addpath(genpath(pn.tuSIM_tools));
 
 % [Optional, MNI transform] Set user/environment-specific paths and parameters
-% parameters.simnibs_bin_path = fullfile('/home', 'neuromod', 'julkos', '.conda', 'envs', 'simnibs_env', 'bin'); 
-% parameters.data_path = fullfile(pn.data_seg, sprintf('m2m_%s', demo_sub_id));
-% parameters.seg_path = pn.data_seg;
-% parameters.ld_library_path = "/opt/gcc/7.2.0/lib64";
+% parameters.io.simnibs_bin_path = fullfile('/home', 'neuromod', 'julkos', '.conda', 'envs', 'simnibs_env', 'bin');
+% parameters.io.data_path = fullfile(pn.data_seg, sprintf('m2m_%s', demo_sub_id));
+% parameters.io.seg_path = pn.data_seg;
+% parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";
 
 % The expected folder structure for key data and intermediate files is:
 % (1a) [TriggerMarkers] Localite trigger position files in: 

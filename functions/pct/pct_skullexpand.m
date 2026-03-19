@@ -42,32 +42,31 @@ function pct_skullexpand(seg_path, path_pct)
 
     %% --- Parameters ---
     parameters = struct();
-    parameters.debug = 1;
+    parameters.simulation.debug = 1;
 
-    parameters.seg_path   = seg_path;
+    parameters.path.seg   = seg_path;
     parameters.debug_path = path_pct;
 
     % If you use this elsewhere in your pipeline, keep it consistent:
-    parameters.t1_path_template = 'T1.nii.gz';
+    parameters.path.t1_pattern = 'T1.nii.gz';
 
-    parameters.wrapradius = 10;
-    parameters.skullwrap_visualize = 0;
+    parameters.headmodel.skull_wrap_radius = 10;
+    parameters.headmodel.skull_wrap_visualize = 0;
 
-    parameters.debug_dir = path_pct;                 % where skull_rubber_wrap_visualize writes images
-    parameters.results_filename_affix = '';
+    parameters.io.debug_dir = path_pct;              % where skull_rubber_wrap_visualize writes images
+    parameters.io.output_affix = '';
 
     % Grid step (mm) from header voxel size if available
     % niftiinfo.PixelDimensions is [dx dy dz] in mm for most NIfTIs.
     if isfield(info_tissues,'PixelDimensions') && numel(info_tissues.PixelDimensions) >= 3
-        parameters.grid_step_mm = double(info_tissues.PixelDimensions(1)); % First dimension, assuming isometric
+        parameters.grid.resolution_mm = double(info_tissues.PixelDimensions(1)); % First dimension, assuming isometric
     else
-        parameters.grid_step_mm = 1; % fallback
+        parameters.grid.resolution_mm = 1; % fallback
     end
 
-    % SimNIBS tissue label conventions: set these to what YOUR data uses
-    parameters.layers.brain = [1, 2];     % GM/WM (example)
-    parameters.layers.skin  = [5];        % skin (example)
-    parameters.seg_labels.csf = [3];      % CSF (example)
+    % SimNIBS tissue label conventions (charm)
+    parameters.layers.brain = [1, 2];     % GM/WM
+    parameters.layers.skin  = [5];        % skin
 
     %% --- Run skull wrap (must exist on path) ---
     skull_rubber_wrap(parameters, BW, medium_masks, segmented_img);

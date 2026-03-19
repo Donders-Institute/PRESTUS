@@ -3,7 +3,7 @@ function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_s
 % for ultrasound neuromodulation simulations, either by preprocessing a 
 % subject-specific head model (T1-weighted MRI) or loading phantom/alternative grids.
 
-if contains(parameters.simulation_medium, {'layered'})
+if contains(parameters.simulation.medium, {'layered'})
     
     % Set up a grid containing a layered medium
     % (1) Align planning image to transducer and rescale to requested grid resolution
@@ -27,31 +27,27 @@ if contains(parameters.simulation_medium, {'layered'})
         return;
     end
     
-    parameters.grid_dims  = size(medium_masks);
-    parameters.n_sim_dims = numel(parameters.grid_dims);
+    parameters.grid.dims  = size(medium_masks);
 
 else
     % In case simulations are not run in a skull of layered tissue, 
     % alternative grid dimensions are set up
-    if strcmp(parameters.simulation_medium, 'phantom')
+    if strcmp(parameters.simulation.medium, 'phantom')
         % read in phantoms directly as medium masks 
-        segmentation_folder = fullfile(parameters.seg_path, sprintf('m2m_sub-%03d', parameters.subject_id));
+        segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
         segmented_img = niftiread(filename_segmented);
-        if size(segmented_img) == parameters.default_grid_dims
-            parameters.grid_dims = parameters.default_grid_dims;
-            parameters.n_sim_dims = length(parameters.grid_dims);
+        if size(segmented_img) == parameters.grid.default_dims
+            parameters.grid.dims = parameters.grid.default_dims;
             disp('Check passed: phantom dimensions fit requested grid...');
-        elseif length(size(segmented_img))==2 && all(size(segmented_img') == parameters.default_grid_dims)
-            parameters.grid_dims = parameters.default_grid_dims;
-            parameters.n_sim_dims = length(parameters.grid_dims);
+        elseif length(size(segmented_img))==2 && all(size(segmented_img') == parameters.grid.default_dims)
+            parameters.grid.dims = parameters.grid.default_dims;
             segmented_img = segmented_img';
             disp('Check passed: phantom dimensions fit requested grid after rotating phantom...');
         else
-            parameters.grid_dims = size(segmented_img);
-            parameters.n_sim_dims = length(parameters.grid_dims);
+            parameters.grid.dims = size(segmented_img);
             disp('Setting grid according to phantom dimensions...')
-            sprintf('%dD grid dimensions: [%d, %d, %d]', parameters.n_sim_dims, parameters.grid_dims);
+            sprintf('%dD grid dimensions: [%d, %d, %d]', numel(parameters.grid.dims), parameters.grid.dims);
         end
         % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
@@ -62,15 +58,14 @@ else
         [parameters] = check_layers(parameters, segmentation);
     else % e.g., water
         % set up default grid dimensions
-        assert(isfield(parameters, 'default_grid_dims'), ...
-            'The parameters structure should have the field grid_dims for the grid dimensions')
-        parameters.grid_dims = squeeze(parameters.default_grid_dims);
-        parameters.n_sim_dims = length(parameters.default_grid_dims);
-        sprintf('Using default %dD grid dimensions: [%d, %d, %d]', parameters.n_sim_dims, parameters.grid_dims);
+        assert(isfield(parameters, 'grid') && isfield(parameters.grid, 'default_dims'), ...
+            'parameters.grid.default_dims must be set for water simulations')
+        parameters.grid.dims = squeeze(parameters.grid.default_dims);
+        sprintf('Using default %dD grid dimensions: [%d, %d, %d]', numel(parameters.grid.dims), parameters.grid.dims);
         % set up empty medium masks and segmentations
-        medium_masks = ones(parameters.grid_dims); % single water layer
-        segmentation = zeros(parameters.grid_dims);
-        bone = zeros(parameters.grid_dims);
+        medium_masks = ones(parameters.grid.dims); % single water layer
+        segmentation = zeros(parameters.grid.dims);
+        bone = zeros(parameters.grid.dims);
         % update present layer (only water)
         [parameters] = check_layers(parameters, segmentation);
     end
@@ -78,7 +73,7 @@ else
     % specify that no transformation was applied
     planimg.t1_image_orig = [];
     planimg.t1_header = [];
-    planimg.transf = zeros(parameters.grid_dims);
-    planimg.inv_transf = zeros(parameters.grid_dims);
+    planimg.transf = zeros(parameters.grid.dims);
+    planimg.inv_transf = zeros(parameters.grid.dims);
 
 end

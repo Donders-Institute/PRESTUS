@@ -49,7 +49,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         focus_pos (:,3)
         max_data_pos (1,3)
         options.show_rectangles = 1
-        options.grid_step = parameters.grid_step_mm
+        options.grid_step = parameters.grid.resolution_mm
         options.rect_size = 2
         options.overlay_threshold_low (1,1) = min(overlay_image(:))
         options.overlay_threshold_high (1,1) = min(overlay_image(:)) + ...
@@ -190,8 +190,8 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     axis off;
     
     % draw transducer (if grid was properly set up)
-    if ~isempty(trans_pos) && parameters.run_grid_setup == 1
-        options.grid_step = parameters.grid_step_mm;
+    if ~isempty(trans_pos) && parameters.modules.run_grid_setup == 1
+        options.grid_step = parameters.grid.resolution_mm;
         plot_transducer_overlay(parameters, trans_pos, focus_pos, max_data_pos, options,  0.3, [0.2 0.6 1])
     end
     
@@ -234,7 +234,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         rect_size = options.rect_size;
         rectangle('Position', [focus_pos(2)-rect_size/2 focus_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
         rectangle('Position', [max_data_pos(2)-rect_size/2 max_data_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'b', 'LineWidth',1,'LineStyle','-')
-        text(max_data_pos(2), max_data_pos(1)+10, [num2str(round(max_data_pos(2)*parameters.grid_step_mm)), 'mm'], 'Color', 'w')
+        text(max_data_pos(2), max_data_pos(1)+10, [num2str(round(max_data_pos(2)*parameters.grid.resolution_mm)), 'mm'], 'Color', 'w')
     end
 
     linkaxes([ax1, ax2], 'xy'); % Synchronize both axes to avoid shifts

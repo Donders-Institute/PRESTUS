@@ -1,247 +1,380 @@
 ## PRESTUS parameters
 
-The following documents the parameters used in PRESTUS. The specification philosophy is the following: `default_config.yaml` provides a list of all parameters with default settings and will be read in first by the function `load_parameters`. This default configuration file should not be changed in standard applications to ensure that necessary fields are provided. 
+Parameters are organised in nested structs that map directly to YAML keys. PRESTUS uses a two-layer configuration system: `default_config.yaml` defines all parameters and their default values and should not be edited. A study-specific config (e.g. `config_study.yaml`) is loaded on top and only needs to specify values that differ from the defaults. Parameters can also be set or overridden programmatically in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
 
-To set up a specific application, an additional `config_<STUDY>.yaml` should be provided. This file should contain exclusively the fields where defaults should be overwritten (e.g., to provide specific transducer settings). Alternatively, parameters can be specified prior to calling the `prestus_pipeline` in MATLAB. This allows dynamic iterations over parameters of interest.
+---
 
-### I/O management
+<details>
+<summary><strong>General</strong></summary>
 
-| **Parameter**                     | **Description**                                       | **Comments**         |
-|-----------------------------------|-------------------------------------------------------|----------------------|
-| `data_path`                       | Absolute path to structural input data location.      | [string] Mandatory   |
-| `seg_path`                        | Absolute path to SimNIBS segmentations.               | [string] Mandatory   |
-| `sim_path`                        | Absolute path to the simulation output.               | [string] Mandatory   |
-| `localite_path`                   | Absolute path to localite planning.                   | [string] Optional    |
-| `simnibs_bin_path`                | Absolute path to SimNIBS binaries.                    | [string] Mandatory   |
-| `paths_to_add`                    | Toolbox paths to add with addpath().                  | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
-| `subpaths_to_add`                 | Toolbox paths to add with addpath(genpath()).         | [cell] e.g., `{"path/to/x", "path/to/Y"}` |
-| `subject_subfolder`               | Manage simulation (and optionally localite planning) outputs in subject-specific subdirectories?    | (`1 = yes [default], 0 = no`) |
-| `results_filename_affix`          | Affix for result file names                           | [string] Can be used to differentiate simulation outputs for the same subject-transducer combination(e.g., different intensities and/or targets.)  |
-| `interactive`                     | Interactive mode (`1 = yes, 0 = no`).                 | (`1 = yes, 0 = no`) Asks prior to overwriting or starting long computations. If set to non-interactive, see the flags `overwrite_files` and `overwrite_simnibs`. |
-| `overwrite_files`                 | File overwrite behavior (`ask`, `never`, or `always`).| (`ask`, `never`, or `always`) This parameter does NOT apply to SimNIBS segmentations.  |
-| `overwrite_simnibs`               | Overwrite SimNIBS segmentation results?               | (`1 = yes, 0 = no` [default]) |
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `subject_id` | Subject identifier used for file naming and folder management. | — | Mandatory. Set before calling `prestus_pipeline_start(parameters)`. |
+| `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab` |
 
-### Simulation type
-see [doc_preproc.md](doc_preproc.md)      
+</details>
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `simulation_medium`               | Medium setup for simulation (`water`/`layered`/`phantom`).                                   | Mandatory.   |
-| `layers`                    | Labels for layered simulation, defining mask indices for different tissue types.      | Mandatory. This parameter allows adding or removing layers of interest (if the corresponding segmenation is available and `parameters.medium` has a corresponding label containing the acoustic properties).  |
-| `seg_labels`                      | Labels for segmentations, specifying indices for CSF, bone mask, and eye regions.     | Mandatory.  |
-| `run_grid_setup`                  | Setup grid and run head processing? Mandatory for simulations.                        | (`1 = yes, 0 = no`)  |
-| `run_medium_setup`                | Map medium acoustic properties? Mandatory for simulations.                            | (`1 = yes, 0 = no`)  |
-| `run_source_setup`                | Set up acoustic source? Mandatory for simulations.                                    | (`1 = yes, 0 = no`)  |
-| `run_acoustic_sims`               | Run acoustic simulations?                                                             | (`1 = yes, 0 = no`)  |
-| `run_acoustic_analysis`           | Run acoustic analysis?                                                                | (`1 = yes, 0 = no`)  |
-| `run_heating_sims`                | Run thermal simulations?                                                              | (`1 = yes, 0 = no`)  |
-| `run_thermal_analysis`            | Run thermal analysis?                                                                 | (`1 = yes, 0 = no`)  |
-| `run_nifti_creation`              | Run Nifti creation?                                                                   | (`1 = yes, 0 = no`)  |
-| `run_posthoc_water_sims`          | Run water simulations following head simulations.                                     | (`1 = yes, 0 = no`)  |
-| `generate_report`                 | Generate a self-contained HTML simulation report at the end of the pipeline?          | (`1 = yes, 0 = no`)  |
-| `n_sim_dims`                      | Simulation type (2D / 3D).                                                            | `2` = 2D (`kspaceFirstOrder2D`), `3` = 3D(`kspaceFirstOrder3D`). If not specified, it is inferred from `default_grid_dims`. For `axisymmetric` setups (see below), specify 2D.    |
-| `axisymmetric`                    | Run 2D simulations with axisymmetry (`kspaceFirstOrderAS `).                          | (`1 = yes, 0 = no`) see [doc_simulations-acoustic.md](doc_simulations-acoustic.md).    |
-| `savemat`                         | Save outputs of acoustic and/or heating simulations as .mat files?                    | (`1 = yes, 0 = no`) For many parallel simulations, setting this to 0 saves disk space.    |
-| `debug`                           | Activate a more verbose debug mode in which more intermediate output plots and files are provided?   | (`1 = yes, 0 = no`) |
+---
 
-### Segmentation/Preprocessing
-see [doc_preproc.md](doc_preproc.md)      
+<details>
+<summary><strong><code>simulation</code> — Simulation type & execution</strong></summary>
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `segmentation_software`           | Segmentation software used (`headreco` or `charm`).                                                       | Use of the former `headreco` may result in errors (e.g., when creating pseudoCTs) due to the assumption of charm-based tissue labels in parts of the codebase.    |
-| `pad_mm`                          | Size of symmetric padding to apply to grid prior to transducer + PML setup [mm; default: `0`]             |   |
-| `csf_mask_expansion_factor`       | Expansion factor for cerebrospinal fluid (CSF) brain mask; controls CSF mask dilation. [grid voxels]      |   |
-| `grid_max_expand`                 | Maximum expansion [mm] for computational grid to optimize prime numbers and speed up computations.        |   |
-| `smooth_method`                   | Smoothing filter type [`gaussian`(default) / `box`]                                                       |   |
-| `smooth_threshold_skull`          | Threshold for smoothing the skull mask; higher values result in thinner masks.                            |   |
-| `smooth_threshold_other`          | Threshold for smoothing other masks; higher values result in thinner masks.                               |   |
-| `smooth_fwhm_mm`                  | FWHM of smoothing kernel [mm] (default: 1)                                           |   |
-| `skullfillmethod`                 | Method for filling holes in the skull ['rubberwrap'(default)/'imclose']                                   |   |
-| `wrapradius`                      | Skull rubber wrap radius [grid voxels] (default: 10)   | Larger = tighter rubber that ignores bigger dents; recommended: 2-10  |
-| `smooth_properties`               | Apply smoothing with parameters above to acoustic property maps?                                          | `false`(default)/`true`   |
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `medium` | Medium setup. | `'layered'` | `water` / `layered` / `phantom`. Mandatory. |
+| `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [doc_backend.md](doc_backend.md). |
+| `precision` | Computational precision for acoustic and thermal simulations. | `'single'` | `single` / `double` |
+| `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
+| `debug` | Verbose debug mode with additional intermediate outputs. | `1` | `1 = yes`, `0 = no` |
 
-### Transducer specification
-see [doc_transducer.md](doc_transducer.md)      
+</details>
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `transducer.source_freq_hz`       | Central frequency of the acoustic source (in Hz).                                 |                      |
-| `transducer.n_elements`           | Number of elements in the transducer.                                             |                      |
-| `transducer.Elements_ID_mm`       | Inner diameter of each transducer element (in mm).                                |                      |
-| `transducer.Elements_OD_mm`       | Outer diameter of each transducer element (in mm).                                |                      |
-| `transducer.curv_radius_mm`       | Radius of curvature of the transducer bowl (in mm).                               |                      |
-| `transducer.dist_to_plane_mm`     | Distance from the geometric focus to the transducer plane (in mm).                |                      |
-| `transducer.source_amp`           | Amplitude of the acoustic source (in Pa).                                         | Must be calibrated.  |
-| `transducer.source_phase_deg`     | Phase of the acoustic source (in degrees).                                        | Must be calibrated.  |
-| `transducer.source_phase_rad`     | Phase of the acoustic source (in radians).                                        | Must be calibrated.  |
-| `transducer.trans_pos`            | Position of transducer bowl (XYZ, T1 grid voxel space).                           |                      |
-| `transducer.focus_pos`            | Position of stimulation target (XYZ, T1 grid voxel space).                        |                      |
-| `expected_focal_distance_ep`      | Expected distance from the transducer exit plane to the stimulation focus (in mm).  | Transducer depth setting [Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or [`transducer.focus_pos` and `transducer.trans_pos`] have to be specified.]    |
-| `expected_focal_distance_bowl`    | Expected distance from the transducer bowl to the stimulation focus (in mm).      |                      |
-| `transducer_from_localite`        | Load transducer position from Localite files?.                                    | (`1 = yes, 0 = no` [default])   |
-| `reference_transducer_distance_mm`  | Distance from tracker to transducer exit plane (in mm).                         | Allows to correct for varying distances between the infrared trackers attached to the transducer and the exit plane. Only applies when `transducer_from_localite=1`. |
-| `use_kWaveArray`                  | Use the kWaveArray class for modeling transducers.                                | (`1 = yes, 0 = no`) see k-Wave documentation.    |
+---
 
-### Target specification
+<details>
+<summary><strong><code>path</code> — Data paths</strong></summary>
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `focus_area_radius`               | Radius of the target area around the focus where ISPPA is averaged (in mm).       | Default: 5 mm        |
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `anat` | Absolute path to structural input data. | — | Mandatory |
+| `sim` | Absolute path to simulation outputs. | — | Mandatory |
+| `seg` | Absolute path to SimNIBS segmentations (m2m folders). | — | Mandatory |
+| `localite` | Path to Localite neuronavigation output folder. | — | Optional |
+| `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
+| `t2_pattern` | T2 image path template relative to `path.anat`. | `'sub-%1$03d_T2w.nii*'` | Optional |
+| `subject_subfolder` | Store outputs in subject-specific subdirectories? | `1` | `1 = yes`, `0 = no` |
 
-### Simulation grid
+</details>
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `grid_step_mm`                    | Resolution of the computational grid (must be isotropic, in mm).                  |                      |
-| `default_grid_dims`               | Default dimensions of the simulation grid for free-water simulations.             |                      |
-| `pml_size`                        | Perfectly Matched Layer (PML) size to absorb waves at grid boundaries.            | See [k-Wave documentation](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). Default: `10` (recommended for 3D grids)|
-| `source_ppw`                      | Points Per Wavelength [default: calculated internally]                            |                      |
-| `source_cfl`                      | Courant-Friedrichs-Lewy fraction                                                  |                      |
-| `source_limit_fraction`           | Fraction of the stability limit to use for time step                              | `0`: do not use stability limit |
-| `precision`                       | Computational precision for both acoustic and thermal simulations                 | `single` (default) / `double` (more precise, but more computationally demanding).|
+---
 
-### Medium properties
-see [doc_medium.md](doc_medium.md)    
+<details>
+<summary><strong><code>startup</code> — Environment & toolbox paths</strong></summary>
 
-| **Parameter**                                     | **Description**                                                                   | **Comments**         |
-|---------------------------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `medium.water.sound_speed`                        | Speed of sound in water (in m/s).                                                 | ITRUSST benchmarks.  |
-| `medium.water.density`                            | Density of water (in kg/m³).                                                      | Tissue Properties DB.|
-| `medium.water.alpha_coeff`                        | Attenuation coefficient for water (in dB/cm/MHz).                                 | k-Plan documentation.|
-| `medium.water.alpha_power`                        | Exponent for attenuation coefficient power law for water.                         | Tissue Properties DB.|
-| `medium.water.thermal_conductivity`               | Thermal conductivity of water (in W/m/°C).                                        | Tissue Properties DB.| 
-| `medium.water.specific_heat_capacity`             | Specific heat capacity of water [J/kg/°C].                                        | Tissue Properties DB.| 
-| `medium.water.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.water.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
-| `medium.skull.sound_speed`                        | Speed of sound in skull bone (in m/s).                                            | ITRUSST benchmarks.  |
-| `medium.skull.density`                            | Density of skull bone (in kg/m³).                                                 | ITRUSST benchmarks.  |
-| `medium.skull.alpha_coeff`                        | Attenuation coefficient at for skull bone (in dB/cm/MHz).                         | Pinton et al., 2011. |
-| `medium.skull.alpha_power`                        | Exponent for attenuation coefficient power law for skull bone.                    | k-Plan documentation.|
-| `medium.skull.thermal_conductivity`               | Thermal conductivity of skull bone (in W/m/°C).                                   | Tissue Properties DB.| 
-| `medium.skull.specific_heat_capacity`             | Specific heat capacity of skull bone (in J/kg/°C).                                | Tissue Properties DB.| 
-| `medium.skull.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.skull.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
-| `medium.brain.sound_speed`                        | Speed of sound in brain tissue (in m/s).                                          | Tissue Properties DB.|
-| `medium.brain.density`                            | Density of brain tissue (in kg/m³).                                               | Tissue Properties DB.|
-| `medium.brain.alpha_coeff`                        | Attenuation coefficient for brain tissue (in dB/cm/MHz).                          | k-Plan documentation.|
-| `medium.brain.alpha_power`                        | Exponent for attenuation coefficient power law for brain tissue.                  | k-Plan documentation.|
-| `medium.brain.thermal_conductivity`               | Thermal conductivity of brain tissue (in W/m/°C).                                 | Tissue Properties DB.| 
-| `medium.brain.specific_heat_capacity`             | Specific heat capacity of brain tissue (in J/kg/°C).                              | Tissue Properties DB.| 
-| `medium.brain.perfusion`                          | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.brain.absorption_fraction`                | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
-| `medium.skin.sound_speed`                         | Speed of sound in skin tissue (in m/s).                                           | ITRUSST benchmarks.  |
-| `medium.skin.density`                             | Density of skin tissue (in kg/m³).                                                | ITRUSST benchmarks.  |
-| `medium.skin.alpha_coeff`                         | Attenuation coefficient for skin tissue (in dB/cm/MHz).                           | ITRUSST benchmarks.  |
-| `medium.skin.alpha_power`                         | Exponent for attenuation coefficient power law for skin tissue.                   | ITRUSST benchmarks.  |
-| `medium.skin.thermal_conductivity`                | Thermal conductivity of skin tissue (in W/m/°C).                                  | Tissue Properties DB.| 
-| `medium.skin.specific_heat_capacity`              | Specific heat capacity of skin tissue (in J/kg/°C).                               | Tissue Properties DB.| 
-| `medium.skin.perfusion`                           | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.skin.absorption_fraction`                 | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. |
-| `medium.skull_trabecular.sound_speed`             | Speed of sound in trabecular bone (in m/s).                                       | ITRUSST benchmarks.  |
-| `medium.skull_trabecular.density`                 | Density of trabecular bone (in kg/m³).                                            | ITRUSST benchmarks.  |
-| `medium.skull_trabecular.alpha_coeff`             | Attenuation coefficient for trabecular bone (in dB/cm/MHz).                       | Pinton et al., 2011. |
-| `medium.skull_trabecular.alpha_power`             | Exponent for attenuation coefficient power law for trabecular bone.               | k-Plan documentation.|
-| `medium.skull_trabecular.thermal_conductivity`    | Thermal conductivity of trabecular bone (in W/m/°C).                              | Tissue Properties DB.| 
-| `medium.skull_trabecular.specific_heat_capacity`  | Specific heat capacity of trabecular bone (in J/kg/°C).                           | Tissue Properties DB.| 
-| `medium.skull_trabecular.perfusion`               | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.skull_trabecular.absorption_fraction`     | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. |  
-| `medium.skull_cortical.sound_speed`               | Speed of sound in cortical bone (in m/s).                                         | ITRUSST benchmarks.  |
-| `medium.skull_cortical.density`                   | Density of cortical bone (in kg/m³).                                              | ITRUSST benchmarks.  |
-| `medium.skull_cortical.alpha_coeff`               | Attenuation coefficient for cortical bone (in dB/cm/MHz).                         | Pinton et al., 2011. |
-| `medium.skull_cortical.alpha_power`               | Exponent for attenuation coefficient power law for cortical bone.                 | k-Plan documentation.|
-| `medium.skull_cortical.thermal_conductivity`      | Thermal conductivity of cortical bone (in W/m/°C).                                | Tissue Properties DB.| 
-| `medium.skull_cortical.specific_heat_capacity`    | Specific heat capacity of cortical bone (in J/kg/°C).                             | Tissue Properties DB.| 
-| `medium.skull_cortical.perfusion`                 | Perfusion / heat transfer rate [mL/min/kg]                                        | Tissue Properties DB.| 
-| `medium.skull_cortical.absorption_fraction`       | Fraction of attenuation converted into attenuation [0-1]                          | Pinton et al., 2012. | 
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
+| `simnibs_bin_path` | Absolute path to SimNIBS binaries. | Mandatory for segmentation and MNI conversion |
+| `paths_to_add` | Paths to add with `addpath()`. | [cell] e.g. `{"path/to/x"}` |
+| `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to config file location |
 
+</details>
 
-### pseudoCT mapping to skull properties
+---
+
+<details>
+<summary><strong><code>io</code> — I/O management</strong></summary>
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
+| `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `ask`. Does NOT apply to SimNIBS segmentations. |
+| `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
+| `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
+| `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
+| `adopted_heatmap` | Path to an existing ISPPA heatmap NIfTI to reuse instead of re-running acoustics. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. | — | Optional. Used for sequential multi-target runs. |
+
+**Runtime-derived (set by `path_log_setup`):**
+
+| **Field** | **Description** |
+|---|---|
+| `output_dir` | Resolved per-subject output directory. Set from `path.sim` (+ subject subfolder if `path.subject_subfolder = 1`). |
+| `debug_dir` | Debug subfolder within `output_dir`. Created automatically. |
+| `filename_output_table` | Path to the per-subject CSV results table. |
+| `kwave_source_filename` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>modules</code> — Pipeline module flags</strong></summary>
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `run_grid_setup` | Setup grid and run head processing. | `1` | Mandatory for simulations. |
+| `run_medium_setup` | Map medium acoustic properties. | `1` | Mandatory for simulations. |
+| `run_source_setup` | Set up acoustic source. | `1` | Mandatory for simulations. |
+| `run_acoustic_sims` | Run acoustic simulations. | `1` | |
+| `run_acoustic_analysis` | Run acoustic analysis. | `1` | |
+| `run_heating_sims` | Run thermal simulations. | `0` | Enable after acoustic results are validated. |
+| `run_thermal_analysis` | Run thermal analysis. | `1` | |
+| `run_nifti_creation` | Export results as NIfTI files. | `1` | |
+| `run_posthoc_water_sims` | Run free-water reference simulations after head simulations. | `1` | |
+| `generate_report` | Generate self-contained HTML simulation report. | `1` | |
+
+All flags: `1 = yes`, `0 = no`.
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>transducer</code> — Transducer specification</strong></summary>
+
+see [doc_transducer.md](doc_transducer.md)
+
+All fields are mandatory and have no defaults — they must be set in the study config.
+
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
+| `source_freq_hz` | Central frequency of the acoustic source [Hz]. | |
+| `n_elements` | Number of transducer elements. | |
+| `Elements_ID_mm` | Inner diameter of each element [mm]. | |
+| `Elements_OD_mm` | Outer diameter of each element [mm]. | |
+| `curv_radius_mm` | Radius of curvature of the transducer bowl [mm]. | |
+| `dist_to_plane_mm` | Distance from geometric focus to transducer plane [mm]. | |
+| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `source_phase_deg` | Source phase [degrees]. | Must be calibrated. |
+| `source_phase_rad` | Source phase [radians]. | Must be calibrated. |
+| `trans_pos` | Transducer bowl position (XYZ, T1 grid voxel space). | |
+| `focus_pos` | Stimulation target position (XYZ, T1 grid voxel space). | |
+| `expected_focal_distance_ep` | Expected distance from transducer exit plane to focus [mm]. | Alternative to specifying `trans_pos`/`focus_pos`. Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or both pos fields must be set. |
+| `expected_focal_distance_bowl` | Expected distance from transducer bowl to focus [mm]. | |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>placement</code> — Transducer placement</strong></summary>
+
+see [doc_transducer.md](doc_transducer.md)
+
+#### `placement.localite`
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `enabled` | Load transducer position from Localite neuronavigation files? | `0` | `1 = yes`, `0 = no` |
+| `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Corrects for varying tracker-to-exit-plane distances. Only applies when `enabled=1`. |
+
+#### `placement.heuristic`
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `save_localite_t1` | Save Localite-aligned T1 output for header correction? | `false` | See [doc_placement_heuristic.md](doc_placement_heuristic.md). |
+| `dist_close` | Distance from target considered sufficiently close [mm]. | `[]` | |
+| `ear_radius` | Radius of the ear exclusion zone [mm]. | `35` | |
+| `left_ear_center` | Approximate coordinates for left ear [image voxels]. | `[]` | Optional |
+| `right_ear_center` | Approximate coordinates for right ear [image voxels]. | `[]` | Optional |
+| `criterion_intersection` | Max fraction of exit plane intersecting skin. | `0.05` | 5% |
+| `criterion_skin_mean` | Mean distance of EP voxels from skin [quantile]. | `[]` | |
+| `criterion_skull_mean` | Mean distance of EP voxels from skull [quantile]. | `[]` | |
+| `criterion_skin_var` | Variance of EP voxel distance from skin [quantile]. | `[]` | |
+| `criterion_skull_var` | Variance of EP voxel distance from skull [quantile]. | `[]` | |
+| `expand_step` | Expansion step for skin intersection criterion. | `0.01` | 1% |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>grid</code> — Simulation grid</strong></summary>
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `resolution_mm` | Grid resolution (must be isotropic) [mm]. | `0.5` | |
+| `default_dims` | Requested grid dimensions [voxels per dimension]. | `[144, 144, 400]` | Directly sets the simulation grid for `water` and `phantom` media. For `layered`, the grid is determined by head preprocessing and this value is not used. |
+| `axisymmetric` | Run axisymmetric 2D simulation (`kspaceFirstOrderAS`). | `0` | `1 = yes`, `0 = no`. See [doc_simulations-acoustic.md](doc_simulations-acoustic.md). |
+| `pml_size` | Perfectly Matched Layer (PML) size [voxels]. | `10` | Absorbs waves at boundaries. Recommended for 3D. See [k-Wave docs](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). |
+| `source_ppw` | Points per wavelength. | `[]` | Calculated internally if not set. |
+| `source_cfl` | Courant-Friedrichs-Lewy fraction. | `0.15` | |
+| `source_limit_fraction` | Fraction of the stability limit to use for time step. | `0.9` | `0` = do not use stability limit |
+| `max_expand` | Maximum grid expansion for prime-number FFT optimisation [voxels]. | `40` | |
+| `use_kWaveArray` | Use the kWaveArray class for transducer modelling? | `1` | `1 = yes`, `0 = no` |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>headmodel</code> — Head model & segmentation preprocessing</strong></summary>
+
+see [doc_preproc.md](doc_preproc.md)
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `head_pad_mm` | Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]. | `0` | |
+| `csf_expansion` | Dilation of the CSF brain mask into surrounding head regions [grid voxels]. | `40` | |
+| `smooth_method` | Mask smoothing filter type. | `'gaussian'` | `gaussian` / `box` |
+| `smooth_threshold_skull` | Binarisation threshold for skull mask; higher = thinner mask. | `0.5` | |
+| `smooth_threshold_other` | Binarisation threshold for other masks; higher = thinner mask. | `0.5` | |
+| `smooth_fwhm_mm` | FWHM of smoothing kernel [mm]. | `1` | |
+| `smooth_properties` | Apply smoothing to acoustic property maps as well? | `false` | |
+| `skull_fill_method` | Method for filling holes in the skull. | `'rubberwrap'` | `rubberwrap` / `imclose` |
+| `skull_wrap_radius` | Rubber-wrap radius [grid voxels]. | `10` | Larger = tighter wrap ignoring bigger dents. Recommended: 2–10. |
+| `skull_wrap_visualize` | Visualize rubber-wrap result? | `0` | `1 = yes`, `0 = no`. Avoid on HPC. |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>segmentation</code> — Segmentation settings</strong></summary>
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
+| `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>pct</code> — pseudo-CT skull property mapping</strong></summary>
+
 see [doc_pseudoCT.md](doc_pseudoCT.md)
 
-| **Parameter**                     | **Description**                                                   | **Comments**         |
-|-----------------------------------|-------------------------------------------------------------------|----------------------|
-| `use_pseudoCT`                    | Use (pseudo-)CT based mapping?  (`1` = yes / `0` = no (default))  |  Map (pseudo-)HU to tissue properties in the skull layer? |
-| `pct_mapping_density`             | Density mapping algorithm (`k-plan`(default)/`k-wave`/`marsac`/`aubry`/`none`) | see [documentation](doc_pseudoCT.md#mapping-skull-density)  |
-| `pct_mapping_soundspeed`          | Sound speed mapping algorithm (`k-plan`(default)/`marsac`/`aubry`/`none`)     | see [documentation](doc_pseudoCT.md#mapping-skull-sound-speed)  |
-| `pct_mapping_attenuation`         | Attenuation mapping algorithm (`k-plan`(default)/`mueller`/`aubry`/`none`)    | see [documentation](doc_pseudoCT.md#mapping-skull-attenuation)  |
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `enabled` | Use (pseudo-)CT to inform skull medium properties? | `0` | `1 = yes`, `0 = no` |
+| `mapping_density` | HU-to-density mapping algorithm. | `'k-plan'` | `k-plan` / `k-wave` / `marsac` / `aubry` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-density). |
+| `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-sound-speed). |
+| `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-attenuation). |
 
+</details>
 
-### Sequence timing and baseline temperature for heating simulations
-see [doc_simulations-acoustic.md](doc_simulations-thermal.md)   
+---
 
-| **Parameter**                     | **Description**                                                                   | **Comments**         |
-|-----------------------------------|-----------------------------------------------------------------------------------|----------------------|
-| `thermal.pd`                      | Pulse Duration (PD) [seconds]  | Duty cycle (DC) inside a Pulse Train [%] is internally calculated as `pd`/`pri`. |   |
-| `thermal.pri`                     | Pulse Repetition Interval (PRI) [seconds] (i.e., an on/off cycle during stimulation).    | Pulse Repetition Frequency (PRF) is internally calculated as 1/`pri`.|
-| `thermal.ptd`                     | Pulse Train Duration (PTD) [seconds]                                                                          |   |
-| `thermal.pt_timestep`             | Modeling time steps inside a PT [seconds]                                                                     |   |
-| `thermal.ptri`                    | Pulse Train Repetition Interval (PTRI) [seconds]                                                              | Duration of OFF period within a PTRI is internally calculated as `ptri`-`ptd`.  |
-| `thermal.ptrd`                    | Pulse Train Repetition Duration (PTRD) [seconds]                                                              |   |
-| `thermal.post_ptri_dur`           | Post-PTRI Steady-state Duration [seconds]                                                                     |   |
-| `thermal.post_pt_timestep`        | Modeling time steps following PT & PTRI [seconds]                                                             |   |
-| `thermal.equal_step_duration`     | Whether simulation step durations are equal for on and off cycles (`1 = yes, 0 = no`).                        |   |
-| `thermal.cem43_iso`               | Calculate CEM43 according to ISO norm (`1`) or kWaveDiffusion (`0`).                                          |   |
-| `thermal.temp_0.water`            | Initial temperature of water medium before simulation (in °C).                                                |   |
-| `thermal.temp_0.skull`            | Initial temperature of skull medium before simulation (in °C).                                                |   |
-| `thermal.temp_0.brain`            | Initial temperature of brain medium before simulation (in °C).                                                |   |
-| `thermal.temp_0.skin`             | Initial temperature of skin medium before simulation (in °C).                                                 |   |
-| `thermal.temp_0.skull_trabecular` | Initial temperature of trabecular skull medium before simulation (in °C).                                     |   |
-| `thermal.temp_0.skull_cortical`   | Initial temperature of cortical skull medium before simulation (in °C).                                       |   |
-| `thermal.sensor_xy_halfsize`      | Maximum size of the sensor window for temperature recording (in grid units).                                  |   |
-| `thermal.record_t_at_every_step`  | Whether to record temperature at every time step for the whole sensor window (`1 = yes, 0 = no`).             |   |
-| `heatingvideo`                    | Save a video of incremental heating? (`1 = yes, 0 = no`)                                                      |   |
+<details>
+<summary><strong><code>layers</code> — Simulation tissue compartments</strong></summary>
 
+see [doc_preproc.md](doc_preproc.md)
 
-### GPU/HPC options
-see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)    
+Maps tissue compartment names to their SimNIBS charm label indices. Compartments are modelled in listed order; any voxel label not assigned to a named compartment is treated as water. Charm label values are hardcoded in `charm_seg_labels()`. Layers can be removed or added.
 
-| **Parameter**                     | **Description**                                                                           | **Comments**         |
-|-----------------------------------|-------------------------------------------------------------------------------------------|----------------------|
-| `code_type`                       | Type of k-Wave code to run (`matlab_cpu`, `matlab_gpu`, `cpp_cpu`, or `cpp_gpu`).         | See [doc_backend.md](doc_backend.md). |
-| `platform`                        | Simulation submit mode                                                                    | `slurm` (recommended), `matlab`, `qsub`      |
-| `hpc_gpu`                         | Request a specific GPU. [Optional]                                                        |  Not recommended by default, rely on automatic GPU detection instead. May be useful when benchmarking specific GPUs. E.g.,```"nvidia_a100-sxm4-40gb:1"```. ```scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'``` lists available GPU types. |
-| `hpc_partition`                   | Request a dedicated GPU partition. [Optional]                                             | The Donders HCP provides a ```gpu40g``` partition that consists of nodes with GPU with vRAM > 40 GB. This is the recommended default for thermal simulations of longer protocols. |
-| `hpc_reservation`                 | Request a reserved cue. [Optional]                                                        |                       |
-| `ld_library_path`                 | Path to LD_LIBRARY used during SimNIBS installation. [Optional]                           |  If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, specify the LD_LIBRARY location e.g., `/opt/gcc/7.2.0/lib64` [torque] or ```/home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux``` [slurm] |
+| **Layer** | **Default charm labels** | **Comments** |
+|---|---|---|
+| `water` | `[0, 3, 6, 9, 10]` | Baseline layer; all unassigned voxels are treated as water |
+| `brain` | `[1, 2]` | White matter + grey matter |
+| `skin` | `[5]` | |
+| `skull` | `[4]` | Single skull layer; used when cortical/trabecular split is not needed |
+| `skull_cortical` | `[7]` | Cortical bone; used in multi-layer skull model |
+| `skull_trabecular` | `[8]` | Trabecular bone; used in multi-layer skull model |
 
-### Transducer calibration
-see [doc_calibration.md](doc_calibration.md)    
+</details>
 
-For transducer calibration, a separate `calibration_config.yaml` applies that should be loaded as `parameters.calibration`.
+---
 
-| **Parameter**                   | **Description**                                         | **Comments**                          |
-|---------------------------------|---------------------------------------------------------|---------------------------------------|
-| `path_input_axial`              | Directory containing axial profiles                     |                                       |
-| `path_input_phase`              | Directory containing phase data                         |                                       |
-| `path_output`                   | Directory for saving free-water simulation results      |                                       |
-| `path_output_profiles`          | Directory for saving optimized profile data             |                                       |
-| `filename_calibrated_CSV`       | Filename of calibrated CSV data                         | Mandatory only when not generated within standalone script based on equipment name.  |
-| `save_in_calibration_folder`    | `TRUE` (default): save in `path_output` ; `FALSE`: save outputs in `sim_path` (see regular config). |  Note: If TRUE calibration results are also appended to existing calibration for this equipment instead of overwritten. |
-| `combinations`                  | Equipment combinations (must refer to equipment in `equipment_config.yaml`) | Multiple combinations can be specified. Every [] specification will be performed for the corresponding (ordered) index equipment combination. Example: all foci within the first [] will be executed for the first equipment combination. If array is empty ([]), all focal depths of available characterization data will be used. |
-| `focal_depths_wrt_exit_plane`   | List of focal depths (in mm) to be characterized.       | Multiple combinations can be specified. |
-| `desired_intensities`           | Desired free-water intensities [W/cm^2]                 | Multiple combinations can be specified. |
-| `add_FDO`                        | Append Focal Distance Offset (distance from transducer bowl to exit plane). Set to `1` if zero point in provided profiles reflects the exit plane, and not as expected the transducer bowl. | The profile is padded (between bowl and exit plane) with zero. This can stabilize the fitting procedure in the near field.  |
-| `axisymmetric2D`                | Overwrite default 3D simulation to perform axisymmetric 2D.   | (`1 = yes, 0 = no`)  |
-| `force_kwavearray`              | Force to run free-water simulations with kwavearray?          | If active, free-water simulations always use kwavearray. If set to `0`, simulations use the setting in the default or study-specific config.            |
-| `opt_method`                    | `FEXminimize` (open source subtoolbox)  or `GlobalSearch` (MATLAB's Global Optimization Toolbox)    |   |
-| `opt_limits`                    | Distance limits for optimization [mm]                   |   |
-| `opt_weights`                   | Weighting of the original profile during fitting (1 = equal weighting, > 1 Gaussian weighting, increasingly narrow with larger weights) |   |
-| `opt_seed`                      | Random seed for optimization                            |   |
-| `skip_front_peak_mm`            | Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts.  | Used only for calculating the peak distance and FWHM.  |
+<details>
+<summary><strong><code>medium</code> — Tissue acoustic & thermal properties</strong></summary>
 
-### Heuristic transducer placement
+see [doc_medium.md](doc_medium.md)
 
-| **Parameter**                   | **Description**                                         | **Comments**                          |
-|---------------------------------|---------------------------------------------------------|---------------------------------------|
-| `tp_dist_close`                 | Distance from target considered sufficiently close [mm] |                                       |
-| `tp_ear_radius`                 | Radius of the nogo zone [mm]                            | [Optional] for ear exclusion          |
-| `tp_left_ear_center`            | Approximate coordinates for left ear [img voxels]       | [Optional] for ear exclusion          |
-| `tp_right_ear_center`           | Approximate coordinates for right ear [img voxels]      | [Optional] for ear exclusion          |
-| `tp_criterion_intersection`     | Criterion: intersection with skin [fraction]            | Default: `0.05` (5%)                  |
-| `tp_criterion_skin_mean`        | Criterion: mean distance of EP voxels from skin [quantile]     | Default: `NaN`                 |
-| `tp_criterion_skull_mean`       | Criterion: mean distance of EP voxels from skull [quantile]    | Default: `NaN`                 |
-| `tp_criterion_skin_var`         | Criterion: variance of EP voxel distance from skin [quantile]  | Default: `NaN`                 |
-| `tp_criterion_skull_var`        | Criterion: variance of EP voxel distance from skull [quantile] | Default: `NaN`                 |
-| `tp_expand_step`                | Expansion step for skin intersection                    | Default: `0.01` (1%)                  |
-| `tp_save_localiteT1`            | Save localite T1                                        | [Optional] Requires `localite_path`   |
+Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, `skull_cortical`) carries the following fields:
+
+| **Field** | **Description** | **Units / Reference** |
+|---|---|---|
+| `sound_speed` | Speed of sound. | m/s — ITRUSST benchmarks |
+| `density` | Density. | kg/m³ — ITRUSST benchmarks |
+| `alpha_coeff` | Attenuation coefficient. | dB/cm/MHz |
+| `alpha_power` | Attenuation power law exponent. | — |
+| `thermal_conductivity` | Thermal conductivity. | W/m/°C — Tissue Properties DB |
+| `specific_heat_capacity` | Specific heat capacity. | J/kg/°C — Tissue Properties DB |
+| `perfusion` | Perfusion / heat transfer rate. | mL/min/kg — Tissue Properties DB |
+| `absorption_fraction` | Fraction of attenuation converted to heat. | [0–1] — Pinton et al., 2012 |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>timing</code> — Sonication timing protocol</strong></summary>
+
+see [doc_simulations-thermal.md](doc_simulations-thermal.md)
+
+Protocol duration fields must be set for thermal simulations.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `pd` | Pulse Duration (PD) [s]. | `NaN` | Duty cycle = `pd`/`pri`. |
+| `pri` | Pulse Repetition Interval (PRI) [s]. | `NaN` | PRF = 1/`pri`. |
+| `ptd` | Pulse Train Duration (PTD) [s]. | `NaN` | |
+| `pt_timestep` | Modelling time step within a pulse train [s]. | `0.02` | |
+| `ptri` | Pulse Train Repetition Interval (PTRI) [s]. | `NaN` | OFF duration = `ptri` − `ptd`. |
+| `ptrd` | Pulse Train Repetition Duration (PTRD) [s]. | `NaN` | |
+| `post_ptri_dur` | Post-PTRI steady-state duration [s]. | `NaN` | |
+| `post_pt_timestep` | Modelling time step following PT & PTRI [s]. | `1` | |
+| `equal_step_duration` | Equal step durations for on and off cycles? | `0` | `1 = yes`, `0 = no` |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>thermal</code> — Thermal simulation settings</strong></summary>
+
+see [doc_simulations-thermal.md](doc_simulations-thermal.md)
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `cem43_iso` | Calculate CEM43 per ISO norm (`1`) or kWaveDiffusion (`0`)? | `0` | |
+| `temp_0.{tissue}` | Initial temperature per tissue compartment [°C]. | `37` | Tissues: `water`, `skull`, `brain`, `skin`, `skull_trabecular`, `skull_cortical` |
+| `sensor_xy_halfsize` | Sensor window half-size for temperature recording [grid units]. | `100` | |
+| `record_t_at_every_step` | Record temperature at every time step for the full sensor window? | `0` | Memory-intensive; disable if out-of-memory errors occur. |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>analysis</code> — Output analysis</strong></summary>
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `focus_area_radius` | Radius around the focus in which ISPPA is averaged for outputs [mm]. | `5` | |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>hpc</code> — High-performance computing</strong></summary>
+
+see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `gpu` | Request a specific GPU. | `''` | e.g. `"nvidia_a100-sxm4-40gb:1"` |
+| `partition` | Request a dedicated queue partition. | `''` | |
+| `reservation` | Request a reserved queue. | `''` | |
+| `wait_for_job` | Block MATLAB until the submitted HPC job completes? | `false` | |
+| `timelimit` | Job time limit. | `'04:00:00'` | |
+| `memorylimit` | Memory limit [GB]. | `20` | |
+| `ld_library_path` | LD_LIBRARY path for SimNIBS installation. | `''` | Set if you see `undefined symbol` errors. e.g. `/opt/gcc/7.2.0/lib64` |
+| `job_prefix` | Prefix string for HPC job names. | `'PRESTUS'` | Overridden to `'TP'` for transducer positioning jobs. |
+| `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
+
+</details>
+
+---
+
+<details>
+<summary><strong><code>calibration</code> — Transducer calibration</strong></summary>
+
+see [doc_calibration.md](doc_calibration.md)
+
+A separate `calibration_config.yaml` applies for calibration workflows and is loaded as `parameters.calibration`.
+
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
+| `path_input_axial` | Directory containing axial intensity profiles. | |
+| `path_input_phase` | Directory containing phase data. | |
+| `path_output` | Directory for saving free-water simulation results. | |
+| `path_output_profiles` | Directory for saving optimised profile data. | |
+| `filename_calibrated_CSV` | Filename of calibrated CSV data. | Mandatory only when not generated within standalone script. |
+| `save_in_calibration_folder` | Save in `path_output` (`TRUE`) or `sim_path` (`FALSE`). | If `TRUE`, results are appended to existing calibration data. |
+| `combinations` | Equipment combinations (must refer to entries in `equipment_config.yaml`). | Multiple combinations can be specified. |
+| `focal_depths_wrt_exit_plane` | List of focal depths to characterise [mm]. | |
+| `desired_intensities` | Desired free-water intensities [W/cm²]. | |
+| `add_FDO` | Append Focal Distance Offset (bowl-to-exit-plane distance)? | Set to `1` if zero point in profiles reflects exit plane rather than bowl. |
+| `axisymmetric2D` | Use axisymmetric 2D instead of default 3D free-water simulations? | `1 = yes`, `0 = no` |
+| `force_kwavearray` | Force use of kWaveArray for free-water simulations? | If `0`, uses the setting in the default/study config. |
+| `opt_method` | Optimisation method. | `FEXminimize` (open source) / `GlobalSearch` (MATLAB Global Optimization Toolbox) |
+| `opt_limits` | Distance limits for optimisation [mm]. | |
+| `opt_weights` | Weighting of original profile during fitting. | `1` = equal; `>1` = Gaussian (narrower with larger values) |
+| `opt_seed` | Random seed for optimisation. | |
+| `skip_front_peak_mm` | Distance from profile start to ignore [mm]. | Avoids near-field artefacts in peak/FWHM calculations. |
+
+</details>

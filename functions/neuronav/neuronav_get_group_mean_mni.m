@@ -5,7 +5,7 @@ function [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ
 % Only includes rows where interpolated == 0.
 
 % Load all subject session CSVs
-csv_files = dir(fullfile(parameters.sim_path, 'sub-*', '*_info.csv'));
+csv_files = dir(fullfile(parameters.path.sim, 'sub-*', '*_info.csv'));
 
 expected_vars = { ...
     'trans_MNI_mm_x', 'trans_MNI_mm_y', 'trans_MNI_mm_z', ...

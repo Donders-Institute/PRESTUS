@@ -23,14 +23,14 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
 
     % Sets up an empty medium mask if none is specified
     if isempty(medium_masks)
-        medium_masks = zeros(parameters.grid_dims);
+        medium_masks = zeros(parameters.grid.dims);
     end
 
     % Get tissue-specific masks
     mask = tissuemask_binary(parameters, medium_masks);
 
     % Creates an output table for temperature readings
-    results_thermal = readtable(parameters.filename_output_table);
+    results_thermal = readtable(parameters.io.filename_output_table);
 
     results_thermal.maxT = max(results_heating.maxT, [], 'all');
     results_thermal.endT = max(results_heating.heating_endT, [], 'all');
@@ -38,7 +38,7 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     results_thermal.maxCEM43end = max(results_heating.CEM43_end, [], 'all');
 
     % Encode layer-specific estimates
-    if contains(parameters.simulation_medium, {'layered'; 'phantom'})
+    if contains(parameters.simulation.medium, {'layered'; 'phantom'})
         % temperature maximum
         results_thermal.maxT_brain = masked_max_3d(results_heating.maxT, mask.brain);
         results_thermal.maxT_skull = masked_max_3d(results_heating.maxT, mask.skull); 
@@ -66,17 +66,17 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     end
     
     % Save overview table
-    writetable(results_thermal, parameters.filename_output_table);
+    writetable(results_thermal, parameters.io.filename_output_table);
 
     % Creates a visual overlay of the transducer (if 3D T1 image is available)
     if exist('planimg') && isfield(planimg, 't1_header')
-        grid_step_mm = planimg.t1_header.PixelDimensions(1);
+        grid.resolution_mm = planimg.t1_header.PixelDimensions(1);
         [~, source_labels] = transducer_setup(...
             parameters.transducer(1), ...
             parameters.transducer(1).trans_pos, ...
             parameters.transducer(1).focus_pos, ...
             size(segmentation), ...
-            grid_step_mm);
+            grid.resolution_mm);
     else
         source_labels = zeros(size(segmentation));
     end
@@ -143,11 +143,11 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
                 'overlay_color_range', temp_color_range, ...
                 'bg_bw_range', [0, numel(fieldnames(parameters.layers))]);
 
-        output_plot_filename = fullfile(parameters.output_dir,...
+        output_plot_filename = fullfile(parameters.io.output_dir,...
             sprintf('sub-%03d_%s_maxT%s.png',...
             parameters.subject_id, ...
             parameters.simulation_medium, ...
-            parameters.results_filename_affix));
+            parameters.io.output_affix));
         saveas(h, output_plot_filename, 'png')
         close(h);
     end

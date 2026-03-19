@@ -11,8 +11,8 @@ switch algorithm
         density(skull_idx) = fit_pairwiselinear(pseudoCT(skull_idx), hounsfieldUnits, massDensity, 1);
 
         % plot the mapping
-        if parameters.debug == 1
-            output_plot = fullfile(parameters.debug_dir, ...
+        if parameters.simulation.debug == 1
+            output_plot = fullfile(parameters.io.debug_dir, ...
                 sprintf('pCT_hounsfield-density_kplan.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
         end
@@ -37,8 +37,8 @@ switch algorithm
         density(skull_idx) = hounsfield2density(pseudoCT(skull_idx), 1);
         
         % plot the mapping
-        if parameters.debug == 1
-            output_plot = fullfile(parameters.debug_dir, ...
+        if parameters.simulation.debug == 1
+            output_plot = fullfile(parameters.io.debug_dir, ...
                 sprintf('pCT_hounsfield-density_kwave.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
         end

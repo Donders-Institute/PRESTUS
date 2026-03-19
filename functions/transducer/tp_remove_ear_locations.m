@@ -4,17 +4,20 @@ function [locs] = tp_remove_ear_locations(parameters, locs)
 %  Only runs if all three ear parameters are specified in parameters struct
 
 % Only run if all three ear parameters are specified
-if isfield(parameters, {'tp_ear_radius', 'tp_left_ear_center', 'tp_right_ear_center'})
+if isfield(parameters, 'placement') && isfield(parameters.placement, 'heuristic') && ...
+        isfield(parameters.placement.heuristic, 'ear_radius') && ...
+        isfield(parameters.placement.heuristic, 'left_ear_center') && ...
+        isfield(parameters.placement.heuristic, 'right_ear_center')
     % Validate complete specification
-    if ~isempty(parameters.tp_ear_radius) && ~isempty(parameters.tp_left_ear_center) && ~isempty(parameters.tp_right_ear_center)
-        
+    if ~isempty(parameters.placement.heuristic.ear_radius) && ~isempty(parameters.placement.heuristic.left_ear_center) && ~isempty(parameters.placement.heuristic.right_ear_center)
+
         % keep copy of original positions
         locs_original = locs;
 
         % Define nogo zone spheres
-        ear_radius = parameters.tp_ear_radius;
-        left_ear_center = parameters.tp_left_ear_center;
-        right_ear_center = parameters.tp_right_ear_center;
+        ear_radius = parameters.placement.heuristic.ear_radius;
+        left_ear_center = parameters.placement.heuristic.left_ear_center;
+        right_ear_center = parameters.placement.heuristic.right_ear_center;
 
         % Calculate Euclidean distances from each transducer position to both ears
         locs.dist_to_left_ear = sqrt((locs.trans_x - left_ear_center(1)).^2 + ...

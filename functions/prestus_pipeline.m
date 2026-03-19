@@ -1,6 +1,5 @@
-function [parameters] = prestus_pipeline(subject_id, parameters, options)
+function [parameters] = prestus_pipeline(parameters, options)
     arguments
-        subject_id 
         parameters struct
         options struct = struct()
     end
@@ -31,10 +30,10 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     currentLoc = fileparts(mfilename("fullpath"));
     % add functions here to detect path setup function
     addpath(genpath(fullfile(currentLoc, '..', 'functions')));
-    [parameters] = path_log_setup(parameters, get_prestus_path, subject_id);
+    [parameters] = path_log_setup(parameters, get_prestus_path);
 
     fprintf('Starting processing for subject %i %s\n',...
-        parameters.subject_id, parameters.results_filename_affix)
+        parameters.subject_id, parameters.io.output_affix)
     
     % ====================================================================
     %% SEGMENT planning image (structural MRI) with SimNIBS
@@ -44,9 +43,9 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('SEGMENTATION \n');
     fprintf('========================================\n\n');
-    log_timer('start','segmentation', parameters.seg_path);
+    log_timer('start','segmentation', parameters.path.seg);
 
-    if contains(parameters.simulation_medium, {'layered'})
+    if contains(parameters.simulation.medium, {'layered'})
         parameters = preproc_segmentation(parameters);
     else
         disp('No head segmentation necessary...')
@@ -62,9 +61,9 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('GRID SETUP & HEAD PREPROC \n');
     fprintf('========================================\n\n');
-    log_timer('start','preproc', parameters.output_dir);
+    log_timer('start','preproc', parameters.io.output_dir);
 
-    if ~isfield(parameters, 'run_grid_setup') || parameters.run_grid_setup==1
+    if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup==1
         % Focal distance calculation (if not specified)
         parameters = focal_distance_calculation(parameters);
     
@@ -95,19 +94,19 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('MEDIUM PROPERTY MAPPING \n');
     fprintf('========================================\n\n');
-    log_timer('start','medium', parameters.output_dir);
+    log_timer('start','medium', parameters.io.output_dir);
 
-    if ~isfield(parameters, 'run_medium_setup') || parameters.run_medium_setup==1
-        if parameters.use_pseudoCT == 1
+    if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup==1
+        if parameters.pct.enabled == 1
             kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
         else
             kwave_medium = medium_setup(parameters, medium_masks, planimg);
         end
     
         % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
-        if isfield(parameters, 'adopted_heatmap') && parameters.adopted_heatmap == 1 && isfile(parameters.adopted_heatmap)
-            heatmap_image = niftiread(parameters.adopted_heatmap);
-            fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.adopted_heatmap)
+        if isfield(parameters.io, 'adopted_heatmap') && parameters.io.adopted_heatmap == 1 && isfile(parameters.io.adopted_heatmap)
+            heatmap_image = niftiread(parameters.io.adopted_heatmap);
+            fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
             medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
         else
@@ -130,9 +129,9 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('K-WAVE SOURCE SETUP \n');
     fprintf('========================================\n\n');
-    log_timer('start','source', parameters.output_dir);
+    log_timer('start','source', parameters.io.output_dir);
 
-    if ~isfield(parameters, 'run_source_setup') || parameters.run_source_setup==1
+    if ~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1
         max_sound_speed = max(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
             source_sensor_setup(...
@@ -142,14 +141,14 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
             focus_pos);
         
         % Check stability & adjust source time step if necessary
-        if isfield(parameters, 'source_limit_fraction') && parameters.source_limit_fraction ~=0
+        if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~=0
             disp('Check stability...')
             dt_stability_limit = checkStability(kgrid, kwave_medium);
             fprintf('Stability limit estimate for time step: %.1d.\n', dt_stability_limit);
             if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
 			    disp('Adapt time step for simulation stability...')
                 % Use (by default 90%) fraction of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
-                grid_time_step = dt_stability_limit*parameters.source_limit_fraction;
+                grid_time_step = dt_stability_limit*parameters.grid.source_limit_fraction;
                 [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
             end
         end
@@ -166,16 +165,16 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC SIMULATION \n');
     fprintf('========================================\n\n');
-    log_timer('start','acoustic', parameters.output_dir);
+    log_timer('start','acoustic', parameters.io.output_dir);
 
-    filename_sensor_data = fullfile(parameters.output_dir, ...
+    filename_sensor_data = fullfile(parameters.io.output_dir, ...
         sprintf('sub-%03d_%s_results%s.mat', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
-    
-    parameters.acoustics_available = 0;
-    if isfield(parameters, 'run_acoustic_sims') && parameters.run_acoustic_sims &&...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+
+    parameters.state.acoustics_available = 0;
+    if isfield(parameters.modules, 'run_acoustic_sims') && parameters.modules.run_acoustic_sims &&...
         confirm_overwriting(filename_sensor_data, parameters) && ...
-        (parameters.interactive == 0 || ...
+        (parameters.simulation.interactive == 0 || ...
         confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
 
         [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
@@ -190,16 +189,16 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
             segmentation, ...
             source_labels);
 
-        parameters.acoustics_available = 1;
+        parameters.state.acoustics_available = 1;
 
     elseif exist(filename_sensor_data, 'file')
         disp('Skipping acoustic simulation, loading existing output file.')
         load(filename_sensor_data);
-        parameters.acoustics_available = 1;
+        parameters.state.acoustics_available = 1;
     else
         disp('No acoustic simulation available or requested ... skipping analysis')
-        parameters.acoustics_available = 0;
-        parameters.run_acoustic_analysis = 0;
+        parameters.state.acoustics_available = 0;
+        parameters.modules.run_acoustic_analysis = 0;
     end
     log_timer('stop', 'acoustic');
 
@@ -210,9 +209,9 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC ANALYSIS \n');
     fprintf('========================================\n\n');
-    log_timer('start','acoustic_analysis', parameters.output_dir);
+    log_timer('start','acoustic_analysis', parameters.io.output_dir);
 
-    if (~isfield(parameters, 'run_acoustic_analysis') || parameters.run_acoustic_analysis)
+    if (~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis)
         [results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels);
     else
@@ -232,20 +231,20 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL SIMULATIONS \n');
     fprintf('========================================\n\n');
-    log_timer('start','thermal', parameters.output_dir);
+    log_timer('start','thermal', parameters.io.output_dir);
 
-    parameters.heating_available = 0;
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims && parameters.acoustics_available == 1
+    parameters.state.heating_available = 0;
+    if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims && parameters.state.acoustics_available == 1
         
         disp('Starting thermal simulations...')
         % Name of thermal simulation output file
-        filename_heating_data = fullfile(parameters.output_dir,...
+        filename_heating_data = fullfile(parameters.io.output_dir,...
             sprintf('sub-%03d_%s_heating_res%s.mat', ...
-            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         
         % Check whether thermal results axist and - if so - should be overwritten
-        if confirm_overwriting(filename_heating_data, parameters) && (parameters.interactive == 0 || ...
-            confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No')) 
+        if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
+            confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
 
             % Pass thermally relevant (but kwave-irregular) medium fields
             kwave_medium.temp_0 = medium_plus.temp_0;
@@ -253,7 +252,7 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
             clear medium_plus;
     
             % convert medium fields to 3D (if axisymmetry was used)
-            if isfield(parameters, 'axisymmetric') && parameters.axisymmetric == 1
+            if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
                 kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0);
                 kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction);
             end
@@ -278,7 +277,7 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
                 planimg.transf, ...
                 medium_masks);
 
-            if isfield(parameters, 'savemat') && parameters.savemat==0
+            if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
                 disp("Not saving thermal simulation output matrices ...")
             else
                 save(filename_heating_data, ...
@@ -289,19 +288,19 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
                     'kwave_medium', ...
                     '-v7.3');
             end
-            parameters.heating_available = 1;
+            parameters.state.heating_available = 1;
         elseif exist(filename_heating_data, 'file')
             disp('Skipping thermal simulation, loading existing output file.')
             load(filename_heating_data);
-            parameters.heating_available = 1;
-        else 
+            parameters.state.heating_available = 1;
+        else
             warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
-            parameters.heating_available = 0;
-            parameters.run_thermal_analysis = 0;
+            parameters.state.heating_available = 0;
+            parameters.modules.run_thermal_analysis = 0;
             results_heating = [];
         end
     else
-        parameters.heating_available = 0;
+        parameters.state.heating_available = 0;
         results_heating = [];
     end
     log_timer('stop','thermal');
@@ -313,10 +312,10 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL ANALYSIS \n');
     fprintf('========================================\n\n');
-    log_timer('start','thermal_analysis', parameters.output_dir);
+    log_timer('start','thermal_analysis', parameters.io.output_dir);
 
-    if parameters.heating_available == 1 && ...
-            (~isfield(parameters, 'run_thermal_analysis') || parameters.run_thermal_analysis)
+    if parameters.state.heating_available == 1 && ...
+            (~isfield(parameters.modules, 'run_thermal_analysis') || parameters.modules.run_thermal_analysis)
         thermal_analysis(parameters, results_heating, time_status_seq, ...
             medium_masks, highlighted_pos, segmentation);
     else
@@ -332,9 +331,9 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     fprintf('========================================\n');
     fprintf('NIFTI IMAGES \n');
     fprintf('========================================\n\n');
-    log_timer('start','nifti', parameters.output_dir);
+    log_timer('start','nifti', parameters.io.output_dir);
 
-    if ~isfield(parameters, 'run_nifti_creation') || parameters.run_nifti_creation==1
+    if ~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation==1
         simulation_nifti(parameters, planimg, results_acoustic, ...
                                 acoustic_isppa, acoustic_MI, acoustic_pressure, ...
                                 medium_masks, results_heating, kwave_medium, highlighted_pos)
@@ -362,7 +361,7 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     disp('Pipeline finished successfully');
 
     % Generate HTML simulation report (after all timers, before diary closes)
-    if isfield(parameters, 'generate_report') && parameters.generate_report
+    if isfield(parameters.modules, 'generate_report') && parameters.modules.generate_report
         generate_simulation_report(parameters);
     end
 
@@ -374,8 +373,8 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
     % ====================================================================
     % To check sonication parameters of the transducer in free water
 
-    if isfield(parameters, 'run_posthoc_water_sims') && parameters.run_posthoc_water_sims && ...
-            contains(parameters.simulation_medium, {'layered', 'phantom'})
+    if isfield(parameters.modules, 'run_posthoc_water_sims') && parameters.modules.run_posthoc_water_sims && ...
+            contains(parameters.simulation.medium, {'layered', 'phantom'})
 
         fprintf('POST-HOC ACOUSTIC WATER SIMULATION \n');
 
@@ -385,21 +384,21 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
                      'Consider running separate configs to test individual transducers.']);
         end
         water_parameters = parameters;
-        water_parameters.simulation_medium = 'water';
-        water_parameters.run_heating_sims = 0;
-        water_parameters.run_posthoc_water_sims = 0;
-        water_parameters.debug = 0;
+        water_parameters.simulation.medium = 'water';
+        water_parameters.modules.run_heating_sims = 0;
+        water_parameters.modules.run_posthoc_water_sims = 0;
+        water_parameters.simulation.debug = 0;
         % run with the same grid dimension as the real simulation
-        water_parameters.default_grid_dims = water_parameters.grid_dims;
+        water_parameters.grid.default_dims = water_parameters.grid.dims;
         % restore subject-specific path to original path if done earlier in this function
-        if isfield(water_parameters,'subject_subfolder') && water_parameters.subject_subfolder == 1
-            water_parameters.output_dir = fileparts(water_parameters.output_dir);
+        if isfield(water_parameters.io,'subject_subfolder') && water_parameters.path.subject_subfolder == 1
+            water_parameters.io.output_dir = fileparts(water_parameters.io.output_dir);
         end
         % inherit submit medium from main pipeline
-        water_parameters.hpc_timelimit = '05:00:00';
-        water_parameters.hpc_memorylimit = 40;
-        water_parameters.hpc_wait_for_job = false;
-        prestus_pipeline_start(parameters.subject_id, water_parameters);
+        water_parameters.hpc.timelimit = '05:00:00';
+        water_parameters.hpc.memorylimit = 40;
+        water_parameters.hpc.wait_for_job = false;
+        prestus_pipeline_start(water_parameters);
         clear water_parameters;
     end
 
@@ -420,17 +419,17 @@ function [parameters] = prestus_pipeline(subject_id, parameters, options)
         sequential_parameters = sequential_configs.(lowestField);
         sequential_configs = rmfield(sequential_configs, lowestField);
         % restore subject-specific path to original path if done earlier in this function
-        sequential_parameters.adopted_heatmap = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, 'heating_end', parameters.results_filename_affix));
-        sequential_parameters.adopted_cem43 = fullfile(parameters.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, 'CEM43_end', parameters.results_filename_affix));
+        sequential_parameters.io.adopted_heatmap = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                parameters.subject_id, 'heating_end', parameters.io.output_affix));
+        sequential_parameters.io.adopted_cem43 = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+                parameters.subject_id, 'CEM43_end', parameters.io.output_affix));
         fprintf('Running subsequent heating simulation on %s\n', lowestField);
         if ~isempty(fieldnames(sequential_configs))
             options.sequential_configs = sequential_configs;
         else
             options = rmfield(options, 'sequential_configs');
         end
-        prestus_pipeline_start(subject_id, parameters, options)
+        prestus_pipeline_start(parameters, options)
     end
 
 end

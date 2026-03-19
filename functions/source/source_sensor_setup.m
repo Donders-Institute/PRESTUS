@@ -10,13 +10,13 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Creates a simulation grid in 3 or 2 dimensions
-    if parameters.n_sim_dims == 3
-        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
-                      parameters.grid_dims(2), parameters.grid_step_mm/1e3, ...
-                      parameters.grid_dims(3), parameters.grid_step_mm/1e3);
-    elseif parameters.n_sim_dims == 2
-        kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
-                      parameters.grid_dims(2), parameters.grid_step_mm/1e3);
+    if numel(parameters.grid.dims) == 3
+        kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...
+                      parameters.grid.dims(2), parameters.grid.resolution_mm/1e3, ...
+                      parameters.grid.dims(3), parameters.grid.resolution_mm/1e3);
+    elseif numel(parameters.grid.dims) == 2
+        kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...
+                      parameters.grid.dims(2), parameters.grid.resolution_mm/1e3);
     end
 
     % Backward-compatible access to (first) transducer
@@ -35,16 +35,16 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     if nargin < 5
         % Calculate the time step using an integer number of points per period
         % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
-        if ~isfield(parameters, 'source_ppw') || isempty(parameters.source_ppw)
-            points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid_step_mm/1e3);
+        if ~isfield(parameters.grid, 'source_ppw') || isempty(parameters.grid.source_ppw)
+            points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid.resolution_mm/1e3);
         else
-            points_per_wavelength = parameters.source_ppw;
+            points_per_wavelength = parameters.grid.source_ppw;
         end
         % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; k-Wave default.
-        if ~isfield(parameters, 'source_cfl') || isempty(parameters.source_cfl)
+        if ~isfield(parameters.grid, 'source_cfl') || isempty(parameters.grid.source_cfl)
             cfl = 0.3;
         else
-            cfl = parameters.source_cfl;
+            cfl = parameters.grid.source_cfl;
         end
         % Temporal samples per wave period.
         points_per_period = ceil(points_per_wavelength / cfl);              
@@ -66,16 +66,16 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     kgrid.setTime(simulation_time_points, grid_time_step);
 
     % Create source (transducer with focuspoint)
-    parameters.kwave_source_filename  = fullfile(parameters.output_dir, ...
+    parameters.io.kwave_source_filename  = fullfile(parameters.io.output_dir, ...
         sprintf('sub-%03d_%s_kwave_source%s.mat', ...
-        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix)); 
-    if confirm_overwriting(parameters.kwave_source_filename, parameters)
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    if confirm_overwriting(parameters.io.kwave_source_filename, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray
-        if numel(parameters.transducer)>1 && parameters.use_kWaveArray == 0
+        if numel(parameters.transducer)>1 && parameters.grid.use_kWaveArray == 0
             nT = numel(parameters.transducer);
-            trans_pos = zeros(nT, parameters.n_sim_dims);
-            focus_pos = zeros(nT, parameters.n_sim_dims);
+            trans_pos = zeros(nT, numel(parameters.grid.dims));
+            focus_pos = zeros(nT, numel(parameters.grid.dims));
 
             for ti = 1:nT
                 tr = parameters.transducer(ti);
@@ -110,19 +110,19 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
         % Create the source matrix
         [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
         % Save the source matrix (unless otherwise requested)
-        if isfield(parameters, 'savemat') && parameters.savemat==0
+        if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
             disp("Not saving kwave source matrix ...")
         else
-            save(parameters.kwave_source_filename, 'source', 'source_labels','-v7.3');
+            save(parameters.io.kwave_source_filename, 'source', 'source_labels','-v7.3');
         end
     else
-        load(parameters.kwave_source_filename);
+        load(parameters.io.kwave_source_filename);
     end
 
     % Creates a sensor that records the the maximum and final pressure
     % values in every point of the grid
     sensor = struct();
-    sensor.mask = ones(parameters.grid_dims);
+    sensor.mask = ones(parameters.grid.dims);
     sensor.record = {'p_max_all','p_final'};
 
     % Record the last 3 cycles in steady state (when sonic waves have traversed the entire medium)

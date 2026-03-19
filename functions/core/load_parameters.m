@@ -2,10 +2,10 @@ function parameters = load_parameters(varargin)
 
 % LOAD_PARAMETERS Loads and merges configuration files for simulation parameters.
 %
-% This function loads a default configuration file and optionally merges it with 
-% additional configuration files or structures provided as input arguments. It 
-% performs checks on the loaded parameters, calculates derived values, and sanitizes 
-% the output file affix. The function also verifies paths and transducer settings 
+% This function loads a default configuration file and optionally merges it with
+% additional configuration files or structures provided as input arguments. It
+% performs checks on the loaded parameters, calculates derived values, and sanitizes
+% the output file affix. The function also verifies paths and transducer settings
 % required for simulations.
 %
 % Input:
@@ -27,8 +27,8 @@ function parameters = load_parameters(varargin)
         if isstruct(extra_config_file)
             extra_parameters = extra_config_file; % Use provided struct directly
         else
-            extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true); 
-        end        
+            extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true);
+        end
         parameters = MergeStruct(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};
@@ -51,96 +51,81 @@ function parameters = load_parameters(varargin)
 
     %% Check interactive mode requirements
 
-    assert(parameters.interactive == 0 || usejava('desktop'), ...
-           'MATLAB should run in desktop mode if parameters.interactive is enabled in PRESTUS config');
+    assert(parameters.simulation.interactive == 0 || usejava('desktop'), ...
+           'MATLAB should run in desktop mode if parameters.simulation.interactive is enabled in PRESTUS config');
 
     %% Transducer settings validation and derived calculations
     parameters = load_transducer_parameters(parameters);
-    
-	%% Derived grid settings
-
-    % Set simulation dimensions based on default grid dimensions or fallback to 3D
-    if ~isfield(parameters, 'n_sim_dims')
-        if isfield(parameters, 'default_grid_dims')
-            parameters.n_sim_dims = length(parameters.default_grid_dims);
-        else
-            parameters.n_sim_dims = 3;
-        end            
-    end
 
     %% Validate thermal simulation settings
     % Request no timing overview here
 
-    if parameters.run_heating_sims
+    if parameters.modules.run_heating_sims
         thermal_parameters(parameters, true);
     end
 
     %% Output file settings validation and sanitization
-    
+
     % Sanitize output file affix to ensure valid characters only
-    sanitized_affix = regexprep(parameters.results_filename_affix, '[^a-zA-Z0-9_]', '_');
-    if ~strcmp(sanitized_affix, parameters.results_filename_affix)
+    sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_]', '_');
+    if ~strcmp(sanitized_affix, parameters.io.output_affix)
         fprintf('The original `results_filename_affix` was sanitized. "%s" will be used instead of "%s"\n', ...
-                sanitized_affix, parameters.results_filename_affix);
-        parameters.results_filename_affix = sanitized_affix;
+                sanitized_affix, parameters.io.output_affix);
+        parameters.io.output_affix = sanitized_affix;
     end
 
     % Set output directory based on absolute or relative path
-    if isfield(parameters, 'sim_path') && ~strcmp(parameters.sim_path, '')
-        javaFileObj = java.io.File(parameters.sim_path); % Check path type (absolute/relative)
+    if isfield(parameters.path, 'sim') && ~strcmp(parameters.path.sim, '')
+        javaFileObj = java.io.File(parameters.path.sim); % Check path type (absolute/relative)
         if javaFileObj.isAbsolute()
-            parameters.sim_path = fullfile(parameters.sim_path);
+            parameters.path.sim = fullfile(parameters.path.sim);
         else
-            parameters.sim_path = fullfile(parameters.data_path, parameters.sim_path);
+            parameters.path.sim = fullfile(parameters.path.anat, parameters.path.sim);
         end
     else
         % Default output directory within data path
-        parameters.sim_path = fullfile(parameters.data_path, 'tussim');
+        parameters.path.sim = fullfile(parameters.path.anat, 'tussim');
     end
- 
+
     %% Validate paths for required libraries and binaries
-    
+
     % Check LD_LIBRARY_PATH existence and warn user if missing
-    if isfield(parameters, 'ld_library_path') && ~strcmp(parameters.ld_library_path, "") && ~exist(parameters.ld_library_path, 'dir')
-        assert(all(confirmation_dlg('The path `ld_library_path` has been specified but does not exist. Do you want to continue?', ...
+    if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') && ...
+       ~strcmp(parameters.hpc.ld_library_path, "") && ~exist(parameters.hpc.ld_library_path, 'dir')
+        assert(all(confirmation_dlg('The path `hpc.ld_library_path` has been specified but does not exist. Do you want to continue?', ...
                                     'Yes', 'No')), 'Exiting');
     end
 
     % Check segmentation software path existence and warn user if missing
-    if isfield(parameters, 'simnibs_bin_path') && ~strcmp(parameters.simnibs_bin_path, "") && ~exist(fullfile(parameters.simnibs_bin_path, parameters.segmentation_software), 'file')
-        assert(all(confirmation_dlg(sprintf('The segmentation software (%s) does not exist at %s. Do you want to continue?', ...
-                                            parameters.segmentation_software, parameters.simnibs_bin_path), ...
+    if isfield(parameters.startup, 'simnibs_bin_path') && ~strcmp(parameters.startup.simnibs_bin_path, "") && ...
+       ~exist(fullfile(parameters.startup.simnibs_bin_path, 'charm'), 'file')
+        assert(all(confirmation_dlg(sprintf('charm does not exist at %s. Do you want to continue?', ...
+                                            parameters.startup.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
-    elseif (~isfield(parameters, 'simnibs_bin_path') || strcmp(parameters.simnibs_bin_path, "")) && contains(parameters.simulation_medium, {'layered'})
+    elseif (~isfield(parameters.startup, 'simnibs_bin_path') || strcmp(parameters.startup.simnibs_bin_path, "")) && contains(parameters.simulation.medium, {'layered'})
         warning('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
 
     %% Default segmentation path fallback
 
-    if ~isfield(parameters, 'seg_path') || isempty(parameters.seg_path) || strcmp(parameters.seg_path, '')
-        parameters.seg_path = parameters.data_path;
+    if ~isfield(parameters.path, 'seg') || isempty(parameters.path.seg) || strcmp(parameters.path.seg, '')
+        parameters.path.seg = parameters.path.anat;
     end
 
-    %% Default: deactivate pseudoCT unless specified
-
-    if ~isfield(parameters, 'use_pseudoCT')
-        parameters.use_pseudoCT = 0;
-    end
-    
     %% Convert additional paths into cell arrays for processing
-    
+
     % Convert `paths_to_add` into cell array format (split by semicolon)
-    if isfield(parameters, 'paths_to_add') && ~isempty(parameters.paths_to_add)
-        parameters.paths_to_add = cellstr(strsplit(parameters.paths_to_add, ';'));
+    if isfield(parameters.startup, 'paths_to_add') && ~isempty(parameters.startup.paths_to_add)
+        parameters.startup.paths_to_add = cellstr(strsplit(parameters.startup.paths_to_add, ';'));
     end
-    
+
     % Convert `subpaths_to_add` into cell array format (split by semicolon)
-    if isfield(parameters, 'subpaths_to_add') && ~isempty(parameters.subpaths_to_add)
-        parameters.subpaths_to_add = cellstr(strsplit(parameters.subpaths_to_add, ';'));
+    if isfield(parameters.startup, 'subpaths_to_add') && ~isempty(parameters.startup.subpaths_to_add)
+        parameters.startup.subpaths_to_add = cellstr(strsplit(parameters.startup.subpaths_to_add, ';'));
     end
-    
+
     %% MATLAB version check for compatibility
-    
+
     % Warn user about outdated MATLAB versions (< R2022b)
     if verLessThan('matlab', '9.13')
        assert(all(confirmation_dlg('MATLAB appears to be outdated. Please update before continuing. Do you want to continue?', ...
@@ -151,7 +136,7 @@ function parameters = load_parameters(varargin)
     % With debugging off, the parameters are saved to the log at the
     % start of pipeline execution (see path_log_setup).
 
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         fprintf('PRELIMINARY specified parameters. Note that this may not be the final specification...\n');
         print_parameter_summary(parameters)
     end

@@ -3,7 +3,7 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
             parameters, sensor_data, segmentation, medium_masks, kwave_medium, source, source_labels)
 
     % if using axisymmetric settings and requesting heating simulations, reshape output to 3D
-    if isfield(parameters, 'run_heating_sims') && parameters.run_heating_sims==1
+    if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims==1
         % when follow-up thermal simulation is requested, expand axisymmetric to 3D
         [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
             convert_axisymmetric_to_3d(...

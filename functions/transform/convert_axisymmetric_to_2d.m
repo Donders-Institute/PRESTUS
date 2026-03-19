@@ -19,14 +19,14 @@ end
 trans_pos_final = parameters.transducer(1).trans_pos;
 focus_pos_final = parameters.transducer(1).focus_pos;
 
-trans_pos_final(2) = trans_pos_final(2)+parameters.grid_dims(2);
-focus_pos_final(2) = focus_pos_final(2)+parameters.grid_dims(2);
+trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
+focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
 
 % convert radial dimension size into diameter
-parameters.grid_dims(2) = parameters.grid_dims(2)*2;
+parameters.grid.dims(2) = parameters.grid.dims(2)*2;
 
 % shift radial to x dim
-parameters.grid_dims = fliplr(parameters.grid_dims);
+parameters.grid.dims = fliplr(parameters.grid.dims);
 trans_pos_final = fliplr(trans_pos_final);
 focus_pos_final = fliplr(focus_pos_final);
 segmentation = segmentation';
@@ -47,7 +47,7 @@ parameters.transducer(1).trans_pos = trans_pos_final;
 parameters.transducer(1).focus_pos = focus_pos_final;
 
 % set up kgrid again for eventual heating sim
-kgrid = kWaveGrid(parameters.grid_dims(1), parameters.grid_step_mm/1e3, ...
-          parameters.grid_dims(2), parameters.grid_step_mm/1e3);
+kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...
+          parameters.grid.dims(2), parameters.grid.resolution_mm/1e3);
 
 end

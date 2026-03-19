@@ -12,4 +12,4 @@ This document contains fixes to known usage issues. If you find and solve an iss
 - When running bilateral simulations simultaneously when segmentation has not yet been completed, both will try to start a segmentation run.
     - One of these will produce an `segment_error` file in the `batch_job_logs` folder. Simply wait for the segmentation to complete and run both again.
 - A common segmentation error is `ValueError: The qform and sform of do not match. Please run charm with the --forceqform option`. 
-    - This can be solved by pasting `use_forceqform: 1` into your config file.
+    - This can be solved by adding `segmentation.use_qform: 1` to your config file.

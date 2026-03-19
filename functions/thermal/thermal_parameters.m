@@ -10,7 +10,7 @@ function params_thermal = thermal_parameters(parameters, silent)
 % Use as:
 %   params_thermal = thermal_parameters(cfg)
 %
-% Required input (in parameters.thermal):
+% Required input (in parameters.timing):
 %   .pd              - pulse duration [s]
 %   .pri             - pulse repetition interval [s]
 %   .ptd             - pulse train duration [s]
@@ -42,13 +42,14 @@ if ~silent
 end
 
 thermal = parameters.thermal;
+timing  = parameters.timing;
 
 % === Pulse / Pulse Train (fine timestep: pt_timestep) ===
 
-pri = thermal.pri;
-pd  = thermal.pd;
-ptd = thermal.ptd;
-pt_dt = thermal.pt_timestep;
+pri = timing.pri;
+pd  = timing.pd;
+ptd = timing.ptd;
+pt_dt = timing.pt_timestep;
 dc = pd / pri;  % Duty cycle (computed)
 
 % encode the above in params_thermal
@@ -58,7 +59,7 @@ params_thermal.ptd = ptd;
 params_thermal.pt_dt = pt_dt;
 params_thermal.dc = dc;
 
-if thermal.equal_step_duration == 0
+if timing.equal_step_duration == 0
     % Different durations, fixed steps=1
     params_thermal.pt_on_steps_n   = 1;
     params_thermal.pt_on_steps_dur = pd;
@@ -78,17 +79,17 @@ params_thermal.n_pulses_per_pt = round_if_integer(ptd / pri, 'Pulses per PT must
 
 % === PTRI repetition ===
 
-params_thermal.ptrd        = thermal.ptrd;
-params_thermal.ptri        = thermal.ptri;
-params_thermal.ptri_off    = thermal.ptri - ptd;
+params_thermal.ptrd        = timing.ptrd;
+params_thermal.ptri        = timing.ptri;
+params_thermal.ptri_off    = timing.ptri - ptd;
 
 params_thermal.n_ptri_reps = round_if_integer(params_thermal.ptrd / params_thermal.ptri, ...
                                              'PTRI reps in PTRD must be integer');
 
 % === PTRI-off & post-PTRI (coarse timestep: post_pt_timestep) ===
 
-params_thermal.post_pt_timestep = thermal.post_pt_timestep;
-post_dt = thermal.post_pt_timestep;
+params_thermal.post_pt_timestep = timing.post_pt_timestep;
+post_dt = timing.post_pt_timestep;
 
 % PTRI-OFF (between PTs)
 if params_thermal.ptri_off <= 0
@@ -100,8 +101,8 @@ else
                                                        'PTRI-OFF steps must be integer');
 end
 
-% Post PTRD stead-state
-post_dur = thermal.post_ptri_dur;
+% Post PTRD steady-state
+post_dur = timing.post_ptri_dur;
 params_thermal.post_ptri_dur = post_dur;
 if post_dur <= 0
     params_thermal.post_ptri_steps_n  = 0;
