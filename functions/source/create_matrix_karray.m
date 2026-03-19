@@ -1,4 +1,4 @@
-function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_mm, trans_pos, focus_pos)
+function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_m, trans_pos, focus_pos)
 %CREATE_MATRIX_KARRAY Adds elements of a matrix transducer to a kWave array.
 %
 % Inputs:
@@ -6,7 +6,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
 %   karray           - kWaveArray object to which elements are added
 %   parameters       - Simulation parameters struct
 %   transducer_pars  - Struct containing transducer geometry, type, curvature, and element properties
-%   elem_pos_mm      - Nx3 matrix of element positions in millimeters
+%   elem_pos_m          - Nx3 matrix of element positions in meters
 %   trans_pos        - 1x3 transducer reference position (indices in kgrid)
 %   focus_pos        - 1x3 focus position (indices in kgrid)
 %
@@ -27,40 +27,29 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
 
     natural_focus_pos_m = trans_pos_m + [0, 0, matrix_tp.curved.curv_radius_mm / 1000]';
 
-    % Convert element positions from mm to meters and shift to transducer position
-    elem_pos_m = elem_pos_mm' / 1e3;  % 3 x N
-    elem_pos_m = elem_pos_m + trans_pos_m;
-
     % Apply Clover setup if requested
     if transducer_pars.is_clover_setup
         elem_pos_m = create_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
     end
     
-    n_elements_total = size(elem_pos_m, 2);
-
-    % Calculate inner and outer diameters for elements based on total diameter and count
-    [id, od] = calc_elements_id_od_mm(matrix_tp.Elements_OD_mm(end), n_elements_total);
-
-    % Store element dimensions in standard location for visualization compatibility
-    matrix_tp.Elements_ID_mm = id;
-    matrix_tp.Elements_OD_mm = od;
+    transducer_pars.n_elements = size(elem_pos_m, 2);
 
     % Initialize source amplitudes (uniform)
-    transducer_pars.source_amp = transducer_pars.source_amp(1) * ones(1, n_elements_total);
+    transducer_pars.source_amp = transducer_pars.source_amp(1) * ones(1, transducer_pars.n_elements);
 
     % Wavelength and wavenumber for phase calculation
     lambda = parameters.medium.water.sound_speed / transducer_pars.source_freq_hz;
     k = 2 * pi / lambda;
 
     % Initialize source phases, scaled vectors, tx, ty, tz
-    source_phase_rad = zeros(1, n_elements_total);
-    scaled_vectors = zeros(3, n_elements_total);
-    tx = zeros(1, n_elements_total);
-    ty = zeros(1, n_elements_total);
-    tz = zeros(1, n_elements_total);
+    source_phase_rad = zeros(1, transducer_pars.n_elements);
+    scaled_vectors = zeros(3, transducer_pars.n_elements);
+    tx = zeros(1, transducer_pars.n_elements);
+    ty = zeros(1, transducer_pars.n_elements);
+    tz = zeros(1, transducer_pars.n_elements);
 
     % Loop over each element and add it to karray
-    for ind = 1:n_elements_total
+    for ind = 1:transducer_pars.n_elements
         el_pos_m_i = elem_pos_m(:, ind);
 
         % Vector from element to natural focus to position elements to
@@ -88,7 +77,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         tz(ind) = yaw;
 
         % Determine element type
-        switch lower(transducer_pars.element)
+        switch lower(matrix_tp.element_shape)
             case 'rect'
                 karray.addRectElement(el_pos_m_i, matrix_tp.elem_height_mm, matrix_tp.elem_width_mm, [roll, pitch, yaw]);
 

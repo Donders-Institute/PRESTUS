@@ -1,4 +1,4 @@
-function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
+function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, focus_pos_m)
 %CONVERT_TO_ELEMENT_POS Generate element positions for matrix transducers
 %
 % This function generates the 3-D element coordinates of a matrix
@@ -13,9 +13,10 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
 % spherical cap when the transducer is defined as curved.
 %
 % INPUTS
-%   tp          Transducer parameter structure
-%   kgrid       k-Wave grid structure
 %   parameters  Global simulation parameters
+%   tp          Transducer parameter structure
+%   trans_pos_m  [3x1] transducer position in meters
+%   focus_pos_m  [3x1] focus position in meters
 %
 % OUTPUTS
 %   elem_pos_m  Element center coordinates [m] (3 × N)
@@ -37,15 +38,9 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
     defined = matrix_tp.matrix_shape.define_here;
     grid_shape = defined.grid_shape;
 
-    trans_pos = tp.trans_pos;
-    focus_pos = tp.focus_pos;
-
-    % Transducer translation offset in simulation grid
-    offset = [
-        kgrid.x_vec(trans_pos(1))
-        kgrid.y_vec(trans_pos(2))
-        kgrid.z_vec(trans_pos(3))
-        ];
+    % Ensure column vectors
+    trans_pos_m = trans_pos_m(:);
+    focus_pos_m = focus_pos_m(:);
 
     switch grid_shape.type
         case 'fibonacci'
@@ -98,14 +93,8 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
             fprintf('Recommended element size (kerf %.3f mm): %.3f mm\n', ...
                 kerf, element_size);
 
-            % Convert to meters
-            elem_pos_m = elem_pos_mm / 1e3;
-
-            % Apply translation to simulation grid
-            elem_pos_m = elem_pos_m + offset';
-
-            % Return in k-Wave format
-            elem_pos_m = elem_pos_m';
+            % Convert to meters + translate
+            elem_pos_m = (elem_pos_mm / 1e3)' + trans_pos_m;
 
         case 'rect'
 
@@ -130,9 +119,9 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
             [X,Y] = meshgrid(x_vec,y_vec);
 
             % Flat array coordinates
-            X = X + kgrid.x_vec(trans_pos(1));
-            Y = Y + kgrid.y_vec(trans_pos(2));
-            Z = kgrid.z_vec(trans_pos(3)) * ones(size(X));
+            X = X + trans_pos_m(1);
+            Y = Y + trans_pos_m(2);
+            Z = trans_pos_m(3) * ones(size(X));
 
             % [DEBUG] visualize grid
             if parameters.debug == 1
@@ -155,8 +144,8 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
             end
 
             % Restrict to circular aperture
-            dx = X(:) - kgrid.x_vec(trans_pos(1));
-            dy = Y(:) - kgrid.y_vec(trans_pos(2));
+            dx = X(:) - trans_pos_m(1);
+            dy = Y(:) - trans_pos_m(2);
             distances = sqrt(dx.^2 + dy.^2);
 
             radius = matrix_tp.Elements_OD_mm(end) * 1e-3 / 2;
@@ -206,14 +195,10 @@ function [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters)
 
         case 'fermat'
             elem_pos_m = makeCartBowl( ...
-                [kgrid.x_vec(trans_pos(1)), ...
-                kgrid.y_vec(trans_pos(2)), ...
-                kgrid.z_vec(trans_pos(3))], ...
+                trans_pos_m', ...
                 matrix_tp.curved.curv_radius_mm * 1e-3, ...
                 matrix_tp.Elements_OD_mm(end) * 1e-3, ...
-                [kgrid.x_vec(focus_pos(1)), ...
-                kgrid.y_vec(focus_pos(2)), ...
-                kgrid.z_vec(focus_pos(3))], ...
+                focus_pos_m', ...
                 matrix_tp.n_elements, ...
                 true);
 

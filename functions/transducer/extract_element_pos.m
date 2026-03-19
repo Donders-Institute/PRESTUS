@@ -1,4 +1,4 @@
-function elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos) 
+function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m) 
 % EXTRACT_ELEMENT_POS Extracts matrix transducer element positions from file.
 %
 % This function reads element position coordinates from an external file
@@ -10,10 +10,9 @@ function elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos)
 % location within the k-Wave simulation grid.
 %
 % Input:
+%   parameters  Global simulation parameters
 %   tp        - Struct containing transducer parameters.
-%   kgrid     - kWaveGrid object defining the simulation grid.
-%   trans_pos - 3-element index specifying the grid position of the
-%               transducer origin.
+%   trans_pos_m  [3x1] transducer position in meters
 %
 % Output:
 %   elem_pos_m - 3 x N matrix containing element positions in metres,
@@ -140,13 +139,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos)
     % ---------------------------------------------------------------------
     % Translate positions into simulation grid coordinates
     % ---------------------------------------------------------------------
-
-    grid_origin = [ ...
-        kgrid.x_vec(trans_pos(1)), ...
-        kgrid.y_vec(trans_pos(2)), ...
-        kgrid.z_vec(trans_pos(3)) ];
-
-    elem_pos_m = phys_positions_m + grid_origin;
+    elem_pos_m = phys_positions_m + trans_pos_m';
 
     elem_pos_m = elem_pos_m';
 

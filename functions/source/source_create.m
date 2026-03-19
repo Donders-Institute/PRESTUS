@@ -222,21 +222,29 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             case 'matrix'
                 matrix_tp = tp.array_shape.matrix;
                 
+                trans_pos_m = [kgrid.x_vec(tp.trans_pos(1));
+                    kgrid.y_vec(tp.trans_pos(2));
+                    kgrid.z_vec(tp.trans_pos(3))];
+
+                focus_pos_m = [kgrid.x_vec(tp.focus_pos(1));
+                    kgrid.y_vec(tp.focus_pos(2));
+                    kgrid.z_vec(tp.focus_pos(3))];
+
                 switch matrix_tp.matrix_shape.type
                     case 'define_here'
-                        [elem_pos_m, tp] = convert_to_element_pos(tp, kgrid, parameters);
+                        [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, focus_pos_m);
                         transducer_pars(1) = tp;
                     case 'extract_from_file'               
-                        elem_pos_m = extract_element_pos(parameters, tp, kgrid, trans_pos);
+                        elem_pos_m = extract_element_pos(parameters, tp,  trans_pos_m);
                     otherwise 
                         error('Matrix shape %s is unknown or not implemented.', matrix_tp.matrix_shape.type)
                 end
 
-                % Convert positions to mm for plotting
-                elem_pos_mm = elem_pos_m' * 1e3;
-
                 % [DEBUG] visualize element distribution
                 if parameters.debug == 1
+                    % Convert positions to mm for plotting
+                    elem_pos_mm = elem_pos_m' * 1e3;
+
                     h = figure;
                     scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
                     axis equal
@@ -262,7 +270,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                     close(h)
                 end
                 
-                karray = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_mm, trans_pos, focus_pos);
+                karray = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_m, trans_pos, focus_pos);
 
             otherwise
                 error('Array shape %s is unknown or not implemented.', tp.array_shape.type)
