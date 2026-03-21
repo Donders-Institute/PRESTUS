@@ -22,8 +22,8 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
 
     % Calculate the corresponding pressure amplitude for the desired intensity
 
-    DENSITY_WATER = parameters.medium.water.density;
-    SOUND_SPEED_WATER = parameters.medium.water.sound_speed;
+    DENSITY_WATER = parameters.medium_properties.water.density;
+    SOUND_SPEED_WATER = parameters.medium_properties.water.sound_speed;
     p_pa = sqrt(2 * desired_intensity * 1e4 * DENSITY_WATER * SOUND_SPEED_WATER);
 
     % Update source amplitude in simulation parameters

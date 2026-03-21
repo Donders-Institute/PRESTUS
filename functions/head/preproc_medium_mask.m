@@ -18,7 +18,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
     [parameters] = check_layers(parameters, segmented_img);
 
     layer_labels = fieldnames(parameters.layers);
-    medium_labels = fieldnames(parameters.simulation.medium);
+    medium_labels = fieldnames(parameters.medium_properties);
     medium_masks = zeros(size(segmented_img));
     
     % === SKULL CONFIGURATION DETECTION ===

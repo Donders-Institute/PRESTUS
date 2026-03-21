@@ -11,7 +11,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     % This function turns the original `layered` segmentations into medium masks such
     % that the setup_medium.m function can fill in the tissue-dependent parameters.
-    % Tissue masks will contain IDs according to the order of tissues in parameters.medium.
+    % Tissue masks will contain IDs according to the order of tissues in parameters.medium_properties.
 
     grid.resolution_mm = parameters.grid.resolution_mm;
    

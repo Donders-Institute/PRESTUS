@@ -31,12 +31,12 @@ function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(param
         repmat(profile_sim.velocity, 1, parameters.transducer.n_elements), ... % Velocity array
         parameters.transducer.source_phase_rad, ... % Source phases [radians]
         parameters.transducer.source_freq_hz, ... % Source frequency [Hz]
-        parameters.medium.water.sound_speed, ... % Sound speed in water [m/s]
-        parameters.medium.water.density, ... % Water density [kg/m^3]
+        parameters.medium_properties.water.sound_speed, ... % Sound speed in water [m/s]
+        parameters.medium_properties.water.density, ... % Water density [kg/m^3]
         (axial_position - 0.5) * 1e-3); % Axial positions (adjusted, in meters)
     
     % Convert pressure to intensities [W/cm^2]
-    i_axial_oneil = p_axial_oneil .^ 2 / (2 * parameters.medium.water.sound_speed * parameters.medium.water.density) * 1e-4;
+    i_axial_oneil = p_axial_oneil .^ 2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
 
     % Plot intensity along the beam axis
     figure('Position', [10, 10, 900, 500]);

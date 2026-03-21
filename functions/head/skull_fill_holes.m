@@ -34,7 +34,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %   - Gap filling identifies largest non-skin-skull blob (likely CSF/air) and ignores it.
 %   - Eyes default to water (label 0) to avoid erroneous bone assignment.
 
-    labels_medium = fieldnames(parameters.simulation.medium);
+    labels_medium = fieldnames(parameters.medium_properties);
     labels_requested = fieldnames(parameters.layers);
 
     if parameters.pct.enabled == 0 && any(contains(labels_requested, 'skull_cortical'))  
@@ -79,7 +79,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
     if isfield(seg_labels, 'eye')
         eye_i = seg_labels.eye;
         eye = segmented_img == eye_i;
-        i_water = find(strcmp(fieldnames(parameters.simulation.medium), 'water'));
+        i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
         medium_masks(eye ~= 0) = i_water; % Default to water
     end
 

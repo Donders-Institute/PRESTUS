@@ -1,6 +1,6 @@
 function mask = tissuemask_binary(parameters, medium_masks)
 
-    labels = fieldnames(parameters.simulation.medium);
+    labels = fieldnames(parameters.medium_properties);
     
     skull_i = find(strcmp(labels, 'skull'));
     cortical_i = find(strcmp(labels, 'skull_cortical'));

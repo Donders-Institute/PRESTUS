@@ -21,7 +21,7 @@ function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep
         init_phases = table2array(phases(foc_index, :));
     elseif isequal(tran.manufact, "Imasonic")
         % Compute phases based on the focal depth
-        init_phases = compute_phases(parameters.medium.water.sound_speed, tran, focal_distance_ep, phase_table);
+        init_phases = compute_phases(parameters.medium_properties.water.sound_speed, tran, focal_distance_ep, phase_table);
     else
         error('Unsupported transducer manufacturer: %s', tran.manufact);
     end

@@ -21,7 +21,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `medium` | Medium setup. | `'layered'` | `water` / `layered` / `phantom`. Mandatory. |
+| `medium` | Simulation medium type. | `'layered'` | `water` / `layered` / `phantom`. Mandatory. |
 | `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [doc_backend.md](doc_backend.md). |
 | `precision` | Computational precision for acoustic and thermal simulations. | `'single'` | `single` / `double` |
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
@@ -259,7 +259,7 @@ Maps tissue compartment names to their SimNIBS charm label indices. Compartments
 ---
 
 <details>
-<summary><strong><code>medium</code> — Tissue acoustic & thermal properties</strong></summary>
+<summary><strong><code>medium_properties</code> — Tissue acoustic & thermal properties</strong></summary>
 
 see [doc_medium.md](doc_medium.md)
 
