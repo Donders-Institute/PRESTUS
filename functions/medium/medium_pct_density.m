@@ -19,7 +19,7 @@ switch algorithm
         close(gcf);
 
         % regularize minimum to density in water
-        density(skull_idx) = max(parameters.medium.water.density, density(skull_idx));
+        density(skull_idx) = max(parameters.medium_properties.water.density, density(skull_idx));
 
     case 'k-wave'
 
@@ -45,7 +45,7 @@ switch algorithm
         close(gcf);
 
         % regularize minimum density to water density
-        density(skull_idx) = max(density(skull_idx),parameters.medium.water.density);
+        density(skull_idx) = max(density(skull_idx),parameters.medium_properties.water.density);
 
         % regularize maximum density to rho_max
         density(skull_idx) = min(density(skull_idx),rho_max);
@@ -65,7 +65,7 @@ switch algorithm
         % regularize maximum pHU to pHU_max
         pseudoCT(skull_idx) = min(pseudoCT(skull_idx),HU_max);
 
-        rho_water     = parameters.medium.water.density;      % density [kg/m^3]
+        rho_water     = parameters.medium_properties.water.density;      % density [kg/m^3]
         rho_bone      = 2100;     % max. skull density [kg/m3]
 
         % estimate density from CT HU based on Marsac et al., 2017 & Bancel et al., 2021
@@ -75,8 +75,8 @@ switch algorithm
 
     case 'aubry'
 
-        rho_water = parameters.medium.water.density;
-        rho_bone = parameters.medium.skull.density;
+        rho_water = parameters.medium_properties.water.density;
+        rho_bone = parameters.medium_properties.skull.density;
 
         phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx))); % [Aubry et al., 2003; Guo et al., 2019]
         density(skull_idx) = rho_water * phi(skull_idx) + ...
@@ -84,7 +84,7 @@ switch algorithm
 
     case 'none'
 
-        density(skull_idx) = parameters.medium.skull.density;
+        density(skull_idx) = parameters.medium_properties.skull.density;
 
     otherwise
         error("Specified CT density mapping is not supported.")

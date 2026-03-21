@@ -15,10 +15,10 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
     % Set residual unmapped medium voxels to water
-    medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.simulation.medium), 'water'));
+    medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
     
     % Loads the medium settings from the config file
-    medium = parameters.simulation.medium;
+    medium = parameters.medium_properties;
     
     % Create empty matrices for medium properties
     empty_grid = NaN(parameters.grid.dims);
@@ -34,7 +34,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
     % Get layer and medium labels
     layer_labels = fieldnames(parameters.layers);
-    medium_labels = fieldnames(parameters.simulation.medium);
+    medium_labels = fieldnames(parameters.medium_properties);
 
     % Iterate through each layer & assign medium ID to create medium mask
     for label_i = 1:length(layer_labels)

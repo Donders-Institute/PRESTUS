@@ -27,7 +27,7 @@ function parameters = preproc_segmentation(parameters)
 
     % Run segmentation (if necessary)
     if confirm_overwriting(filename_segmented, parameters) && ...
-       (~isfield(parameters,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ~exist(filename_segmented,'file'))
+       (~isfield(parameters.io,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ~exist(filename_segmented,'file'))
         if parameters.pct.enabled == 1
             % Note: This could be improved by allowing to specify a UTE/CT path in the config...
             warning("SimNIBS integration not supported when requesting pseudoCT. Please ensure SimNIBS has been run.");

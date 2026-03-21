@@ -29,7 +29,7 @@ fprintf('\n');
 %% 2. Simulation Type
 
 fprintf('⚙️ SIMULATION TYPE\n');
-print_if_field(parameters, 'medium', '%s');
+print_if_field(parameters.simulation, 'medium', '%s');
 print_if_field(parameters.grid, 'n_dims', '%dD');
 print_flag(parameters.grid, 'axisymmetric');
 print_modules(parameters.modules);
@@ -87,7 +87,7 @@ for t_idx = 1:length(tissues)
     
     % Handle 'tissues' wildcard → all tissue props
     if strcmp(tissue, 'tissues')
-        tissue_fields = fieldnames(parameters.simulation.medium);
+        tissue_fields = fieldnames(parameters.medium_properties);
         tissue_list = tissue_fields(startsWith(tissue_fields, 'tissue_') | ...
                                    startsWith(tissue_fields, 'brain') | ...
                                    startsWith(tissue_fields, 'csf'));

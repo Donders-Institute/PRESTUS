@@ -33,7 +33,7 @@ PRESTUS supports homo- and heterogeneous medium configurations. These can be spe
 
 ### Medium acoustic properties
 
-![acoustic_properties](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/acoustic_properties.png)
+![medium_properties](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/medium_properties.png)
 
 Accurate modeling of wave propagation through heterogeneous media requires valid assignment of acoustic parameters such as speed of sound, density, and attenuation to the separate tissue media. PRESTUS provides defaults based on the literature, while providing flexibility to alter assigned parameter values, e.g., to implement more conservative or liberal assumptions. 
 

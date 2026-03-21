@@ -132,7 +132,13 @@ grid:
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
 
-#------------ Head model / Segmentation processing
+#------------ Segmentation
+
+segmentation:
+  use_qform: 0      # Force qform reorientation before charm segmentation? Set to 1 if charm reports qform/sform mismatch.
+  debug: 0          # Pass --debug flag to charm segmentation for verbose output?
+
+#------------ Head model processing
 
 headmodel:
   head_pad_mm: 0      # Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]
@@ -147,12 +153,6 @@ headmodel:
   skull_fill_method: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
   skull_wrap_radius: 10 # Rubber-wrap radius [grid voxels]; larger = tighter rubber ignoring bigger dents (recommendation: 2–10)
   skull_wrap_visualize: 0 # Visualize rubber-wrap result? (Currently causes issues on HPC)
-
-#------------ Segmentation
-
-segmentation:
-  use_qform: 0      # Force qform reorientation before charm segmentation? Set to 1 if charm reports qform/sform mismatch.
-  debug: 0          # Pass --debug flag to charm segmentation for verbose output?
 
 #------------ (pseudo-)CT skull property mapping
 
@@ -173,7 +173,6 @@ layers:
   skull: [4]
   skull_cortical: [7]
   skull_trabecular: [8]
-
 
 #------------ Sonication timing protocol (no defaults - must be specified for thermal simulations)
 
@@ -205,7 +204,7 @@ thermal:
 #------------  Medium properties
 # References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
 # Note: skull attenuation and absorption values remain uncertain, use defaults with caution!
-medium:
+medium_properties:
   water:
     sound_speed: 1500
     density: 994
