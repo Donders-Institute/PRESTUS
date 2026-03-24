@@ -188,34 +188,12 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     
     % draw transducer
     if ~isempty(trans_pos)
-        focal_slope = (trans_pos-focus_pos)/norm(trans_pos-focus_pos);
-        focal_angle = atan2(focal_slope(2),focal_slope(1));
-        
-        grid_step = options.grid_step;
-        ex_plane_pos = trans_pos - (parameters.transducer(1).curv_radius_mm-parameters.transducer(1).dist_to_plane_mm)/parameters.grid_step_mm*[cos(focal_angle); sin(focal_angle)];
-        geom_focus_pos = trans_pos - (parameters.transducer(1).curv_radius_mm)/grid_step*[cos(focal_angle), sin(focal_angle)];
-        max_od = max(parameters.transducer(1).Elements_OD_mm);
-        dist_to_ep = 0.5*sqrt(4*parameters.transducer(1).curv_radius_mm^2-max_od^2)/grid_step;
-        ex_plane_pos_trig = geom_focus_pos + dist_to_ep *[cos(focal_angle), sin(focal_angle)];
-        ort_angle = atan(-focal_slope(1)/focal_slope(2));
+        % Add bounding box for visualization
+        get_transducer_box(trans_pos, focus_pos, parameters.grid_step_mm, parameters);
 
-        arc_halfangle = atan(max_od/2/dist_to_ep/grid_step);
-
-        r = max(parameters.transducer(1).Elements_OD_mm)/2/grid_step;
-
-        hold on
-        lineWidth = 1;
-
-        boxColor = [235, 185, 47]/255*(1-overlay_weight) + overlay_color*overlay_weight;
-        LineSmoothing = 'on';
-
-        trans_full_depth = 16/grid_step;
-        trans_back = ex_plane_pos_trig+trans_full_depth*focal_slope;
-        line([trans_back(2)-r*sin(ort_angle), trans_back(2) + r*sin(ort_angle)], [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth, 'Color', boxColor,'LineSmoothing',LineSmoothing )
-        line([ex_plane_pos_trig(2), trans_back(2)]-r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]-r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing  )
-        line([ex_plane_pos_trig(2), trans_back(2)]+r*sin(ort_angle), [ex_plane_pos_trig(1), trans_back(1)]+r*cos(ort_angle),  'LineWidth', lineWidth,'Color', boxColor,'LineSmoothing',LineSmoothing )
         % exit plane
         line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
+
         % transducer curvature
         [arc_x, arc_y] = get_arc(geom_focus_pos, parameters.transducer(1).curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
         plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )

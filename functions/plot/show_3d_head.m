@@ -110,10 +110,30 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
         c = color_list(k,:);
         % Plot transducer exit plane if not cropped
         if ~any(crop_at_target)
+            % Maximum outer diameter of transducer elements
+            switch parameters.transducer(1).array_shape.type
+                case 'annular'
+                    max_od_mm = max(parameters.transducer(1).Elements_OD_mm);
+                case 'matrix'
+                    max_od_mm = parameters.transducer(1).array_shape.matrix.outer_diameter_mm;
+                otherwise
+                    error('Array type %s is unknown or not implemented.', parameters.transducer(1).array_shape.type)
+            end
+
             % All shapes in downsampled space
-            max_od_mm = max(parameters.transducer(1).Elements_OD_mm);
             max_od_grid = max_od_mm / pixel_size;
-            norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
+            
+            if parameters.transducer(1).align_transducer_with_focus
+                norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
+
+            else
+                % Use the natural focus based on transducer curvature
+                curv_radius = parameters.transducer(1).array_shape.matrix.curv_radius_mm;
+                natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
+                natural_focus_grid = natural_focus / pixel_size;
+
+                norm_vec = (thisTrans - natural_focus_grid) / norm(thisTrans - natural_focus_grid);
+            end
 
             % Geometric focus in grid space
             geom_focus = thisTrans - norm_vec * (parameters.transducer(1).curv_radius_mm) / pixel_size;

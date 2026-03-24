@@ -99,6 +99,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
         % infinity. A finite value is assigned here for visualization purposes.
         matrix_tr.curved.dist_to_plane_mm = 70;
     end
+    
+    tr.curv_radius_mm = matrix_tr.curved.curv_radius_mm;
 
     % ---------------------------------------------------------------------
     % Optional Clover multi-aperture configuration
@@ -193,7 +195,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     n_elem_col = rect_grid.n_elem_col;
 
                     % Calculate initial element count (will be adjusted later for circular cutout)
-                    matrix_tr.n_elements = n_elem_col * n_elem_row;
+                    tr.n_elements = n_elem_col * n_elem_row;
 
                 case 'fibonacci'
                     % Sparse spiral grid configuration
@@ -208,7 +210,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape.fibonacci, 'kerf_mm'), ...
                        'Transducer %i; Missing kerf_mm parameter for grid. Please specify.', t_i);
 
-                    matrix_tr.n_elements = grid_shape.fibonacci.n_elements;
+                    tr.n_elements = grid_shape.fibonacci.n_elements;
 
                 case 'fermat'
                     % Sparse spiral grid configuration
@@ -220,7 +222,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape.fermat, 'n_elements'), ...
                         'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
                     
-                    matrix_tr.n_elements = grid_shape.fermat.n_elements;
+                    tr.n_elements = grid_shape.fermat.n_elements;
 
                 otherwise
                     error('Transducer %i; Grid shape type "%s" is not implemented.', ...
@@ -252,7 +254,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             assert(isfield(extract_shape_from_file, 'n_elements'), ...
                 'Transducer %i; Missing n_elements. Please specify number of elements.', t_i);
 
-            matrix_tr.n_elements = extract_shape_from_file.n_elements;
+            tr.n_elements = extract_shape_from_file.n_elements;
 
             if isfield(extract_shape_from_file, 'select_random_subset')
 
@@ -292,19 +294,6 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 t_i, matrix_tr.matrix_shape.type);
     end
     matrix_tr.matrix_shape.extract_from_file = extract_shape_from_file;
-
-    % ---------------------------------------------------------------------
-    % Derived visualization parameters
-    % Convert matrix array into equivalent annular representation.
-    % ---------------------------------------------------------------------
-    transducer_diameter_mm = matrix_tr.outer_diameter_mm;
-
-    % Calculate inner and outer diameters for elements
-    [id, od] = calc_elements_id_od_mm(transducer_diameter_mm, matrix_tr.n_elements);
-
-    % Store element dimensions in standard location for visualization compatibility
-    matrix_tr.Elements_ID_mm = id;
-    matrix_tr.Elements_OD_mm = od;
 
     tr.array_shape.matrix = matrix_tr;
 end

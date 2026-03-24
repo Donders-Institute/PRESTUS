@@ -82,7 +82,7 @@ function parameters = load_transducer_parameters(parameters)
                     [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i);
 
                 case 'annular'
-                    validate_annular_transducer(tr, t_i);
+                    tr = validate_annular_transducer(tr, t_i);
 
                 otherwise
                     error('Transducer %i; Element shape option "%s" is not implemented.', ...

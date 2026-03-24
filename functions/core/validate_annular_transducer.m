@@ -1,4 +1,4 @@
-function validate_annular_transducer(tr, t_i)
+function tr = validate_annular_transducer(tr, t_i)
 % VALIDATE_ANNULAR_TRANSDUCER Validates configuration of an annular transducer.
 %
 % This function checks that all required fields for an annular transducer
@@ -25,12 +25,17 @@ function validate_annular_transducer(tr, t_i)
     
     assert(isfield(annular_tr, 'n_elements'), ...
         'Transducer %i; Missing n_elements parameter for annular transducer. This defines element count.', t_i);
+
+    tr.n_elements = annular_tr.n_elements;
     
     % Validate curvature definition
     assert(isfield(annular_tr, 'curv_radius_mm'), ...
         'Transducer %i; Missing curv_radius_mm field for annular transducer. Please specify radius of curvature.', t_i);
+
+    tr.curv_radius_mm = annular_tr.curv_radius_mm;
     
     % Validate source phase definition
     assert(isfield(annular_tr, 'source_phase_deg'), ...
         'Transducer %i;: Missing source_phase_deg field for annular transducer. Please specify phases.', t_i);
+   
 end

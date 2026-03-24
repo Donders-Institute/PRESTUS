@@ -146,6 +146,8 @@ function [transducer_mask, source_label, transducer_pars] = ...
                 % Assign a unique label to this element in the source label matrix
                 source_label = source_label + el_i * bowl;
             end
+        otherwise
+            error('Array type %s is unknown or not implemented.', transducer_pars.array_shape.type)
     end
 
 end
