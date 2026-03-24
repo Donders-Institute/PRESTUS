@@ -63,10 +63,25 @@ debug: 1 # Activate a debug mode in which more intermediate outputs are provided
 
 #------------ High-performance computing
 
+hpc_name: 'default'   # 'default' or 'snellius'
 hpc_submit_medium: 'matlab' # slurm (recommended) | qsub | matlab (default)
 hpc_gpu: ''
 hpc_partition: ''
 hpc_reservation: ''
+
+hpc_cores: 8             # request 8 CPU cores
+hpc_mem: '64G'           # request 64 GB memory
+
+# Smallest possible allocation (https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660209/Snellius+partitions+and+accounting)
+snellius:
+  a100:
+    cores: 18
+    memorylimit: 120
+    timelimit: "120:00:00" # max wall time of 120 h
+  h100:
+    cores: 16
+    memorylimit: 180
+    timelimit: "120:00:00" # max wall time of 120 h
 
 # An optional path to LD_LIBRARY used during SimNIBS installation
 # If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location

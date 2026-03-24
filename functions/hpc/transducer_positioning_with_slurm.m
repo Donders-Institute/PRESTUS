@@ -68,6 +68,10 @@ function transducer_positioning_with_slurm(subject_id, parameters, pn, target_na
         parameters.slurm_job_prefix = 'PRESTUS';
     end
 
+    if ~isfield(parameters, 'hpc_name')
+        parameters.hpc_name = 'default';
+    end
+
     temp_slurm_file = tempname(log_dir);
     job_name = [parameters.slurm_job_prefix '_' subj_id_string];
     
@@ -79,17 +83,49 @@ function transducer_positioning_with_slurm(subject_id, parameters, pn, target_na
     else
         fprintf(fid, '#SBATCH --partition=gpu\n');
     end
-    if isfield(parameters, 'hcp_gpu') && ~isempty(parameters.hcp_gpu)
+    if isfield(parameters, 'hcp_gpu') && ~isempty(parameters.hcp_gpu) && ... 
+        ~strcmp(parameters.hpc_gpu, '') && ~strcmp(parameters.hpc_name, 'snellius')
         fprintf(fid, '#SBATCH --gres=%s\n', parameters.hcp_gpu);
     else
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
     end
+    
+    if strcmp(parameters.hpc_name, 'snellius')
+        switch parameters.hpc_gpu
+            case 'a100'
+                memorylimit = parameters.snellius.a100.memorylimit;
+                cores = parameters.snellius.a100.cores;
+                max_timelimit = parameters.snellius.a100.timelimit;
+            case 'h100'
+                memorylimit = parameters.snellius.h100.memorylimit;
+                cores = parameters.snellius.h100.cores;
+                max_timelimit = parameters.snellius.h100.timelimit;
+            otherwise
+                error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc_gpu)
+        end
+
+        assert(timelimit <= max_timelimit, ...
+            'Maximum wall time of %s is exceeded (%s).', ...
+            max_timelimit, ...
+            timelimit)
+
+        fprintf(fid, '#SBATCH --cpus-per-task=%i\n', cores);
+
+    end
+
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', timelimit);
     fprintf(fid, '#SBATCH --output=%s\n', sprintf('%s_slurm_output_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --error=%s\n', sprintf('%s_slurm_error_%%j.log', subj_id_string));
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
-    fprintf(fid, 'module load matlab\n');
+
+    if strcmp(parameters.hpc_name, 'snellius')
+        fprintf(fid, 'module load 2024\n');
+        fprintf(fid, 'module load MATLAB/2024b\n');
+    else
+        fprintf(fid, 'module load matlab/R2023b\n');
+    end
+
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file_name);
     fclose(fid);
 
