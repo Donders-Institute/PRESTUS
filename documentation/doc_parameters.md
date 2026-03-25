@@ -4,20 +4,16 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-<details>
-<summary><strong>General</strong></summary>
+### General
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `subject_id` | Subject identifier used for file naming and folder management. | — | Mandatory. Set before calling `prestus_pipeline_start(parameters)`. |
 | `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>simulation</code> — Simulation type & execution</strong></summary>
+### `simulation` — Simulation type & execution
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -27,12 +23,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
 | `debug` | Verbose debug mode with additional intermediate outputs. | `1` | `1 = yes`, `0 = no` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>path</code> — Data paths</strong></summary>
+### `path` — Data paths
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -44,12 +37,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `'sub-%1$03d_T2w.nii*'` | Optional |
 | `subject_subfolder` | Store outputs in subject-specific subdirectories? | `1` | `1 = yes`, `0 = no` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>startup</code> — Environment & toolbox paths</strong></summary>
+### `startup` — Environment & toolbox paths
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
@@ -57,12 +47,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `paths_to_add` | Paths to add with `addpath()`. | [cell] e.g. `{"path/to/x"}` |
 | `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to config file location |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>io</code> — I/O management</strong></summary>
+### `io` — I/O management
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -71,7 +58,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
-| `adopted_heatmap` | Path to an existing ISPPA heatmap NIfTI to reuse instead of re-running acoustics. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_heatmap` | Path to an existing intensity heatmap NIfTI to reuse instead of re-running acoustics. | — | Optional. Used for sequential multi-target runs. |
 | `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. | — | Optional. Used for sequential multi-target runs. |
 
 **Runtime-derived (set by `path_log_setup`):**
@@ -83,12 +70,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `filename_output_table` | Path to the per-subject CSV results table. |
 | `kwave_source_filename` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>modules</code> — Pipeline module flags</strong></summary>
+### `modules` — Pipeline module flags
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -106,14 +90,11 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 All flags: `1 = yes`, `0 = no`.
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>transducer</code> — Transducer specification</strong></summary>
+### `transducer` — Transducer specification
 
-see [doc_transducer.md](doc_transducer.md)
+See [doc_transducer.md](doc_transducer.md).
 
 All fields are mandatory and have no defaults — they must be set in the study config.
 
@@ -133,14 +114,11 @@ All fields are mandatory and have no defaults — they must be set in the study 
 | `expected_focal_distance_ep` | Expected distance from transducer exit plane to focus [mm]. | Alternative to specifying `trans_pos`/`focus_pos`. Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or both pos fields must be set. |
 | `expected_focal_distance_bowl` | Expected distance from transducer bowl to focus [mm]. | |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>placement</code> — Transducer placement</strong></summary>
+### `placement` — Transducer placement
 
-see [doc_transducer.md](doc_transducer.md)
+See [doc_transducer.md](doc_transducer.md).
 
 #### `placement.localite`
 
@@ -165,12 +143,9 @@ see [doc_transducer.md](doc_transducer.md)
 | `criterion_skull_var` | Variance of EP voxel distance from skull [quantile]. | `[]` | |
 | `expand_step` | Expansion step for skin intersection criterion. | `0.01` | 1% |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>grid</code> — Simulation grid</strong></summary>
+### `grid` — Simulation grid
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -184,14 +159,11 @@ see [doc_transducer.md](doc_transducer.md)
 | `max_expand` | Maximum grid expansion for prime-number FFT optimisation [voxels]. | `40` | |
 | `use_kWaveArray` | Use the kWaveArray class for transducer modelling? | `1` | `1 = yes`, `0 = no` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>headmodel</code> — Head model & segmentation preprocessing</strong></summary>
+### `headmodel` — Head model & segmentation preprocessing
 
-see [doc_preproc.md](doc_preproc.md)
+See [doc_preproc.md](doc_preproc.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -206,26 +178,20 @@ see [doc_preproc.md](doc_preproc.md)
 | `skull_wrap_radius` | Rubber-wrap radius [grid voxels]. | `10` | Larger = tighter wrap ignoring bigger dents. Recommended: 2–10. |
 | `skull_wrap_visualize` | Visualize rubber-wrap result? | `0` | `1 = yes`, `0 = no`. Avoid on HPC. |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>segmentation</code> — Segmentation settings</strong></summary>
+### `segmentation` — Segmentation settings
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
 | `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>pct</code> — pseudo-CT skull property mapping</strong></summary>
+### `pct` — Pseudo-CT skull property mapping
 
-see [doc_pseudoCT.md](doc_pseudoCT.md)
+See [doc_pseudoCT.md](doc_pseudoCT.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -234,14 +200,11 @@ see [doc_pseudoCT.md](doc_pseudoCT.md)
 | `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-sound-speed). |
 | `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-attenuation). |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>layers</code> — Simulation tissue compartments</strong></summary>
+### `layers` — Simulation tissue compartments
 
-see [doc_preproc.md](doc_preproc.md)
+See [doc_preproc.md](doc_preproc.md).
 
 Maps tissue compartment names to their SimNIBS charm label indices. Compartments are modelled in listed order; any voxel label not assigned to a named compartment is treated as water. Charm label values are hardcoded in `charm_seg_labels()`. Layers can be removed or added.
 
@@ -254,14 +217,11 @@ Maps tissue compartment names to their SimNIBS charm label indices. Compartments
 | `skull_cortical` | `[7]` | Cortical bone; used in multi-layer skull model |
 | `skull_trabecular` | `[8]` | Trabecular bone; used in multi-layer skull model |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>medium_properties</code> — Tissue acoustic & thermal properties</strong></summary>
+### `medium_properties` — Tissue acoustic & thermal properties
 
-see [doc_medium.md](doc_medium.md)
+See [doc_medium.md](doc_medium.md).
 
 Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, `skull_cortical`) carries the following fields:
 
@@ -276,14 +236,11 @@ Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, 
 | `perfusion` | Perfusion / heat transfer rate. | mL/min/kg — Tissue Properties DB |
 | `absorption_fraction` | Fraction of attenuation converted to heat. | [0–1] — Pinton et al., 2012 |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>timing</code> — Sonication timing protocol</strong></summary>
+### `timing` — Sonication timing protocol
 
-see [doc_simulations-thermal.md](doc_simulations-thermal.md)
+See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 Protocol duration fields must be set for thermal simulations.
 
@@ -299,14 +256,11 @@ Protocol duration fields must be set for thermal simulations.
 | `post_pt_timestep` | Modelling time step following PT & PTRI [s]. | `1` | |
 | `equal_step_duration` | Equal step durations for on and off cycles? | `0` | `1 = yes`, `0 = no` |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>thermal</code> — Thermal simulation settings</strong></summary>
+### `thermal` — Thermal simulation settings
 
-see [doc_simulations-thermal.md](doc_simulations-thermal.md)
+See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -315,25 +269,19 @@ see [doc_simulations-thermal.md](doc_simulations-thermal.md)
 | `sensor_xy_halfsize` | Sensor window half-size for temperature recording [grid units]. | `100` | |
 | `record_t_at_every_step` | Record temperature at every time step for the full sensor window? | `0` | Memory-intensive; disable if out-of-memory errors occur. |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>analysis</code> — Output analysis</strong></summary>
+### `analysis` — Output analysis
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `focus_area_radius` | Radius around the focus in which ISPPA is averaged for outputs [mm]. | `5` | |
-
-</details>
+| `focus_area_radius` | Radius around the focus in which IPA is averaged for outputs [mm]. | `5` | |
 
 ---
 
-<details>
-<summary><strong><code>hpc</code> — High-performance computing</strong></summary>
+### `hpc` — High-performance computing
 
-see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)
+See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -347,14 +295,11 @@ see [doc_backend.md](doc_backend.md) [doc_hpc.md](doc_hpc.md)
 | `job_prefix` | Prefix string for HPC job names. | `'PRESTUS'` | Overridden to `'TP'` for transducer positioning jobs. |
 | `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
 
-</details>
-
 ---
 
-<details>
-<summary><strong><code>calibration</code> — Transducer calibration</strong></summary>
+### `calibration` — Transducer calibration
 
-see [doc_calibration.md](doc_calibration.md)
+See [doc_calibration.md](doc_calibration.md).
 
 A separate `calibration_config.yaml` applies for calibration workflows and is loaded as `parameters.calibration`.
 
@@ -377,5 +322,3 @@ A separate `calibration_config.yaml` applies for calibration workflows and is lo
 | `opt_weights` | Weighting of original profile during fitting. | `1` = equal; `>1` = Gaussian (narrower with larger values) |
 | `opt_seed` | Random seed for optimisation. | |
 | `skip_front_peak_mm` | Distance from profile start to ignore [mm]. | Avoids near-field artefacts in peak/FWHM calculations. |
-
-</details>
