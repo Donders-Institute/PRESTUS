@@ -1,4 +1,4 @@
-function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, ...
+function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, ...
                          medium_masks, results_heating, kwave_medium, highlighted_pos)
 
 % SIMULATION_NIFTI - Export k-Wave simulation results to NIfTI (native + MNI space).
@@ -10,7 +10,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 %   - parameters (struct) - Simulation config: output_dir, simulation_medium, 
 %                           results_filename_affix, run_heating_sims, etc.
 %   - planimg (struct) - SimNibs planning: t1_image_orig, inv_transf, t1_header
-%   - acoustic_isppa (array) - Peak spatial-average intensity [W/cm²], from acoustic_analysis
+%   - acoustic_Ipa (array) - Peak spatial-average intensity [W/cm²], from acoustic_analysis
 %   - acoustic_MI (array) - Mechanical Index grid
 %   - acoustic_pressure (array) - Peak pressure [Pa]
 %   - medium_masks (array) - Layer label mask (uint8)
@@ -22,7 +22,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 
         data_types = "medium_masks";
         if parameters.state.acoustics_available == 1 
-            data_types  = [data_types, "isppa","MI","pressure"];
+            data_types  = [data_types, "intensity","MI","pressure"];
         end
         if parameters.state.heating_available == 1
             data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end"];
@@ -35,8 +35,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
 
             if strcmp(data_type, "medium_masks")
                 data = medium_masks;
-            elseif strcmp(data_type, "isppa")
-                data = single(acoustic_isppa);
+            elseif strcmp(data_type, "intensity")
+                data = single(acoustic_Ipa);
             elseif strcmp(data_type, "MI")
                 data = single(acoustic_MI);
             elseif strcmp(data_type, "pressure")
@@ -109,18 +109,18 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                 data_backtransf = niftiread(orig_file_with_ext);
             end
 
-            if strcmp(data_type, "isppa") && ~strcmp(parameters.simulation.medium, 'phantom')
+            if strcmp(data_type, "intensity") && ~strcmp(parameters.simulation.medium, 'phantom')
             
                 max_plots = min(2, numel(parameters.transducer));
                 if numel(parameters.transducer) > max_plots
-                    warning('More than two transducers: ISPPA-over-T1 plots will be created only for the first 2 transducers');
+                    warning('More than two transducers: intensity-over-T1 plots will be created only for the first 2 transducers');
                 end
 
                 % define the maximum value to plot
-                if isfield(results_acoustic, 'max_Isppa_brain') && ~isempty(results_acoustic.max_Isppa_brain) && ~isnan(results_acoustic.max_Isppa_brain)
-                    max_val = results_acoustic.max_Isppa_brain;
+                if isfield(results_acoustic, 'Isppa_brain') && ~isempty(results_acoustic.Isppa_brain) && ~isnan(results_acoustic.Isppa_brain)
+                    max_val = results_acoustic.Isppa_brain;
                 else
-                    max_val = results_acoustic.max_Isppa;
+                    max_val = results_acoustic.Isppa;
                 end
             
                 for ti = 1:max_plots
@@ -140,7 +140,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                         size(planimg.t1_image_orig), ...
                         planimg.t1_header.PixelDimensions(1));
             
-                    % Plots the Isppa over the untransformed image
+                    % Plots the intensity over the untransformed image
                     [~,~,~,~,~,~,~,h]=plot_overlay(...
                         data_backtransf, ...
                         planimg.t1_image_orig, ...
@@ -157,9 +157,11 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                         'overlay_threshold_high', max_val, ...
                         'rotation', 0); % rotation = 90 not implemented for transducer overlay
             
+                    trans_suffix = '';
+                    if max_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
                     output_plot_filename = fullfile(parameters.io.output_dir, ...
-                        sprintf('sub-%03d_%s_isppa_t1_T%02d%s.png', ...
-                        parameters.subject_id, parameters.simulation.medium, ti, ...
+                        sprintf('sub-%03d_%s_intensity_t1%s%s.png', ...
+                        parameters.subject_id, parameters.simulation.medium, trans_suffix, ...
                         parameters.io.output_affix));
                     saveas(h, output_plot_filename, 'png')
                     close(h);

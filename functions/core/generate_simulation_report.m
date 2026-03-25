@@ -217,10 +217,10 @@ function limits = get_safety_limits()
     limits = struct();
 
     % MI limits (ITRUSST: MI <= 1.9)
-    limits.max_MI_tc     = struct('label', 'MI (transcranial)', 'limit', 1.9, 'unit', '');
-    limits.max_MI_brain  = struct('label', 'MI (brain)',  'limit', 1.9, 'unit', '');
-    limits.max_MI_skull  = struct('label', 'MI (skull)',  'limit', 1.9, 'unit', '');
-    limits.max_MI_skin   = struct('label', 'MI (skin)',   'limit', 1.9, 'unit', '');
+    limits.MI_tc    = struct('label', 'MI (transcranial)', 'limit', 1.9, 'unit', '');
+    limits.MI_brain = struct('label', 'MI (brain)',  'limit', 1.9, 'unit', '');
+    limits.MI_skull = struct('label', 'MI (skull)',  'limit', 1.9, 'unit', '');
+    limits.MI_skin  = struct('label', 'MI (skin)',   'limit', 1.9, 'unit', '');
 
     % Temperature rise limits (ITRUSST: <= 2 C rise)
     limits.riseT_brain = struct('label', 'Temp rise (brain)', 'limit', 2.0, 'unit', [char(176) 'C']);
@@ -238,17 +238,17 @@ function limits = get_safety_limits()
     limits.maxT_skin  = struct('label', 'Max temp (skin)',  'limit', 39.0, 'unit', [char(176) 'C']);
 
     % ISPPA (informational, no ITRUSST limit)
-    limits.max_Isppa_brain = struct('label', 'ISPPA (brain)', 'limit', Inf, 'unit', 'W/cm²');
-    limits.max_Isppa_skull = struct('label', 'ISPPA (skull)', 'limit', Inf, 'unit', 'W/cm²');
-    limits.max_Isppa_skin  = struct('label', 'ISPPA (skin)',  'limit', Inf, 'unit', 'W/cm²');
+    limits.Isppa_brain = struct('label', 'ISPPA (brain)', 'limit', Inf, 'unit', 'W/cm²');
+    limits.Isppa_skull = struct('label', 'ISPPA (skull)', 'limit', Inf, 'unit', 'W/cm²');
+    limits.Isppa_skin  = struct('label', 'ISPPA (skin)',  'limit', Inf, 'unit', 'W/cm²');
 end
 
 function limits = get_safety_limits_water()
 % Returns global-only safety limits for water/free-field simulations.
 % Tissue-specific limits are not applicable.
     limits = struct();
-    limits.max_Isppa = struct('label', 'ISPPA (global)',  'limit', Inf, 'unit', 'W/cm²');
-    limits.max_pressure_Pa = struct('label', 'Max pressure', 'limit', Inf, 'unit', 'Pa');
+    limits.Isppa  = struct('label', 'ISPPA (global)', 'limit', Inf, 'unit', 'W/cm²');
+    limits.Psptp = struct('label', 'Psptp',         'limit', Inf, 'unit', 'Pa');
 end
 
 function color = safety_color(value, limit)
@@ -301,7 +301,7 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
         end
 
         % Special handling for pressure: use dynamic unit scaling
-        if strcmp(name, 'max_pressure_Pa') && ~isnan(value)
+        if strcmp(name, 'Psptp') && ~isnan(value)
             [value, display_unit] = scale_pressure(value);
         end
 
@@ -376,17 +376,17 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
     html = [html '<h2>Simulation Summary</h2>'];
     html = [html '<div class="summary-grid">'];
 
-    % Always show: ISPPA at target, focal distance, max ISPPA
-    html = [html summary_card('ISPPA at target', csv_value(csv_table, 'isppa_at_target'), 'W/cm²')];
+    % Always show: IPA at target, focal distance, max ISPPA
+    html = [html summary_card('Ipa at target', csv_value(csv_table, 'Ipa_target'), 'W/cm²')];
     html = [html summary_card('Focal distance', csv_value(csv_table, 'real_focal_distance_mm'), 'mm')];
-    html = [html summary_card('Max ISPPA', csv_value(csv_table, 'max_Isppa'), 'W/cm²')];
+    html = [html summary_card('ISPPA', csv_value(csv_table, 'Isppa'), 'W/cm²')];
 
     if is_layered
-        html = [html summary_card('ISPPA brain', csv_value(csv_table, 'max_Isppa_brain'), 'W/cm²')];
-        html = [html summary_card('-6dB vol. brain', csv_value(csv_table, 'minus6dB_volume_brain_mm3'), 'mm³')];
+        html = [html summary_card('ISPPA brain', csv_value(csv_table, 'Isppa_brain'), 'W/cm²')];
+        html = [html summary_card('-6dB vol. brain', csv_value(csv_table, 'halfmax_ISPPA_volume_brain_mm3'), 'mm³')];
     else
-        [p_val, p_unit] = scale_pressure(csv_value(csv_table, 'max_pressure_Pa'));
-        html = [html summary_card('Max pressure', p_val, p_unit)];
+        [p_val, p_unit] = scale_pressure(csv_value(csv_table, 'Psptp'));
+        html = [html summary_card('Psptp', p_val, p_unit)];
     end
 
     % Thermal summary if available
@@ -621,13 +621,13 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             if ~isempty(avail_cols)
                 sub_table = csv_table(:, avail_cols);
                 % Scale pressure values dynamically (Pa -> kPa/MPa based on magnitude)
-                if ismember('max_pressure_Pa', sub_table.Properties.VariableNames)
-                    pressure_vals = sub_table{:, 'max_pressure_Pa'};
+                if ismember('Psptp', sub_table.Properties.VariableNames)
+                    pressure_vals = sub_table{:, 'Psptp'};
                     if ~all(isnan(pressure_vals))
                         [scaled_vals, display_unit] = scale_pressure(pressure_vals);
-                        sub_table{:, 'max_pressure_Pa'} = scaled_vals;
+                        sub_table{:, 'Psptp'} = scaled_vals;
                         % Rename column header to reflect actual unit
-                        sub_table.Properties.VariableNames{'max_pressure_Pa'} = ['max_pressure_' display_unit];
+                        sub_table.Properties.VariableNames{'Psptp'} = ['Psptp_' display_unit];
                     end
                 end
                 html = [html table2html(sub_table, struct(), {})];
@@ -639,7 +639,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         html = [html '<p class="placeholder">No acoustic CSV data found.</p>'];
     end
 
-    % ISPPA images
+    % Intensity images
     n_trans = 1;
     if isfield(parameters, 'transducer')
         n_trans = numel(parameters.transducer);
@@ -647,20 +647,23 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
 
     html = [html '<div class="image-grid">'];
     for t = 1:n_trans
-        % ISPPA on segmentation
+        trans_suffix = '';
+        if n_trans > 1; trans_suffix = sprintf('_T%02d', t); end
+
+        % Intensity on segmentation
         img_path = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_%s_isppa_T%02d%s.png', subject_id, medium, t, affix));
-        img_html = embed_image(img_path, sprintf('ISPPA on segmentation T%02d', t), ...
-            sprintf('ISPPA overlay (segmentation) — T%02d', t));
+            sprintf('sub-%03d_%s_intensity%s%s.png', subject_id, medium, trans_suffix, affix));
+        img_html = embed_image(img_path, sprintf('Intensity on segmentation%s', trans_suffix), ...
+            sprintf('Intensity overlay (segmentation)%s', trans_suffix));
         if ~isempty(img_html)
             html = [html img_html];
         end
 
-        % ISPPA on T1
+        % Intensity on T1
         img_path = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_%s_isppa_t1_T%02d%s.png', subject_id, medium, t, affix));
-        img_html = embed_image(img_path, sprintf('ISPPA on T1 T%02d', t), ...
-            sprintf('ISPPA overlay (T1) — T%02d', t));
+            sprintf('sub-%03d_%s_intensity_t1%s%s.png', subject_id, medium, trans_suffix, affix));
+        img_html = embed_image(img_path, sprintf('Intensity on T1%s', trans_suffix), ...
+            sprintf('Intensity overlay (T1)%s', trans_suffix));
         if ~isempty(img_html)
             html = [html img_html];
         end
@@ -1032,8 +1035,9 @@ end
 %  ========================================================================
 
 function cols = get_acoustic_columns()
-    cols = {'max_MI_tc', 'max_MI_brain', 'max_MI_skull', 'max_MI_skin', ...
-            'max_Isppa_brain', 'max_Isppa_skull', 'max_Isppa_skin'};
+    cols = {'MI_tc', 'MI_brain', 'MI_skull', 'MI_skin', ...
+            'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
+            'Psptp_brain', 'Psptp_skull', 'Psptp_skin', 'Ptp_target'};
 end
 
 function cols = get_thermal_columns()
@@ -1047,9 +1051,9 @@ function cols = get_thermal_columns()
 end
 
 function cols = get_acoustic_columns_water()
-    cols = {'subject_id', 'max_Isppa', 'max_Isppa_after_exitplane', ...
-            'max_pressure_Pa', 'real_focal_distance_mm', ...
-            'isppa_at_target', 'avg_isppa_around_target'};
+    cols = {'subject_id', 'freq_Hz', 'Isppa', 'Isppa_after_exitplane', ...
+            'Psptp', 'Ptp_target', 'real_focal_distance_mm', ...
+            'Ipa_target', 'Ipa_target_radius'};
 end
 
 function cols = get_thermal_columns_water()

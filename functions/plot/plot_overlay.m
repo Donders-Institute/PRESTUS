@@ -5,7 +5,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
 %
 % This function overlays a computed metric (e.g., intensity) 
 % on a specific 2D slice of a 3D background image (`bg_image`). It highlights 
-% key positions such as the transducer position, focus position, and maximum ISppa 
+% key positions such as the transducer position, focus position, and maximum intensity 
 % position. The function supports various customization options for visualization.
 %
 % Input:
@@ -18,14 +18,14 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
 %                     * Second element: slice number along the specified axis.
 %   trans_pos       - [1x3] array specifying the transducer position in grid coordinates (row, col, slice).
 %   focus_pos       - [1x3] array specifying the focus position in grid coordinates (row, col, slice).
-%   max_data_pos   - [1x3] array specifying the maximum ISppa position in grid coordinates (row, col, slice).
+%   max_data_pos   - [1x3] array specifying the maximum intensity position in grid coordinates (row, col, slice).
 %   options         - Struct containing optional visualization settings:
 %                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
 %                     * grid_step: Grid step size in mm (default: from parameters).
 %                     * rect_size: Size of rectangles for key positions (default: 2).
-%                     * overlay_threshold_low/high: Thresholds for alpha scaling of ISppa map.
-%                     * overlay_color_range: Range for ISppa map color scaling.
-%                     * color_scale: Colormap for ISppa map (default: 'viridis').
+%                     * overlay_threshold_low/high: Thresholds for alpha scaling of intensity map.
+%                     * overlay_color_range: Range for intensity map color scaling.
+%                     * color_scale: Colormap for intensity map (default: 'viridis').
 %                     * rotation: Rotation angle for visualization (default: 0).
 %                     * show_colorbar: Boolean flag to display colorbar (default: 1).
 %
@@ -74,11 +74,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         error('Transducer point is outside of image boundaries');
     end
     if any(max_data_pos > size(bg_image))
-        warning('Max ISPPA point is outside of image boundaries. Regularizing to max. of dimensions');
+        warning('Max intensity point is outside of image boundaries. Regularizing to max. of dimensions');
         max_data_pos = min([max_data_pos; size(bg_image)]);
     end
 
-    %% Set thresholds and color range for ISPPA map
+    %% Set thresholds and color range for intensity map
     if options.overlay_threshold_low == options.overlay_threshold_high
         options.overlay_threshold_low = options.overlay_threshold_low - 0.05;
     end
@@ -202,13 +202,13 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     ax2 = axes;
         
     if options.use_overlay_alpha
-        isppa_alpha = rescale(overlay_image, 'InputMin', options.overlay_threshold_low, 'InputMax', options.overlay_threshold_high);
+        intensity_alpha = rescale(overlay_image, 'InputMin', options.overlay_threshold_low, 'InputMax', options.overlay_threshold_high);
     else
-        isppa_alpha = ones(size(overlay_image));
-        isppa_alpha(overlay_image==min(overlay_image(:))) = 0;
+        intensity_alpha = ones(size(overlay_image));
+        intensity_alpha(overlay_image==min(overlay_image(:))) = 0;
     end
     
-    imagesc(ax2, overlay_image,'alphadata', isppa_alpha);
+    imagesc(ax2, overlay_image,'alphadata', intensity_alpha);
 
     if exist("clim")==2 % renamed in R2022a
         clim(options.overlay_color_range);

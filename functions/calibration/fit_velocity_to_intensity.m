@@ -8,7 +8,7 @@ function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_int
 %
 % Because opt_source_amp divides by simulated_analytical_scaling, the
 % analytical target must be desired_intensity * scaling so that the final
-% simulation's max_Isppa equals desired_intensity.
+% simulation's Isppa equals desired_intensity.
 %
 % Arguments:
 %   parameters                   - Structure with transducer and medium parameters.
@@ -79,6 +79,6 @@ function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_int
         opt_velocity, corrected_velocity, correction_factor);
     fprintf('Analytical target: %.2f W/cm^2 (desired_intensity * scaling = %.2f * %.4f)\n', ...
         analytical_target, desired_intensity, simulated_analytical_scaling);
-    fprintf('Expected max_Isppa in simulation: %.2f W/cm^2\n', desired_intensity);
+    fprintf('Expected Isppa in simulation: %.2f W/cm^2\n', desired_intensity);
 
 end
