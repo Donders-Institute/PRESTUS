@@ -63,6 +63,7 @@ nav:
     - Backend: doc_backend.md
     - HPC: doc_hpc.md
     - Group: doc_group.md
+    - Testing: doc_testing.md
   - 🆘 Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
     - Code of Conduct: CODE_OF_CONDUCT.md
