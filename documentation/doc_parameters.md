@@ -13,7 +13,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-### `simulation` — Simulation type & execution
+### Simulation type (`simulation`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-### `path` — Data paths
+### Data paths (`path`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -39,7 +39,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-### `startup` — Environment & toolbox paths
+### Environment & toolbox paths (`startup`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
@@ -49,7 +49,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-### `io` — I/O management
+### I/O management (`io`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -72,7 +72,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
-### `modules` — Pipeline module flags
+### Pipeline modules (`modules`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -92,7 +92,7 @@ All flags: `1 = yes`, `0 = no`.
 
 ---
 
-### `transducer` — Transducer specification
+### Transducer specification (`transducer`)
 
 See [doc_transducer.md](doc_transducer.md).
 
@@ -116,11 +116,13 @@ All fields are mandatory and have no defaults — they must be set in the study 
 
 ---
 
-### `placement` — Transducer placement
+### Transducer placement (`placement`)
 
-See [doc_transducer.md](doc_transducer.md).
+See [doc_placement.md](doc_placement.md).
 
 #### `placement.localite`
+
+See [doc_placement_neuronav.md](doc_placement_neuronav.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -128,6 +130,8 @@ See [doc_transducer.md](doc_transducer.md).
 | `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Corrects for varying tracker-to-exit-plane distances. Only applies when `enabled=1`. |
 
 #### `placement.heuristic`
+
+See [doc_placement_heuristic.md](doc_placement_heuristic.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -145,7 +149,7 @@ See [doc_transducer.md](doc_transducer.md).
 
 ---
 
-### `grid` — Simulation grid
+### Simulation grid (`grid`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -161,7 +165,16 @@ See [doc_transducer.md](doc_transducer.md).
 
 ---
 
-### `headmodel` — Head model & segmentation preprocessing
+### Segmentation (`segmentation`)
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
+| `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
+
+---
+
+### Head model & segmentation preprocessing (`headmodel`)
 
 See [doc_preproc.md](doc_preproc.md).
 
@@ -180,16 +193,7 @@ See [doc_preproc.md](doc_preproc.md).
 
 ---
 
-### `segmentation` — Segmentation settings
-
-| **Parameter** | **Description** | **Default** | **Comments** |
-|---|---|---|---|
-| `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
-| `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
-
----
-
-### `pct` — Pseudo-CT skull property mapping
+### Pseudo-CT skull property mapping (`pct`)
 
 See [doc_pseudoCT.md](doc_pseudoCT.md).
 
@@ -202,7 +206,7 @@ See [doc_pseudoCT.md](doc_pseudoCT.md).
 
 ---
 
-### `layers` — Simulation tissue compartments
+### Tissue layers (`layers`)
 
 See [doc_preproc.md](doc_preproc.md).
 
@@ -219,7 +223,7 @@ Maps tissue compartment names to their SimNIBS charm label indices. Compartments
 
 ---
 
-### `medium_properties` — Tissue acoustic & thermal properties
+### Tissue acoustic & thermal properties (`medium_properties`)
 
 See [doc_medium.md](doc_medium.md).
 
@@ -238,7 +242,7 @@ Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, 
 
 ---
 
-### `timing` — Sonication timing protocol
+### Sonication timing (`timing`)
 
 See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
@@ -258,7 +262,7 @@ Protocol duration fields must be set for thermal simulations.
 
 ---
 
-### `thermal` — Thermal simulation settings
+### Thermal settings (`thermal`)
 
 See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
@@ -271,7 +275,7 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 ---
 
-### `analysis` — Output analysis
+### Output analysis (`analysis`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -279,7 +283,7 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 ---
 
-### `hpc` — High-performance computing
+### High-performance computing (`hpc`)
 
 See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 
@@ -297,7 +301,7 @@ See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 
 ---
 
-### `calibration` — Transducer calibration
+### Transducer calibration (`calibration`)
 
 See [doc_calibration.md](doc_calibration.md).
 
