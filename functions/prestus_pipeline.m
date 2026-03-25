@@ -219,12 +219,12 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('start','acoustic_analysis', parameters.io.output_dir);
 
     if (~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis)
-        [results_acoustic, acoustic_isppa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
+        [results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels);
     else
         disp('No acoustic simulation results available (or requested). Skipping analysis...')
         results_acoustic = [];
-        acoustic_isppa = [];
+        acoustic_Ipa = [];
         acoustic_MI = [];
         acoustic_pressure = [];
         highlighted_pos = [];
@@ -342,7 +342,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     if ~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation==1
         simulation_nifti(parameters, planimg, results_acoustic, ...
-                                acoustic_isppa, acoustic_MI, acoustic_pressure, ...
+                                acoustic_Ipa, acoustic_MI, acoustic_pressure, ...
                                 medium_masks, results_heating, kwave_medium, highlighted_pos)
     else
         disp('No nifti creation requested...')

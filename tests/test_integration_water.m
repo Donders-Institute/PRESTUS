@@ -50,14 +50,14 @@ classdef test_integration_water < matlab.unittest.TestCase
             tc.verifyNotEmpty(nii_files, 'Expected at least one NIfTI output file');
         end
 
-        function test_isppa_positive(tc)
+        function test_intensity_positive(tc)
             % Read the output CSV and check Isppa > 0
             prestus_pipeline(tc.Parameters);
             csv_files = dir(fullfile(tc.SimPath, '**', '*output_table*.csv'));
             tc.verifyNotEmpty(csv_files);
             tbl = readtable(fullfile(csv_files(1).folder, csv_files(1).name));
-            isppa_col = tbl{:, contains(tbl.Properties.VariableNames, 'Isppa', 'IgnoreCase', true)};
-            tc.verifyGreaterThan(isppa_col(1), 0, 'Isppa should be positive');
+            intensity_col = tbl{:, contains(tbl.Properties.VariableNames, 'Isppa', 'IgnoreCase', true)};
+            tc.verifyGreaterThan(intensity_col(1), 0, 'Isppa (I_sppa) should be positive');
         end
 
         function test_axisymmetric_water_runs(tc)
