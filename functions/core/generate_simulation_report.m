@@ -217,6 +217,7 @@ function limits = get_safety_limits()
     limits = struct();
 
     % MI limits (ITRUSST: MI <= 1.9)
+    limits.max_MI_tc     = struct('label', 'MI (transcranial)', 'limit', 1.9, 'unit', '');
     limits.max_MI_brain  = struct('label', 'MI (brain)',  'limit', 1.9, 'unit', '');
     limits.max_MI_skull  = struct('label', 'MI (skull)',  'limit', 1.9, 'unit', '');
     limits.max_MI_skin   = struct('label', 'MI (skin)',   'limit', 1.9, 'unit', '');
@@ -1031,7 +1032,7 @@ end
 %  ========================================================================
 
 function cols = get_acoustic_columns()
-    cols = {'max_MI_brain', 'max_MI_skull', 'max_MI_skin', ...
+    cols = {'max_MI_tc', 'max_MI_brain', 'max_MI_skull', 'max_MI_skin', ...
             'max_Isppa_brain', 'max_Isppa_skull', 'max_Isppa_skin'};
 end
 
