@@ -9,6 +9,7 @@ function labels = charm_seg_labels()
 %
 %   Fields:
 %     bonemask        - All tissues within the skull [1,2,3,4,7,8,9]
+%     intracranial    - Intracranial tissues (skull excluded) [1,2,3,9]
 %     external        - Background / external [0]
 %     wm              - White matter [1]
 %     gm              - Grey matter [2]
@@ -22,6 +23,7 @@ function labels = charm_seg_labels()
 %     muscle          - Muscle [10]
 
 labels.bonemask         = [1, 2, 3, 4, 7, 8, 9];
+labels.intracranial     = [1, 2, 3, 9];
 labels.external         = 0;
 labels.wm               = 1;
 labels.gm               = 2;
