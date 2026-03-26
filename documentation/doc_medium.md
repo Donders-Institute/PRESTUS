@@ -50,8 +50,11 @@ The following default medium properties applt in a full layered simulation. Para
 
 > **Note: Absorption Fraction.** For thermal simulations, PRESTUS models the fraction of attenuation that is assumed to be absorbed in the bioheat equation. The current default estimate is informed as follows: The bulk attenuation coefficient includes contributions from both longitudinal and shear waves. However, longitudinal waves contribute most (~ 80%,  Wang et al., 2018) to absorption and heating in the skull (Pinton et al., 2012; White et al., 2006). For longitudinal and shear waves, absorption values of 2.7 dB/cm2/MHz, and 5.4 dB/cm2/MHz have been reported (Pinton et al., 2012), with a bulk attenuation of 13.3 dB/cm2/MHz. As such, we assume: absorption fraction = (longitudinal wave absorption + 0.2 * shear wave absorption) / bulk attenuation. This yields (2.7+0.2*5.4)/13.3 = 0.28. This estimate of the bone absorption fraction (28%) is substantially lower than the default of 100% implemented in k-Plan, but larger than the default implemented in BabelBrain (16%). More measurements are needed to decrease uncertainty about the relative acoustic energy absorption in the skull layer.
 
-*References*
-
-- Pinton G, Aubry J, Bossy E, Muller M, Pernot M, Tanter M. Attenuation, scattering, and absorption of ultrasound in the skull bone. Méd Phys 2012;39:299–307. https://doi.org/10.1118/1.3668316.
-- Wang X-D, Lin W-J, Su C, Wang X-M. Influence of mode conversions in the skull on transcranial focused ultrasound and temperature fields utilizing the wave field separation method: A numerical study. Chin Phys B 2018;27:024302. https://doi.org/10.1088/1674-1056/27/2/024302.
-- White PJ, Clement GT, Hynynen K. Longitudinal and shear mode ultrasound propagation in human skull bone. Ultrasound Med Biol 2006;32:1085–96. https://doi.org/10.1016/j.ultrasmedbio.2006.03.015.
+<br>
+<span style="font-size: 12px;">
+  <strong>References:</strong><br>
+  Pinton, G., Aubry, J., Bossy, E., Muller, M., Pernot, M., & Tanter, M. Attenuation, scattering, and absorption of ultrasound in the skull bone. <em>Méd Phys</em> <strong>39</strong>, 299–307 (2012). https://doi.org/10.1118/1.3668316.<br>
+  Wang, X.-D., Lin, W.-J., Su, C., & Wang, X.-M. Influence of mode conversions in the skull on transcranial focused ultrasound and temperature fields utilizing the wave field separation method: A numerical study. <em>Chin Phys B</em> <strong>27</strong>, 024302 (2018). https://doi.org/10.1088/1674-1056/27/2/024302.<br>
+  White, P. J., Clement, G. T., & Hynynen, K. Longitudinal and shear mode ultrasound propagation in human skull bone. <em>Ultrasound Med Biol</em> <strong>32</strong>, 1085–1096 (2006). https://doi.org/10.1016/j.ultrasmedbio.2006.03.015.
+</span>
+<br>

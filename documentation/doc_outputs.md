@@ -24,7 +24,16 @@ The **spatial peak** of IPA is ISPPA. When IPA is reported at a specific locatio
 
 The **mechanical index** at each voxel is defined as MI = p⁻ / √f, where p⁻ is the peak negative pressure in MPa and f is the centre frequency in MHz. Note: PRESTUS uses `p_max_all` (peak positive pressure) as a proxy for p⁻; a direct negative-pressure map would require additional sensor configuration.
 
----
+An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical Neurophysiology)](https://doi.org/10.1016/j.clinph.2021.12.010).
+
+![intensity_nomenclature](https://ars.els-cdn.com/content/image/1-s2.0-S1388245721008920-gr2.jpg)
+
+<br>
+<span style="font-size: 12px;">
+  <strong>References:</strong><br>
+  Darmani, G., Bergmann, T. O., Butts Pauly, K., Caskey, C. F., de Lecea, L., Fomenko, A., Fouragnan, E., Legon, W., Murphy, K. R., Nandi, T., Phipps, M. A., Pinton, G., Ramezanpour, H., Sallet, J., Yaakub, S. N., Yoo, S. S., & Chen, R. (2022). Non‑invasive transcranial ultrasound stimulation for neuromodulation. <em>Clinical Neurophysiology, 133</em>(7), 167–177. https://doi.org/10.1016/j.clinph.2022.03.011
+</span>
+<br>
 
 ### Acoustic metrics
 
