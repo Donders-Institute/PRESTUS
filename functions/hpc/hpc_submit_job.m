@@ -39,7 +39,18 @@ fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters), 
 function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
     job_name = hpc_job_name(parameters);
+	
+	% Define HPC type
+	if ~isfield(parameters.hpc, 'name')
+        parameters.hpc.name = 'default';
+    end
     
+	% Overwrite and extract additional parameters if Snellius HPC
+	is_snellius = strcmp(parameters.hpc.name, 'snellius');
+	if is_snellius
+		[memorylimit, cores, n_gpu] = extract_snellius_parameters(parameters);
+	end
+	
     fid = fopen(temp_slurm_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
@@ -53,7 +64,9 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --partition=gpu\n');
     end
 
-    if isfield(parameters.hpc, 'gpu') && ~isempty(strtrim(char(parameters.hpc.gpu)))
+	if is_snellius
+		fprintf(fid, '#SBATCH --gpus=%i\n', n_gpu);
+    elseif isfield(parameters.hpc, 'gpu') && ~isempty(strtrim(char(parameters.hpc.gpu)))
         fprintf(fid, '#SBATCH --gres=%s\n', strtrim(char(parameters.hpc.gpu)));
     elseif needs_gpu
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
@@ -63,6 +76,10 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --reservation=%s\n', strtrim(char(parameters.hpc.reservation)));
     end
 
+	if is_snellius
+        fprintf(fid, '#SBATCH --cpus-per-task=%i\n', cores);
+    end
+
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc.memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', parameters.hpc.timelimit);
     fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
@@ -70,9 +87,37 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
     
     if needs_gpu, fprintf(fid, 'nvidia-smi\n'); end
-    fprintf(fid, 'module load matlab/R2023b\n');
+	if strcmp(parameters.hpc.name, 'snellius')
+        fprintf(fid, 'module load 2024\n');
+        fprintf(fid, 'module load MATLAB/2024b\n');
+    else
+		fprintf(fid, 'module load matlab/R2023b\n');
+	end
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
+end
+
+function [memorylimit, cores, n_gpu] = extract_snellius_parameters(parameters)
+	
+    switch parameters.hpc_partition
+        case 'gpu_a100'
+            memorylimit = parameters.snellius.a100.memorylimit;
+            cores = parameters.snellius.a100.cores;
+            max_timelimit = parameters.snellius.a100.timelimit;
+            n_gpu = parameters.snellius.a100.n_gpu;
+        case 'gpu_h100'
+            memorylimit = parameters.snellius.h100.memorylimit;
+            cores = parameters.snellius.h100.cores;
+            max_timelimit = parameters.snellius.h100.timelimit;
+            n_gpu = parameters.snellius.h100.n_gpu;
+        otherwise
+            error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc_partition)
+    end
+
+    assert(timelimit <= max_timelimit, ...
+        'Maximum wall time of %s is exceeded (%s).', ...
+        max_timelimit, ...
+        timelimit)
 end
 
 function job_id = submit_slurm_job(temp_slurm_path, log_dir)
@@ -100,7 +145,7 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#PBS -o %s_qsub_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -e %s_qsub_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -d %s\n', log_dir);
-    fprintf(fid, 'module load matlab/R2023b\n');
+	fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
 end
