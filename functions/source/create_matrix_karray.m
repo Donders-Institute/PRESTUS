@@ -28,7 +28,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     natural_focus_pos_m = trans_pos_m + [0, 0, matrix_tp.curved.curv_radius_mm / 1000]';
 
     % Apply Clover setup if requested
-    if transducer_pars.is_clover_setup
+    if matrix_tp.is_clover_setup
         elem_pos_m = create_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
     end
     

@@ -75,11 +75,13 @@ snellius:
     cores: 18
     memorylimit: 120
     timelimit: "120:00:00" # max wall time of 120 h
+    n_gpu: 1
   h100:
     cores: 16
     memorylimit: 180
     timelimit: "120:00:00" # max wall time of 120 h
-
+    n_gpu: 1
+    
 # An optional path to LD_LIBRARY used during SimNIBS installation
 # If you experience an `undefined symbol` error in `create_mesh_surf.cpython-39-x86_64-linux-gnu.so`, set either of the next lines to your LD_LIBRARY location
 ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux

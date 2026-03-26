@@ -28,6 +28,16 @@ function tr = validate_annular_transducer(tr, t_i)
 
     tr.n_elements = annular_tr.n_elements;
     
+    assert(numel(annular_tr.Elements_ID_mm) == annular_tr.n_elements, ...
+        'Transducer %i; Elements_ID_mm length must match n_elements.', t_i);
+            
+    assert(numel(annular_tr.Elements_OD_mm) == annular_tr.n_elements, ...
+        'Transducer %i; Elements_OD_mm length must match n_elements.', t_i);
+
+    % Validate inner/outer diameter ordering
+    assert(all(annular_tr.Elements_OD_mm > annular_tr.Elements_ID_mm), ...
+        'Transducer %i; Outer diameter must be larger than inner diameter for all elements.', t_i);
+    
     % Validate curvature definition
     assert(isfield(annular_tr, 'curv_radius_mm'), ...
         'Transducer %i; Missing curv_radius_mm field for annular transducer. Please specify radius of curvature.', t_i);
@@ -37,5 +47,25 @@ function tr = validate_annular_transducer(tr, t_i)
     % Validate source phase definition
     assert(isfield(annular_tr, 'source_phase_deg'), ...
         'Transducer %i;: Missing source_phase_deg field for annular transducer. Please specify phases.', t_i);
+   
+    tr.source_phase_deg = annular_tr.source_phase_deg;
+    
+    % 3D steering unavailable for annular arrays → align with focus
+    tr.align_transducer_with_focus = true;
+
+                        
+    % Calculate distance to transducer plane if not provided
+    if ~isfield(tr, 'dist_to_plane_mm')
+        assert(annular_tr.curv_radius_mm > max(annular_tr.Elements_OD_mm)/2, ...
+            'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
+            
+        tr.dist_to_plane_mm = sqrt(annular_tr.curv_radius_mm^2 - ...
+                                (max(annular_tr.Elements_OD_mm) / 2)^2);
+
+        fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
+                t_i, tr.dist_to_plane_mm);
+    else
+        tr.dist_to_plane_mm = annular_tr.dist_to_plane_mm;
+    end
    
 end

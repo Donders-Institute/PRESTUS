@@ -46,10 +46,6 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 t_i, matrix_tr.steering);
     end
 
-    % Initialize element phases to zero degrees by default.
-    % Phase delays are later adjusted based on the defined focus.
-    matrix_tr.source_phase_deg = 0;
-
     % ---------------------------------------------------------------------
     % Element geometry
     % Defines the physical dimensions of individual matrix elements.
@@ -85,19 +81,22 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             assert(matrix_tr.curved.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
                 'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 
-            matrix_tr.curved.dist_to_plane_mm = sqrt(matrix_tr.curved.curv_radius_mm^2 - ...
+            tr.dist_to_plane_mm = sqrt(matrix_tr.curved.curv_radius_mm^2 - ...
                 (matrix_tr.outer_diameter_mm / 2)^2);
 
             fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
                 t_i, matrix_tr.curved.dist_to_plane_mm);
+        else
+            tr.dist_to_plane_mm = matrix_tr.curved.dist_to_plane_mm;
         end
+   
 
     else
         matrix_tr.curved.curv_radius_mm = inf;
 
         % For a flat transducer the distance to the focal plane approaches
         % infinity. A finite value is assigned here for visualization purposes.
-        matrix_tr.curved.dist_to_plane_mm = 70;
+        tr.dist_to_plane_mm = 70;
     end
     
     tr.curv_radius_mm = matrix_tr.curved.curv_radius_mm;
@@ -244,7 +243,9 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
             assert(~isempty(resolved_path), ...
                 'Transducer %i; File "%s" does not exist or is not on the MATLAB path.', t_i, file_path);
-
+            
+            extract_shape_from_file.file_path = resolved_path;
+            
             assert(isfield(extract_shape_from_file, 'start_row'), ...
                 'Transducer %i; Missing start_row parameter. Please specify start row of element positions.', t_i);
 
@@ -293,6 +294,12 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             error('Transducer %i; Matrix shape option "%s" is not implemented.', ...
                 t_i, matrix_tr.matrix_shape.type);
     end
+    
+    
+    % Initialize element phases to zero degrees by default.
+    % Phase delays are later adjusted based on the defined focus.
+    tr.source_phase_deg = repmat(0, [1, tr.n_elements]);
+    
     matrix_tr.matrix_shape.extract_from_file = extract_shape_from_file;
 
     tr.array_shape.matrix = matrix_tr;

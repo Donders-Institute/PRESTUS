@@ -28,7 +28,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     % Read element positions from file
     % ---------------------------------------------------------------------
 
-    tran_info = readtable(matrix_tp.file_path);
+    tran_info = readtable(file_ext.file_path);
 
     row_start = file_ext.start_row;
     row_end   = row_start + file_ext.n_elements - 1;

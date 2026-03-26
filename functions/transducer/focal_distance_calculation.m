@@ -63,10 +63,10 @@ if needs_t1
     disp('Expected focal distance not specified for all transducers, trying to get it from positions on T1 grid')
 
     % Load T1 header once
-    filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
+    filename_t1 = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id)));
     if isempty(filename_t1)
         error('File does not exist for T1 (t1_path_template): %s', ...
-              fullfile(parameters.data_path, sprintf(parameters.t1_path_template, subject_id)));
+              fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id)));
     end
     filename_t1 = fullfile(filename_t1(1).folder, filename_t1(1).name); % first match
     t1_info = niftiinfo(filename_t1);

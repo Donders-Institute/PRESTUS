@@ -99,6 +99,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos(2:3);
+            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid_step_mm];
         end
         max_data_pos = max_data_pos(2:3);
     elseif slice{1} == 'y'
@@ -108,15 +109,17 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos([1,3]);
+            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid_step_mm];
         end
         max_data_pos = max_data_pos([1,3]);
     elseif slice{1} == 'z'
         slice_z = slice{2};
         if ~isempty(focus_pos)
-        focus_pos = focus_pos(1:2);
+            focus_pos = focus_pos(1:2);
         end
         if ~isempty(trans_pos)
-        trans_pos = trans_pos([1,2]);
+            trans_pos = trans_pos([1,2]);
+            natural_focus = trans_pos + [0, 0];
         end
         max_data_pos = max_data_pos([1,2]);
     else
@@ -158,7 +161,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];
         if ~isempty(focus_pos)
-        focus_pos = round(R*double(focus_pos'));
+            focus_pos = round(R*double(focus_pos'));
         end
         if ~isempty(trans_pos)
             trans_pos = round(R*double(trans_pos'));
@@ -189,14 +192,8 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     % draw transducer
     if ~isempty(trans_pos)
         % Add bounding box for visualization
-        get_transducer_box(trans_pos, focus_pos, parameters.grid_step_mm, parameters);
+         [~, ex_plane_pos, ~, ~] = get_transducer_box(trans_pos, focus_pos, natural_focus, parameters.grid_step_mm, parameters);
 
-        % exit plane
-        line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)],  'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', 'LineSmoothing',LineSmoothing )
-
-        % transducer curvature
-        [arc_x, arc_y] = get_arc(geom_focus_pos, parameters.transducer(1).curv_radius_mm/grid_step, focal_angle-arc_halfangle, focal_angle+arc_halfangle );
-        plot(arc_y, arc_x, 'Color',boxColor,'LineWidth', lineWidth,'LineSmoothing',LineSmoothing )
     end
     
     if options.overlay_segmented
@@ -237,6 +234,8 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     if options.show_rectangles 
         rect_size = options.rect_size;
         if ~isempty(trans_pos)
+            boxColor = [235, 185, 47] / 255 * (1 - overlay_weight) + overlay_color * overlay_weight; % Box color blending
+                
             rectangle('Position', [trans_pos(2)-1-rect_size/2  trans_pos(1)-rect_size/2  rect_size*2+1 rect_size*2+1], 'EdgeColor', boxColor, 'LineWidth',2,'LineStyle','-')
             text(trans_pos(2)-1, trans_pos(1)+10, [num2str(round((trans_pos(2)-1)*parameters.grid_step_mm))], 'Color', 'w')
             % the following plots the onset of the grid; note: grid is in voxels, not mm
@@ -274,7 +273,17 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
            
     end
     ax2.Position = ax1.Position;
-    ax2_colour = ax1.Children(length(ax1.Children)).CData(1,1,:);
+    
+    child = ax1.Children(end);
+
+    if isa(child, 'matlab.graphics.primitive.Image')
+        ax2_colour = child.CData(1,1,:);
+    elseif isa(child, 'matlab.graphics.chart.primitive.Line')
+        ax2_colour = child.Color;
+    else
+        error('Unknown child type');
+    end
+    
     if any(ax2_colour > 1)
         ax2_colour = zeros(size(ax2_colour));
     end

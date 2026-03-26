@@ -26,6 +26,8 @@ function parameters = load_transducer_parameters(parameters)
 
     if isfield(parameters, 'transducer')
 
+        new_transducers = struct([]);
+        
         for t_i = 1:numel(parameters.transducer)
     
             tr = parameters.transducer(t_i);
@@ -80,7 +82,7 @@ function parameters = load_transducer_parameters(parameters)
 
                 case 'matrix'
                     [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i);
-
+                    
                 case 'annular'
                     tr = validate_annular_transducer(tr, t_i);
 
@@ -89,71 +91,45 @@ function parameters = load_transducer_parameters(parameters)
                         tr.array_shape.type);
             end
     
-            if strcmp(tr.array_shape.type, 'annular')
-
-                annular_tr = tr.array_shape.annular;
-
-                % 3D steering unavailable for annular arrays → align with focus
-                tr.align_transducer_with_focus = true;
-
-                assert(numel(annular_tr.Elements_ID_mm) == annular_tr.n_elements, ...
-                    'Transducer %i; Elements_ID_mm length must match n_elements.', t_i);
-                
-                assert(numel(annular_tr.Elements_OD_mm) == annular_tr.n_elements, ...
-                    'Transducer %i; Elements_OD_mm length must match n_elements.', t_i);
-
-                % Validate inner/outer diameter ordering
-                assert(all(annular_tr.Elements_OD_mm > annular_tr.Elements_ID_mm), ...
-                    'Transducer %i; Outer diameter must be larger than inner diameter for all elements.', t_i);
+            % Validate general parameters
+            % Ensure source phase is set in radians or degrees
+            if ~isfield(tr, 'source_phase_rad') && isfield(tr, 'source_phase_deg')
+                tr.source_phase_rad = deg2rad(tr.source_phase_deg);
+            elseif ~isfield(tr, 'source_phase_rad')
+                error('Transducer %i; Phase must be specified as source_phase_rad or source_phase_deg.', t_i);
+            end
     
-                % Ensure source phase is set in radians or degrees
-                if ~isfield(annular_tr, 'source_phase_rad') && isfield(annular_tr, 'source_phase_deg')
-                    annular_tr.source_phase_rad = deg2rad(annular_tr.source_phase_deg);
-                elseif ~isfield(annular_tr, 'source_phase_rad')
-                    error('Transducer %i; Phase must be specified as source_phase_rad or source_phase_deg.', t_i);
-                end
-    
-                % Calculate distance to transducer plane if not provided
-                if ~isfield(annular_tr, 'dist_to_plane_mm')
-                    assert(annular_tr.curv_radius_mm > max(annular_tr.Elements_OD_mm)/2, ...
-                        'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
-                    
-                    annular_tr.dist_to_plane_mm = sqrt(annular_tr.curv_radius_mm^2 - ...
-                        (max(annular_tr.Elements_OD_mm) / 2)^2);
-
-                    fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                        t_i, annular_tr.dist_to_plane_mm);
-                end
-                
-                assert(isfield(tr,'source_amp'), ...
+            assert(isfield(tr,'source_amp'), ...
                     'Transducer %i; Missing source_amp field.', t_i);
 
-                % Ensure source amplitude matches number of transducer elements
-                if numel(tr.source_amp) == 1 && annular_tr.n_elements > 1
-                    tr.source_amp = repmat(tr.source_amp, [1, annular_tr.n_elements]);
-                end
-    
-                % Evaluate source phase expressions if stored as cell arrays
-                if iscell(annular_tr.source_phase_rad)
-                    for p_i = 1:numel(annular_tr.source_phase_rad)
-                        if ~isnumeric(annular_tr.source_phase_rad{p_i})
-                            annular_tr.source_phase_rad{p_i} = eval(annular_tr.source_phase_rad{p_i});
-                        end
-                    end
-                    annular_tr.source_phase_rad = cell2mat(annular_tr.source_phase_rad);
-                end
-    
-                % Ensure source phase degrees are calculated from radians if not provided
-                if ~isfield(annular_tr, 'source_phase_deg')
-                    annular_tr.source_phase_deg = rad2deg(annular_tr.source_phase_rad);
-                end
-
-                tr.array_shape.annular = annular_tr;
+            % Ensure source amplitude matches number of transducer elements
+            if numel(tr.source_amp) == 1 && tr.n_elements > 1
+                tr.source_amp = repmat(tr.source_amp, [1, tr.n_elements]);
             end
-
-            parameters.transducer(t_i) = tr;
-
+    
+            % Evaluate source phase expressions if stored as cell arrays
+            if iscell(tr.source_phase_rad)
+                for p_i = 1:numel(tr.source_phase_rad)
+                    if ~isnumeric(tr.source_phase_rad{p_i})
+                        tr.source_phase_rad{p_i} = eval(tr.source_phase_rad{p_i});
+                    end
+                end
+                tr.source_phase_rad = cell2mat(tr.source_phase_rad);
+            end
+    
+            % Ensure source phase degrees are calculated from radians if not provided
+            if ~isfield(tr, 'source_phase_deg')
+                tr.source_phase_deg = rad2deg(tr.source_phase_rad);
+            end
+            
+            if t_i == 1
+                new_transducers = tr;
+            else
+                new_transducers(t_i) = tr;
+            end
         end
+
+        parameters.transducer = new_transducers;
 
     else
         % Warn user about missing transducer information

@@ -64,6 +64,29 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     if ~isfield(parameters, 'hpc_name')
         parameters.hpc_name = 'default';
     end
+    
+    
+    if strcmp(parameters.hpc_name, 'snellius')
+        switch parameters.hpc_partition
+            case 'a100'
+                memorylimit = parameters.snellius.a100.memorylimit;
+                cores = parameters.snellius.a100.cores;
+                max_timelimit = parameters.snellius.a100.timelimit;
+                n_gpu = parameters.snellius.a100.n_gpu;
+            case 'h100'
+                memorylimit = parameters.snellius.h100.memorylimit;
+                cores = parameters.snellius.h100.cores;
+                max_timelimit = parameters.snellius.h100.timelimit;
+                n_gpu = parameters.snellius.h100.n_gpu;
+            otherwise
+                error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc_partition)
+        end
+
+        assert(timelimit <= max_timelimit, ...
+            'Maximum wall time of %s is exceeded (%s).', ...
+            max_timelimit, ...
+            timelimit)
+    end
 
     % Create a temporary SLURM batch script file
     temp_slurm_file = tempname(log_dir);
@@ -73,7 +96,11 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
     if isfield(parameters, 'hpc_partition') && ~isempty(parameters.hpc_partition) && ...
             ~strcmp(parameters.hpc_partition, '')
-        fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
+        if strcmp(parameters.hpc_name, 'snellius')
+            fprintf(fid, '#SBATCH --partition=gpu_%s\n', parameters.hpc_partition);
+        else
+            fprintf(fid, '#SBATCH --partition=%s\n', parameters.hpc_partition);
+        end
         request_gpu = 1;
     elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
         fprintf(fid, '#SBATCH --partition=gpu\n');
@@ -81,8 +108,11 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     else
         request_gpu = 0;
     end
-    if isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ...
-            ~strcmp(parameters.hpc_gpu, '') && ~strcmp(parameters.hpc_name, 'snellius')
+    
+    if strcmp(parameters.hpc_name, 'snellius')
+        fprintf(fid, '#SBATCH --gpus=%i\n', n_gpu);
+    elseif isfield(parameters, 'hpc_gpu') && ~isempty(parameters.hpc_gpu) && ...
+            ~strcmp(parameters.hpc_gpu, '')
         fprintf(fid, '#SBATCH --gres=%s\n', parameters.hpc_gpu);
     elseif strcmp(parameters.code_type, 'matlab_gpu') || strcmp(parameters.code_type, 'cpp_gpu')
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
@@ -93,26 +123,7 @@ function single_subject_pipeline_with_slurm(subject_id, parameters, wait_for_job
     end
 
     if strcmp(parameters.hpc_name, 'snellius')
-        switch parameters.hpc_gpu
-            case 'a100'
-                memorylimit = parameters.snellius.a100.memorylimit;
-                cores = parameters.snellius.a100.cores;
-                max_timelimit = parameters.snellius.a100.timelimit;
-            case 'h100'
-                memorylimit = parameters.snellius.h100.memorylimit;
-                cores = parameters.snellius.h100.cores;
-                max_timelimit = parameters.snellius.h100.timelimit;
-            otherwise
-                error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc_gpu)
-        end
-
-        assert(timelimit <= max_timelimit, ...
-            'Maximum wall time of %s is exceeded (%s).', ...
-            max_timelimit, ...
-            timelimit)
-
         fprintf(fid, '#SBATCH --cpus-per-task=%i\n', cores);
-
     end
 
     fprintf(fid, '#SBATCH --mem=%iG\n', memorylimit);

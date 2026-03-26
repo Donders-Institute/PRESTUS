@@ -46,11 +46,12 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
     for it = 1:nT
         tp = transducer_pars(it);
-
-        tp.Elements_OD = 2 * floor(tp.Elements_OD_mm / grid_step_mm / 2) + 1;
-        tp.Elements_ID = 2 * floor(tp.Elements_ID_mm / grid_step_mm / 2) + 1;
-        tp.Elements_ID(tp.Elements_ID_mm == 0) = 0;
-
+        if strcmp(tp.array_shape.type, 'annular')
+            tp.array_shape.annular.Elements_OD = 2 * floor(tp.array_shape.annular.Elements_OD_mm / grid_step_mm / 2) + 1;
+            tp.array_shape.annular.Elements_ID = 2 * floor(tp.array_shape.annular.Elements_ID_mm / grid_step_mm / 2) + 1;
+            tp.array_shape.annular.Elements_ID(tp.array_shape.annular.Elements_ID_mm == 0) = 0;
+        end
+        
         tp.radius_grid = round(tp.curv_radius_mm / grid_step_mm);
 
         if it == 1
@@ -111,20 +112,20 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 % outer element aperture
                 if parameters.n_sim_dims == 3
                     bowl = makeBowl(grid_dims, trans_pos_i, tp.radius_grid, ...
-                                    tp.Elements_OD(el_i), focus_pos_i);
+                                    tp.array_shape.annular.Elements_OD(el_i), focus_pos_i);
                 else
                     bowl = makeArc(grid_dims, trans_pos_i, tp.radius_grid, ...
-                                   tp.Elements_OD(el_i), focus_pos_i);
+                                   tp.array_shape.annular.Elements_OD(el_i), focus_pos_i);
                 end
         
                 % subtract inner aperture if applicable
-                if tp.Elements_ID(el_i) > 0
+                if tp.array_shape.annular.Elements_ID(el_i) > 0
                     if parameters.n_sim_dims == 3
                         bowl = bowl - makeBowl(grid_dims, trans_pos_i, ...
-                                               tp.radius_grid, tp.Elements_ID(el_i), focus_pos_i);
+                                               tp.radius_grid, tp.array_shape.annular.Elements_ID(el_i), focus_pos_i);
                     else
                         bowl = bowl - makeArc(grid_dims, trans_pos_i, ...
-                                              tp.radius_grid, tp.Elements_ID(el_i), focus_pos_i);
+                                              tp.radius_grid, tp.array_shape.annular.Elements_ID(el_i), focus_pos_i);
                     end
                 end
         
@@ -205,7 +206,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         
                     karray.addAnnularArray(pos_vec, ...
                                            tp.curv_radius_mm * 1e-3, ...
-                                           [tp.Elements_ID_mm; tp.Elements_OD_mm] * 1e-3, ...
+                                           [tp.array_shape.annular.Elements_ID_mm; tp.array_shape.annular.Elements_OD_mm] * 1e-3, ...
                                            focus_vec);
         
                 elseif parameters.n_sim_dims == 2 && axisymmetric == false
@@ -216,7 +217,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         
                     karray.addArcElement(pos_vec, ...
                                          tp.curv_radius_mm * 1e-3, ...
-                                         tp.Elements_OD_mm * 1e-3, ...
+                                         tp.array_shape.annular.Elements_OD_mm * 1e-3, ...
                                          focus_vec);
                 end
             case 'matrix'
@@ -286,7 +287,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             focus_pos_full = [0, 0+eps];
             
             for el_i = 1:tp.n_elements
-                el_OD_m = tp.Elements_OD_mm(el_i) * 1e-3;
+                el_OD_m = tp.array_shape.annular.Elements_OD_mm(el_i) * 1e-3;
                 y_shift = (el_i - (tp.n_elements+1)/2) * el_OD_m;
                 element_pos = position_base + [0, y_shift];
 
