@@ -1,4 +1,4 @@
-function job_id = hpc_submit_job(hpc_type, temp_m_file, parameters, log_dir)
+function [job_id, parameters] = hpc_submit_job(hpc_type, temp_m_file, parameters, log_dir)
 %% HPC_SUBMIT_JOB  Submit HPC batch job (SLURM or qsub)
 %
 %   Generates scheduler script and submits job. Supports SLURM (sbatch) and
@@ -21,6 +21,16 @@ subj_id_string = sprintf('sub-%03d', parameters.subject_id);
 switch hpc_type
     case 'slurm'
         temp_slurm_path = fullfile(log_dir, sprintf('temp_slurm_%s.sh', datestr(now, 'yyyymmdd_HHMMSS')));
+        % Define HPC type
+	    if ~isfield(parameters.hpc, 'name')
+            parameters.hpc.name = 'default';
+        end
+    
+	    % Overwrite and extract additional parameters if Snellius HPC
+	    if strcmp(parameters.hpc.name, 'snellius')
+		    [parameters] = extract_snellius_parameters(parameters);
+	    end
+        
         write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir);
         job_id = submit_slurm_job(temp_slurm_path, log_dir);
 
@@ -40,17 +50,6 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
     job_name = hpc_job_name(parameters);
 	
-	% Define HPC type
-	if ~isfield(parameters.hpc, 'name')
-        parameters.hpc.name = 'default';
-    end
-    
-	% Overwrite and extract additional parameters if Snellius HPC
-	is_snellius = strcmp(parameters.hpc.name, 'snellius');
-	if is_snellius
-		[memorylimit, cores, n_gpu] = extract_snellius_parameters(parameters);
-	end
-	
     fid = fopen(temp_slurm_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
@@ -64,8 +63,8 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --partition=gpu\n');
     end
 
-	if is_snellius
-		fprintf(fid, '#SBATCH --gpus=%i\n', n_gpu);
+    if strcmp(parameters.hpc.name, 'snellius')
+		fprintf(fid, '#SBATCH --gpus=%i\n', parameters.hpc.n_gpu);
     elseif isfield(parameters.hpc, 'gpu') && ~isempty(strtrim(char(parameters.hpc.gpu)))
         fprintf(fid, '#SBATCH --gres=%s\n', strtrim(char(parameters.hpc.gpu)));
     elseif needs_gpu
@@ -76,8 +75,8 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --reservation=%s\n', strtrim(char(parameters.hpc.reservation)));
     end
 
-	if is_snellius
-        fprintf(fid, '#SBATCH --cpus-per-task=%i\n', cores);
+	if strcmp(parameters.hpc.name, 'snellius')
+        fprintf(fid, '#SBATCH --cpus-per-task=%i\n', parameters.hpc.cores);
     end
 
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc.memorylimit);
@@ -97,27 +96,27 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     fclose(fid);
 end
 
-function [memorylimit, cores, n_gpu] = extract_snellius_parameters(parameters)
+function [parameters] = extract_snellius_parameters(parameters)
 	
-    switch parameters.hpc_partition
+    switch parameters.hpc.partition
         case 'gpu_a100'
-            memorylimit = parameters.snellius.a100.memorylimit;
-            cores = parameters.snellius.a100.cores;
-            max_timelimit = parameters.snellius.a100.timelimit;
-            n_gpu = parameters.snellius.a100.n_gpu;
+            parameters.hpc.memorylimit = parameters.snellius.gpu_a100.memorylimit;
+            parameters.hpc.cores = parameters.snellius.gpu_a100.cores;
+            max_timelimit = parameters.snellius.gpu_a100.timelimit;
+            parameters.hpc.n_gpu = parameters.snellius.gpu_a100.n_gpu;
         case 'gpu_h100'
-            memorylimit = parameters.snellius.h100.memorylimit;
-            cores = parameters.snellius.h100.cores;
-            max_timelimit = parameters.snellius.h100.timelimit;
-            n_gpu = parameters.snellius.h100.n_gpu;
+            parameters.hpc.memorylimit = parameters.snellius.gpu_h100.memorylimit;
+            parameters.hpc.cores = parameters.snellius.gpu_h100.cores;
+            max_timelimit = parameters.snellius.gpu_h100.timelimit;
+            parameters.hpc.n_gpu = parameters.snellius.gpu_h100.n_gpu;
         otherwise
-            error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc_partition)
+            error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc.partition)
     end
 
-    assert(timelimit <= max_timelimit, ...
+    assert(parameters.hpc.timelimit <= max_timelimit, ...
         'Maximum wall time of %s is exceeded (%s).', ...
         max_timelimit, ...
-        timelimit)
+        parameters.hpc.timelimit)
 end
 
 function job_id = submit_slurm_job(temp_slurm_path, log_dir)

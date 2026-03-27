@@ -98,12 +98,7 @@ function parameters = load_transducer_parameters(parameters)
             elseif ~isfield(tr, 'source_phase_rad')
                 error('Transducer %i; Phase must be specified as source_phase_rad or source_phase_deg.', t_i);
             end
-			
-			% Calculate distance between target and ep/bowl is not provided
-			if ~isfield(parameters, 'expected_focal_distance_bowl') || ~isfield(parameters, 'expected_focal_distance_ep')
-				parameters = focal_distance_calculation(parameters);
-			end
-    
+			 
             assert(isfield(tr,'source_amp'), ...
                     'Transducer %i; Missing source_amp field.', t_i);
 
@@ -135,6 +130,11 @@ function parameters = load_transducer_parameters(parameters)
         end
 
         parameters.transducer = new_transducers;
+
+        % Calculate distance between target and ep/bowl is not provided
+        if ~isfield(parameters, 'expected_focal_distance_bowl') || ~isfield(parameters, 'expected_focal_distance_ep')
+            parameters = focal_distance_calculation(parameters);
+        end
 
     else
         % Warn user about missing transducer information

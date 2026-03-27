@@ -17,10 +17,10 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
 
     % Construct base filename for saved figures
     base_filename = sprintf('sub-%03d_%s_binary_transducer_mask%s', ...
-        parameters.subject_id, parameters.simulation_medium, ...
-        parameters.results_filename_affix);
+        parameters.subject_id, parameters.simulation.medium, ...
+        parameters.io.output_affix);
 
-    if parameters.n_sim_dims == 3
+    if numel(parameters.grid.dims) == 3
 
         % -----------------------------------------------------------------
         % 3D visualization using isosurface
@@ -43,8 +43,8 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         title('3D Visualization of Transducer Binary Mask');
 
         % Save figure
-        saveas(h, fullfile(parameters.debug_dir, [base_filename '.fig']));
-        saveas(h, fullfile(parameters.debug_dir, [base_filename '.png']));
+        saveas(h, fullfile(parameters.io.debug_dir, [base_filename '.fig']));
+        saveas(h, fullfile(parameters.io.debug_dir, [base_filename '.png']));
 
         close(h);
     else
@@ -61,7 +61,7 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         title('Transducer Binary Mask in Simulation Grid');
 
         % Save figure
-        saveas(h, fullfile(parameters.debug_dir, [base_filename '.png']));
+        saveas(h, fullfile(parameters.io.debug_dir, [base_filename '.png']));
 
         close(h);
     end

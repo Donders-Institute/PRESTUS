@@ -99,7 +99,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos(2:3);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid_step_mm];
+            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos(2:3);
     elseif slice{1} == 'y'
@@ -109,7 +109,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos([1,3]);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid_step_mm];
+            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos([1,3]);
     elseif slice{1} == 'z'
@@ -192,7 +192,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     % draw transducer (if grid was properly set up)
     if ~isempty(trans_pos) && parameters.modules.run_grid_setup == 1
         options.grid_step = parameters.grid.resolution_mm;
-        plot_transducer_overlay(parameters, trans_pos, focus_pos, max_data_pos, options,  0.3, [0.2 0.6 1])
+        plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_focus, max_data_pos, options,  0.3, [0.2 0.6 1])
     end
     
     if options.overlay_segmented

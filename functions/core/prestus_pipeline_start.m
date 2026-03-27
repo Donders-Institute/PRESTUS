@@ -71,7 +71,7 @@ function prestus_pipeline_start(parameters, options)
             job_name = hpc_job_name(parameters);
 
             % Submit job
-            job_id = hpc_submit_job(platform, temp_m_file, parameters, log_dir);
+            [job_id, parameters] = hpc_submit_job(platform, temp_m_file, parameters, log_dir);
 
             % Display job info
             job_info = hpc_job_info(platform, job_id, job_name, ...

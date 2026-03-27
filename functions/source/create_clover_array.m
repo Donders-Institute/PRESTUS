@@ -69,7 +69,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 
 
     % [DEBUG] visualize leaf orientation
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         h = figure;
         hold on;
         axis equal;
@@ -120,7 +120,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
         dist_focus = norm(parent_center_mm' - apex);
 
         % [DEBUG] visualize leaf orientation
-        if parameters.debug == 1
+        if parameters.simulation.debug == 1
             legend_entries(i+1) = sprintf('Leaf %d (dist: %.2f mm)', i+1, dist_focus);
 
             scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
@@ -144,7 +144,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % Debug plot
     % --------------------------------------------------------------------
     % [DEBUG] visualize leaf orientation
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         h_parent = scatter3(parent_center_mm(1), parent_center_mm(2), ...
             parent_center_mm(3), 100, 'r', 'filled');
         h_focus  = scatter3(focus_pos_m(1)*1e3, focus_pos_m(2)*1e3, focus_pos_m(3)*1e3, 100, 'b', 'filled');
@@ -169,10 +169,10 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
         grid on;
         view([20 25 30]);
 
-        output_file = fullfile(parameters.debug_dir, ...
+        output_file = fullfile(parameters.io.debug_dir, ...
             sprintf('sub-%03d_%s_clover%s.png', ...
-            parameters.subject_id, parameters.simulation_medium, ...
-            parameters.results_filename_affix));
+            parameters.subject_id, parameters.simulation.medium, ...
+            parameters.io.output_affix));
 
         saveas(h, output_file);
         close(h);

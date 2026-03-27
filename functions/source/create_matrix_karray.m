@@ -38,7 +38,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     transducer_pars.source_amp = transducer_pars.source_amp(1) * ones(1, transducer_pars.n_elements);
 
     % Wavelength and wavenumber for phase calculation
-    lambda = parameters.medium.water.sound_speed / transducer_pars.source_freq_hz;
+    lambda = parameters.medium_properties.water.sound_speed / transducer_pars.source_freq_hz;
     k = 2 * pi / lambda;
 
     % Initialize source phases, scaled vectors, tx, ty, tz
@@ -120,7 +120,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     transducer_pars.source_phase_deg = rad2deg(source_phase_rad);
 
     % [DEBUG] visualize matrix element orientation
-    if parameters.debug == 1
+    if parameters.simulation.debug == 1
         h = figure;
         hold on;
         axis equal;
@@ -178,15 +178,15 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         view(0, 0);
         xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
         title('Element Orientation Validation (Red = Euler, Green = Ground Truth)')
-        grid on
+        grid on;
     
         legend({'Element Position','Natural Focus','Focus','From Euler Angles','Ground Truth'})
     
         base_name = sprintf('sub-%03d_%s_transducer_element_orientation%s', ...
-            parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix);
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
     
-        saveas(h, fullfile(parameters.debug_dir, [base_name '.fig']))
-        saveas(h, fullfile(parameters.debug_dir, [base_name '.png']))
+        saveas(h, fullfile(parameters.io.debug_dir, [base_name '.fig']))
+        saveas(h, fullfile(parameters.io.debug_dir, [base_name '.png']))
     
         close(h)
     end

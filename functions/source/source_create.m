@@ -42,19 +42,18 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
     %% Convert element diameters from mm to grid points (for all transducers)
 
     transducer_pars = parameters.transducer;
-    grid.resolution_mm    = parameters.grid.resolution_mm;
 
     for it = 1:nT
         tp = transducer_pars(it);
 
         if strcmp(tp.array_shape.type, 'annular')
-            tp.array_shape.annular.Elements_OD = 2 * floor(tp.array_shape.annular.Elements_OD_mm / grid.resolution_mm / 2) + 1;
-            tp.array_shape.annular.Elements_ID = 2 * floor(tp.array_shape.annular.Elements_ID_mm / grid.resolution_mm / 2) + 1;
+            tp.array_shape.annular.Elements_OD = 2 * floor(tp.array_shape.annular.Elements_OD_mm / parameters.grid.resolution_mm / 2) + 1;
+            tp.array_shape.annular.Elements_ID = 2 * floor(tp.array_shape.annular.Elements_ID_mm / parameters.grid.resolution_mm / 2) + 1;
             tp.array_shape.annular.Elements_ID(tp.array_shape.annular.Elements_ID_mm == 0) = 0;
 			
         end
         
-        tp.radius_grid = round(tp.curv_radius_mm / grid.resolution_mm);
+        tp.radius_grid = round(tp.curv_radius_mm / parameters.grid.resolution_mm);
 
         if it == 1
             % initialise struct array with full field set of tp
@@ -244,7 +243,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 end
 
                 % [DEBUG] visualize element distribution
-                if parameters.debug == 1
+                if parameters.simulation.debug == 1
                     % Convert positions to mm for plotting
                     elem_pos_mm = elem_pos_m' * 1e3;
 
@@ -256,16 +255,16 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                     zlabel('Z [mm]')
                     view([0 90])
                     title('Transducer Element Distribution')
-                    grid on
+                    grid on;
 
                     % Build filenames
-                    fig_filename = fullfile(parameters.debug_dir, ...
+                    fig_filename = fullfile(parameters.io.debug_dir, ...
                         sprintf('sub-%03d_%s_transducer_element_distribution%s.fig', ...
-                        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+                        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
-                    png_filename = fullfile(parameters.debug_dir, ...
+                    png_filename = fullfile(parameters.io.debug_dir, ...
                         sprintf('sub-%03d_%s_transducer_element_distribution%s.png', ...
-                        parameters.subject_id, parameters.simulation_medium, parameters.results_filename_affix));
+                        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
                     % Save outputs
                     saveas(h, fig_filename, 'fig')
