@@ -1,4 +1,4 @@
-function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, trans_pos_m)    
+function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, trans_pos_m, focus_pos_m)    
 % CREATE_CLOVER_ARRAY Generate a multi-leaf clover transducer configuration.
 %
 % This function replicates a single matrix transducer layout into a clover
@@ -19,6 +19,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 %   matrix_tp    - struct containing matrix + clover configuration
 %   elem_pos_m   - [3 x N] element positions (single sub-array) [m]
 %   trans_pos_m  - [3 x 1] transducer origin in simulation grid [m]
+%	focus_pos_m  - [3 x 1] acoustic focus position in simulation grid [m]
 %
 % OUTPUTS:
 %   elem_pos_m   - [3 x N_total] full clover element positions [m]
@@ -33,7 +34,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 
     % Estimate elevation angle to ensure sub-apertures do not overlap on
     % the parent sphere
-    aperture_diam = matrix_tp.Elements_OD_mm(end);
+    aperture_diam = matrix_tp.outer_diameter_mm;
     radius_circle = aperture_diam / (2 * ROC_parent_mm * sin(theta_az / 2));
     elevation_angle = asin(radius_circle);
 
@@ -53,9 +54,9 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % (along X-axis azimuthally)
     % --------------------------------------------------------------------
     center0 = parent_center_mm + [ ...
-        ROC_parent * cos(elevation_angle);
+        ROC_parent_mm * cos(elevation_angle);
         0;
-        ROC_parent * sin(elevation_angle)
+        ROC_parent_mm * sin(elevation_angle)
     ];
 
     % Express base positions relative to first center
@@ -80,10 +81,10 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % --------------------------------------------------------------------
     % Generate each clover leaf
     % --------------------------------------------------------------------
-    for i = 0:n_leaves-1
+    for i = 1:n_leaves
 
         % --- Rotation matrices --- 
-        angle_z = i * theta_az;
+        angle_z = (i-1) * theta_az;
 
         % Rotate around Z to spread evenly
         Rz = [cos(angle_z), -sin(angle_z), 0;
@@ -121,10 +122,10 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 
         % [DEBUG] visualize leaf orientation
         if parameters.simulation.debug == 1
-            legend_entries(i+1) = sprintf('Leaf %d (dist: %.2f mm)', i+1, dist_focus);
+            legend_entries(i) = sprintf('Leaf %d (dist: %.2f mm)', i, dist_focus);
 
             scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
-                15, colors(i+1,:), 'filled');
+                15, colors(i,:), 'filled');
 
             h_leaves(i) = plot3([apex(1), parent_center_mm(1)], ...
                 [apex(2), parent_center_mm(2)], ...
@@ -155,7 +156,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 
         % Labels
         par_bowl_label = "Middle of parent bowl, ROC " + sprintf('%.2f', ...
-            ROC_parent) + " mm";
+            ROC_parent_mm) + " mm";
         legend_labels = [legend_entries, ...
             par_bowl_label, "Focus", "Transducer center"];
 

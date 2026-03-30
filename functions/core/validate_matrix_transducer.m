@@ -290,6 +290,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 extract_shape_from_file.project_on_new_ROC = false;
             end
 
+        matrix_tr.matrix_shape.extract_from_file = extract_shape_from_file;
+
         otherwise
             error('Transducer %i; Matrix shape option "%s" is not implemented.', ...
                 t_i, matrix_tr.matrix_shape.type);
@@ -299,8 +301,6 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     % Initialize element phases to zero degrees by default.
     % Phase delays are later adjusted based on the defined focus.
     tr.source_phase_deg = repmat(0, [1, tr.n_elements]);
-    
-    matrix_tr.matrix_shape.extract_from_file = extract_shape_from_file;
 
     tr.array_shape.matrix = matrix_tr;
 end

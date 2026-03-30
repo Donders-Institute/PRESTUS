@@ -39,7 +39,6 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     tran_info(row_start:row_end, col_start:col_start+2) ...
     );
     
-
     % ---------------------------------------------------------------------
     % Optional: randomly select subset of elements
     % ---------------------------------------------------------------------
@@ -61,10 +60,8 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     % ---------------------------------------------------------------------
     ROC = matrix_tp.curved.curv_radius_mm;
 
-    phys_positions_m = (phys_positions_mm - [0, 0, ROC]) / 1000;
-
-    % Flip Z-axis to match simulation coordinate system
-    phys_positions_m(:,3) = -phys_positions_m(:,3);
+    % Translate origin from [0,0,ROC] to [0,0,0], convert mm→m, and flip Z-axis
+    phys_positions_m = (phys_positions_mm - [0, 0, ROC]) .* [1, 1, -1] / 1000;
     
     % ---------------------------------------------------------------------
     % Optional: project elements onto new radius of curvature

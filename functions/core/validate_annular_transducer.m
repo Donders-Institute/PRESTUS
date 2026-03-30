@@ -44,15 +44,8 @@ function tr = validate_annular_transducer(tr, t_i)
 
     tr.curv_radius_mm = annular_tr.curv_radius_mm;
     
-    % Validate source phase definition
-    assert(isfield(annular_tr, 'source_phase_deg'), ...
-        'Transducer %i;: Missing source_phase_deg field for annular transducer. Please specify phases.', t_i);
-   
-    tr.source_phase_deg = annular_tr.source_phase_deg;
-    
     % 3D steering unavailable for annular arrays → align with focus
     tr.align_transducer_with_focus = true;
-
                         
     % Calculate distance to transducer plane if not provided
     if ~isfield(tr, 'dist_to_plane_mm')

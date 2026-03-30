@@ -37,7 +37,7 @@ function parameters = load_transducer_parameters(parameters)
             % ---------------------------------------------------------------------
             
             % Detect legacy configurations where only annular transducers are defined
-            if ~isfield(tr, 'array_shape')
+            if ~isfield(tr, 'array_shape') || isempty(tr.array_shape.type)
 
                 % Create a clean structure for the new format
                 new_tr = struct();
@@ -64,8 +64,24 @@ function parameters = load_transducer_parameters(parameters)
                     new_tr.array_shape.annular.dist_to_plane_mm = tr.dist_to_plane_mm;
                 end
 
+                if isfield(tr, 'source_amp')
+                    new_tr.source_amp = tr.source_amp;
+                end
+
                 if isfield(tr, 'source_phase_deg')
-                    new_tr.array_shape.annular.source_phase_deg = tr.source_phase_deg;
+                    new_tr.source_phase_deg = tr.source_phase_deg;
+                end
+				
+                if isfield(tr, 'source_freq_hz')
+                    new_tr.source_freq_hz = tr.source_freq_hz;
+                end
+
+                if isfield(tr, 'trans_pos')
+                    new_tr.trans_pos = tr.trans_pos;
+                end
+
+                if isfield(tr, 'focus_pos')
+                    new_tr.focus_pos = tr.focus_pos;
                 end
 
                 % Replace old transducer completely
@@ -122,6 +138,10 @@ function parameters = load_transducer_parameters(parameters)
                 tr.source_phase_deg = rad2deg(tr.source_phase_rad);
             end
             
+			if ~isfield(tr, 'depth_mm')
+				tr.depth_mm = 16;
+			end
+			
             if t_i == 1
                 new_transducers = tr;
             else

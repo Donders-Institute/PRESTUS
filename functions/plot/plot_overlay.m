@@ -165,6 +165,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = round(R*double(trans_pos'));
+			natural_focus = round(R*double(natural_focus'));
         end
         max_data_pos = round(R*double(max_data_pos'));
         overlay_image = imrotate(overlay_image, options.rotation);

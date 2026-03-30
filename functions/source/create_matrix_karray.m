@@ -28,8 +28,8 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
     natural_focus_pos_m = trans_pos_m + [0, 0, matrix_tp.curved.curv_radius_mm / 1000]';
 
     % Apply Clover setup if requested
-    if matrix_tp.is_clover_setup
-        elem_pos_m = create_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
+    if matrix_tp.is_clover_setup    
+        elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, trans_pos_m, focus_pos_m);
     end
     
     transducer_pars.n_elements = size(elem_pos_m, 2);
@@ -107,14 +107,12 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         end
 
         % Calculate phase delay based on set focus
-
         distance = sqrt((el_pos_m_i(1) - focus_pos_m(1))^2 + (el_pos_m_i(2) - focus_pos_m(2))^2 + (el_pos_m_i(3) - focus_pos_m(3))^2);
 
         source_phase_rad(ind) = mod(k * distance, 2 * pi);
     end
 
     transducer_pars.array_shape.matrix = matrix_tp;
-
 
     transducer_pars.source_phase_rad = source_phase_rad;
     transducer_pars.source_phase_deg = rad2deg(source_phase_rad);
