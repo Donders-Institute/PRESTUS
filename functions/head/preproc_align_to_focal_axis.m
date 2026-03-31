@@ -55,7 +55,15 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     %% Step 1: Compute focal axis
     % The focal axis is defined as a vector from `trans_pos_grid` to `focus_pos_grid`.
-    focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
+    % [Multi-transducer] the preprocessing will be based on the first transducer
+    if parameters.transducer(1).align_transducer_with_focus 
+        focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
+    else
+        % Use the natural focus based on transducer curvature
+        curv_radius = parameters.transducer(1).array_shape.matrix.curv_radius_mm;
+        natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
+        focal_axis = [natural_focus - trans_pos_grid, 1]';
+    end
 
     %% Step 2: Compute rotation angles
     % Rotate around the y-axis first to align focal axis with z-axis projection in x-z plane

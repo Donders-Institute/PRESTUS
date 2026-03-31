@@ -55,50 +55,7 @@ function parameters = load_parameters(varargin)
            'MATLAB should run in desktop mode if parameters.simulation.interactive is enabled in PRESTUS config');
 
     %% Transducer settings validation and derived calculations
-
-    for t_i = 1:numel(parameters.transducer)
-
-        % Ensure source phase is set in radians or degrees
-        if ~isfield(parameters.transducer(t_i), 'source_phase_rad')
-            assert(isfield(parameters.transducer(t_i), 'source_phase_deg'), ...
-                   'Source phase should be set in transducer parameters as source_phase_rad or source_phase_deg');
-            parameters.transducer(t_i).source_phase_rad = parameters.transducer(t_i).source_phase_deg / 180 * pi;
-        end
-
-        % Calculate distance to transducer plane if not provided
-        if ~isfield(parameters.transducer(t_i), 'dist_to_plane_mm')
-            parameters.transducer(t_i).dist_to_plane_mm = sqrt(parameters.transducer(t_i).curv_radius_mm^2 - ...
-                                                          (max(parameters.transducer(t_i).Elements_OD_mm) / 2)^2);
-            fprintf('Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                    parameters.transducer(t_i).dist_to_plane_mm);
-        end
-
-        % Calculate distance between target and ep/bowl is not provided
-        if ~isfield(parameters, 'expected_focal_distance_bowl') || ~isfield(parameters, 'expected_focal_distance_ep')
-            parameters = focal_distance_calculation(parameters);
-        end
-
-        % Ensure source amplitude matches number of transducer elements
-        if length(parameters.transducer(t_i).source_amp) == 1 && parameters.transducer(t_i).n_elements > 1
-            parameters.transducer(t_i).source_amp = repmat(parameters.transducer(t_i).source_amp, [1, parameters.transducer(t_i).n_elements]);
-        end
-
-        % Evaluate source phase expressions if stored as cell arrays
-        if iscell(parameters.transducer(t_i).source_phase_rad)
-            for i = 1:length(parameters.transducer(t_i).source_phase_rad)
-                if ~isnumeric(parameters.transducer(t_i).source_phase_rad{i})
-                    parameters.transducer(t_i).source_phase_rad{i} = eval(parameters.transducer(t_i).source_phase_rad{i});
-                end
-            end
-            parameters.transducer(t_i).source_phase_rad = cell2mat(parameters.transducer(t_i).source_phase_rad);
-        end
-
-        % Ensure source phase degrees are calculated from radians if not provided
-        if ~isfield(parameters.transducer(t_i), 'source_phase_deg')
-            parameters.transducer(t_i).source_phase_deg = parameters.transducer(t_i).source_phase_rad / pi * 180;
-        end
-
-    end
+    parameters = load_transducer_parameters(parameters);
 
     %% Validate thermal simulation settings
     % Request no timing overview here

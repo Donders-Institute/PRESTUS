@@ -22,7 +22,7 @@ function [x, y] = get_arc(center, radius, angleStart, angleEnd, npoints)
         radius (1,1) double
         angleStart (1,1) double
         angleEnd (1,1) double
-        npoints (1,1) int8 = 200
+        npoints (1,1) double = 200
     end
 
     % Generate angles uniformly between `angleStart` and `angleEnd`

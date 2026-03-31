@@ -47,22 +47,104 @@ print_if_field(parameters, 'precision', '%s');
 fprintf('\n');
 
 %% 4. Transducer Specification
-
 fprintf('🎯 TRANSDUCER SPECIFICATION\n');
-if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
-    td = parameters.transducer(1);
-else
-    td = struct();
+
+% Loop over all transducers (support multiple transducers)
+for t_i = 1:numel(parameters.transducer)
+	tr = parameters.transducer(t_i);
+
+    % Determine type
+    tr_type = tr.array_shape.type;
+
+    fprintf('Transducer %d (%s):\n', t_i, tr_type);
+
+    switch tr_type
+        case 'annular'
+            ann = tr.array_shape.annular;
+
+            print_if_field(ann, 'n_elements', '%d');
+            print_if_field(ann, 'curv_radius_mm', '%.0f mm');
+            print_if_field(ann, 'source_phase_deg', '%.1f deg.');
+
+        case 'matrix'
+            mat = tr.array_shape.matrix;
+
+            fprintf('  Steering: %s\n', mat.steering);
+            fprintf('  Element shape: %s\n', mat.element_shape);
+            print_if_field(mat, 'elem_height_mm', '%.3f mm');
+            print_if_field(mat, 'elem_width_mm', '%.3f mm');
+            print_if_field(mat, 'outer_diameter_mm', '%.2f mm');
+            print_if_field(mat, 'is_curved', '%d');
+
+            if mat.is_curved && isfield(mat, 'curved')
+                print_if_field(mat.curved, 'curv_radius_mm', '%.2f mm');
+            end
+
+            % Clover setup
+            if isfield(mat, 'is_clover_setup') && mat.is_clover_setup
+                fprintf('  Clover setup enabled:\n');
+                print_if_field(mat.clover, 'n_leaves', '%d');
+                print_if_field(mat.clover, 'ROC_parent', '%.2f mm');
+            end
+
+            % Matrix shape type
+            shape_type = mat.matrix_shape.type;
+            fprintf('  Matrix shape type: %s\n', shape_type);
+
+            switch shape_type
+                case 'define_here'
+                    define_here = mat.matrix_shape.define_here;
+                    grid_type = define_here.grid_shape.type;
+                    fprintf('    Grid type: %s\n', grid_type);
+
+                    switch grid_type
+                        case 'rect'
+                            rect_grid = define_here.grid_shape.rect;
+                            fprintf('      Rectangular grid:\n');
+                            print_if_field(rect_grid, 'n_elem_row', '%d');
+                            print_if_field(rect_grid, 'n_elem_col', '%d');
+                            print_if_field(rect_grid, 'elem_spacing_height_mm', '%.2f mm');
+                            print_if_field(rect_grid, 'elem_spacing_width_mm', '%.2f mm');
+                            print_if_field(rect_grid, 'sparsity_factor', '%.2f');
+
+                        case 'fibonacci'
+                            fib_grid = define_here.grid_shape.fibonacci;
+                            fprintf('      Fibonacci grid:\n');
+                            print_if_field(fib_grid, 'n_elements', '%d');
+
+                        case 'fermat'
+                            fermat_grid = define_here.grid_shape.fermat;
+                            fprintf('      Fermat spiral grid:\n');
+                            print_if_field(fermat_grid, 'n_elements', '%d');
+                    end
+
+                case 'extract_from_file'
+                    ext = mat.matrix_shape.extract_from_file;
+                    print_if_field(ext, 'file_path', '%s');
+                    print_if_field(ext, 'start_row', '%d');
+                    print_if_field(ext, 'start_col', '%d');
+                    print_if_field(ext, 'n_elements', '%d');
+                    print_if_field(ext, 'select_random_subset', '%d');
+                    if ext.select_random_subset
+                        print_if_field(ext.subset, 'random_seed', '%d');
+                        print_if_field(ext.subset, 'subset_n_elements', '%d');
+                    end
+                    print_if_field(ext, 'project_on_new_ROC', '%d');
+                    if ext.project_on_new_ROC
+                        print_if_field(ext.ROC_projection, 'new_ROC_mm', '%.2f mm');
+                    end
+            end
+    end
+
+    print_if_field(tr, 'source_freq_hz', '%.1f Hz');
+    print_if_field(tr, 'source_amp', '%.1f Pa');
+    print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
+    print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
+	print_if_field(parameters, 'expected_focal_distance_ep', '%.1f mm');
+	print_if_field(parameters, 'expected_focal_distance_bowl', '%.1f mm');
+
+    fprintf('\n');
 end
-print_if_field(td, 'source_freq_hz', '%.1f Hz');
-print_if_field(td, 'n_elements', '%d');
-print_if_field(td, 'curv_radius_mm', '%.0f mm');
-print_if_field(td, 'source_amp', '%.1f Pa');
-print_if_field(td, 'trans_pos', '[%.1f %.1f %.1f]');
-print_if_field(td, 'focus_pos', '[%.1f %.1f %.1f]');
-print_if_field(td, 'expected_focal_distance_ep', '%.1f mm');
-print_if_field(td, 'expected_focal_distance_bowl', '%.1f mm');
-fprintf('\n');
 
 %% 5. Medium Properties (requested layers only)
 
