@@ -36,16 +36,17 @@ end
 fclose( fid );
 fn_out = [tempname,'.csv'];
 
-% include LD fix
-if isfield(parameters.hpc,'ld_library_path')
+% include LD fix (Unix only; Windows does not use LD_LIBRARY_PATH)
+if isfield(parameters.hpc,'ld_library_path') && ~isempty(parameters.hpc.ld_library_path) && ~ispc
     ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.hpc.ld_library_path);
 else
     ld_command = '';
 end
 
-% Run mni2subject_coords
-[status,result] = system(sprintf('%s%s/mni2subject_coords -m %s -s %s -o %s -t %s;', ...
-    ld_command, parameters.startup.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
+% Run mni2subject_coords (quote paths for spaces)
+mni2sub_bin = fullfile(parameters.startup.simnibs_bin_path, 'mni2subject_coords');
+[status,result] = system(sprintf('%s"%s" -m "%s" -s "%s" -o "%s" -t %s', ...
+    ld_command, mni2sub_bin, subdir, fn_in, fn_out, transformation_type));
 
 
 % system([simnibs_cli_call('mni2subject_coords')...

@@ -22,9 +22,9 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         parameters.io.overwrite_simnibs = 1;
     end
     if ~isempty(filename_t2)
-        segment_call = sprintf('charm %s %s %s', subj_id_string, filename_t1, filename_t2);
+        segment_call = sprintf('charm %s "%s" "%s"', subj_id_string, filename_t1, filename_t2);
     else
-        segment_call = sprintf('charm %s %s', subj_id_string, filename_t1);
+        segment_call = sprintf('charm %s "%s"', subj_id_string, filename_t1);
     end
     if isfield(parameters, 'overwrite_simnibs') && parameters.io.overwrite_simnibs == 1
         segment_call = [segment_call ' --forcerun'];
@@ -55,8 +55,9 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
             parameters.path.seg);
 
         % execute simnibs call in segmentation directory
-        full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', ...
-            parameters.path.seg, parameters.startup.simnibs_bin_path, segment_call, qsub_call);
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        full_cmd = sprintf('cd "%s"; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s" | %s', ...
+            parameters.path.seg, strrep(segment_call, 'charm', charm_path), qsub_call);
         
         % 3) submit segmentation job
         fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -88,9 +89,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.hpc.ld_library_path);
         
         % Add segmentation call
-        fprintf(fid, 'cd %s\n', parameters.path.seg);
+        fprintf(fid, 'cd "%s"\n', parameters.path.seg);
         fprintf(fid, 'charm --version\n');
-        fprintf(fid, '%s\n', [parameters.startup.simnibs_bin_path, '/', segment_call]);
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        fprintf(fid, '%s\n', strrep(segment_call, 'charm', sprintf('"%s"', charm_path)));
         fclose(fid);
     
         % Ensure script is executable
@@ -115,7 +117,8 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         end
         
         % Use FULL PATH to charm (don't rely on PATH)
-        full_segment_call = sprintf('%s/%s', parameters.startup.simnibs_bin_path, segment_call);
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        full_segment_call = strrep(segment_call, 'charm', sprintf('"%s"', charm_path));
         fprintf('Full command: %s\n', full_segment_call);
         
         orig_dir = pwd;
