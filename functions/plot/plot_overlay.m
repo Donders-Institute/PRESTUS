@@ -99,7 +99,6 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos(2:3);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos(2:3);
     elseif slice{1} == 'y'
@@ -109,17 +108,15 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos([1,3]);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos([1,3]);
     elseif slice{1} == 'z'
         slice_z = slice{2};
         if ~isempty(focus_pos)
-            focus_pos = focus_pos(1:2);
+        focus_pos = focus_pos(1:2);
         end
         if ~isempty(trans_pos)
-            trans_pos = trans_pos([1,2]);
-            natural_focus = trans_pos + [0, 0];
+        trans_pos = trans_pos([1,2]);
         end
         max_data_pos = max_data_pos([1,2]);
     else
@@ -161,11 +158,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];
         if ~isempty(focus_pos)
-            focus_pos = round(R*double(focus_pos'));
+        focus_pos = round(R*double(focus_pos'));
         end
         if ~isempty(trans_pos)
             trans_pos = round(R*double(trans_pos'));
-			natural_focus = round(R*double(natural_focus'));
         end
         max_data_pos = round(R*double(max_data_pos'));
         overlay_image = imrotate(overlay_image, options.rotation);
@@ -193,7 +189,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     % draw transducer (if grid was properly set up)
     if ~isempty(trans_pos) && parameters.modules.run_grid_setup == 1
         options.grid_step = parameters.grid.resolution_mm;
-        plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_focus, max_data_pos, options,  0.3, [0.2 0.6 1])
+        plot_transducer_overlay(parameters, trans_pos, focus_pos, max_data_pos, options,  0.3, [0.2 0.6 1])
     end
     
     if options.overlay_segmented
@@ -257,17 +253,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
            
     end
     ax2.Position = ax1.Position;
-    
-    child = ax1.Children(end);
-
-    if isa(child, 'matlab.graphics.primitive.Image')
-        ax2_colour = child.CData(1,1,:);
-    elseif isa(child, 'matlab.graphics.chart.primitive.Line')
-        ax2_colour = child.Color;
-    else
-        error('Unknown child type');
-    end
-    
+    ax2_colour = ax1.Children(length(ax1.Children)).CData(1,1,:);
     if any(ax2_colour > 1)
         ax2_colour = zeros(size(ax2_colour));
     end

@@ -69,8 +69,8 @@ modules:
   segmentation_only: 0      # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
 
 #------------ High-performance computing
+
 hpc:
-  name: 'default'   # 'default' or 'snellius'
   gpu: ''
   partition: ''
   reservation: ''
@@ -81,104 +81,21 @@ hpc:
   job_prefix: 'PRESTUS' # Prefix for HPC job names
   max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
 
-# Smallest possible allocation (https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660209/Snellius+partitions+and+accounting)
-snellius:
-  gpu_a100:
-    cores: 18
-    memorylimit: 120
-    timelimit: "120:00:00" # max wall time of 120 h
-    n_gpu: 1
-  gpu_h100:
-    cores: 16
-    memorylimit: 180
-    timelimit: "120:00:00" # max wall time of 120 h
-    n_gpu: 1
-
 #------------ Target analysis
+
 analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
 
 #------------ Transducer specification  (no defaults)
 
 transducer:
-  # ------------------------------
-  # General annular/matrix properties
-  # ------------------------------
-  array_shape:
-    type: []                # 'annular' for Annular array or 'matrix' for Matrix array
-
-    # --------------------------
-    # Annular transducer parameters
-    # --------------------------
-    annular:
-      n_elements: []        # Number of elements in the transducer [#]
-      Elements_ID_mm: []    # Inner diameter of each element [mm]
-      Elements_OD_mm: []    # Outer diameter of each element [mm]
-      curv_radius_mm: []    # Radius of curvature of the bowl [mm]
-      dist_to_plane_mm: []  # Distance from transducer plane to geometric focus [mm]
-      source_phase_deg: []  # Source phase of each element [deg] (0-360)
-
-    # --------------------------
-    # Matrix transducer parameters
-    # --------------------------
-    matrix:
-      steering: []          # '1D' (Axial steering) or '3D' (Volumetric steering)
-      element_shape: []     # 'rect', 'disc', or 'bowl' - physical shape of each element
-      elem_height_mm: []    # Element height [mm]
-      elem_width_mm: []     # Element width [mm]
-      outer_diameter_mm: [] # Outer diameter of the transducer [mm]
-      is_curved: []         # true if transducer has a curved (spherical) surface, false if flat
-      curved:
-        curv_radius_mm: []   # Radius of curvature of the bowl [mm]
-        dist_to_plane_mm: [] # Distance from transducer plane to geometric focus [mm]
-
-      # Optional Clover multi-aperture configuration
-      is_clover_setup: []  # true to enable Clover replication
-      clover:
-        n_leaves: []       # Number of leaves (1–3)
-        ROC_parent: []     # Radius of curvature of parent setup [mm]
-
-      # --------------------------
-      # Grid definition
-      # --------------------------
-      matrix_shape:
-        type: []           # 'define_here' (define grid manually) or 'extract_from_file' (load positions from file)
-
-        # If define_here is used:
-        define_here:
-          grid_shape:
-            type: []       # 'rect', 'fibonacci', 'fermat' - type of grid layout
-
-            rect:
-              n_elem_row: []          # Number of rows in rectangular grid
-              n_elem_col: []          # Number of columns in rectangular grid
-              elem_spacing_height_mm: [] # Edge-to-edge spacing between rows [mm]
-              elem_spacing_width_mm: []  # Edge-to-edge spacing between columns [mm]
-              sparsity_factor: []     # Fraction of elements used (0 < value <= 1)
-
-            fibonacci:
-              n_elements: []          # Total number of elements for Fibonacci grid
-              kerf_mm: []             # Minimum spacing between elements [mm]
-
-            fermat:
-              n_elements: []          # Total number of elements for Fermat spiral grid
-
-        # If extract_from_file is used:
-        extract_from_file:
-          file_path: []              # Path to file with element positions (x, y, z) [string]
-          start_row: []              # Row in file where element data starts
-          start_col: []              # Column in file where element data starts
-          n_elements: []             # Total number of elements to extract
-          select_random_subset: []   # true to randomly pick a subset
-          subset:
-            random_seed: []          # true to use a new seed each run, false to fix seed
-            subset_n_elements: []    # Number of elements in the subset
-          project_on_new_ROC: []     # true to project elements onto new ROC
-          ROC_projection:
-            new_ROC_mm: []           # New desired radius of curvature [mm]
-  
-  depth_mm: []          # Depth of transducer used for visualization purposes [mm]
-  source_amp: []        # Pressure amplitude [Pa] 
+  n_elements: []        # Number of elements in the transducer [#]
+  Elements_ID_mm: []    # Inner diameter of each element [mm]
+  Elements_OD_mm: []    # Outer diameter of each element [mm]
+  curv_radius_mm: []    # Radius of curvature of the bowl [mm]
+  dist_to_plane_mm: []  # Distance to the transducer plane from the geometric focus [mm]
+  source_amp: []        # Pressure amplitude [Pa]
+  source_phase_deg: []  # Source phase [deg]
   source_freq_hz: []    # Fundamental frequency [Hz]
   trans_pos: []         # Transducer position [T1 grid space]
   focus_pos: []         # Stimulation target position[T1 grid space]
