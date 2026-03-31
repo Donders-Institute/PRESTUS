@@ -158,6 +158,7 @@ transducer:
 
             fibonacci:
               n_elements: []          # Total number of elements for Fibonacci grid
+              kerf_mm: []             # Minimum spacing between elements [mm]
 
             fermat:
               n_elements: []          # Total number of elements for Fermat spiral grid

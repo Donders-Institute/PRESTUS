@@ -175,13 +175,6 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         trans_pos_1  = trans_pos(1, :);
         focus_pos_1  = focus_pos(1, :);
 
-        % CW per-element for this transducer
-        cw_signal = createCWSignals( ...
-            kgrid.t_array, ...
-            tp.source_freq_hz, ...
-            tp.source_amp, ...
-            tp.source_phase_rad);   % [n_elements x Nt]
-
         % Determine if axisymmetric mode should be enabled
         if numel(parameters.grid.dims) == 2 && ...
                 isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
@@ -235,7 +228,6 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 switch matrix_tp.matrix_shape.type
                     case 'define_here'
                         [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, focus_pos_m);
-                        transducer_pars(1) = tp;
                     case 'extract_from_file'               
                         elem_pos_m = extract_element_pos(parameters, tp,  trans_pos_m);
                     otherwise 
@@ -272,11 +264,18 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                     close(h)
                 end
                 
-                karray = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_m, trans_pos, focus_pos);
+                [karray, tp] = create_matrix_karray(kgrid, karray, parameters, tp, elem_pos_m, trans_pos, focus_pos);
 
             otherwise
                 error('Array shape %s is unknown or not implemented.', tp.array_shape.type)
         end
+
+        % CW per-element for this transducer
+        cw_signal = createCWSignals( ...
+            kgrid.t_array, ...
+            tp.source_freq_hz, ...
+            tp.source_amp, ...
+            tp.source_phase_rad);   % [n_elements x Nt]
 
         if axisymmetric == true && strcmp(tp.array_shape.type, 'annular')
 
@@ -370,6 +369,6 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
             show_binary_mask_transducer(karray, kgrid, parameters);
         end
-
+        transducer_pars(1) = tp;
     end
 end
