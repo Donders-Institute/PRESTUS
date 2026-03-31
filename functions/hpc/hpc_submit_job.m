@@ -21,6 +21,7 @@ subj_id_string = sprintf('sub-%03d', parameters.subject_id);
 switch hpc_type
     case 'slurm'
         temp_slurm_path = fullfile(log_dir, sprintf('temp_slurm_%s.sh', datestr(now, 'yyyymmdd_HHMMSS')));
+
         % Define HPC type
 	    if ~isfield(parameters.hpc, 'name')
             parameters.hpc.name = 'default';
