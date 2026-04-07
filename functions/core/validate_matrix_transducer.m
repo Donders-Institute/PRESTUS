@@ -24,7 +24,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 %   tr         - Transducer struct with validated and normalized fields,
 %                including geometry, grid configuration, and derived values.
 
-    matrix_tr = tr.array_shape.matrix;
+    matrix_tr = tr.matrix;
 
     fprintf('Matrix transducer detected. Using kWaveArray (set to 1).\n');
     parameters.use_kWaveArray = 1;
@@ -38,9 +38,9 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
     switch matrix_tr.steering
         case '1D'
-            tr.align_transducer_with_focus = true;
+            tr.align_to_focus = true;
         case '3D'
-            tr.align_transducer_with_focus = false;
+            tr.align_to_focus = false;
         otherwise
             error('Transducer %i; Steering option "%s" is not implemented.', ...
                 t_i, matrix_tr.steering);
@@ -73,34 +73,32 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
         'Transducer %i; Missing is_curved field for matrix transducer. Please specify.', t_i);
 
     if matrix_tr.is_curved
-        assert(isfield(matrix_tr.curved, 'curv_radius_mm'), ...
+        assert(isfield(matrix_tr, 'curv_radius_mm'), ...
             'Transducer %i; Missing curv_radius_mm field for matrix transducer. Please specify radius of curvature.', t_i);
 
         % Calculate distance to transducer plane if not provided
-        if ~isfield(matrix_tr.curved, 'dist_to_plane_mm')
-            assert(matrix_tr.curved.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
+        if ~isfield(matrix_tr, 'dist_to_plane_mm')
+            assert(matrix_tr.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
                 'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 
-            tr.dist_to_plane_mm = sqrt(matrix_tr.curved.curv_radius_mm^2 - ...
+            matrix_tr.dist_to_plane_mm = sqrt(matrix_tr.curv_radius_mm^2 - ...
                 (matrix_tr.outer_diameter_mm / 2)^2);
 
             fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                t_i, matrix_tr.curved.dist_to_plane_mm);
+                t_i, matrix_tr.dist_to_plane_mm);
         else
-            tr.dist_to_plane_mm = matrix_tr.curved.dist_to_plane_mm;
+            matrix_tr.dist_to_plane_mm = matrix_tr.dist_to_plane_mm;
         end
    
 
     else
-        matrix_tr.curved.curv_radius_mm = inf;
+        matrix_tr.curv_radius_mm = inf;
 
         % For a flat transducer the distance to the focal plane approaches
         % infinity. A finite value is assigned here for visualization purposes.
-        tr.dist_to_plane_mm = 70;
+        matrix_tr.dist_to_plane_mm = 70;
     end
     
-    tr.curv_radius_mm = matrix_tr.curved.curv_radius_mm;
-
     % ---------------------------------------------------------------------
     % Optional Clover multi-aperture configuration
     % ---------------------------------------------------------------------
@@ -194,7 +192,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     n_elem_col = rect_grid.n_elem_col;
 
                     % Calculate initial element count (will be adjusted later for circular cutout)
-                    tr.n_elements = n_elem_col * n_elem_row;
+                    matrix_tr.n_elements = n_elem_col * n_elem_row;
 
                 case 'fibonacci'
                     % Sparse spiral grid configuration
@@ -209,7 +207,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape.fibonacci, 'kerf_mm'), ...
                        'Transducer %i; Missing kerf_mm parameter for grid. Please specify.', t_i);
 
-                    tr.n_elements = grid_shape.fibonacci.n_elements;
+                    matrix_tr.n_elements = grid_shape.fibonacci.n_elements;
 
                 case 'fermat'
                     % Sparse spiral grid configuration
@@ -221,7 +219,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape.fermat, 'n_elements'), ...
                         'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
                     
-                    tr.n_elements = grid_shape.fermat.n_elements;
+                    matrix_tr.n_elements = grid_shape.fermat.n_elements;
 
                 otherwise
                     error('Transducer %i; Grid shape type "%s" is not implemented.', ...
@@ -255,7 +253,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             assert(isfield(extract_shape_from_file, 'n_elements'), ...
                 'Transducer %i; Missing n_elements. Please specify number of elements.', t_i);
 
-            tr.n_elements = extract_shape_from_file.n_elements;
+            matrix_tr.n_elements = extract_shape_from_file.n_elements;
 
             if isfield(extract_shape_from_file, 'select_random_subset')
 
@@ -297,10 +295,13 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 t_i, matrix_tr.matrix_shape.type);
     end
     
-    
-    % Initialize element phases to zero degrees by default.
-    % Phase delays are later adjusted based on the defined focus.
-    tr.source_phase_deg = repmat(0, [1, tr.n_elements]);
+    assert(isfield(matrix_tr,'source_amp'), ...
+            'Transducer %i; Missing source_amp field.', t_i);
 
-    tr.array_shape.matrix = matrix_tr;
+    % Initialize depth_mm for visualization purposes (if not provided)
+    if ~isfield(matrix_tr, 'depth_mm')
+        matrix_tr.depth_mm = 16;
+    end
+
+    tr.matrix = matrix_tr;
 end

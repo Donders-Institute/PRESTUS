@@ -11,7 +11,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
 %   mri_hdr             - Header of the MRI file containing the world-to-voxel transformation matrix.
 %   parameters          - Struct containing additional parameters:
 %                         * placement.localite.reference_distance_mm: Distance between reference point and transducer (in mm).
-%                         * expected_focal_distance_bowl: Distance between transducer bowl and focus point (in mm).
+%                         * exp_FD_bowl: Distance between transducer bowl and focus point (in mm).
 %
 % Output:
 %   trans_pos           - [1x3] array specifying the transducer position in voxel coordinates (ijk).
@@ -23,7 +23,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
     % - 'localite_instr_file' contains the path to the Localite instrument markers XML file.
     % - 'mri_hdr' is the header of the MRI file that provides world-to-voxel transformation matrix.
     % - 'placement.localite.reference_distance_mm' is the distance between neuronavigation reference point and transducer (mm).
-    % - 'expected_focal_distance_bowl' is the distance between transducer bowl and focus point (mm).
+    % - 'exp_FD_bowl' is the distance between transducer bowl and focus point (mm).
     %
     % The Localite coordinates are provided in RAS format. For details on NIFTI coordinate systems, refer to:
     % "Orientation information" at https://brainder.org/2012/09/23/the-nifti-file-format/.
@@ -53,7 +53,7 @@ function [trans_pos, focus_pos, focus_pos_ras, trans_pos_ras] = position_transdu
     trans_pos_ras = reference_pos + parameters.placement.localite.reference_distance_mm * reference_center_to_head;
 
     % Calculate focus position relative to transducer position.
-    focus_pos_ras = trans_pos_ras + parameters.expected_focal_distance_bowl * reference_center_to_head;
+    focus_pos_ras = trans_pos_ras + parameters.exp_FD_bowl * reference_center_to_head;
 
     %% Convert Positions from RAS Space to Voxel Space
     % Use MRI header's transformation matrix to convert RAS coordinates to voxel coordinates.

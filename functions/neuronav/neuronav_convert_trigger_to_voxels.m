@@ -58,10 +58,8 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
         transducer_ras(i,:) = ref_pos + reference_dist * ref_vec;
         % -- Compute the RAS mm position of the acoustic focal point (forward along vector)
         parameters = focal_distance_calculation(parameters);
-        if isfield(parameters, 'expected_focal_distance_bowl')
-            target_ras(i,:) = ref_pos + parameters.expected_focal_distance_bowl * ref_vec;
-        elseif isfield(parameters.transducer(1), 'expected_focal_distance_bowl')
-            target_ras(i,:) = ref_pos + parameters.transducer(1).expected_focal_distance_bowl * ref_vec;
+        if isfield(parameters.transducer(1).position, 'exp_FD_bowl')
+            target_ras(i,:) = ref_pos + parameters.transducer(1).position.exp_FD_bowl * ref_vec;
         end
         % -- Convert these world (RAS mm) positions into MRI voxel index space
         transducer_pos(i,:) = ras_to_grid(transducer_ras(i,1:3)', t1_header);

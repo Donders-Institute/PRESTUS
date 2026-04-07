@@ -37,31 +37,31 @@ function parameters = load_transducer_parameters(parameters)
             % ---------------------------------------------------------------------
             
             % Detect legacy configurations where only annular transducers are defined
-            if ~isfield(tr, 'array_shape') || isempty(tr.array_shape.type)
+            if ~isfield(tr, 'type') || isempty(tr.type)
 
                 % Create a clean structure for the new format
                 new_tr = struct();
-                new_tr.array_shape.type = 'annular';
-                new_tr.array_shape.annular = struct();  % initialize annular sub-struct;
+                new_tr.type = 'annular';
+                new_tr.annular = struct();  % initialize annular sub-struct;
 
                 if isfield(tr, 'n_elements')
-                    new_tr.array_shape.annular.n_elements = tr.n_elements;
+                    new_tr.annular.n_elements = tr.n_elements;
                 end
 
                 if isfield(tr, 'Elements_ID_mm')
-                    new_tr.array_shape.annular.Elements_ID_mm = tr.Elements_ID_mm;
+                    new_tr.annular.Elements_ID_mm = tr.Elements_ID_mm;
                 end
 
                 if isfield(tr, 'Elements_OD_mm')
-                    new_tr.array_shape.annular.Elements_OD_mm = tr.Elements_OD_mm;
+                    new_tr.annular.Elements_OD_mm = tr.Elements_OD_mm;
                 end
 
                 if isfield(tr, 'curv_radius_mm')
-                    new_tr.array_shape.annular.curv_radius_mm = tr.curv_radius_mm;
+                    new_tr.annular.curv_radius_mm = tr.curv_radius_mm;
                 end
 
                 if isfield(tr, 'dist_to_plane_mm')
-                    new_tr.array_shape.annular.dist_to_plane_mm = tr.dist_to_plane_mm;
+                    new_tr.annular.dist_to_plane_mm = tr.dist_to_plane_mm;
                 end
 
                 if isfield(tr, 'source_amp')
@@ -76,12 +76,21 @@ function parameters = load_transducer_parameters(parameters)
                     new_tr.source_freq_hz = tr.source_freq_hz;
                 end
 
+                new_tr.position = struct();
                 if isfield(tr, 'trans_pos')
-                    new_tr.trans_pos = tr.trans_pos;
+                    new_tr.position.trans_pos = tr.trans_pos;
                 end
 
                 if isfield(tr, 'focus_pos')
-                    new_tr.focus_pos = tr.focus_pos;
+                    new_tr.position.focus_pos = tr.focus_pos;
+                end
+
+                if isfield(tr, 'expected_focal_distance_ep')
+                    new_tr.position.exp_FD_ep = tr.expected_focal_distance_ep;
+                end
+
+                if isfield(tr, 'expected_focal_distance_bowl')
+                    new_tr.position.exp_FD_bowl = tr.expected_focal_distance_bowl;
                 end
 
                 % Replace old transducer completely
@@ -90,36 +99,25 @@ function parameters = load_transducer_parameters(parameters)
 
             % Supported transducer geometries: matrix and annular arrays
 
-            % Ensure the array_shape.type field is defined
-            assert(isfield(tr.array_shape, 'type'),...
+            % Ensure the type field is defined
+            assert(isfield(tr, 'type'),...
                 'Transducer %i; Missing type field. Please specify either "matrix" or "annular".', t_i);
 
-            switch tr.array_shape.type
+            switch tr.type
 
                 case 'matrix'
                     [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i);
-                    
+
                 case 'annular'
                     tr = validate_annular_transducer(tr, t_i);
 
                 otherwise
                     error('Transducer %i; Element shape option "%s" is not implemented.', ...
-                        tr.array_shape.type);
+                        tr.type);
             end
-    
-            % Validate general parameters
-			 
-            assert(isfield(tr,'source_amp'), ...
-                    'Transducer %i; Missing source_amp field.', t_i);
 
-            % Ensure source amplitude matches number of transducer elements
-            if numel(tr.source_amp) == 1 && tr.n_elements > 1
-                tr.source_amp = repmat(tr.source_amp, [1, tr.n_elements]);
-            end
-            
-			if ~isfield(tr, 'depth_mm')
-				tr.depth_mm = 16;
-			end
+             % Ensure distance between target and ep/bowl is provided
+            parameters = focal_distance_calculation(parameters);
 			
             if t_i == 1
                 new_transducers = tr;
@@ -129,12 +127,6 @@ function parameters = load_transducer_parameters(parameters)
         end
 
         parameters.transducer = new_transducers;
-
-        % Calculate distance between target and ep/bowl is not provided
-        if ~isfield(parameters, 'expected_focal_distance_bowl') || ...
-                ~isfield(parameters, 'expected_focal_distance_ep')
-            parameters = focal_distance_calculation(parameters);
-        end
 
     else
         % Warn user about missing transducer information

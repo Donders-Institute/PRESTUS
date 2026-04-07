@@ -120,7 +120,7 @@ for i = 1:N_i
         focal_distance_ep = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
         fprintf('Focus from exit plane: %.2f \n', focal_distance_ep)
 
-        parameters.expected_focal_distance_ep = focal_distance_ep;
+        parameters.exp_FD_ep = focal_distance_ep;
 
         % Load default parameters incl. additional chosen parameters like transducer
         parameters = load_parameters(parameters);
@@ -161,7 +161,7 @@ for i = 1:N_i
 
             % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
             if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
-                dist_bowl_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
+                dist_bowl_exit_plane = parameters.transducer.annular.curv_radius_mm - parameters.transducer.annular.dist_to_plane_mm;
             else
                 dist_bowl_exit_plane = 0;
             end
@@ -169,8 +169,8 @@ for i = 1:N_i
 
             % Set the expected focal distance to exit plane 
             % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
-            parameters.expected_focal_distance_ep = focal_distance_ep;
-            parameters.expected_focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
+            parameters.exp_FD_ep = focal_distance_ep;
+            parameters.exp_FD_bowl = focal_distance_ep + dist_bowl_exit_plane;
 
             % if the original profiles are measured from the exit plane,
             % we do not model the space until the exit plane; this can lead
@@ -195,7 +195,7 @@ for i = 1:N_i
             profile_empirical.axial_distance_bowl = dist_bowl_focus;
 
             % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus); 
-            % hold on; xline(parameters.expected_focal_distance_bowl)
+            % hold on; xline(parameters.exp_FD_bowl)
 
             % Show current iteration
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...

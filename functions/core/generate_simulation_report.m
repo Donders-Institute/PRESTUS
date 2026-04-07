@@ -536,12 +536,12 @@ function html = build_config_summary(parameters)
     % Transducer (first transducer)
     if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
         td = parameters.transducer(1);
-        html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td, 'source_freq_hz', NaN)));
-        html = config_row(html, 'Elements', sprintf('%d', safe_field(td, 'n_elements', NaN)));
-        html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td, 'curv_radius_mm', NaN)));
-        html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td, 'source_amp', NaN)));
+        html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td.(td.type), 'source_freq_hz', NaN)));
+        html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'n_elements', NaN)));
+        html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td.(td.type), 'curv_radius_mm', NaN)));
+        html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'source_amp', NaN)));
     end
-    focal = safe_field(parameters, 'expected_focal_distance_bowl', NaN);
+    focal = safe_field(parameters, 'exp_FD_bowl', NaN);
     if ~isnan(focal)
         html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
     end

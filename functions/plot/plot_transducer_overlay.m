@@ -15,10 +15,12 @@ if isempty(trans_pos)
     return;
 end
 
+tp = parameters.transducer(1);
+
 %% 1. GEOMETRY CALCULATIONS (curved transducer details)
 %% Compute focal slope
 % Calculate unit vector pointing from focus to transducer
-if parameters.transducer(1).align_transducer_with_focus
+if tp.align_to_focus
     focal_slope = (trans_pos(:) - focus_pos(:)) / norm(trans_pos(:) - focus_pos(:));
 
 else
@@ -30,25 +32,25 @@ focal_angle = atan2(focal_slope(2), focal_slope(1));
 grid_step = options.grid_step;
 %% Compute distance to exit plane
 % Maximum outer diameter of transducer elements
-switch parameters.transducer(1).array_shape.type
+switch tp.type
     case 'annular'
-        max_od = max(parameters.transducer(1).array_shape.annular.Elements_OD_mm);
+        max_od = max(tp.annular.Elements_OD_mm);
     case 'matrix'
-        max_od = parameters.transducer(1).array_shape.matrix.outer_diameter_mm;
+        max_od = tp.matrix.outer_diameter_mm;
     otherwise
-        error('Array type %s is unknown or not implemented.', parameters.transducer(1).array_shape.type)
+        error('Array type %s is unknown or not implemented.', tp.type)
 end
 
 r = max_od / 2 / grid_step;
 
 % Exit plane positions (two methods for consistency)
-dist_to_exit_plane_mm = parameters.transducer(1).curv_radius_mm - parameters.transducer(1).dist_to_plane_mm;
+dist_to_exit_plane_mm = tp.(tp.type).curv_radius_mm - tp.(tp.type).dist_to_plane_mm;
 dist_to_exit_plane_vox = round(dist_to_exit_plane_mm / parameters.grid.resolution_mm);
 ex_plane_x_simple = trans_pos(2) - 1 + dist_to_exit_plane_vox;  % Rectangle method
 
 % Full geometry (for curved visualization)
-geom_focus_pos = trans_pos(:)' - (parameters.transducer(1).curv_radius_mm / grid_step) * [cos(focal_angle), sin(focal_angle)];
-dist_to_ep = 0.5 * sqrt(4*parameters.transducer(1).curv_radius_mm^2 - max_od^2) / grid_step;
+geom_focus_pos = trans_pos(:)' - (tp.(tp.type).curv_radius_mm / grid_step) * [cos(focal_angle), sin(focal_angle)];
+dist_to_ep = 0.5 * sqrt(4*tp.(tp.type).curv_radius_mm^2 - max_od^2) / grid_step;
 ex_plane_pos_trig = geom_focus_pos + dist_to_ep * [cos(focal_angle), sin(focal_angle)];
 ort_angle = atan2(-focal_slope(1), focal_slope(2));
 
@@ -71,7 +73,7 @@ if options.show_rectangles
     
     % GRID ONSET MARKERS
     try
-        rectangle('Position', [trans_pos(2)-parameters.transducer(1).trans_pos(3)-rect_size/2, ...
+        rectangle('Position', [trans_pos(2)-tp.position.trans_pos(3)-rect_size/2, ...
                               trans_pos(1)-rect_size/2, rect_size*2+1, rect_size*2+1], ...
                   'EdgeColor', 'w', 'LineWidth', 1, 'LineStyle', ':');
         rectangle('Position', [parameters.grid.dims(3)-rect_size/2, trans_pos(1)-rect_size/2, ...
@@ -104,7 +106,7 @@ if options.show_rectangles
 end
 
 %% 5. DETAILED TRANSDUCER GEOMETRY (always shown)
-trans_full_depth = parameters.transducer(1).depth_mm / grid_step;
+trans_full_depth = tp.(tp.type).depth_mm / grid_step;
 trans_back = ex_plane_pos_trig + trans_full_depth * focal_slope(:)';
 
 % BACK PLANE, SIDE WALLS, EXIT CHORD (as before)
@@ -130,7 +132,7 @@ line([left_edge_x, right_edge_x], [left_edge_y, right_edge_y], ...
 
 % Curved front surface
 arc_halfangle = atan((max_od/2) / (dist_to_ep * grid_step));
-[arc_x, arc_y] = get_arc(geom_focus_pos, parameters.transducer(1).curv_radius_mm/grid_step, ...
+[arc_x, arc_y] = get_arc(geom_focus_pos, tp.(tp.type).curv_radius_mm/grid_step, ...
                         focal_angle-arc_halfangle, focal_angle+arc_halfangle);
 plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth, 'LineSmoothing', LineSmoothing);
 

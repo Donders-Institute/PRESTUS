@@ -25,7 +25,7 @@ sz = size(img);  % Get image dimensions [Nx Ny Nz]
 
 % Initialize minimum focal distance (bowl radius in voxels)
 if ~isfield(parameters, 'min_focal_distance_mm')
-    parameters.min_focal_distance_mm = parameters.expected_focal_distance_bowl;  % Default to bowl geometry
+    parameters.min_focal_distance_mm = parameters.exp_FD_bowl;  % Default to bowl geometry
 end
 
 outer_sphere_3d = []; outer_sphere = [];  % Pre-allocate for while loop

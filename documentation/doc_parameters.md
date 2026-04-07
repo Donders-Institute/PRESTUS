@@ -98,87 +98,94 @@ See [doc_transducer.md](doc_transducer.md).
 
 All fields are mandatory and have no defaults — they must be set in the study config.
 
-###### General Transducer Parameters
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
+| `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
+
+#### Position (`position`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `depth_mm` | Transducer depth [mm]. | Visualization only. |
-| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
-| `source_freq_hz` | Central frequency [Hz]. | |
 | `trans_pos` | Transducer position (XYZ, T1 grid). | |
 | `focus_pos` | Focus (target) position (XYZ, T1 grid). | |
-| `expected_focal_distance_ep` | Expected distance from transducer exit plane to focus [mm]. | Alternative to specifying `trans_pos`/`focus_pos`, applicable only when using 1D steering. Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or both pos fields must be set. |
-| `expected_focal_distance_bowl` | Expected distance from transducer bowl to focus [mm]. | |
-| `array_shape.type` | Type of transducer array. | Options: `annular`, `matrix`. |
+| `exp_FD_ep` | Expected focal distance from transducer exit plane [mm]. | Alternative to `trans_pos`/`focus_pos`; applicable only with 1D steering. Either `exp_FD_ep`, `exp_FD_bowl`, or both position fields must be set. |
+| `exp_FD_bowl` | Expected focal distance from transducer bowl [mm]. | |
 
 #### Annular Array Definition (`annular`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
+| `source_freq_hz` | Central frequency [Hz]. | |
+| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `source_phase_deg` | Source phase per element [degrees]. | Must be calibrated. |
 | `n_elements` | Number of transducer elements. | |
 | `Elements_ID_mm` | Inner diameter of each element [mm]. | |
 | `Elements_OD_mm` | Outer diameter of each element [mm]. | |
 | `curv_radius_mm` | Radius of curvature of the transducer bowl [mm]. | |
-| `dist_to_plane_mm` | Distance from geometric focus to transducer plane [mm]. | |
-| `source_phase_deg` | Source phase [degrees]. | Must be calibrated. |
+| `dist_to_plane_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` if not provided. |
+| `depth_mm` | Transducer depth [mm]. | Visualization only. |
 
 #### Matrix Array Definition (`matrix`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `matrix.steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
-| `matrix.element_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
-| `matrix.elem_height_mm` | Element height [mm]. | Used to define equivalent area. |
-| `matrix.elem_width_mm` | Element width [mm]. | Used to define equivalent area. |
-| `matrix.outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
-| `matrix.is_curved` | Whether the array has a curved surface. | |
-| `matrix.curved.curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. |
-| `matrix.curved.dist_to_plane_mm` | Distance from geometric focus to transducer plane [mm]. | Used for geometry definition. |
-| `matrix.is_clover_setup` | Enables Clover (multi-array) configuration. | Replicates array into multiple leaves. |
-| `matrix.clover.n_leaves` | Number of Clover leaves. | Maximum: 3. |
-| `matrix.clover.ROC_parent` | Radius of curvature of the combined Clover setup [mm]. | Can differ from individual array ROC. |
-| `matrix.matrix_shape.type` | Method used to define element positions. | Options: `define_here`, `extract_from_file`. |
+| `source_freq_hz` | Central frequency [Hz]. | |
+| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `depth_mm` | Transducer depth [mm]. | Visualization only. |
+| `steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
+| `element_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
+| `elem_height_mm` | Element height [mm]. | Used to define equivalent area. |
+| `elem_width_mm` | Element width [mm]. | Used to define equivalent area. |
+| `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
+| `is_curved` | Whether the array has a curved surface. | |
+| `curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. Depends on `is_curved`. |
+| `dist_to_plane_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` and `outer_diameter_mm` if not provided. Depends on `is_curved`. |
+| `is_clover_setup` | Enables Clover (multi-array) configuration. | Replicates array into multiple leaves. |
+| `matrix_shape.type` | Method used to define element positions. | Options: `define_here`, `extract_from_file`. |
 
----
-
-##### Grid Definition (`define_here`)
-
-Note: The define_here options may contain bugs due to limited testing time.
+##### Matrix: Clover (`clover`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `matrix.matrix_shape.define_here.grid_shape.type` | Grid distribution type. | Options: `rect`, `fibonacci`, `fermat`. |
+| `n_leaves` | Number of Clover leaves. | Maximum: 3. |
+| `ROC_parent` | Radius of curvature of the combined Clover setup [mm]. | Can differ from individual array ROC. |
+
+##### Matrix: Grid distribution (`define_here`)
+
+Warning: The `define_here` options are experimental and may contain bugs due to limited testing time.
+
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
+| `grid_shape.type` | Grid distribution type. | Options: `rect`, `fibonacci`, `fermat`. |
 
 ####### Rectangular Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `rect.n_elem_row` | Number of element rows. | |
-| `rect.n_elem_col` | Number of element columns. | |
-| `rect.elem_spacing_height_mm` | Spacing between elements in height direction [mm]. | Edge-to-edge spacing. |
-| `rect.elem_spacing_width_mm` | Spacing between elements in width direction [mm]. | Edge-to-edge spacing. |
-| `rect.sparsity_factor` | Fraction of active elements. | Range: 0.1–1.0. |
+| `n_elem_row` | Number of element rows. | |
+| `n_elem_col` | Number of element columns. | |
+| `elem_spacing_height_mm` | Spacing between elements in height direction [mm]. | Edge-to-edge spacing. |
+| `elem_spacing_width_mm` | Spacing between elements in width direction [mm]. | Edge-to-edge spacing. |
+| `sparsity_factor` | Fraction of active elements. | Range: 0.1–1.0. |
 
 ####### Fibonacci Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `fibonacci.n_elements` | Total number of elements. | |
-| `fibonacci.kerf_mm` | Minimum spacing between elements [mm]. | |
+| `n_elements` | Total number of elements. | |
+| `kerf_mm` | Minimum spacing between elements [mm]. | |
 
 ####### Fermat Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `fermat.n_elements` | Total number of elements. | Uses spiral distribution. |
+| `n_elements` | Total number of elements. | Uses spiral distribution. |
 
----
-
-###### File-Based Layout (`extract_from_file`)
+##### Matrix: File extraction (`extract_from_file`)
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `matrix.matrix_shape.extract_from_file.file_path` | Path to coordinate file. | Must contain (x, y, z). |
+| `file_path` | Path to coordinate file. | Must contain (x, y, z). |
 | `start_row` | Row index where data starts. | MATLAB may skip header row. |
 | `start_col` | Column index where data starts. | |
 | `n_elements` | Number of elements to extract. | Can exceed final active count. |
@@ -187,8 +194,6 @@ Note: The define_here options may contain bugs due to limited testing time.
 | `subset.subset_n_elements` | Number of elements in subset. | Must be ≤ total elements. |
 | `project_on_new_ROC` | Project elements onto new curvature. | May introduce unrealistic layouts. |
 | `ROC_projection.new_ROC_mm` | New radius of curvature [mm]. | Used when projection enabled. |
-
----
 
 ### Transducer placement (`placement`)
 

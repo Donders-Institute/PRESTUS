@@ -19,8 +19,8 @@ end
 %% convert positions from 2d radial to 3d 
 
 % shift positions to diameter location
-trans_pos_final = parameters.transducer(1).trans_pos;
-focus_pos_final = parameters.transducer(1).focus_pos;
+trans_pos_final = parameters.transducer(1).position.trans_pos;
+focus_pos_final = parameters.transducer(1).position.focus_pos;
 
 trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
 focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
@@ -40,8 +40,8 @@ focus_pos_final = fliplr(focus_pos_final);
 focus_pos_final = [focus_pos_final(1), focus_pos_final(1), focus_pos_final(2)];
 
 % encode in the transducer position
-parameters.transducer.trans_pos = trans_pos_final;
-parameters.transducer.focus_pos = focus_pos_final;
+parameters.transducer.position.trans_pos = trans_pos_final;
+parameters.transducer.position.focus_pos = focus_pos_final;
 
 %% set up 3D kgrid for follow-up heating simulations
 kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...

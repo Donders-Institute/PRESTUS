@@ -86,8 +86,8 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         if numel(parameters.transducer) > 1
             warning('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
         end
-        trans_pos_grid = parameters.transducer(1).trans_pos;
-        focus_pos_grid = parameters.transducer(1).focus_pos;
+        trans_pos_grid = parameters.transducer(1).position.trans_pos;
+        focus_pos_grid = parameters.transducer(1).position.focus_pos;
     end
 
     % ensure that dimensions of transducer in grid are sensible

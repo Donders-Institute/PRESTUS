@@ -19,7 +19,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
 %                expressed in simulation coordinates.
 
     % Extract matrix transducer configuration from the transducer parameters
-    matrix_tp = tp.array_shape.matrix;
+    matrix_tp = tp.matrix;
 
     % Extract file-based matrix shape parameters for reading element positions
     file_ext = matrix_tp.matrix_shape.extract_from_file;
@@ -58,7 +58,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     % ---------------------------------------------------------------------
     % Convert positions from mm to metres and center coordinates
     % ---------------------------------------------------------------------
-    ROC = matrix_tp.curved.curv_radius_mm;
+    ROC = matrix_tp.curv_radius_mm;
 
     % Translate origin from [0,0,ROC] to [0,0,0], convert mm→m, and flip Z-axis
     phys_positions_m = (phys_positions_mm - [0, 0, ROC]) .* [1, 1, -1] / 1000;

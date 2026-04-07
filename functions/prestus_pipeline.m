@@ -86,8 +86,8 @@ function [parameters] = prestus_pipeline(parameters, options)
             grid_axisymmetry(parameters, segmentation, bone, medium_masks);
     
         % Extract variables for quick access
-        trans_pos = parameters.transducer(1).trans_pos;
-        focus_pos = parameters.transducer(1).focus_pos;    
+        trans_pos = parameters.transducer(1).position.trans_pos;
+        focus_pos = parameters.transducer(1).position.focus_pos;    
     else
         disp('No grid setup requested...no simulations will be performed.')
     end

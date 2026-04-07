@@ -52,7 +52,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
         medium_masks_focal = squeeze(medium_masks(trans_pos(1),:));
     end
     % extract position of focus
-    target_pos_focal = parameters.transducer(1).focus_pos(end);
+    target_pos_focal = parameters.transducer(1).position.focus_pos(end);
 
     mask = tissuemask_binary(parameters, medium_masks_focal);
 
@@ -310,7 +310,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     if parameters.io.save_heatingvideo == 1
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
         if ndims(medium_masks) == 3
-            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.trans_pos(2),:)));
+            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.position.trans_pos(2),:)));
         elseif ndims(medium_masks) == 2
             brain_slice = mat2gray(squeeze(medium_masks));
         end

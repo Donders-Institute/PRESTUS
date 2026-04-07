@@ -20,11 +20,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     end
 
     % Backward-compatible access to (first) transducer
-    tx = parameters.transducer(1);
-    if numel(parameters.transducer)>1
-        warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', tx.source_freq_hz)
-    end
-
+    tx = parameters.transducer(1).(parameters.transducer(1).type);
     wave_period = 1 / tx.source_freq_hz;    % period [s]
     
     % Check the number of input arguments

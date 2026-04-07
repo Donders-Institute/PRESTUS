@@ -54,20 +54,20 @@ for t_i = 1:numel(parameters.transducer)
 	tr = parameters.transducer(t_i);
 
     % Determine type
-    tr_type = tr.array_shape.type;
+    tr_type = tr.type;
 
     fprintf('Transducer %d (%s):\n', t_i, tr_type);
 
     switch tr_type
         case 'annular'
-            ann = tr.array_shape.annular;
+            ann = tr.annular;
 
             print_if_field(ann, 'n_elements', '%d');
             print_if_field(ann, 'curv_radius_mm', '%.0f mm');
             print_if_field(ann, 'source_phase_deg', '%.1f deg.');
 
         case 'matrix'
-            mat = tr.array_shape.matrix;
+            mat = tr.matrix;
 
             fprintf('  Steering: %s\n', mat.steering);
             fprintf('  Element shape: %s\n', mat.element_shape);
@@ -76,8 +76,8 @@ for t_i = 1:numel(parameters.transducer)
             print_if_field(mat, 'outer_diameter_mm', '%.2f mm');
             print_if_field(mat, 'is_curved', '%d');
 
-            if mat.is_curved && isfield(mat, 'curved')
-                print_if_field(mat.curved, 'curv_radius_mm', '%.2f mm');
+            if mat.is_curved
+                print_if_field(mat, 'curv_radius_mm', '%.2f mm');
             end
 
             % Clover setup
@@ -136,12 +136,12 @@ for t_i = 1:numel(parameters.transducer)
             end
     end
 
-    print_if_field(tr, 'source_freq_hz', '%.1f Hz');
-    print_if_field(tr, 'source_amp', '%.1f Pa');
-    print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
-    print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
-	print_if_field(parameters, 'expected_focal_distance_ep', '%.1f mm');
-	print_if_field(parameters, 'expected_focal_distance_bowl', '%.1f mm');
+    print_if_field(tr.(tr.type), 'source_freq_hz', '%.1f Hz');
+    print_if_field(tr.(tr.type), 'source_amp', '%.1f Pa');
+    print_if_field(tr.position, 'trans_pos', '[%.1f %.1f %.1f]');
+    print_if_field(tr.position, 'focus_pos', '[%.1f %.1f %.1f]');
+	print_if_field(tr.position, 'exp_FD_ep', '%.1f mm');
+	print_if_field(tr.position, 'exp_FD_bowl', '%.1f mm');
 
     fprintf('\n');
 end
@@ -166,20 +166,6 @@ labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz
 
 for t_idx = 1:length(tissues)
     tissue = tissues{t_idx};
-    
-    % Handle 'tissues' wildcard → all tissue props
-    if strcmp(tissue, 'tissues')
-        tissue_fields = fieldnames(parameters.medium_properties);
-        tissue_list = tissue_fields(startsWith(tissue_fields, 'tissue_') | ...
-                                   startsWith(tissue_fields, 'brain') | ...
-                                   startsWith(tissue_fields, 'csf'));
-        for sub_tissue = tissue_list'
-            print_tissue_props(parameters, sub_tissue{1}, props, labels);
-        end
-        continue;
-    end
-    
-    fprintf('  %s:\n', upper(tissue));
     print_tissue_props(parameters, tissue, props, labels);
 end
 
@@ -394,7 +380,7 @@ function print_tissue_props(params, tissue, props, labels)
     has_props = false;
     for p_idx = 1:length(props)
         prop = props{p_idx}; label = labels{p_idx};
-        val = get_nested_safe(params, sprintf('medium.%s.%s', tissue, prop));
+        val = get_nested_safe(params, sprintf('medium_properties.%s.%s', tissue, prop));
         
         if ~isempty(val) && ~isnan(val) && isfinite(val)
             unit = get_unit(prop);  % Reuse your function

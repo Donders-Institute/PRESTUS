@@ -4,8 +4,10 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     
     disp('Processing the results of acoustic simulations...')
 
-    trans_pos = parameters.transducer(1).trans_pos;
-    focus_pos = parameters.transducer(1).focus_pos;
+    % select transducer info
+    tr = parameters.transducer(1);
+    trans_pos = tr.position.trans_pos;
+    focus_pos = tr.position.focus_pos;
     
     % intialize output structure
     results = struct();
@@ -21,7 +23,10 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     results.Isppa = max(acoustic_Ipa(:));
 
     % Calculates the Mechanical Index for every gridpoint
-    acoustic_MI = (acoustic_pressure/10^6)/sqrt((parameters.transducer(1).source_freq_hz/10^6));
+
+    freq_Hz = tr.(tr.type).source_freq_hz;
+    freq_MHz = freq_Hz/10^6;
+    acoustic_MI = (acoustic_pressure/10^6)/sqrt(freq_MHz);
 
     % Creates the foundation for a mask before the exit plane to calculate max values outside of it
     if numel(parameters.transducer) > 1
@@ -31,8 +36,8 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     end
     comp_grid_size = size(sensor_data.p_max_all);
     after_exit_plane_mask = ones(comp_grid_size);
-    bowl_depth_grid = round((parameters.transducer(1).curv_radius_mm-...
-        parameters.transducer(1).dist_to_plane_mm)/parameters.grid.resolution_mm);
+    bowl_depth_grid = round((tr.(tr.type).curv_radius_mm-...
+        tr.(tr.type).dist_to_plane_mm)/parameters.grid.resolution_mm);
     % Places the exit plane mask in the grid, adjusted to the amount of dimensions
     if numel(parameters.grid.dims) == 3
         if trans_pos(3) > comp_grid_size(3)/2
@@ -127,7 +132,6 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
             results.MI_tc = NaN; % intracranial tissues not modelled
         end
 
-        freq_Hz = parameters.transducer(1).source_freq_hz;
         writetable(table(parameters.subject_id, freq_Hz, ...
             results.Isppa, results.Isppa_after_exit_plane, ...
             real_focal_distance, results.Isppa_skin, results.Isppa_skull, ...
@@ -148,7 +152,6 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     else
         % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
         highlighted_pos = results.max_isppa_eplane_pos;
-        freq_Hz = parameters.transducer(1).source_freq_hz;
         writetable(table(parameters.subject_id, freq_Hz, results.Isppa, results.Isppa_after_exit_plane, ...
             results.Psptp, results.Ptp_target, real_focal_distance, trans_pos, focus_pos, ...
             results.Ipa_target, results.Ipa_target_radius, ...
@@ -164,13 +167,9 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
         warning('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
     end
     for ti = 1:n_plots
-        if ti == 1
-            tpos_sim = trans_pos;
-            fpos_sim = focus_pos;
-        else
-            tpos_sim = parameters.transducer(ti).trans_pos;
-            fpos_sim = parameters.transducer(ti).focus_pos;
-        end
+
+        tpos_sim = parameters.transducer(ti).position.trans_pos;
+        fpos_sim = parameters.transducer(ti).position.focus_pos;
 		
 		trans_suffix = '';
 		if n_plots > 1; trans_suffix = sprintf('_T%02d', ti); end

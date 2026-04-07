@@ -25,14 +25,14 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
 % NOTES
 %   • Element coordinates are returned in k-Wave format (3 × N)
 %   • Internal calculations are performed in millimeters unless noted
-%   • Curvature is applied only when tp.array_shape.matrix.is_curved = true
+%   • Curvature is applied only when tp.matrix.is_curved = true
 
     % ----------------------------------------------------------------------
     % Extract configuration
     % -----------------------------------------------------------------------
 
     % Extract matrix transducer configuration from the transducer parameters
-    matrix_tp = tp.array_shape.matrix;
+    matrix_tp = tp.matrix;
 
     % Extract defined matrix shape parameters for reading element positions
     defined = matrix_tp.matrix_shape.define_here;
@@ -155,11 +155,11 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
             elem_pos_m = elem_pos_m(mask,:);
 
             % Update number of elements
-            tp.array_shape.matrix.n_elements = size(elem_pos_m,1);
+            tp.matrix.n_elements = size(elem_pos_m,1);
 
             % Duplicate source amplitude per element
             tp.source_amp = tp.source_amp(1) * ...
-                ones(1,tp.array_shape.matrix.n_elements);
+                ones(1,tp.matrix.n_elements);
 
             % [DEBUG] visualize circular aperture
             if parameters.debug == 1
@@ -178,7 +178,7 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
             % Apply curvature (spherical cap)
             if matrix_tp.is_curved
 
-                ROC = matrix_tp.curved.curv_radius_mm / 1000;
+                ROC = matrix_tp.curv_radius_mm / 1000;
                 R2  = ROC^2;
 
                 sagitta_term = R2 - elem_pos_m(:,1).^2 - elem_pos_m(:,2).^2;
@@ -196,7 +196,7 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
         case 'fermat'
             elem_pos_m = makeCartBowl( ...
                 trans_pos_m', ...
-                matrix_tp.curved.curv_radius_mm * 1e-3, ...
+                matrix_tp.curv_radius_mm * 1e-3, ...
                 matrix_tp.outer_diameter_mm * 1e-3, ...
                 focus_pos_m', ...
                 tp.n_elements, ...

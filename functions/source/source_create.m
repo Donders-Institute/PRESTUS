@@ -9,7 +9,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 % Input:
 %   parameters      - struct containing simulation parameters (must contain parameters.transducer)
 %   kgrid           - k-Wave grid struct (e.g., kWaveGrid)
-%   trans_pos       - [nT x n_sim_dims] or [1 x n_sim_dims] / [n_sim_dims x 1]
+%   trans_pos       - [transducer_N x n_sim_dims] or [1 x n_sim_dims] / [n_sim_dims x 1]
 %   focus_pos       - same shape rules as trans_pos
 %
 % Output:
@@ -17,9 +17,9 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 %   source_labels   - grid of integer labels identifying active source regions
 %   transducer_pars - struct array of transducer parameters with grid-based fields
 
-    nT = numel(parameters.transducer);
+    transducer_N = numel(parameters.transducer);
 
-    if parameters.grid.use_kWaveArray ~= 0 && nT > 1
+    if parameters.grid.use_kWaveArray ~= 0 && transducer_N > 1
         error(['Multiple transducers with kWaveArray (use_kWaveArray ~= 0) ' ...
                'are not implemented yet. Use use_kWaveArray == 0 or a single transducer.']);
     end
@@ -29,10 +29,10 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
     if isequal(size(trans_pos), [numel(parameters.grid.dims) 1]), trans_pos = trans_pos'; end
     if isequal(size(focus_pos), [numel(parameters.grid.dims) 1]), focus_pos = focus_pos'; end
 
-    if size(trans_pos,1) == 1,  trans_pos  = repmat(trans_pos,  nT, 1); end
-    if size(focus_pos,1) == 1,  focus_pos  = repmat(focus_pos, nT, 1); end
+    if size(trans_pos,1) == 1,  trans_pos  = repmat(trans_pos,  transducer_N, 1); end
+    if size(focus_pos,1) == 1,  focus_pos  = repmat(focus_pos, transducer_N, 1); end
 
-    if size(trans_pos,1) ~= nT || size(focus_pos,1) ~= nT
+    if size(trans_pos,1) ~= transducer_N || size(focus_pos,1) ~= transducer_N
         error('trans_pos and focus_pos must have one row per transducer.');
     end
     if size(trans_pos,2) ~= numel(parameters.grid.dims) || size(focus_pos,2) ~= numel(parameters.grid.dims)
@@ -43,21 +43,21 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
     transducer_pars = parameters.transducer;
 
-    for it = 1:nT
+    for it = 1:transducer_N
         tp = transducer_pars(it);
 
-        if strcmp(tp.array_shape.type, 'annular')
-            tp.array_shape.annular.Elements_OD = 2 * floor(tp.array_shape.annular.Elements_OD_mm / parameters.grid.resolution_mm / 2) + 1;
-            tp.array_shape.annular.Elements_ID = 2 * floor(tp.array_shape.annular.Elements_ID_mm / parameters.grid.resolution_mm / 2) + 1;
-            tp.array_shape.annular.Elements_ID(tp.array_shape.annular.Elements_ID_mm == 0) = 0;
+        if strcmp(tp.type, 'annular')
+            tp.annular.Elements_OD = 2 * floor(tp.annular.Elements_OD_mm / parameters.grid.resolution_mm / 2) + 1;
+            tp.annular.Elements_ID = 2 * floor(tp.annular.Elements_ID_mm / parameters.grid.resolution_mm / 2) + 1;
+            tp.annular.Elements_ID(tp.annular.Elements_ID_mm == 0) = 0;
 			
         end
         
-        tp.radius_grid = round(tp.curv_radius_mm / parameters.grid.resolution_mm);
+        tp.(tp.type).radius_grid = round(tp.(tp.type).curv_radius_mm / parameters.grid.resolution_mm);
 
         if it == 1
             % initialise struct array with full field set of tp
-            transducer_pars = repmat(tp, 1, nT);
+            transducer_pars = repmat(tp, 1, transducer_N);
         end
 
         transducer_pars(it) = tp;
@@ -71,29 +71,29 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
         % --- per-transducer CW signals (per-element) ---
 
-        freqs = [transducer_pars.source_freq_hz];
+        freqs = [transducer_pars.(transducer_pars(1).type).source_freq_hz];
         if numel(unique(freqs)) > 1
             warning('Multiple source frequencies not yet supported. Using %i Hz.', freqs(1));
         end
 
-        cw_signals_all    = cell(1, nT);
-        n_elements_per_T  = zeros(1, nT);
+        cw_signals_all    = cell(1, transducer_N);
+        n_elements_per_T  = zeros(1, transducer_N);
 
-        for it = 1:nT
+        for it = 1:transducer_N
             tp = transducer_pars(it);
 
-            % tp.source_amp and tp.source_phase_rad are per-element vectors
+            % source_amp and source_phase_rad are per-element vectors
             cw_signals_all{it} = createCWSignals( ...
                 kgrid.t_array, ...
                 freqs(1), ...               % use canonical frequency
-                tp.source_amp, ...
-                tp.source_phase_rad);       % [n_elements x Nt]
+                tp.(tp.type).source_amp, ...
+                tp.(tp.type).source_phase_rad);       % [n_elements x Nt]
 
             n_elements_per_T(it) = tp.n_elements;
         end
 
         % global element indexing: each (transducer, element) → unique index
-        offsets          = [0, cumsum(n_elements_per_T(1:end-1))];  % length nT
+        offsets          = [0, cumsum(n_elements_per_T(1:end-1))];  % length transducer_N
         n_elements_total = sum(n_elements_per_T);
 
         % --- geometry: per-element bowls, numeric source_labels = global element index ---
@@ -102,31 +102,31 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         transducer_mask = false(grid_dims);
         source_labels   = zeros(grid_dims);
         
-        for it = 1:nT
+        for it = 1:transducer_N
             tp          = transducer_pars(it);
-            trans_pos_i = trans_pos(it, :);
-            focus_pos_i = focus_pos(it, :);
+            trans_pos_i = transducer_pars(it).position.trans_pos;
+            focus_pos_i = transducer_pars(it).position.focus_pos;
         
-            for el_i = 1:tp.n_elements
+            for el_i = 1:tp.(tp.type).n_elements
                 global_el = offsets(it) + el_i;  % 1..n_elements_total
         
                 % outer element aperture
                 if numel(parameters.grid.dims) == 3
-                    bowl = makeBowl(grid_dims, trans_pos_i, tp.radius_grid, ...
-                                    tp.array_shape.annular.Elements_OD(el_i), focus_pos_i);
+                    bowl = makeBowl(grid_dims, trans_pos_i, tp.(tp.type).radius_grid, ...
+                                    tp.(tp.type).Elements_OD(el_i), focus_pos_i);
                 else
-                    bowl = makeArc(grid_dims, trans_pos_i, tp.radius_grid, ...
-                                   tp.array_shape.annular.Elements_OD(el_i), focus_pos_i);
+                    bowl = makeArc(grid_dims, trans_pos_i, tp.(tp.type).radius_grid, ...
+                                   tp.(tp.type).Elements_OD(el_i), focus_pos_i);
                 end
 
                 % subtract inner aperture if applicable
-                if tp.array_shape.annular.Elements_ID(el_i) > 0
+                if tp.(tp.type).Elements_ID(el_i) > 0
                     if numel(parameters.grid.dims) == 3
                         bowl = bowl - makeBowl(grid_dims, trans_pos_i, ...
-                                               tp.radius_grid, tp.array_shape.annular.Elements_ID(el_i), focus_pos_i);
+                                               tp.(tp.type).radius_grid, tp.(tp.type).Elements_ID(el_i), focus_pos_i);
                     else
                         bowl = bowl - makeArc(grid_dims, trans_pos_i, ...
-                                              tp.radius_grid, tp.array_shape.annular.Elements_ID(el_i), focus_pos_i);
+                                              tp.(tp.type).radius_grid, tp.(tp.type).Elements_ID(el_i), focus_pos_i);
                     end
                 end
         
@@ -143,7 +143,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         Nt        = size(cw_signals_all{1}, 2);
         cw_global = zeros(n_elements_total, Nt);
 
-        for it = 1:nT
+        for it = 1:transducer_N
             idx0 = offsets(it) + 1;
             idx1 = offsets(it) + n_elements_per_T(it);
             cw_global(idx0:idx1, :) = cw_signals_all{it};  % rows = elements of transducer it
@@ -171,9 +171,9 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
         % allow support for multiple transducers in future implementations.
         tp = transducer_pars(1);  % use first (and only) transducer here
 
-        % 3D/2D positions for kWaveArray are taken from the first row
-        trans_pos_1  = trans_pos(1, :);
-        focus_pos_1  = focus_pos(1, :);
+        % 3D/2D positions for kWaveArray are taken from the first transducer
+        trans_pos_1  = tp.position.trans_pos;
+        focus_pos_1  = tp.position.focus_pos;
 
         % Determine if axisymmetric mode should be enabled
         if numel(parameters.grid.dims) == 2 && ...
@@ -190,40 +190,40 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                            'UpsamplingRate', 10, ...
                            'BLIType', 'sinc');
 
-        switch tp.array_shape.type
+        switch tp.type
             case 'annular'
                 % Set focus position and transducer position vectors in physical coordinates
                 if numel(parameters.grid.dims) == 3
                     % 3D annular array
                     pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
                     focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
-        
+
                     karray.addAnnularArray(pos_vec, ...
-                                           tp.curv_radius_mm * 1e-3, ...
-                                           [tp.array_shape.annular.Elements_ID_mm; tp.array_shape.annular.Elements_OD_mm] * 1e-3, ...
+                                           tp.annular.curv_radius_mm * 1e-3, ...
+                                           [tp.annular.Elements_ID_mm; tp.annular.Elements_OD_mm] * 1e-3, ...
                                            focus_vec);
-        
+
                 elseif numel(parameters.grid.dims) == 2 && axisymmetric == false
-        
+
                     % 2D arc-shaped element
                     pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
                     focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
-        
+
                     karray.addArcElement(pos_vec, ...
-                                         tp.curv_radius_mm * 1e-3, ...
-                                         tp.array_shape.annular.Elements_OD_mm * 1e-3, ...
+                                         tp.annular.curv_radius_mm * 1e-3, ...
+                                         tp.annular.Elements_OD_mm * 1e-3, ...
                                          focus_vec);
                 end
             case 'matrix'
-                matrix_tp = tp.array_shape.matrix;
+                matrix_tp = tp.matrix;
                 
-                trans_pos_m = [kgrid.x_vec(tp.trans_pos(1));
-                    kgrid.y_vec(tp.trans_pos(2));
-                    kgrid.z_vec(tp.trans_pos(3))];
+                trans_pos_m = [kgrid.x_vec(tp.position.trans_pos(1));
+                    kgrid.y_vec(tp.position.trans_pos(2));
+                    kgrid.z_vec(tp.position.trans_pos(3))];
 
-                focus_pos_m = [kgrid.x_vec(tp.focus_pos(1));
-                    kgrid.y_vec(tp.focus_pos(2));
-                    kgrid.z_vec(tp.focus_pos(3))];
+                focus_pos_m = [kgrid.x_vec(tp.position.focus_pos(1));
+                    kgrid.y_vec(tp.position.focus_pos(2));
+                    kgrid.z_vec(tp.position.focus_pos(3))];
 
                 switch matrix_tp.matrix_shape.type
                     case 'define_here'
@@ -267,17 +267,17 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 [karray, tp] = create_matrix_karray(kgrid, karray, parameters, tp, elem_pos_m, trans_pos, focus_pos);
 
             otherwise
-                error('Array shape %s is unknown or not implemented.', tp.array_shape.type)
+                error('Array shape %s is unknown or not implemented.', tp.type)
         end
 
         % CW per-element for this transducer
         cw_signal = createCWSignals( ...
             kgrid.t_array, ...
-            tp.source_freq_hz, ...
-            tp.source_amp, ...
-            tp.array_shape.annular.source_phase_rad);   % [n_elements x Nt]
+            tp.(tp.type).source_freq_hz, ...
+            tp.(tp.type).source_amp, ...
+            tp.annular.source_phase_rad);   % [n_elements x Nt]
 
-        if axisymmetric == true && strcmp(tp.array_shape.type, 'annular')
+        if axisymmetric == true && strcmp(tp.type, 'annular')
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
@@ -286,9 +286,9 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
             position_base = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
             focus_pos_full = [0, 0+eps];
             
-            for el_i = 1:tp.n_elements
-                el_OD_m = tp.array_shape.annular.Elements_OD_mm(el_i) * 1e-3;
-                y_shift = (el_i - (tp.n_elements+1)/2) * el_OD_m;
+            for el_i = 1:tp.annular.n_elements
+                el_OD_m = tp.annular.Elements_OD_mm(el_i) * 1e-3;
+                y_shift = (el_i - (tp.annular.n_elements+1)/2) * el_OD_m;
                 element_pos = position_base + [0, y_shift];
 
                 karray_full.addArcElement(element_pos, tp.curv_radius_mm * 1e-3, el_OD_m, focus_pos_full);
@@ -324,9 +324,9 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
 
         else
             % Non-axisymmetric: compute weights and distribute signals manually
-            grid_weights_4d = zeros(tp.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            grid_weights_4d = zeros(tp.annular.n_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
 
-            for ind = 1:tp.n_elements
+            for ind = 1:tp.annular.n_elements
                 fprintf('Computing weights for element %i...', ind);
                 grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
                 fprintf(' done\n');
@@ -346,7 +346,7 @@ function [source, source_labels, transducer_pars] = source_create(parameters, kg
                 distributed_source_signal = gpuArray(distributed_source_signal);
             end
 
-            for ind = 1:tp.n_elements
+            for ind = 1:tp.annular.n_elements
                 source_weights = squeeze(grid_weights_4d(ind,:,:,:));
                 el_binary_mask = source_weights ~= 0;
 

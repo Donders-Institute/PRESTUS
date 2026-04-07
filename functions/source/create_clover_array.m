@@ -105,7 +105,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
         elems_rot = (R * positions_local')' + center_rot';
 
         % --- Fit sphere to find apex (validation) ---
-        ROC_leaf = matrix_tp.curved.curv_radius_mm;
+        ROC_leaf = matrix_tp.curv_radius_mm;
 
         residuals = @(c) vecnorm(elems_rot - c, 2, 2) - ROC_leaf;
 

@@ -30,7 +30,7 @@ medium = rmfield(medium,'specific_heat');
 medium = rmfield(medium,'perfusion_coeff');
 
 % Define scale for plotting
-input_args.PlotScale = [-1, 1] * parameters.transducer(1).source_amp(1);
+input_args.PlotScale = [-1, 1] * parameters.transducer(1).(parameters.transducer(1).type).source_amp(1);
 
 % Select submission based on code type
 switch parameters.simulation.code_type

@@ -124,8 +124,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
                 end
             
                 for ti = 1:max_plots
-                    tpos_sim = parameters.transducer(ti).trans_pos;
-                    fpos_sim = parameters.transducer(ti).focus_pos;
+                    tpos_sim = parameters.transducer(ti).position.trans_pos;
+                    fpos_sim = parameters.transducer(ti).position.focus_pos;
             
                     % map canonical / per-T positions + highlighted_pos back to T1 space
                     backtransf_coordinates = round(tformfwd(...

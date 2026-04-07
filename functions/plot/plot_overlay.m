@@ -18,7 +18,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
 %                     * Second element: slice number along the specified axis.
 %   trans_pos       - [1x3] array specifying the transducer position in grid coordinates (row, col, slice).
 %   focus_pos       - [1x3] array specifying the focus position in grid coordinates (row, col, slice).
-%   max_data_pos   - [1x3] array specifying the maximum intensity position in grid coordinates (row, col, slice).
+%   max_data_pos    - [1x3] array specifying the maximum intensity position in grid coordinates (row, col, slice).
 %   options         - Struct containing optional visualization settings:
 %                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
 %                     * grid_step: Grid step size in mm (default: from parameters).
@@ -86,6 +86,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         options.overlay_color_range = [max([options.overlay_threshold_low, min(overlay_image(:)), 0]), max(overlay_image(:))];
     end
 
+
+    %% Extract transducer info
+
+    tr = parameters.transducer(1);
+
     %% Extract specified slice from images and masks
     % Determine slicing axis and adjust positions accordingly
     slice_x = 1:size(overlay_image,1);
@@ -99,7 +104,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos(2:3);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
+            natural_focus = trans_pos + [0, tr.(tr.type).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos(2:3);
     elseif slice{1} == 'y'
@@ -109,7 +114,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         end
         if ~isempty(trans_pos)
             trans_pos = trans_pos([1,3]);
-            natural_focus = trans_pos + [0, parameters.transducer(1).curv_radius_mm / parameters.grid.resolution_mm];
+            natural_focus = trans_pos + [0, tr.(tr.type).curv_radius_mm / parameters.grid.resolution_mm];
         end
         max_data_pos = max_data_pos([1,3]);
     elseif slice{1} == 'z'
