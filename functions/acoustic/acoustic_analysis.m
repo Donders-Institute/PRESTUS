@@ -72,7 +72,7 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     % calculate X, Y and Z coordinates of max. intensity 
     % if medium includes brain, consider only intensities within the brain
     % otherwise: consider all media beyond the exit plane
-    if ~isempty(mask.brain)
+    if any(mask.brain(:))
         [results.Isppa_after_exit_plane, Ix_eplane, Iy_eplane,Iz_eplane] = ...
             masked_max_3d(acoustic_Ipa, mask.brain);
     else
@@ -175,14 +175,14 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 		trans_suffix = '';
 		if n_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
         
-		if numel(parameters.grid.dims)==3
+        if numel(parameters.grid.dims)==3
             slices = struct( ...
                 'dim', {'x', 'y', 'z'}, ...
                 'pos', {fpos_sim(1), fpos_sim(2), fpos_sim(3)} ...
                 );
 
-            for i = 1:numel(slices)
-                slice = slices(i);
+            for i_slice = 1:numel(slices)
+                slice = slices(i_slice);
 
                 [~,~,~,~,~,~,~,h]=plot_overlay(...
                     acoustic_Ipa, ...
