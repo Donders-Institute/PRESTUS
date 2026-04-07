@@ -98,11 +98,23 @@ See [doc_transducer.md](doc_transducer.md).
 
 All fields are mandatory and have no defaults — they must be set in the study config.
 
+###### General Transducer Parameters
+
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
+| `depth_mm` | Transducer depth [mm]. | Visualization only. |
+| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `source_freq_hz` | Central frequency [Hz]. | |
+| `trans_pos` | Transducer position (XYZ, T1 grid). | |
+| `focus_pos` | Focus (target) position (XYZ, T1 grid). | |
+| `expected_focal_distance_ep` | Expected distance from transducer exit plane to focus [mm]. | Alternative to specifying `trans_pos`/`focus_pos`, applicable only when using 1D steering. Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or both pos fields must be set. |
+| `expected_focal_distance_bowl` | Expected distance from transducer bowl to focus [mm]. | |
 | `array_shape.type` | Type of transducer array. | Options: `annular`, `matrix`. |
 
 #### Annular Array Definition (`annular`)
+
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
 | `n_elements` | Number of transducer elements. | |
 | `Elements_ID_mm` | Inner diameter of each element [mm]. | |
 | `Elements_OD_mm` | Outer diameter of each element [mm]. | |
@@ -111,6 +123,9 @@ All fields are mandatory and have no defaults — they must be set in the study 
 | `source_phase_deg` | Source phase [degrees]. | Must be calibrated. |
 
 #### Matrix Array Definition (`matrix`)
+
+| **Parameter** | **Description** | **Comments** |
+|---|---|---|
 | `matrix.steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
 | `matrix.element_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
 | `matrix.elem_height_mm` | Element height [mm]. | Used to define equivalent area. |
@@ -172,20 +187,6 @@ Note: The define_here options may contain bugs due to limited testing time.
 | `subset.subset_n_elements` | Number of elements in subset. | Must be ≤ total elements. |
 | `project_on_new_ROC` | Project elements onto new curvature. | May introduce unrealistic layouts. |
 | `ROC_projection.new_ROC_mm` | New radius of curvature [mm]. | Used when projection enabled. |
-
----
-
-###### General Transducer Parameters
-
-| **Parameter** | **Description** | **Comments** |
-|---|---|---|
-| `depth_mm` | Transducer depth [mm]. | Visualization only. |
-| `source_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
-| `source_freq_hz` | Central frequency [Hz]. | |
-| `trans_pos` | Transducer position (XYZ, T1 grid). | |
-| `focus_pos` | Focus (target) position (XYZ, T1 grid). | |
-| `expected_focal_distance_ep` | Expected distance from transducer exit plane to focus [mm]. | Alternative to specifying `trans_pos`/`focus_pos`, applicable only when using 1D steering. Either `expected_focal_distance_ep`, `expected_focal_distance_bowl`, or both pos fields must be set. |
-| `expected_focal_distance_bowl` | Expected distance from transducer bowl to focus [mm]. | |
 
 ---
 

@@ -108,12 +108,6 @@ function parameters = load_transducer_parameters(parameters)
             end
     
             % Validate general parameters
-            % Ensure source phase is set in radians or degrees
-            if ~isfield(tr, 'source_phase_rad') && isfield(tr, 'source_phase_deg')
-                tr.source_phase_rad = deg2rad(tr.source_phase_deg);
-            elseif ~isfield(tr, 'source_phase_rad')
-                error('Transducer %i; Phase must be specified as source_phase_rad or source_phase_deg.', t_i);
-            end
 			 
             assert(isfield(tr,'source_amp'), ...
                     'Transducer %i; Missing source_amp field.', t_i);
@@ -121,21 +115,6 @@ function parameters = load_transducer_parameters(parameters)
             % Ensure source amplitude matches number of transducer elements
             if numel(tr.source_amp) == 1 && tr.n_elements > 1
                 tr.source_amp = repmat(tr.source_amp, [1, tr.n_elements]);
-            end
-    
-            % Evaluate source phase expressions if stored as cell arrays
-            if iscell(tr.source_phase_rad)
-                for p_i = 1:numel(tr.source_phase_rad)
-                    if ~isnumeric(tr.source_phase_rad{p_i})
-                        tr.source_phase_rad{p_i} = eval(tr.source_phase_rad{p_i});
-                    end
-                end
-                tr.source_phase_rad = cell2mat(tr.source_phase_rad);
-            end
-    
-            % Ensure source phase degrees are calculated from radians if not provided
-            if ~isfield(tr, 'source_phase_deg')
-                tr.source_phase_deg = rad2deg(tr.source_phase_rad);
             end
             
 			if ~isfield(tr, 'depth_mm')
@@ -152,7 +131,8 @@ function parameters = load_transducer_parameters(parameters)
         parameters.transducer = new_transducers;
 
         % Calculate distance between target and ep/bowl is not provided
-        if ~isfield(parameters, 'expected_focal_distance_bowl') || ~isfield(parameters, 'expected_focal_distance_ep')
+        if ~isfield(parameters, 'expected_focal_distance_bowl') || ...
+                ~isfield(parameters, 'expected_focal_distance_ep')
             parameters = focal_distance_calculation(parameters);
         end
 

@@ -60,5 +60,36 @@ function tr = validate_annular_transducer(tr, t_i)
     else
         tr.dist_to_plane_mm = annular_tr.dist_to_plane_mm;
     end
+
+    % Evaluate source phase expressions if stored as cell arrays
+    if isfield(annular_tr, 'source_phase_rad') && iscell(annular_tr.source_phase_rad)
+        for p_i = 1:numel(annular_tr.source_phase_rad)
+            if ~isnumeric(annular_tr.source_phase_rad{p_i})
+                annular_tr.source_phase_rad{p_i} = eval(annular_tr.source_phase_rad{p_i});
+            end
+        end
+        annular_tr.source_phase_rad = cell2mat(annular_tr.source_phase_rad);
+    end 
+
+    if isfield(annular_tr, 'source_phase_deg') && iscell(annular_tr.source_phase_deg)
+        for p_i = 1:numel(annular_tr.source_phase_deg)
+            if ~isnumeric(annular_tr.source_phase_deg{p_i})
+                annular_tr.source_phase_deg{p_i} = eval(annular_tr.source_phase_deg{p_i});
+            end
+        end
+        annular_tr.source_phase_deg = cell2mat(annular_tr.source_phase_deg);
+    end 
+
+    % Validate that source phase is set in radians or degrees
+    if ~isfield(annular_tr, 'source_phase_rad') && isfield(annular_tr, 'source_phase_deg')
+        annular_tr.source_phase_rad = deg2rad(annular_tr.source_phase_deg);
+    elseif ~isfield(annular_tr, 'source_phase_deg') && isfield(annular_tr, 'source_phase_rad')
+        annular_tr.source_phase_deg = rad2deg(annular_tr.source_phase_rad);
+    elseif ~isfield(annular_tr, 'source_phase_rad') && ~isfield(annular_tr, 'source_phase_deg')
+        error('Transducer %i; Phase must be specified as source_phase_rad or source_phase_deg.', t_i);
+    end
+
+    % Encode updated annular transducer field
+    tr.array_shape.annular = annular_tr;
    
 end

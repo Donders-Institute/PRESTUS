@@ -85,7 +85,8 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
          [trans_pos_final(1,1) focus_pos_final(1,1)], 'Color', 'white');
     
     % Add bounding box for visualization
-    get_transducer_box(trans_pos_final(1,[1,3])', focus_pos_final(1,[1,3])', parameters.grid.resolution_mm, parameters);
+    get_transducer_box(trans_pos_final(1,[1,3])', focus_pos_final(1,[1,3])', ...
+        [], parameters.grid.resolution_mm, parameters);
     
     colormap(ax3,[0.3 0.3 0.3; lines(12)]);
 

@@ -104,8 +104,13 @@ transducer:
   # ------------------------------
   # General annular/matrix properties
   # ------------------------------
+  depth_mm: []          # Depth of transducer used for visualization purposes [mm]
+  source_amp: []        # Pressure amplitude [Pa] 
+  source_freq_hz: []    # Fundamental frequency [Hz]
+  trans_pos: []         # Transducer position [T1 grid space]
+  focus_pos: []         # Stimulation target position [T1 grid space]
   array_shape:
-    type: []                # 'annular' for Annular array or 'matrix' for Matrix array
+    type: []            # 'annular' for Annular array or 'matrix' for Matrix array
 
     # --------------------------
     # Annular transducer parameters
@@ -176,12 +181,6 @@ transducer:
           project_on_new_ROC: []     # true to project elements onto new ROC
           ROC_projection:
             new_ROC_mm: []           # New desired radius of curvature [mm]
-  
-  depth_mm: []          # Depth of transducer used for visualization purposes [mm]
-  source_amp: []        # Pressure amplitude [Pa] 
-  source_freq_hz: []    # Fundamental frequency [Hz]
-  trans_pos: []         # Transducer position [T1 grid space]
-  focus_pos: []         # Stimulation target position[T1 grid space]
 
 #------------ Transducer Placement
 

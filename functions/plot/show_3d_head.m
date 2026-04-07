@@ -113,7 +113,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             % Maximum outer diameter of transducer elements
             switch parameters.transducer(1).array_shape.type
                 case 'annular'
-                    max_od_mm = max(parameters.transducer(1).Elements_OD_mm);
+                    max_od_mm = max(parameters.transducer(1).array_shape.annular.Elements_OD_mm);
                 case 'matrix'
                     max_od_mm = parameters.transducer(1).array_shape.matrix.outer_diameter_mm;
                 otherwise

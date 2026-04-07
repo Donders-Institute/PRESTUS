@@ -60,23 +60,35 @@ function [transducer_mask, source_label, transducer_pars] = ...
     switch transducer_pars.array_shape.type
         case 'annular'
             % Convert element diameters from millimeters to grid points and ensure they are odd integers
-			transducer_pars.Elements_OD = 2*floor(transducer_pars.Elements_OD_mm / grid_res_mm / 2) + 1; % Outer diameter in grid points
-			transducer_pars.Elements_ID = 2*floor(transducer_pars.Elements_ID_mm / grid_res_mm / 2) + 1; % Inner diameter in grid points
+			transducer_pars.array_shape.annular.Elements_OD = ...
+                2*floor(transducer_pars.array_shape.annular.Elements_OD_mm / grid_res_mm / 2) + 1; % Outer diameter in grid points
+			transducer_pars.array_shape.annular.Elements_ID = ...
+                2*floor(transducer_pars.array_shape.annular.Elements_ID_mm / grid_res_mm / 2) + 1; % Inner diameter in grid points
 
 			% Handle cases where inner diameter is zero (e.g., for flat elements)
-			transducer_pars.Elements_ID(transducer_pars.Elements_ID_mm == 0) = 0;
+			transducer_pars.array_shape.annular.Elements_ID(transducer_pars.array_shape.annular.Elements_ID_mm == 0) = 0;
 
 			% Convert the curvature radius from millimeters to grid points
-			transducer_pars.radius_grid = round(transducer_pars.curv_radius_mm / grid_res_mm); % Radius in grid points
+			transducer_pars.array_shape.annular.radius_grid = round(transducer_pars.array_shape.annular.curv_radius_mm / grid_res_mm); % Radius in grid points
 
             % Loop through each transducer element to create its geometry
-            for el_i = 1:transducer_pars.n_elements
+            for el_i = 1:transducer_pars.array_shape.annular.n_elements
                 % Create the outer bowl geometry for the current element
-                bowl = makeBowl(grid_dims, trans_pos, transducer_pars.radius_grid, transducer_pars.Elements_OD(el_i), focus_pos);
+                bowl = makeBowl(...
+                    grid_dims, ...
+                    trans_pos, ...
+                    transducer_pars.array_shape.annular.radius_grid,...
+                    transducer_pars.array_shape.annular.Elements_OD(el_i), ...
+                    focus_pos);
 
                 % If the inner diameter is greater than zero, subtract the inner bowl geometry
-                if transducer_pars.Elements_ID(el_i) > 0
-                    bowl = bowl - makeBowl(grid_dims, trans_pos, transducer_pars.radius_grid, transducer_pars.Elements_ID(el_i), focus_pos);
+                if transducer_pars.array_shape.annular.Elements_ID(el_i) > 0
+                    bowl = bowl - makeBowl(...
+                        grid_dims, ...
+                        trans_pos, ...
+                        transducer_pars.array_shape.annular.radius_grid, ...
+                        transducer_pars.array_shape.annular.Elements_ID(el_i), ...
+                        focus_pos);
                 end
 
                 % Add the current element's bowl geometry to the binary mask
