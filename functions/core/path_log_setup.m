@@ -55,7 +55,9 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     subject_id = parameters.subject_id;
 
     % [SIMULATION OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if isfield(parameters.path, 'sim') && isstring(parameters.path.sim) && ~strcmp(parameters.path.sim, "")
+    if isfield(parameters.path, 'sim') && ...
+            (isstring(parameters.path.sim) || ischar(parameters.path.sim)) && ...
+            any(~strcmp(parameters.path.sim, {"", ''}))
         if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
             parameters.io.output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', subject_id));
         else
@@ -65,7 +67,9 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     end
 
     % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if isfield(parameters.path, 'localite') && isstring(parameters.path.sim) && ~strcmp(parameters.path.localite, "")
+    if isfield(parameters.path, 'localite') && ...
+            (isstring(parameters.path.localite) || ischar(parameters.path.localite)) && ...
+            any(~strcmp(parameters.path.localite, {"", ''}))
         if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
             parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
         end
