@@ -85,6 +85,20 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --error=%s_slurm_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
+
+    % Job dependencies (used by uncertainty pipeline for stage chaining).
+    % --kill-on-invalid-dep=yes ensures that if the predecessor fails or is
+    % cancelled, all dependent jobs are automatically cancelled rather than
+    % remaining stuck as DependencyNeverSatisfied indefinitely.
+    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
+        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
+            'UniformOutput', false), ':');
+        fprintf(fid, '#SBATCH --dependency=afterok:%s\n', dep_str);
+        fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
+    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
+        fprintf(fid, '#SBATCH --dependency=afterok:%d\n', parameters.hpc.depend_job_id);
+        fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
+    end
     
     if needs_gpu, fprintf(fid, 'nvidia-smi\n'); end
 	if strcmp(parameters.hpc.name, 'snellius')
@@ -145,6 +159,15 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#PBS -o %s_qsub_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -e %s_qsub_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -d %s\n', log_dir);
+
+    % Job dependencies (used by uncertainty pipeline for stage chaining)
+    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
+        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
+            'UniformOutput', false), ':');
+        fprintf(fid, '#PBS -W depend=afterok:%s\n', dep_str);
+    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
+        fprintf(fid, '#PBS -W depend=afterok:%d\n', parameters.hpc.depend_job_id);
+    end
 	fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);

@@ -50,7 +50,14 @@ io:
   output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
   overwrite_files: always   # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
-  save_matrices: 0          # Save output matrices?
+  # Intermediate matrix saving
+  # save_matrices is the global fallback: set to 0 to suppress all saves,
+  # set to 1 to enable all saves. Individual flags below take precedence
+  # when explicitly set, allowing fine-grained control per output type.
+  save_matrices: 0          # Global fallback for all intermediate matrix saves (0 = skip all)
+  save_source_matrices: 1   # kwave_source.mat — transducer source array; shared across variants
+  save_acoustic_matrices: 0 # Acoustic sensor_data + kgrid + kwave_medium + source (can be very large)
+  save_thermal_matrices: 1  # heating_res.mat — temperature timeseries and field maps
   save_heatingvideo: 0      # Save a video of incremental heating?
 
 #------------ Module execution

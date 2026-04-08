@@ -16,7 +16,9 @@ function medium_properties_nifti(parameters, kwave_medium, inv_final_transformat
         warning('Missing field: %s', property);
     else
         % Transform and save if file doesn't exist
-        if ~isfile(file_name)
+        % niftiwrite with 'Compressed',true produces file_name.nii.gz;
+        % check for that explicitly to avoid repeated writes on re-runs.
+        if ~isfile([file_name '.nii.gz']) && ~isfile([file_name '.nii'])
             transformed_data = single(tformarray(...
                 kwave_medium.(property), ...
                 inv_final_transformation_matrix, ...

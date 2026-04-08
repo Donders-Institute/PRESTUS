@@ -1,8 +1,9 @@
-function prestus_pipeline_start(parameters, options)
+function job_id = prestus_pipeline_start(parameters, options)
 %% PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher
 %
 %   prestus_pipeline_start(parameters)
 %   prestus_pipeline_start(parameters, options)
+%   job_id = prestus_pipeline_start(parameters)
 %
 %   Auto-detects platform and handles direct MATLAB, SLURM, or qsub execution.
 %   Subject ID must be set as parameters.subject_id before calling.
@@ -10,6 +11,9 @@ function prestus_pipeline_start(parameters, options)
 %   Inputs:
 %     parameters  - Struct; must contain parameters.subject_id
 %     options     - Struct with sequential_configs (default: empty)
+%
+%   Outputs:
+%     job_id      - Submitted HPC job id ([] when running on MATLAB platform)
 
     arguments
         parameters struct
@@ -41,9 +45,18 @@ function prestus_pipeline_start(parameters, options)
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
             prestus_pipeline(parameters, options);
+            job_id = [];
 
         case {'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
+            % Intercept uncertainty mode before single-job submission:
+            % uncertainty_pipeline manages its own multi-stage job graph.
+            if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
+                    parameters.simulation.uncertainty
+                uncertainty_pipeline(parameters, options);
+                job_id = [];
+                return;
+            end
             hpc_validate_parameters(parameters, platform);
             [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters);
@@ -54,7 +67,11 @@ function prestus_pipeline_start(parameters, options)
             % Generate MATLAB call
             fid = fopen(temp_m_path, 'w+');
             fprintf(fid, 'load(''%s'');\n', temp_data_path);
-            fprintf(fid, 'addpath(genpath(''%s''));\n', prestus_path);
+            % Bootstrap safe_addpath, then use it to add all PRESTUS paths
+            % without including hidden directories (e.g. .claude worktrees).
+            fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
+            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
+            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'toolboxes'));
             if ismember(fieldnames(options), 'sequential_configs')
                 sequential_configs = options.sequential_configs;
                 save(temp_data_path, 'sequential_configs', '-append');
@@ -78,8 +95,7 @@ function prestus_pipeline_start(parameters, options)
                 fprintf('➡️  Continuing in MATLAB ...\n\n');
             end
             
-            % Save job ID for chaining
-            parameters.hpc.job_id = job_id;
+            % job_id is already set by hpc_submit_job above
 
         otherwise
             error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...

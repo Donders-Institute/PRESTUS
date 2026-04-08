@@ -107,10 +107,17 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
             filename_segmented, segmentation_folder)
 
-    % Defines output file location and name
+    % Defines output file location and name.
+    % Use io.preproc_affix when set (uncertainty pipeline stages 2–4 point
+    % this at stage 1's cached files with affix ''), otherwise io.output_affix.
+    if isfield(parameters.io, 'preproc_affix')
+        preproc_affix = parameters.io.preproc_affix;
+    else
+        preproc_affix = parameters.io.output_affix;
+    end
     filename_reoriented_scaled_data = fullfile(parameters.io.debug_dir, ...
         sprintf('sub-%03d_after_rotating_and_scaling%s.mat', ...
-        parameters.subject_id, parameters.io.output_affix));
+        parameters.subject_id, preproc_affix));
 
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
@@ -212,24 +219,62 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         assert(isequal(size(trans_pos_rescaled(1:2)),size(focus_pos_rescaled(1:2))),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
 
-        % Save rotated and rescaled data
-        save(filename_reoriented_scaled_data, ...
-            't1_img_rr', ...
-            'segmented_img_rr', ...
-            'bone_img_rr', ...
-            'trans_pos_rescaled', ...
-            'focus_pos_rescaled', ...
-            'scale_rotate_recenter_matrix', ...
-            'rotation_matrix');
+        % Save rotated and rescaled data.
+        % The transformation matrices are always saved — they are small and
+        % needed for any downstream use of this checkpoint file.
+        % The large image volumes (t1_img_rr, segmented_img_rr, bone_img_rr)
+        % are only needed as inputs to the smoothing/cropping step (file 2).
+        % Once file 2 exists they are never used again, so we omit them from
+        % the checkpoint to save disk space.
+        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.debug_dir, ...
+            sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', ...
+            parameters.subject_id, parameters.simulation.medium, preproc_affix));
+        if ~isfile(filename_cropped_smoothed_skull_data_check)
+            % File 2 does not yet exist — include volumes so the next block
+            % can load them if this session is interrupted and restarted.
+            save(filename_reoriented_scaled_data, ...
+                't1_img_rr', ...
+                'segmented_img_rr', ...
+                'bone_img_rr', ...
+                'trans_pos_rescaled', ...
+                'focus_pos_rescaled', ...
+                'scale_rotate_recenter_matrix', ...
+                'rotation_matrix');
+        else
+            % File 2 already exists — volumes are no longer needed; save
+            % only the small transformation matrices.
+            save(filename_reoriented_scaled_data, ...
+                'trans_pos_rescaled', ...
+                'focus_pos_rescaled', ...
+                'scale_rotate_recenter_matrix', ...
+                'rotation_matrix');
+        end
         log_timer('stop','preproc_rotscale');
-    else 
+    else
         disp('Skipping reorientation; the file already exists. Loading it instead.');
-        load(filename_reoriented_scaled_data);
+        % Only load the large volumes if file 2 does not yet exist —
+        % they are only needed as inputs to the smoothing/cropping step.
+        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.debug_dir, ...
+            sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', ...
+            parameters.subject_id, parameters.simulation.medium, preproc_affix));
+        cropped_exists = isfile(filename_cropped_smoothed_skull_data_check);
+        if ~cropped_exists
+            load(filename_reoriented_scaled_data);   % includes volumes + matrices
+        else
+            load(filename_reoriented_scaled_data, ...
+                'trans_pos_rescaled', 'focus_pos_rescaled', ...
+                'scale_rotate_recenter_matrix', 'rotation_matrix');
+        end
     end
-    
+
+    % volumes_available tracks whether t1_img_rr / segmented_img_rr /
+    % bone_img_rr are in the workspace (they are omitted on load when
+    % after_cropping_and_smoothing.mat already exists).
+    volumes_available = exist('t1_img_rr', 'var');
+
     %% [DEBUG] Plot the skin & skull from the segmented image and an overlay for comparison
 
-    if parameters.simulation.debug == 1
+    if parameters.simulation.debug == 1 && volumes_available
         % Create a T1 slice for comparison to SimNIBS segmented data
         t1_slice = repmat(mat2gray(squeeze(t1_img_rr(:,trans_pos_rescaled(2),:))), [1 1 3]);
         % Create slices of segmented SimNIBS data
@@ -263,7 +308,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     % Defines output file location and name
     filename_cropped_smoothed_skull_data = fullfile(parameters.io.debug_dir, ...
         sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        parameters.subject_id, parameters.simulation.medium, preproc_affix));
     
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.io.output_dir);

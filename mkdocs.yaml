@@ -54,6 +54,7 @@ nav:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
     - (pseudo)CT: doc_pseudoCT.md
+    - Uncertainty: doc_uncertainty.md
   - 📚 References: 
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md

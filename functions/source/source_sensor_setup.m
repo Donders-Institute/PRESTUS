@@ -61,10 +61,18 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     % Create the time array
     kgrid.setTime(simulation_time_points, grid_time_step);
 
-    % Create source (transducer with focuspoint)
+    % Create source (transducer with focuspoint).
+    % Use io.preproc_affix when set (uncertainty pipeline points simulation
+    % variants at the stage-1 cache with affix ''), otherwise fall back to
+    % io.output_affix.
+    if isfield(parameters.io, 'preproc_affix')
+        source_affix = parameters.io.preproc_affix;
+    else
+        source_affix = parameters.io.output_affix;
+    end
     parameters.io.kwave_source_filename  = fullfile(parameters.io.output_dir, ...
         sprintf('sub-%03d_%s_kwave_source%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        parameters.subject_id, parameters.simulation.medium, source_affix));
     if confirm_overwriting(parameters.io.kwave_source_filename, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray
@@ -105,11 +113,12 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
         end
         % Create the source matrix
         [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
-        % Save the source matrix (unless otherwise requested)
-        if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
-            disp("Not saving kwave source matrix ...")
-        else
+        % Save the source matrix (controlled by io.save_source_matrices,
+        % falling back to io.save_matrices, defaulting to true)
+        if should_save_output(parameters.io, 'save_source_matrices')
             save(parameters.io.kwave_source_filename, 'source', 'source_labels','-v7.3');
+        else
+            disp('Not saving kwave source matrix ...')
         end
     else
         load(parameters.io.kwave_source_filename);

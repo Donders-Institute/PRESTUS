@@ -4,23 +4,21 @@ function [parameters] = path_log_setup(parameters, prestus_path)
 
     disp(['Location of PRESTUS: ', prestus_path])
 
-    % Add paths to the 'functions' and toolbox folders
+    % Add paths to the 'functions' and toolbox folders.
+    % safe_addpath filters out hidden directories (e.g. .claude, .git) to
+    % prevent stale file copies from shadowing the current versions.
     functionsLoc = fullfile(prestus_path, 'functions');
     toolboxesLoc = fullfile(prestus_path, 'toolboxes');
-    allPaths = regexp(path,pathsep,'Split');
+    allPaths = regexp(path, pathsep, 'Split');
 
-    % Add 'functions' folders
-    if ~any(ismember(fullfile(functionsLoc, 'helper'),allPaths))
-        addpath(genpath(functionsLoc));
+    if ~any(ismember(fullfile(functionsLoc, 'helper'), allPaths))
+        safe_addpath(functionsLoc);
         disp(['Adding ', functionsLoc, ' and subfolders']);
-    else
     end
 
-    % Add 'toolboxes' 
-    if ~any(ismember(toolboxesLoc,allPaths))
-        addpath(genpath(toolboxesLoc));
+    if ~any(ismember(toolboxesLoc, allPaths))
+        safe_addpath(toolboxesLoc);
         disp(['Adding ', toolboxesLoc, ' and subfolders']);
-    else
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs
@@ -55,14 +53,10 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     subject_id = parameters.subject_id;
 
     % [SIMULATION OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if isfield(parameters.path, 'sim') && ...
+    if isfield(parameters.path, 'sim') && ~isempty(parameters.path.sim) && ...
             (isstring(parameters.path.sim) || ischar(parameters.path.sim)) && ...
             any(~strcmp(parameters.path.sim, {"", ''}))
-        if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-            parameters.io.output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', subject_id));
-        else
-            parameters.io.output_dir = parameters.path.sim;
-        end
+        parameters.io.output_dir = get_output_dir(parameters);
         if ~isfolder(parameters.io.output_dir); mkdir(parameters.io.output_dir); end
     end
 

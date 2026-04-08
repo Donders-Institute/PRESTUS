@@ -4,33 +4,68 @@ function [parameters] = prestus_pipeline(parameters, options)
         options struct = struct()
     end
 
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                       PRESTUS pipeline                            %
-    %                                                                   %
-    % This serves as the main pipeline for simulating the sonication    %
-    % effects on the bone and neural tissue of individual subjects.     %
-    % In practice, neither this pipeline nor any of the functions in    %
-    % the functions folder need to be altered to run the simulations.   %
-    %                                                                   %
-    % Parameters are loaded in using a custom config file.              %
-    % The file 'default_config' contains all possible to-be altered     %
-    % parameters, but not all of them need to be used to succesfully    %
-    % run the pipeline.                                                 %
-    %                                                                   %
-    % Some notes:                                                       %
-    % - Matlab 2023b*, SimNIBS 4, and k-Wave 1.4.1 have been tested     %
-    % - 'subject_id' must be a number.                                  %
-    % - 'parameters' is a structure (see default_config for options)    %
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+% PRESTUS_PIPELINE  End-to-end transcranial focused ultrasound simulation pipeline.
+%
+% Executes the full PRESTUS workflow for a single subject and transducer
+% configuration, from head model construction through acoustic and thermal
+% simulation to output report generation.
+%
+% Pipeline stages (each independently toggled via parameters.modules.*):
+%   1. Segmentation      SimNIBS charm segmentation of structural MRI
+%   2. Head processing   Reorientation, rescaling, smoothing, and cropping
+%                        of the head model to the simulation grid
+%   3. Source setup      Construction of the transducer source array
+%                        (kWaveArray or analytical; annular or matrix)
+%   4. Acoustic sim      k-Wave pressure field simulation
+%   5. Acoustic analysis ISPPA, ISPTA, MI, and focal metrics
+%   6. Thermal sim       Bio-heat equation solved over the sonication protocol
+%   7. Thermal analysis  Peak temperature, CEM43, and safety metrics
+%   8. NIfTI export      Pressure and temperature maps written as NIfTI volumes
+%   9. Free-water sim    Repeat acoustic simulation in homogeneous water medium
+%  10. Report            Self-contained HTML summary report
+%
+% Usage:
+%   parameters = prestus_pipeline(parameters)
+%   parameters = prestus_pipeline(parameters, options)
+%
+%   Typically invoked via prestus_pipeline_start, which handles platform
+%   selection (MATLAB / SLURM / qsub) and uncertainty mode dispatch.
+%
+% Inputs:
+%   parameters  Struct built from default_config.yaml and a subject-specific
+%               override config. Must include subject_id, path.sim, and all
+%               transducer/grid settings. See configs/default_config.yaml for
+%               the full list of available fields.
+%   options     Optional struct. Currently supports:
+%                 .sequential_configs  Cell array of additional YAML config
+%                                      paths merged in sequence before running.
+%
+% Output:
+%   parameters  Updated struct with fields added by path_log_setup and
+%               intermediate processing steps (e.g., io.output_dir,
+%               io.kwave_source_filename, transducer positions).
+%
+% Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB >= 2023b
     
     % ====================================================================
     %% PATH & LOG setup
     % ====================================================================
 
     currentLoc = fileparts(mfilename("fullpath"));
-    % add functions here to detect path setup function
-    addpath(genpath(fullfile(currentLoc, '..', 'functions')));
+    safe_addpath(fullfile(currentLoc, '..', 'functions'));
     [parameters] = path_log_setup(parameters, get_prestus_path);
+
+    % ====================================================================
+    %% UNCERTAINTY MODE (MATLAB platform only)
+    % ====================================================================
+    % On HPC, uncertainty mode is intercepted earlier in
+    % prestus_pipeline_start before job submission. Here we handle the
+    % MATLAB platform case, after path_log_setup has set output_dir.
+    if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
+            parameters.simulation.uncertainty
+        uncertainty_pipeline(parameters, options);
+        return;
+    end
 
     fprintf('Starting processing for subject %i %s\n',...
         parameters.subject_id, parameters.io.output_affix)
@@ -73,21 +108,21 @@ function [parameters] = prestus_pipeline(parameters, options)
     if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup==1
         % Focal distance calculation (if not specified)
         parameters = focal_distance_calculation(parameters);
-    
+
         % Set up grid by preprocessing the planning image or reading in phantom
         [parameters, medium_masks, segmentation, bone, planimg] = ...
             grid_tissue_setup(parameters);
-    
+
         % Position the transducer(s) in the grid
         [parameters] = grid_transducer_location(parameters, planimg);
-    
+
         % Adapt grid to axisymmetry (if requested)
         [parameters, segmentation, bone, medium_masks] = ...
             grid_axisymmetry(parameters, segmentation, bone, medium_masks);
-    
+
         % Extract variables for quick access
         trans_pos = parameters.transducer(1).trans_pos;
-        focus_pos = parameters.transducer(1).focus_pos;    
+        focus_pos = parameters.transducer(1).focus_pos;
     else
         disp('No grid setup requested...no simulations will be performed.')
     end
@@ -284,8 +319,8 @@ function [parameters] = prestus_pipeline(parameters, options)
                 planimg.transf, ...
                 medium_masks);
 
-            if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
-                disp("Not saving thermal simulation output matrices ...")
+            if ~should_save_output(parameters.io, 'save_thermal_matrices')
+                disp('Not saving thermal simulation output matrices ...')
             else
                 save(filename_heating_data, ...
                     'kwaveDiffusion',...
@@ -370,6 +405,15 @@ function [parameters] = prestus_pipeline(parameters, options)
     % Generate HTML simulation report (after all timers, before diary closes)
     if isfield(parameters.modules, 'generate_report') && parameters.modules.generate_report
         generate_simulation_report(parameters);
+    end
+
+    % Generate uncertainty report when requested by uncertainty_pipeline
+    if isfield(parameters.modules, 'uncertainty_report') && parameters.modules.uncertainty_report
+        if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'affixes')
+            generate_uncertainty_report(parameters, parameters.uncertainty.affixes);
+        else
+            generate_uncertainty_report(parameters);
+        end
     end
 
     % end logging

@@ -3,6 +3,7 @@
 This folder contains example scripts that interact with the PRESTUS pipeline
 
 - `calibration_standalone` initiates the calibration of transducer phases and amplitudes for equipment at the Donders institute.
+- `example_uncertainty` runs the uncertainty quantification pipeline (three-variant simulation + combined report); see [Uncertainty](doc_uncertainty.md).
 - `createPhantom` can be used to generate 2D phantoms
 - `createPseudoCT` can be used to start pseuodCT generation from UTE images
 - `demo_localite` illustrates localite coordinate extraction for read-in in PRESTUS
