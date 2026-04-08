@@ -69,7 +69,7 @@ function parameters = load_parameters(varargin)
     % Sanitize output file affix to ensure valid characters only
     sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_]', '_');
     if ~strcmp(sanitized_affix, parameters.io.output_affix)
-        fprintf('The original `results_filename_affix` was sanitized. "%s" will be used instead of "%s"\n', ...
+        fprintf('The original `io.output_affix` was sanitized. "%s" will be used instead of "%s"\n', ...
                 sanitized_affix, parameters.io.output_affix);
         parameters.io.output_affix = sanitized_affix;
     end

@@ -158,15 +158,15 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_param.transducer.annular.elem_amp = opt_source_amp;
     opt_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
     opt_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
-    opt_param.results_filename_affix = '_optimized';
+    opt_param.io.output_affix = '_optimized';
 
     opt_param.subject_id = sim_id;
     opt_param.hpc.wait_for_job = true;
     prestus_pipeline_start(opt_param);
 
-    %% Load optimized simulation results    
+    %% Load optimized simulation results
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        opt_param.io.outputs_folder, sim_id, opt_param.results_filename_affix));
+        opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix));
 
     opt_params = opt_res.acoustic_info.parameters;
     opt_params.calibration.prefix = 'Opt_';

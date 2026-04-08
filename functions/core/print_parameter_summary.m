@@ -22,7 +22,7 @@ print_if_field(parameters.io, 'data_path', '%s');
 print_if_field(parameters.io, 'seg_path', '%s');
 print_if_field(parameters.io, 'sim_path', '%s');
 print_if_field(parameters.io, 'simnibs_bin_path', '%s');
-print_if_field(parameters.io, 'results_filename_affix', '%s');
+print_if_field(parameters.io, 'output_affix', '%s');
 print_overwrite_pair(parameters.io);
 fprintf('\n');
 
