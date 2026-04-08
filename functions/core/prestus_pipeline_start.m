@@ -19,7 +19,6 @@ function prestus_pipeline_start(parameters, options)
     if ~isfield(parameters, 'subject_id')
         error('parameters.subject_id must be set before calling prestus_pipeline_start.');
     end
-    subject_id = parameters.subject_id;
 
     % Ensure helper functions are accessible
     helpers_path = fileparts(mfilename('fullpath'));
@@ -67,15 +66,8 @@ function prestus_pipeline_start(parameters, options)
             fprintf(fid, 'delete(''%s'');\n', temp_m_path);
             fclose(fid);
 
-            % Job name
-            job_name = hpc_job_name(parameters);
-
             % Submit job
-            job_id = hpc_submit_job(platform, temp_m_file, parameters, log_dir);
-
-            % Display job info
-            job_info = hpc_job_info(platform, job_id, job_name, ...
-                parameters.hpc.memorylimit, parameters.hpc.timelimit, log_dir, true);
+            [job_id, parameters] = hpc_submit_job(platform, temp_m_file, parameters, log_dir);
 
             % Optional wait
             if isfield(parameters.hpc, 'wait_for_job') && parameters.hpc.wait_for_job

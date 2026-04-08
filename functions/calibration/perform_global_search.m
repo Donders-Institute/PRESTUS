@@ -49,9 +49,9 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
     if ~isfield(parameters.calibration, 'opt_upper_velocity') || isempty(parameters.calibration.opt_upper_velocity)
         parameters.calibration.opt_upper_velocity = 0.2; % set default for upper velocity to 20 mm/s;
     end
-    initial_guess = [randi(360, [1, parameters.transducer.n_elements]) / 180 * pi, velocity];
-    lower_bounds = [zeros(1, parameters.transducer.n_elements), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.n_elements), parameters.calibration.opt_upper_velocity]; % Upper bounds: [2pi rad, 200 mm/s]
+    initial_guess = [randi(360, [1, parameters.transducer.annular.elem_n]) / 180 * pi, velocity];
+    lower_bounds = [zeros(1, parameters.transducer.annular.elem_n), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
+    upper_bounds = [2 * pi * ones(1, parameters.transducer.annular.elem_n), parameters.calibration.opt_upper_velocity]; % Upper bounds: [2pi rad, 200 mm/s]
 
     if ~isfield(parameters.calibration, 'opt_method') || strcmp(parameters.calibration.opt_method, 'FEXminimize')
         % by default use FEXminimize
@@ -101,7 +101,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         weights);
 
     % Save the figure
-    fig_path = fullfile(parameters.outputs_folder, sprintf('GlobalSearch.png'));
+    fig_path = fullfile(parameters.io.outputs_folder, sprintf('GlobalSearch.png'));
     saveas(gcf, fig_path);
     close(gcf);
 

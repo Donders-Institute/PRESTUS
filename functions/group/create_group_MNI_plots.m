@@ -21,8 +21,8 @@ function create_group_MNI_plots(subject_list, parameters, options)
 %     - temp_output_dir [string]               : Path to output folder for subject images
 %     - layers.brain [array]             : Label values of brain tissue (for binary mask)
 %     - layers.water [array]             : Label values of water tissue (mask heating)
-%     - results_filename_affix [string/wildcard]: e.g., '_ses-*'.
-%     - simulation_medium [string]             : Used in table filenames
+%     - io.output_affix [string/wildcard]: e.g., '_ses-*'.
+%     - simulation.medium [string]             : Used in table filenames
 %     - subject_subfolder [bool, optional]     : If files are in subfolders like sub-001/sub-001_...
 %     - seg_path / data_path [string]          : Path to SimNIBS m2m segmentation data
 %     - thermal.temp_0 [scalar or struct]      : Baseline temp, or struct with .skin and .water

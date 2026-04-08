@@ -11,8 +11,8 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %                     - debug                      (1/0) Enable debug plots.
 %                     - debug_dir                  (string) Directory for saving debug images.
 %                     - subject_id                 (numeric) Subject ID for filename.
-%                     - simulation_medium          (string) Medium type (e.g., 'water').
-%                     - results_filename_affix     (string) Affix for output filenames.
+%                     - simulation.medium          (string) Medium type (e.g., 'water').
+%                     - io.output_affix            (string) Affix for output filenames.
 %                     - seg_labels.eye             (optional int) Label index for eye tissue.
 %   medium_masks    - 3D array of initial medium labels (updated in-place and returned).
 %   focus_pos_grid  - 1x3 vector [x,y,z] indices of focus position for debug slice (y-slice used).

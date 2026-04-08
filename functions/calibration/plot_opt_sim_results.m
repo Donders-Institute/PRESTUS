@@ -39,7 +39,7 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
     hold off;
 
     % Add focus and intensity reference lines
-    xline(parameters.expected_focal_distance_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
+    xline(parameters.transducer(1).focal_distance_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
     yline(parameters.calibration.desired_intensity, '--', 'DisplayName', 'Desired Intensity');
 
     xlabel('Distance wrt Mid-Bowl of Transducer [mm]');
@@ -50,7 +50,7 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
     xlim([0 inf]);
     
     % Save the profile comparison figure
-    fig_path = fullfile(parameters.outputs_folder, ...
+    fig_path = fullfile(parameters.io.outputs_folder, ...
         strcat('Opt_simulation_at_F_', num2str(parameters.calibration.desired_focal_distance_ep), ...
             '_at_I_', num2str(parameters.calibration.desired_intensity), ...
             '_', parameters.calibration.equipment_name, '.png'));
@@ -67,16 +67,16 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
         'LineWidth', 2, 'Color', 'r', 'DisplayName', 'Desired Profile');
     hold off;
     % Add focus and intensity reference lines
-    xline(parameters.expected_focal_distance_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
+    xline(parameters.transducer(1).focal_distance_bowl, '--', 'DisplayName', 'Focal Point wrt mid-bowl');
     yline(parameters.calibration.desired_intensity, '--', 'DisplayName', 'Desired Intensity');
     % add expected distance
-    if isfield(parameters, 'expected_focal_distance_bowl')
-        xline(parameters.expected_focal_distance_bowl, '--', ...
+    if isfield(parameters.transducer(1), 'focal_distance_bowl')
+        xline(parameters.transducer(1).focal_distance_bowl, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)', 'Color', [1 0 0]);
     end
     % add exit plane
-    if isfield(parameters.transducer, 'focal_distance_offset')
-        xline(parameters.transducer.focal_distance_offset, '--', ...
+    if isfield(parameters.transducer(1), 'focal_distance_offset')
+        xline(parameters.transducer(1).focal_distance_offset, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Exit Plane');
     end
     xlabel('Distance wrt Mid-Bowl of Transducer [mm]');
@@ -99,14 +99,14 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
 
     max_intensity_index = find(profile_sim_opt.axial_intensity == max(profile_sim_opt.axial_intensity), 1);
     fprintf('Expected distance from bowl to the point of maximum intensity: %.2f mm\n', ...
-        parameters.expected_focal_distance_bowl);
+        parameters.transducer(1).focal_distance_bowl);
     fprintf('Estimated distance from bowl to the point of maximum intensity: %.2f mm\n', ...
         profile_sim_opt.axial_distance_bowl(max_intensity_index));
     
     fprintf('Expected distance from exit plane to the point of maximum intensity: %.2f mm\n', ...
-        parameters.expected_focal_distance_ep);
+        parameters.transducer(1).focal_distance_ep);
     fprintf('Estimated distance from exit plane to the point of maximum intensity: %.2f mm\n', ...
-        profile_sim_opt.axial_distance_bowl(max_intensity_index)-parameters.transducer.focal_distance_offset);
+        profile_sim_opt.axial_distance_bowl(max_intensity_index)-parameters.transducer(1).focal_distance_offset);
 
     
 end

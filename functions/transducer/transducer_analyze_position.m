@@ -26,10 +26,10 @@ function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] 
 
     %% Step 1: Compute maximum outer diameter and exit plane distance
     % Calculate maximum outer diameter of transducer elements
-    max_od = max(parameters.transducer.Elements_OD_mm);
+    max_od = max(parameters.transducer(1).(parameters.transducer(1).type).elem_od_mm);
 
     % Compute distance from geometric focus to exit plane in mm
-    dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer.curv_radius_mm^2 - max_od^2);
+    dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm^2 - max_od^2);
 
     %% Step 2: Compute normal vector and adjust transducer position
     % Calculate normal vector pointing from transducer to target
@@ -40,7 +40,7 @@ function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] 
 
     %% Step 3: Compute geometric focus and exit plane positions
     % Compute geometric focus position based on curvature radius
-    geom_focus_pos = trans_pos - norm_v * (parameters.transducer.curv_radius_mm) / pixel_size;
+    geom_focus_pos = trans_pos - norm_v * (parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm) / pixel_size;
 
     % Compute exit plane position based on distance to exit plane
     ex_plane_pos = geom_focus_pos + norm_v * dist_to_ep_mm / pixel_size;

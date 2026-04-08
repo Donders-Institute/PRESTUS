@@ -16,7 +16,7 @@ function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
 %   See also HPC_SUBMIT_JOB.
 
 % Setup output directory
-if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder
+if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder
     output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', parameters.subject_id));
 else
     output_dir = parameters.path.sim;

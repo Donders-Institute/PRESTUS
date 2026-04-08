@@ -1,4 +1,4 @@
-function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, plot_options)
+function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, plot_options)
 
 % PLOT_T1_WITH_TRANSDUCER Creates a plot of a T1 slice oriented along the transducer's axis.
 %
@@ -17,7 +17,7 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
 %
 % Output:
 %   res_image       - [Mx x My x 3] RGB image matrix representing the T1 slice with overlays.
-%   transducer_pars - Struct containing parameters of the transducer setup.
+%   tr - Struct containing parameters of the transducer setup.
 
     % Checks if all data is in the right format
     arguments
@@ -59,7 +59,7 @@ function [res_image, transducer_pars] = plot_t1_with_transducer(t1_image, voxel_
     end
 
     %% Create transducer mask and setup parameters
-    [transducer_bowl, ~, transducer_pars] = transducer_setup(parameters.transducer(1), ...
+    [transducer_bowl, ~, tr] = transducer_setup(parameters.transducer(1), ...
                                                              trans_pos_grid, focus_pos_grid, ...
                                                              im_size, voxel_size_mm);
 

@@ -14,7 +14,7 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
     % Returns:
     % - profile_target.axial_intensity: Adjusted intensity profile to match the desired intensity [W/cm^2].
     % - profile_target.axial_distance_bowl: Distance from transducer reference point (mm)
-    % - parameters: updated with scaled parameters.transducer.source_amp
+    % - parameters: updated with scaled parameters.transducer.annular.elem_amp
 
     % Calculate maximum intensity and log adjustment details
     max_intens = max(profile_empirical.axial_intensity);
@@ -27,7 +27,7 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
     p_pa = sqrt(2 * desired_intensity * 1e4 * DENSITY_WATER * SOUND_SPEED_WATER);
 
     % Update source amplitude in simulation parameters
-    parameters.transducer.source_amp = repmat(p_pa, 1, parameters.transducer.n_elements);
+    parameters.transducer.annular.elem_amp = repmat(p_pa, 1, parameters.transducer.annular.elem_n);
 
     % Linearly scale the intensity profile
     adjustment_factor_intensity = max_intens / desired_intensity;

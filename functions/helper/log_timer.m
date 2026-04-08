@@ -75,8 +75,10 @@ function [used_bytes, free_bytes] = log_disk_space(monitor_path) % fetch disk sp
         free_bytes = str2double(strtrim(out_free));
     elseif ispc
         drive = monitor_path(1);
-        [~, out_used] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Used"', drive));
-        [~, out_free] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Free"', drive));
+        driveLetter = char(drive);
+        driveLetter = driveLetter(1);
+        [~, out_used] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Used"', driveLetter));
+        [~, out_free] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Free"', driveLetter));
         used_bytes = str2double(strtrim(out_used));
         free_bytes = str2double(strtrim(out_free));
     else

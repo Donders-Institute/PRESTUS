@@ -8,6 +8,7 @@ clear; close all;
 
 % add paths
 addpath(genpath('functions'))
+addpath(genpath('configs')) 
 addpath(genpath('toolboxes'))
 
 parameters = load_parameters('tutorial_config.yaml'); % load the configuration file

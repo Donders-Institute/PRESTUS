@@ -7,8 +7,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
 %                   MEDIUM_MASKS, HEATING_MAXT, HEATING_CEM43, KWAVE_MEDIUM, HIGHLIGHTED_POS)
 %
 % Inputs:
-%   - parameters (struct) - Simulation config: output_dir, simulation_medium, 
-%                           results_filename_affix, run_heating_sims, etc.
+%   - parameters (struct) - Simulation config: io.output_dir, simulation.medium,
+%                           io.output_affix, modules.run_heating_sims, etc.
 %   - planimg (struct) - SimNibs planning: t1_image_orig, inv_transf, t1_header
 %   - acoustic_Ipa (array) - Peak spatial-average intensity [W/cm²], from acoustic_analysis
 %   - acoustic_MI (array) - Mechanical Index grid

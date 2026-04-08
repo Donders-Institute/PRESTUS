@@ -21,11 +21,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 
     % Backward-compatible access to (first) transducer
     tx = parameters.transducer(1);
-    if numel(parameters.transducer)>1
-        warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', tx.source_freq_hz)
-    end
-
-    wave_period = 1 / tx.source_freq_hz;    % period [s]
+    wave_period = 1 / tx.freq_hz;    % period [s]
     
     % Check the number of input arguments
     % As a default the time step is based on the default CFL number of 0.3.
@@ -36,7 +32,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
         % Calculate the time step using an integer number of points per period
         % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
         if ~isfield(parameters.grid, 'source_ppw') || isempty(parameters.grid.source_ppw)
-            points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid.resolution_mm/1e3);
+            points_per_wavelength = max_sound_speed /(tx.freq_hz * parameters.grid.resolution_mm/1e3);
         else
             points_per_wavelength = parameters.grid.source_ppw;
         end
