@@ -88,6 +88,11 @@ function tr = validate_annular_transducer(tr, t_i)
         annular_tr.elem_amp = repmat(annular_tr.elem_amp, [1, annular_tr.elem_n]);
     end
 
+    % Default depth_mm for visualization (if not set in config)
+    if ~isfield(annular_tr, 'depth_mm') || isempty(annular_tr.depth_mm)
+        annular_tr.depth_mm = 16;
+    end
+
     % Encode updated annular transducer field
     tr.annular = annular_tr;
    
