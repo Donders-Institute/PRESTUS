@@ -27,13 +27,13 @@ function elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, 
     end
 
     % Adjust phases for virtual elements if necessary
-    if tran.n_elem ~= tran.prestus.transducer.elem_n
+    if tran.n_elem ~= tran.prestus.transducer.annular.elem_n
         % Map real elements to virtual elements
         original_pos = linspace(1, tran.n_elem, tran.n_elem);
 
         % Convert phases to radians, unwrap, and interpolate
         unwrapped_phases = unwrap(init_phases * pi / 180) * 180 / pi;
-        virtual_pos = linspace(1, tran.n_elem, tran.prestus.transducer.elem_n);
+        virtual_pos = linspace(1, tran.n_elem, tran.prestus.transducer.annular.elem_n);
         virtual_phases = interp1(original_pos, unwrapped_phases, virtual_pos, 'linear');
 
         % Convert back to degrees and apply modulo operation

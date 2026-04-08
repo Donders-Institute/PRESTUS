@@ -103,7 +103,7 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
     pred_axial_intensity = pred_axial_pressure .^ 2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
 
     % Compute particle velocity [m/s]
-    velocity = parameters.transducer.elem_amp(1) / ...
+    velocity = parameters.transducer.annular.elem_amp(1) / ...
                (parameters.medium_properties.water.density * parameters.medium_properties.water.sound_speed);
 
     %% Collect profile and distance

@@ -40,6 +40,7 @@ config.trans.(field_name_tran_1).prestus.transducer.annular.elem_od_mm = [32.359
 config.trans.(field_name_tran_1).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_1).prestus.transducer.annular.dist_geom_ep_mm = 52.38; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_1).prestus.transducer.freq_hz = 250000; % [Hz]
+config.trans.(field_name_tran_1).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_2 = 'CTX_250_009';
 config.trans.(field_name_tran_2).serial = field_name_tran_2;
@@ -54,6 +55,7 @@ config.trans.(field_name_tran_2).prestus.transducer.annular.elem_od_mm = [5.7744
 config.trans.(field_name_tran_2).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_2).prestus.transducer.annular.dist_geom_ep_mm = 56.87;
 config.trans.(field_name_tran_2).prestus.transducer.freq_hz = 250000; % [Hz]
+config.trans.(field_name_tran_2).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_3 = 'CTX_250_014';
 config.trans.(field_name_tran_3).serial = field_name_tran_3;
@@ -68,6 +70,7 @@ config.trans.(field_name_tran_3).prestus.transducer.annular.elem_od_mm = [5.7744
 config.trans.(field_name_tran_3).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_3).prestus.transducer.annular.dist_geom_ep_mm = 56.87;
 config.trans.(field_name_tran_3).prestus.transducer.freq_hz = 250000; % [Hz]
+config.trans.(field_name_tran_3).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_4 = 'CTX_250_026';
 config.trans.(field_name_tran_4).serial = field_name_tran_4;
@@ -82,6 +85,7 @@ config.trans.(field_name_tran_4).prestus.transducer.annular.elem_od_mm = [32.359
 config.trans.(field_name_tran_4).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_4).prestus.transducer.annular.dist_geom_ep_mm = 52.38; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_4).prestus.transducer.freq_hz = 250000; % [Hz]
+config.trans.(field_name_tran_4).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_5 = 'CTX_500_006';
 config.trans.(field_name_tran_5).serial = field_name_tran_5;
@@ -96,6 +100,7 @@ config.trans.(field_name_tran_5).prestus.transducer.annular.elem_od_mm = [4.0942
 config.trans.(field_name_tran_5).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_5).prestus.transducer.annular.dist_geom_ep_mm = 56.87; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_5).prestus.transducer.freq_hz = 500000; % [Hz]
+config.trans.(field_name_tran_5).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_6 = 'CTX_500_026';
 config.trans.(field_name_tran_6).serial = field_name_tran_6;
@@ -110,6 +115,7 @@ config.trans.(field_name_tran_6).prestus.transducer.annular.elem_od_mm = [32.512
 config.trans.(field_name_tran_6).prestus.transducer.annular.curv_radius_mm = 63.20; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_6).prestus.transducer.annular.dist_geom_ep_mm = 52.38; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_6).prestus.transducer.freq_hz = 500000; % [Hz]
+config.trans.(field_name_tran_6).prestus.transducer.type = 'annular'; % Transducer type
 
 %                   Imasonic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -129,6 +135,7 @@ config.trans.(field_name_tran_7).prestus.transducer.annular.elem_od_mm = [13.766
 config.trans.(field_name_tran_7).prestus.transducer.annular.curv_radius_mm = 75; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_7).prestus.transducer.annular.dist_geom_ep_mm = 65.3; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_7).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_7).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_8 = 'IS_PCD15287_01002';
 config.trans.(field_name_tran_8).serial = field_name_tran_8;
@@ -143,6 +150,7 @@ config.trans.(field_name_tran_8).prestus.transducer.annular.elem_od_mm = [13.766
 config.trans.(field_name_tran_8).prestus.transducer.annular.curv_radius_mm = 75; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_8).prestus.transducer.annular.dist_geom_ep_mm = 65.3; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_8).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_8).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_9 = 'IS_PCD15473_01001';
 config.trans.(field_name_tran_9).serial = field_name_tran_9;
@@ -157,6 +165,7 @@ config.trans.(field_name_tran_9).prestus.transducer.annular.elem_od_mm = [21.1, 
 config.trans.(field_name_tran_9).prestus.transducer.annular.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_9).prestus.transducer.annular.dist_geom_ep_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_9).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_9).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_10 = 'IS_PCD15473_01003';
 config.trans.(field_name_tran_10).serial = field_name_tran_10;
@@ -171,6 +180,7 @@ config.trans.(field_name_tran_10).prestus.transducer.annular.elem_od_mm = [21.1,
 config.trans.(field_name_tran_10).prestus.transducer.annular.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_10).prestus.transducer.annular.dist_geom_ep_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_10).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_10).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_11 = 'IS_PCD15473_01001_OPM';
 config.trans.(field_name_tran_11).serial = field_name_tran_11;
@@ -185,6 +195,7 @@ config.trans.(field_name_tran_11).prestus.transducer.annular.elem_od_mm = [21.1,
 config.trans.(field_name_tran_11).prestus.transducer.annular.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_11).prestus.transducer.annular.dist_geom_ep_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_11).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_11).prestus.transducer.type = 'annular'; % Transducer type
 
 field_name_tran_12 = 'IS_PCD15473_01003_OPM';
 config.trans.(field_name_tran_12).serial = field_name_tran_12;
@@ -199,6 +210,7 @@ config.trans.(field_name_tran_12).prestus.transducer.annular.elem_od_mm = [21.1,
 config.trans.(field_name_tran_12).prestus.transducer.annular.curv_radius_mm = 100; % Radius of curvature of the bowl  [mm]
 config.trans.(field_name_tran_12).prestus.transducer.annular.dist_geom_ep_mm = 92.7; % Distance to the transducer exit plane from the geometric focus [mm]
 config.trans.(field_name_tran_12).prestus.transducer.freq_hz = 300000; % [Hz]
+config.trans.(field_name_tran_12).prestus.transducer.type = 'annular'; % Transducer type
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                   Driving systems

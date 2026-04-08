@@ -14,8 +14,8 @@ function save_optimized_values(parameters)
         parameters.calibration.filename_calibrated_CSV);
     
     % Extract and round phases and amplitudes
-    opt_phases = round(parameters.transducer.elem_phase_deg, 2);
-    elem_amp = double(parameters.transducer.elem_amp(1));
+    opt_phases = round(parameters.transducer.annular.elem_phase_deg, 2);
+    elem_amp = double(parameters.transducer.annular.elem_amp(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     

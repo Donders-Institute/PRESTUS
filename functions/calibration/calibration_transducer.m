@@ -143,7 +143,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     
     % Calculate optimized source amplitude
     opt_source_amp = round(opt_velocity / profile_sim.velocity * ...
-        initial_params.transducer.elem_amp / ...
+        initial_params.transducer.annular.elem_amp / ...
         simulated_analytical_scaling);
 
     % Collect phases
@@ -155,9 +155,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     %% Rerun water simulation with optimized phases and source amplitude
 
     opt_param = sim_param;
-    opt_param.transducer.elem_amp = opt_source_amp;
-    opt_param.transducer.elem_phase_rad = opt_source_phase_rad;
-    opt_param.transducer.elem_phase_deg = opt_source_phase_deg;
+    opt_param.transducer.annular.elem_amp = opt_source_amp;
+    opt_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
+    opt_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
     opt_param.results_filename_affix = '_optimized';
 
     opt_param.subject_id = sim_id;
