@@ -7,15 +7,15 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             tr = parameters.transducer(ti);
 
             % require T1-grid positions for each transducer
-            assert(isfield(tr.position, 'trans_pos') && isfield(tr.position, 'focus_pos') && ...
-                   ~isempty(tr.position.trans_pos) && ~isempty(tr.position.focus_pos), ...
+            assert(isfield(tr, 'trans_pos') && isfield(tr, 'focus_pos') && ...
+                   ~isempty(tr.trans_pos) && ~isempty(tr.focus_pos), ...
                    'trans_pos and focus_pos must be defined for each transducer');
 
-            pts_t1 = [tr.position.trans_pos(:).'; tr.position.focus_pos(:).'];  % 2×3
+            pts_t1 = [tr.trans_pos(:).'; tr.focus_pos(:).'];  % 2×3
             pts_sim = round(tformfwd(pts_t1, maketform('affine', planimg.transf))); % 2×3
 
-            parameters.transducer(ti).position.trans_pos  = pts_sim(1,:);
-            parameters.transducer(ti).position.focus_pos  = pts_sim(2,:);
+            parameters.transducer(ti).trans_pos  = pts_sim(1,:);
+            parameters.transducer(ti).focus_pos  = pts_sim(2,:);
         end
     else
         % non-layered media currently only support a single transducer
@@ -31,18 +31,18 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             % for water medium remove potential position specifications
             % the grid has an arbitrary size that does not necessarily map onto the planning image
             if strcmp(parameters.simulation.medium, 'water')
-                parameters.transducer.position.trans_pos = [];
-                parameters.transducer.position.focus_pos = [];
+                parameters.transducer.trans_pos = [];
+                parameters.transducer.focus_pos = [];
             end
         end
 
-        if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.position.trans_pos)) ...
-                || (~isfield(parameters.transducer, 'focus_pos')|| isempty(parameters.transducer.position.focus_pos))
+        if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...
+                || (~isfield(parameters.transducer, 'focus_pos')|| isempty(parameters.transducer.focus_pos))
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
             % note that the focus position matters only for the orientation of the transducer
         end
         % set transducer position in grid
-        if ~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.position.trans_pos)
+        if ~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)
             % transducer positioned arbitrarily (2D only)
             % y: first position beyond pml layer
             % x: halfway
@@ -50,7 +50,7 @@ function [parameters] = grid_transducer_location(parameters, planimg)
                 [parameters.grid.dims(1:(numel(parameters.grid.dims)-1))/2, ...
                 parameters.grid.pml_size+1]);
         else
-            trans_pos = parameters.transducer.position.trans_pos;
+            trans_pos = parameters.transducer.trans_pos;
             % Adjust if the positions are transposed
             if size(trans_pos,1)>size(trans_pos, 2)
                 warning('Specified transducer position appears transposed...adjusting');
@@ -58,7 +58,7 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             end
         end
         % set focus position in grid
-        if ~isfield(parameters.transducer, 'focus_pos') || isempty(parameters.transducer.position.focus_pos)
+        if ~isfield(parameters.transducer, 'focus_pos') || isempty(parameters.transducer.focus_pos)
             % no focus point specified
             % position focus at expected distance from transducer
             % index dimension depends on 2D/3D
@@ -67,9 +67,9 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             focus_pos = trans_pos;
             focus_pos(numel(parameters.grid.dims)) = ...
                 round(focus_pos(numel(parameters.grid.dims)) + ...
-                parameters.transducer(1).position.exp_FD_bowl/parameters.grid.resolution_mm);
+                parameters.transducer(1).focal_distance_bowl/parameters.grid.resolution_mm);
         else
-            focus_pos = parameters.transducer.position.focus_pos;
+            focus_pos = parameters.transducer.focus_pos;
             % Adjust if the positions are transposed (2D only)
             % In 2D, we expect the second index as the axial dimension
             if numel(parameters.grid.dims) == 2 && focus_pos(1)>focus_pos(2)
@@ -78,16 +78,16 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             end
         end
         % Retain transducer and focus positions
-        parameters.transducer(1).position.trans_pos = trans_pos;
-        parameters.transducer(1).position.focus_pos = focus_pos;
+        parameters.transducer(1).trans_pos = trans_pos;
+        parameters.transducer(1).focus_pos = focus_pos;
     end
     
     % If a PML layer is used to absorb waves reaching the edge of the grid,
     % this will check if there is enough room for a PML layer between the
     % transducers and the edge of the grid
     for ti = 1:numel(parameters.transducer)
-        tp = parameters.transducer(ti).position.trans_pos;
-        fp = parameters.transducer(ti).position.focus_pos;
+        tp = parameters.transducer(ti).trans_pos;
+        fp = parameters.transducer(ti).focus_pos;
         assert(min(abs([repmat(0, 1, numel(parameters.grid.dims));parameters.grid.dims]-...
             tp ),[],'all') > parameters.grid.pml_size, ...
             sprintf('The minimal distance between the transducer %i and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size', ti))

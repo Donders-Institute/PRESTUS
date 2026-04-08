@@ -1,4 +1,4 @@
-function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m) 
+function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m) 
 % EXTRACT_ELEMENT_POS Extracts matrix transducer element positions from file.
 %
 % This function reads element position coordinates from an external file
@@ -11,18 +11,15 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
 %
 % Input:
 %   parameters  Global simulation parameters
-%   tp        - Struct containing transducer parameters.
+%   tr        - Struct containing transducer parameters.
 %   trans_pos_m  [3x1] transducer position in meters
 %
 % Output:
 %   elem_pos_m - 3 x N matrix containing element positions in metres,
 %                expressed in simulation coordinates.
 
-    % Extract matrix transducer configuration from the transducer parameters
-    matrix_tp = tp.matrix;
-
     % Extract file-based matrix shape parameters for reading element positions
-    file_ext = matrix_tp.matrix_shape.extract_from_file;
+    file_ext = tr.matrix.matrix_shape.extract_from_file;
 
     % ---------------------------------------------------------------------
     % Read element positions from file
@@ -31,7 +28,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     tran_info = readtable(file_ext.file_path);
 
     row_start = file_ext.start_row;
-    row_end   = row_start + file_ext.n_elements - 1;
+    row_end   = row_start + file_ext.elem_n - 1;
 
     col_start = file_ext.start_col;
     
@@ -58,7 +55,7 @@ function elem_pos_m = extract_element_pos(parameters, tp, trans_pos_m)
     % ---------------------------------------------------------------------
     % Convert positions from mm to metres and center coordinates
     % ---------------------------------------------------------------------
-    ROC = matrix_tp.curv_radius_mm;
+    ROC = tr.matrix.curv_radius_mm;
 
     % Translate origin from [0,0,ROC] to [0,0,0], convert mm→m, and flip Z-axis
     phys_positions_m = (phys_positions_mm - [0, 0, ROC]) .* [1, 1, -1] / 1000;

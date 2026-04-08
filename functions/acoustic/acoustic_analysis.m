@@ -6,8 +6,8 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 
     % select transducer info
     tr = parameters.transducer(1);
-    trans_pos = tr.position.trans_pos;
-    focus_pos = tr.position.focus_pos;
+    trans_pos = tr.trans_pos;
+    focus_pos = tr.focus_pos;
     
     % intialize output structure
     results = struct();
@@ -24,7 +24,7 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 
     % Calculates the Mechanical Index for every gridpoint
 
-    freq_Hz = tr.(tr.type).source_freq_hz;
+    freq_Hz = tr.freq_hz;
     freq_MHz = freq_Hz/10^6;
     acoustic_MI = (acoustic_pressure/10^6)/sqrt(freq_MHz);
 
@@ -37,7 +37,7 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     comp_grid_size = size(sensor_data.p_max_all);
     after_exit_plane_mask = ones(comp_grid_size);
     bowl_depth_grid = round((tr.(tr.type).curv_radius_mm-...
-        tr.(tr.type).dist_to_plane_mm)/parameters.grid.resolution_mm);
+        tr.(tr.type).dist_geom_ep_mm)/parameters.grid.resolution_mm);
     % Places the exit plane mask in the grid, adjusted to the amount of dimensions
     if numel(parameters.grid.dims) == 3
         if trans_pos(3) > comp_grid_size(3)/2
@@ -168,8 +168,8 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
     end
     for ti = 1:n_plots
 
-        tpos_sim = parameters.transducer(ti).position.trans_pos;
-        fpos_sim = parameters.transducer(ti).position.focus_pos;
+        tpos_sim = parameters.transducer(ti).trans_pos;
+        fpos_sim = parameters.transducer(ti).focus_pos;
 		
 		trans_suffix = '';
 		if n_plots > 1; trans_suffix = sprintf('_T%02d', ti); end

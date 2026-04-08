@@ -60,15 +60,15 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.modules.generate_report        = 0;
 
     % Transducer — single-element annular bowl
-    parameters.transducer.annular.n_elements         = 1;
-    parameters.transducer.annular.Elements_ID_mm     = 0;
-    parameters.transducer.annular.Elements_OD_mm     = 32.0;
+    parameters.transducer.annular.elem_n         = 1;
+    parameters.transducer.annular.elem_id_mm     = 0;
+    parameters.transducer.annular.elem_od_mm     = 32.0;
     parameters.transducer.annular.curv_radius_mm     = 63.2;
-    parameters.transducer.annular.dist_to_plane_mm   = 52.38;
+    parameters.transducer.annular.dist_geom_ep_mm   = 52.38;
     parameters.transducer.annular.source_freq_hz     = 250e3;
-    parameters.transducer.annular.source_amp         = 91590;
-    parameters.transducer.annular.source_phase_deg   = 0;
-    parameters.transducer.annular.source_phase_rad   = 0;
+    parameters.transducer.annular.elem_amp         = 91590;
+    parameters.transducer.annular.elem_phase_deg   = 0;
+    parameters.transducer.annular.elem_phase_rad   = 0;
 
     % Transducer & focus position (centre of grid, pointing along z)
     half = round(parameters.grid.default_dims / 2);

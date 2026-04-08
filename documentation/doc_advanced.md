@@ -43,11 +43,11 @@ Multiple transducers can be specified in layered simulations. See [this pull req
 ```
 transducer:
   - name: right
-    n_elements: 10
+    elem_n: 10
     ...
 
   - name: left
-    n_elements: 10
+    elem_n: 10
     ...
 ```
 

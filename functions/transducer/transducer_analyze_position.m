@@ -26,7 +26,7 @@ function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] 
 
     %% Step 1: Compute maximum outer diameter and exit plane distance
     % Calculate maximum outer diameter of transducer elements
-    max_od = max(parameters.transducer.Elements_OD_mm);
+    max_od = max(parameters.transducer.elem_od_mm);
 
     % Compute distance from geometric focus to exit plane in mm
     dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer.curv_radius_mm^2 - max_od^2);

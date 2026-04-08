@@ -102,42 +102,41 @@ analysis:
 
 transducer:
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
+  freq_hz: []           # Fundamental frequency [Hz]
 
-  position:
-    trans_pos: []       # Transducer position [T1 grid space]
-    focus_pos: []       # Stimulation target position [T1 grid space]
-    exp_FD_ep: []       # Expected focal distance from transducer exit plane [mm]
-    exp_FD_bowl: []     # Expected focal distance from transducer bowl [mm]
+  trans_pos: []              # Transducer position [T1 grid space]
+  focus_pos: []              # Stimulation target position [T1 grid space]
+  focal_distance_ep: []      # Expected focal distance from transducer exit plane [mm]
+  focal_distance_bowl: []    # Expected focal distance from transducer bowl [mm]
+  focal_distance_offset: []  # Offset between bowl and exit plane [mm] [DERIVED]
   
   # --------------------------
   # Annular transducer parameters
   # --------------------------
   annular:
-    n_elements: []        # Number of elements in the transducer [#]
-    source_freq_hz: []    # Fundamental frequency [Hz]
-    source_amp: []        # Pressure amplitude [Pa]
-    source_phase_deg: []  # Source phase of each element [deg] (0-360)
-    Elements_ID_mm: []    # Inner diameter of each element [mm]
-    Elements_OD_mm: []    # Outer diameter of each element [mm]
+    elem_n: []            # Number of elements in the transducer [#]
+    elem_id_mm: []        # Inner diameter of each element [mm]
+    elem_od_mm: []        # Outer diameter of each element [mm]
+    elem_amp: []          # Pressure amplitude [Pa]
+    elem_phase_deg: []    # Source phase of each element [deg] (0-360)
     curv_radius_mm: []    # Radius of curvature of the bowl [mm]
-    dist_to_plane_mm: []  # Distance from transducer plane to geometric focus [mm]
+    dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
     depth_mm: []          # Depth of transducer used for visualization purposes [mm]
 
   # --------------------------
   # Matrix transducer parameters
   # --------------------------
   matrix:
-    source_freq_hz: []    # Fundamental frequency [Hz]
-    source_amp: []        # Pressure amplitude [Pa]
+    elem_amp: []          # Pressure amplitude [Pa]
     steering: []          # '1D' (Axial steering) or '3D' (Volumetric steering)
-    element_shape: []     # 'rect', 'disc', or 'bowl' - physical shape of each element
+    elem_shape: []        # 'rect', 'disc', or 'bowl' - physical shape of each element
     elem_height_mm: []    # Element height [mm]
     elem_width_mm: []     # Element width [mm]
     outer_diameter_mm: [] # Outer diameter of the transducer [mm]
     depth_mm: []          # Depth of transducer used for visualization purposes [mm]
     is_curved: []         # true if transducer has a curved (spherical) surface, false if flat
     curv_radius_mm: []    # Radius of curvature of the bowl [mm]
-    dist_to_plane_mm: []  # Distance from transducer plane to geometric focus [mm]
+    dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
 
     # Optional Clover multi-aperture configuration
     is_clover_setup: []  # true to enable Clover replication
@@ -157,25 +156,25 @@ transducer:
           type: []       # 'rect', 'fibonacci', 'fermat' - type of grid layout
 
           rect:
-            n_elem_row: []          # Number of rows in rectangular grid
-            n_elem_col: []          # Number of columns in rectangular grid
+            elem_n_row: []          # Number of rows in rectangular grid
+            elem_n_col: []          # Number of columns in rectangular grid
             elem_spacing_height_mm: [] # Edge-to-edge spacing between rows [mm]
             elem_spacing_width_mm: []  # Edge-to-edge spacing between columns [mm]
             sparsity_factor: []     # Fraction of elements used (0 < value <= 1)
 
           fibonacci:
-            n_elements: []          # Total number of elements for Fibonacci grid
-            kerf_mm: []             # Minimum spacing between elements [mm]
+            elem_n: []             # Total number of elements for Fibonacci grid
+            kerf_mm: []            # Minimum spacing between elements [mm]
 
           fermat:
-            n_elements: []          # Total number of elements for Fermat spiral grid
+            elem_n: []             # Total number of elements for Fermat spiral grid
 
       # If extract_from_file is used:
       extract_from_file:
         file_path: []              # Path to file with element positions (x, y, z) [string]
         start_row: []              # Row in file where element data starts
         start_col: []              # Column in file where element data starts
-        n_elements: []             # Total number of elements to extract
+        elem_n: []                 # Total number of elements to extract
         select_random_subset: []   # true to randomly pick a subset
         subset:
           random_seed: []          # true to use a new seed each run, false to fix seed

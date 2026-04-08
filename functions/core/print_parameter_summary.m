@@ -30,8 +30,8 @@ fprintf('\n');
 
 fprintf('⚙️ SIMULATION TYPE\n');
 print_if_field(parameters.simulation, 'medium', '%s');
-print_if_field(parameters.grid, 'n_dims', '%dD');
-print_flag(parameters.grid, 'axisymmetric');
+print_if_field(parameters.simulation, 'precision', '%s');
+print_if_field(parameters.simulation, 'code_type', '%s');
 print_modules(parameters.modules);
 fprintf('\n');
 
@@ -39,11 +39,12 @@ fprintf('\n');
 
 fprintf('📐 SIMULATION GRID\n');
 grid = get_struct_or_default(parameters, 'grid');
+print_if_field(grid, 'n_dims', '%dD');
 print_if_field(grid, 'resolution_mm', '%.2f mm');
+print_flag(grid, 'axisymmetric');
 print_if_field(grid, 'default_dims', '%s');
 print_if_field(grid, 'pml_size', '%d');
 print_if_field(grid, 'max_expand', '%.1f');
-print_if_field(parameters, 'precision', '%s');
 fprintf('\n');
 
 %% 4. Transducer Specification
@@ -62,15 +63,15 @@ for t_i = 1:numel(parameters.transducer)
         case 'annular'
             ann = tr.annular;
 
-            print_if_field(ann, 'n_elements', '%d');
+            print_if_field(ann, 'elem_n', '%d');
             print_if_field(ann, 'curv_radius_mm', '%.0f mm');
-            print_if_field(ann, 'source_phase_deg', '%.1f deg.');
+            print_if_field(ann, 'elem_phase_deg', '%.1f deg.');
 
         case 'matrix'
             mat = tr.matrix;
 
             fprintf('  Steering: %s\n', mat.steering);
-            fprintf('  Element shape: %s\n', mat.element_shape);
+            fprintf('  Element shape: %s\n', mat.elem_shape);
             print_if_field(mat, 'elem_height_mm', '%.3f mm');
             print_if_field(mat, 'elem_width_mm', '%.3f mm');
             print_if_field(mat, 'outer_diameter_mm', '%.2f mm');
@@ -101,8 +102,8 @@ for t_i = 1:numel(parameters.transducer)
                         case 'rect'
                             rect_grid = define_here.grid_shape.rect;
                             fprintf('      Rectangular grid:\n');
-                            print_if_field(rect_grid, 'n_elem_row', '%d');
-                            print_if_field(rect_grid, 'n_elem_col', '%d');
+                            print_if_field(rect_grid, 'elem_n_row', '%d');
+                            print_if_field(rect_grid, 'elem_n_col', '%d');
                             print_if_field(rect_grid, 'elem_spacing_height_mm', '%.2f mm');
                             print_if_field(rect_grid, 'elem_spacing_width_mm', '%.2f mm');
                             print_if_field(rect_grid, 'sparsity_factor', '%.2f');
@@ -110,12 +111,12 @@ for t_i = 1:numel(parameters.transducer)
                         case 'fibonacci'
                             fib_grid = define_here.grid_shape.fibonacci;
                             fprintf('      Fibonacci grid:\n');
-                            print_if_field(fib_grid, 'n_elements', '%d');
+                            print_if_field(fib_grid, 'elem_n', '%d');
 
                         case 'fermat'
                             fermat_grid = define_here.grid_shape.fermat;
                             fprintf('      Fermat spiral grid:\n');
-                            print_if_field(fermat_grid, 'n_elements', '%d');
+                            print_if_field(fermat_grid, 'elem_n', '%d');
                     end
 
                 case 'extract_from_file'
@@ -123,7 +124,7 @@ for t_i = 1:numel(parameters.transducer)
                     print_if_field(ext, 'file_path', '%s');
                     print_if_field(ext, 'start_row', '%d');
                     print_if_field(ext, 'start_col', '%d');
-                    print_if_field(ext, 'n_elements', '%d');
+                    print_if_field(ext, 'elem_n', '%d');
                     print_if_field(ext, 'select_random_subset', '%d');
                     if ext.select_random_subset
                         print_if_field(ext.subset, 'random_seed', '%d');
@@ -136,12 +137,12 @@ for t_i = 1:numel(parameters.transducer)
             end
     end
 
-    print_if_field(tr.(tr.type), 'source_freq_hz', '%.1f Hz');
-    print_if_field(tr.(tr.type), 'source_amp', '%.1f Pa');
-    print_if_field(tr.position, 'trans_pos', '[%.1f %.1f %.1f]');
-    print_if_field(tr.position, 'focus_pos', '[%.1f %.1f %.1f]');
-	print_if_field(tr.position, 'exp_FD_ep', '%.1f mm');
-	print_if_field(tr.position, 'exp_FD_bowl', '%.1f mm');
+    print_if_field(tr, 'freq_hz', '%.1f Hz');
+    print_if_field(tr.(tr.type), 'elem_amp', '%.1f Pa');
+    print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
+    print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
+	print_if_field(tr, 'focal_distance_ep', '%.1f mm');
+	print_if_field(tr, 'focal_distance_bowl', '%.1f mm');
 
     fprintf('\n');
 end
@@ -187,7 +188,6 @@ end
 
 fprintf('💻 HPC/GPU OPTIONS\n');
 print_if_field(parameters, 'platform', '%s');
-print_if_field(parameters, 'code_type', '%s');
 hpc = get_struct_or_default(parameters, 'hpc');
 print_if_field(hpc, 'partition', '%s');
 fprintf('\n');

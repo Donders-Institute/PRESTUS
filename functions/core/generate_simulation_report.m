@@ -442,12 +442,12 @@ end
 
 function html = build_medium_properties_section(parameters)
     html = '';
-    if ~isfield(parameters, 'medium') || ~isfield(parameters, 'layers')
+    if ~isfield(parameters, 'medium_properties') || ~isfield(parameters, 'layers')
         html = '<p class="placeholder">Missing medium or layers data.</p>';
         return
     end
 
-    med = parameters.simulation.medium;
+    med = parameters.medium_properties;
     layer_names = fieldnames(parameters.layers);
     
     % === CORRECT FILTER: layers in BOTH parameters.layers AND parameters.simulation.medium ===
@@ -516,7 +516,7 @@ function html = build_config_summary(parameters)
     html = '<table class="config-table">';
 
     % Simulation type
-    html = config_row(html, 'Simulation medium', safe_field(parameters, 'medium', 'N/A'));
+    html = config_row(html, 'Simulation medium', safe_field(parameters.simulation, 'medium', 'N/A'));
     html = config_row(html, 'Dimensions', sprintf('%dD', safe_field(parameters.grid, 'n_dims', 3)));
 
     % Grid
@@ -536,12 +536,12 @@ function html = build_config_summary(parameters)
     % Transducer (first transducer)
     if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
         td = parameters.transducer(1);
-        html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td.(td.type), 'source_freq_hz', NaN)));
-        html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'n_elements', NaN)));
+        html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td, 'freq_hz', NaN)));
+        html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'elem_n', NaN)));
         html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td.(td.type), 'curv_radius_mm', NaN)));
-        html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'source_amp', NaN)));
+        html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'elem_amp', NaN)));
     end
-    focal = safe_field(parameters, 'exp_FD_bowl', NaN);
+    focal = safe_field(parameters.transducer(1), 'focal_distance_bowl', NaN);
     if ~isnan(focal)
         html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
     end
@@ -552,7 +552,7 @@ function html = build_config_summary(parameters)
                'run_heating_sims', 'Thermal sims'; ...
                'run_posthoc_water_sims', 'Post-hoc water'};
     for i = 1:size(modules, 1)
-        val = safe_field(parameters, modules{i,1}, 0);
+        val = safe_field(parameters.modules, modules{i,1}, 0);
         if val
             status = 'Enabled';
         else
@@ -562,7 +562,7 @@ function html = build_config_summary(parameters)
     end
 
     % Thermal protocol (if enabled)
-    if isfield(parameters, 'thermal') && safe_field(parameters, 'run_heating_sims', 0)
+    if isfield(parameters, 'thermal') && isfield(parameters, 'modules') && safe_field(parameters.modules, 'run_heating_sims', 0)
         th = parameters.thermal;
         thermal_fields = {'pd', 'Pulse duration'; 'pri', 'Pulse repetition interval'; ...
                           'ptd', 'Pulse train duration'; 'ptri', 'Pulse train rep. interval'; ...
@@ -733,7 +733,7 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
     html = '';
 
     debug_dir = '';
-    if isfield(parameters, 'debug_dir')
+    if isfield(parameters.io, 'debug_dir')
         debug_dir = parameters.io.debug_dir;
     end
     if isempty(debug_dir) || ~isfolder(debug_dir)
@@ -847,7 +847,7 @@ function html = build_log_section(parameters, subject_id, medium, affix)
     log_text = strjoin(tail_lines, newline);
 
     html = [html sprintf('<p class="note">Log: <code>%s</code></p>', ...
-        n, html_escape(log_path))];
+        html_escape(log_path))];
     html = [html '<pre class="log-block">' html_escape(log_text) '</pre>'];
 end
 
@@ -1067,7 +1067,7 @@ end
 function log_path = find_log_file(parameters, subject_id, medium, affix)
 % Find the most recent diary log file.
     log_path = '';
-    if ~isfield(parameters, 'output_dir') || ~isfolder(parameters.io.output_dir)
+    if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'output_dir') || ~isfolder(parameters.io.output_dir)
         return
     end
 

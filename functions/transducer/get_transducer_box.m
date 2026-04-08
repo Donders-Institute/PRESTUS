@@ -43,22 +43,22 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ..
 
     %% Compute geometric focus position
     % Calculate geometric focus position based on curvature radius and focal angle
-    t = parameters.transducer(1);
-    geom_focus_pos = trans_pos - (t.(t.type).curv_radius_mm) / grid_step * focal_slope;
+    tr = parameters.transducer(1);
+    geom_focus_pos = trans_pos - (tr.(tr.type).curv_radius_mm) / grid_step * focal_slope;
 
     %% Compute distance to exit plane
     % Maximum outer diameter of transducer elements
-    switch t.type
+    switch tr.type
         case 'annular'
-            max_od = max(t.annular.Elements_OD_mm);
+            max_od = max(tr.annular.elem_od_mm);
         case 'matrix'
-            max_od = t.matrix.outer_diameter_mm;
+            max_od = tr.matrix.outer_diameter_mm;
         otherwise
-            error('Array type %s is unknown or not implemented.', t.type)
+            error('Array type %s is unknown or not implemented.', tr.type)
     end
 
     % Distance from geometric focus to exit plane in mm
-    dist_to_ep_mm = 0.5 * sqrt(4 * t.(t.type).curv_radius_mm^2 - max_od^2);
+    dist_to_ep_mm = 0.5 * sqrt(4 * tr.(tr.type).curv_radius_mm^2 - max_od^2);
 
     % Convert distance to exit plane from mm to grid units
     dist_to_ep_grid = dist_to_ep_mm / grid_step;
@@ -78,7 +78,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ..
     r = max_od / 2 / grid_step;
 
     % Depth of transducer in grid units
-    trans_full_depth = t.(t.type).depth_mm / grid_step;
+    trans_full_depth = tr.(tr.type).depth_mm / grid_step;
 
     % Back end position of transducer based on depth and focal slope
     trans_back = ex_plane_pos_trig + trans_full_depth * focal_slope;
@@ -120,7 +120,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ..
             
         % transducer curvature
         [arc_x, arc_y] = get_arc(geom_focus_pos, ...
-            t.(t.type).curv_radius_mm/grid_step, ...
+            tr.(tr.type).curv_radius_mm/grid_step, ...
             focal_angle-arc_halfangle, ...
             focal_angle+arc_halfangle );
         plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth, ...

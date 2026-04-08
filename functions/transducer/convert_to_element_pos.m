@@ -1,4 +1,4 @@
-function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, focus_pos_m)
+function [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m)
 %CONVERT_TO_ELEMENT_POS Generate element positions for matrix transducers
 %
 % This function generates the 3-D element coordinates of a matrix
@@ -14,28 +14,25 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
 %
 % INPUTS
 %   parameters  Global simulation parameters
-%   tp          Transducer parameter structure
+%   tr          Transducer parameter structure
 %   trans_pos_m  [3x1] transducer position in meters
 %   focus_pos_m  [3x1] focus position in meters
 %
 % OUTPUTS
 %   elem_pos_m  Element center coordinates [m] (3 × N)
-%   tp          Updated transducer parameter structure
+%   tr          Updated transducer parameter structure
 %
 % NOTES
 %   • Element coordinates are returned in k-Wave format (3 × N)
 %   • Internal calculations are performed in millimeters unless noted
-%   • Curvature is applied only when tp.matrix.is_curved = true
+%   • Curvature is applied only when tr.matrix.is_curved = true
 
     % ----------------------------------------------------------------------
     % Extract configuration
     % -----------------------------------------------------------------------
 
-    % Extract matrix transducer configuration from the transducer parameters
-    matrix_tp = tp.matrix;
-
     % Extract defined matrix shape parameters for reading element positions
-    defined = matrix_tp.matrix_shape.define_here;
+    defined = tr.matrix.matrix_shape.define_here;
     grid_shape = defined.grid_shape;
 
     % Ensure column vectors
@@ -47,9 +44,9 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
 
             fib = grid_shape.fibonacci;
 
-            N = fib.n_elements;              % number of elements
-            D = matrix_tp.outer_diameter_mm; % aperture diameter [mm]
-            R = matrix_tp.curv_radius_mm;    % radius of curvature [mm]
+            N = fib.elem_n;              % number of elements
+            D = tr.matrix.outer_diameter_mm; % aperture diameter [mm]
+            R = tr.matrix.curv_radius_mm;    % radius of curvature [mm]
 
             a = D/2;                         % aperture radius [mm]
             ga = pi*(3 - sqrt(5));           % golden angle
@@ -66,7 +63,7 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
                 y = r*sin(theta);
 
                 % Project onto spherical cap if curved
-                if matrix_tp.is_curved
+                if tr.matrix.is_curved
                     z = R - sqrt(R^2 - x^2 - y^2);
                 else
                     z = 0;
@@ -101,20 +98,20 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
             rect = grid_shape.rect;
 
             % --- Compute array dimensions --------------------------------------
-            tran_width = (rect.n_elem_row * tp.elem_width_mm) + ...
-                ((rect.n_elem_row - 1) * rect.elem_spacing_width_mm);
+            tran_width = (rect.elem_n_row * tr.elem_width_mm) + ...
+                ((rect.elem_n_row - 1) * rect.elem_spacing_width_mm);
 
-            tran_height = (rect.n_elem_col * tp.elem_height_mm) + ...
-                ((rect.n_elem_col - 1) * rect.elem_spacing_height_mm);
+            tran_height = (rect.elem_n_col * tr.elem_height_mm) + ...
+                ((rect.elem_n_col - 1) * rect.elem_spacing_height_mm);
 
             % --- Element center coordinates ------------------------------------
-            x_vec = linspace(-tran_width/2 + tp.elem_width_mm/2,...
-                tran_width/2 - tp.elem_width_mm/2,...
-                rect.n_elem_row);
+            x_vec = linspace(-tran_width/2 + tr.elem_width_mm/2,...
+                tran_width/2 - tr.elem_width_mm/2,...
+                rect.elem_n_row);
 
-            y_vec = linspace(-tran_height/2 + tp.elem_height_mm/2,...
-                tran_height/2 - tp.elem_height_mm/2,...
-                rect.n_elem_col);
+            y_vec = linspace(-tran_height/2 + tr.elem_height_mm/2,...
+                tran_height/2 - tr.elem_height_mm/2,...
+                rect.elem_n_col);
 
             [X,Y] = meshgrid(x_vec,y_vec);
 
@@ -148,18 +145,18 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
             dy = Y(:) - trans_pos_m(2);
             distances = sqrt(dx.^2 + dy.^2);
 
-            radius = matrix_tp.Elements_OD_mm(end) * 1e-3 / 2;
+            radius = tr.matrix.elem_od_mm(end) * 1e-3 / 2;
             mask   = distances <= radius;
 
             elem_pos_m = [X(:) Y(:) Z(:)];
             elem_pos_m = elem_pos_m(mask,:);
 
             % Update number of elements
-            tp.matrix.n_elements = size(elem_pos_m,1);
+            tr.matrix.elem_n = size(elem_pos_m,1);
 
             % Duplicate source amplitude per element
-            tp.source_amp = tp.source_amp(1) * ...
-                ones(1,tp.matrix.n_elements);
+            tr.elem_amp = tr.elem_amp(1) * ...
+                ones(1,tr.matrix.elem_n);
 
             % [DEBUG] visualize circular aperture
             if parameters.debug == 1
@@ -176,9 +173,9 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
             end
 
             % Apply curvature (spherical cap)
-            if matrix_tp.is_curved
+            if tr.matrix.is_curved
 
-                ROC = matrix_tp.curv_radius_mm / 1000;
+                ROC = tr.matrix.curv_radius_mm / 1000;
                 R2  = ROC^2;
 
                 sagitta_term = R2 - elem_pos_m(:,1).^2 - elem_pos_m(:,2).^2;
@@ -196,10 +193,10 @@ function [elem_pos_m, tp] = convert_to_element_pos(parameters, tp, trans_pos_m, 
         case 'fermat'
             elem_pos_m = makeCartBowl( ...
                 trans_pos_m', ...
-                matrix_tp.curv_radius_mm * 1e-3, ...
-                matrix_tp.outer_diameter_mm * 1e-3, ...
+                tr.matrix.curv_radius_mm * 1e-3, ...
+                tr.matrix.outer_diameter_mm * 1e-3, ...
                 focus_pos_m', ...
-                tp.n_elements, ...
+                tr.elem_n, ...
                 true);
 
         otherwise

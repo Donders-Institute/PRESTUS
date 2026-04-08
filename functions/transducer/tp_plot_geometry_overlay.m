@@ -9,7 +9,7 @@ sz = size(img);  % Get image dimensions [Nx Ny Nz] - overrides input sz
 [t1_x, t1_y, t1_z] = ndgrid(1:sz(1), 1:sz(2), 1:sz(3));  % 3D voxel coordinate grids (X,Y,Z)
 
 % Transducer geometry parameters (physical → voxel space)
-max_od_mm = max(parameters.transducer.Elements_OD_mm); % Largest element diameter (mm) - aperture size
+max_od_mm = max(parameters.transducer.elem_od_mm); % Largest element diameter (mm) - aperture size
 % Sagitta calculation: distance from geometric focus to exit plane
 % h = R - sqrt(R^2 - (D/2)^2) where R=curvature radius, D=aperture diameter
 % Exit plane lies at h/2 from sphere center along optical axis

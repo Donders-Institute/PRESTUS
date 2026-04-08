@@ -52,7 +52,7 @@ parameters.t2_path_template = fullfile(sprintf('m2m_sub-%03d', subject_id), "T2_
 
 ### Specify a transducer and target location
 
-For `layered` simulations, specify locations via `parameters.transducer.position.trans_pos` and `parameters.transducer.position.focus_pos`. 
+For `layered` simulations, specify locations via `parameters.transducer.trans_pos` and `parameters.transducer.focus_pos`. 
 
 See [Placement](doc_placement.md).
 

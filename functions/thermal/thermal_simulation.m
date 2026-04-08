@@ -48,15 +48,14 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, CEM43_max, C
 sensor.mask = zeros(size(sensor.mask));
 
 % Transducer position in grid coordinates
-tr_pos = parameters.transducer(1).position;
-tr_characteristics = parameters.transducer(1).(parameters.transducer(1).type);
+tr = parameters.transducer(1);
 
 % Place sensor along the focal axis 
 heating_window_dims = ones(2,3);
 for i = 1:2
     heating_window_dims(:,i) = [...
-        max(1, -parameters.thermal.sensor_xy_halfsize + tr_pos.trans_pos(i)), ...
-        min(parameters.grid.dims(i), parameters.thermal.sensor_xy_halfsize + tr_pos.trans_pos(i))];
+        max(1, -parameters.thermal.sensor_xy_halfsize + tr.trans_pos(i)), ...
+        min(parameters.grid.dims(i), parameters.thermal.sensor_xy_halfsize + tr.trans_pos(i))];
 end
 
 % Define a simulation window
@@ -83,13 +82,13 @@ kwave_medium.alpha_coeff = ...
 
 % convert the absorption coefficients to nepers/m (!)
 % see also fitPowerLawParamsMulti.m
-w = 2*pi*tr_characteristics.source_freq_hz; % Frequency [rad/s]
+w = 2*pi*tr.freq_hz; % Frequency [rad/s]
 a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power); % [Nepers/((rad/s)^y m)]
 alpha_np = a0_np.*w.^kwave_medium.alpha_power;
 clear w a0_np;
 
 % alternative simplified conversion dB to Nepers
-% alpha_np = (100 * kwave_medium.alpha_coeff .* (tr_characteristics.source_freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
+% alpha_np = (100 * kwave_medium.alpha_coeff .* (tr.freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
 
 % save absorption coefficient [Np] for debugging
 if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.simulation.debug == 1
@@ -198,8 +197,8 @@ total_timepoints = 1 + n_ptri_reps * snapshots_per_ptri + params_thermal.post_pt
 if ndims(T_max) == 3
     T_focal     = NaN([size(T_max,[1,3]) total_timepoints]);
     CEM43_focal = NaN([size(T_max,[1,3]) total_timepoints]);
-    T_focal(:,:,1)     = squeeze(T_max(:,tr_pos.trans_pos(2),:));
-    CEM43_focal(:,:,1) = squeeze(CEM43_max(:,tr_pos.trans_pos(2),:));
+    T_focal(:,:,1)     = squeeze(T_max(:,tr.trans_pos(2),:));
+    CEM43_focal(:,:,1) = squeeze(CEM43_max(:,tr.trans_pos(2),:));
 elseif ndims(T_max) == 2
     T_focal     = NaN([size(T_max) total_timepoints]);
     CEM43_focal = NaN([size(CEM43_max) total_timepoints]);
@@ -252,8 +251,8 @@ for rep_i = 1:n_ptri_reps
         end
         cur_timepoint = cur_timepoint + 1;
         if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr_pos.trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr_pos.trans_pos(2),:));
+            T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr.trans_pos(2),:));
+            CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
         else
             T_focal(:,:,cur_timepoint)     = T_cur;
             CEM43_focal(:,:,cur_timepoint) = CEM43_cur;
@@ -289,8 +288,8 @@ for rep_i = 1:n_ptri_reps
             end
             cur_timepoint = cur_timepoint + 1;
             if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr_pos.trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr_pos.trans_pos(2),:));
+                T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr.trans_pos(2),:));
+                CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
             else
                 T_focal(:,:,cur_timepoint)     = T_cur;
                 CEM43_focal(:,:,cur_timepoint) = CEM43_cur;
@@ -330,8 +329,8 @@ for rep_i = 1:n_ptri_reps
             end
             cur_timepoint = cur_timepoint + 1;
             if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr_pos.trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr_pos.trans_pos(2),:));
+                T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr.trans_pos(2),:));
+                CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
             else
                 T_focal(:,:,cur_timepoint)     = T_cur;
                 CEM43_focal(:,:,cur_timepoint) = CEM43_cur;
@@ -373,8 +372,8 @@ if params_thermal.post_ptri_steps_n > 0
         end
         cur_timepoint = cur_timepoint + 1;
         if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr_pos.trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr_pos.trans_pos(2),:));
+            T_focal(:,:,cur_timepoint)     = squeeze(T_cur(:,tr.trans_pos(2),:));
+            CEM43_focal(:,:,cur_timepoint) = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
         else
             T_focal(:,:,cur_timepoint)     = T_cur;
             CEM43_focal(:,:,cur_timepoint) = CEM43_cur;

@@ -18,10 +18,10 @@ function parameters = load_transducer_parameters(parameters)
 % Output:
 %   parameters - Struct with validated and normalized transducer parameters,
 %                including additional derived fields such as:
-%                * n_elements, Elements_ID_mm, Elements_OD_mm
-%                * source_phase_rad, source_phase_deg
-%                * curv_radius_mm, dist_to_plane_mm
-%                * n_elem_row, n_elem_col (for matrix grids)
+%                * elem_n, elem_id_mm, elem_od_mm
+%                * elem_phase_rad, elem_phase_deg
+%                * curv_radius_mm, dist_geom_ep_mm
+%                * elem_n_row, elem_n_col (for matrix grids)
 %                * sparsity_factor, clover setup fields, etc.
 
     if isfield(parameters, 'transducer')
@@ -35,67 +35,6 @@ function parameters = load_transducer_parameters(parameters)
             % ---------------------------------------------------------------------
             % Validate and initialize transducer parameters
             % ---------------------------------------------------------------------
-            
-            % Detect legacy configurations where only annular transducers are defined
-            if ~isfield(tr, 'type') || isempty(tr.type)
-
-                % Create a clean structure for the new format
-                new_tr = struct();
-                new_tr.type = 'annular';
-                new_tr.annular = struct();  % initialize annular sub-struct;
-
-                if isfield(tr, 'n_elements')
-                    new_tr.annular.n_elements = tr.n_elements;
-                end
-
-                if isfield(tr, 'Elements_ID_mm')
-                    new_tr.annular.Elements_ID_mm = tr.Elements_ID_mm;
-                end
-
-                if isfield(tr, 'Elements_OD_mm')
-                    new_tr.annular.Elements_OD_mm = tr.Elements_OD_mm;
-                end
-
-                if isfield(tr, 'curv_radius_mm')
-                    new_tr.annular.curv_radius_mm = tr.curv_radius_mm;
-                end
-
-                if isfield(tr, 'dist_to_plane_mm')
-                    new_tr.annular.dist_to_plane_mm = tr.dist_to_plane_mm;
-                end
-
-                if isfield(tr, 'source_amp')
-                    new_tr.source_amp = tr.source_amp;
-                end
-
-                if isfield(tr, 'source_phase_deg')
-                    new_tr.source_phase_deg = tr.source_phase_deg;
-                end
-				
-                if isfield(tr, 'source_freq_hz')
-                    new_tr.source_freq_hz = tr.source_freq_hz;
-                end
-
-                new_tr.position = struct();
-                if isfield(tr, 'trans_pos')
-                    new_tr.position.trans_pos = tr.trans_pos;
-                end
-
-                if isfield(tr, 'focus_pos')
-                    new_tr.position.focus_pos = tr.focus_pos;
-                end
-
-                if isfield(tr, 'expected_focal_distance_ep')
-                    new_tr.position.exp_FD_ep = tr.expected_focal_distance_ep;
-                end
-
-                if isfield(tr, 'expected_focal_distance_bowl')
-                    new_tr.position.exp_FD_bowl = tr.expected_focal_distance_bowl;
-                end
-
-                % Replace old transducer completely
-                tr = new_tr;
-            end
 
             % Supported transducer geometries: matrix and annular arrays
 
@@ -116,9 +55,6 @@ function parameters = load_transducer_parameters(parameters)
                         tr.type);
             end
 
-             % Ensure distance between target and ep/bowl is provided
-            parameters = focal_distance_calculation(parameters);
-			
             if t_i == 1
                 new_transducers = tr;
             else
@@ -127,6 +63,26 @@ function parameters = load_transducer_parameters(parameters)
         end
 
         parameters.transducer = new_transducers;
+
+        % Warn if transducers have mismatched frequencies
+        all_freqs = [parameters.transducer.freq_hz];
+        if numel(unique(all_freqs)) > 1
+            warning('Transducers have different frequencies: %s Hz. This is not fully supported.', ...
+                num2str(unique(all_freqs)));
+        end
+
+        % Legacy: top-level expected_focal_distance_mm was ep distance
+        if isfield(parameters, 'expected_focal_distance_mm') && ~isempty(parameters.expected_focal_distance_mm)
+            for ti = 1:numel(parameters.transducer)
+                if ~isfield(parameters.transducer(ti), 'focal_distance_ep') || ...
+                        isempty(parameters.transducer(ti).focal_distance_ep)
+                    parameters.transducer(ti).focal_distance_ep = parameters.expected_focal_distance_mm;
+                end
+            end
+        end
+
+        % Calculate focal distances (ep ↔ bowl) for all transducers
+        parameters = focal_distance_calculation(parameters);
 
     else
         % Warn user about missing transducer information

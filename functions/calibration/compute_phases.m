@@ -11,14 +11,14 @@ function phases = compute_phases(SOUND_SPEED_WATER, tran, desired_focal_distance
     % - phases: Computed phase values [degrees] for each transducer element.
 
     % Calculate wavelength based on sound speed and source frequency
-    wavelen = SOUND_SPEED_WATER / tran.prestus.transducer.annular.source_freq_hz; % [m]
+    wavelen = SOUND_SPEED_WATER / tran.prestus.transducer.freq_hz; % [m]
     
     % Initialize phases array for all transducer elements
     phases = zeros(1, tran.n_elem);
     
     % Convert focal distance relative to the exit plane to relative to the mid-bowl
     dist_to_mid_bowl = tran.prestus.transducer.annular.curv_radius_mm - ...
-        tran.prestus.transducer.annular.dist_to_plane_mm;
+        tran.prestus.transducer.annular.dist_geom_ep_mm;
     focus_wrt_mid_bowl = desired_focal_distance_ep + dist_to_mid_bowl;
 
     % Compute the target point in relation to the natural focus [mm]

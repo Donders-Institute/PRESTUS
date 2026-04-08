@@ -160,11 +160,12 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             plot_fit = false;
         end
     
-        source_freq = parameters.transducer(1).(parameters.transducer(1).type).source_freq_hz;
+        all_freqs = [parameters.transducer.freq_hz];
+        source_freq = all_freqs(1);
 
-        if numel(parameters.transducer) > 1
-            warning('Multiple source frequencies not yet supported. Using %i Hz from first transducer.', ...
-                    source_freq)
+        if numel(unique(all_freqs)) > 1
+            warning('Transducers have different frequencies (%s Hz). Using %i Hz from first transducer.', ...
+                    num2str(unique(all_freqs)), source_freq);
         end
         
         alpha_coeff_fixed = fitPowerLawParamsMulti(...

@@ -12,7 +12,7 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
 %   target     - 1x3 target position [x y z] in voxel space
 %   parameters - Struct with fields:
 %                  .tp_dist_close (mm), .transducer.curv_radius_mm,
-%                  .transducer.Elements_OD_mm (vector of element ODs in mm)
+%                  .transducer.elem_od_mm (vector of element ODs in mm)
 %   pixel_size - Scalar voxel size in mm
 %
 % OUTPUT (struct mesh)
@@ -67,7 +67,7 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     norm_v = gpuArray((trans_pos_coords - target) ./ ...
              repmat(sqrt(sum((trans_pos_coords - target).^2, 2)), [1, 3]));
 
-    max_od_mm      = max(parameters.transducer.Elements_OD_mm);
+    max_od_mm      = max(parameters.transducer.elem_od_mm);
     dist_gf_to_ep_mm = 0.5 * sqrt(4*parameters.transducer.curv_radius_mm^2 - max_od_mm^2);
     dist_tp_to_ep_mm = parameters.transducer.curv_radius_mm - dist_gf_to_ep_mm;
 

@@ -16,8 +16,8 @@ for i = 1:numel(fields)
 end
 
 % shift positions to diameter location
-trans_pos_final = parameters.transducer(1).position.trans_pos;
-focus_pos_final = parameters.transducer(1).position.focus_pos;
+trans_pos_final = parameters.transducer(1).trans_pos;
+focus_pos_final = parameters.transducer(1).focus_pos;
 
 trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
 focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
@@ -43,8 +43,8 @@ for i = 1:numel(fields)
 end
 
 % Retain transducer and focus positions after all grid manipulations
-parameters.transducer(1).position.trans_pos = trans_pos_final;
-parameters.transducer(1).position.focus_pos = focus_pos_final;
+parameters.transducer(1).trans_pos = trans_pos_final;
+parameters.transducer(1).focus_pos = focus_pos_final;
 
 % set up kgrid again for eventual heating sim
 kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...

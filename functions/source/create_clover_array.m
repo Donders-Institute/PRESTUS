@@ -1,4 +1,4 @@
-function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, trans_pos_m, focus_pos_m)    
+function elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)    
 % CREATE_CLOVER_ARRAY Generate a multi-leaf clover transducer configuration.
 %
 % This function replicates a single matrix transducer layout into a clover
@@ -16,7 +16,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
 %
 % INPUTS:
 %   parameters   - global parameter struct (used for debug output)
-%   matrix_tp    - struct containing matrix + clover configuration
+%   tr_matrix    - struct containing matrix + clover configuration
 %   elem_pos_m   - [3 x N] element positions (single sub-array) [m]
 %   trans_pos_m  - [3 x 1] transducer origin in simulation grid [m]
 %	focus_pos_m  - [3 x 1] acoustic focus position in simulation grid [m]
@@ -27,14 +27,14 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % --------------------------------------------------------------------
     % Clover geometry parameters
     % --------------------------------------------------------------------
-    n_leaves = matrix_tp.clover.n_leaves;
-    ROC_parent_mm = matrix_tp.clover.ROC_parent;
+    n_leaves = tr_matrix.clover.n_leaves;
+    ROC_parent_mm = tr_matrix.clover.ROC_parent;
 
     theta_az = 2*pi / 3;  % 120° spacing (fixed geometry)
 
     % Estimate elevation angle to ensure sub-apertures do not overlap on
     % the parent sphere
-    aperture_diam = matrix_tp.outer_diameter_mm;
+    aperture_diam = tr_matrix.outer_diameter_mm;
     radius_circle = aperture_diam / (2 * ROC_parent_mm * sin(theta_az / 2));
     elevation_angle = asin(radius_circle);
 
@@ -66,7 +66,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
     % Allocate storage
     % --------------------------------------------------------------------
     elem_all = [];
-    h_leaves = gobjects(1, matrix_tp.clover.n_leaves);  % handles for each leaf
+    h_leaves = gobjects(1, tr_matrix.clover.n_leaves);  % handles for each leaf
 
 
     % [DEBUG] visualize leaf orientation
@@ -105,7 +105,7 @@ function elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, tra
         elems_rot = (R * positions_local')' + center_rot';
 
         % --- Fit sphere to find apex (validation) ---
-        ROC_leaf = matrix_tp.curv_radius_mm;
+        ROC_leaf = tr_matrix.curv_radius_mm;
 
         residuals = @(c) vecnorm(elems_rot - c, 2, 2) - ROC_leaf;
 

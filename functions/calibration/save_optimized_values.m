@@ -14,8 +14,8 @@ function save_optimized_values(parameters)
         parameters.calibration.filename_calibrated_CSV);
     
     % Extract and round phases and amplitudes
-    opt_phases = round(parameters.transducer.source_phase_deg, 2);
-    source_amp = double(parameters.transducer.source_amp(1));
+    opt_phases = round(parameters.transducer.elem_phase_deg, 2);
+    elem_amp = double(parameters.transducer.elem_amp(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     
@@ -45,7 +45,7 @@ function save_optimized_values(parameters)
         end
 
         % Update optimized values
-        virtual_data{row_index_int, col_index_foc} = mat2str([opt_phases, source_amp]);
+        virtual_data{row_index_int, col_index_foc} = mat2str([opt_phases, elem_amp]);
 
         % Handle missing values
         mask = cellfun(@(x) isempty(x) || isa(x, 'missing'), virtual_data);
@@ -67,7 +67,7 @@ function save_optimized_values(parameters)
         % Create a new file
         virtual_data = {
             'Desired Intensity [W/cm^2] - Focus wrt Exit Plane [mm]', parameters.calibration.desired_focal_distance_ep;
-            parameters.calibration.desired_intensity, mat2str([opt_phases, source_amp])
+            parameters.calibration.desired_intensity, mat2str([opt_phases, elem_amp])
         };
 
         writecell(virtual_data, output_file_path, 'FileType', 'text');
@@ -84,7 +84,7 @@ function save_optimized_values(parameters)
     end
     yaml_path = fullfile(parameters.calibration.path_output_profiles, yaml_file);
 
-    parameters.transducer.set_focus_wrt_exit_plane_mm = parameters.calibration.desired_focal_distance_ep;
+    parameters.transducer.focal_distance_ep = parameters.calibration.desired_focal_distance_ep;
     parameters.transducer.set_intensity_w_per_cm2 = parameters.calibration.desired_intensity;
 
     % Wrap transducer parameters in a parent structure for YAML

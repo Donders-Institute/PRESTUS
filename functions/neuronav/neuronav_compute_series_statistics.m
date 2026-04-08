@@ -25,10 +25,10 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
         end
         elements = localite.Element;
         if ~iscell(elements), elements = {elements}; end
-        n_elements = numel(elements{:});
-        triggerMarkers(n_elements) = struct();
+        elem_n = numel(elements{:});
+        triggerMarkers(elem_n) = struct();
         
-        for i = 1:n_elements
+        for i = 1:elem_n
             instr_marker = elements{:}(i).InstrumentMarker;
             matrix4d = instr_marker.Matrix4D;
             triggerMarkers(i).Matrix4D = matrix4d;
@@ -58,7 +58,7 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
                 triggerMarkers(i).(rot_fields{f}) = rot_flat(f);
             end
         end
-        recordingTimes = (1:n_elements)';
+        recordingTimes = (1:elem_n)';
     end
 
     % Process TriggerMarkers Matrix4D

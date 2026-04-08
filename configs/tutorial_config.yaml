@@ -12,27 +12,26 @@ segmentation:
 
 transducer:
   type: matrix # 'annular' (Annular array transducer) or 'matrix' (Matrix array transducer)
+  freq_hz: 250e3 # [Hz] the central frequency
 
   position:
     trans_pos: [128, 139, 15] # position on T1 grid
     focus_pos: [128, 142, 75] # stimulation target on T1 grid
-    exp_FD_ep: 60             # Expected focal distance from transducer exit plane [mm]
-    exp_FD_bowl: []           # Expected focal distance from transducer bowl [mm]
+    focal_distance_ep: 60             # Expected focal distance from transducer exit plane [mm]
+    focal_distance_bowl: []           # Expected focal distance from transducer bowl [mm]
 
   annular:
-    source_freq_hz: 250e3 # [Hz] the central frequency
-    source_amp: 91590 # [Pa]
-    source_phase_deg: [0, 0, 0, 274]
+    elem_amp: 91590 # [Pa]
+    elem_phase_deg: [0, 0, 0, 274]
     depth_mm: 16 # depth of transducer used for visualization purposes
-    n_elements: 4 # number of elements in the transducer
-    Elements_ID_mm: [0, 32.9184, 46.1264, 56.0324]
-    Elements_OD_mm: [32.3596, 45.5676, 55.5244, 64.008]
+    elem_n: 4 # number of elements in the transducer
+    elem_id_mm: [0, 32.9184, 46.1264, 56.0324]
+    elem_od_mm: [32.3596, 45.5676, 55.5244, 64.008]
     curv_radius_mm: 63.20 # radius of curvature of the bowl
-    dist_to_plane_mm: 52.38 # distance to the transducer plane from the geometric focus # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
+    dist_geom_ep_mm: 52.38 # distance to the transducer plane from the geometric focus # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
 
   matrix:
-    source_freq_hz: 250e3 # [Hz] the central frequency
-    source_amp: 91590 # [Pa]
+    elem_amp: 91590 # [Pa]
     depth_mm: 16 # depth of transducer used for visualization purposes
     steering: 3D # 1D (Axial steering) or 3D (Volumetric steering)
 
@@ -40,7 +39,7 @@ transducer:
     #   rect → Rectangular
     #   disc → Circular disc
     #   bowl → Curved (bowl-shaped)
-    element_shape: bowl
+    elem_shape: bowl
 
     # Element area is based on a rectangular shape with the specified height and width.
     # If a disc or bowl shape is selected, its area matches that of the rectangular element.
@@ -52,7 +51,7 @@ transducer:
     # Used only for visualization if element positions are loaded from file.
     is_curved: true
     curv_radius_mm: 100 # radius of curvature of the bowl
-    dist_to_plane_mm: 94.99 # distance to the transducer plane from the geometric focus
+    dist_geom_ep_mm: 94.99 # distance to the transducer plane from the geometric focus
 
     # When the Clover setup is enabled, the defined transducer is replicated
     # into a three-leaf Clover configuration (up to three leaves).
@@ -74,8 +73,8 @@ transducer:
 
           rect:
             # Number of rows and columns in the transducer (for rectangular grid).
-            n_elem_row: 9
-            n_elem_col: 9
+            elem_n_row: 9
+            elem_n_col: 9
 
             # Element spacing in each direction [mm], defined as edge-to-edge.
             elem_spacing_height_mm: 0.5
@@ -85,12 +84,12 @@ transducer:
 
           fibonacci:
             # Total number of elements for Fibonacci grid.
-            n_elements: 64
+            elem_n: 64
             kerf_mm: 0.5
 
           fermat:
             # Total number of elements for Fermat's spiral grid.
-            n_elements: 64
+            elem_n: 64
 
       extract_from_file:
         file_path: example_coord_file.xlsx # Path to the file containing x, y, z coordinates of the elements
@@ -102,7 +101,7 @@ transducer:
 
         # Total number of elements to extract.
         # Set to the full number of elements if you plan to select a random subset later.
-        n_elements: 52
+        elem_n: 52
 
         # Enable to randomly select a subset of elements from the total.
         select_random_subset: false

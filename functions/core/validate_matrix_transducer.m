@@ -50,8 +50,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     % Element geometry
     % Defines the physical dimensions of individual matrix elements.
     % ---------------------------------------------------------------------
-    assert(isfield(matrix_tr, 'element_shape'), ...
-        'Transducer %i; Missing element_shape field for matrix array. Please specify "rect", "disc" or "bowl".', t_i);
+    assert(isfield(matrix_tr, 'elem_shape'), ...
+        'Transducer %i; Missing elem_shape field for matrix array. Please specify "rect", "disc" or "bowl".', t_i);
 
     assert(isfield(matrix_tr, 'elem_height_mm'), ...
         'Transducer %i; Missing elem_height parameter. Please specify to define height of each element.', t_i);
@@ -77,17 +77,17 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             'Transducer %i; Missing curv_radius_mm field for matrix transducer. Please specify radius of curvature.', t_i);
 
         % Calculate distance to transducer plane if not provided
-        if ~isfield(matrix_tr, 'dist_to_plane_mm')
+        if ~isfield(matrix_tr, 'dist_geom_ep_mm')
             assert(matrix_tr.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
                 'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 
-            matrix_tr.dist_to_plane_mm = sqrt(matrix_tr.curv_radius_mm^2 - ...
+            matrix_tr.dist_geom_ep_mm = sqrt(matrix_tr.curv_radius_mm^2 - ...
                 (matrix_tr.outer_diameter_mm / 2)^2);
 
             fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
-                t_i, matrix_tr.dist_to_plane_mm);
+                t_i, matrix_tr.dist_geom_ep_mm);
         else
-            matrix_tr.dist_to_plane_mm = matrix_tr.dist_to_plane_mm;
+            matrix_tr.dist_geom_ep_mm = matrix_tr.dist_geom_ep_mm;
         end
    
 
@@ -96,7 +96,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
         % For a flat transducer the distance to the focal plane approaches
         % infinity. A finite value is assigned here for visualization purposes.
-        matrix_tr.dist_to_plane_mm = 70;
+        matrix_tr.dist_geom_ep_mm = 70;
     end
     
     % ---------------------------------------------------------------------
@@ -149,11 +149,11 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     rect_grid = grid_shape.rect;
 
                     % Validate required parameters for grid
-                    assert(isfield(rect_grid, 'n_elem_row'), ...
-                            'Transducer %i;: Missing n_elem_row parameter for grid. Please specify to define number of rows.', t_i);
+                    assert(isfield(rect_grid, 'elem_n_row'), ...
+                            'Transducer %i;: Missing elem_n_row parameter for grid. Please specify to define number of rows.', t_i);
 
-                    assert(isfield(rect_grid, 'n_elem_col'), ...
-                            'Transducer %i; Missing n_elem_col parameter for grid. Please specify to define number of columns.', t_i);
+                    assert(isfield(rect_grid, 'elem_n_col'), ...
+                            'Transducer %i; Missing elem_n_col parameter for grid. Please specify to define number of columns.', t_i);
 
                     assert(isfield(rect_grid, 'elem_spacing_height_mm'), ...
                             'Transducer %i; Missing elem_spacing_height parameter for grid. Please specify to define height spacing between elements.', t_i);
@@ -188,11 +188,11 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(rect_grid.sparsity_factor > 0 && rect_grid.sparsity_factor <= 1)
 
                     % Extract grid dimensions
-                    n_elem_row = rect_grid.n_elem_row;
-                    n_elem_col = rect_grid.n_elem_col;
+                    elem_n_row = rect_grid.elem_n_row;
+                    elem_n_col = rect_grid.elem_n_col;
 
                     % Calculate initial element count (will be adjusted later for circular cutout)
-                    matrix_tr.n_elements = n_elem_col * n_elem_row;
+                    matrix_tr.elem_n = elem_n_col * elem_n_row;
 
                 case 'fibonacci'
                     % Sparse spiral grid configuration
@@ -201,13 +201,13 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape, 'fibonacci'), ...
                         'Transducer %i; Missing fibonacci field in grid_shape for sparser grid configuration.', t_i);
                  
-                    assert(isfield(grid_shape.fibonacci, 'n_elements'), ...
-                       'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
+                    assert(isfield(grid_shape.fibonacci, 'elem_n'), ...
+                       'Transducer %i; Missing elem_n parameter for grid. Please specify to define number of elements.', t_i);
 
                     assert(isfield(grid_shape.fibonacci, 'kerf_mm'), ...
                        'Transducer %i; Missing kerf_mm parameter for grid. Please specify.', t_i);
 
-                    matrix_tr.n_elements = grid_shape.fibonacci.n_elements;
+                    matrix_tr.elem_n = grid_shape.fibonacci.elem_n;
 
                 case 'fermat'
                     % Sparse spiral grid configuration
@@ -216,10 +216,10 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(isfield(grid_shape, 'fermat'), ...
                         'Transducer %i; Missing fermat field in grid_shape for sparser grid configuration.', t_i);
 
-                    assert(isfield(grid_shape.fermat, 'n_elements'), ...
-                        'Transducer %i; Missing n_elements parameter for grid. Please specify to define number of elements.', t_i);
+                    assert(isfield(grid_shape.fermat, 'elem_n'), ...
+                        'Transducer %i; Missing elem_n parameter for grid. Please specify to define number of elements.', t_i);
                     
-                    matrix_tr.n_elements = grid_shape.fermat.n_elements;
+                    matrix_tr.elem_n = grid_shape.fermat.elem_n;
 
                 otherwise
                     error('Transducer %i; Grid shape type "%s" is not implemented.', ...
@@ -250,10 +250,10 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             assert(isfield(extract_shape_from_file, 'start_col'), ...
                 'Transducer %i; Missing start_col parameter. Please specify start column of element positions.', t_i);
 
-            assert(isfield(extract_shape_from_file, 'n_elements'), ...
-                'Transducer %i; Missing n_elements. Please specify number of elements.', t_i);
+            assert(isfield(extract_shape_from_file, 'elem_n'), ...
+                'Transducer %i; Missing elem_n. Please specify number of elements.', t_i);
 
-            matrix_tr.n_elements = extract_shape_from_file.n_elements;
+            matrix_tr.elem_n = extract_shape_from_file.elem_n;
 
             if isfield(extract_shape_from_file, 'select_random_subset')
 
@@ -295,8 +295,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 t_i, matrix_tr.matrix_shape.type);
     end
     
-    assert(isfield(matrix_tr,'source_amp'), ...
-            'Transducer %i; Missing source_amp field.', t_i);
+    assert(isfield(matrix_tr,'elem_amp'), ...
+            'Transducer %i; Missing elem_amp field.', t_i);
 
     % Initialize depth_mm for visualization purposes (if not provided)
     if ~isfield(matrix_tr, 'depth_mm')

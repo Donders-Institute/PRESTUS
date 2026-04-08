@@ -1,20 +1,17 @@
-function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, parameters, transducer_pars, elem_pos_m, trans_pos, focus_pos)
+function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
 %CREATE_MATRIX_KARRAY Adds elements of a matrix transducer to a kWave array.
 %
 % Inputs:
 %   kgrid            - kWave grid object
 %   karray           - kWaveArray object to which elements are added
 %   parameters       - Simulation parameters struct
-%   transducer_pars  - Struct containing transducer geometry, type, curvature, and element properties
+%   tr  - Struct containing transducer geometry, type, curvature, and element properties
 %   elem_pos_m          - Nx3 matrix of element positions in meters
 %   trans_pos        - 1x3 transducer reference position (indices in kgrid)
 %   focus_pos        - 1x3 focus position (indices in kgrid)
 %
 % Output:
 %   karray           - Updated kWaveArray object with elements added
-
-    % Extract matrix transducer configuration from the transducer parameters
-    matrix_tp = transducer_pars.matrix;
 
     % Convert positions from kgrid indices to meters
     trans_pos_m = [kgrid.x_vec(trans_pos(1)), ...
@@ -25,31 +22,31 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
                    kgrid.y_vec(focus_pos(2)), ...
                    kgrid.z_vec(focus_pos(3))]';
 
-    natural_focus_pos_m = trans_pos_m + [0, 0, matrix_tp.curv_radius_mm / 1000]';
+    natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
     % Apply Clover setup if requested
-    if matrix_tp.is_clover_setup    
-        elem_pos_m = create_clover_array(parameters, matrix_tp, elem_pos_m, trans_pos_m, focus_pos_m);
+    if tr.matrix.is_clover_setup    
+        elem_pos_m = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
     end
     
-    transducer_pars.matrix.n_elements = size(elem_pos_m, 2);
+    tr.matrix.elem_n = size(elem_pos_m, 2);
 
     % Initialize source amplitudes (uniform)
-    transducer_pars.matrix.source_amp = transducer_pars.matrix.source_amp(1) * ones(1, transducer_pars.matrix.n_elements);
+    tr.matrix.elem_amp = tr.matrix.elem_amp(1) * ones(1, tr.matrix.elem_n);
 
     % Wavelength and wavenumber for phase calculation
-    lambda = parameters.medium_properties.water.sound_speed / transducer_pars.matrix.source_freq_hz;
+    lambda = parameters.medium_properties.water.sound_speed / tr.freq_hz;
     k = 2 * pi / lambda;
 
     % Initialize source phases, scaled vectors, tx, ty, tz
-    source_phase_rad = zeros(1, transducer_pars.matrix.n_elements);
-    scaled_vectors = zeros(3, transducer_pars.matrix.n_elements);
-    tx = zeros(1, transducer_pars.matrix.n_elements);
-    ty = zeros(1, transducer_pars.matrix.n_elements);
-    tz = zeros(1, transducer_pars.matrix.n_elements);
+    elem_phase_rad = zeros(1, tr.matrix.elem_n);
+    scaled_vectors = zeros(3, tr.matrix.elem_n);
+    tx = zeros(1, tr.matrix.elem_n);
+    ty = zeros(1, tr.matrix.elem_n);
+    tz = zeros(1, tr.matrix.elem_n);
 
     % Loop over each element and add it to karray
-    for ind = 1:transducer_pars.matrix.n_elements
+    for ind = 1:tr.matrix.elem_n
         el_pos_m_i = elem_pos_m(:, ind);
 
         % Vector from element to natural focus to position elements to
@@ -77,18 +74,18 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         tz(ind) = yaw;
 
         % Determine element type
-        switch lower(matrix_tp.element_shape)
+        switch lower(tr.matrix.elem_shape)
             case 'rect'
-                karray.addRectElement(el_pos_m_i, matrix_tp.elem_height_mm, matrix_tp.elem_width_mm, [roll, pitch, yaw]);
+                karray.addRectElement(el_pos_m_i, tr.matrix.elem_height_mm, tr.matrix.elem_width_mm, [roll, pitch, yaw]);
 
             case 'disc'
                 % Disc with same area as rectangular element
-                diameter = sqrt(matrix_tp.elem_height_mm * matrix_tp.elem_width_mm * 4 / pi);
+                diameter = sqrt(tr.matrix.elem_height_mm * tr.matrix.elem_width_mm * 4 / pi);
                 karray.addDiscElement(el_pos_m_i, diameter, natural_focus_pos_m);
 
             case 'bowl'
-                r_c = matrix_tp.curv_radius_mm / 1e3;
-                A_target = matrix_tp.elem_height_mm * matrix_tp.elem_width_mm;
+                r_c = tr.matrix.curv_radius_mm / 1e3;
+                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm;
                 a_min = 0.001; % Lower bound of aperture radius (in m)
                 a_max = r_c * 0.999; % Slightly less than full bowl radius
 
@@ -109,13 +106,11 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         % Calculate phase delay based on set focus
         distance = sqrt((el_pos_m_i(1) - focus_pos_m(1))^2 + (el_pos_m_i(2) - focus_pos_m(2))^2 + (el_pos_m_i(3) - focus_pos_m(3))^2);
 
-        source_phase_rad(ind) = mod(k * distance, 2 * pi);
+        elem_phase_rad(ind) = mod(k * distance, 2 * pi);
     end
 
-    transducer_pars.matrix = matrix_tp;
-
-    transducer_pars.source_phase_rad = source_phase_rad;
-    transducer_pars.source_phase_deg = rad2deg(source_phase_rad);
+    tr.elem_phase_rad = elem_phase_rad;
+    tr.elem_phase_deg = rad2deg(elem_phase_rad);
 
     % [DEBUG] visualize matrix element orientation
     if parameters.simulation.debug == 1
@@ -127,7 +122,7 @@ function [karray, transducer_pars] = create_matrix_karray(kgrid, karray, paramet
         scatter3(natural_focus_pos_m(1,:), natural_focus_pos_m(2,:), natural_focus_pos_m(3,:), 'r.');
         plot3(focus_pos_m(1), focus_pos_m(2), focus_pos_m(3), 'go', 'MarkerFaceColor', 'g');
     
-        for ind = 1:transducer_pars.n_elements
+        for ind = 1:tr.elem_n
             el_pos = elem_pos_m(:, ind);
     
             % --- Ground truth direction (element -> focus)

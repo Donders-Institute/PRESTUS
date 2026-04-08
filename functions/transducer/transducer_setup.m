@@ -1,22 +1,22 @@
-function [transducer_mask, source_label, transducer_pars] = ...
-    transducer_setup(transducer_pars, trans_pos, focus_pos, grid_dims, grid_res_mm)
+function [transducer_mask, source_label, tr] = ...
+    transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm)
 
 % TRANSDUCER_SETUP Creates a transducer mask and label matrix for a computational grid.
 %
 % This function generates a binary mask (`transducer_mask`) and a labeled matrix 
 % (`source_label`) for a multi-element ultrasound transducer. It computes these 
 % based on the transducer's geometric parameters and its position relative to 
-% a computational grid. Additionally, it updates the `transducer_pars` structure 
+% a computational grid. Additionally, it updates the `tr` structure 
 % with converted values (e.g., diameters in grid points).
 %
 % Use this function to define the geometry of a transducer and map it to a 
 % computational grid for numerical simulations.
 %
 % Input:
-%   transducer_pars   - Struct containing geometric parameters of the transducer:
-%                       * n_elements: Number of elements in the transducer.
-%                       * Elements_OD_mm: Outer diameter of each element (in mm).
-%                       * Elements_ID_mm: Inner diameter of each element (in mm).
+%   tr   - Struct containing geometric parameters of the transducer:
+%                       * elem_n: Number of elements in the transducer.
+%                       * elem_od_mm: Outer diameter of each element (in mm).
+%                       * elem_id_mm: Inner diameter of each element (in mm).
 %                       * curv_radius_mm: Curvature radius of the elements (in mm).
 %
 %   trans_pos         - [1x2/3] or [2/3x1] array specifying the Cartesian coordinates 
@@ -36,7 +36,7 @@ function [transducer_mask, source_label, transducer_pars] = ...
 %   source_label      - Labeled matrix of size `grid_dims`. Each non-zero value uniquely 
 %                       identifies an individual element in the transducer.
 %
-%   transducer_pars   - Updated struct with additional fields:
+%   tr   - Updated struct with additional fields:
 %                       * Elements_OD: Outer diameter in grid points.
 %                       * Elements_ID: Inner diameter in grid points.
 %                       * radius_grid: Curvature radius in grid points.
@@ -57,37 +57,37 @@ function [transducer_mask, source_label, transducer_pars] = ...
     % Initialize computational grids for the transducer mask and source label matrix
     transducer_mask = zeros(grid_dims); % Binary mask representing active transducer regions
     source_label = zeros(grid_dims);   % Label matrix for identifying individual elements
-    switch transducer_pars.type
+    switch tr.type
         case 'annular'
             % Convert element diameters from millimeters to grid points and ensure they are odd integers
-			transducer_pars.annular.Elements_OD = ...
-                2*floor(transducer_pars.annular.Elements_OD_mm / grid_res_mm / 2) + 1; % Outer diameter in grid points
-			transducer_pars.annular.Elements_ID = ...
-                2*floor(transducer_pars.annular.Elements_ID_mm / grid_res_mm / 2) + 1; % Inner diameter in grid points
+			tr.annular.Elements_OD = ...
+                2*floor(tr.annular.elem_od_mm / grid_res_mm / 2) + 1; % Outer diameter in grid points
+			tr.annular.Elements_ID = ...
+                2*floor(tr.annular.elem_id_mm / grid_res_mm / 2) + 1; % Inner diameter in grid points
 
 			% Handle cases where inner diameter is zero (e.g., for flat elements)
-			transducer_pars.annular.Elements_ID(transducer_pars.annular.Elements_ID_mm == 0) = 0;
+			tr.annular.Elements_ID(tr.annular.elem_id_mm == 0) = 0;
 
 			% Convert the curvature radius from millimeters to grid points
-			transducer_pars.annular.radius_grid = round(transducer_pars.annular.curv_radius_mm / grid_res_mm); % Radius in grid points
+			tr.annular.radius_grid = round(tr.annular.curv_radius_mm / grid_res_mm); % Radius in grid points
 
             % Loop through each transducer element to create its geometry
-            for el_i = 1:transducer_pars.annular.n_elements
+            for el_i = 1:tr.annular.elem_n
                 % Create the outer bowl geometry for the current element
                 bowl = makeBowl(...
                     grid_dims, ...
                     trans_pos, ...
-                    transducer_pars.annular.radius_grid,...
-                    transducer_pars.annular.Elements_OD(el_i), ...
+                    tr.annular.radius_grid,...
+                    tr.annular.Elements_OD(el_i), ...
                     focus_pos);
 
                 % If the inner diameter is greater than zero, subtract the inner bowl geometry
-                if transducer_pars.annular.Elements_ID(el_i) > 0
+                if tr.annular.Elements_ID(el_i) > 0
                     bowl = bowl - makeBowl(...
                         grid_dims, ...
                         trans_pos, ...
-                        transducer_pars.annular.radius_grid, ...
-                        transducer_pars.annular.Elements_ID(el_i), ...
+                        tr.annular.radius_grid, ...
+                        tr.annular.Elements_ID(el_i), ...
                         focus_pos);
                 end
 
@@ -98,28 +98,26 @@ function [transducer_mask, source_label, transducer_pars] = ...
                 source_label = source_label + el_i * bowl;
             end
         case 'matrix'
-            matrix_tp = transducer_pars.matrix;
-
             trans_pos_m = trans_pos * grid_step_mm / 1e3;
             focus_pos_m = focus_pos * grid_step_mm / 1e3;
 
-            switch matrix_tp.matrix_shape.type
+            switch tr.matrix.matrix_shape.type
                 case 'define_here'
-                    [elem_pos_m, transducer_pars] = convert_to_element_pos(parameters, transducer_pars,  trans_pos_m, focus_pos_m);
+                    [elem_pos_m, tr] = convert_to_element_pos(parameters, tr,  trans_pos_m, focus_pos_m);
                 case 'extract_from_file'
-                    elem_pos_m = extract_element_pos(parameters, transducer_pars,  trans_pos_m);
+                    elem_pos_m = extract_element_pos(parameters, tr,  trans_pos_m);
                 otherwise
-                    error('Matrix shape %s is unknown or not implemented.', matrix_tp.matrix_shape.type)
+                    error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
             end
 
-            natural_focus_pos_m = trans_pos_m + [0, 0, matrix_tp.curv_radius_mm / 1000]';
+            natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
             % Apply Clover setup if requested
-            if transducer_pars.is_clover_setup
-                elem_pos_m = create_clover_array(elem_pos_m, transducer_pars, trans_pos_m);
+            if tr.is_clover_setup
+                elem_pos_m = create_clover_array(elem_pos_m, tr, trans_pos_m);
             end
 
-            transducer_pars.n_elements = size(elem_pos_m, 2);
+            tr.elem_n = size(elem_pos_m, 2);
 
             % Convert to grid units
             elem_pos_grid = round(elem_pos_m * 1e3 / grid_step_mm);
@@ -127,11 +125,11 @@ function [transducer_mask, source_label, transducer_pars] = ...
             natural_focus_pos_grid = round(natural_focus_pos_m * 1e3 / grid_step_mm);
 
             % Loop through each transducer element to create its geometry
-            for el_i = 1:transducer_pars.n_elements
+            for el_i = 1:tr.elem_n
                 el_pos_grid_i = elem_pos_grid(:, el_i);
 
-                r_c = matrix_tp.curv_radius_mm / 1e3;
-                A_target = matrix_tp.elem_height_mm * matrix_tp.elem_width_mm;
+                r_c = tr.matrix.curv_radius_mm / 1e3;
+                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm;
                 a_min = 0.001; % Lower bound of aperture radius (in m)
                 a_max = r_c * 0.999; % Slightly less than full bowl radius
 
@@ -159,7 +157,7 @@ function [transducer_mask, source_label, transducer_pars] = ...
                 source_label = source_label + el_i * bowl;
             end
         otherwise
-            error('Array type %s is unknown or not implemented.', transducer_pars.type)
+            error('Array type %s is unknown or not implemented.', tr.type)
     end
 
 end

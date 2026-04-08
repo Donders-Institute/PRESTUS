@@ -40,7 +40,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
     t1_image = niftiread(fullfile(t1_file.folder, t1_file.name));
 
     % --- STEP 2: Compute the physical offset from the matrix origin to the transducer face
-    reference_dist = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm);
+    reference_dist = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_geom_ep_mm);
 
     % --- STEP 3: For each stimulation side, extract the averaged transformation matrix and compute positions
     for i = positions
@@ -58,8 +58,8 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
         transducer_ras(i,:) = ref_pos + reference_dist * ref_vec;
         % -- Compute the RAS mm position of the acoustic focal point (forward along vector)
         parameters = focal_distance_calculation(parameters);
-        if isfield(parameters.transducer(1).position, 'exp_FD_bowl')
-            target_ras(i,:) = ref_pos + parameters.transducer(1).position.exp_FD_bowl * ref_vec;
+        if isfield(parameters.transducer(1), 'focal_distance_bowl')
+            target_ras(i,:) = ref_pos + parameters.transducer(1).focal_distance_bowl * ref_vec;
         end
         % -- Convert these world (RAS mm) positions into MRI voxel index space
         transducer_pos(i,:) = ras_to_grid(transducer_ras(i,1:3)', t1_header);

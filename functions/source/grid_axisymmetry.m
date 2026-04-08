@@ -2,13 +2,13 @@ function [parameters, segmentation, bone, medium_masks] = ...
     grid_axisymmetry(parameters, segmentation, bone, medium_masks)
     % adapt grid dimensions to axisymmetry (if requested)
     % grid should be specified as [axial, radial x 2]
-    if numel(parameters.transducer(1).position.focus_pos) == 2 && ...
+    if numel(parameters.transducer(1).focus_pos) == 2 && ...
             isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
         if numel(parameters.transducer) > 1
             error('Axisymmetric simulations with multiple transducers are not supported (only a single transducer is allowed when axisymmetric == 1)');
         end
-        trans_pos = parameters.transducer(1).position.trans_pos;
-        focus_pos = parameters.transducer(1).position.focus_pos;
+        trans_pos = parameters.transducer(1).trans_pos;
+        focus_pos = parameters.transducer(1).focus_pos;
         % ensure that radial(y) dim is shorter than axial (x) dim
         if parameters.grid.dims(2) > parameters.grid.dims(1)
             parameters.grid.dims = fliplr(parameters.grid.dims);
@@ -29,6 +29,6 @@ function [parameters, segmentation, bone, medium_masks] = ...
         trans_pos(2) = 1; 
         focus_pos(2) = 1; 
         % Retain transducer and focus positions after grid manipulations
-        parameters.transducer(1).position.trans_pos = trans_pos;
-        parameters.transducer(1).position.focus_pos = focus_pos;
+        parameters.transducer(1).trans_pos = trans_pos;
+        parameters.transducer(1).focus_pos = focus_pos;
     end

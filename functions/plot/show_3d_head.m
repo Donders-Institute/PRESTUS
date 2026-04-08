@@ -108,17 +108,17 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
         thisTrans = trans_xyz(k,:);
         thisTarg = target_xyz(k,:);
 
-        t = parameters.transducer(1);
+        tr = parameters.transducer(1);
 
         c = color_list(k,:);
         % Plot transducer exit plane if not cropped
         if ~any(crop_at_target)
             % Maximum outer diameter of transducer elements
-            switch t.type
+            switch tr.type
                 case 'annular'
-                    max_od_mm = max(t.annular.Elements_OD_mm);
+                    max_od_mm = max(tr.annular.elem_od_mm);
                 case 'matrix'
-                    max_od_mm = t.matrix.outer_diameter_mm;
+                    max_od_mm = tr.matrix.outer_diameter_mm;
                 otherwise
                     error('Array type %s is unknown or not implemented.', parameters.transducer(1).type)
             end
@@ -126,12 +126,12 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             % All shapes in downsampled space
             max_od_grid = max_od_mm / pixel_size;
             
-            if t.align_to_focus
+            if tr.align_to_focus
                 norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
 
             else
                 % Use the natural focus based on transducer curvature
-                curv_radius = t.(t.type).curv_radius_mm;
+                curv_radius = tr.(tr.type).curv_radius_mm;
                 natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
                 natural_focus_grid = natural_focus / pixel_size;
 
@@ -139,8 +139,8 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             end
 
             % Geometric focus in grid space
-            geom_focus = thisTrans - norm_vec * (t.(t.type).curv_radius_mm) / pixel_size;
-            dist_gf_to_ep_mm = 0.5 * sqrt(4 * t.(t.type).curv_radius_mm^2 - max_od_mm^2);
+            geom_focus = thisTrans - norm_vec * (tr.(tr.type).curv_radius_mm) / pixel_size;
+            dist_gf_to_ep_mm = 0.5 * sqrt(4 * tr.(tr.type).curv_radius_mm^2 - max_od_mm^2);
             ex_plane = geom_focus + norm_vec * dist_gf_to_ep_mm / pixel_size;
 
             % Now get full-res (voxel) coordinates, then downsample
