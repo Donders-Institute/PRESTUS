@@ -40,7 +40,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
     t1_image = niftiread(fullfile(t1_file.folder, t1_file.name));
 
     % --- STEP 2: Compute the physical offset from the matrix origin to the transducer face
-    reference_dist = -(parameters.transducer.curv_radius_mm - parameters.transducer.dist_geom_ep_mm);
+    reference_dist = -(parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm - parameters.transducer(1).(parameters.transducer(1).type).dist_geom_ep_mm);
 
     % --- STEP 3: For each stimulation side, extract the averaged transformation matrix and compute positions
     for i = positions

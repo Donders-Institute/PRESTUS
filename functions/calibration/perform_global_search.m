@@ -101,7 +101,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
         weights);
 
     % Save the figure
-    fig_path = fullfile(parameters.outputs_folder, sprintf('GlobalSearch.png'));
+    fig_path = fullfile(parameters.io.outputs_folder, sprintf('GlobalSearch.png'));
     saveas(gcf, fig_path);
     close(gcf);
 

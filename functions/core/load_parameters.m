@@ -74,19 +74,6 @@ function parameters = load_parameters(varargin)
         parameters.io.output_affix = sanitized_affix;
     end
 
-    % Set output directory based on absolute or relative path
-    if isfield(parameters.path, 'sim') && ~strcmp(parameters.path.sim, '')
-        javaFileObj = java.io.File(parameters.path.sim); % Check path type (absolute/relative)
-        if javaFileObj.isAbsolute()
-            parameters.path.sim = fullfile(parameters.path.sim);
-        else
-            parameters.path.sim = fullfile(parameters.path.anat, parameters.path.sim);
-        end
-    else
-        % Default output directory within data path
-        parameters.path.sim = fullfile(parameters.path.anat, 'tussim');
-    end
-
     %% Validate paths for required libraries and binaries
 
     % Check LD_LIBRARY_PATH existence and warn user if missing

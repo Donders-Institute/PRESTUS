@@ -67,14 +67,14 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     norm_v = gpuArray((trans_pos_coords - target) ./ ...
              repmat(sqrt(sum((trans_pos_coords - target).^2, 2)), [1, 3]));
 
-    max_od_mm      = max(parameters.transducer.elem_od_mm);
-    dist_gf_to_ep_mm = 0.5 * sqrt(4*parameters.transducer.curv_radius_mm^2 - max_od_mm^2);
-    dist_tp_to_ep_mm = parameters.transducer.curv_radius_mm - dist_gf_to_ep_mm;
+    max_od_mm      = max(parameters.transducer(1).(parameters.transducer(1).type).elem_od_mm);
+    dist_gf_to_ep_mm = 0.5 * sqrt(4*parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm^2 - max_od_mm^2);
+    dist_tp_to_ep_mm = parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm - dist_gf_to_ep_mm;
 
     pos_shift_mm   = 5 + dist_tp_to_ep_mm;
     shifted_trans_pos_coords = trans_pos_coords + norm_v * (pos_shift_mm / pixel_size);
 
-    geom_focus_pos_all = shifted_trans_pos_coords - norm_v * (parameters.transducer.curv_radius_mm / pixel_size);
+    geom_focus_pos_all = shifted_trans_pos_coords - norm_v * (parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm / pixel_size);
     ex_plane_pos_all   = geom_focus_pos_all + norm_v * (dist_gf_to_ep_mm / pixel_size);
 
     all_masks_indx     = find(img > 0);

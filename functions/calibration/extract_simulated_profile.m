@@ -44,16 +44,16 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
         p_axialprofile = squeeze(p_max(:, :))';
     elseif numel(parameters.grid.dims) == 3
         % 3D simulation -> take the central slice at the transducer’s lateral position.
-        p_axialprofile = squeeze(p_max(:, parameters.transducer.trans_pos(2), :))';
+        p_axialprofile = squeeze(p_max(:, parameters.transducer(1).trans_pos(2), :))';
     else
         error('Unsupported simulation dimensionality: expected 2 or 3.');
     end
 
     % Location of the transducer bowl, exit plane, and focus (in mm)
-    i_bowl = parameters.transducer.trans_pos(end)*parameters.grid.resolution_mm;
-    i_ep = round(parameters.transducer.trans_pos(end)*parameters.grid.resolution_mm+...
-        parameters.transducer.focal_distance_offset);
-    i_focus = parameters.transducer.focus_pos(end)*parameters.grid.resolution_mm;
+    i_bowl = parameters.transducer(1).trans_pos(end)*parameters.grid.resolution_mm;
+    i_ep = round(parameters.transducer(1).trans_pos(end)*parameters.grid.resolution_mm+...
+        parameters.transducer(1).focal_distance_offset);
+    i_focus = parameters.transducer(1).focus_pos(end)*parameters.grid.resolution_mm;
 
     % Plot the pressure map
     imagesc(p_distance, p_width, p_axialprofile);
@@ -70,7 +70,7 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
 
     clear p_distance p_width p_axialprofile;
 
-    fig_path = fullfile(parameters.outputs_folder, ...
+    fig_path = fullfile(parameters.io.outputs_folder, ...
         strcat(parameters.calibration.prefix, 'Intensity_map_2D_at_F_', ...
             num2str(parameters.calibration.desired_focal_distance_ep), ...
             '_at_I_', num2str(parameters.calibration.desired_intensity), ...
@@ -85,16 +85,16 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
     % This section isolates the 1D pressure distribution along the acoustic beam.
     if numel(parameters.grid.dims) == 2
         % For 2D: extract the axial profile along the transducer's horizontal position.
-        i_x = parameters.transducer.trans_pos(1);
-        i_axis = parameters.transducer.trans_pos(end);
+        i_x = parameters.transducer(1).trans_pos(1);
+        i_axis = parameters.transducer(1).trans_pos(end);
         pred_axial_pressure = squeeze(p_max(i_x, i_axis:end));
         clear i_x;
 
     elseif numel(parameters.grid.dims) == 3
         % For 3D: extract along both lateral center coordinates.
-        i_x = parameters.transducer.trans_pos(1);
-        i_y = parameters.transducer.trans_pos(2);
-        i_axis = parameters.transducer.trans_pos(end);
+        i_x = parameters.transducer(1).trans_pos(1);
+        i_y = parameters.transducer(1).trans_pos(2);
+        i_axis = parameters.transducer(1).trans_pos(end);
         pred_axial_pressure = squeeze(p_max(i_x, i_y, i_axis:end));
         clear i_x i_y;
     end
@@ -103,13 +103,13 @@ function [profile_sim] = extract_simulated_profile(initial_res, parameters)
     pred_axial_intensity = pred_axial_pressure .^ 2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
 
     % Compute particle velocity [m/s]
-    velocity = parameters.transducer.annular.elem_amp(1) / ...
+    velocity = parameters.transducer(1).annular.elem_amp(1) /...
                (parameters.medium_properties.water.density * parameters.medium_properties.water.sound_speed);
 
     %% Collect profile and distance
 
     % caluclated distances in mm in the grid
-    axial_trans_pos_mm = parameters.transducer.trans_pos(end)* parameters.grid.resolution_mm;
+    axial_trans_pos_mm = parameters.transducer(1).trans_pos(end)* parameters.grid.resolution_mm;
     axial_end_pos_mm = parameters.grid.default_dims(end) * parameters.grid.resolution_mm;
     axial_position_sim_mm = axial_trans_pos_mm:parameters.grid.resolution_mm:axial_end_pos_mm;
     % for distance from bowl, remove PML/transducer position

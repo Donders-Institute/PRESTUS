@@ -65,14 +65,14 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.transducer.annular.elem_od_mm     = 32.0;
     parameters.transducer.annular.curv_radius_mm     = 63.2;
     parameters.transducer.annular.dist_geom_ep_mm   = 52.38;
-    parameters.transducer.annular.source_freq_hz     = 250e3;
+    parameters.transducer.freq_hz                     = 250e3;
     parameters.transducer.annular.elem_amp         = 91590;
     parameters.transducer.annular.elem_phase_deg   = 0;
     parameters.transducer.annular.elem_phase_rad   = 0;
 
     % Transducer & focus position (centre of grid, pointing along z)
     half = round(parameters.grid.default_dims / 2);
-    parameters.transducer.position.trans_pos = [half(1), half(2), 5];
-    parameters.transducer.position.focus_pos = [half(1), half(2), half(3)];
+    parameters.transducer.trans_pos = [half(1), half(2), 5];
+    parameters.transducer.focus_pos = [half(1), half(2), half(3)];
 
 end
