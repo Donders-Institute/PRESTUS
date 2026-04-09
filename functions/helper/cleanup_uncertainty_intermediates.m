@@ -7,7 +7,6 @@ function cleanup_uncertainty_intermediates(parameters, affixes)
 %
 % Files removed:
 %   heating_res<affix>.mat  — thermal matrices for each variant (large)
-%   kwave_source.mat        — shared source matrix from stage 1
 %   debug/<subj>_after_rotating_and_scaling.mat
 %   debug/<subj>_<medium>_after_cropping_and_smoothing.mat
 %
@@ -27,10 +26,6 @@ function cleanup_uncertainty_intermediates(parameters, affixes)
         f  = fullfile(output_dir, sprintf('%s_%s_heating_res%s.mat', subj, medium, af));
         delete_if_exists(f);
     end
-
-    % Shared kwave source matrix (written by stage 1)
-    f = fullfile(output_dir, sprintf('%s_%s_kwave_source.mat', subj, medium));
-    delete_if_exists(f);
 
     % Debug intermediates
     debug_dir = fullfile(output_dir, 'debug');

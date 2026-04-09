@@ -216,6 +216,7 @@ grid:
   default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
   pml_size: 10        # Perfectly Matched Layer (PML) size [3D recommendation: 10]
   source_ppw: []      # Points Per Wavelength [default: calculated internally]
+  min_ppw: 6          # Minimum acceptable PPW at the fundamental frequency; triggers a warning if violated
   source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction
   source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations

@@ -8,6 +8,50 @@ See the available [simulation backends](doc_backend.md).
 
 > **Turning off acoustic simulations.** PRESTUS uses the `run_acoustic_sims` flag to indicate whether to run simulations. If set to `false`, PRESTUS will first check for existing files and check whether `overwrite_files` is set to off to load the existing matrices. This is intended to make this more intuitive for workflows in which acoustic simulations are "turned off" to run follow-up thermal simulations. This behaviour is unique for this module (turning off other modules may not run the step at all incl. loading existing data).
 
+## Spatial and temporal sampling
+
+Acoustic simulation accuracy depends on resolving the shortest wavelength in the domain. Two parameters govern this:
+
+- **Grid resolution (`grid.resolution_mm`)** sets the spatial step `dx`. Together with the medium sound speed and fundamental frequency, this determines the number of spatial samples per wavelength:
+
+  ```
+  PPW = c / (f × dx)
+  ```
+
+  The worst case (lowest PPW, highest risk of under-sampling) occurs in the slowest medium (typically water or brain at ~1500 m/s). A minimum of **PPW ≥ 6** is recommended; PRESTUS warns if this is violated (configurable via `grid.min_ppw`).
+
+- **CFL number (`grid.source_cfl`)** sets the temporal resolution via the time step `dt`, relative to the spatial step `dx` and the maximum sound speed in the domain:
+
+  ```
+  dt = CFL × dx / c_max
+  ```
+
+  `c_max` is the fastest medium in the domain (typically skull at ~2800 m/s), which sets the stability limit. The number of temporal samples per wave period then follows from the spatial sampling (PPW) and the CFL:
+
+  ```
+  PPP = PPW / CFL
+  ```
+
+  Tools that only expose PPW implicitly couple spatial and temporal resolution. PRESTUS exposes them independently: `resolution_mm` controls spatial resolution, `source_cfl` controls temporal resolution given that spatial step. This means you can choose a coarser or finer time step independently of the grid — but both must be set consistently to remain within the stability limit.
+
+> **Rule of thumb.** To find the coarsest grid that satisfies a minimum PPW at a given frequency and minimum sound speed:
+> ```
+> dx_max = c_min / (f × PPW_min)
+> ```
+> For example, at 500 kHz in water (1500 m/s) with PPW = 6: `resolution_mm = 0.50 mm`.
+
+### Additional considerations
+
+**PPW varies across tissues.** The minimum-PPW check (`grid.min_ppw`) uses the slowest medium sound speed, which is the worst case for spatial sampling. In practice, PPW varies considerably across the domain: at 500 kHz with 0.5 mm resolution, water/brain (1500 m/s) gives PPW ≈ 10 while skull (2800 m/s) gives PPW ≈ 37. The skull is always massively over-resolved spatially relative to the soft tissues — the binding spatial constraint is always in the slow tissues.
+
+**The stability recheck can reduce `dt` below the CFL target.** After source setup, `prestus_pipeline` calls `checkStability` and, if the CFL-derived `dt` exceeds the estimated stability limit for the heterogeneous medium, reruns source setup with a smaller time step scaled by `grid.source_limit_fraction` (default 0.9). The final effective `dt` may therefore be smaller than `CFL × dx / c_max`. The PPW validation fires only on the first source setup call; the adjusted call bypasses it since `dt` is passed explicitly.
+
+**Overriding `source_ppw` decouples temporal from spatial resolution.** If `grid.source_ppw` is set manually, it only affects the time step derivation (`PPP = source_ppw / CFL`). The spatial accuracy warning (`grid.min_ppw`) still computes the actual PPW from `c_min / (f × dx)` independently. It is therefore possible to set `source_ppw` to a coarser value to increase `dt` and reduce runtime without suppressing the spatial resolution warning.
+
+**Default CFL of 0.15 is intentionally conservative.** k-Wave's own default CFL is 0.3; PRESTUS uses 0.15 to provide additional temporal stability margin in heterogeneous skull simulations, where the theoretical stability limit is only an approximation (see [`checkStability`](http://www.k-wave.org/documentation/checkStability.php)). This roughly doubles the number of time steps — and acoustic simulation runtime — compared to k-Wave's default. If runtime is a concern and simulations are stable, `source_cfl` can be increased toward 0.3, but this should be validated against `checkStability` output for the specific medium.
+
+---
+
 ## Axisymmetric simulations
 
 For debugging, it can be useful to specify and model symmetric 2D tissues (e.g, 2D `phantom` or `water` media). However, [`kspaceFirstOrder2D`](http://www.k-wave.org/documentation/kspaceFirstOrder2D.php) models an infinite cylinder, not a focusing shell. It uses a 2D Cartesian grid with **X and Y axes**. These are assumed to map onto the second and first dimensions of input matrices and coordinates (i.e., [y, x]), respectively. This may at first may seem unintuitive, but it is designed to facilitate the mapping to 3D image space voxel coordinates [i,j,k], which traditionally map onto [Y,X,Z]. In the future, this could also be resolved by assuming a XY mapping for k-Wave, and introducing a remapping of voxel space coordinates.

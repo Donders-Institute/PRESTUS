@@ -120,12 +120,14 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %                       The base value is absorbed into options.affixes.default
 %                       above so it is not silently discarded.
 %
-%   io.preproc_affix    Set to '' for simulation variants so that preprocessing
-%                       file lookups (kwave source, reoriented/scaled data,
+%   io.preproc_affix    Set to '' for simulation variants so that head-
+%                       preprocessing file lookups (reoriented/scaled data,
 %                       cropped/smoothed skull) point at the stage-1 cache
 %                       rather than looking for per-variant files that do not
-%                       exist. preproc_head.m and source_sensor_setup.m both
-%                       honour this field.
+%                       exist. preproc_head.m honours this field.
+%                       NOTE: kwave source files are NOT shared — each variant
+%                       computes its own source using io.output_affix so that
+%                       the time axis matches the variant's medium sound speed.
 %
 %   io.overwrite_files  Hardcoded to 'never' so a restarted pipeline resumes
 %                       from where it left off rather than re-running finished
@@ -250,17 +252,19 @@ switch platform
         medium     = parameters.simulation.medium;
 
         % ── Stage 1 ──────────────────────────────────────────────────────
-        % Skip if the shared kwave source (the key stage-1 output) already
-        % exists.  When skipped, stages 2–4 are submitted without a
+        % Skip if the head preprocessing cache already exists.
+        % Sentinel: debug/sub-NNN_<medium>_after_cropping_and_smoothing.mat
+        % (written by preproc_head with preproc_affix = '').
+        % When skipped, stages 2–4 are submitted without an afterok
         % dependency so they can start immediately.
-        source_file = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s_kwave_source.mat', subject_id, medium));
+        preproc_sentinel = fullfile(output_dir, 'debug', ...
+            sprintf('sub-%03d_%s_after_cropping_and_smoothing.mat', subject_id, medium));
         p_stage1.hpc.timelimit = options.stage1_timelimit;
         p_stage1.hpc.job_name  = sprintf('PRESTUS-u1-preproc_%s', subj);
         p_stage1               = apply_memorylimit(p_stage1, options.stage1_memorylimit);
         p_stage1               = strip_gpu_requirements(p_stage1, options.stage1_partition);
-        if isfile(source_file)
-            fprintf('[Stage 1] Source file exists — skipping submission.\n');
+        if isfile(preproc_sentinel)
+            fprintf('[Stage 1] Preprocessing cache exists — skipping submission.\n');
             job_id_stage1 = [];
         else
             fprintf('[Stage 1] Submitting preprocessing job...\n');
@@ -384,9 +388,10 @@ end
 function p = make_stage1_params(base)
 % Stage 1: preprocessing and source setup only — no simulation.
 %
-% Produces the shared grid and source cache used by all three simulation
-% variants. The kwave source matrix is written here and loaded by stages 2–4
-% via io.preproc_affix.
+% Produces the shared head-preprocessing cache used by all three simulation
+% variants (skull, tissue masks, etc.). Each variant computes its own kwave
+% source matrix (via io.output_affix) because the time axis depends on the
+% variant's medium sound speed.
 %
 % GPU is not required: no k-Wave simulation runs in this stage.
     p = clear_uncertainty_flag(base);
@@ -399,7 +404,7 @@ function p = make_stage1_params(base)
     p.io.output_affix                  = '';
     p.io.overwrite_files               = 'never';
     p.io.overwrite_simnibs             = 0;
-    p.io.save_source_matrices          = 1;   % shared source → loaded by stages 2–4
+    p.io.save_source_matrices          = 0;   % source is recomputed per variant; no need to cache here
     p.io.save_acoustic_matrices        = 0;   % no acoustic sim in stage 1
     p.io.save_thermal_matrices         = 0;   % no thermal sim in stage 1
     p.simulation.interactive           = 0;
@@ -438,7 +443,7 @@ function p = make_sim_params(base, affix, medium_config)
     p.io.preproc_affix                 = '';
     p.io.overwrite_files               = 'never';
     p.io.overwrite_simnibs             = 0;
-    p.io.save_source_matrices          = 0;   % already written by stage 1
+    p.io.save_source_matrices          = 0;   % source is recomputed at the start of each variant; no benefit to caching
     p.io.save_acoustic_matrices        = 0;   % large; not needed after analysis
     p.io.save_thermal_matrices         = 1;   % needed by generate_uncertainty_report
     p.simulation.interactive           = 0;

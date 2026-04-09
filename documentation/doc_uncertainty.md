@@ -141,7 +141,7 @@ uncertainty_pipeline(parameters, options);
 
 The medium override YAMLs are merged on top of the base parameters using `MergeStruct`, so only the properties defined in the override file are changed — all other settings (transducer, grid, paths) are inherited from the base config.
 
-> **Resuming a partial run.** On HPC, each stage is skipped automatically if its key output already exists: stage 1 is skipped if `sub-NNN_<medium>_kwave_source.mat` is present; stages 2–4 if their `output_table<affix>.csv` exists; stage 5 if `uncertainty_report.html` exists. Only the missing stages are resubmitted, and dependencies are set only for jobs that were actually submitted.
+> **Resuming a partial run.** On HPC, each stage is skipped automatically if its sentinel output already exists (see [Resuming a partial run](#resuming-a-partial-run) below). Only the missing stages are resubmitted, and scheduler dependencies are set only for jobs that were actually submitted.
 
 The built-in medium override configs live in `configs/uncertainty/`:
 
@@ -163,11 +163,10 @@ Each simulation variant writes its outputs into the shared `path.sim` output fol
 | `sub-NNN_layered_thermal_max<affix>.png` | Temperature vs. time plot | yes |
 | `sub-NNN_layered_parameters<affix>.mat` | Parameter struct for the variant | yes |
 | `sub-NNN_layered_heating_res<affix>.mat` | Heating simulation matrices (large) | **removed** |
-| `sub-NNN_layered_kwave_source.mat` | Shared k-Wave source matrix from stage 1 | **removed** |
 | `debug/sub-NNN_after_rotating_and_scaling.mat` | Intermediate head model (debug) | **removed** |
 | `debug/sub-NNN_layered_after_cropping_and_smoothing.mat` | Intermediate skull grid (debug) | **removed** |
 
-> **Automatic cleanup.** When `parameters.io.save_matrices = 0`, the pipeline deletes the four files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, which is called automatically on both the MATLAB and HPC platforms. Files needed for restarting the pipeline (`kwave_source.mat`) are removed only after the report is complete, so a failed run can still be resumed before that point.
+> **Automatic cleanup.** When `parameters.io.save_matrices = 0`, the pipeline deletes the files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, called automatically on both the MATLAB and HPC platforms. Cleanup only runs after stage 5 completes, so a failed run can be resumed beforehand.
 
 The uncertainty report is written as:
 
@@ -186,6 +185,26 @@ The uncertainty report (`generate_uncertainty_report.m`) is a self-contained HTM
 - **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Side-by-side temperature-vs-time images (`thermal_max`) across liberal, default, and conservative variants.
 - **Additional maps** — Side-by-side maximum temperature maps across variants.
 - **Raw data tables** — Full CSV output tables for each variant.
+
+---
+
+## Resuming a partial run
+
+The uncertainty pipeline supports automatic resumption on both platforms.
+
+**HPC (slurm/qsub).** Before submitting each job, the pipeline checks for a sentinel file. If the sentinel exists, the job is skipped entirely and no scheduler dependency is created for it:
+
+| Stage | Sentinel file | Location |
+|---|---|---|
+| 1 — Preprocessing | `sub-NNN_<medium>_after_cropping_and_smoothing.mat` | `<output_dir>/debug/` |
+| 2 — Default sim | `sub-NNN_<medium>_output_table.csv` | `<output_dir>/` |
+| 3 — Liberal sim | `sub-NNN_<medium>_output_table_liberal.csv` | `<output_dir>/` |
+| 4 — Conservative sim | `sub-NNN_<medium>_output_table_conservative.csv` | `<output_dir>/` |
+| 5 — Report | `sub-NNN_<medium>_uncertainty_report.html` | `<output_dir>/` |
+
+To rerun a stage, delete its sentinel file before resubmitting.
+
+**MATLAB platform.** There is no stage-level skip logic. Instead, resumability relies on `io.overwrite_files = 'never'` being set for all variant stages: each individual file write inside the pipeline is skipped if the file already exists. This means a restarted MATLAB run will fast-forward through completed steps file-by-file rather than stage-by-stage.
 
 ---
 

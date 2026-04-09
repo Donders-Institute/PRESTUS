@@ -231,9 +231,10 @@ See [doc_placement_heuristic.md](doc_placement_heuristic.md).
 | `default_dims` | Requested grid dimensions [voxels per dimension]. | `[144, 144, 400]` | Directly sets the simulation grid for `water` and `phantom` media. For `layered`, the grid is determined by head preprocessing and this value is not used. |
 | `axisymmetric` | Run axisymmetric 2D simulation (`kspaceFirstOrderAS`). | `0` | `1 = yes`, `0 = no`. See [doc_simulations-acoustic.md](doc_simulations-acoustic.md). |
 | `pml_size` | Perfectly Matched Layer (PML) size [voxels]. | `10` | Absorbs waves at boundaries. Recommended for 3D. See [k-Wave docs](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). |
-| `source_ppw` | Points per wavelength. | `[]` | Calculated internally if not set. |
-| `source_cfl` | Courant-Friedrichs-Lewy fraction. | `0.15` | |
-| `source_limit_fraction` | Fraction of the stability limit to use for time step. | `0.9` | `0` = do not use stability limit |
+| `source_ppw` | Points per wavelength (PPW) override. | `[]` | Calculated internally from `resolution_mm` and the medium's maximum sound speed if not set. Setting this overrides the internal calculation and fixes the number of spatial samples per wavelength used to derive the time step. |
+| `min_ppw` | Minimum acceptable PPW at the fundamental frequency. | `6` | Checked against the slowest medium sound speed (worst-case spatial sampling). A warning is raised if the actual PPW falls below this value, along with the maximum `resolution_mm` that would satisfy it. |
+| `source_cfl` | Courant-Friedrichs-Lewy (CFL) fraction. | `0.15` | Controls temporal resolution independently of spatial resolution. Given a fixed spatial step `dx`, the time step is `dt = CFL × dx / c_max`, where `c_max` is the fastest medium sound speed (typically skull at ~2800 m/s). Smaller CFL = finer temporal sampling and must remain below the stability limit. Set to 0.15 (half k-Wave's default of 0.3) for additional stability margin in heterogeneous skull simulations. Can be relaxed toward 0.3 to reduce runtime, but should be validated against `checkStability` output. |
+| `source_limit_fraction` | Fraction of the stability limit to use for time step. | `0.9` | After source setup, `checkStability` is called; if the CFL-derived `dt` exceeds the estimated limit, source setup reruns with `dt = source_limit_fraction × dt_stability_limit`. The final effective `dt` may therefore be smaller than `CFL × dx / c_max`. Set to `0` to disable. |
 | `max_expand` | Maximum grid expansion for prime-number FFT optimisation [voxels]. | `40` | |
 | `use_kWaveArray` | Use the kWaveArray class for transducer modelling? | `1` | `1 = yes`, `0 = no` |
 

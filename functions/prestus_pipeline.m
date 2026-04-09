@@ -175,12 +175,15 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     if ~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1
         max_sound_speed = max(kwave_medium.sound_speed(:));
+        min_sound_speed = min(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
             source_sensor_setup(...
             parameters, ...
             max_sound_speed, ...
             trans_pos, ...
-            focus_pos);
+            focus_pos, ...
+            [], ...
+            min_sound_speed);
         
         % Check stability & adjust source time step if necessary
         if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~=0
@@ -191,7 +194,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 			    disp('Adapt time step for simulation stability...')
                 % Use (by default 90%) fraction of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
                 grid_time_step = dt_stability_limit*parameters.grid.source_limit_fraction;
-                [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step);
+                [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
             end
         end
     else
