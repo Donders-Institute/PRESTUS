@@ -15,18 +15,18 @@ The three simulation variants are defined as:
 | Variant | Interpretation | Expected effect |
 |---|---|---|
 | **Default** | Best-estimate medium properties | Reference simulation |
-| **Liberal** | Parameter combination that tends to produce *higher* acoustic intensity and heating at the target | Upper bound on in-situ exposure |
-| **Conservative** | Parameter combination that tends to produce *lower* acoustic intensity and heating at the target | Lower bound on in-situ exposure |
-
-> **Safety assessment.** For the purpose of regulatory or ethical review, the **liberal** variant represents the highest plausible exposure: if safety limits are met under liberal tissue assumptions, they are expected to be met under any plausible tissue configuration. The default simulation provides the best-estimate, and the conservative variant documents the lower end of the plausible range.
+| **Liberal** | Acoustic tissue parameter combination that tends to produce higher acoustic intensity at the target and reduced heating in the skull (e.g., lower skull attenuation, lower skull absorption fraction) | Indicative upper range of in-situ exposure |
+| **Conservative** | Acoustic tissue parameter combination that tends to produce lower acoustic intensity at the target and increased heating in the skull (e.g., higher skull attenuation, higher skull absorption fraction) | Indicative lower range of in-situ exposure |
 
 The liberal/conservative distinction follows the logic that different parameter choices affect different stages of wave propagation in opposite directions. For example, higher skull attenuation reduces intracranial intensity (beneficial) but increases skull heating (adverse). The liberal and conservative parameter sets are therefore not simply "high" and "low" across all properties — they are tailored to yield the highest and lowest plausible values for the metrics of interest (intracranial intensity and heating).
+
+> **Limitations.** The parameter value ranges used for the liberal and conservative variants remain under investigation and should not be interpreted as absolute bounds on simulation outcomes. Parameter interactions can be non-linear — both amongst tissue properties and with subject-specific head anatomy such as skull thickness and morphology. Additionally, analysis choices such as the degree of image smoothing applied to the segmentation independently affect intensity and thermal estimates. The liberal and conservative variants are therefore best understood as illustrative scenarios that bracket a plausible range, not as guaranteed worst- or best-case predictions.
 
 ---
 
 ## Medium property ranges
 
-The following table summarises the default, liberal, and conservative medium properties currently implemented in PRESTUS. Liberal values are chosen to maximise acoustic exposure and heating at the target; conservative values minimise them.
+The following table summarises the default, liberal, and conservative medium acoustic properties currently implemented in PRESTUS. Liberal values are chosen to maximise acoustic exposure and heating at the target; conservative values minimise them.
 
 ### Brain
 
@@ -54,7 +54,7 @@ The following table summarises the default, liberal, and conservative medium pro
 | Perfusion | 10 | 20 | 30 | mL/min/kg |
 | Absorption fraction | 1.00 | 0.28 | 0.16 | — |
 
-> **Rationale for skull properties.** The conservative variant uses high attenuation and high acoustic impedance (high density × sound speed), which reflects a denser, more calcified skull: more acoustic energy is lost before reaching the brain, so intracranial intensity is lower. Conversely, the liberal variant uses a skull with low impedance and low attenuation, which allows more energy through to the brain. The absorption fraction modulates how much of the attenuated energy is converted to heat: a lower fraction means less skull heating per unit attenuation. In practice, the liberal variant thus produces higher intracranial intensity *and* allows more conservative skull heating estimates relative to the default.
+> **Rationale for skull properties.** The conservative variant uses high attenuation and high acoustic impedance (high density × sound speed), which reflects a denser, more calcified skull: more acoustic energy is lost before reaching the brain, so intracranial intensity is lower. Conversely, the liberal variant uses a skull with low impedance and low attenuation, which allows more energy through to the brain. The absorption fraction modulates how much of the attenuated energy is converted to heat: a lower fraction means less skull heating per unit attenuation. In practice, the liberal variant thus produces higher intracranial intensity *and* allows more limited skull heating estimates relative to the default.
 
 > **Multi-compartment skull models.** When a segmentation includes separate skull sub-compartments (e.g., `skull_cortical` and `skull_trabecular`), the same liberal and conservative values are currently applied identically to all skull compartments. This is a known simplification — in reality, cortical and trabecular bone have distinct acoustic properties. Users modelling detailed skull microstructure should consider customising the uncertainty configs (see [Customising medium property ranges](#customising-medium-property-ranges)) to assign compartment-specific ranges.
 
@@ -80,21 +80,25 @@ All five stages are managed automatically when `parameters.simulation.uncertaint
 
 ```matlab
 prestus_path = '/path/to/PRESTUS';
-addpath(genpath(fullfile(prestus_path, 'functions')));
-cd(prestus_path);
+addpath(fullfile(prestus_path, 'functions', 'helper'));
+safe_addpath(fullfile(prestus_path, 'functions'));
+safe_addpath(fullfile(prestus_path, 'toolboxes'));
 
 parameters = load_parameters('config_study.yaml');
 parameters.subject_id             = 1;
 parameters.simulation.medium      = 'layered';
-parameters.simulation.uncertainty = true;   % activates uncertainty mode
-parameters.platform               = 'auto'; % 'matlab', 'slurm', or 'qsub'
+parameters.simulation.uncertainty = true;    % activates uncertainty mode
+parameters.platform               = 'auto';  % 'matlab', 'slurm', or 'qsub'
+parameters.path.sim               = '/absolute/path/to/sim_outputs';  % must be set
 
-prestus_pipeline(parameters);
+prestus_pipeline_start(parameters);
 ```
 
-`prestus_pipeline` detects `simulation.uncertainty = true` at startup and redirects to `uncertainty_pipeline`, which handles module flags, output affixes, medium config merging, and (on HPC) job chaining. The per-variant parameter structs built internally have `simulation.uncertainty` cleared, so there is no recursion.
+> **`parameters.path.sim` must be an absolute path.** The default config sets `path.sim = ''`. If it is empty when the pipeline is called, `get_output_dir` will throw an error. Set it in your study config or explicitly in the script as shown above.
 
-On a local MATLAB session (`platform = 'matlab'`) the five stages run sequentially. On HPC (`platform = 'slurm'` or `'qsub'`) stages 2–4 are submitted in parallel with a dependency on stage 1, and stage 5 is submitted with a dependency on all three simulation jobs.
+`prestus_pipeline_start` detects `simulation.uncertainty = true` on HPC and redirects to `uncertainty_pipeline` before submitting a single job. On MATLAB, `prestus_pipeline` handles the redirect after `path_log_setup` has run. The per-variant parameter structs built internally have `simulation.uncertainty` cleared, so there is no recursion.
+
+On a local MATLAB session (`platform = 'matlab'`) the five stages run sequentially. On HPC (`platform = 'slurm'` or `'qsub'`) all five jobs are submitted immediately: stages 2–4 with a dependency on stage 1, and stage 5 with a dependency on all three simulation jobs. No MATLAB session is held open during execution.
 
 ### Customising options
 
@@ -137,6 +141,8 @@ uncertainty_pipeline(parameters, options);
 
 The medium override YAMLs are merged on top of the base parameters using `MergeStruct`, so only the properties defined in the override file are changed — all other settings (transducer, grid, paths) are inherited from the base config.
 
+> **Resuming a partial run.** On HPC, each stage is skipped automatically if its key output already exists: stage 1 is skipped if `sub-NNN_<medium>_kwave_source.mat` is present; stages 2–4 if their `output_table<affix>.csv` exists; stage 5 if `uncertainty_report.html` exists. Only the missing stages are resubmitted, and dependencies are set only for jobs that were actually submitted.
+
 The built-in medium override configs live in `configs/uncertainty/`:
 
 - `config_medium_liberal.yaml` — low-impedance, low-attenuation skull; higher brain intensity
@@ -148,13 +154,20 @@ The built-in medium override configs live in `configs/uncertainty/`:
 
 Each simulation variant writes its outputs into the shared `path.sim` output folder (or a subject subfolder), identified by `io.output_affix`:
 
-| File pattern | Description |
-|---|---|
-| `sub-NNN_layered_output_table<affix>.csv` | Acoustic and thermal metrics table |
-| `sub-NNN_layered_heating_res<affix>.mat` | Heating simulation matrices and timeseries |
-| `sub-NNN_layered_intensity<affix>.png` | Intensity overlay image |
-| `sub-NNN_layered_maxT<affix>.png` | Max temperature overlay image |
-| `sub-NNN_layered_report<affix>.html` | Per-variant simulation report |
+| File pattern | Description | Kept when `save_matrices = 0` |
+|---|---|---|
+| `sub-NNN_layered_output_table<affix>.csv` | Acoustic and thermal metrics table | yes |
+| `sub-NNN_layered_report<affix>.html` | Per-variant simulation report | yes |
+| `sub-NNN_layered_intensity_<dim><affix>.png` | Intensity overlay image per slice dimension (x, y, z) | yes |
+| `sub-NNN_layered_maxT_<dim><affix>.png` | Max temperature overlay image per slice dimension (x, y, z) | yes |
+| `sub-NNN_layered_thermal_max<affix>.png` | Temperature vs. time plot | yes |
+| `sub-NNN_layered_parameters<affix>.mat` | Parameter struct for the variant | yes |
+| `sub-NNN_layered_heating_res<affix>.mat` | Heating simulation matrices (large) | **removed** |
+| `sub-NNN_layered_kwave_source.mat` | Shared k-Wave source matrix from stage 1 | **removed** |
+| `debug/sub-NNN_after_rotating_and_scaling.mat` | Intermediate head model (debug) | **removed** |
+| `debug/sub-NNN_layered_after_cropping_and_smoothing.mat` | Intermediate skull grid (debug) | **removed** |
+
+> **Automatic cleanup.** When `parameters.io.save_matrices = 0`, the pipeline deletes the four files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, which is called automatically on both the MATLAB and HPC platforms. Files needed for restarting the pipeline (`kwave_source.mat`) are removed only after the report is complete, so a failed run can still be resumed before that point.
 
 The uncertainty report is written as:
 
@@ -168,17 +181,19 @@ The uncertainty report is written as:
 
 The uncertainty report (`generate_uncertainty_report.m`) is a self-contained HTML file that includes:
 
-- **Safety dashboard** — Color-coded cards for all ITRUSST consensus safety metrics (MI, CEM43, temperature rise, absolute temperature), showing the worst-case (liberal) value, the conservative-to-liberal range, and a progress bar relative to the limit.
-- **Acoustic results** — Range table showing conservative / default / liberal values for key acoustic metrics (ISPPA, focal distance, MI, half-maximum volume), with color coding of the worst-case value against the limit. Side-by-side intensity map comparison across all three variants.
-- **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Inline SVG timeseries plot with the default trajectory and a shaded uncertainty band spanning the conservative-to-liberal range. Side-by-side maximum temperature maps.
-- **Image gallery** — Full side-by-side comparison of all output images across variants.
+- **Safety dashboard** — Color-coded cards for all ITRUSST consensus safety metrics (MI, CEM43, temperature rise, absolute temperature). Each card shows the **default** value with the liberal–conservative range annotated. The bar spans a metric-specific minimum (37 °C for absolute temperatures, 0 elsewhere) to `max(max_sim, limit)`. The colored fill extends to `min(max_sim, limit)`; three ticks mark the liberal (blue), default (black), and conservative (brown) values. Color is determined by the conservative value.
+- **Acoustic results** — Range table showing liberal / default / conservative values for key acoustic metrics (ISPPA, focal distance, MI, half-maximum volume).
+- **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Side-by-side temperature-vs-time images (`thermal_max`) across liberal, default, and conservative variants.
+- **Additional maps** — Side-by-side maximum temperature maps across variants.
 - **Raw data tables** — Full CSV output tables for each variant.
 
 ---
 
 ## HPC usage
 
-When `platform` is `'slurm'` or `'qsub'`, `uncertainty_pipeline` submits all five jobs in the correct order using scheduler dependencies (`--dependency=afterok` for SLURM). Stage 1 is submitted first with `wait_for_job = true`, blocking until it completes before stages 2–4 are submitted. Stage 5 is submitted with a dependency on all three simulation job IDs and runs automatically once they have all succeeded.
+When `platform` is `'slurm'` or `'qsub'`, `uncertainty_pipeline` submits all five jobs immediately using scheduler dependencies (`--dependency=afterok` for SLURM). Stages 2–4 depend on stage 1; stage 5 depends on all three simulation jobs. If stage 1 fails, all downstream jobs are automatically cancelled (`--kill-on-invalid-dep=yes`). No MATLAB session is held open during execution.
+
+Stages 1 and 5 (preprocessing and report) do not require a GPU and are submitted to the scheduler's default CPU queue. Stages 2–4 inherit the GPU resources from the base config. To override the queue for CPU stages use `options.stage1_partition = 'gpu'` and `options.report_partition = 'gpu'`.
 
 This requires that `hpc_submit_job` supports the `parameters.hpc.depend_job_id` (single) and `parameters.hpc.depend_job_ids` (array) fields — see [doc_hpc.md](doc_hpc.md).
 

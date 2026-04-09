@@ -18,11 +18,13 @@ fprintf('========================================\n\n');
 %% 1. I/O Management
 
 fprintf('📁 I/O MANAGEMENT\n');
-print_if_field(parameters.io, 'data_path', '%s');
-print_if_field(parameters.io, 'seg_path', '%s');
-print_if_field(parameters.io, 'sim_path', '%s');
-print_if_field(parameters.io, 'simnibs_bin_path', '%s');
-print_if_field(parameters.io, 'output_affix', '%s');
+pth = get_struct_or_default(parameters, 'path');
+print_if_field(pth,              'anat',              '%s', 'anat_path');
+print_if_field(pth,              'seg',               '%s', 'seg_path');
+print_if_field(pth,              'sim',               '%s', 'sim_path');
+startup = get_struct_or_default(parameters, 'startup');
+print_if_field(startup,          'simnibs_bin_path',  '%s', 'simnibs_bin_path');
+print_if_field(parameters.io,    'output_affix',      '%s');
 print_overwrite_pair(parameters.io);
 fprintf('\n');
 

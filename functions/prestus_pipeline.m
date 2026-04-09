@@ -411,6 +411,10 @@ function [parameters] = prestus_pipeline(parameters, options)
     if isfield(parameters.modules, 'uncertainty_report') && parameters.modules.uncertainty_report
         if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'affixes')
             generate_uncertainty_report(parameters, parameters.uncertainty.affixes);
+            % Clean up intermediate files on HPC when save_matrices = 0
+            if ~should_save_output(parameters.io, 'save_matrices')
+                cleanup_uncertainty_intermediates(parameters, parameters.uncertainty.affixes);
+            end
         else
             generate_uncertainty_report(parameters);
         end

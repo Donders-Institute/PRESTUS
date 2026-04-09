@@ -55,7 +55,7 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     % [SIMULATION OUTPUT] Make subfolder (if enabled) and check if directory exists
     if isfield(parameters.path, 'sim') && ~isempty(parameters.path.sim) && ...
             (isstring(parameters.path.sim) || ischar(parameters.path.sim)) && ...
-            any(~strcmp(parameters.path.sim, {"", ''}))
+            ~any(strcmp(parameters.path.sim, {"", ''}))
         parameters.io.output_dir = get_output_dir(parameters);
         if ~isfolder(parameters.io.output_dir); mkdir(parameters.io.output_dir); end
     end
@@ -63,7 +63,7 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
     if isfield(parameters.path, 'localite') && ...
             (isstring(parameters.path.localite) || ischar(parameters.path.localite)) && ...
-            any(~strcmp(parameters.path.localite, {"", ''}))
+            ~any(strcmp(parameters.path.localite, {"", ''}))
         if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
             parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
         end
@@ -90,11 +90,19 @@ function [parameters] = path_log_setup(parameters, prestus_path)
         save(filename_parameters, 'parameters');
         clear filename_parameters;
 
-        % Create a log
-        filename_log = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_%s%s_%s.txt', ...
-            subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
-            string(datetime('now'), 'yyMMdd_HHmm')));
+        % Create a log.
+        % Use a pre-assigned path if uncertainty_pipeline set one (so all
+        % five stage logs have known, deterministic paths); otherwise fall
+        % back to a timestamp-based name.
+        if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
+            filename_log = parameters.io.log_file;
+        else
+            filename_log = fullfile(parameters.io.output_dir, ...
+                sprintf('sub-%03d_%s%s_%s.txt', ...
+                subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
+                string(datetime('now'), 'yyMMdd_HHmm')));
+        end
+        parameters.io.log_file = filename_log;
         diary(filename_log);
     end
 

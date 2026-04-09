@@ -47,12 +47,11 @@ function job_id = prestus_pipeline_start(parameters, options)
             prestus_pipeline(parameters, options);
             job_id = [];
 
-        case {'slurm', 'qsub'}
+        case {'auto', 'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
             % Intercept uncertainty mode before single-job submission:
             % uncertainty_pipeline manages its own multi-stage job graph.
-            if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
-                    parameters.simulation.uncertainty
+            if isfield(parameters.simulation, 'uncertainty') && parameters.simulation.uncertainty
                 uncertainty_pipeline(parameters, options);
                 job_id = [];
                 return;

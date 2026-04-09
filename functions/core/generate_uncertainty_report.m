@@ -149,6 +149,16 @@ try
         html_parts{end+1} = section_error('Additional Maps', ME);
     end
 
+    % Timing summary
+    try
+        timing_html = build_timing_section(parameters, variant_affixes, variant_labels);
+        if ~isempty(timing_html)
+            html_parts{end+1} = collapsible_section('Pipeline Timing', timing_html, false, 'timing');
+        end
+    catch ME
+        html_parts{end+1} = section_error('Pipeline Timing', ME);
+    end
+
     % Raw data tables
     try
         html_parts{end+1} = collapsible_section('Raw Data Tables', ...
@@ -846,6 +856,166 @@ function str = format_cell_value(val)
 end
 
 %% ========================================================================
+%  PIPELINE TIMING
+%% ========================================================================
+
+function timing = parse_timing_from_log(log_path)
+% Parse a diary log file and return a struct array with fields:
+%   label (char), seconds (double).
+% Returns empty struct array if the file is missing or parsing fails.
+    timing = struct('label', {}, 'seconds', {});
+    if isempty(log_path) || ~isfile(log_path); return; end
+    try
+        fid = fopen(log_path, 'r', 'n', 'UTF-8');
+        if fid == -1; return; end
+        lines = {};
+        while ~feof(fid)
+            lines{end+1} = fgetl(fid); %#ok<AGROW>
+        end
+        fclose(fid);
+    catch
+        return;
+    end
+    % Match timer-stop lines: ⏱ <label>  <seconds>s | ...
+    % The ⏱ character is U+23F1 (UTF-8: E2 8F B1).
+    timer_char = native2unicode([0xE2, 0x8F, 0xB1], 'UTF-8');
+    pat = ['^' timer_char '\s+(\S+)\s+([\d.]+)s\b'];
+    for li = 1:numel(lines)
+        ln = lines{li};
+        if ~ischar(ln) || isempty(ln); continue; end
+        tok = regexp(ln, pat, 'tokens');
+        if ~isempty(tok)
+            t.label   = tok{1}{1};
+            t.seconds = str2double(tok{1}{2});
+            timing(end+1) = t; %#ok<AGROW>
+        end
+    end
+end
+
+function html = build_timing_section(parameters, variant_affixes, variant_labels)
+% Build an HTML table showing per-step wall times across all five pipeline
+% stages, using the pre-assigned log file paths in
+% parameters.uncertainty.log_files.
+% Returns empty string if no timing data is found.
+
+    if ~isfield(parameters, 'uncertainty') || ~isfield(parameters.uncertainty, 'log_files')
+        html = '';
+        return;
+    end
+    lf = parameters.uncertainty.log_files;  % struct: stage1, default, liberal, conservative, report
+
+    % Stage 1: preprocessing steps (preproc, medium, source)
+    t_stage1 = parse_timing_from_log(char(lf.stage1));
+
+    % Stages 2–4: simulation variants (acoustic, thermal, total pipeline)
+    % variant_affixes = {liberal, default, conservative}
+    t_variants = cell(1, 3);
+    variant_log_fields = {'liberal', 'default', 'conservative'};
+    for v = 1:3
+        t_variants{v} = parse_timing_from_log(char(lf.(variant_log_fields{v})));
+    end
+
+    % Stage 5: report
+    t_report = parse_timing_from_log(char(lf.report));
+
+    any_data = ~isempty(t_stage1) || any(~cellfun(@isempty, t_variants)) || ~isempty(t_report);
+    if ~any_data
+        html = '';
+        return;
+    end
+
+    % Step definitions: {log_label, display_label, source}
+    % source: 'stage1' | 'variant' | 'report' | 'total'
+    % 'total' spans all variant columns and the report column.
+    steps = { ...
+        'preproc',           'Head preprocessing',  'stage1';  ...
+        'medium',            'Medium setup',         'stage1';  ...
+        'source',            'Source setup',         'stage1';  ...
+        'acoustic',          'Acoustic simulation',  'variant'; ...
+        'acoustic_analysis', 'Acoustic analysis',    'variant'; ...
+        'thermal',           'Thermal simulation',   'variant'; ...
+        'thermal_analysis',  'Thermal analysis',     'variant'; ...
+        'nifti',             'NIfTI export',         'variant'; ...
+        'prestus_pipeline',  'Total (pipeline)',     'total';   ...
+    };
+
+    % Column headers: Stage 1 | Liberal | Default | Conservative | Report
+    col_labels = [{'Stage 1'}, variant_labels, {'Report'}];
+    col_colors = {'#475569', '#1d4ed8', '#1e293b', '#92400e', '#475569'};
+
+    html = '<p style="font-size:0.82em;color:#64748b;margin:0 0 12px;">Wall times from pre-assigned log files for each pipeline stage. Steps skipped due to caching are shown as —.</p>';
+    html = [html '<div style="overflow-x:auto"><table class="range-table" style="min-width:600px">'];
+    html = [html '<thead><tr><th>Step</th>'];
+    for c = 1:numel(col_labels)
+        html = [html sprintf('<th style="color:%s">%s</th>', col_colors{c}, col_labels{c})]; %#ok<AGROW>
+    end
+    html = [html '</tr></thead><tbody>'];
+
+    function s = lookup(t, key)
+        s = NaN;
+        for ti = 1:numel(t)
+            if strcmp(t(ti).label, key); s = t(ti).seconds; return; end
+        end
+    end
+
+    function str = fmt(s)
+        if isnan(s); str = ''; return; end
+        if s >= 3600;     str = sprintf('%.1f h',   s / 3600);
+        elseif s >= 60;   str = sprintf('%.1f min', s / 60);
+        else;             str = sprintf('%.0f s',   s);
+        end
+    end
+
+    function str = cell_html(s)
+        if isnan(s)
+            str = '<td style="color:#94a3b8">—</td>';
+        else
+            str = sprintf('<td>%s</td>', fmt(s));
+        end
+    end
+
+    for si = 1:size(steps, 1)
+        key    = steps{si, 1};
+        lbl    = steps{si, 2};
+        src    = steps{si, 3};
+        is_tot = strcmp(key, 'prestus_pipeline');
+        row_style = '';
+        if is_tot; row_style = ' style="font-weight:600;border-top:2px solid #e2e8f0"'; end
+
+        html = [html sprintf('<tr%s><td>%s</td>', row_style, lbl)]; %#ok<AGROW>
+
+        % Stage 1 column
+        if strcmp(src, 'stage1')
+            html = [html cell_html(lookup(t_stage1, key))]; %#ok<AGROW>
+        elseif strcmp(src, 'total')
+            html = [html '<td style="color:#94a3b8">—</td>']; %#ok<AGROW>
+        else
+            html = [html '<td style="color:#e2e8f0">·</td>']; %#ok<AGROW>
+        end
+
+        % Variant columns (liberal, default, conservative)
+        for v = 1:3
+            if strcmp(src, 'variant') || strcmp(src, 'total')
+                html = [html cell_html(lookup(t_variants{v}, key))]; %#ok<AGROW>
+            else
+                html = [html '<td style="color:#e2e8f0">·</td>']; %#ok<AGROW>
+            end
+        end
+
+        % Report column
+        if strcmp(src, 'report') || strcmp(src, 'total')
+            html = [html cell_html(lookup(t_report, key))]; %#ok<AGROW>
+        else
+            html = [html '<td style="color:#e2e8f0">·</td>']; %#ok<AGROW>
+        end
+
+        html = [html '</tr>']; %#ok<AGROW>
+    end
+
+    html = [html '</tbody></table></div>'];
+end
+
+%% ========================================================================
 %  UTILITIES
 %% ========================================================================
 
@@ -859,6 +1029,7 @@ function html = build_toc(is_layered, has_thermal)
         html = [html '<a href="#thermal">Thermal</a>'];
     end
     html = [html '<a href="#images">Images</a>'];
+    html = [html '<a href="#timing">Timing</a>'];
     html = [html '<a href="#tables">Tables</a>'];
     html = [html '</nav>'];
 end

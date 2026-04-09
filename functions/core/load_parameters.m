@@ -17,8 +17,12 @@ function parameters = load_parameters(varargin)
 %   parameters - Struct containing merged simulation parameters.
 
     %% Load default configuration file
-
-    parameters = yaml.loadFile('default_config.yaml', "ConvertToArray", true);
+    % Use an absolute path derived from this file's location so that
+    % load_parameters works correctly regardless of the caller's CWD.
+    this_dir     = fileparts(mfilename('fullpath'));          % functions/core/
+    prestus_root = fileparts(fileparts(this_dir));            % PRESTUS root
+    default_config_path = fullfile(prestus_root, 'configs', 'default_config.yaml');
+    parameters = yaml.loadFile(default_config_path, "ConvertToArray", true);
 
     %% Merge with additional configuration files or structures
 

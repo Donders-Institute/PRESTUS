@@ -102,7 +102,6 @@ if ~isfield(options, 'stage1_timelimit');    options.stage1_timelimit    = '12:0
 if ~isfield(options, 'sim_timelimit');       options.sim_timelimit       = '02:00:00'; end
 if ~isfield(options, 'report_timelimit');    options.report_timelimit    = '00:30:00'; end
 % Memory limits per stage (GB).
-% Stage 1 defaults to 16 GB (CPU-only preprocessing; increase if OOM-killed).
 % Simulation and report stages inherit hpc.memorylimit from the base config.
 if ~isfield(options, 'stage1_memorylimit'); options.stage1_memorylimit  = []; end  % resolved below after platform detection
 if ~isfield(options, 'stage1_partition');   options.stage1_partition   = []; end  % [] = scheduler default; set e.g. 'gpu' to avoid a long batch queue
@@ -166,14 +165,6 @@ if strcmp(platform, 'auto')
     platform = hpc_detect_system();
 end
 
-% Resolve stage1_memorylimit default: 2× base memorylimit, floored at 40 GB.
-% Stage 1 is consistently more RAM-intensive than simulation stages because
-% it loads all imaging volumes and builds 3D medium maps before any k-Wave
-% computation begins.
-if isempty(options.stage1_memorylimit)
-    options.stage1_memorylimit = 16;
-end
-
 fprintf('\n');
 fprintf('╔══════════════════════════════════════╗\n');
 fprintf('║   PRESTUS Uncertainty Pipeline       ║\n');
@@ -200,7 +191,27 @@ p_liberal      = make_sim_params(parameters, ...
 p_conservative = make_sim_params(parameters, ...
                      options.affixes.conservative, options.conservative_config);
 
-p_report       = make_report_params(parameters, options.affixes);
+% Pre-assign deterministic log file paths for all five stages so that
+% generate_uncertainty_report can locate each stage's timing data.
+% Using a single pipeline-run timestamp keeps file names stable across
+% MATLAB and HPC (where the paths must be encoded before job submission).
+run_ts     = string(datetime('now'), 'yyMMdd_HHmm');
+output_dir = get_output_dir(parameters);
+subj       = sprintf('sub-%03d', parameters.subject_id);
+medium     = parameters.simulation.medium;
+
+log_files.stage1      = fullfile(output_dir, sprintf('%s_%s_stage1_%s.txt',       subj, medium, run_ts));
+log_files.default     = fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.default,      run_ts));
+log_files.liberal     = fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.liberal,      run_ts));
+log_files.conservative= fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.conservative, run_ts));
+log_files.report      = fullfile(output_dir, sprintf('%s_%s_stage5_report_%s.txt',subj, medium, run_ts));
+
+p_stage1.io.log_file       = log_files.stage1;
+p_default.io.log_file      = log_files.default;
+p_liberal.io.log_file      = log_files.liberal;
+p_conservative.io.log_file = log_files.conservative;
+
+p_report       = make_report_params(parameters, options.affixes, log_files);
 
 % =========================================================================
 %% Execute
@@ -221,6 +232,11 @@ switch platform
         % Warn about any missing variant outputs before attempting report
         assert_variant_outputs_exist(parameters, options.affixes);
         run_stage(5, 'Uncertainty report',           @() prestus_pipeline(p_report));
+
+        % Clean up intermediate files when save_matrices = 0
+        if ~should_save_output(parameters.io, 'save_matrices')
+            cleanup_uncertainty_intermediates(parameters, options.affixes);
+        end
 
     % ---------------------------------------------------------------------
     case {'slurm', 'qsub'}
@@ -428,11 +444,13 @@ function p = make_sim_params(base, affix, medium_config)
     p.simulation.interactive           = 0;
 end
 
-function p = make_report_params(base, affixes)
+function p = make_report_params(base, affixes, log_files)
 % Stage 5: generate the uncertainty report only — no simulation.
 %
 % The affixes struct is passed through parameters.uncertainty.affixes so
 % that generate_uncertainty_report can locate the three variant output files.
+% log_files is a struct with fields stage1, default, liberal, conservative,
+% report — pre-assigned paths that allow the report to parse per-stage timing.
     p = clear_uncertainty_flag(base);
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
@@ -442,9 +460,11 @@ function p = make_report_params(base, affixes)
     p.modules.generate_report        = 0;
     p.modules.uncertainty_report     = 1;
     p.io.output_affix                = '';
+    p.io.log_file                    = log_files.report;
     p.io.overwrite_files             = 'never';
     p.simulation.interactive         = 0;
     p.uncertainty.affixes            = affixes;
+    p.uncertainty.log_files          = log_files;
 end
 
 % =========================================================================

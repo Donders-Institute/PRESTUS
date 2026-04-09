@@ -36,8 +36,9 @@ subject_id = 1;
 %% 2. SETUP
 % =========================================================================
 
-addpath(genpath(fullfile(prestus_path, 'functions')));
-cd(prestus_path);
+addpath(fullfile(prestus_path, 'functions', 'helper'));
+safe_addpath(fullfile(prestus_path, 'functions'));
+safe_addpath(fullfile(prestus_path, 'toolboxes'));
 
 % Load base parameters from your study config.
 % Do NOT set io.output_affix here — the pipeline manages it per variant.
@@ -46,6 +47,9 @@ parameters.subject_id              = subject_id;
 parameters.simulation.medium       = 'layered';
 parameters.simulation.uncertainty  = true;   % <-- activates uncertainty mode
 parameters.platform                = 'auto'; % 'matlab' | 'slurm' | 'qsub' | 'auto'
+
+% path.sim MUST be an absolute path — the pipeline errors if it is empty.
+parameters.path.sim = '/absolute/path/to/sim_outputs';  % <-- set this
 
 % =========================================================================
 %% 3. OPTIONAL: OVERRIDE UNCERTAINTY OPTIONS
@@ -77,7 +81,6 @@ options.report_timelimit  = '00:30:00';   % uncertainty report generation
 %% 4. RUN
 % =========================================================================
 
-% prestus_pipeline detects simulation.uncertainty = true and automatically
-% runs the full uncertainty workflow (stages 1–5).
-% No prestus_path argument needed — uncertainty_pipeline resolves it internally.
-prestus_pipeline(parameters, options);
+% prestus_pipeline_start detects simulation.uncertainty = true and
+% automatically runs the full uncertainty workflow (stages 1–5).
+prestus_pipeline_start(parameters, options);
