@@ -192,6 +192,10 @@ function [parameters] = prestus_pipeline(parameters, options)
             fprintf('Stability limit estimate for time step: %.1d.\n', dt_stability_limit);
             if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
 			    disp('Adapt time step for simulation stability...')
+                % Free GPU memory from the first source before recomputing with
+                % the adjusted time step — source.p is a gpuArray and keeping
+                % both in memory simultaneously can exceed device memory.
+                clear source sensor source_labels
                 % Use (by default 90%) fraction of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
                 grid_time_step = dt_stability_limit*parameters.grid.source_limit_fraction;
                 [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
