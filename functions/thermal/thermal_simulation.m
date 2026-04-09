@@ -163,7 +163,7 @@ end
 T_max = thermal_diff_obj.T;
 
 % initialize field for cem43
-if isfield(parameters, 'adopted_cem43')
+if isfield(parameters.io, 'adopted_cem43') && ~isempty(parameters.io.adopted_cem43) && isfile(parameters.io.adopted_cem43)
     cumulative_heat_image = niftiread(parameters.io.adopted_cem43);
     fprintf('\nAdopting CEM43 heatmap %s from previous simulation\n', parameters.io.adopted_cem43)
     thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, ...

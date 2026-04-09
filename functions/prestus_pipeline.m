@@ -146,7 +146,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
     
         % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
-        if isfield(parameters.io, 'adopted_heatmap') && parameters.io.adopted_heatmap == 1 && isfile(parameters.io.adopted_heatmap)
+        if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_heatmap) && isfile(parameters.io.adopted_heatmap)
             heatmap_image = niftiread(parameters.io.adopted_heatmap);
             fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
             medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
@@ -273,6 +273,9 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop', 'acoustic_analysis');
 
+    % source_labels no longer needed after acoustic analysis
+    clear source_labels
+
     % =========================================================================
     %% THERMAL SIMULATIONS
     % =========================================================================
@@ -337,6 +340,13 @@ function [parameters] = prestus_pipeline(parameters, options)
                     'kwave_medium', ...
                     '-v7.3');
             end
+
+            % Free large arrays no longer needed after thermal simulation:
+            % sensor_data (acoustic pressure field), source and sensor
+            % (transducer arrays), kgrid (time/space grid), and
+            % kwaveDiffusion (thermal solver object — large on GPU).
+            clear sensor_data source sensor kgrid kwaveDiffusion
+
             parameters.state.heating_available = 1;
         elseif exist(filename_heating_data, 'file')
             disp('Skipping thermal simulation, loading existing output file.')
@@ -372,6 +382,9 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','thermal_analysis');
 
+    % time_status_seq and segmentation no longer needed after thermal analysis
+    clear time_status_seq segmentation bone
+
     % ================================================================
     %% CREATE NIFTI IMAGES
     % ================================================================
@@ -393,7 +406,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('stop','nifti');
 
     % cleanup to reduce RAM load
-    clear acoustic_* heating_*
+    clear acoustic_* results_heating medium_masks kwave_medium planimg
 
     % ====================================================================
     %% END OF THIS SIMULATION
