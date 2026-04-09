@@ -10,10 +10,17 @@ function parameters = preproc_segmentation(parameters)
     
     % Define paths to T1 and T2 images
     filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
-    filename_t2 = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
+    if isfield(parameters.path, 't2_pattern') && ~isempty(parameters.path.t2_pattern)
+        filename_t2 = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
+    else
+        filename_t2 = '';
+    end
 
-    % Validate existence of files
-    files_to_check = {filename_t1, filename_t2};
+    % Validate existence of files (T2 is optional)
+    files_to_check = {filename_t1};
+    if ~isempty(filename_t2)
+        files_to_check{end+1} = filename_t2;
+    end
     check_availability(files_to_check)
     
     %% SEGMENTATION USING SIMNIBS

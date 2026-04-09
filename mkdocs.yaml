@@ -40,6 +40,7 @@ nav:
   - 🚀 Getting Started:
     - Installation: doc_installation.md
     - Getting started: doc_getting-started.md
+    - GUI: doc_gui.md
   - 📖 Documentation:
     - Transducer Setup: doc_transducer.md
     - Transducer Calibration: doc_calibration.md

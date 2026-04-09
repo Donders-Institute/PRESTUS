@@ -71,6 +71,10 @@ function parameters = load_parameters(varargin)
     %% Output file settings validation and sanitization
 
     % Sanitize output file affix to ensure valid characters only
+    % yaml.loadFile reads empty-string YAML values as [] (numeric empty); coerce to char.
+    if ~ischar(parameters.io.output_affix)
+        parameters.io.output_affix = '';
+    end
     sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_]', '_');
     if ~strcmp(sanitized_affix, parameters.io.output_affix)
         fprintf('The original `io.output_affix` was sanitized. "%s" will be used instead of "%s"\n', ...

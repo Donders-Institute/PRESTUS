@@ -33,7 +33,7 @@ path:
   sim: ''               # Location of the simulation outputs [full path or folder name in path.anat]
   seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
   t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
-  t2_pattern: 'sub-%1$03d_T2w.nii*' # T2 image path template relative to path.anat
+  t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
   localite: ''          # Path to Localite neuronavigation output folder
   subject_subfolder: 1  # Should each participant's output be stored in a separate folder?
 
