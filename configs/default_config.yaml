@@ -194,8 +194,23 @@ transducer:
 
 placement:
   localite:
-    enabled: 0        # Should the script position_transducer_localite be used?
-    reference_distance_mm: 15 # Allows one to correct for varying distances between the infrared trackers attached to the transducer and the exit plane (can only be used with the function 'transducer_from_localite')
+    enabled: 0        # Use Localite neuronavigation to position the transducer?
+    # --- Simple mode: provide a direct path to a single Localite XML file ---
+    file: ''          # Path to a single Localite XML file (TriggerMarkers or GUMMarkers)
+    # --- Full neuronav mode: automatic file selection from path.localite folder ---
+    # Used when placement.localite.file is empty and path.localite is set.
+    session: 1        # Session identifier for file selection (integer or 'ses-XX')
+    markertype: 'TriggerMarkers'  # 'TriggerMarkers' or 'GUMMarkers'
+    position: 1       # Series index to use when multiple positions are in the file
+    # --- Shared ---
+    reference_distance_mm: 15 # Fallback offset (mm) from Localite matrix origin to bowl rear centre (used by k-Wave makeBowl).
+                              # Negative = bowl rear centre is on the housing side relative to the matrix origin.
+                              # Only used when transducer geometry fields are absent and tracker_to_bowl_mm is not set.
+    tracker_to_bowl_mm: []  # Explicit measured offset (mm) from the Localite 4×4 matrix origin to the bowl rear centre
+                            # (the geometric axis point at the back of the housing; bowl_pos in k-Wave makeBowl).
+                            # Negative = bowl rear centre is on the housing/tracker side (away from head).
+                            # When set, overrides both the geometry-derived value and reference_distance_mm.
+                            # See doc_placement_neuronav.md §"Localite matrix origin" for how to determine this value.
   heuristic:
     dist_close: []
     ear_radius: 35

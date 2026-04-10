@@ -5,18 +5,56 @@ Extracting neuronavigation coordinates for post-hoc ultrasound simulations is cr
 PRESTUS provides functions that aim to facilitate the read-in and preprocessing of positions recorded with the Localite system. 
 To get started, see an example demo (without provided data) in `/examples/demo_localite.m`.
 
-Multiple Localite filetypes are supported:
+Multiple Localite file types are supported. Both are parsed via the same pipeline (`neuronav_compute_series_statistics`), which handles single markers, repeated trigger trains, and multi-position recordings uniformly.
 
 ### `TriggerMarkers`
 
-Multiple triggers can be sent during stimulation to acquire updates to the transducer location over time. Recorded locations will be recorded by localite to files named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations will be averaged within a position (associated with a continuous time stamp stream). Multiple positions per recording session are supported. 
+Multiple triggers can be sent during stimulation to acquire updates to the transducer location over time. Files are named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations are averaged within each position series (identified by time-gap segmentation). Multiple positions per recording session are supported.
 
 ### `GUMMarkers`
 
-These files contain a static location that can be directly read in (either via `position_transducer_localite` or using the more comprehensive `neuronav_` function suite as in `demo_localite.m`).
+These files contain one or more static marker positions. They are parsed by the same `neuronav_compute_series_statistics` pipeline as TriggerMarkers.
 
-Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). 
-The functions also facilitate standard-space definitons (experimental), e.g., to plot average transducer positions in standard space.
+### Pipeline entry point
+
+Set `parameters.placement.localite.enabled = 1` to use Localite positioning in the PRESTUS pipeline (`prestus_pipeline` → `preproc_head`). Two modes are supported:
+
+#### Simple mode — single XML file
+
+Set `placement.localite.file` to the path of a specific Localite XML file. The file is parsed directly via `position_transducer_localite`.
+
+```yaml
+placement:
+  localite:
+    enabled: 1
+    file: '/path/to/GUMMarkers_sub-001.xml'
+```
+
+#### Full neuronav mode — automatic file selection
+
+Leave `placement.localite.file` empty and set `path.localite` to the Localite data folder. The pipeline automatically selects the most recent valid file for the subject and session using `neuronav_select_localite`, averages markers across triggers using `neuronav_compute_series_statistics`, and resolves positions via `localite_matrix_to_positions`.
+
+```yaml
+path:
+  localite: '/path/to/localite/data/'
+
+placement:
+  localite:
+    enabled: 1
+    session: 1              # Session number or 'ses-01'
+    markertype: 'TriggerMarkers'  # or 'GUMMarkers'
+    position: 1             # Series index when multiple positions are recorded
+```
+
+This mode is appropriate when TriggerMarkers files contain repeated acquisitions per position that need to be averaged, or when automatic session-based file deduplication is required.
+
+#### Standalone / batch use
+
+For multi-position or multi-session workflows outside the pipeline, use `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m`).
+
+All paths share the same XML parser and position math (`localite_matrix_to_positions`). The reference distance from the IR tracker attachment point to the transducer exit plane is derived automatically from transducer geometry (`curv_radius_mm − dist_geom_ep_mm`) when defined, with fallback to `parameters.placement.localite.reference_distance_mm`.
+
+Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). The functions also facilitate standard-space definitions (experimental), e.g., to plot average transducer positions in standard space.
 
 ### Neuronavigation Coordinate Transforms
 
@@ -66,3 +104,58 @@ SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.
 	- Native mm coordinates (if desired): (x, y, z in subject’s scanner space)
 	- MNI mm coordinates for each (from deformation step): (x, y, z in standard space)
 	- MNI voxel indices (may be inaccurate with limited FOVs)
+
+---
+
+## Localite matrix origin: physical interpretation and calibration
+
+### Background
+
+The Localite 4×4 transformation matrix encodes the pose of an IR-tracked instrument. Column 4 (the translation vector) gives the 3D position in RAS mm; column 1 (the first axis) gives the beam direction (from the coil/transducer face toward the target). These are the only two columns used by PRESTUS.
+
+**What PRESTUS models as the transducer position** is the *bowl rear centre* — the geometric axis point at the back of the bowl housing. This is `bowl_pos` in k-Wave's `makeBowl`, from which the acoustic focus is offset by `focal_distance_bowl` along the beam direction. The acoustic focus position is therefore self-consistent with this convention.
+
+**The physical meaning of the Localite matrix origin (column 4) is not fixed** — it depends on how the instrument was registered in the Localite instrument definition at the time of recording. Possible interpretations and their implications:
+
+| Possible matrix origin | Value of `tracker_to_bowl_mm` |
+|---|---|
+| Exit plane centre | `-(curv_radius_mm − dist_geom_ep_mm)` (negative; bowl rear is behind exit plane) |
+| Bowl rear centre | `0` |
+| IR tracker cluster centroid | Measured distance from cluster to bowl rear centre (likely negative) |
+| Housing reference point | Measured distance from reference to bowl rear centre |
+
+The default geometry-derived formula (`-(curv_radius_mm − dist_geom_ep_mm)`) **assumes the matrix origin is at the exit plane**, placing the bowl rear centre behind it by the bowl depth. This assumption holds only if the Localite instrument was registered with the exit plane as the origin — which is a common convention, but is not guaranteed.
+
+An incorrect assumption introduces a systematic spatial error along the beam axis equal to the difference between the assumed and actual origin.
+
+### How to determine the correct offset
+
+**Option 1 — Localite instrument definition file (recommended)**
+
+The Localite instrument definition is an XML file typically stored in the Localite software installation under `Instruments/` or provided by the instrument manufacturer. Open it and locate the `<ReferencePoint>` or `<Origin>` tag. This describes what physical point the matrix origin corresponds to and its distance from key transducer landmarks in mm.
+
+**Option 2 — Empirical measurement (ruler / phantom)**
+
+1. Place the transducer on a flat phantom surface and record a Localite position.
+2. Measure the distance from the phantom surface (= exit plane) to the IR tracker attachment on the housing.
+3. The bowl rear centre is approximately `curv_radius_mm − dist_geom_ep_mm` mm behind the exit plane.
+4. Set `tracker_to_bowl_mm` = (bowl rear centre position) − (matrix origin position), in mm along the beam axis.
+
+Alternatively, acquire an MR image of a gel phantom with the transducer in place and compare the PRESTUS-predicted bowl voxel position against the visible gel/transducer interface.
+
+**Option 3 — Contact Localite support**
+
+The instrument registration specification can be confirmed by Localite (https://www.localite.de). Provide the instrument type and firmware version used during the recording.
+
+### Setting the calibrated offset in PRESTUS
+
+Once the offset is known, set it explicitly in your config:
+
+```yaml
+placement:
+  localite:
+    tracker_to_bowl_mm: -15   # mm from the Localite matrix origin to the bowl rear centre
+                              # negative = bowl rear is on the housing side (away from head)
+```
+
+`tracker_to_bowl_mm` takes priority over the geometry-derived distance and over `reference_distance_mm`. The geometry-derived fallback (`-(curv_radius_mm − dist_geom_ep_mm)`) remains available when transducer geometry is fully specified and the matrix origin is known to be at the exit plane.
