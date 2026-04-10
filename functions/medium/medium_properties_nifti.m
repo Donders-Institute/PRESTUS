@@ -10,7 +10,7 @@ function medium_properties_nifti(parameters, kwave_medium, inv_final_transformat
     orig_hdr = t1_header; % header based on original T1w
     orig_hdr.Datatype = 'single';
 
-    file_name = fullfile(parameters.io.debug_dir, property);
+    file_name = fullfile(char(parameters.io.cache_dir), char(property));
     
     if ~isfield(kwave_medium, property)
         warning('Missing field: %s', property);
@@ -25,8 +25,17 @@ function medium_properties_nifti(parameters, kwave_medium, inv_final_transformat
                 makeresampler('nearest', 'fill'), ...
                 [1 2 3], [1 2 3], ...
                 orig_hdr.ImageSize, [], 0));
-            
-            niftiwrite(transformed_data, file_name, orig_hdr, 'Compressed', true);
+
+            % Use two-step write: niftiwrite then manual gzip.
+            % Compressed=true is unreliable on network filesystems because
+            % MATLAB writes a temp .nii file first; if that write stalls,
+            % gzip fails with "file does not exist".
+            niftiwrite(transformed_data, file_name, orig_hdr);
+            nii_file = [file_name '.nii'];
+            if isfile(nii_file)
+                gzip(nii_file);
+                delete(nii_file);
+            end
         end
     end
 end
