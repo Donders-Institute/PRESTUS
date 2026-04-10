@@ -72,16 +72,63 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     end
 
     %% Determine transducer position in T1 grid
-    % based on configuration file [default] or localite [experimental, undocumented]
-    % Note: localite coordinates may refer to different header than e.g., simnibs segmentation
-    % [Multi-transducer] the preprocessing will be based on the first transducer
+    % based on configuration file [default] or localite neuronavigation data.
+    % Note: localite coordinates refer to the planning T1 header, which may
+    % differ from the SimNIBS segmentation T1.
+    % [Multi-transducer] preprocessing is based on the first transducer only.
 
     if isfield(parameters.placement,'localite') && isfield(parameters.placement.localite,'enabled') && parameters.placement.localite.enabled
-        % Validate existence of localite file
-        check_availability({localite_file})
-        % Determine transducer position [experimental]
-        [trans_pos_grid, focus_pos_grid, ~, ~] = ...
-            position_transducer_localite(localite_file, t1_header, parameters);
+
+        lc = parameters.placement.localite;
+        use_file = isfield(lc, 'file') && ~isempty(lc.file);
+        use_neuronav = ~use_file && isfield(parameters, 'path') && ...
+                       isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite);
+
+        if use_file
+            % --- Simple mode: single XML file specified directly ---
+            check_availability({lc.file})
+            [trans_pos_grid, focus_pos_grid, ~, ~] = ...
+                position_transducer_localite(lc.file, t1_header, parameters);
+
+        elseif use_neuronav
+            % --- Full neuronav mode: automatic file selection + series averaging ---
+            % Required: parameters.path.localite (data folder)
+            % Optional: placement.localite.session   (e.g., 'ses-01' or 1; default: 1)
+            %           placement.localite.markertype (default: 'TriggerMarkers')
+            %           placement.localite.position   (series index to use; default: 1)
+            pn.data_postlocalite = parameters.path.localite;
+            sub_id  = sprintf('sub-%03d', parameters.subject_id);
+            ses_id  = 1;
+            if isfield(lc, 'session') && ~isempty(lc.session), ses_id = lc.session; end
+            markertype = 'TriggerMarkers';
+            if isfield(lc, 'markertype') && ~isempty(lc.markertype), markertype = lc.markertype; end
+            position = 1;
+            if isfield(lc, 'position') && ~isempty(lc.position), position = lc.position; end
+
+            localite = neuronav_select_localite(pn, sub_id, ses_id, markertype);
+            if isempty(localite)
+                error('PRESTUS:localite:noFile', ...
+                    'neuronav_select_localite found no valid %s file for %s session %s in:\n  %s', ...
+                    markertype, sub_id, num2str(ses_id), parameters.path.localite);
+            end
+
+            stats = neuronav_compute_series_statistics(localite, 1, [], markertype);
+            if isempty(stats) || position > numel(stats)
+                error('PRESTUS:localite:noSeries', ...
+                    'Requested position index %d not found in Localite data (%d series detected).', ...
+                    position, numel(stats));
+            end
+
+            coord_matrix = reshape(squeeze(stats{position}.matrix4d_mean), [4, 4])';
+            [trans_pos_grid, focus_pos_grid] = ...
+                localite_matrix_to_positions(coord_matrix, t1_header, parameters);
+
+        else
+            error('PRESTUS:localite:noSource', ...
+                ['placement.localite.enabled = 1 but no Localite source is configured. ' ...
+                 'Set placement.localite.file (single XML) or path.localite (folder for ' ...
+                 'automatic file selection).']);
+        end
     else
         if numel(parameters.transducer) > 1
             warning('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
