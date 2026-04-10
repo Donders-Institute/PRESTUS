@@ -2,6 +2,8 @@
 
 The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click front-end to the pipeline. Every field maps directly to a YAML parameter — see [doc_parameters.md](doc_parameters.md) for the full reference.
 
+![PRESTUS GUI](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_gui.png)
+
 ## Starting the GUI
 
 ```matlab

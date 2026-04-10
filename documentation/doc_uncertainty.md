@@ -1,10 +1,12 @@
 # Uncertainty quantification
 
-> **⚠ Experimental feature.** The uncertainty quantification workflow is under active development. The liberal and conservative medium property ranges shipped with PRESTUS are informed by published literature but should not be interpreted as formally validated bounds. They reflect plausible variation in tissue acoustic properties and are intended to support sensitivity analysis, not to replace subject-specific measurements or regulatory assessment. The ranges may not capture all sources of simulation uncertainty (e.g., segmentation errors, transducer positioning uncertainty, skull heterogeneity). Users are strongly encouraged to review and adapt the medium property ranges to their specific study population and equipment before drawing safety conclusions.
+> **⚠ Experimental feature.** The uncertainty quantification workflow is under active development. The liberal and conservative medium property ranges shipped with PRESTUS are informed by published literature but should not be interpreted as formally validated bounds. They reflect plausible variation in tissue acoustic properties but will not capture all sources of simulation uncertainty. Parameter interactions can be non-linear — both amongst tissue properties and with subject-specific head anatomy such as skull thickness and morphology. Additionally, analysis choices such as the degree of image smoothing applied to the segmentation independently affect intensity and thermal estimates. The liberal and conservative variants are therefore best understood as illustrative scenarios that bracket a plausible range, not as guaranteed worst- or best-case predictions.
 
 TUS simulations of wave propagation through the skull involve acoustic and thermal medium properties (e.g., speed of sound, density, attenuation) that are not precisely known for any individual subject. Published values vary considerably across studies. This uncertainty has direct implications for safety assessments: the true in-situ intensity and heating at a given location may differ from the simulated value depending on which tissue properties are assumed.
 
 PRESTUS provides an **uncertainty mode** that makes these assumptions explicit. Rather than running a single simulation with one set of tissue properties, the uncertainty mode runs three parallel simulations — *default*, *liberal*, and *conservative* — each with a different but internally consistent set of medium properties. A dedicated postprocessing step then compares outcomes and produces an uncertainty report that summarises the range of plausible values for each safety metric.
+
+![PRESTUS uncertainty](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_uncertainty.png)
 
 ---
 
@@ -20,13 +22,11 @@ The three simulation variants are defined as:
 
 The liberal/conservative distinction follows the logic that different parameter choices affect different stages of wave propagation in opposite directions. For example, higher skull attenuation reduces intracranial intensity (beneficial) but increases skull heating (adverse). The liberal and conservative parameter sets are therefore not simply "high" and "low" across all properties — they are tailored to yield the highest and lowest plausible values for the metrics of interest (intracranial intensity and heating).
 
-> **Limitations.** The parameter value ranges used for the liberal and conservative variants remain under investigation and should not be interpreted as absolute bounds on simulation outcomes. Parameter interactions can be non-linear — both amongst tissue properties and with subject-specific head anatomy such as skull thickness and morphology. Additionally, analysis choices such as the degree of image smoothing applied to the segmentation independently affect intensity and thermal estimates. The liberal and conservative variants are therefore best understood as illustrative scenarios that bracket a plausible range, not as guaranteed worst- or best-case predictions.
-
 ---
 
 ## Medium property ranges
 
-The following table summarises the default, liberal, and conservative medium acoustic properties currently implemented in PRESTUS. Liberal values are chosen to maximise acoustic exposure and heating at the target; conservative values minimise them.
+The following table summarises the default, liberal, and conservative medium acoustic properties currently implemented in PRESTUS.
 
 ### Brain
 
@@ -173,8 +173,6 @@ The uncertainty report is written as:
 | File | Description |
 |---|---|
 | `sub-NNN_layered_uncertainty_report.html` | Unified uncertainty HTML report |
-
-![PRESTUS GUI](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_uncertainty.png)
 
 ---
 
