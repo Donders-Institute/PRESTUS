@@ -47,7 +47,7 @@ function uncertainty_pipeline(parameters, options)
 %                          Default: <prestus_root>/configs/uncertainty/
 %                                   config_medium_conservative.yaml
 %     .stage1_timelimit    HPC wall time for stage 1    (default '12:00:00')
-%     .sim_timelimit       HPC wall time for stages 2–4 (default '02:00:00')
+%     .sim_timelimit       HPC wall time for stages 2–4 (default '06:00:00')
 %     .report_timelimit    HPC wall time for stage 5    (default '00:30:00')
 %     .stage1_memorylimit  RAM in GB for stage 1        (default: 16 GB)
 %     .stage1_partition   Partition for stage 1         (default: scheduler default)
@@ -99,7 +99,7 @@ if ~isfield(options, 'conservative_config')
     options.conservative_config = fullfile(uncertainty_configs, 'config_medium_conservative.yaml');
 end
 if ~isfield(options, 'stage1_timelimit');    options.stage1_timelimit    = '12:00:00'; end
-if ~isfield(options, 'sim_timelimit');       options.sim_timelimit       = '02:00:00'; end
+if ~isfield(options, 'sim_timelimit');       options.sim_timelimit       = '06:00:00'; end
 if ~isfield(options, 'report_timelimit');    options.report_timelimit    = '00:30:00'; end
 % Memory limits per stage (GB).
 % Simulation and report stages inherit hpc.memorylimit from the base config.
@@ -140,7 +140,7 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %   io.save_source_matrices    Stage 1: 1 (write source for stages 2–4)
 %                              Stages 2–4: 0 (already written)
 %   io.save_acoustic_matrices  All stages: 0 (large; not needed after analysis)
-%   io.save_thermal_matrices   Stages 2–4: 1 (needed by uncertainty report)
+%   io.save_thermal_matrices   Stages 2–4: inherited from base modules.run_heating_sims
 %                              Stage 1: 0 (no thermal sim)
 %
 %   simulation.interactive  Hardcoded to 0; HPC jobs cannot show dialogs.
@@ -253,11 +253,11 @@ switch platform
 
         % ── Stage 1 ──────────────────────────────────────────────────────
         % Skip if the head preprocessing cache already exists.
-        % Sentinel: debug/sub-NNN_<medium>_after_cropping_and_smoothing.mat
+        % Sentinel: cache/sub-NNN_<medium>_after_cropping_and_smoothing.mat
         % (written by preproc_head with preproc_affix = '').
         % When skipped, stages 2–4 are submitted without an afterok
         % dependency so they can start immediately.
-        preproc_sentinel = fullfile(output_dir, 'debug', ...
+        preproc_sentinel = fullfile(output_dir, 'cache', ...
             sprintf('sub-%03d_%s_after_cropping_and_smoothing.mat', subject_id, medium));
         p_stage1.hpc.timelimit = options.stage1_timelimit;
         p_stage1.hpc.job_name  = sprintf('PRESTUS-u1-preproc_%s', subj);
@@ -433,8 +433,14 @@ function p = make_sim_params(base, affix, medium_config)
 
     p.modules.run_source_setup         = 1;
     p.modules.run_acoustic_sims        = 1;
-    p.modules.run_heating_sims         = 1;
-    p.modules.run_thermal_analysis     = 1;
+    % Thermal steps: inherit from base config rather than forcing on.
+    % run_heating_sims = 0 in the base will produce acoustic-only uncertainty
+    % variants, which is valid when thermal estimation is not requested.
+    run_thermal = isfield(base.modules, 'run_heating_sims') && base.modules.run_heating_sims;
+    p.modules.run_heating_sims         = run_thermal;
+    p.modules.run_thermal_analysis     = run_thermal && ...
+                                         isfield(base.modules, 'run_thermal_analysis') && ...
+                                         base.modules.run_thermal_analysis;
     p.modules.run_posthoc_water_sims   = 0;
     p.modules.generate_report          = 1;
     p.io.output_affix                  = affix;
@@ -445,7 +451,7 @@ function p = make_sim_params(base, affix, medium_config)
     p.io.overwrite_simnibs             = 0;
     p.io.save_source_matrices          = 0;   % source is recomputed at the start of each variant; no benefit to caching
     p.io.save_acoustic_matrices        = 0;   % large; not needed after analysis
-    p.io.save_thermal_matrices         = 1;   % needed by generate_uncertainty_report
+    p.io.save_thermal_matrices         = run_thermal;  % only needed when thermal ran
     p.simulation.interactive           = 0;
 end
 
