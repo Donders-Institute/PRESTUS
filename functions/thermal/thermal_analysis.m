@@ -36,6 +36,8 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     results_thermal.endT = max(results_heating.heating_endT, [], 'all');
     results_thermal.maxCEM43 = max(results_heating.CEM43, [], 'all');
     results_thermal.maxCEM43end = max(results_heating.CEM43_end, [], 'all');
+    results_thermal.maxCEM43iso = max(results_heating.CEM43_iso, [], 'all');
+    results_thermal.maxCEM43isoend = max(results_heating.CEM43_iso_end, [], 'all');
 
     % Encode layer-specific estimates
     if contains(parameters.simulation.medium, {'layered'; 'phantom'})
@@ -55,14 +57,22 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
         results_thermal.rise_endT_brain = results_thermal.endT_brain-parameters.thermal.temp_0.brain;
         results_thermal.rise_endT_skull = results_thermal.endT_skull-parameters.thermal.temp_0.skull; 
         results_thermal.rise_endT_skin = results_thermal.endT_skin-parameters.thermal.temp_0.skin;
-        % CEM43
+        % CEM43 (kWave)
         results_thermal.CEM43_brain = masked_max_3d(results_heating.CEM43, mask.brain);
-        results_thermal.CEM43_skull = masked_max_3d(results_heating.CEM43, mask.skull); 
-        results_thermal.CEM43_skin = masked_max_3d(results_heating.CEM43, mask.skin);
-        % CEM43 (at simulation offset)
+        results_thermal.CEM43_skull = masked_max_3d(results_heating.CEM43, mask.skull);
+        results_thermal.CEM43_skin  = masked_max_3d(results_heating.CEM43, mask.skin);
+        % CEM43 kWave (at simulation offset)
         results_thermal.CEM43_end_brain = masked_max_3d(results_heating.CEM43_end, mask.brain);
-        results_thermal.CEM43_end_skull = masked_max_3d(results_heating.CEM43_end, mask.skull); 
-        results_thermal.CEM43_end_skin = masked_max_3d(results_heating.CEM43_end, mask.skin);
+        results_thermal.CEM43_end_skull = masked_max_3d(results_heating.CEM43_end, mask.skull);
+        results_thermal.CEM43_end_skin  = masked_max_3d(results_heating.CEM43_end, mask.skin);
+        % CEM43 (ISO)
+        results_thermal.CEM43iso_brain = masked_max_3d(results_heating.CEM43_iso, mask.brain);
+        results_thermal.CEM43iso_skull = masked_max_3d(results_heating.CEM43_iso, mask.skull);
+        results_thermal.CEM43iso_skin  = masked_max_3d(results_heating.CEM43_iso, mask.skin);
+        % CEM43 ISO (at simulation offset)
+        results_thermal.CEM43iso_end_brain = masked_max_3d(results_heating.CEM43_iso_end, mask.brain);
+        results_thermal.CEM43iso_end_skull = masked_max_3d(results_heating.CEM43_iso_end, mask.skull);
+        results_thermal.CEM43iso_end_skin  = masked_max_3d(results_heating.CEM43_iso_end, mask.skin);
     end
     
     % Save overview table
@@ -89,7 +99,8 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
         parameters.transducer(1).trans_pos, ...
         medium_masks, ...
         results_heating.focal_planeCEM43, ...
-        results_heating.timeseries);
+        results_heating.timeseries, ...
+        results_heating.focal_planeCEM43_iso);
             
     % Plots the maximum temperature in the segmented brain
     if results_thermal.maxT < 38
