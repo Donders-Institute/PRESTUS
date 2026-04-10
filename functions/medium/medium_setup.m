@@ -113,7 +113,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                     xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 1);
                     xline(medium.skull.alpha_coeff, 'k', 'LineWidth', 2);
                     title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
-                output_plot = fullfile(parameters.io.debug_dir, ...
+                output_plot = fullfile(parameters.io.debug_dir_medium,...
                     sprintf('pCT_histograms%s.png',parameters.io.output_affix));
                 exportgraphics(h, output_plot, 'Resolution', 150);
                 close(h);
@@ -178,7 +178,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
     
         % DEBUG mode: save plot of fitted attenuation values
         if parameters.simulation.debug == 1
-            fig_path = fullfile(parameters.io.debug_dir, ...
+            fig_path = fullfile(parameters.io.debug_dir_medium,...
             ['attenuation_fit', char(parameters.io.output_affix), '.png']);
             saveas(gcf, fig_path);
             close(gcf);
@@ -221,7 +221,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             end
             subplot(1,2,1); imagesc(density_pre); title('Original density')
             subplot(1,2,2); imagesc(density_post); title('Smoothed density')
-            output_plot_filename = fullfile(parameters.io.debug_dir, ...
+            output_plot_filename = fullfile(parameters.io.debug_dir_medium,...
                 sprintf('sub-%03d_%s_density_smoothing_changes%s.png', ...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
@@ -245,30 +245,17 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
                           'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
-    %% [debug] save acoustic property images
-    if parameters.simulation.debug == 1
-        % save raw medium matrices as niftis
+    %% Save acoustic property NIfTIs in T1 space (always for layered; raw matrices debug-only)
+    %
+    % T1-space maps (medium_properties_nifti): written unconditionally for
+    % layered simulations so that they are available for QC and for the
+    % uncertainty report without requiring debug mode.
+    %
+    % Raw simulation-grid matrices (matrix_*.nii.gz): debug-only because they
+    % are large, anisotropic, and not directly interpretable without the grid
+    % metadata.
+    if contains(parameters.simulation.medium, {'layered'}) && exist('planimg','var') && ~isempty(planimg)
         try
-            filename_density = fullfile(parameters.io.debug_dir, sprintf('matrix_density'));
-            niftiwrite(density, filename_density, 'Compressed',true); pause(0.1);
-            filename_sound_speed = fullfile(parameters.io.debug_dir, sprintf('matrix_sound_speed'));
-            niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_coeff'));
-            niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true); pause(0.1);
-            filename_alpha_power = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_power'));
-            niftiwrite(alpha_power, filename_alpha_power, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff_fixed = fullfile(parameters.io.debug_dir, sprintf('matrix_alpha_coeff_fixed'));
-            niftiwrite(alpha_coeff_fixed, filename_alpha_coeff_fixed, 'Compressed',true); pause(0.1);
-            filename_perfusion = fullfile(parameters.io.debug_dir, sprintf('matrix_perfusion'));
-            niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
-            filename_absorption = fullfile(parameters.io.debug_dir, sprintf('matrix_absorption'));
-            niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
-        catch
-            warning("Error with saving debug images: medium mapping. May result from concurrent write attempts...")
-        end
-
-        % save images of assigned medium properties with proper headers
-        if contains(parameters.simulation.medium, {'layered'}) && (exist('planimg') & ~isempty(planimg))
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
@@ -277,11 +264,37 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'specific_heat')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'perfusion_coeff')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'absorption_fraction')
+        catch ME
+            warning('medium_setup:niftiWrite', ...
+                'Could not write medium property NIfTIs: %s', ME.message);
+        end
+    end
+
+    if parameters.simulation.debug == 1
+        % [debug] save raw simulation-grid medium matrices as NIfTIs
+        try
+            filename_density = fullfile(parameters.io.debug_dir_medium,'matrix_density');
+            niftiwrite(density, filename_density, 'Compressed',true); pause(0.1);
+            filename_sound_speed = fullfile(parameters.io.debug_dir_medium,'matrix_sound_speed');
+            niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true); pause(0.1);
+            filename_alpha_coeff = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_coeff');
+            niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true); pause(0.1);
+            filename_alpha_power = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_power');
+            niftiwrite(alpha_power, filename_alpha_power, 'Compressed',true); pause(0.1);
+            filename_alpha_coeff_fixed = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_coeff_fixed');
+            niftiwrite(alpha_coeff_fixed, filename_alpha_coeff_fixed, 'Compressed',true); pause(0.1);
+            filename_perfusion = fullfile(parameters.io.debug_dir_medium,'matrix_perfusion');
+            niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
+            filename_absorption = fullfile(parameters.io.debug_dir_medium,'matrix_absorption');
+            niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
+        catch
+            warning('medium_setup:debugNifti', ...
+                'Error saving debug grid matrices — may result from concurrent write attempts.');
         end
 
-        % save a pCT (if used)
+        % [debug] save pCT (if used)
         if parameters.pct.enabled == 1
-            filename_pct = fullfile(parameters.io.debug_dir, sprintf('pct%s', parameters.io.output_affix));
+            filename_pct = fullfile(parameters.io.debug_dir_medium,sprintf('pct%s', parameters.io.output_affix));
             niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
         end
     end

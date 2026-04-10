@@ -101,7 +101,7 @@ Temperature is simulated over the full sonication protocol (on/off cycles) using
 
 ### Non-significant risk limits
 
-The HTML report flags each metric against the ITRUSST consensus safety limits for transcranial ultrasound (Aubry et al., 2025, Brain Stimulation):
+The HTML report flags each metric against the ITRUSST consensus non-significant risk limits for transcranial ultrasound (Aubry et al., 2025, Brain Stimulation):
 
 | Metric | Limit |
 |---|---|
@@ -137,18 +137,30 @@ Filename pattern: `sub-XXX_final_<type>_MNI<affix>.nii.gz`
 
 ---
 
-## MATLAB structures
+## Output directory structure
 
-PRESTUS saves simulation parameters and, by default, intermediate matrices. If matrices are detected in the output folder and `io.overwrite_files` is set to `never`, they are loaded instead of recomputing. Matrix saving can be disabled globally via `io.save_matrices = 0`.
+```
+sub-XXX_<medium>_report<affix>.html       ← self-contained HTML report
+sub-XXX_<medium>_output_table<affix>.csv  ← quantitative metrics
 
-| File | Description |
-|---|---|
-| `sub-XXX_<medium>_parameters<affix>.mat` | Full parameters struct used for the simulation |
-| `sub-XXX_after_rotating_and_scaling<affix>.mat` | Head volume after grid scaling |
-| `sub-XXX_after_cropping_and_smoothing<affix>.mat` | Cropped head including medium masks |
-| `sub-XXX_<medium>_kwave_source<affix>.mat` | k-Wave source definition |
-| `sub-XXX_<medium>_results<affix>.mat` | Acoustic simulation sensor data |
-| `sub-XXX_<medium>_heating_res<affix>.mat` | Thermal simulation results |
+cache/                                     ← regenerable intermediates
+    sub-XXX_<medium>_parameters_<ts>.mat     parameters snapshot
+    sub-XXX_<medium>_after_rotating_and_scaling<affix>.mat
+    sub-XXX_<medium>_after_cropping_and_smoothing<affix>.mat
+    sub-XXX_<medium>_kwave_source<affix>.mat
+    sub-XXX_<medium>_results<affix>.mat      acoustic sensor data
+    sub-XXX_<medium>_heating_res<affix>.mat  thermal results
+    sound_speed.nii.gz  density.nii.gz  ...  T1-space property maps
+
+debug/                                     ← diagnostic artefacts (debug=1 only)
+    preproc/        head preprocessing (rotation, cropping, skull visualisations)
+    medium/         medium mapping (grid-space property matrices, pCT)
+    source/         source/transducer setup (element distribution plots)
+```
+
+**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving matrices (cache files will not be written).
+
+**Debug files** are only written when `parameters.simulation.debug = 1`.
 
 ---
 

@@ -53,7 +53,7 @@ function pct_skullexpand(seg_path, path_pct)
     parameters.headmodel.skull_wrap_radius = 10;
     parameters.headmodel.skull_wrap_visualize = 0;
 
-    parameters.io.debug_dir = path_pct;              % where skull_rubber_wrap_visualize writes images
+    parameters.io.debug_dir_preproc = path_pct;       % where skull_rubber_wrap_visualize writes images
     parameters.io.output_affix = '';
 
     % Grid step (mm) from header voxel size if available

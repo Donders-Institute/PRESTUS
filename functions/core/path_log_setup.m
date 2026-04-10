@@ -70,10 +70,26 @@ function [parameters] = path_log_setup(parameters, prestus_path)
         if ~exist(parameters.path.localite); mkdir(parameters.path.localite); end
     end
 
-    % specify dedicated subfolder for debugging contents
+    % Output subdirectories
+    % ├── cache/         — regenerable intermediates (checkpoints, matrices, T1-space property maps)
+    % └── debug/         — diagnostic artefacts written only when debug=1
+    %     ├── preproc/   — head preprocessing (rotation, cropping, skull visualizations)
+    %     ├── medium/    — medium mapping (grid-space property matrices, pCT)
+    %     └── source/    — source/transducer setup (element distribution plots)
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
-        parameters.io.debug_dir = fullfile(parameters.io.output_dir, 'debug');
-        if ~isfolder(parameters.io.debug_dir); mkdir(parameters.io.debug_dir); end
+        out = parameters.io.output_dir;
+
+        parameters.io.cache_dir        = fullfile(out, 'cache');
+        parameters.io.debug_dir        = fullfile(out, 'debug');
+        parameters.io.debug_dir_preproc = fullfile(out, 'debug', 'preproc');
+        parameters.io.debug_dir_medium  = fullfile(out, 'debug', 'medium');
+        parameters.io.debug_dir_source  = fullfile(out, 'debug', 'source');
+
+        for d = {parameters.io.cache_dir, parameters.io.debug_dir, ...
+                 parameters.io.debug_dir_preproc, parameters.io.debug_dir_medium, ...
+                 parameters.io.debug_dir_source}
+            if ~isfolder(d{1}); mkdir(d{1}); end
+        end
     end
 
     % create segmentation folder if it doesn't exist
@@ -82,9 +98,9 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     end
     
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
-        % Save parameters
-        filename_parameters = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_parameters_%s%s_%s.mat', ...
+        % Save parameter snapshot to cache (regenerable, not a primary output)
+        filename_parameters = fullfile(parameters.io.cache_dir, ...
+            sprintf('sub-%03d_%s%s_parameters_%s.mat', ...
             subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
             string(datetime('now'), 'yyMMdd_HHmm')));
         save(filename_parameters, 'parameters');

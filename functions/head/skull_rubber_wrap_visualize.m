@@ -153,7 +153,7 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
 
     %% Fast raster export (avoid slow vector pipeline)
 
-    output_png = fullfile(parameters.io.debug_dir, ...
+    output_png = fullfile(parameters.io.debug_dir_preproc,...
         sprintf('skull_visualization%s.png', parameters.io.output_affix));
 
     drawnow limitrate;

@@ -178,8 +178,8 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
         base_name = sprintf('sub-%03d_%s_transducer_element_orientation%s', ...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
     
-        saveas(h, fullfile(parameters.io.debug_dir, [base_name '.fig']))
-        saveas(h, fullfile(parameters.io.debug_dir, [base_name '.png']))
+        saveas(h, fullfile(parameters.io.debug_dir_source, [base_name '.fig']))
+        saveas(h, fullfile(parameters.io.debug_dir_source, [base_name '.png']))
     
         close(h)
     end
