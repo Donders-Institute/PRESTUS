@@ -108,6 +108,17 @@ build_tab_advanced(tabs.advanced);
 build_tab_run(tabs.run);
 build_tab_results(tabs.results);
 
+%% ── Wire cross-tab callbacks ──────────────────────────────────────────────
+
+% Thermal timing fields are only meaningful when thermal simulation is on.
+% Disable them initially (run_heating_sims defaults to false) and toggle
+% whenever the checkbox changes.
+h_heating = findobj(fig, 'Tag', 'modules.run_heating_sims');
+if ~isempty(h_heating)
+    h_heating.ValueChangedFcn = @(cb,~) cb_toggle_thermal_timing(cb.Value);
+    cb_toggle_thermal_timing(h_heating.Value);  % apply initial state
+end
+
 %% ── Load defaults ─────────────────────────────────────────────────────────
 
 load_defaults();
@@ -959,6 +970,22 @@ load_defaults();
         end
     end
 
+
+    function cb_toggle_thermal_timing(enabled)
+    % Enable or disable the sonication timing fields in the Thermal tab.
+    % These fields are only meaningful when thermal simulation is requested.
+        en = 'off';
+        if enabled; en = 'on'; end
+        timing_tags = { ...
+            'timing.pd', 'timing.pri', 'timing.ptd', 'timing.ptri', ...
+            'timing.ptrd', 'timing.post_ptri_dur', ...
+            'timing.pt_timestep', 'timing.post_pt_timestep', ...
+            'timing.equal_step_duration' };
+        for k = 1:numel(timing_tags)
+            h = findobj(fig, 'Tag', timing_tags{k});
+            if ~isempty(h); set(h, 'Enable', en); end
+        end
+    end
 
     function cb_transducer_type(dd)
         pnl_ann = findobj(fig, 'Tag', 'panel_annular');
