@@ -217,9 +217,9 @@ function html = build_header(subject_id, medium, parameters, affixes)
 end
 
 function html = build_safety_dashboard(tables, variant_labels, is_layered)
+    limits = struct();
     if is_layered
-        limits = get_risk_limits(is_layered);
-    else
+        limits = get_risk_limits(true);
     end
     metric_names = fieldnames(limits);
 
@@ -282,14 +282,6 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
                 html = [html sprintf('<div class="risk-limit">%s (informational)</div>', display_unit)];
             end
 
-            % BAR DESIGN NOTE:
-            % - scale_min : metric-specific baseline (37°C for absolute temps, 0 elsewhere)
-            % - scale_max : max(max_across_3_sims, limit) — scale always reaches at least the limit
-            % - bar_val   : min(max_across_3_sims, limit)
-            %               → bar fills to the highest simulation value when within the limit,
-            %                 or to the limit when any simulation value exceeds it
-            % - limit line: dashed marker at the limit position on the scale
-            % - ticks     : blue=liberal, black=default, brown=conservative
             if ~isinf(info.limit)
                 % Axis lower bound: hardcoded baseline
                 if strncmp(name, 'maxT', 4) || strncmp(name, 'endT', 4)
@@ -308,12 +300,10 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
                 if scale_max <= scale_min; scale_max = scale_min + 1; end
                 scale_range = scale_max - scale_min;
 
-                % Bar spans the range of simulated values (min_sim to min(max_sim, limit))
-                bar_left = (min_sim    - scale_min) / scale_range * 100;
-                bar_right = (min(max_sim, info.limit) - scale_min) / scale_range * 100;
-                bar_left  = max(bar_left,  0);
-                bar_right = min(bar_right, 100);
-                bar_width = bar_right - bar_left;
+                % Bar spans min to max of simulated values across variants
+                bar_left  = max((min_sim - scale_min) / scale_range * 100, 0);
+                bar_right = min((max_sim  - scale_min) / scale_range * 100, 100);
+                bar_width = max(bar_right - bar_left, 0);
 
                 lim_pct = (info.limit - scale_min) / scale_range * 100;
                 limit_line = sprintf('<div class="safety-bar-limit" style="left:%.1f%%"></div>', lim_pct);
@@ -328,15 +318,13 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
                     markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--default" style="left:%.1f%%"></div>', pct)];
                 end
                 if ~isnan(cons_val)
-                    pct = (cons_val    - scale_min) / scale_range * 100;
+                    pct = (cons_val - scale_min) / scale_range * 100;
                     markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--conservative" style="left:%.1f%%"></div>', pct)];
                 end
 
-                % Range label: simulated min–max so the bar range is legible
-                if ~isempty(all_vals_finite)
-                    range_str = sprintf('%.3g &ndash; %.3g %s', min_sim, max_sim, display_unit);
-                    html = [html sprintf('<div class="safety-bar-range">%s</div>', range_str)];
-                end
+                % Scale range printed directly above the bar
+                range_str = sprintf('%.3g &ndash; %.3g %s', scale_min, scale_max, display_unit);
+                html = [html sprintf('<div class="safety-bar-range">%s</div>', range_str)];
                 html = [html sprintf('<div class="safety-bar-track"><div class="safety-bar" style="left:%.1f%%;width:%.1f%%"></div>%s%s</div>', bar_left, bar_width, limit_line, markers)];
             end
         end
@@ -346,8 +334,16 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
 
     html = [html '</div>'];
     html = [html '<p class="safety-footnote">Non-significant risk limits: ITRUSST consensus (Aubry et al., 2025). ' ...
-        'Green: &lt;50% of limit. Amber: 50&ndash;100%. Red: exceeds limit. ' ...
-        'Value shown for the <em>default</em> variant. Colored bar = 0 to limit; grey dashed line = limit; ticks: &#x25A0;&nbsp;black&nbsp;=&nbsp;default, <span style="color:#2563eb">&#x25A0;</span>&nbsp;blue&nbsp;=&nbsp;liberal, <span style="color:#92400e">&#x25A0;</span>&nbsp;brown&nbsp;=&nbsp;conservative. Scale extends beyond limit when values exceed it.</p>'];
+        '<strong>Card colour</strong> reflects the <strong>conservative</strong> variant: ' ...
+        'green &lt;50% of limit, amber 50&ndash;100%, red exceeds limit. ' ...
+        '<strong>Value</strong> shown for the <em>default</em> variant; ' ...
+        '<strong>lib&ndash;cons range</strong> printed below the value. ' ...
+        '<strong>Scale</strong> (above bar): fixed axis range — baseline (0 or 37&thinsp;&deg;C for temperature) to max(simulated, NSR limit). ' ...
+        '<strong>Bar</strong>: simulated range from minimum (liberal) to maximum (conservative) variant. ' ...
+        'Grey dashed line = NSR limit. ' ...
+        'Ticks: &#x25A0;&nbsp;black&nbsp;=&nbsp;default, ' ...
+        '<span style="color:#2563eb">&#x25A0;</span>&nbsp;blue&nbsp;=&nbsp;liberal, ' ...
+        '<span style="color:#92400e">&#x25A0;</span>&nbsp;brown&nbsp;=&nbsp;conservative.</p>'];
     html = [html '</section>'];
 end
 
@@ -479,9 +475,9 @@ end
 
 function html = build_range_table(tables, variant_labels, metric_names)
 % Build a table with one row per metric, columns: metric | conservative | default | liberal | range
+    limits = struct();
     if is_layered_limits(metric_names)
-        limits = get_risk_limits(is_layered);
-    else
+        limits = get_risk_limits(true);
     end
 
     html = '<div class="table-wrapper"><table class="data-table"><thead><tr>';
