@@ -174,6 +174,8 @@ The uncertainty report is written as:
 |---|---|
 | `sub-NNN_layered_uncertainty_report.html` | Unified uncertainty HTML report |
 
+![PRESTUS GUI](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_uncertainty.png)
+
 ---
 
 ## Uncertainty report contents
