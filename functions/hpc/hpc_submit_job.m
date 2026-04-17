@@ -1,4 +1,4 @@
-function job_id = hpc_submit_job(hpc_type, temp_m_file, parameters, log_dir)
+function [job_id, parameters] = hpc_submit_job(hpc_type, temp_m_file, parameters, log_dir)
 %% HPC_SUBMIT_JOB  Submit HPC batch job (SLURM or qsub)
 %
 %   Generates scheduler script and submits job. Supports SLURM (sbatch) and
@@ -21,6 +21,17 @@ subj_id_string = sprintf('sub-%03d', parameters.subject_id);
 switch hpc_type
     case 'slurm'
         temp_slurm_path = fullfile(log_dir, sprintf('temp_slurm_%s.sh', datestr(now, 'yyyymmdd_HHMMSS')));
+
+        % Define HPC type
+	    if ~isfield(parameters.hpc, 'name')
+            parameters.hpc.name = 'default';
+        end
+    
+	    % Overwrite and extract additional parameters if Snellius HPC
+	    if strcmp(parameters.hpc.name, 'snellius')
+		    [parameters] = extract_snellius_parameters(parameters);
+	    end
+        
         write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir);
         job_id = submit_slurm_job(temp_slurm_path, log_dir);
 
@@ -39,7 +50,7 @@ fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters), 
 function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
     job_name = hpc_job_name(parameters);
-    
+	
     fid = fopen(temp_slurm_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
@@ -53,7 +64,9 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --partition=gpu\n');
     end
 
-    if isfield(parameters.hpc, 'gpu') && ~isempty(strtrim(char(parameters.hpc.gpu)))
+    if strcmp(parameters.hpc.name, 'snellius')
+		fprintf(fid, '#SBATCH --gpus=%i\n', parameters.hpc.n_gpu);
+    elseif isfield(parameters.hpc, 'gpu') && ~isempty(strtrim(char(parameters.hpc.gpu)))
         fprintf(fid, '#SBATCH --gres=%s\n', strtrim(char(parameters.hpc.gpu)));
     elseif needs_gpu
         fprintf(fid, '#SBATCH --gres=gpu:1\n');
@@ -63,16 +76,62 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
         fprintf(fid, '#SBATCH --reservation=%s\n', strtrim(char(parameters.hpc.reservation)));
     end
 
+	if strcmp(parameters.hpc.name, 'snellius')
+        fprintf(fid, '#SBATCH --cpus-per-task=%i\n', parameters.hpc.cores);
+    end
+
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc.memorylimit);
     fprintf(fid, '#SBATCH --time=%s\n', parameters.hpc.timelimit);
     fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --error=%s_slurm_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --chdir=%s\n', log_dir);
+
+    % Job dependencies (used by uncertainty pipeline for stage chaining).
+    % --kill-on-invalid-dep=yes ensures that if the predecessor fails or is
+    % cancelled, all dependent jobs are automatically cancelled rather than
+    % remaining stuck as DependencyNeverSatisfied indefinitely.
+    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
+        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
+            'UniformOutput', false), ':');
+        fprintf(fid, '#SBATCH --dependency=afterok:%s\n', dep_str);
+        fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
+    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
+        fprintf(fid, '#SBATCH --dependency=afterok:%d\n', parameters.hpc.depend_job_id);
+        fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
+    end
     
     if needs_gpu, fprintf(fid, 'nvidia-smi\n'); end
-    fprintf(fid, 'module load matlab/R2023b\n');
+	if strcmp(parameters.hpc.name, 'snellius')
+        fprintf(fid, 'module load 2024\n');
+        fprintf(fid, 'module load MATLAB/2024b\n');
+    else
+		fprintf(fid, 'module load matlab/R2023b\n');
+	end
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
+end
+
+function [parameters] = extract_snellius_parameters(parameters)
+	
+    switch parameters.hpc.partition
+        case 'gpu_a100'
+            parameters.hpc.memorylimit = parameters.snellius.gpu_a100.memorylimit;
+            parameters.hpc.cores = parameters.snellius.gpu_a100.cores;
+            max_timelimit = parameters.snellius.gpu_a100.timelimit;
+            parameters.hpc.n_gpu = parameters.snellius.gpu_a100.n_gpu;
+        case 'gpu_h100'
+            parameters.hpc.memorylimit = parameters.snellius.gpu_h100.memorylimit;
+            parameters.hpc.cores = parameters.snellius.gpu_h100.cores;
+            max_timelimit = parameters.snellius.gpu_h100.timelimit;
+            parameters.hpc.n_gpu = parameters.snellius.gpu_h100.n_gpu;
+        otherwise
+            error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc.partition)
+    end
+
+    assert(parameters.hpc.timelimit <= max_timelimit, ...
+        'Maximum wall time of %s is exceeded (%s).', ...
+        max_timelimit, ...
+        parameters.hpc.timelimit)
 end
 
 function job_id = submit_slurm_job(temp_slurm_path, log_dir)
@@ -100,7 +159,16 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#PBS -o %s_qsub_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -e %s_qsub_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -d %s\n', log_dir);
-    fprintf(fid, 'module load matlab/R2023b\n');
+
+    % Job dependencies (used by uncertainty pipeline for stage chaining)
+    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
+        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
+            'UniformOutput', false), ':');
+        fprintf(fid, '#PBS -W depend=afterok:%s\n', dep_str);
+    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
+        fprintf(fid, '#PBS -W depend=afterok:%d\n', parameters.hpc.depend_job_id);
+    end
+	fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
 end

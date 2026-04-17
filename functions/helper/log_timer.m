@@ -75,8 +75,10 @@ function [used_bytes, free_bytes] = log_disk_space(monitor_path) % fetch disk sp
         free_bytes = str2double(strtrim(out_free));
     elseif ispc
         drive = monitor_path(1);
-        [~, out_used] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Used"', drive));
-        [~, out_free] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Free"', drive));
+        driveLetter = char(drive);
+        driveLetter = driveLetter(1);
+        [~, out_used] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Used"', driveLetter));
+        [~, out_free] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Free"', driveLetter));
         used_bytes = str2double(strtrim(out_used));
         free_bytes = str2double(strtrim(out_free));
     else
@@ -94,18 +96,27 @@ function ram_gb = log_process_memory() % fetch memory use of a process
 end
 
 function sample_peak_closure(label)
-    persistent last_update
-    if isempty(last_update), last_update = now; end
-    
-    if TIMER_STATES.isKey(label)  % Still active
+    % TIMER_STATES is a persistent variable in the parent scope. If the
+    % parent function was cleared mid-run (e.g. due to an error), it will
+    % no longer exist when this timer callback fires. Guard defensively and
+    % self-stop the timer to avoid repeated "Reference to a cleared variable"
+    % warnings.
+    try
+        if ~TIMER_STATES.isKey(label)
+            return   % Timer already stopped or entry removed — nothing to do.
+        end
         state = TIMER_STATES(label);
         current_ram = log_process_memory();
-        
         if current_ram > state.peak_ram_gb
             state.peak_ram_gb = current_ram;
             TIMER_STATES(label) = state;
-            % [DEBUG] print every time a new peak RAM occurs...
-            % fprintf('🔥 %-20s PEAK RAM: %.2fGB\n', label, current_ram);
+        end
+    catch
+        % Parent scope was cleared; stop and delete this timer so it doesn't
+        % keep firing.
+        t_list = timerfindall('TimerFcn', @(t,e)sample_peak_closure(label));
+        for k = 1:numel(t_list)
+            if isvalid(t_list(k)), stop(t_list(k)); delete(t_list(k)); end
         end
     end
 end

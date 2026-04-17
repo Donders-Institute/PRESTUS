@@ -26,11 +26,11 @@ function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(param
     
     % Compute O'Neil analytical solution for pressure along the beam axis [Pa]
     p_axial_oneil = focusedAnnulusONeil(...
-        parameters.transducer.curv_radius_mm / 1e3, ... % Convert radius to meters
-        [parameters.transducer.Elements_ID_mm; parameters.transducer.Elements_OD_mm] / 1e3, ... % Element dimensions in meters
-        repmat(profile_sim.velocity, 1, parameters.transducer.n_elements), ... % Velocity array
-        parameters.transducer.source_phase_rad, ... % Source phases [radians]
-        parameters.transducer.source_freq_hz, ... % Source frequency [Hz]
+        parameters.transducer.annular.curv_radius_mm / 1e3, ... % Convert radius to meters
+        [parameters.transducer.annular.elem_id_mm; parameters.transducer.annular.elem_od_mm] / 1e3, ... % Element dimensions in meters
+        repmat(profile_sim.velocity, 1, parameters.transducer.annular.elem_n), ... % Velocity array
+        parameters.transducer.annular.elem_phase_rad, ... % Source phases [radians]
+        parameters.transducer.freq_hz, ... % Source frequency [Hz]
         parameters.medium_properties.water.sound_speed, ... % Sound speed in water [m/s]
         parameters.medium_properties.water.density, ... % Water density [kg/m^3]
         (axial_position - 0.5) * 1e-3); % Axial positions (adjusted, in meters)
@@ -47,12 +47,12 @@ function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(param
         '--', 'LineWidth', 1.5, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Inital Simulated Intensity');
     plot(profile_target.axial_distance_bowl, profile_target.axial_intensity, ...
         'LineWidth', 2, 'Color', [1 0 0], 'DisplayName', 'Desired Profile');
-    if isfield(parameters, 'expected_focal_distance_bowl')
-        xline(parameters.expected_focal_distance_bowl, '--', ...
+    if isfield(parameters.transducer(1), 'focal_distance_bowl')
+        xline(parameters.transducer(1).focal_distance_bowl, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Expected Focal Distance (mm from bowl)', 'Color', [1 0 0]);
     end
-    if isfield(parameters.transducer, 'focal_distance_offset')
-        xline(parameters.transducer.focal_distance_offset, '--', ...
+    if isfield(parameters.transducer(1), 'focal_distance_offset')
+        xline(parameters.transducer(1).focal_distance_offset, '--', ...
             'LineWidth', 1.2, 'DisplayName', 'Exit Plane');
     end
     hold off;
@@ -66,7 +66,7 @@ function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(param
     xlim([0 inf]);
 
     % Save the figure
-    fig_path = fullfile(parameters.outputs_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
+    fig_path = fullfile(parameters.io.outputs_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
         parameters.calibration.desired_focal_distance_ep, parameters.calibration.desired_intensity, parameters.calibration.equipment_name));
     saveas(gcf, fig_path);
     close(gcf);

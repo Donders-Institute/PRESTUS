@@ -54,8 +54,8 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     acoustic_info.parameters = parameters;
     acoustic_info.kwave_input_args = kwave_input_args;
 
-    if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
-        disp("Not saving acoustic output matrices ...")
+    if ~should_save_output(parameters.io, 'save_acoustic_matrices')
+        disp('Not saving acoustic output matrices ...')
     else
         % keep 'parameters' as a copy so not to confuse future runs
         acoustic_info.parameters = parameters;

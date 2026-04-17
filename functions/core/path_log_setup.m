@@ -4,23 +4,21 @@ function [parameters] = path_log_setup(parameters, prestus_path)
 
     disp(['Location of PRESTUS: ', prestus_path])
 
-    % Add paths to the 'functions' and toolbox folders
+    % Add paths to the 'functions' and toolbox folders.
+    % safe_addpath filters out hidden directories (e.g. .claude, .git) to
+    % prevent stale file copies from shadowing the current versions.
     functionsLoc = fullfile(prestus_path, 'functions');
     toolboxesLoc = fullfile(prestus_path, 'toolboxes');
-    allPaths = regexp(path,pathsep,'Split');
+    allPaths = regexp(path, pathsep, 'Split');
 
-    % Add 'functions' folders
-    if ~any(ismember(fullfile(functionsLoc, 'helper'),allPaths))
-        addpath(genpath(functionsLoc));
+    if ~any(ismember(fullfile(functionsLoc, 'helper'), allPaths))
+        safe_addpath(functionsLoc);
         disp(['Adding ', functionsLoc, ' and subfolders']);
-    else
     end
 
-    % Add 'toolboxes' 
-    if ~any(ismember(toolboxesLoc,allPaths))
-        addpath(genpath(toolboxesLoc));
+    if ~any(ismember(toolboxesLoc, allPaths))
+        safe_addpath(toolboxesLoc);
         disp(['Adding ', toolboxesLoc, ' and subfolders']);
-    else
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs
@@ -55,59 +53,84 @@ function [parameters] = path_log_setup(parameters, prestus_path)
     subject_id = parameters.subject_id;
 
     % [SIMULATION OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-        parameters.io.output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', subject_id));
-        if ~exist(parameters.io.output_dir); mkdir(parameters.io.output_dir); end;
-    else
-        parameters.io.output_dir = parameters.path.sim;
+    if isfield(parameters.path, 'sim') && ~isempty(parameters.path.sim) && ...
+            (isstring(parameters.path.sim) || ischar(parameters.path.sim)) && ...
+            ~any(strcmp(parameters.path.sim, {"", ''}))
+        parameters.io.output_dir = get_output_dir(parameters);
+        if ~isfolder(parameters.io.output_dir); mkdir(parameters.io.output_dir); end
     end
 
     % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if (isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)) && ...
-        isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-        parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
-        if ~exist(parameters.path.localite); mkdir(parameters.path.localite); end;
-    else
-        if ~isfield(parameters.path, 'localite') || isempty(parameters.path.localite)
-            parameters.path.localite = parameters.io.output_dir;
+    if isfield(parameters.path, 'localite') && ...
+            (isstring(parameters.path.localite) || ischar(parameters.path.localite)) && ...
+            ~any(strcmp(parameters.path.localite, {"", ''}))
+        if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
+            parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
+        end
+        if ~exist(parameters.path.localite); mkdir(parameters.path.localite); end
+    end
+
+    % Output subdirectories
+    % ├── cache/         — regenerable intermediates (checkpoints, matrices, T1-space property maps)
+    % └── debug/         — diagnostic artefacts written only when debug=1
+    %     ├── preproc/   — head preprocessing (rotation, cropping, skull visualizations)
+    %     ├── medium/    — medium mapping (grid-space property matrices, pCT)
+    %     └── source/    — source/transducer setup (element distribution plots)
+    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
+        out = parameters.io.output_dir;
+
+        parameters.io.cache_dir        = fullfile(out, 'cache');
+        parameters.io.debug_dir        = fullfile(out, 'debug');
+        parameters.io.debug_dir_preproc = fullfile(out, 'debug', 'preproc');
+        parameters.io.debug_dir_medium  = fullfile(out, 'debug', 'medium');
+        parameters.io.debug_dir_source  = fullfile(out, 'debug', 'source');
+
+        for d = {parameters.io.cache_dir, parameters.io.debug_dir, ...
+                 parameters.io.debug_dir_preproc, parameters.io.debug_dir_medium, ...
+                 parameters.io.debug_dir_source}
+            if ~isfolder(d{1}); mkdir(d{1}); end
         end
     end
 
-    % specify dedicated subfolder for debugging contents
-    parameters.io.debug_dir = fullfile(parameters.io.output_dir, 'debug');
-
-    if ~isfolder(parameters.io.output_dir)
-        mkdir(parameters.io.output_dir);
-    end
-    if ~isfolder(parameters.io.debug_dir)
-        mkdir(parameters.io.debug_dir);
-    end
-    if isfield(parameters.path, 'seg') && ~isfolder(parameters.path.seg)
+    % create segmentation folder if it doesn't exist
+    if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg) && ~isfolder(parameters.path.seg)
         mkdir(parameters.path.seg);
     end
     
-    % Save parameters
-    filename_parameters = fullfile(parameters.io.output_dir, ...
-        sprintf('sub-%03d_parameters_%s%s_%s.mat', ...
-        subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
-        string(datetime('now'), 'yyMMdd_HHmm')));
-    save(filename_parameters, 'parameters');
-    clear filename_parameters;
+    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
+        % Save parameter snapshot to cache (regenerable, not a primary output)
+        filename_parameters = fullfile(parameters.io.cache_dir, ...
+            sprintf('sub-%03d_%s%s_parameters_%s.mat', ...
+            subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
+            string(datetime('now'), 'yyMMdd_HHmm')));
+        save(filename_parameters, 'parameters');
+        clear filename_parameters;
 
-    % Create a log
-    filename_log = fullfile(parameters.io.output_dir, ...
-        sprintf('sub-%03d_%s%s_%s.txt', ...
-        subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
-        string(datetime('now'), 'yyMMdd_HHmm')));
-    diary(filename_log);
+        % Create a log.
+        % Use a pre-assigned path if uncertainty_pipeline set one (so all
+        % five stage logs have known, deterministic paths); otherwise fall
+        % back to a timestamp-based name.
+        if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
+            filename_log = parameters.io.log_file;
+        else
+            filename_log = fullfile(parameters.io.output_dir, ...
+                sprintf('sub-%03d_%s%s_%s.txt', ...
+                subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
+                string(datetime('now'), 'yyMMdd_HHmm')));
+        end
+        parameters.io.log_file = filename_log;
+        diary(filename_log);
+    end
 
     % summarize parameters
     print_parameter_summary(parameters)
 
     % Define the filename of the summary table
-    parameters.io.filename_output_table = ...
-        fullfile(parameters.io.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
-        subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
+        parameters.io.filename_output_table = ...
+            fullfile(parameters.io.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
+            subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    end
 
     % suppress unneccessary warnings from export_fig when running without OpenGL
     warning('off','MATLAB:prnRenderer:opengl');

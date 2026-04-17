@@ -1,4 +1,4 @@
-function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries)
+function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries, CEM43_iso)
 
 % THERMAL_PLOT_SIM Visualizes heating simulation results over time.
 %
@@ -198,9 +198,50 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     hold off
     legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
     legend('boxoff');
-    title('CEM43 in focal plane (NOT overall tissue max.)');
+    title('CEM43 (kWave) in focal plane (NOT overall tissue max.)');
     saveas(g, output_plot_CEM, 'png');
     close(g);
+
+    %% [focal axis] ISO CEM43 values over time
+
+    if nargin >= 8 && ~isempty(CEM43_iso)
+        output_plot_CEM_iso = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_iso%s.png', ...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        focal_CEM_iso = squeeze(CEM43_iso(trans_pos(1),:,:));
+        g = figure; hold on;
+        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        if any(find(mask.skull))
+            data2plot = max(focal_CEM_iso(mask.skull, 1:size(time_status_seq,2)),[],1);
+        end
+        p1 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        if any(find(mask.skin))
+            data2plot = max(focal_CEM_iso(mask.skin, 1:size(time_status_seq,2)),[],1);
+        end
+        p2 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        if any(find(mask.brain))
+            data2plot = max(focal_CEM_iso(mask.brain, 1:size(time_status_seq,2)),[],1);
+        end
+        p3 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        p4 = plot(HEAT.recordedtime, focal_CEM_iso(target_pos_focal, 1:size(time_status_seq,2)), 'LineWidth', 2);
+        colormap('lines')
+        xlabel('Time [s]'); ylabel('CEM43 (ISO)');
+        y_range = ylim();
+        for i = 2:(length(time_status_seq)-1)
+            if ~strcmp(time_status_seq(i).status,'on'), continue; end
+            x_points = [time_status_seq(i-1).time time_status_seq(i-1).time time_status_seq(i).time time_status_seq(i).time];
+            y_points = [y_range(1) y_range(2) y_range(2) y_range(1)];
+            a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
+            a.FaceAlpha = 0.1;
+        end
+        xlim([0, HEAT.recordedtime(end)]); hold off
+        legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
+        legend('boxoff');
+        title('CEM43 ISO in focal plane (NOT overall tissue max.)');
+        saveas(g, output_plot_CEM_iso, 'png');
+        close(g);
+    end
 
     %% Plot timeseries for maximum in medium
 
@@ -292,9 +333,36 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
     hold off
     legend(available_layers);
     legend('boxoff');
-    title('Thermal Index CEM43 (overall tissue max.)');
+    title('Thermal Index CEM43 kWave (overall tissue max.)');
     saveas(h, [output_plot_CEM], 'png');
     close(h);
+
+    % [layer-max] ISO CEM43 over time
+    if isfield(timeseries, 'CEM43_iso') && ~isempty(fieldnames(timeseries.CEM43_iso))
+        output_plot_CEM_iso_max = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_iso_max%s.png', ...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        h = figure; hold on;
+        for i_layer = 1:numel(available_layers)
+            if isfield(timeseries.CEM43_iso, available_layers{i_layer})
+                plot(HEAT.recordedtime, timeseries.CEM43_iso.(available_layers{i_layer}), 'LineWidth', 2);
+            end
+        end
+        colormap('lines')
+        xlabel('Time [s]'); ylabel('Thermal Index [CEM43 ISO]');
+        y_range = ylim();
+        for i = 2:(length(time_status_seq)-1)
+            if ~strcmp(time_status_seq(i).status,'on'), continue; end
+            x_points = [time_status_seq(i-1).time time_status_seq(i-1).time time_status_seq(i).time time_status_seq(i).time];
+            y_points = [y_range(1) y_range(2) y_range(2) y_range(1)];
+            a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
+            a.FaceAlpha = 0.1;
+        end
+        xlim([1, HEAT.recordedtime(end)]); hold off
+        legend(available_layers); legend('boxoff');
+        title('Thermal Index CEM43 ISO (overall tissue max.)');
+        saveas(h, output_plot_CEM_iso_max, 'png');
+        close(h);
+    end
 
     %% Save values for post-hoc group analysis
 

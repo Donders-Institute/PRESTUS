@@ -1,4 +1,4 @@
-## Transducer definition
+## Transducer modeling
 
 PRESTUS does not provide default transducer calibrations. Instead, it encourages users to set up transducers and optimize settings to match their empirical setup.
 
@@ -6,52 +6,49 @@ See the full [parameter documentation](doc_parameters.md#transducer-specificatio
 
 #### Static parameters
 
-`transducer.source_freq_hz`  
-Central frequency of the acoustic source (in Hz).
+The transducer supports two alternative configurations:
 
-`transducer.n_elements`  
-Number of transducer elements.
+- **Annular array** (`type` = `annular`)
+- **Matrix array** (`type` = `matrix`)
 
-`transducer.Elements_ID_mm`  
-Inner diameter of each transducer element (in mm).
+Each type is configured in its own sub-struct (`annular` or `matrix`). Shared fields (`trans_pos`, `focus_pos`, `focal_distance_ep`/`focal_distance_bowl`, `freq_hz`) sit at the `transducer` level.
 
-`transducer.Elements_OD_mm`  
-Outer diameter of each transducer element (in mm).
+For the setup of annular transducers see [the annular definition](doc_parameters.md#annular-array-definition-annular).
 
-`transducer.curv_radius_mm`  
-Radius of curvature of the transducer bowl (in mm).
-
-`transducer.dist_to_plane_mm`   
-Distance from the geometric focus to the transducer plane (in mm).
+For the setup of matrix transducers see [the matrix definition](doc_parameters.md#matrix-array-definition-matrix).
 
 #### Dynamic parameters: amplitude and focus
 
 These parameters are traditionally calibrated in free-water simulations (see below).
 
-`transducer.source_amp`     
+**Note:** Calibration is currently implemented only for **annular arrays**.
+
+`transducer.annular.elem_amp`  
 Amplitude of the acoustic source (in Pa). [**CALIBRATED**]
 
-`transducer.source_phase_deg`   
-Phase of the acoustic source (in degrees). [**CALIBRATED**]
+`transducer.annular.elem_phase_deg`  
+Phase of the acoustic source per element (in degrees). [**CALIBRATED**]
 
-`transducer.source_phase_rad`   
-Phase of the acoustic source (in radians). [**CALIBRATED**]
+For **matrix arrays**, phase delays are currently **not provided as input**.  
+Instead, steering is performed automatically by computing the phase for each element based on `transducer.trans_pos` and `transducer.focus_pos`.
 
 See [transducer calibration](doc_calibration.md).
 
-#### Placement parameters
+#### Transducer placement
 
 See also [transducer placement](doc_placement.md). 
 
-In `water` simulations, the placement will be automatically determined based on the edge of the PML layer.
+In `water` simulations in combination with annular arrays, the placement will be automatically determined based on the edge of the PML layer.
 
 `transducer.trans_pos`  
 Position of transducer bowl (XYZ, T1 grid voxel space).
+Used for placement and **phase calculation in matrix arrays**.
 
 `transducer.focus_pos`  
 Position of stimulation target (XYZ, T1 grid voxel space).
+Defines the focal point and is used for **automatic steering in matrix arrays**.
 
-#### Target distance parameters
+#### Transducer-target distance specification
 
 ![PRESTUS transducer distance definitions](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/transducer_distances.png)
 
@@ -59,19 +56,46 @@ The figure shows PRESTUS definitions for annular transducer distances.
 
 PRESTUS expects one either of the following to be specified (or it will attempt a geometric distance calculation based on `trans_pos` and `focus_pos`, if specified).
 
-`expected_focal_distance_ep`    
-Expected distance from the transducer exit plane to the stimulation focus (mm). This often corresponds to the focal depth setting of the driving system - transducer calibration.
+`focal_distance_ep`  
+Expected distance from the transducer exit plane to the stimulation focus (mm). This often corresponds to the focal depth setting of the driving system / transducer calibration.
 
-`expected_focal_distance_bowl`  
-Expected distance from the transducer bowl to the stimulation focus (mm). Will be internally calculated based on `expected_focal_distance_ep`, `dist_to_plane_mm`, and `curv_radius_mm`.
+`focal_distance_bowl`  
+Expected distance from the transducer bowl to the stimulation focus (mm). Will be internally calculated based on `focal_distance_ep`, `dist_geom_ep_mm`, and `curv_radius_mm`.
 
-## Transducer modeling
+---
 
-The `setup_source` function creates realistic transducer sources for k-Wave simulations, supporting both simple uniform elements and advanced curved arrays that produce focused beams. The function produces binary masks (active source locations) and time-varying pressure signals. Two setups are supported:
+## Transducer geometry: annular vs. matrix array
 
-1.	Realistic kWaveArray Elements (**recommended**)
-The  kWaveArray  class (`use_kWaveArray`) in the k-Wave toolbox enables realistic simulation of multi-element phased arrays by defining transducers via physical parameters (radius, element position, apodization) rather than discrete grid points. Elements render smoothly regardless of grid resolution. Independent delays/weights per element enable dynamic focusing and element overlap is automatically handled through weighted element contributions. Supports annular rings, axisymmetric 2D simulations, and GPU acceleration. This is the recommended setup type.
-<br>
-2.	Simple Custom Elements
-Creates single- or multi-element bowl-shaped (3D) or arc-shaped (2D) pressure source regions for each transducer element using geometric functions (k-Wave function: `makeBowl`). Each element gets identical continuous wave (CW) signals. Best for uniform, non-overlapping arrays where you want simple control. The discretization of grid points can introduce  staircasing artifacts in the resulting `source.p`  masks.
+### Annular array
 
+An annular array consists of concentric ring-shaped elements arranged on a spherically curved surface. Because all elements share the same acoustic axis, focusing is inherently one-dimensional (axial). Lateral steering is not possible; the transducer must be physically repositioned to change the target location.
+
+**Modeling in PRESTUS:**  
+Element geometry is defined by inner/outer diameters (`Elements_ID_mm`, `Elements_OD_mm`) and bowl curvature (`curv_radius_mm`). Each element is assigned an independent pressure amplitude (`elem_amp`) and phase (`elem_phase_deg`), which must be calibrated empirically. PRESTUS includes a calibration pipeline for annular arrays to match simulated pressure to free-water measurements.
+
+**When to use:**  
+Use annular arrays when your hardware is a single-focus or multi-ring bowl transducer  with pre-calibrated per-element amplitudes and phases. This is the simpler and better-validated configuration.
+
+---
+
+### Matrix array
+
+A matrix array consists of many small elements distributed across a curved or flat surface. Because each element can be driven with an independent phase delay, the acoustic focus can be steered electronically in three dimensions without moving the transducer.
+
+**Modeling in PRESTUS:**  
+Element positions are either defined analytically (Fibonacci, Fermat spiral, or rectangular grid) or loaded from a coordinate file. Element shape can be rectangular (`rect`), circular (`disc`), or curved (`bowl`). Phase delays are computed automatically from the geometric relationship between each element, `trans_pos`, and `focus_pos` — no manual phase input is required. For curved arrays, `curv_radius_mm` and `dist_geom_ep_mm` define the bowl geometry used for visualization and offset calculations. An optional Clover configuration replicates the array into a multi-aperture (up to three-leaf) arrangement.
+
+**When to use:**  
+Use matrix arrays when your hardware supports electronic steering (e.g., a phased array system) or when you want to simulate volumetric targeting without repositioning the transducer. Note that amplitude calibration is not yet implemented for matrix arrays.
+
+---
+
+## Transducer modeling: kWaveArray vs. simple elements
+
+The `setup_source` function creates the acoustic source for k-Wave simulations. Two implementations are supported:
+
+1. **Realistic kWaveArray elements** (`use_kWaveArray = 1`, recommended)  
+   Uses the k-Wave `kWaveArray` class to define transducer elements via physical parameters (position, radius, apodization) rather than discrete grid voxels. Elements render smoothly at any grid resolution. Independent per-element delays and weights enable dynamic focusing. Element overlap is handled automatically through weighted contributions. Supports annular rings, axisymmetric 2D simulations, matrix arrays, and GPU acceleration.
+
+2. **Simple custom elements** (`use_kWaveArray = 0`)  
+   Creates bowl-shaped (3D) or arc-shaped (2D) pressure source regions per element using the k-Wave `makeBowl` function. Each element receives an identical continuous wave (CW) signal. Best for uniform single-element setups where simplicity is preferred. Grid discretization can introduce staircasing artifacts in the source mask.

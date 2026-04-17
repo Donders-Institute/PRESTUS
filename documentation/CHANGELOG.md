@@ -4,62 +4,51 @@ Notable changes to this project will be documented here.
 
 ## `development` v0.5.0 [*unreleased*]
 
-Note: While intended to be largely backwards compatible, parameters, their naming, and default values have changed. Please consult the [documentation](https://donders-institute.github.io/PRESTUS/) for the current parameter specification. 
+Note: Parameters, naming, and default values have changed. Please consult the [documentation](https://donders-institute.github.io/PRESTUS/) for the current parameter specification.
 
 #### Added
 
-- [**feature**] C++ support by @jkosciessa
-- [**feature**] Advanced logging & benchmarking
-    - Key parameters are displayed at onset of simulation
-    - PRESTUS and k-Wave commit version logged (git-only)
-- [**feature**] html summary output by @sirmrmarty
-    - Acoustic properties will only be printed for modeled layers @jkosciessa
-- [**feature**] Parallel multi-transducer support for layered simulation by @dreamstimlab (see [PR](https://github.com/Donders-Institute/PRESTUS/pull/100))
-- [**skull**] new option `parameters.rubberwrap` by @meijer-s (see [PR](https://github.com/Donders-Institute/PRESTUS/pull/103))
-    - Locally inflate the skull mask. 
-    - New default for the layered simulation and only option during pCT creation. The sequence of where this is implemented currently varies between layered/pCT. For pCT, the rubber expansion is implemented following segmentation. For layered, it follows medium map creation (i.e., following the smoothing of masks) to catch potential issues where smoothing and binarization may (re-)introduce holes. 
-- [**doc**] GitHub pages [documentation](https://donders-institute.github.io/PRESTUS/)
-    - Full parameter & function overview
-    - Installation Guide
-    - Quick Start Guide
-    - Example demos
-    - Draft of processing steps
-- [**thermal**] More flexible and standardised protocol timing specification
-- [**thermal**] Output plot of requested timing protocol
-- [**thermal**] Additional thermal timeseries of max. in tissue and heating at focus
-- [**thermal**] Heating timeseries are saved as .mat
-- [**parameter**] I/O handling of intermediate outputs. `savemat` can be set to 0 to not save processing matrices (save disk space)
-- [**parameter**] Dedicated `debug` parameter
-    - saves plots of postprocessing etc in debug folder of sim directory
-    - parameter overview when loading config (cf. pipeline onset)
-    - saves nifti images of raw acoustic properties
-    - currectly active by default
+- [**feature**] Uncertainty quantification pipeline by @jkosciessa
+    - Three-variant simulation workflow (default / liberal / conservative medium properties) producing a unified HTML report with safety dashboard, acoustic and thermal range tables, timing summary, and side-by-side maps
+    - Supports MATLAB (sequential) and HPC (parallel, scheduler-dependent) execution with automatic resumption from partial runs
+- [**feature**] Matrix transducer support (see [PR #117](https://github.com/Donders-Institute/PRESTUS/pull/117))
+    - Flexible element layout options (rectangular grid, Fibonacci, Fermat spiral) and Clover multi-array configuration
+    - Element positions can be defined inline or loaded from file
+- [**feature**] Heuristic transducer placement
+    - Automated skull-surface search with configurable positioning criteria and ear exclusion
+- [**feature**] C++ backend CPU & GPU support by @jkosciessa
+- [**feature**] HTML simulation report by @sirmrmarty
+    - Self-contained per-subject summary of acoustic and thermal outputs
+- [**feature**] Parallel multi-transducer support for layered simulations by @dreamstimlab (see [PR #100](https://github.com/Donders-Institute/PRESTUS/pull/100))
+- [**feature**] Per-step pipeline benchmarking: wall time, peak RAM, and disk usage logged at each stage
+- [**grid**] Minimum PPW validation at source setup (`grid.min_ppw`, default 6); warns with the maximum `resolution_mm` that would satisfy the requirement
+- [**skull**] Rubber-wrap skull mask inflation by @meijer-s (see [PR #103](https://github.com/Donders-Institute/PRESTUS/pull/103))
+- [**thermal**] More flexible and standardised protocol timing specification with output plot
+- [**thermal**] Additional thermal timeseries outputs (max per tissue, heating at focus)
+- [**doc**] GitHub Pages [documentation](https://donders-institute.github.io/PRESTUS/) covering parameters, functions, installation, quick start, and processing steps
 
 #### Changed
 
-- [**refactor**] Pipeline and main processing steps refactored
-    - Functions organized by relevant processing stage
-    - main pipeline: 1150 lines -> 450 lines (incl. updated logging)
-- [**calibration**] Dedicated config and unified pipeline for transducer calibration, new parameters. Function for calibration. [@MaCuinea, @jkosciessa]
-- [**parameter**] Minor parameters changes: some were dropped, some renamed, others added, check the function doc if in doubt. default_config and documentation updated accordingly. Behaviour should be comparable to v0.4.0
-- [**pCT**] pCT creation updated to new folder structure and simplified based on @meijer-s  implementation.
-- [**savemat**] kwave source matrix saving now can be deactivated (as intended)
-- [**feature**] updates to axisymmetry support
-- [**advanced**] Updates to the sequential simulations with different transducer-target specs @Kenneth van der Zee
-- [**preproc**] segmentation smoothing choices changed @jkosciessa
-- [**preproc**] grid interpolation for continuous data changed @jkosciessa
+- [**refactor**] Pipeline and core processing steps refactored; functions organised by processing stage
+- [**calibration**] Dedicated config and unified pipeline for transducer calibration [@MaCuinea, @jkosciessa]
+- [**hpc**] HPC submission refactored; platform selection unified under `parameters.platform`
+- [**preproc**] Segmentation smoothing now specified in FWHM mm; grid interpolation updated for continuous data
+- [**pCT**] Updated to new folder structure; skull density and sound speed regularised to water minimum
+- [**axisymmetric**] Axisymmetric acoustic simulations now default to 3D thermal output
+- [**parameter**] Various parameters renamed or restructured; consult `default_config.yaml` and the documentation for current names
 
 #### Fixed
 
 Not all (hot-)fixes are reported here.
 
-- [**calibration**] potential bugs with distance calculation
-- [**savemat**] kwave source matrix saving now can be deactivated (as intended)
-- [**savemat**] water simulations will force-save matrix outputs
+- [**source**] Each uncertainty variant now recomputes its own k-Wave source with its own time axis; shared caching across variants with different medium sound speeds could produce incorrect pressure maps
+- [**paths**] `load_parameters` resolves `default_config.yaml` via an absolute path, preventing stray output folders when called from an unexpected working directory
+- [**calibration**] Potential bugs with transducer distance calculation
+- [**savemat**] k-Wave source matrix saving can now be correctly deactivated; water simulations force-save matrix outputs
 
 #### Deprecated/Removed
 
-- [**feature**] Removed explicit ‘skull’-only simulations. These can be run by removing layers in the simulation setup.
+- [**feature**] Removed explicit ‘skull’-only simulations; equivalent behaviour is achieved by removing layers in the simulation setup
 
 ## v0.4.0
 

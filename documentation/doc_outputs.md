@@ -83,8 +83,10 @@ Temperature is simulated over the full sonication protocol (on/off cycles) using
 |---|---|---|
 | `maxT` | °C | Global maximum temperature reached at any point during sonication |
 | `endT` | °C | Global maximum temperature at the end of the last sonication pulse |
-| `maxCEM43` | min | Global maximum CEM43 over the full protocol |
-| `maxCEM43end` | min | Global maximum CEM43 at end of last pulse |
+| `maxCEM43` | min | Global maximum CEM43 (kWave form) over the full protocol |
+| `maxCEM43end` | min | Global maximum CEM43 (kWave form) at end of last pulse |
+| `maxCEM43iso` | min | Global maximum CEM43 (ISO form) over the full protocol |
+| `maxCEM43isoend` | min | Global maximum CEM43 (ISO form) at end of last pulse |
 
 #### Tissue-specific
 
@@ -94,14 +96,18 @@ Temperature is simulated over the full sonication protocol (on/off cycles) using
 | `endT_brain/skull/skin` | °C | Maximum temperature in each tissue at end of last pulse |
 | `riseT_brain/skull/skin` | °C | Maximum temperature rise above baseline (maxT − baseline). ITRUSST limit: 2 °C |
 | `rise_endT_brain/skull/skin` | °C | Temperature rise above baseline at end of last pulse |
-| `CEM43_brain/skull/skin` | min | Maximum CEM43 in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
-| `CEM43_end_brain/skull/skin` | min | CEM43 in each tissue at end of last pulse |
+| `CEM43_brain/skull/skin` | min | Maximum CEM43 (kWave form) in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
+| `CEM43_end_brain/skull/skin` | min | CEM43 (kWave form) in each tissue at end of last pulse |
+| `CEM43iso_brain/skull/skin` | min | Maximum CEM43 (ISO form) in each tissue |
+| `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at end of last pulse |
+
+Both CEM43 formulations are always computed. See [doc_simulations-thermal.md](doc_simulations-thermal.md) for formula details. The HTML report displays the formulation selected by `parameters.thermal.cem43_iso`.
 
 ---
 
 ### Non-significant risk limits
 
-The HTML report flags each metric against the ITRUSST consensus safety limits for transcranial ultrasound (Aubry et al., 2025, Brain Stimulation):
+The HTML report flags each metric against the ITRUSST consensus non-significant risk limits for transcranial ultrasound (Aubry et al., 2025, Brain Stimulation):
 
 | Metric | Limit |
 |---|---|
@@ -132,23 +138,37 @@ Filename pattern: `sub-XXX_final_<type>_MNI<affix>.nii.gz`
 | `heating_end` | Temperature at end of last pulse [°C] |
 | `heatrise` | Temperature rise above baseline [°C] |
 | `heatrise_end` | Temperature rise above baseline at end of last pulse [°C] |
-| `CEM43` | CEM43 thermal dose [min] |
-| `CEM43_end` | CEM43 at end of last pulse [min] |
+| `CEM43` | CEM43 thermal dose — kWave form [min] |
+| `CEM43_end` | CEM43 (kWave) at end of last pulse [min] |
+| `CEM43_iso` | CEM43 thermal dose — ISO form [min] |
+| `CEM43_iso_end` | CEM43 (ISO) at end of last pulse [min] |
 
 ---
 
-## MATLAB structures
+## Output directory structure
 
-PRESTUS saves simulation parameters and, by default, intermediate matrices. If matrices are detected in the output folder and `io.overwrite_files` is set to `never`, they are loaded instead of recomputing. Matrix saving can be disabled globally via `io.save_matrices = 0`.
+```
+sub-XXX_<medium>_report<affix>.html       ← self-contained HTML report
+sub-XXX_<medium>_output_table<affix>.csv  ← quantitative metrics
 
-| File | Description |
-|---|---|
-| `sub-XXX_<medium>_parameters<affix>.mat` | Full parameters struct used for the simulation |
-| `sub-XXX_after_rotating_and_scaling<affix>.mat` | Head volume after grid scaling |
-| `sub-XXX_after_cropping_and_smoothing<affix>.mat` | Cropped head including medium masks |
-| `sub-XXX_<medium>_kwave_source<affix>.mat` | k-Wave source definition |
-| `sub-XXX_<medium>_results<affix>.mat` | Acoustic simulation sensor data |
-| `sub-XXX_<medium>_heating_res<affix>.mat` | Thermal simulation results |
+cache/                                     ← regenerable intermediates
+    sub-XXX_<medium>_parameters_<ts>.mat     parameters snapshot
+    sub-XXX_<medium>_after_rotating_and_scaling<affix>.mat
+    sub-XXX_<medium>_after_cropping_and_smoothing<affix>.mat
+    sub-XXX_<medium>_kwave_source<affix>.mat
+    sub-XXX_<medium>_results<affix>.mat      acoustic sensor data
+    sub-XXX_<medium>_heating_res<affix>.mat  thermal results
+    sound_speed.nii.gz  density.nii.gz  ...  T1-space property maps
+
+debug/                                     ← diagnostic artefacts (debug=1 only)
+    preproc/        head preprocessing (rotation, cropping, skull visualisations)
+    medium/         medium mapping (grid-space property matrices, pCT)
+    source/         source/transducer setup (element distribution plots)
+```
+
+**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving matrices (cache files will not be written).
+
+**Debug files** are only written when `parameters.simulation.debug = 1`.
 
 ---
 
@@ -169,7 +189,7 @@ A self-contained HTML report is written to the output directory (`sub-XXX_<mediu
 - **Configuration summary** — parameters used for the run
 - **Medium properties** — per-tissue acoustic and thermal properties (layered only)
 - **Acoustic results** — intensity overlay images and the full acoustic metrics table
-- **Thermal results** — temperature and CEM43 plots (if heating simulations were run)
+- **Thermal results** — temperature, CEM43 (kWave), and CEM43 (ISO) plots (if heating simulations were run); the safety dashboard uses the formulation selected by `parameters.thermal.cem43_iso`
 - **Post-hoc water simulation** — free-field reference results (if run)
 - **Log** — full pipeline execution log
 

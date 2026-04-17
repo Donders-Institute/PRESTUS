@@ -71,8 +71,8 @@ for i = 1:N_i
 
     % Configure transducer parameters
     parameters.transducer = tran.prestus.transducer;
-    parameters.transducer.source_phase_deg = zeros(1, tran.prestus.transducer.n_elements); % initial phases
-    parameters.transducer.source_amp = repmat(200000, 1, tran.prestus.transducer.n_elements); % initial amplitude
+    parameters.transducer.annular.elem_phase_deg = zeros(1, tran.prestus.transducer.annular.elem_n); % initial phases
+    parameters.transducer.annular.elem_amp = repmat(200000, 1, tran.prestus.transducer.annular.elem_n); % initial amplitude
 
     % Construct output directory for final profiles
     if ~isfield(parameters.calibration, 'path_output_profiles') || isempty(parameters.calibration)
@@ -120,7 +120,8 @@ for i = 1:N_i
         focal_distance_ep = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
         fprintf('Focus from exit plane: %.2f \n', focal_distance_ep)
 
-        parameters.expected_focal_distance_ep = focal_distance_ep;
+        parameters.transducer.type = 'annular';
+        parameters.transducer.focal_distance_ep = focal_distance_ep;
 
         % Load default parameters incl. additional chosen parameters like transducer
         parameters = load_parameters(parameters);
@@ -133,8 +134,8 @@ for i = 1:N_i
         end
 
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
-        source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters);
-        parameters.transducer.source_phase_deg = source_phase_deg; clear source_phase_deg;
+        elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters);
+        parameters.transducer.annular.elem_phase_deg = elem_phase_deg; clear elem_phase_deg;
 
         % Interpolate or select axial profile
         [profile_focus_ep, max_intens] = extract_real_intensity_profile(...
@@ -161,7 +162,8 @@ for i = 1:N_i
 
             % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
             if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
-                dist_bowl_exit_plane = parameters.transducer.curv_radius_mm - parameters.transducer.dist_to_plane_mm;
+                dist_bowl_exit_plane = parameters.transducer.annular.curv_radius_mm - ...
+                    parameters.transducer.annular.dist_geom_ep_mm;
             else
                 dist_bowl_exit_plane = 0;
             end
@@ -169,8 +171,8 @@ for i = 1:N_i
 
             % Set the expected focal distance to exit plane 
             % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
-            parameters.expected_focal_distance_ep = focal_distance_ep;
-            parameters.expected_focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
+            parameters.transducer.focal_distance_ep = focal_distance_ep;
+            parameters.transducer.focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
 
             % if the original profiles are measured from the exit plane,
             % we do not model the space until the exit plane; this can lead
@@ -195,7 +197,7 @@ for i = 1:N_i
             profile_empirical.axial_distance_bowl = dist_bowl_focus;
 
             % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus); 
-            % hold on; xline(parameters.expected_focal_distance_bowl)
+            % hold on; xline(parameters.focal_distance_bowl)
 
             % Show current iteration
             disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...

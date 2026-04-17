@@ -64,9 +64,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % if a subfolder is requested, move outputs to subfolders
     if parameters.path.subject_subfolder
-        parameters.outputs_folder = sprintf('%s/sub-%03d', parameters.path.sim, sim_id);
+        parameters.io.outputs_folder = sprintf('%s/sub-%03d', parameters.path.sim, sim_id);
     else
-        parameters.outputs_folder = sprintf('%s', parameters.path.sim);
+        parameters.io.outputs_folder = sprintf('%s', parameters.path.sim);
     end
 
     % Copy calibration settings to relevant entries in simulation config
@@ -99,7 +99,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     %% Load initial results
 
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        sim_param.outputs_folder, sim_id, sim_param.io.output_affix));
+        sim_param.io.outputs_folder, sim_id, sim_param.io.output_affix));
 
     initial_params = initial_res.acoustic_info.parameters;
     initial_params.calibration.prefix = 'Initial_';
@@ -143,30 +143,30 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     
     % Calculate optimized source amplitude
     opt_source_amp = round(opt_velocity / profile_sim.velocity * ...
-        initial_params.transducer.source_amp / ...
+        initial_params.transducer.annular.elem_amp / ...
         simulated_analytical_scaling);
 
     % Collect phases
     opt_source_phase_rad = opt_phases;
     opt_source_phase_deg = opt_phases/pi*180;
 
-    fprintf('The optimized source_amp = %i\n', opt_source_amp(1));
+    fprintf('The optimized elem_amp = %i\n', opt_source_amp(1));
 
     %% Rerun water simulation with optimized phases and source amplitude
 
     opt_param = sim_param;
-    opt_param.transducer.source_amp = opt_source_amp;
-    opt_param.transducer.source_phase_rad = opt_source_phase_rad;
-    opt_param.transducer.source_phase_deg = opt_source_phase_deg;
-    opt_param.results_filename_affix = '_optimized';
+    opt_param.transducer.annular.elem_amp = opt_source_amp;
+    opt_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
+    opt_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
+    opt_param.io.output_affix = '_optimized';
 
     opt_param.subject_id = sim_id;
     opt_param.hpc.wait_for_job = true;
     prestus_pipeline_start(opt_param);
 
-    %% Load optimized simulation results    
+    %% Load optimized simulation results
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        opt_param.outputs_folder, sim_id, opt_param.results_filename_affix));
+        opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix));
 
     opt_params = opt_res.acoustic_info.parameters;
     opt_params.calibration.prefix = 'Opt_';

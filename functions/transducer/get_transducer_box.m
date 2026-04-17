@@ -1,4 +1,5 @@
-function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = get_transducer_box(trans_pos, focus_pos, grid_step, parameters, plot)
+function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ...
+    get_transducer_box(trans_pos, focus_pos, natural_foc, grid_step, parameters, is_plot)
 
 % GET_TRANSDUCER_BOX Computes the transducer box dimensions and positions.
 %
@@ -10,6 +11,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
 % Input:
 %   trans_pos   - [1x2] array specifying the transducer position in grid coordinates.
 %   focus_pos   - [1x2] array specifying the focus position in grid coordinates.
+%   natural_foc - [1x2] array specifying the natural focus position in grid coordinates.
 %   grid_step   - Scalar specifying the grid step size (in mm).
 %   parameters  - Struct containing transducer properties (e.g., curvature radius, element diameters).
 %   plot        - Boolean flag to enable/disable visualization of the transducer box (default: 1).
@@ -23,44 +25,60 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
     arguments
         trans_pos (1, 2) % Transducer position in grid coordinates
         focus_pos (1, 2) % Focus position in grid coordinates
+        natural_foc double % Natural focus position in grid coordinates
         grid_step (1, 1) % Grid step size in mm
         parameters struct % Struct containing transducer properties
-        plot = 1 % Enable/disable visualization (default: enabled)
+        is_plot = 1 % Enable/disable visualization (default: enabled)
     end
 
-    %% Compute focal slope and angle
-    % Calculate unit vector pointing from focus to transducer and its angle
-    focal_slope = (trans_pos - focus_pos) / norm(trans_pos - focus_pos);
-    focal_angle = atan2(focal_slope(2), focal_slope(1));
+    %% Compute focal slope0
+    % Calculate unit vector pointing from focus to transducer
+    if parameters.transducer(1).align_to_focus == 0 && ~isempty(natural_foc)
+        focal_slope = (trans_pos - natural_foc) / norm(trans_pos - natural_foc);
+    else
+        focal_slope = (trans_pos - focus_pos) / norm(trans_pos - focus_pos);
+    end
+    
+    focal_angle = atan2(focal_slope(2),focal_slope(1));
 
     %% Compute geometric focus position
     % Calculate geometric focus position based on curvature radius and focal angle
-    geom_focus_pos = trans_pos - (parameters.transducer(1).curv_radius_mm) / grid_step * [cos(focal_angle), sin(focal_angle)];
+    tr = parameters.transducer(1);
+    geom_focus_pos = trans_pos - (tr.(tr.type).curv_radius_mm) / grid_step * focal_slope;
 
     %% Compute distance to exit plane
     % Maximum outer diameter of transducer elements
-    max_od = max(parameters.transducer(1).Elements_OD_mm);
+    switch tr.type
+        case 'annular'
+            max_od = max(tr.annular.elem_od_mm);
+        case 'matrix'
+            max_od = tr.matrix.outer_diameter_mm;
+        otherwise
+            error('Array type %s is unknown or not implemented.', tr.type)
+    end
 
     % Distance from geometric focus to exit plane in mm
-    dist_to_ep_mm = 0.5 * sqrt(4 * parameters.transducer(1).curv_radius_mm^2 - max_od^2);
+    dist_to_ep_mm = 0.5 * sqrt(4 * tr.(tr.type).curv_radius_mm^2 - max_od^2);
 
     % Convert distance to exit plane from mm to grid units
     dist_to_ep_grid = dist_to_ep_mm / grid_step;
 
     %% Compute exit plane position
     % Calculate exit plane position based on focal angle and distance to exit plane
-    ex_plane_pos_trig = geom_focus_pos + dist_to_ep_grid * [cos(focal_angle), sin(focal_angle)];
+    ex_plane_pos_trig = geom_focus_pos + dist_to_ep_grid * focal_slope;
 
     %% Compute orthogonal angle for bounding box calculation
     % Orthogonal angle perpendicular to focal slope
     ort_angle = atan(-focal_slope(1) / focal_slope(2));
 
+    arc_halfangle = atan(max_od/2/dist_to_ep_grid/grid_step);
+
     %% Compute bounding box dimensions
     % Radius of bounding box based on maximum outer diameter of elements
-    r = max(parameters.transducer(1).Elements_OD_mm) / 2 / grid_step;
+    r = max_od / 2 / grid_step;
 
     % Depth of transducer in grid units
-    trans_full_depth = 16 / grid_step;
+    trans_full_depth = tr.(tr.type).depth_mm / grid_step;
 
     % Back end position of transducer based on depth and focal slope
     trans_back = ex_plane_pos_trig + trans_full_depth * focal_slope;
@@ -72,7 +90,8 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
                       [ex_plane_pos_trig(2) + r * sin(ort_angle), ex_plane_pos_trig(1) + r * cos(ort_angle)]];
 
     %% Visualization (optional)
-    if plot 
+    if is_plot 
+        hold on;
         overlay_weight = 0; % Weight for overlay color blending
         overlay_color = [0, 0.2, 0.7]; % Overlay color (blue)
         lineWidth = 1; % Line width for visualization
@@ -92,6 +111,20 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ge
         line([ex_plane_pos_trig(2), trans_back(2)] + r * sin(ort_angle), ...
              [ex_plane_pos_trig(1), trans_back(1)] + r * cos(ort_angle), ...
              'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+             
+        % exit plane
+        line([ex_plane_pos_trig(2), ex_plane_pos_trig(2)]+r*sin(ort_angle), ...
+            [trans_back(1)-r*cos(ort_angle), trans_back(1) + r*cos(ort_angle)], ...  
+            'LineWidth', lineWidth,'Color', boxColor,'LineStyle', ':', ... 
+            'LineSmoothing',LineSmoothing);
+            
+        % transducer curvature
+        [arc_x, arc_y] = get_arc(geom_focus_pos, ...
+            tr.(tr.type).curv_radius_mm/grid_step, ...
+            focal_angle-arc_halfangle, ...
+            focal_angle+arc_halfangle );
+        plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth, ...
+            'LineSmoothing', LineSmoothing)
     end
 
 end

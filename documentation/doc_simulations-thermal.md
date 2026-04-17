@@ -51,24 +51,37 @@ These parameters influence the underlying mechanisms of how the thermal simulati
 
 ### Thermal dose (CEM43) calculation
 
-There are two implementations of thermal dose calculations:
+PRESTUS always computes **both** CEM43 formulations in every thermal simulation run. Both are written to the CSV output, exported as NIfTI volumes, and shown as separate figures. The HTML report displays the formulation selected by `parameters.thermal.cem43_iso`.
 
-- By default, PRESTUS calculates CEM43 as implemented in k-Wave's kWaveDiffusion.
+#### kWave form (default)
+
+CEM43 as implemented in k-Wave's `kWaveDiffusion`:
 
 ```
 cem43 = cem43 + ...
         dt ./ 60 .* ...
-        (0.25 .* (T >= 37 & T < 43 ) + ...
-        0.5 .* (T >= 43)).^(43 - T);
+        (0.25 .* (T >= 37 & T < 43) + ...
+         0.5  .* (T >= 43)).^(43 - T);
 ```
 
-- By setting ```paramaters.thermal.cem43_iso``` to 1, PRESTUS calculates CEM43 according to ISO standards. This variant defines CEM43 as zero below 39 degrees Celsius, sets it to infinite above 57 degrees, and applies a scaling of 0.5 to all voxels that have crossed 43 degrees in the past (not just following the most recent energy update).
+#### ISO form
+
+Set `parameters.thermal.cem43_iso = 1` to display the ISO variant in the HTML report. The ISO form defines CEM43 as zero below 39 °C, infinite above 57 °C, and applies R = 0.5 to all voxels that have previously exceeded 43 °C (tracked via T_max), not just to those currently above 43 °C.
 
 ```
- cem43_iso = cem43_iso + ...
+cem43_iso = cem43_iso + ...
         dt ./ 60 .* ...
-        (0 .* (T < 39 & T_max < 43) + ...
-        0.25 .* (T >= 39 & T < 43 & T_max < 43) + ...
-        0.5 .* (T >= 43 | T_max >= 43) + ...
-        Inf .* (T >= 57)).^(43 - T);
+        (0    .* (T < 39  & T_max < 43) + ...
+         0.25 .* (T >= 39 & T < 43 & T_max < 43) + ...
+         0.5  .* (T >= 43 | T_max >= 43) + ...
+         Inf  .* (T >= 57)).^(43 - T);
 ```
+
+#### Output naming
+
+| Suffix | Description |
+|---|---|
+| `CEM43` / `CEM43_end` | kWave form (max over protocol / at end of last pulse) |
+| `CEM43_iso` / `CEM43_iso_end` | ISO form (max over protocol / at end of last pulse) |
+
+Both suffixes apply to NIfTI filenames (`sub-XXX_final_CEM43_iso_orig_coord.nii.gz`, etc.) and to CSV columns (`CEM43_brain`, `CEM43iso_brain`, etc.).

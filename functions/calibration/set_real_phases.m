@@ -1,4 +1,4 @@
-function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters)
+function elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters)
     % Set the manufacturer-specified phases of the transducer for a given focal depth.
     %
     % Arguments:
@@ -9,7 +9,7 @@ function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep
     %       .medium.water.sound_speed: Speed of sound in water [m/s].
     %
     % Returns:
-    % - source_phase_deg: new phase values.
+    % - elem_phase_deg: new phase values.
 
     % Extract or interpolate phases for the given focal depth
     if isequal(tran.manufact, "Sonic Concepts")
@@ -27,13 +27,13 @@ function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep
     end
 
     % Adjust phases for virtual elements if necessary
-    if tran.n_elem ~= tran.prestus.transducer.n_elements
+    if tran.n_elem ~= tran.prestus.transducer.annular.elem_n
         % Map real elements to virtual elements
         original_pos = linspace(1, tran.n_elem, tran.n_elem);
 
         % Convert phases to radians, unwrap, and interpolate
         unwrapped_phases = unwrap(init_phases * pi / 180) * 180 / pi;
-        virtual_pos = linspace(1, tran.n_elem, tran.prestus.transducer.n_elements);
+        virtual_pos = linspace(1, tran.n_elem, tran.prestus.transducer.annular.elem_n);
         virtual_phases = interp1(original_pos, unwrapped_phases, virtual_pos, 'linear');
 
         % Convert back to degrees and apply modulo operation
@@ -41,6 +41,6 @@ function source_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep
     end
 
     % Output source phase
-    source_phase_deg = init_phases;
+    elem_phase_deg = init_phases;
 
 end

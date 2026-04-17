@@ -1,4 +1,4 @@
-function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
+function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
     
     % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
     %                  Set up the transducer and sensor                 %
@@ -21,22 +21,17 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 
     % Backward-compatible access to (first) transducer
     tx = parameters.transducer(1);
-    if numel(parameters.transducer)>1
-        warning('Individual source frequencies per transducer are not supported yet. Using %i Hz for grid time axis.', tx.source_freq_hz)
-    end
-
-    wave_period = 1 / tx.source_freq_hz;    % period [s]
+    wave_period = 1 / tx.freq_hz;    % period [s]
     
     % Check the number of input arguments
-    % As a default the time step is based on the default CFL number of 0.3.
-    % If grid_time_step is given, it means that the transducer and sensor
-    % has to be set up again with a smaller time step due to simulation
-    % instability.
-    if nargin < 5
+    % As a default the time step is based on the CFL number (grid.source_cfl,
+    % default 0.15). If grid_time_step is given (non-empty), the function was
+    % called a second time with a smaller time step due to simulation instability.
+    if nargin < 5 || isempty(grid_time_step)
         % Calculate the time step using an integer number of points per period
-        % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (target ≥3).
+        % PPW: Spatial samples per wavelength at source freq; ensures dx resolves waves (minimum grid.min_ppw, default 6).
         if ~isfield(parameters.grid, 'source_ppw') || isempty(parameters.grid.source_ppw)
-            points_per_wavelength = max_sound_speed /(tx.source_freq_hz * parameters.grid.resolution_mm/1e3);
+            points_per_wavelength = max_sound_speed /(tx.freq_hz * parameters.grid.resolution_mm/1e3);
         else
             points_per_wavelength = parameters.grid.source_ppw;
         end
@@ -50,9 +45,32 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
         points_per_period = ceil(points_per_wavelength / cfl);              
         % Calculate time step dt  
         grid_time_step = (wave_period / points_per_period);
+        % Validate PPW against minimum requirement using the slowest medium
+        % speed (shortest wavelength = worst-case spatial sampling).
+        % max_sound_speed is intentionally NOT used here — it gives the
+        % best-case PPW and would miss under-sampling in slow tissues.
+        if isfield(parameters.grid, 'min_ppw') && ~isempty(parameters.grid.min_ppw)
+            min_ppw = parameters.grid.min_ppw;
+        else
+            min_ppw = 6;
+        end
+        if nargin >= 6 && ~isempty(min_sound_speed)
+            c_check = min_sound_speed;
+        else
+            c_check = max_sound_speed;  % fallback: conservative (overestimates PPW)
+        end
+        ppw_actual = c_check / (tx.freq_hz * parameters.grid.resolution_mm / 1e3);
+        if ppw_actual < min_ppw
+            dx_required_mm = c_check / (tx.freq_hz * min_ppw) * 1e3;
+            warning(['PPW %.1f < minimum %.0f at %.0f Hz with %.2f mm resolution ' ...
+                     '(based on min. sound speed %.0f m/s). ' ...
+                     'Reduce grid.resolution_mm to ≤ %.2f mm.'], ...
+                ppw_actual, min_ppw, tx.freq_hz, parameters.grid.resolution_mm, ...
+                c_check, dx_required_mm);
+        end
         % Print parameter summary
-        fprintf('Calculating the time step of %.1d based on PPW %d, CFL= %.1f and PPP %.1d.\n', ...
-            grid_time_step, round(points_per_wavelength), cfl, points_per_period);
+        fprintf('Calculating the time step of %.1d based on PPW %.1f, CFL= %.2f and PPP %d.\n', ...
+            grid_time_step, points_per_wavelength, cfl, points_per_period);
     else
         fprintf('Using the time step of %.1d based on approx. max. stable time step.\n', ...
             grid_time_step);
@@ -65,10 +83,16 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
     % Create the time array
     kgrid.setTime(simulation_time_points, grid_time_step);
 
-    % Create source (transducer with focuspoint)
-    parameters.io.kwave_source_filename  = fullfile(parameters.io.output_dir, ...
+    % Create source (transducer with focuspoint).
+    % Always use output_affix so each simulation variant (default, liberal,
+    % conservative) computes its own kwave_source.mat with the correct time
+    % axis for that variant's medium speed.  preproc_affix is intentionally
+    % NOT used here — it only applies to head-preprocessing file lookups in
+    % preproc_head.m.
+    source_affix = parameters.io.output_affix;
+    parameters.io.kwave_source_filename  = fullfile(parameters.io.cache_dir, ...
         sprintf('sub-%03d_%s_kwave_source%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        parameters.subject_id, parameters.simulation.medium, source_affix));
     if confirm_overwriting(parameters.io.kwave_source_filename, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray
@@ -109,11 +133,12 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
         end
         % Create the source matrix
         [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
-        % Save the source matrix (unless otherwise requested)
-        if isfield(parameters.io, 'save_matrices') && parameters.io.save_matrices==0
-            disp("Not saving kwave source matrix ...")
-        else
+        % Save the source matrix (controlled by io.save_source_matrices,
+        % falling back to io.save_matrices, defaulting to true)
+        if should_save_output(parameters.io, 'save_source_matrices')
             save(parameters.io.kwave_source_filename, 'source', 'source_labels','-v7.3');
+        else
+            disp('Not saving kwave source matrix ...')
         end
     else
         load(parameters.io.kwave_source_filename);

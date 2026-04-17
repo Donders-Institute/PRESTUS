@@ -63,8 +63,8 @@ pn.configs = fullfile(pn.data_path, 'configs');                 % Folder [4] con
 cd(pn.configs);
 parameters = load_parameters(['config_', demo_setup, '.yaml']); 
 
-% Select the latest valid Localite trigger XML file for the subject and session
-localite = neuronav_select_and_average_localite(pn, demo_sub_id, demo_session, demo_markertype);
+% Select the latest valid Localite XML file for the subject and session
+localite = neuronav_select_localite(pn, demo_sub_id, demo_session, demo_markertype);
 
 % Calculate statistics over stimulus series (e.g., average position, variability)
 % Parameters: voxel size of planning image  (1 mm), expected localite trigger train length (2)

@@ -7,8 +7,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
 %                   MEDIUM_MASKS, HEATING_MAXT, HEATING_CEM43, KWAVE_MEDIUM, HIGHLIGHTED_POS)
 %
 % Inputs:
-%   - parameters (struct) - Simulation config: output_dir, simulation_medium, 
-%                           results_filename_affix, run_heating_sims, etc.
+%   - parameters (struct) - Simulation config: io.output_dir, simulation.medium,
+%                           io.output_affix, modules.run_heating_sims, etc.
 %   - planimg (struct) - SimNibs planning: t1_image_orig, inv_transf, t1_header
 %   - acoustic_Ipa (array) - Peak spatial-average intensity [W/cm²], from acoustic_analysis
 %   - acoustic_MI (array) - Mechanical Index grid
@@ -25,7 +25,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
             data_types  = [data_types, "intensity","MI","pressure"];
         end
         if parameters.state.heating_available == 1
-            data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end"];
+            data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"];
         end
         for data_type = data_types
             orig_file = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
@@ -53,6 +53,10 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
                 data = single(results_heating.CEM43);
             elseif strcmp(data_type, "CEM43_end")
                 data = single(results_heating.CEM43_end);
+            elseif strcmp(data_type, "CEM43_iso")
+                data = single(results_heating.CEM43_iso);
+            elseif strcmp(data_type, "CEM43_iso_end")
+                data = single(results_heating.CEM43_iso_end);
             end
             orig_file_with_ext = strcat(orig_file, '.nii.gz');
     
@@ -96,7 +100,8 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, a
                             
                             data_backtransf(:,:,1:2)     = parameters.thermal.temp_0.water;  % First two planes in the 3rd dimension
                             data_backtransf(:,:,end-1:end) = parameters.thermal.temp_0.water;  % Last two planes in the 3rd dimension
-                        elseif strcmp(data_type, "CEM43") || strcmp(data_type, "CEM43_end")
+                        elseif strcmp(data_type, "CEM43") || strcmp(data_type, "CEM43_end") || ...
+                               strcmp(data_type, "CEM43_iso") || strcmp(data_type, "CEM43_iso_end")
                             % Removes edge artifacts
                             data_backtransf(data_backtransf <= 0) = 0.0000001;
                         end

@@ -27,11 +27,13 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             parameters.transducer = parameters.transducer(1);
         end
 
-        % for water medium remove potential position specifications
-        % the grid has an arbitrary size that does not necessarily map onto the planning image
-        if strcmp(parameters.simulation.medium, 'water')
-            parameters.transducer.trans_pos = [];
-            parameters.transducer.focus_pos = [];
+        if strcmp(parameters.transducer.type, 'annular')
+            % for water medium remove potential position specifications
+            % the grid has an arbitrary size that does not necessarily map onto the planning image
+            if strcmp(parameters.simulation.medium, 'water')
+                parameters.transducer.trans_pos = [];
+                parameters.transducer.focus_pos = [];
+            end
         end
 
         if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...
@@ -61,13 +63,11 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             % position focus at expected distance from transducer
             % index dimension depends on 2D/3D
             % this already accounts for PML size
-            if ~isfield(parameters, 'expected_focal_distance_bowl')
-                parameters = focal_distance_calculation(parameters);
-            end
+            parameters = focal_distance_calculation(parameters);
             focus_pos = trans_pos;
             focus_pos(numel(parameters.grid.dims)) = ...
                 round(focus_pos(numel(parameters.grid.dims)) + ...
-                parameters.transducer(1).expected_focal_distance_bowl/parameters.grid.resolution_mm);
+                parameters.transducer(1).focal_distance_bowl/parameters.grid.resolution_mm);
         else
             focus_pos = parameters.transducer.focus_pos;
             % Adjust if the positions are transposed (2D only)
