@@ -56,8 +56,11 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
 
         % execute simnibs call in segmentation directory
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        % Anchor the replacement to the start of segment_call so that 'charm'
+        % appearing inside T1/T2 paths (e.g. /home/user/charm_study/...) isn't mangled.
+        segment_call_full = regexprep(segment_call, '^charm\b', charm_path);
         full_cmd = sprintf('cd "%s"; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s" | %s', ...
-            parameters.path.seg, strrep(segment_call, 'charm', charm_path), qsub_call);
+            parameters.path.seg, segment_call_full, qsub_call);
         
         % 3) submit segmentation job
         fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -92,7 +95,9 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         fprintf(fid, 'cd "%s"\n', parameters.path.seg);
         fprintf(fid, 'charm --version\n');
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
-        fprintf(fid, '%s\n', strrep(segment_call, 'charm', sprintf('"%s"', charm_path)));
+        % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
+        segment_call_full = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
+        fprintf(fid, '%s\n', segment_call_full);
         fclose(fid);
     
         % Ensure script is executable
@@ -116,9 +121,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
             error('simnibs_bin_path required for local execution');
         end
         
-        % Use FULL PATH to charm (don't rely on PATH)
+        % Use FULL PATH to charm (don't rely on PATH).
+        % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
-        full_segment_call = strrep(segment_call, 'charm', sprintf('"%s"', charm_path));
+        full_segment_call = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
         fprintf('Full command: %s\n', full_segment_call);
         
         orig_dir = pwd;
