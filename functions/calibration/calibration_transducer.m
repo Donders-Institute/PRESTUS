@@ -73,8 +73,12 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param = parameters;
     % Force water medium
     sim_param.simulation.medium = 'water';
-    % Force save result matrices
+    % Force save result matrices. save_acoustic_matrices is set explicitly
+    % because default_config.yaml sets it to 0, and per-field flags take
+    % precedence over the global save_matrices fallback in should_save_output.
+    % Calibration requires the acoustic sensor_data .mat between runs.
     sim_param.io.save_matrices = 1;
+    sim_param.io.save_acoustic_matrices = 1;
     % Overwrite transducer kwavearray modeling (if specified)
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
@@ -99,7 +103,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     %% Load initial results
 
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        sim_param.io.outputs_folder, sim_id, sim_param.io.output_affix));
+        fullfile(sim_param.io.outputs_folder, 'cache'), sim_id, sim_param.io.output_affix));
 
     initial_params = initial_res.acoustic_info.parameters;
     initial_params.calibration.prefix = 'Initial_';
@@ -166,7 +170,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     %% Load optimized simulation results
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix));
+        fullfile(opt_param.io.outputs_folder, 'cache'), sim_id, opt_param.io.output_affix));
 
     opt_params = opt_res.acoustic_info.parameters;
     opt_params.calibration.prefix = 'Opt_';
