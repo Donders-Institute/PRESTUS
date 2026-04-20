@@ -103,7 +103,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     %% Load initial results
 
     initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        fullfile(sim_param.io.outputs_folder, sim_id, sim_param.io.output_affix);
+        fullfile(sim_param.io.outputs_folder, 'cache'), sim_id, sim_param.io.output_affix));
 
     initial_params = initial_res.acoustic_info.parameters;
     initial_params.calibration.prefix = 'Initial_';
@@ -170,7 +170,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     %% Load optimized simulation results
     opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
-        fullfile(opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix);
+        fullfile(opt_param.io.outputs_folder, 'cache'), sim_id, opt_param.io.output_affix));
 
     opt_params = opt_res.acoustic_info.parameters;
     opt_params.calibration.prefix = 'Opt_';
