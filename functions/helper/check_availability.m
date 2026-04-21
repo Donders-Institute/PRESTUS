@@ -1,4 +1,23 @@
 function check_availability(files_to_check)
+% CHECK_AVAILABILITY  Verify that a list of files or glob patterns exist on disk
+%
+% Checks each entry in files_to_check. If an entry contains a wildcard (*),
+% exactly one matching file must exist; otherwise the literal path must be
+% a regular file. Errors if a wildcard matches zero or multiple files;
+% warns if a literal path does not exist.
+%
+% Use as:
+%   check_availability(files_to_check)
+%
+% Input:
+%   files_to_check - [1xN] cell array of file paths or glob patterns
+%
+% See also: DIR, ISFILE
+
+arguments
+    files_to_check (1,:) cell
+end
+
     % Loop through each filename passed
     for i = 1:length(files_to_check)
         filename = files_to_check{i};

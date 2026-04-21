@@ -1,31 +1,26 @@
 function [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m)
-%CONVERT_TO_ELEMENT_POS Generate element positions for matrix transducers
+% CONVERT_TO_ELEMENT_POS  Generate element positions for matrix transducers
 %
-% This function generates the 3-D element coordinates of a matrix
-% array transducer based on the configuration defined in the parameter
-% structure. Supported grid layouts are:
+% Generates 3-D element coordinates of a matrix array transducer from the
+% configuration in the parameter structure. Supported grid layouts are
+% rectangular, Fibonacci spiral, and Fermat spiral (via makeCartBowl).
+% Element coordinates are optionally projected onto a spherical cap when
+% the transducer is defined as curved.
 %
-%   • rectangular grid
-%   • Fibonacci spiral grid
-%   • Fermat spiral grid (via makeCartBowl)
+% Use as:
+%   [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m)
 %
-% The resulting element coordinates are optionally projected onto a
-% spherical cap when the transducer is defined as curved.
+% Input:
+%   parameters  - (1,1) simulation parameters struct
+%   tr          - (1,1) transducer parameter struct
+%   trans_pos_m - [3x1] transducer position [m]
+%   focus_pos_m - [3x1] focus position [m]
 %
-% INPUTS
-%   parameters  Global simulation parameters
-%   tr          Transducer parameter structure
-%   trans_pos_m  [3x1] transducer position in meters
-%   focus_pos_m  [3x1] focus position in meters
+% Output:
+%   elem_pos_m - [3xN] element center coordinates [m]
+%   tr         - updated transducer parameter struct
 %
-% OUTPUTS
-%   elem_pos_m  Element center coordinates [m] (3 × N)
-%   tr          Updated transducer parameter structure
-%
-% NOTES
-%   • Element coordinates are returned in k-Wave format (3 × N)
-%   • Internal calculations are performed in millimeters unless noted
-%   • Curvature is applied only when tr.matrix.is_curved = true
+% See also: EXTRACT_ELEMENT_POS, TRANSDUCER_SETUP
 
     % ----------------------------------------------------------------------
     % Extract configuration

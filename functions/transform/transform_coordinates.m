@@ -1,11 +1,29 @@
 function output_pos = transform_coordinates(parameters, input_pos, input_cs, output_cs, nii_hdr)
-% TRANSFORM_COORDINATES Transform input coordinates between coordinate systems
+% TRANSFORM_COORDINATES  Convert a 3D position between MNI, RAS+, and simulation grid spaces
 %
-% Coord systems: 'mni' | 'ras_plus' | 'grid'
-% Required varargin:
-%   'mni' -> 'ras_plus'/'grid'
-%   'ras_plus' -> 'grid': {nii_header}
-%   'grid' -> 'ras_plus': {nii_header}
+% Supports three coordinate systems: 'mni' (MNI152 world space, mm),
+% 'ras_plus' (subject T1 RAS+ world space, mm), and 'grid' (PRESTUS
+% simulation voxel indices). MNI→subject conversion calls
+% mni2subject_coords_LDfix (SimNIBS CLI); RAS+↔grid conversion uses
+% the NIfTI affine via transformPointsInverse/Forward.
+%
+% Use as:
+%   output_pos = transform_coordinates(parameters, input_pos, input_cs, output_cs)
+%   output_pos = transform_coordinates(parameters, input_pos, input_cs, output_cs, nii_hdr)
+%
+% Input:
+%   parameters - PRESTUS config (needs path.seg, subject_id,
+%                startup.simnibs_bin_path, hpc.ld_library_path)
+%   input_pos  - [1x3] position in the input coordinate system [mm or voxels]
+%   input_cs   - input coordinate system: 'mni' | 'ras_plus' | 'grid'
+%   output_cs  - target coordinate system: 'ras_plus' | 'grid'
+%   nii_hdr    - niftiinfo header for RAS+↔grid conversions
+%                (optional; mandatory when input_cs or output_cs is 'ras_plus'/'grid')
+%
+% Output:
+%   output_pos - [1x3] position in the output coordinate system [mm or voxels]
+%
+% See also: MNI2SUBJECT_COORDS_LDFIX, RAS_TO_GRID, NIFTIINFO
 
     arguments
         parameters struct

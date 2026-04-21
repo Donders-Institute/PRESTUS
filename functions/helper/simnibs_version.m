@@ -1,12 +1,26 @@
 function parameters = simnibs_version(segmentation_folder, parameters)
-%LOG_SIMNIBS_VERSION Extract SimNIBS version from charm_log.html and store in parameters
+% SIMNIBS_VERSION  Extract SimNIBS version from charm_log.html and store in parameters
 %
-% Inputs:
-%   segmentation_folder - Path to folder containing charm_log.html
-%   parameters         - Existing parameters struct
+% Reads the first line of charm_log.html, parses the SimNIBS version string,
+% and stores it in parameters.simnibs_version. Falls back to 'unknown' if
+% the file is missing or the version cannot be parsed.
+%
+% Use as:
+%   parameters = simnibs_version(segmentation_folder, parameters)
+%
+% Input:
+%   segmentation_folder - path to folder containing charm_log.html
+%   parameters          - PRESTUS config struct to update
 %
 % Output:
-%   parameters - Updated with .simnibs_version field
+%   parameters - updated with parameters.simnibs_version field
+%
+% See also: KWAVE_VERSION, PRESTUS_VERSION
+
+arguments
+    segmentation_folder (1,:) char
+    parameters          (1,1) struct
+end
 
     log_file = fullfile(segmentation_folder, 'charm_log.html');
     

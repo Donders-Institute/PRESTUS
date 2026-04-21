@@ -1,4 +1,36 @@
 function [kgrid_AS, medium_AS, source_AS] = convert_2d_to_axisymmetric(kgrid, medium, source)
+% CONVERT_2D_TO_AXISYMMETRIC  Extract the right half-plane of a 2D medium for axisymmetric simulation
+%
+% Slices the medium property arrays at the centre column, retaining only the
+% right half (columns floor(N/2)+1 to end). The kgrid and source structs are
+% passed through unchanged. This is a lightweight conversion used when a full
+% 2D symmetric grid is already available and needs to be reduced to the
+% axisymmetric half-plane for kspaceFirstOrderAS. The commented-out sections
+% in the body show alternative implementations that also adjust source.p_mask
+% and rebuild kgrid_AS; these are retained for reference.
+%
+% Use as:
+%   [kgrid_AS, medium_AS, source_AS] = convert_2d_to_axisymmetric(kgrid, medium, source)
+%
+% Input:
+%   kgrid  - 2D grid object (passed through unchanged)
+%   medium - 2D medium with fields sound_speed, density, alpha_coeff [each Nx x Ny]
+%   source - k-Wave source (passed through unchanged)
+%
+% Output:
+%   kgrid_AS  - same as input kgrid (unchanged)
+%   medium_AS - half-plane medium with sound_speed, density,
+%               alpha_coeff sliced to columns floor(Ny/2)+1:end
+%   source_AS - same as input source (unchanged)
+%
+% See also: CONVERT_AXISYMMETRIC_TO_2D, CONVERT_AXISYMMETRIC_TO_3D,
+%           KSPACEFIRSTORDERAS
+
+arguments
+    kgrid  (1,1)
+    medium (1,1) struct
+    source (1,1) struct
+end
 
     swap_axes = 0;
 

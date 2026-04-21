@@ -1,51 +1,56 @@
 function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
 
-% preproc_align_to_focal_axis Aligns a 3D image to the focal axis and scales it.
+% PREPROC_ALIGN_TO_FOCAL_AXIS  Rotate a 3D image so the focal axis aligns with the z-axis
 %
-% This function rotates a 3D image (`nii_image`) such that the focal axis 
-% (defined by `trans_pos_grid` and `focus_pos_grid`) aligns with the z-axis 
-% of the coordinate system. It also scales the image by a specified factor 
-% (`scale_factor`), computes new positions for the transducer and focus, 
-% and generates a montage image comparing the original and transformed images.
+% Rotates and optionally scales a 3D image such that the vector from
+% trans_pos_grid to focus_pos_grid becomes aligned with the z-axis.
+% Returns updated transducer/focus positions and the full affine transform.
+%
+% Use as:
+%   [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, ...
+%    rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
+%       preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, ...
+%           focus_pos_grid, scale_factor, parameters)
 %
 % Input:
-%   nii_image        - [Nx x Ny x Nz] matrix representing the 3D image data.
-%   nii_header       - Struct containing metadata about the image (e.g., pixel dimensions).
-%   trans_pos_grid   - [1x3] array specifying the transducer position in grid coordinates.
-%   focus_pos_grid   - [1x3] array specifying the focus position in grid coordinates.
-%   scale_factor     - Scalar specifying the scaling factor for the image.
-%   parameters       - Struct containing additional parameters for visualization.
+%   nii_image      - [Nx x Ny x Nz] 3D image volume
+%   nii_header     - NIfTI header struct (from niftiinfo)
+%   trans_pos_grid - [1x3] transducer position in voxel coordinates
+%   focus_pos_grid - [1x3] focus position in voxel coordinates
+%   scale_factor   - image scaling factor (1 = no scaling)
+%   parameters     - (1,1) simulation parameters struct
 %
 % Output:
-%   rotated_img      - Rotated and scaled 3D image matrix.
-%   trans_pos_new    - [1x3] array specifying the new transducer position after transformation.
-%   focus_pos_new    - [1x3] array specifying the new focus position after transformation.
-%   transformation_matrix - [4x4] affine transformation matrix used for rotation and scaling.
-%   rotation_matrix  - [4x4] rotation matrix aligning the focal axis with the z-axis.
-%   angle_x_rad      - Scalar angle (in radians) of rotation around the x-axis.
-%   angle_y_rad      - Scalar angle (in radians) of rotation around the y-axis.
-%   montage_img      - Montage image comparing original and transformed images with transducer positions.
+%   rotated_img          - rotated and scaled image volume
+%   trans_pos_new        - [1x3] transducer position after transformation
+%   focus_pos_new        - [1x3] focus position after transformation
+%   transformation_matrix - [4x4] combined affine transformation matrix
+%   rotation_matrix      - [4x4] rotation-only matrix
+%   angle_x_rad          - rotation angle around x-axis [rad]
+%   angle_y_rad          - rotation angle around y-axis [rad]
+%   montage_img          - comparison montage image
 %
-% Detailed conversion algorithm:
-% 1. Focal vector d = focus_pos_grid - trans_pos_grid (homogeneous).
-% 2. theta_y = atan2(d(1), d(3)); R_y(-theta_y) via makehgtform.
-% 3. d' = R_y * d; theta_x = atan2(d'(2), d'(3)); R_x(theta_x).
-% 4. R = R_x * R_y; S = scale; T_rs = R * S.
-% 5. Bounds from tformfwd on corners; newdims = ceil(max-min).
-% 6. Center c = (sz+1)/2; forward = translate(-c); backward = translate((newdims+1)/2).
-% 7. T = forward' * T_rs' * backward'; rotated_img = tformarray(nii_image, T).
-% Dependency: Image Processing Toolbox (makehgtform, tformarray).
+% Algorithm:
+%   1. Focal vector d = focus_pos_grid - trans_pos_grid (homogeneous).
+%   2. theta_y = atan2(d(1), d(3)); R_y(-theta_y) via makehgtform.
+%   3. d' = R_y * d; theta_x = atan2(d'(2), d'(3)); R_x(theta_x).
+%   4. R = R_x * R_y; S = scale; T_rs = R * S.
+%   5. Bounds from tformfwd on corners; newdims = ceil(max-min).
+%   6. Center c = (sz+1)/2; forward = translate(-c); backward = translate((newdims+1)/2).
+%   7. T = forward' * T_rs' * backward'; rotated_img = tformarray(nii_image, T).
+%   Assumes right-handed coordinates; angles ensure positive rotation.
+%   Requires Image Processing Toolbox (makehgtform, tformarray).
 %
-% Notes: Assumes right-handed coords; angles ensure positive rotation.
+% See also: PREPROC_HEAD, PREPROC_CROP_GRID
 
     arguments
-        nii_image (:,:,:)
-        nii_header struct
-        trans_pos_grid (1, 3)
-        focus_pos_grid (1, 3)
-        scale_factor double
-        parameters struct
+        nii_image      (:,:,:) {mustBeNumeric}
+        nii_header     (1,1) struct
+        trans_pos_grid (1,3) double
+        focus_pos_grid (1,3) double
+        scale_factor   (1,1) double
+        parameters     (1,1) struct
     end
 
     % Ensure inputs are on CPU (tformarray and other image processing functions don't support gpuArray)

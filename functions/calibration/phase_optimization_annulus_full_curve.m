@@ -1,27 +1,36 @@
 function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
 
-% PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE Optimizes the phase profile for a focused annular transducer.
+% PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE  Compute intensity profile error for full-curve phase optimisation
 %
-% This function computes the acoustic intensity profile along the axial direction 
-% for a focused annular transducer using O'Neil's model. It compares the computed 
-% profile to a desired intensity curve and calculates an error metric. Optionally, 
-% it visualizes the results and the cost function used for optimization.
+% Evaluates the O'Neil axial intensity model, restricts comparison to the
+% optimisation range, applies optional Gaussian weighting around the FLHM
+% centre, and returns the weighted mean squared error. Optionally plots the
+% profiles and cost function.
+%
+% Use as:
+%   [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, ...
+%       axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
 %
 % Input:
-%   phase                  - Array specifying the phase shifts for each transducer element.
-%   parameters             - Struct containing transducer and medium properties.
-%   velocity               - Array specifying particle velocities for each transducer element.
-%   axial_position         - Array specifying axial positions (0 = transducer surface).
-%   desired_intensity_curve- Array specifying the desired intensity profile along the axial direction.
-%   plot_results           - Boolean flag to enable/disable visualization of results (default: 0).
-%   opt_limits             - [1x2] array specifying limits for optimization (default: [1, max(axial_position)]).
-%   weights                - Array specifying weights for the cost function (default: Gaussian weights around FLHM center).
+%   phase                   - phase shifts per transducer element [rad]
+%   parameters              - PRESTUS config with transducer.annular geometry
+%                             and medium_properties.water
+%   velocity                - particle velocities per element [m/s]
+%   axial_position          - axial positions (0 = transducer surface) [mm]
+%   desired_intensity_curve - desired intensity profile along the axial direction [W/cm²]
+%   plot_results            - enable visualisation (default: 0)
+%   opt_limits              - [1x2] distance limits for error computation [mm]
+%                             (default: [1, max(axial_position)])
+%   weights                 - weights for the cost function; 0 = Gaussian around FLHM centre
+%                             (default: 0)
 %
 % Output:
-%   error                  - Scalar value representing the mean squared error between computed and desired profiles.
-%   ax1                    - Handle to the first subplot (intensity profiles and weights).
-%   ax2                    - Handle to the second subplot (error visualization).
-%   h                      - Handle to the figure containing plots.
+%   error - weighted mean squared error between computed and desired profiles
+%   ax1   - handle to the intensity and weights subplot
+%   ax2   - handle to the error visualisation subplot
+%   h     - handle to the figure
+%
+% See also: PERFORM_GLOBAL_SEARCH, PHASE_OPTIMIZATION_ANNULUS
 
     arguments
         phase

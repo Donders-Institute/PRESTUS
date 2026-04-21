@@ -1,6 +1,27 @@
 function hpc_wait_for_completion(job_id, hpc_type, max_checks)
-%% HPC_WAIT_FOR_COMPLETION  Monitor HPC job until completion
-%  Fixed for Donders/DCCN SLURM cluster format
+% HPC_WAIT_FOR_COMPLETION  Poll an HPC job until it completes or times out
+%
+% Repeatedly checks job status via squeue/sacct (SLURM) or qstat (qsub)
+% every 20 seconds until the job finishes or max_checks is reached.
+% Calibrated for the Donders/DCCN SLURM cluster column format.
+% Blocks the calling MATLAB session for the duration of polling.
+%
+% Use as:
+%   hpc_wait_for_completion(job_id, hpc_type)
+%   hpc_wait_for_completion(job_id, hpc_type, max_checks)
+%
+% Input:
+%   job_id     - scheduler job ID (numeric for SLURM, string for qsub)
+%   hpc_type   - 'slurm' or 'qsub'
+%   max_checks - (optional) maximum number of status polls before giving up;
+%                default 540 (~3 hours at one check per 20 s)
+%
+% Note:
+%   This function blocks the MATLAB session. Only use when the caller
+%   explicitly wants to wait (e.g. single-stage pipeline on SLURM).
+%   For fire-and-forget submission use hpc_submit_job without calling this.
+%
+% See also: HPC_SUBMIT_JOB, HPC_DETECT_SYSTEM
 
 if nargin < 3 || isempty(max_checks)
     max_checks = 540;  % default: ~3 hours at 1 check/20s

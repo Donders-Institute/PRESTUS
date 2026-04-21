@@ -1,4 +1,37 @@
 function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, algorithm)
+% MEDIUM_PCT_DENSITY  Map pseudo-CT Hounsfield values to skull bone density
+%
+% Applies one of five algorithms to fill density for skull voxels indexed
+% by skull_idx. Algorithm 'k-plan' uses the piece-wise linear HU-density
+% look-up from the k-Plan pipeline; 'k-wave' uses hounsfield2density with
+% a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
+% 2017; 'aubry' uses the porosity mixture model from Aubry et al. 2003;
+% 'none' uses the fixed scalar from parameters.medium_properties.skull.
+% All algorithms clamp density to at least water density.
+%
+% Use as:
+%   [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, algorithm)
+%
+% Input:
+%   parameters - PRESTUS config; must contain medium_properties.water.density [kg/m^3],
+%                medium_properties.skull.density [kg/m^3], and simulation.debug
+%   density    - full-grid density array to update [kg/m^3]
+%   pseudoCT   - pseudo-CT Hounsfield values (full grid)
+%   skull_idx  - linear indices of skull voxels into the grid
+%   algorithm  - one of 'k-plan', 'k-wave', 'marsac', 'aubry', 'none'
+%
+% Output:
+%   density - updated density with skull voxels filled [kg/m^3]
+%
+% See also: MEDIUM_SETUP, MEDIUM_PCT_SOUNDSPEED, MEDIUM_PCT_ATTENUATION
+
+arguments
+    parameters (1,1) struct
+    density    {mustBeNumeric}
+    pseudoCT   {mustBeNumeric}
+    skull_idx  {mustBeNumeric}
+    algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','none'})}
+end
 
 switch algorithm
     case 'k-plan'

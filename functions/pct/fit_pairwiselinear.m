@@ -1,28 +1,30 @@
 function density = fit_pairwiselinear(ct_data, hounsfieldUnits, massDensity, plot_fitting)
-%FIT_PAIRWISELINEAR Perform piecewise linear mapping from Hounsfield Units to density.
+% FIT_PAIRWISELINEAR  Piecewise linear mapping from Hounsfield Units to mass density
 %
-% DESCRIPTION:
-%     Maps CT data in Hounsfield units (HU) to mass density (kg/m^3) using
-%     piecewise linear interpolation and linear extrapolation based on given
-%     calibration points. Optional plot of the fit.
+% Maps CT values in Hounsfield units to mass density using piecewise
+% linear interpolation between calibration points, with linear
+% extrapolation beyond the calibration range.
 %
-% USAGE:
-%     density = fit_pairwiselinear(ct_data, hounsfieldUnits, massDensity)
-%     density = fit_pairwiselinear(ct_data, hounsfieldUnits, massDensity, plot_fitting)
+% Use as:
+%   density = fit_pairwiselinear(ct_data, hounsfieldUnits, massDensity)
+%   density = fit_pairwiselinear(ct_data, hounsfieldUnits, massDensity, plot_fitting)
 %
-% INPUTS:
-%     ct_data         - CT data in Hounsfield units [scalar or array]
-%     hounsfieldUnits - Calibration HU values, sorted ascending [vector]
-%     massDensity     - Corresponding density values in kg/m^3 [vector, same length]
+% Input:
+%   ct_data         - CT data in Hounsfield units (any size)
+%   hounsfieldUnits - [1xP] calibration HU values, sorted ascending
+%   massDensity     - [1xP] corresponding density values [kg/m^3]
+%   plot_fitting    - display the piecewise fit (default: false)
 %
-% OPTIONAL INPUTS:
-%     plot_fitting    - Boolean to plot fit (default = false)
+% Output:
+%   density - mass density mapped from ct_data [kg/m^3], same size as ct_data
 %
-% OUTPUTS:
-%     density         - Mapped density values [same size as ct_data]
+% See also: PCT_SKULLMAPPING, PCT_SOFT_TISSUE_PEAK
 
-if nargin < 4
-    plot_fitting = false;
+arguments
+    ct_data         {mustBeNumeric}
+    hounsfieldUnits (1,:) {mustBeNumeric}
+    massDensity     (1,:) {mustBeNumeric}
+    plot_fitting    (1,1) logical = false
 end
 
 % Ensure inputs are column vectors and sorted

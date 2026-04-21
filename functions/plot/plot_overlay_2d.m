@@ -8,32 +8,31 @@ function [h] = plot_overlay_2d(...
     max_intensity_pos, ...
     options)
 
-% plot_overlay_2D Visualizes overlay on a background image.
+% PLOT_OVERLAY_2D  Overlay a metric map on a 2D background image
 %
-% This function visualizes an overlay
-% on a 2D background image (`bg_image`) and highlights key positions such as 
-% the transducer position, focus position, and maximum intensity position. The 
-% visualization includes additional masks for regions before and after the 
-% transducer's exit plane.
+% Overlays a 2D metric image on an anatomical background and marks
+% transducer, focus, and maximum intensity positions. Supports alpha-scaled
+% colouring and optional post-exit-plane masking.
+%
+% Use as:
+%   h = plot_overlay_2d(overlay_image, bg_image, transducer_bowl, ...
+%       after_exit_plane_mask, trans_pos, focus_pos, max_intensity_pos)
+%   h = plot_overlay_2d(..., options)
 %
 % Input:
-%   overlay_image         - [Nx x Ny] matrix representing the overlay image.
-%   bg_image              - [Nx x Ny] matrix representing the background image (e.g., anatomical image).
-%   transducer_bowl       - [Nx x Ny] binary mask representing the transducer bowl region.
-%   after_exit_plane_mask - [Nx x Ny] binary mask for regions after the transducer's exit plane.
-%   trans_pos             - [1x2] array specifying the transducer position in grid coordinates (row, col).
-%   focus_pos             - [1x2] array specifying the focus position in grid coordinates (row, col).
-%   max_intensity_pos         - [1x2] array specifying the maximum intensity position in grid coordinates (row, col).
-%   options         - Struct containing optional visualization settings:
-%                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
-%                     * rect_size: Size of rectangles for key positions (default: 2).
-%                     * overlay_threshold_low/high: Thresholds for alpha scaling of intensity map.
-%                     * overlay_color_range: Range for overlay map color scaling.
-%                     * bg_bw_range: Black/white min-max range for background map.
-%                     * color_scale: Colormap for intensity map (default: 'viridis').
-%                     * show_colorbar: Boolean flag to display colorbar (default: 1).
+%   overlay_image         - [Nx x Ny] metric map to overlay
+%   bg_image              - [Nx x Ny] anatomical background image
+%   transducer_bowl       - [Nx x Ny] binary transducer bowl mask
+%   after_exit_plane_mask - [Nx x Ny] binary mask for post-exit-plane region
+%   trans_pos             - [1x2] transducer position in grid coordinates
+%   focus_pos             - [1x2] focus position in grid coordinates
+%   max_intensity_pos     - [1x2] maximum intensity position in grid coordinates
+%   options               - name-value visualisation settings
+%
 % Output:
-%   h                     - Handle to the created figure.
+%   h - figure handle
+%
+% See also: PLOT_OVERLAY, PLOT_T1_WITH_TRANSDUCER
 
     arguments
         overlay_image (:,:)

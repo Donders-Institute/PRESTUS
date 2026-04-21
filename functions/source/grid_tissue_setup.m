@@ -1,7 +1,35 @@
 function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_setup(parameters)
-% GRID_TISSUE_SETUP sets up the computational grid and tissue masks
-% for ultrasound neuromodulation simulations, either by preprocessing a 
-% subject-specific head model (T1-weighted MRI) or loading phantom/alternative grids.
+% GRID_TISSUE_SETUP  Set up computational grid and tissue masks for TUS simulation
+%
+% Dispatches to one of three setup paths depending on parameters.simulation.medium:
+%   'layered'  - preprocesses a SimNIBS T1-weighted head segmentation
+%   'phantom'  - loads a pre-built NIfTI phantom from the SimNIBS m2m folder
+%   other      - initialises a homogeneous water grid of default_dims
+%
+% Use as:
+%   [parameters, medium_masks, segmentation, bone, planimg] = ...
+%       grid_tissue_setup(parameters)
+%
+% Input:
+%   parameters - (struct) PRESTUS config; must contain:
+%                  simulation.medium (char)
+%                  grid.default_dims [1x2] or [1x3] voxels
+%                  path.seg (char) root path to SimNIBS m2m folders
+%                  subject_id (int)
+%
+% Output:
+%   parameters   - updated: grid.dims set from loaded/created mask
+%   medium_masks - [Nx x Ny (x Nz)] uint8, medium layer label map
+%   segmentation - [Nx x Ny (x Nz)] uint8, tissue label map
+%   bone         - [Nx x Ny (x Nz)] logical, binary skull mask
+%   planimg      - (struct) planning image data (t1_image_orig, t1_header,
+%                    transf, inv_transf); fields are empty for non-layered media
+%
+% See also: GRID_AXISYMMETRY, PREPROC_HEAD, PREPROC_MEDIUM_MASK
+
+arguments
+    parameters (1,1) struct
+end
 
 if contains(parameters.simulation.medium, {'layered'})
     
@@ -36,7 +64,7 @@ else
         % read in phantoms directly as medium masks 
         segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
-        segmented_img = niftiread(filename_segmented);
+        segmented_img = squeeze(niftiread(filename_segmented));
         if size(segmented_img) == parameters.grid.default_dims
             parameters.grid.dims = parameters.grid.default_dims;
             disp('Check passed: phantom dimensions fit requested grid...');

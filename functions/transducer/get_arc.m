@@ -1,21 +1,26 @@
 function [x, y] = get_arc(center, radius, angleStart, angleEnd, npoints)
 
-% GET_ARC Generates the coordinates of an arc in 2D space.
+% GET_ARC  Generate x/y coordinates of a 2-D arc
 %
-% This function computes the x and y coordinates of points along an arc 
-% defined by a center, radius, start angle, and end angle. The arc is 
-% sampled uniformly with a specified number of points.
+% Computes uniformly sampled points along a circular arc defined by a
+% centre, radius, start angle, and end angle.
+%
+% Use as:
+%   [x, y] = get_arc(center, radius, angleStart, angleEnd)
+%   [x, y] = get_arc(center, radius, angleStart, angleEnd, npoints)
 %
 % Input:
-%   center     - [1x2] array specifying the (x, y) coordinates of the arc's center.
-%   radius     - Scalar specifying the radius of the arc.
-%   angleStart - Scalar specifying the starting angle of the arc (in radians).
-%   angleEnd   - Scalar specifying the ending angle of the arc (in radians).
-%   npoints    - Integer specifying the number of points to sample along the arc (default: 200).
+%   center     - [1x2] (x, y) centre of the arc
+%   radius     - arc radius
+%   angleStart - start angle [rad]
+%   angleEnd   - end angle [rad]
+%   npoints    - number of sample points (default: 200)
 %
 % Output:
-%   x          - [1xnpoints] array containing the x coordinates of points along the arc.
-%   y          - [1xnpoints] array containing the y coordinates of points along the arc.
+%   x - [1xnpoints] x-coordinates along the arc
+%   y - [1xnpoints] y-coordinates along the arc
+%
+% See also: GET_TRANSDUCER_BOX
 
     arguments
         center (1,2) double

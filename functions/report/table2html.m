@@ -1,19 +1,29 @@
 function html = table2html(tbl, limits, color_columns)
-% TABLE2HTML  Convert MATLAB table to HTML <table> with optional color-coded cells.
+% TABLE2HTML  Convert a MATLAB table to an HTML table element
 %
-% Usage:
+% Renders a MATLAB table as an HTML string with optional colour-coding of
+% numeric cells based on ITRUSST risk limits. Intended for embedding in
+% PRESTUS HTML reports.
+%
+% Use as:
 %   html = table2html(tbl)
 %   html = table2html(tbl, limits)
 %   html = table2html(tbl, limits, color_columns)
 %
-% Inputs:
-%   tbl           - MATLAB table
-%   limits        - (optional) struct of risk limits (from get_risk_limits)
-%   color_columns - (optional) cell array of column names to color-code
+% Input:
+%   tbl           - MATLAB table to render
+%   limits        - struct of risk limits from GET_RISK_LIMITS (default: empty)
+%   color_columns - cell array of column names to colour-code (default: {})
+%
+% Output:
+%   html - character array containing the HTML table markup
+%
+% See also: GET_RISK_LIMITS, GENERATE_SIMULATION_REPORT
+
 arguments
     tbl
-    limits        struct = struct()
-    color_columns cell   = {}
+    limits        (1,1) struct = struct()
+    color_columns (1,:) cell   = {}
 end
 
     cols = tbl.Properties.VariableNames;

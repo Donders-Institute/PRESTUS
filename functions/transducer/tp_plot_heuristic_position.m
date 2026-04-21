@@ -1,15 +1,25 @@
 function tp_plot_heuristic_position(trans_pos, target_pos, img, img_header, parameters, pixel_size, target_name, subject_id)
-% TP_PLOT_HEURISTIC_POSITION Create visualization of heuristic transducer placement
+% TP_PLOT_HEURISTIC_POSITION  Create visualisation of heuristic transducer placement
 %
-% INPUT
-%   trans_pos   - Heuristic Transducer position (xyz) [grid]
-%   target_pos  - Target position (xyz) [grid]
-%   img         - Segmented head image
-%   img_header  - NIfTI header info  
-%   parameters  - Parameters struct
-%   pixel_size  - Scalar voxel size in mm
-%   target_name - String target identifier
-%   subject_id  - Scalar subject ID
+% Rotates the head image to the focal axis, then generates slice-overlay
+% plots showing the heuristic transducer and target positions. Saves
+% figures to disk.
+%
+% Use as:
+%   tp_plot_heuristic_position(trans_pos, target_pos, img, img_header, ...
+%       parameters, pixel_size, target_name, subject_id)
+%
+% Input:
+%   trans_pos   - [1x3] heuristic transducer position in voxel space
+%   target_pos  - [1x3] target position in voxel space
+%   img         - [Nx x Ny x Nz] segmented head volume
+%   img_header  - NIfTI header struct (from niftiinfo)
+%   parameters  - (1,1) simulation parameters struct
+%   pixel_size  - voxel size [mm]
+%   target_name - target label string used in output filename
+%   subject_id  - subject identifier used in output filename
+%
+% See also: TP_SELECT_HEURISTIC_POSITION, TP_PLOT_CANDIDATE_POSITIONS
 
 trans_xyz = gather(trans_pos);
 target_xyz = gather(target_pos);

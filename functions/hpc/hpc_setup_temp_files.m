@@ -1,19 +1,30 @@
 function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
     hpc_setup_temp_files(parameters)
-%% HPC_SETUP_TEMP_FILES  Setup directories and generate temporary files
+% HPC_SETUP_TEMP_FILES  Create output/log directories and timestamped temp files
 %
-%   Creates output directory, log directory, and timestamped temporary files
-%   for MATLAB data and script.
-%   Subject ID is read from parameters.subject_id.
+% Creates the simulation output directory and a batch_job_logs/ subdirectory,
+% then generates uniquely named temporary files for passing parameters to the
+% HPC worker (a .mat data file) and as the submitted MATLAB script (a .m file).
+% File names are timestamped and randomised to avoid collisions between
+% concurrent job submissions.
 %
-%   Outputs:
-%     log_dir         - Path to batch_job_logs directory
-%     prestus_path    - PRESTUS path
-%     temp_data_path  - Path for temporary .mat data file
-%     temp_m_path     - Path for temporary .m script file
-%     temp_m_file     - Basename of MATLAB script (no path)
+% Use as:
+%   [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
+%       hpc_setup_temp_files(parameters)
 %
-%   See also HPC_SUBMIT_JOB.
+% Input:
+%   parameters - PRESTUS config struct; must contain subject_id and io fields
+%                used by get_output_dir
+%
+% Output:
+%   log_dir        - path to <output_dir>/batch_job_logs/
+%   prestus_path   - absolute path to the PRESTUS root (from get_prestus_path)
+%   temp_data_path - full path to the temporary .mat file (written by caller)
+%   temp_m_path    - full path to the temporary .m script (written by caller)
+%   temp_m_file    - basename of the .m script without extension (used in
+%                    scheduler script as the MATLAB entry point)
+%
+% See also: HPC_SUBMIT_JOB, GET_OUTPUT_DIR, GET_PRESTUS_PATH
 
 % Setup output directory
 output_dir = get_output_dir(parameters);

@@ -1,11 +1,19 @@
 function print_parameter_summary(parameters)
-% PRINT_PARAMETER_SUMMARY displays PRESTUS pipeline using EXACT config field names.
+% PRINT_PARAMETER_SUMMARY  Print a structured PRESTUS configuration summary to the console
+%
+% Iterates over the main configuration sections (I/O, simulation type, grid,
+% transducer(s), medium properties, thermal sequence, HPC/GPU) and prints
+% each field with its value using the exact YAML parameter names. Checks field
+% existence before printing; warns for missing required fields. Supports
+% multiple transducers and matrix / annular types.
 %
 % Use as:
 %   print_parameter_summary(parameters)
 %
-% Checks field existence before printing; shows exact YAML parameter names
-% from PRESTUS configuration documentation.
+% Input:
+%   parameters - PRESTUS config as returned by LOAD_PARAMETERS
+%
+% See also: LOAD_PARAMETERS, PATH_LOG_SETUP
 
 arguments
     parameters struct

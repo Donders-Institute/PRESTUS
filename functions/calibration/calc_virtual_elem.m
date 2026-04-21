@@ -1,3 +1,13 @@
+% CALC_VIRTUAL_ELEM  Compute inner and outer diameters for evenly-spaced virtual annular elements
+%
+% Standalone script (not a function) that subdivides the annular aperture
+% into n_v_elem virtual elements with uniform spacing. Each element occupies
+% perc_elem percent of the available pitch; the remainder is inter-element gap.
+% Edit start_elem, end_elem, n_v_elem, and perc_elem at the top of the script
+% to match the target transducer geometry before running.
+%
+% See also: CALIBRATION_TRANSDUCER, COMPUTE_ONEIL_SOLUTION
+
 clear;
 
 % Define input parameters

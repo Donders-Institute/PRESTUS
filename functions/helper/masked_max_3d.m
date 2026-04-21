@@ -1,20 +1,28 @@
 function [val, Ix, Iy, Iz] = masked_max_3d(array_3d, mask)
-
-% MASKED_MAX_3D Computes the maximum intensity within a masked 3D region.
+% MASKED_MAX_3D  Find the maximum value and its 3D subscript within a masked region
 %
-% This function takes a 3D intensity matrix (`array_3d`) and a binary mask (`mask`) 
-% to calculate the maximum intensity value within the masked region. It also returns 
-% the corresponding indices along the x, y, and z axes.
+% Sets voxels outside the mask to NaN, then returns the max and its
+% [x, y, z] subscript indices.
+%
+% Use as:
+%   [val, Ix, Iy, Iz] = masked_max_3d(array_3d, mask)
 %
 % Input:
-%   array_3d - [Nx x Ny x Nz] matrix representing the 3D intensity values.
-%   mask     - [Nx x Ny x Nz] binary matrix defining the region of interest (1 = included, 0 = excluded).
+%   array_3d - [Nx x Ny x Nz] 3D value array
+%   mask     - [Nx x Ny x Nz] binary mask (1 = included, 0 = excluded)
 %
 % Output:
-%   val      - Maximum intensity value within the masked region.
-%   Ix       - Index along the x-axis corresponding to the maximum intensity value.
-%   Iy       - Index along the y-axis corresponding to the maximum intensity value.
-%   Iz       - Index along the z-axis corresponding to the maximum intensity value.
+%   val - maximum value within the masked region
+%   Ix  - x-index of the maximum
+%   Iy  - y-index of the maximum
+%   Iz  - z-index of the maximum
+%
+% See also: ACOUSTIC_ANALYSIS, THERMAL_ANALYSIS
+
+arguments
+    array_3d {mustBeNumeric}
+    mask     {mustBeNumeric}
+end
 
     % Exclude values outside the mask by setting them to NaN
     array_3d(~mask) = nan;

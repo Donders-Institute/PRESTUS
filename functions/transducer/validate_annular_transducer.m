@@ -1,15 +1,20 @@
 function tr = validate_annular_transducer(tr, t_i)
-% VALIDATE_ANNULAR_TRANSDUCER Validates configuration of an annular transducer.
+% VALIDATE_ANNULAR_TRANSDUCER  Validate configuration fields of an annular transducer
 %
-% This function checks that all required fields for an annular transducer
-% definition are present in the input transducer structure.
+% Checks that all required fields for an annular transducer definition are
+% present and consistent in the input transducer struct.
+%
+% Use as:
+%   tr = validate_annular_transducer(tr, t_i)
 %
 % Input:
-%   tr  - Struct containing a single transducer definition.
-%   t_i - Index of the transducer in the configuration (used for error messages).
+%   tr  - (1,1) transducer definition struct
+%   t_i - transducer index used in error messages
 %
 % Output:
-%   (None)
+%   tr - validated transducer struct (unchanged if all checks pass)
+%
+% See also: VALIDATE_MATRIX_TRANSDUCER, TRANSDUCER_SETUP
 
     assert(isfield(tr, 'annular'), ...
         'Transducer %i; Appropriate configuration for annular transducer is missing.', t_i);

@@ -1,22 +1,26 @@
 function parameters = focal_distance_calculation(parameters)
-% Compute expected focal distances for (multi-)transducer setup
+% FOCAL_DISTANCE_CALCULATION  Compute expected focal distances for all transducers
 %
-% DESCRIPTION:
-%   Ensures all transducers in parameters.transducer have valid focal_distance_ep
-%   and focal_distance_bowl fields at the transducer top level.
-%   Derives missing values from the counterpart (ep↔bowl) using the transducer
-%   geometry offset, or falls back to geometric distance from trans_pos/focus_pos.
+% Ensures every entry in parameters.transducer has valid focal_distance_ep
+% and focal_distance_bowl fields. Derives missing values from the available
+% counterpart using the transducer geometry offset (ep ↔ bowl), or falls
+% back to the geometric distance between trans_pos and focus_pos.
 %
-% INPUTS:
-%   parameters  - (struct) Simulation configuration with:
-%                   .transducer - (1×N struct array) each element may contain:
-%                     .focal_distance_ep   - [mm] focal distance from exit plane (optional)
-%                     .focal_distance_bowl - [mm] focal distance from bowl (optional)
-%                     .trans_pos        - [voxels] transducer position in T1 grid (optional)
-%                     .focus_pos        - [voxels] target position in T1 grid (optional)
+% Use as:
+%   parameters = focal_distance_calculation(parameters)
 %
-% OUTPUTS:
-%   parameters  - (struct) Updated with focal_distance_ep/bowl on all transducers.
+% Input:
+%   parameters - (1,1) simulation configuration struct with .transducer array
+%
+% Output:
+%   parameters - updated struct with focal_distance_ep and focal_distance_bowl
+%                set on every transducer
+%
+% See also: TRANSDUCER_SETUP, TRANSDUCER_POSITIONING
+
+arguments
+    parameters (1,1) struct
+end
 
 for ti = 1:numel(parameters.transducer)
     tr = parameters.transducer(ti);

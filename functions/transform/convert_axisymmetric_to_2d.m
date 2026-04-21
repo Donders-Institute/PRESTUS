@@ -1,7 +1,45 @@
 function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
     convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels)
-          
-% Convert the data from symmetric about x=0 to a mirrored 2d setup.
+% CONVERT_AXISYMMETRIC_TO_2D  Mirror axisymmetric simulation fields into a full 2D cross-section
+%
+% Reflects the [Nz x Nr] axisymmetric half-plane about the axis of symmetry
+% to produce a [Nz x 2*Nr] bilateral cross-section, then transposes to
+% [2*Nr x Nz]. Used when a follow-up 3D thermal simulation is not requested;
+% for phantom simulations convert_axisymmetric_to_3d is always used instead.
+%
+% Use as:
+%   [sensor_data, parameters, segmentation, medium_masks, ...
+%    kwave_medium, kgrid, source, source_labels] = ...
+%       convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, ...
+%                                  medium_masks, kwave_medium, source, source_labels)
+%
+% Input:
+%   sensor_data  - (struct) k-Wave sensor output with fields p_final, p_max_all [Pa]
+%   parameters   - (struct) PRESTUS config; grid.dims = [Nz, Nr] on entry
+%   segmentation - [Nz x Nr] uint8, tissue label map
+%   medium_masks - [Nz x Nr] uint8, medium layer label map
+%   kwave_medium - (struct) spatial medium property maps [Nz x Nr] each
+%   kgrid        - (kWaveGrid) 2D axisymmetric grid
+%   source       - (struct) k-Wave source with field p_mask [Nz x Nr]
+%   source_labels- [Nz x Nr] numeric, transducer element label map
+%
+% Output:
+%   All inputs returned with spatial fields mirrored and transposed to [2*Nr x Nz].
+%   parameters.grid.dims updated to [2*Nr, Nz].
+%   kgrid replaced with a 2D kWaveGrid.
+%
+% See also: CONVERT_AXISYMMETRIC_TO_3D, GRID_AXISYMMETRY
+
+arguments
+    sensor_data  (1,1) struct
+    parameters   (1,1) struct
+    segmentation (:,:) {mustBeNumeric}
+    medium_masks (:,:) {mustBeNumeric}
+    kwave_medium (1,1) struct
+    kgrid        (1,1)
+    source       (1,1) struct
+    source_labels(:,:) {mustBeNumeric}
+end
 sensor_data.p_final = cat(2, fliplr(sensor_data.p_final), sensor_data.p_final);
 sensor_data.p_max_all = cat(2, fliplr(sensor_data.p_max_all), sensor_data.p_max_all);
 segmentation = cat(2, fliplr(segmentation), segmentation);

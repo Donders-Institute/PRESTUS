@@ -1,32 +1,30 @@
 function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
     neuronav_convert_MNI_to_native(sub_id, parameters, pn, trans_mm, targ_mm)
 
-% NEURONAV_CONVERT_MNI_TO_NATIVE - Transform coordinates from MNI space to native subject space
+% NEURONAV_CONVERT_MNI_TO_NATIVE  Transform coordinates from MNI space to native subject space
 %
-% This function converts stimulation coordinates given in MNI space (millimeters)
-% back into the native anatomical space of a subject, expressed both as continuous
-% RAS millimeter coordinates and as voxel indices within the subject’s segmentation image.
+% Converts stimulation coordinates from MNI space back to native anatomical
+% space via SimNIBS nonlinear warp fields, returning both RAS mm
+% coordinates and voxel indices in the subject’s segmentation image.
 %
-% INPUTS:
-%   sub_id      - Subject identifier string, e.g., 'sub-010'
-%   parameters  - Struct containing subject-specific processing parameters and settings
-%   pn          - Struct with standardized file paths and toolbox locations
-%   trans_mm    - Nx3 array of transducer coordinates in MNI space (millimeters, RAS)
-%   targ_mm     - Nx3 array of target coordinates in MNI space (millimeters, RAS)
+% Use as:
+%   [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
+%       neuronav_convert_MNI_to_native(sub_id, parameters, pn, trans_mm, targ_mm)
 %
-% OUTPUTS:
-%   native_target_mm - Nx3 array of target coordinates transformed to native subject RAS space (mm)
-%   native_trans_mm  - Nx3 array of transducer coordinates transformed to native subject RAS space (mm)
-%   target_pos       - Nx3 array of voxel indices corresponding to targets within the subject's segmentation image
-%   trans_pos        - Nx3 array of voxel indices corresponding to transducers within the subject's segmentation image
+% Input:
+%   sub_id     - subject identifier string (e.g. ‘sub-010’)
+%   parameters - (1,1) simulation parameters struct
+%   pn         - (1,1) path names struct with data_seg field
+%   trans_mm   - [Nx3] transducer coordinates in MNI space [mm RAS]
+%   targ_mm    - [Nx3] target coordinates in MNI space [mm RAS]
 %
-% PROCESS:
-%   1. Load segmentation NIfTI header info for the subject.
-%   2. Use inverse nonlinear warp fields (SimNIBS mni2subject_coords_LDfix) to map MNI mm coords into native mm coords.
-%   3. Convert native RAS mm coordinates to voxel indices in segmentation space via 'ras_to_grid'.
+% Output:
+%   native_target_mm - [Nx3] target coordinates in native subject RAS space [mm]
+%   native_trans_mm  - [Nx3] transducer coordinates in native subject RAS space [mm]
+%   target_pos       - [Nx3] target voxel indices in segmentation image
+%   trans_pos        - [Nx3] transducer voxel indices in segmentation image
 %
-% This function is critical for relating group-level or atlas-derived MNI coordinates
-% to the individual subject anatomy for precise spatial localization and accurate simulation.
+% See also: NEURONAV_CONVERT_NATIVE_TO_MNI, LOCALITE_MATRIX_TO_POSITIONS
 
     Npos = size(trans_mm,1); % Number of positions
 

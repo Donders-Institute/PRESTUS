@@ -1,23 +1,32 @@
 function nii_out = canonical_affine_transform(nii_in_path, output_path)
-%% CANONICAL_AFFINE_TRANSFORM Set NIfTI affine to diagonal voxel dimensions (LPI origin)
+% CANONICAL_AFFINE_TRANSFORM  Set NIfTI affine to a diagonal voxel-scaling matrix (LPI origin)
 %
-% Purpose: Remove rotations/shear, set origin to LPI corner (0,0,0), 
-% diagonal elements = voxel_size. Prevents k-Wave padding issues.
+% Removes rotations and shear from the NIfTI affine, replacing it with a
+% pure diagonal scaling matrix whose diagonal entries equal the voxel
+% dimensions in mm. The origin is fixed at [0 0 0] (LPI corner). This
+% prevents k-Wave grid-padding issues caused by rotated affines and ensures
+% Localite neuronavigation can import the image using simple voxel scaling
+% (world_pos = voxel_pos * voxel_size) without a rotation matrix.
+% Equivalent to Python: nib.as_closest_canonical() + custom diagonal affine.
 %
-% LOCALITE COMPATIBILITY: Ensures clean RAS+ → LPI coordinate mapping for 
-% Localite neuronavigation import. Voxel coordinates [x,y,z] map directly to
-% physical mm via simple scaling: world_pos = voxel_pos * voxel_size.
-% No rotation matrix required for Localite target import.
+% Use as:
+%   nii_out = canonical_affine_transform(nii_in_path, output_path)
 %
-% Equivalent to Python: nib.as_closest_canonical() + custom diagonal affine
+% Input:
+%   nii_in_path - path to the input T1 NIfTI file (.nii or .nii.gz)
+%   output_path - path for the output NIfTI file (uncompressed;
+%                 a .gz copy is also written automatically)
 %
-% INPUT
-%   nii_in_path  - Input T1 NIfTI file path
-%   output_path  - Output T1 NIfTI file path  
+% Output:
+%   nii_out     - modified niftiinfo struct with diagonal affine
+%                 (also saved to output_path and output_path.gz)
 %
-% OUTPUT
-%   nii_out      - Modified NIfTI structure (also saved to output_path)
-%                  Localite-ready: T*[x;y;z;1] = [vx*sx, vy*sy, vz*sz, 1]'
+% See also: NIFTIINFO, NIFTIREAD, NIFTIWRITE, RAS_TO_GRID
+
+arguments
+    nii_in_path (1,:) char
+    output_path (1,:) char
+end
 
 %% Load input NIfTI
 nii_in = niftiinfo(nii_in_path);

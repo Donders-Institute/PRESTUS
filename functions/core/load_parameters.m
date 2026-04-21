@@ -1,20 +1,29 @@
 function parameters = load_parameters(varargin)
-
-% LOAD_PARAMETERS Loads and merges configuration files for simulation parameters.
+% LOAD_PARAMETERS  Load default PRESTUS config and merge with one or more extra YAML files or structs
 %
-% This function loads a default configuration file and optionally merges it with
-% additional configuration files or structures provided as input arguments. It
-% performs checks on the loaded parameters, calculates derived values, and sanitizes
-% the output file affix. The function also verifies paths and transducer settings
-% required for simulations.
+% Reads configs/default_config.yaml relative to the PRESTUS root (resolved from
+% this file's location so CWD is irrelevant), then deep-merges any caller-supplied
+% YAML files or parameter structs on top. After merging, runs validation:
+% interactive-mode check, transducer parameter derivation, thermal timing check,
+% output-affix sanitization, path existence checks, and MATLAB version guard.
+%
+% Use as:
+%   parameters = load_parameters()
+%   parameters = load_parameters(extra_config_file)
+%   parameters = load_parameters(extra_config_file, extra_config_location)
+%   parameters = load_parameters(file1, loc1, file2, loc2, ...)
 %
 % Input:
-%   varargin - Optional input arguments:
-%              * Single argument: Path to an extra configuration file or a struct.
-%              * Two arguments: Path to an extra configuration file and its location.
+%   varargin - (optional) variable-length argument list:
+%              * 0 args:  load default config only
+%              * 1 arg:   path to an extra YAML file, or a parameter struct to merge
+%              * 2 args:  (filename, folder) pair for one extra YAML file
+%              * 2N args: N (filename, folder) pairs, merged left-to-right
 %
 % Output:
-%   parameters - Struct containing merged simulation parameters.
+%   parameters - merged and validated PRESTUS simulation parameters
+%
+% See also: LOAD_TRANSDUCER_PARAMETERS, PRINT_PARAMETER_SUMMARY, PATH_LOG_SETUP
 
     %% Load default configuration file
     % Use an absolute path derived from this file's location so that

@@ -1,25 +1,45 @@
 function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries, CEM43_iso)
-
-% THERMAL_PLOT_SIM Visualizes heating simulation results over time.
+% THERMAL_PLOT_SIM  Visualise heating simulation results over time and save figures
 %
-% This function generates plots and visualizations for heating simulations, including:
-%   1. Temperature profile over time.
-%   2. Temperature rise over time.
-%   3. CEM43 (Cumulative Equivalent Minutes at 43°C) values over time.
-% The function also creates a video showing heating effects on a brain slice during the experiment.
+% Generates six or more PNG files and one AVI video (if requested):
+%   focal-axis temperature, temperature rise, and CEM43 (kWave & ISO) for
+%   the plane through the transducer; and overall tissue-maximum versions
+%   of each metric using the layer timeseries. Tissue masks are derived
+%   from medium_masks via tissuemask_binary. Grey-shaded regions mark ON
+%   periods in the sonication protocol. The video encodes focal-plane
+%   temperature frames coloured by viridis, blended over the tissue mask.
+%   Note: focal-axis plots track the single axial line through trans_pos,
+%   not the spatial maximum — see the timeseries plots for true maxima.
+%
+% Use as:
+%   thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries)
+%   thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, medium_masks, CEM43, timeseries, CEM43_iso)
 %
 % Input:
-%   focal_planeT      - [Nx x Ny x Nt] matrix representing temperature values on the focal plane over time.
-%   time_status_seq   - Struct array containing time points and status of the simulation (e.g., 'on', 'off').
-%   parameters        - Struct containing simulation parameters (e.g., output directory, transducer position).
-%   trans_pos         - [1x3] array specifying the transducer position in grid coordinates.
-%   medium_masks      - [Nx x Ny x Nz] matrix representing the brain labels
-%   CEM43             - [Nx x Ny x Nt] matrix representing CEM43 values over time.
+%   focal_planeT    - temperature in focal plane over time [°C]
+%   time_status_seq - struct array with fields time [s], status, recorded
+%   parameters      - PRESTUS config; must contain io.output_dir, io.output_affix,
+%                     subject_id, simulation.medium, transducer(1).trans_pos,
+%                     transducer(1).focus_pos, thermal.temp_0, io.save_heatingvideo
+%   trans_pos       - [1x3] transducer position in grid indices
+%   medium_masks    - layer label map
+%   CEM43           - k-Wave CEM43 in focal plane over time [min]
+%   timeseries      - struct from THERMAL_UPDATE_TIMESERIES with fields
+%                     T, Tdiff, CEM43, CEM43_iso (each a struct of layer arrays)
+%   CEM43_iso       - ISO CEM43 in focal plane over time [min] (optional, default: [])
 %
-% Output:
-%   None. The function saves plots and a video in the specified output directory.
-%   Note: The timeseries capture metrics in the focal axis of the
-%   transducer, not the maximum of observed values!
+% See also: THERMAL_SIMULATION, THERMAL_ANALYSIS, THERMAL_UPDATE_TIMESERIES
+
+arguments
+    focal_planeT    {mustBeNumeric}
+    time_status_seq (1,:) struct
+    parameters      (1,1) struct
+    trans_pos       (1,:) {mustBeNumeric}
+    medium_masks    {mustBeNumeric}
+    CEM43           {mustBeNumeric}
+    timeseries      (1,1) struct
+    CEM43_iso       {mustBeNumeric} = []
+end
 
     %% Define output file paths for plots
     output_plot = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermal%s.png', ...

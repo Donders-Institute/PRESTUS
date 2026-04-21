@@ -65,8 +65,23 @@ Multiple adjustments are made if axisymmetry is requested:
 - Internally, `[radial x 2, axial]` is remapped onto `[axial radial]` and only values from `[half+1:end]` are retained.
 - Medium, source, and sensor are set up according to [axial, radial] dimensions.
 - Following acoustic simulation, values are either mirrored into a cartesian 2D grid, or radially expanded into a cartesion 3D grid (see the note below). In cartesian 2D, the output will have [radial x 2, axial] dimensions again, in line with the default specification for kspaceFirstOrder2D.
+- Only a **single transducer** is supported; specifying multiple transducers with `axisymmetric == 1` raises an error.
+- Only **annular transducers** explicitly support axisymmetric `kWaveArray` mode. Other transducer types are not tested in this configuration.
 
 > **Axisymmetric 2D vs. 3D output**
 > Axisymmetric simulations are effectively 3D simulations that are performed efficiently on 2D input grids. By default, PRESTUS assumes that users want to follow-up an axisymmetric acoustic simulation with a 3D heating simulation. When heating is requested in the simulation pipeline, axisymmetric acoustic simulation outputs will be provided in 3D. If 2D outputs are desired, heating has to be deactivated. 2D heating simulations are possible by first running an acoustic 2D simulation without heating, and then running a heating simulation with the prior output, while deactivating (or not overwriting) the acoustic simulation.
+
+### Backend compatibility
+
+| Backend (`simulation.code_type`) | Axisymmetry support | Notes |
+|---|---|---|
+| `matlab_cpu` | ✓ | Uses `kspaceFirstOrderAS` |
+| `matlab_gpu` | ✓ | Uses `kspaceFirstOrderAS` with `RadialSymmetry` option |
+| `cpp_cpu` | ✓ | Uses the C++ OMP binary `kspaceFirstOrderASC` |
+| `cpp_gpu` (CUDA) | ✗ | No CUDA binary supports axisymmetric geometry. PRESTUS automatically falls back to the `matlab_gpu` path (`kspaceFirstOrderAS` with `gpuArray` data cast) with a warning. GPU acceleration is preserved; only the CUDA binary is bypassed. |
+
+### PML behaviour in axisymmetric mode
+
+The PML is applied asymmetrically when `PMLInside=false` (the PRESTUS default): the **axial** dimension receives `pml_size` voxels on both sides, while the **radial** outer edge receives `pml_size` voxels on one side only. The inner radial boundary at `r = 0` is a symmetry axis and does not require a PML. k-Wave handles this automatically; no configuration change is needed.
 
 

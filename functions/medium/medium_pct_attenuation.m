@@ -1,4 +1,38 @@
 function [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm)
+% MEDIUM_PCT_ATTENUATION  Map pseudo-CT Hounsfield values to skull attenuation coefficients
+%
+% Applies one of four algorithms to fill alpha_coeff and alpha_power for
+% skull voxels indexed by skull_idx. Algorithm 'k-plan' uses a fixed
+% value; 'mueller' uses a square-root porosity model from Aubry et al.
+% 2022 / Fry 1978; 'aubry' uses the porosity model from Aubry et al.
+% 2003; 'none' uses the fixed scalar from parameters.medium_properties.skull.
+%
+% Use as:
+%   [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm)
+%
+% Input:
+%   parameters  - PRESTUS config; must contain
+%                 medium_properties.skull.alpha_coeff [dB/(MHz cm)] and alpha_power
+%   alpha_coeff - full-grid attenuation coefficient array to update
+%   alpha_power - full-grid attenuation power array to update
+%   pseudoCT    - pseudo-CT Hounsfield values (full grid)
+%   skull_idx   - linear indices of skull voxels into the grid
+%   algorithm   - one of 'k-plan', 'mueller', 'aubry', 'none'
+%
+% Output:
+%   alpha_coeff - updated alpha_coeff with skull voxels filled
+%   alpha_power - updated alpha_power with skull voxels filled
+%
+% See also: MEDIUM_SETUP, MEDIUM_PCT_DENSITY, MEDIUM_PCT_SOUNDSPEED
+
+arguments
+    parameters  (1,1) struct
+    alpha_coeff {mustBeNumeric}
+    alpha_power {mustBeNumeric}
+    pseudoCT    {mustBeNumeric}
+    skull_idx   {mustBeNumeric}
+    algorithm   (1,:) char {mustBeMember(algorithm, {'k-plan','mueller','aubry','none'})}
+end
 
 switch algorithm
     case 'k-plan'

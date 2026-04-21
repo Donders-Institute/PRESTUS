@@ -1,8 +1,10 @@
 ## Transducer Calibration
 
-To emulate transducers, PRESTUS aims to optimise the velocity and phase settings of virtual transducers such that they produce focal axis profiles similar to those measured with real driving system - transducer setups in free water (measured either in-house via hydrophones or provided by device manufacturers). This calibrated emulation will vary between different transducers, for different focal depth settings, and free-water pressures.
+To emulate transducers, PRESTUS optimises the velocity and phase settings of virtual transducers such that they produce focal axis profiles similar to those measured with real driving system–transducer setups in free water (measured either in-house via hydrophones or provided by device manufacturers). This calibrated emulation varies between different transducers, for different focal depth settings, and free-water pressures.
 
 Transducer calibration relies on an additional config (`calibration_config`) that should be loaded as `parameters.calibration` (see the example `calibration_standalone`).
+
+---
 
 ### Standalone calibration setup
 
@@ -10,9 +12,9 @@ Transducer calibration relies on an additional config (`calibration_config`) tha
 
 #### Use cases
 
-- Create a library of calibration settings for one (or multiple) transducer-depth settings
+- Create a library of calibration settings for one (or multiple) transducer–depth settings
 - Incorporate manufacturer information
-- Template to set up and generate calibrated profiles for transducer equipment at the Donders Institute. 
+- Template to set up and generate calibrated profiles for transducer equipment at the Donders Institute
 
 #### Prerequisites
 
@@ -24,119 +26,180 @@ For the Donders, the empirical profiles (steering tables) can be found on the [F
 
 Requested calibrations for unique TPO-transducer & focal depth & intensity combinations can be specified in `calibration_config.yaml` via `combinations`, `focal_depths_wrt_exit_plane`, and `desired_intensities`.
 
-Each line in the configuration corresponds to a unique TPO-transducer setup. In the following example specification, an IGT transducer with ID `PCD15287_01001` would be emulated for two focal depths of 40 and 50 mm from the exit plane, each for free-water intensities of 30 and 60 W/cm2 respectively. For a second transducer (`PCD15473_01001`), emulated phases and amplitudes would be provided for a depth of 40 mm at an intensity of 30 W/cm2. 
+Each line in the configuration corresponds to a unique TPO-transducer setup. In the following example, an IGT transducer with ID `PCD15287_01001` would be emulated for two focal depths of 40 and 50 mm from the exit plane, each for free-water intensities of 30 and 60 W/cm² respectively. For a second transducer (`PCD15473_01001`), emulated phases and amplitudes would be provided for a depth of 40 mm at an intensity of 30 W/cm².
 
 > This example fits a 32-channel transducer with 10 artificial channels. The number of emulated channels can impact the stability of the fitting solution. It is governed by the setup in `equipment_config.yaml`.
 
 Transducer-TPO setups to be characterized:
-```
-  combinations:
-    - IS_PCD15287_01001_IGT_32_ch_comb_10_ch
-    - IS_PCD15473_01001_IGT_32_ch_comb_10_ch
+```yaml
+combinations:
+  - IS_PCD15287_01001_IGT_32_ch_comb_10_ch
+  - IS_PCD15473_01001_IGT_32_ch_comb_10_ch
 ```
 List of focal depths (in mm) to be characterized:
+```yaml
+focal_depths_wrt_exit_plane:
+  - [40, 50]
+  - [40]
 ```
-  focal_depths_wrt_exit_plane:
-    - [40, 50]
-    - [40]
-```
-List of intensities (in free-water W/cm2) to be characterized:
-
-```
-  desired_intensities:
-    - [30, 60]
-    - [30]
+List of intensities (in free-water W/cm²) to be characterized:
+```yaml
+desired_intensities:
+  - [30, 60]
+  - [30]
 ```
 
 #### Steps
 
 - Define and initialize the simulation environment by setting paths and loading configuration files with equipment and user calibration data.
 - Automatically load Donders-specific transducer information: Identify specific equipment combinations and extract associated transducer and driving system parameters, setting default initial amplitudes and phases.
-- Set initial simulation to manufacturer data: Load measured characterization data of the actual transducer’s acoustic field including axial intensity profiles and phase information provided by manufacturers.
-- Interpolate requested distance from multiple empirically measured distances
-- Add Focal Distance Offset (FDO; via `add_FDO`): Translate measured focal depths relative to the transducer exit plane into simulation-relevant coordinates centered on the transducer’s mid-bowl. Missing distances are zero-interpolated.
+- Set initial simulation to manufacturer data: Load measured characterization data of the actual transducer's acoustic field including axial intensity profiles and phase information provided by manufacturers.
+- Interpolate requested distance from multiple empirically measured distances.
+- Add Focal Distance Offset (FDO; via `add_FDO`): Translate measured focal depths relative to the transducer exit plane into simulation-relevant coordinates centered on the transducer's mid-bowl. Missing distances are zero-interpolated.
 - Select or interpolate the axial intensity profiles for the specified focal depth.
-- Call `calibration_transducer`
+- Call `calibration_transducer`.
 
-###  Calibrate phase and amplitude settings
+---
+
+### Calibrate phase and amplitude settings
 
 **Function: `calibration_transducer`**
 
 #### Use cases
 
 - Flexibility: only need to specify the desired axial profile
-- Dynamic integration into end-to-end simulation loops (e.g.,  iterate across a amplitude-distance parameter space)
+- Dynamic integration into end-to-end simulation loops (e.g., iterating across an amplitude–distance parameter space)
 
 #### Prerequisites
 
-- `profile_empirical.axial_intensity`   
-    Desired intensity profile along focal beam axis
-- `profile_empirical.axial_distance_bowl`   
-    Distance (mm from transducer bowl)
-- `desired_focal_distance_ep`   
-    Requested focal distance (mm from transducer exit plane)
+- `profile_empirical.axial_intensity`  
+  Desired intensity profile along the focal beam axis [W/cm²]
+- `profile_empirical.axial_distance_bowl`  
+  Distance from the transducer bowl [mm]
+- `desired_focal_distance_ep`  
+  Requested focal distance from the transducer exit plane [mm]
 
-#### Steps
+#### Detailed pipeline
 
-1. Scale the requested profile to the desired intensity
-2. Run free-water simulation
+##### Step 1 — Scale the empirical profile to the desired intensity
 
-    How simulations will be run will largely be determined by the main `parameters` (e.g., `parameters.code_type`). 
-    However, additional settings in `parameters.calibration` can overwrite default behaviour:
+`scale_real_intensity_profile` linearly rescales the input empirical profile so its peak equals `desired_intensity`. It simultaneously sets the initial `elem_amp` in `parameters.transducer.annular` to the pressure amplitude corresponding to `desired_intensity` via:
 
-    - `axisymmetric2D`  
-    Overwrite default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no (default)).
-    - `force_kwavearray`    
-    Force run free-water simulations with kwavearray (recommended)?  If set to `0`, simulations use the setting in the default or study-specific config.
+$$p = \sqrt{2 \cdot I_\mathrm{desired} \cdot 10^4 \cdot \rho \cdot c}$$
 
-3. Extract simulated intensity along the focal axis
-4. Compute analytical O'Neil solution
+The profile is then truncated or NaN-padded to match the simulation axis length (derived from `grid.default_dims(end)`).
 
-    Also computes `simulated_analytical_scaling` factor from analytical to simulated intensity
+##### Step 2 — Run initial free-water simulation
 
-5. Optimize the virtual transducer’s element velocity and phases
+How simulations are run is determined by the main `parameters` (e.g., `simulation.code_type`). Additional settings in `parameters.calibration` can override default behaviour:
 
-    Goal: match settings such that analytical profile corresponds to scaled empirical profile
+- `axisymmetric2D`  
+  Override default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no, default `0`).
+- `force_kwavearray`  
+  Force free-water simulations to use kWaveArray (`1`). If `0`, uses the setting in the default or study-specific config.
+- `save_in_calibration_folder`  
+  If `true` (default), all simulation outputs are redirected to `calibration.path_output` rather than the subject output folder.
 
-    Multiple parameters configure the calibration:
+##### Step 3 — Extract simulated intensity along the focal axis
 
-    - `opt_method`  
-    Optimization backend to use: `FEXminimize` (open source subtoolbox, default) | `GlobalSearch` (MATLAB's Global Optimization Toolbox)
-    - `opt_weights  
-    Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM). 
-        - Uniform (`opt_weights == 0`): Equal weighting across entire profile—optimizes global shape.
-        - Gaussian (`opt_weights >= 1`): FWHM-centered Gaussian peaking at focal maximum to emphasize near-focus optimization. Higher weights yield narrower Gaussians (sigma = focus_pos / weights).
-    - `opt_limits`  
-    Distance limits for optimization [mm]
-    - `opt_seed`    
-    Random seed for optimization. Specifying a seed increases reproducibility.
-    - `opt_upper_velocity`  
-    Upper velocity to use in global search.
-    
-    <br>
+`extract_simulated_profile` retrieves `p_max_all` from the simulation results and:
+- In 3D, takes the lateral slice at the transducer's lateral centre (`trans_pos(1:2)`)
+- Extracts the 1D axial pressure profile from the transducer position onward
+- Converts pressure to intensity: $I = p^2 / (2 \rho c) \times 10^{-4}$ [W/cm²]
+- Back-computes particle velocity from `elem_amp` via the acoustic impedance relation: $v = \mathrm{elem\_amp} / (\rho \cdot c)$
 
-    > Note: `skip_front_peak_mm` specifies the distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts when calculating the peak distance and FWHM. It does not impact fitting. If the fit is intended over a narower range, define `opt_limits`.
+The axial distance axis is expressed in mm from the transducer bowl.
 
-    ![calibration_fitting](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_fitting.png)
-    The above figure shows an example profile fit. Here, uniform `opt_weights` are used.
-    <br>
+##### Step 4 — Compute the analytical O'Neil solution
 
-6. Recalculate analytical solution with optimized phases and velocity
-7. Calculate optimized source amplitude: 
+`compute_oneil_solution` calls `focusedAnnulusONeil` with the initial simulation velocity and phases to produce an analytical pressure profile, converted to intensity. This establishes a baseline for the optimization.
 
-    $$ \mathrm{amplitude\_optimized} = \left( \frac{\mathrm{velocity\_optimized}}{\mathrm{velocity\_original}} \right) \cdot \left( \frac{\mathrm{amplitude\_original}}{\mathrm{simulated\_analytical\_scaling}} \right) $$
+It also computes `simulated_analytical_scaling`:
 
-8. Rerun water simulation with optimized phases and source amplitude
-9. Extract simulated optimized intensity along the focal axis
+$$\mathrm{simulated\_analytical\_scaling} = \frac{\max(I_\mathrm{simulated})}{\max(I_\mathrm{O'Neil})}$$
 
-    | Initial simulation | Optimized simulation |
-    |--------------------|----------------------|
-    | ![calibration_initial_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_initial_intensity.png) | ![calibration_opt_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_opt_intensity.png) |
-    | Visualized in Step 3. | Visualized in Step 9. |
+This ratio captures the systematic offset between the k-Wave simulation and the analytical model and is propagated through the amplitude calculation in Step 7.
 
-    Note: The black line indicates the position of the **transducer bowl**, the red line indicated the position of the **transducer exit plane**, the white line indicates the maximum estimated **(focal) intensity** (see [distance definitions](doc_transducer.md#target-distance-parameters)).
-    <br>
+> **Coordinate note:** `focusedAnnulusONeil` receives axial positions as `(axial_position - 0.5) × 10^{-3}` metres. The `−0.5` half-voxel shift converts from voxel-centre to voxel-edge coordinates.
 
-10. Plot comparison between original and optimized results (analytical and simulated)
+##### Step 5 — Optimize element phases and velocity (global search)
 
-    ![calibration_optimized_analytical](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_optimized_analytical.png)
+`perform_global_search` minimises the weighted mean-squared error between the analytical O'Neil profile and the scaled empirical target profile over element phases [0, 2π] and particle velocity [0.001, `opt_upper_velocity`].
+
+The initial phase guess is **random** (uniform over [0°, 360°]), not the manufacturer-provided phases. This means results can vary across runs unless a seed is fixed via `opt_seed`.
+
+Parameters that configure the search:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `opt_method` | `FEXminimize` | Optimization backend: `FEXminimize` (open-source, bundled) or `GlobalSearch` (MATLAB Global Optimization Toolbox) |
+| `opt_weights` | `0` | Profile weighting: `0` = uniform across the full profile; `≥1` = Gaussian centred on the focal maximum with FWHM narrowing as weight increases (σ = focus_pos / weight) |
+| `opt_limits` | full profile range | Distance range [mm] over which the error is evaluated; defaults to the non-NaN extent of the target profile |
+| `opt_seed` | *(none)* | Integer random seed for reproducibility; if unset, results may vary across runs |
+| `opt_upper_velocity` | `0.2` m/s | Upper bound on particle velocity during search |
+| `skip_front_peak_mm` | `0` | Excludes the first N mm from peak detection to avoid near-field artifacts. Applied in both the global search objective and the amplitude correction (Step 5b). Does not restrict the fitting range — use `opt_limits` for that. |
+
+The `FEXminimize` backend uses fixed internal settings: `popsize = 5000`, `FinDiffType = 'central'`, `TolCon = 1e-8`.
+
+![calibration_fitting](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_fitting.png)
+Example profile fit with uniform `opt_weights`.
+
+##### Step 5b — Amplitude correction to match desired peak intensity exactly (optional)
+
+After the global search optimises profile **shape**, the peak intensity of the analytical profile may not exactly equal `desired_intensity` because the search jointly optimises phases and velocity without a hard intensity constraint.
+
+`fit_velocity_to_intensity` corrects this analytically. Since intensity scales with velocity squared ($I \propto v^2$), the corrected velocity is:
+
+$$v_\mathrm{corrected} = v_\mathrm{opt} \cdot \sqrt{\frac{I_\mathrm{desired} \cdot \mathrm{simulated\_analytical\_scaling}}{I_\mathrm{peak}}}$$
+
+The `simulated_analytical_scaling` factor is included because `opt_source_amp` in Step 7 divides by it, so the analytical target must overshoot by that factor to yield the correct intensity in the final simulation.
+
+`skip_front_peak_mm` is applied when finding $I_\mathrm{peak}$.
+
+A warning is issued if `corrected_velocity` exceeds `opt_upper_velocity`.
+
+This step is **enabled by default**. To disable:
+```yaml
+calibration:
+  fit_velocity_to_intensity: false
+```
+
+When disabled, the velocity from the global search is used as-is, and the peak intensity of the optimized simulation may deviate from `desired_intensity`.
+
+##### Step 6 — Recalculate the analytical O'Neil solution with optimized parameters
+
+`recompute_oneil_solution` calls `focusedAnnulusONeil` with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to produce the final analytical profile. This profile is plotted against the target and the original O'Neil solution for visual inspection.
+
+##### Step 7 — Calculate the optimized source amplitude
+
+The amplitude that yields the corrected velocity in the k-Wave simulation is:
+
+$$\mathrm{elem\_amp\_optimized} = \mathrm{round}\!\left( \frac{v_\mathrm{corrected}}{v_\mathrm{original}} \cdot \frac{\mathrm{elem\_amp\_original}}{\mathrm{simulated\_analytical\_scaling}} \right)$$
+
+where `v_original` and `elem_amp_original` come from the initial simulation (Steps 2–3), and `simulated_analytical_scaling` is from Step 4.
+
+##### Step 8 — Rerun water simulation with optimized phases and amplitude
+
+The pipeline reruns `prestus_pipeline_start` with `elem_amp = elem_amp_optimized`, `elem_phase_rad = opt_phases`, and `output_affix = '_optimized'`.
+
+##### Step 9 — Extract simulated optimized intensity along the focal axis
+
+Same procedure as Step 3, applied to the optimized simulation results.
+
+| Initial simulation | Optimized simulation |
+|--------------------|----------------------|
+| ![calibration_initial_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_initial_intensity.png) | ![calibration_opt_intensity](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_opt_intensity.png) |
+
+The black line indicates the **transducer bowl**, the red line the **transducer exit plane**, the white line the **maximum focal intensity** (see [distance definitions](doc_transducer.md#target-distance-parameters)).
+
+##### Step 10 — Plot and save results
+
+`plot_opt_sim_results` produces a comparison figure of the initial and optimized analytical and simulated profiles.
+
+`save_optimized_values` writes two output files to `calibration.path_output_profiles`:
+
+1. **CSV** (`calibration.filename_calibrated_CSV`) — a lookup table indexed by `[desired_intensity × focal_depth_ep]`. Each cell contains a string encoding `[opt_phases_deg, elem_amp]`. If the file already exists, the new entry is inserted and the table is re-sorted by intensity (rows) and focal depth (columns).
+
+2. **YAML** (`<equipment_name>-F<focal_depth>mm-I<intensity>wpercm2.yaml`) — the full `transducer` parameter struct with optimized phases and amplitude, ready to be merged into a PRESTUS study config.
+
+![calibration_optimized_analytical](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_optimized_analytical.png)

@@ -1,30 +1,30 @@
 function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters, options)
 
-% COMBINE_PLOTS_BY_SUFFIX Combines subject-specific plots into a single montage image.
+% COMBINE_PLOTS_BY_SUFFIX  Combine per-subject plots into a labelled montage image
 %
-% This function reads individual subject plots (with a specified suffix), adds 
-% text labels to each plot, and combines them into a single montage image. The 
-% montage is created using the `montage` command-line tool. 
+% Reads individual subject plot files matching the given suffix, adds
+% subject ID text labels, and assembles them into a single montage PNG
+% saved in outputs_path as all_<suffix>.png.
+%
+% Use as:
+%   combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters)
+%   combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters, options)
 %
 % Input:
-%   suffix        - String specifying the suffix of the plot filenames to combine.
-%   outputs_path  - String specifying the directory where output files are stored.
-%   subject_list  - List of subject IDs for which plots will be combined.
-%   parameters    - Struct containing additional configuration options (e.g., `subject_subfolder`).
+%   suffix       - filename suffix identifying the plots to combine
+%   outputs_path - directory containing subject output files
+%   subject_list - array of subject identifiers
+%   parameters   - (1,1) simulation parameters struct
+%   options      - name-value options: font_size (default: 64)
 %
-% Options:
-%   font_size     - Font size for text labels added to each plot (default: 64).
-%
-% Output:
-%   A combined montage image is saved in the `outputs_path` directory with the 
-%   filename `all_<suffix>.png`.
+% See also: CREATE_GROUP_MNI_PLOTS
 
     arguments
-        suffix string 
-        outputs_path string 
-        subject_list 
-        parameters struct
-        options.font_size = 64 % Default font size for text labels
+        suffix       (1,:) char
+        outputs_path (1,:) char
+        subject_list
+        parameters   (1,1) struct
+        options.font_size (1,1) double = 64
     end
 
     % Ensure temporary directory exists for intermediate files

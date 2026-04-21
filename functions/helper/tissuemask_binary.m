@@ -1,4 +1,27 @@
 function mask = tissuemask_binary(parameters, medium_masks)
+% TISSUEMASK_BINARY  Build per-tissue binary masks from a medium label map
+%
+% Derives skull, skull_cortical, skull_trabecular, brain, skin, and water
+% binary masks by finding the label indices in parameters.medium_properties
+% and applying ismember to medium_masks.
+%
+% Use as:
+%   mask = tissuemask_binary(parameters, medium_masks)
+%
+% Input:
+%   parameters   - PRESTUS config with medium_properties fieldnames used as tissue labels
+%   medium_masks - medium label volume (values = medium index)
+%
+% Output:
+%   mask - struct with binary fields: skull, skull_cortical, skull_trabecular,
+%          brain, skin, water
+%
+% See also: ACOUSTIC_ANALYSIS, THERMAL_ANALYSIS, GETIDX
+
+arguments
+    parameters   (1,1) struct
+    medium_masks {mustBeNumeric}
+end
 
     labels = fieldnames(parameters.medium_properties);
     

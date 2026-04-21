@@ -1,18 +1,27 @@
 function response = confirmation_dlg(promptMessage, yes_text, no_text)
-
-% CONFIRMATION_DLG Displays a dialog box to confirm user action.
+% CONFIRMATION_DLG  Display a two-button modal dialog and return the user's choice
 %
-% This function creates a modal dialog box with customizable options for 
-% confirmation. The user can choose between two options, and the function 
-% returns a binary response based on the selection.
+%   Creates a questdlg with two customizable button labels and returns 1 if
+%   the user selects the affirmative option, 0 otherwise.
+%
+% Use as:
+%   response = confirmation_dlg(promptMessage, yes_text, no_text)
 %
 % Input:
-%   promptMessage - String specifying the message displayed in the dialog box.
-%   yes_text      - String specifying the text for the "Yes" button.
-%   no_text       - String specifying the text for the "No" button.
+%   promptMessage - message to display in the dialog
+%   yes_text      - label for the affirmative button
+%   no_text       - label for the negative button (also the default)
 %
 % Output:
-%   response      - Boolean flag indicating the user's choice (1 = Yes, 0 = No).
+%   response      - [1x1] 1 = affirmative, 0 = negative or dialog closed
+%
+% See also: QUESTDLG, CONFIRM_OVERWRITING
+
+arguments
+    promptMessage (1,:) char
+    yes_text      (1,:) char
+    no_text       (1,:) char
+end
 
     % Display a confirmation dialog box with custom button labels
     selection = questdlg(promptMessage, 'Confirmation needed', ...

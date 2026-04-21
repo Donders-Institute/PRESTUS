@@ -1,43 +1,42 @@
 function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h] = ...
     plot_overlay(overlay_image, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_data_pos, options)
 
-% PLOT_OVERLAY Visualizes overlay on a 2D slice of a 3D background image.
+% PLOT_OVERLAY  Overlay a metric map on a 2D slice of a 3D background image
 %
-% This function overlays a computed metric (e.g., intensity) 
-% on a specific 2D slice of a 3D background image (`bg_image`). It highlights 
-% key positions such as the transducer position, focus position, and maximum intensity 
-% position. The function supports various customization options for visualization.
+% Extracts a specified orthogonal slice from a 3D volume and overlays a
+% metric (e.g., acoustic intensity) with alpha-scaled colouring. Marks
+% transducer, focus, and maximum intensity positions.
+%
+% Use as:
+%   [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h] = ...
+%       plot_overlay(overlay_image, bg_image, transducer_bowl, parameters, ...
+%           slice, trans_pos, focus_pos, max_data_pos)
+%   [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h] = ...
+%       plot_overlay(..., options)
 %
 % Input:
-%   overlay_image   - [Nx x Ny x Nz] matrix representing the overlay (e.g., intensity).
-%   bg_image        - [Nx x Ny x Nz] matrix representing the 3D background image (e.g., anatomical image).
-%   transducer_bowl - [Nx x Ny x Nz] binary mask representing the transducer bowl region.
-%   parameters      - Struct containing simulation parameters (e.g., grid step size).
-%   slice           - Cell array specifying the slice to visualize:
-%                     * First element: axis ('x', 'y', or 'z').
-%                     * Second element: slice number along the specified axis.
-%   trans_pos       - [1x3] array specifying the transducer position in grid coordinates (row, col, slice).
-%   focus_pos       - [1x3] array specifying the focus position in grid coordinates (row, col, slice).
-%   max_data_pos    - [1x3] array specifying the maximum intensity position in grid coordinates (row, col, slice).
-%   options         - Struct containing optional visualization settings:
-%                     * show_rectangles: Boolean flag to show rectangles for key positions (default: 1).
-%                     * grid_step: Grid step size in mm (default: from parameters).
-%                     * rect_size: Size of rectangles for key positions (default: 2).
-%                     * overlay_threshold_low/high: Thresholds for alpha scaling of intensity map.
-%                     * overlay_color_range: Range for intensity map color scaling.
-%                     * color_scale: Colormap for intensity map (default: 'viridis').
-%                     * rotation: Rotation angle for visualization (default: 0).
-%                     * show_colorbar: Boolean flag to display colorbar (default: 1).
+%   overlay_image   - [Nx x Ny x Nz] metric volume to overlay
+%   bg_image        - [Nx x Ny x Nz] anatomical background volume
+%   transducer_bowl - [Nx x Ny x Nz] binary transducer bowl mask
+%   parameters      - (1,1) simulation parameters struct
+%   slice           - {axis, index} cell specifying the slice ('x', 'y', or 'z')
+%   trans_pos       - [1x3] transducer position in grid coordinates
+%   focus_pos       - [1x3] focus position in grid coordinates
+%   max_data_pos    - [1x3] maximum intensity position in grid coordinates
+%   options         - name-value visualisation settings (show_rectangles,
+%                     grid_step, rect_size, overlay thresholds, color_scale, etc.)
 %
 % Output:
-%   bg_slice        - Extracted 2D slice from the background image.
-%   transducer_bowl - Extracted 2D slice from the transducer bowl mask.
-%   overlay_image     Extracted 2D slice from the overlay map.
-%   ax1             - Handle to the axes displaying the background image.
-%   ax2             - Handle to the axes displaying the overlay.
-%   bg_min          - Minimum intensity value of the background image slice.
-%   bg_max          - Maximum intensity value of the background image slice.
-%   h               - Handle to the created figure.
+%   bg_slice        - extracted 2D background slice
+%   transducer_bowl - extracted 2D transducer bowl slice
+%   overlay_image   - extracted 2D overlay slice
+%   ax1             - handle to background axes
+%   ax2             - handle to overlay axes
+%   bg_min          - minimum background intensity
+%   bg_max          - maximum background intensity
+%   h               - figure handle
+%
+% See also: PLOT_OVERLAY_2D, PLOT_CORONAL_SLICES
 
     arguments
         overlay_image (:,:,:)

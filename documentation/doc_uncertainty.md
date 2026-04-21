@@ -94,8 +94,6 @@ parameters.path.sim               = '/absolute/path/to/sim_outputs';  % must be 
 prestus_pipeline_start(parameters);
 ```
 
-> **`parameters.path.sim` must be an absolute path.** The default config sets `path.sim = ''`. If it is empty when the pipeline is called, `get_output_dir` will throw an error. Set it in your study config or explicitly in the script as shown above.
-
 `prestus_pipeline_start` detects `simulation.uncertainty = true` on HPC and redirects to `uncertainty_pipeline` before submitting a single job. On MATLAB, `prestus_pipeline` handles the redirect after `path_log_setup` has run. The per-variant parameter structs built internally have `simulation.uncertainty` cleared, so there is no recursion.
 
 On a local MATLAB session (`platform = 'matlab'`) the five stages run sequentially. On HPC (`platform = 'slurm'` or `'qsub'`) all five jobs are submitted immediately: stages 2–4 with a dependency on stage 1, and stage 5 with a dependency on all three simulation jobs. No MATLAB session is held open during execution.

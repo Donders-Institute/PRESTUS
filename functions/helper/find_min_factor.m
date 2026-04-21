@@ -1,18 +1,27 @@
 function min_factor = find_min_factor(min_number, max_number)
-
-% FIND_MIN_FACTOR Finds the number with the smallest maximum factor in a range.
+% FIND_MIN_FACTOR  Find the integer in a range whose largest prime factor is smallest
 %
-% This function computes the number within a specified range `[min_number, max_number]` 
-% that has the smallest maximum factor. It uses MATLAB's `factor` function to 
-% determine the factors of each number in the range.
+%   Searches [min_number, max_number] and returns the value whose maximum
+%   prime factor is minimised. Used to choose FFT-friendly grid dimensions for
+%   k-Wave simulations; k-Wave FFTs are most efficient when the grid dimension
+%   is a product of small primes.
+%
+% Use as:
+%   min_factor = find_min_factor(min_number, max_number)
 %
 % Input:
-%   min_number - Integer specifying the start of the range (inclusive).
-%   max_number - Integer specifying the end of the range (inclusive).
+%   min_number - [1x1] lower bound of the search range (inclusive)
+%   max_number - [1x1] upper bound of the search range (inclusive)
 %
 % Output:
-%   min_factor - The number within the range `[min_number, max_number]` that 
-%                has the smallest maximum factor.
+%   min_factor - [1x1] integer in [min_number, max_number] with the smallest maximum prime factor
+%
+% See also: FACTOR, PREPROC_CROP_GRID
+
+arguments
+    min_number (1,1) {mustBeInteger, mustBePositive}
+    max_number (1,1) {mustBeInteger, mustBePositive}
+end
 
     % Initialize arrays to store the number of factors and maximum factor for each number
     facs = zeros(1, max_number - min_number); % Number of factors for each number

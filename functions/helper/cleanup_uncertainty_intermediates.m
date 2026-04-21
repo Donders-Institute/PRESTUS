@@ -1,9 +1,24 @@
 function cleanup_uncertainty_intermediates(parameters, affixes)
-% CLEANUP_UNCERTAINTY_INTERMEDIATES  Delete large intermediate files after
-% the uncertainty report (stage 5) when save_matrices = 0.
+% CLEANUP_UNCERTAINTY_INTERMEDIATES  Delete large intermediate cache files after uncertainty analysis
 %
-% Called automatically by uncertainty_pipeline (MATLAB platform) and by
-% prestus_pipeline (HPC platform, after the report job runs).
+%   Called automatically by uncertainty_pipeline (MATLAB platform) and by
+%   prestus_pipeline (HPC platform, after the report job runs).
+%
+% Use as:
+%   cleanup_uncertainty_intermediates(parameters, affixes)
+%
+% Input:
+%   parameters - PRESTUS config with subject_id and simulation.medium;
+%                used by GET_OUTPUT_DIR to resolve the cache folder
+%   affixes    - struct with fields .default, .liberal, .conservative
+%                (suffix strings for each uncertainty variant)
+%
+% See also: GET_OUTPUT_DIR, UNCERTAINTY_PIPELINE
+
+arguments
+    parameters (1,1) struct
+    affixes    (1,1) struct
+end
 %
 % Files removed:
 %   cache/<subj>_<medium>_heating_res<affix>.mat  — thermal matrices for each variant (large)

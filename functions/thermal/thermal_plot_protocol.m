@@ -1,17 +1,35 @@
 function thermal_plot_protocol(params_thermal, parameters, varargin)
-% THERMAL_PLOT_PROTOCOL Plots the full ultrasound stimulation protocol timeline.
+% THERMAL_PLOT_PROTOCOL  Plot the full ultrasound stimulation protocol timeline
+%
+% Generates a two-panel figure: the top panel shows a single pulse-train
+% period with sine-wave ON intervals and shaded OFF regions; the bottom
+% panel shows rectangular patches for each PT repetition across the full
+% PTRD duration (up to 20 equidistant patches are drawn when many
+% repetitions exist). The figure is saved as a PNG to
+% parameters.io.output_dir and closed.
+%
+% Use as:
+%   thermal_plot_protocol(params_thermal, parameters)
+%   thermal_plot_protocol(params_thermal, parameters, Name, Value, ...)
 %
 % Input:
-%   params_thermal - Struct from thermal_parameters() containing:
-%     .pt_dt, .pt_on_steps_n/dur, .pt_off_steps_n/dur, .n_pulses_per_pt, .n_ptri_reps,
-%     .ptri_off_step_dur, .ptri_off_steps_n, .post_ptri_step_dur, .post_ptri_steps_n,
-%     .pd (pulse duration), .pri (pulse rep interval), .ptd, .ptri, .ptrd, .dc, .prf
+%   params_thermal - struct from THERMAL_PARAMETERS; must contain
+%                    pt_dt [s], pt_on_steps_n, pt_on_steps_dur [s],
+%                    pt_off_steps_n, pt_off_steps_dur [s],
+%                    n_pulses_per_pt, n_ptri_reps, ptri_off_step_dur [s],
+%                    ptri_off_steps_n, post_ptri_step_dur [s],
+%                    post_ptri_steps_n, pd [s], pri [s], ptd [s],
+%                    ptri [s], ptrd [s], dc, prf [Hz]
+%   parameters     - PRESTUS config; must contain io.output_dir, io.output_affix,
+%                    subject_id, simulation.medium
 %
 % Optional name-value pairs:
-%   'PulseFreqColor', 'r' - Color for pulse ON periods
-%   'OffColor', [0.8 0.8 0.8] - Color for OFF periods
-%   'FigureSize', [12 8] - Figure dimensions
-%   'UpsampleFactor', 100 - Timepoints per timestep for smooth sine rendering
+%   PulseFreqColor - (1,:) char, color for pulse ON regions (default: 'r')
+%   OffColor       - (1,3) double, RGB color for OFF shading (default: [0.8 0.8 0.8])
+%   FigureSize     - (1,2) double, figure size in inches (default: [14 10])
+%   UpsampleFactor - (1,1) double, sine points per timestep (default: 50)
+%
+% See also: THERMAL_PARAMETERS, THERMAL_SIMULATION
 
 p = inputParser;
 addParameter(p, 'PulseFreqColor', 'r', @ischar);

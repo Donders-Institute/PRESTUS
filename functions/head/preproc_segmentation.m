@@ -1,8 +1,25 @@
 function parameters = preproc_segmentation(parameters)
 
-% PREPROC_SEGMENTATION Segment the data using SimNIBS
+% PREPROC_SEGMENTATION  Segment structural MRI using SimNIBS
 %
-% Note: T1, T2 (or UTE/CT) paths should correspond to BIDS directory
+% Locates T1 (and optionally T2/UTE/CT) images following BIDS naming,
+% runs SimNIBS charm segmentation, and saves the output. Paths in
+% parameters must follow BIDS directory conventions.
+%
+% Use as:
+%   parameters = preproc_segmentation(parameters)
+%
+% Input:
+%   parameters - (1,1) simulation configuration struct with path fields
+%
+% Output:
+%   parameters - updated struct with segmentation path fields
+%
+% See also: PREPROC_HEAD, SEGMENTATION_RUN
+
+arguments
+    parameters (1,1) struct
+end
 
     %% CHECK INPUTS
 

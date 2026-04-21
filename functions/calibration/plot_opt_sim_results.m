@@ -1,26 +1,36 @@
 function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile_oneil_opt, profile_sim, profile_sim_opt, min_err)
-    % Plot optimized simulation results and compare with desired profiles
-    %
-    % Arguments:
-    % - parameters: Structure containing optimized parameters.
-    %       .calibration.path_output: Directory for saving output.
-    %       .calibration.save_in_calibration_folder: Option to save data in the general PRESTUS output folder.
-    %       .calibration.desired_focal_distance_ep: Focal depth with respect to the transducer exit plane [mm].
-    %       .calibration.desired_intensity: Target intensity for optimization [W/cm^2].
-    %       .calibration.equipment_name: Name of the equipment used.
-    %       .outputs_folder: Directory containing output simulation results.
-    % - profile_target
-    %       .axial_distance_bowl: Axial position vector [mm from bowl].
-    %       .axial_intensity: Adjusted desired intensity profile [W/cm^2].
-    % - profile_oneil
-    %       .axial_intensity: Original O'Neil solution for intensity [W/cm^2].
-    % - profile_oneil_opt
-    %       .axial_intensity: Optimized O'Neil solution for intensity [W/cm^2].
-    % - profile_sim
-    %       .axial_intensity: Original simulation intensity profile [W/cm^2].
-    % - profile_sim_opt
-    %       .axial_intensity: Optimized simulation intensity profile [W/cm^2].
-    % - min_err: Minimum optimization error.
+% PLOT_OPT_SIM_RESULTS  Plot and save comparison of calibration optimisation profiles
+%
+% Generates a figure comparing the target, original analytical, optimised
+% analytical, original simulated, and optimised simulated axial intensity
+% profiles. Saves the figure to calibration.path_output.
+%
+% Use as:
+%   plot_opt_sim_results(parameters, profile_target, profile_oneil, profile_oneil_opt, ...
+%                        profile_sim, profile_sim_opt, min_err)
+%
+% Input:
+%   parameters       - PRESTUS config; uses calibration.path_output,
+%                      calibration.desired_focal_distance_ep [mm],
+%                      calibration.desired_intensity [W/cm²], calibration.equipment_name
+%   profile_target   - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
+%   profile_oneil    - struct with axial_intensity from original O'Neil solution [W/cm²]
+%   profile_oneil_opt- struct with axial_intensity from optimised O'Neil solution [W/cm²]
+%   profile_sim      - struct with axial_intensity from original simulation [W/cm²]
+%   profile_sim_opt  - struct with axial_intensity from optimised simulation [W/cm²]
+%   min_err          - minimum optimisation error
+%
+% See also: CALIBRATION_TRANSDUCER, PERFORM_GLOBAL_SEARCH, RECOMPUTE_ONEIL_SOLUTION
+
+arguments
+    parameters        (1,1) struct
+    profile_target    (1,1) struct
+    profile_oneil     (1,1) struct
+    profile_oneil_opt (1,1) struct
+    profile_sim       (1,1) struct
+    profile_sim_opt   (1,1) struct
+    min_err           (1,1) {mustBeNumeric}
+end
     
     %% Plot comparison of profiles
 

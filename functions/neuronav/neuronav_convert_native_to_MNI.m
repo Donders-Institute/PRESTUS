@@ -7,52 +7,36 @@ function [trans_ras_seg, ...
     neuronav_convert_native_to_MNI...
     (sub_id, parameters, pn, trans_ras, target_ras, side_order)
 
-% NEURONAV_CONVERT_NATIVE_TO_MNI - Convert native RAS coordinates to MNI space
+% NEURONAV_CONVERT_NATIVE_TO_MNI  Convert native RAS coordinates to MNI space
 %
-% This function transforms transducer and target coordinates from native subject 
-% space (RAS mm) into segmentation space and then into standardized MNI space,
-% producing both voxel indices and RAS coordinates in MNI space. It also clamps 
-% coordinates to the valid overlapping spatial bounds between segmentation and MNI spaces 
-% to ensure anatomical plausibility. Optionally, the output voxel positions are adjusted 
-% based on the recorded stimulation hemisphere ('left' or 'right').
+% Transforms transducer and target coordinates from native subject RAS
+% space to standardised MNI space via SimNIBS nonlinear warp fields.
+% Clamps coordinates to valid overlapping bounds and optionally adjusts
+% for stimulation laterality.
 %
-% INPUTS:
-%   sub_id       - Subject ID string, e.g., 'sub-010'
-%   parameters   - Struct containing subject-specific parameters and settings
-%   pn           - Struct with paths to necessary data and toolboxes
-%   trans_ras    - Nx3 array of transducer RAS coordinates in native space (in mm)
-%   target_ras   - Nx3 array of target RAS coordinates in native space (in mm)
-%   side_order   - Cell array of strings {'left','right',...} indicating laterality per coordinate (optional)
+% Use as:
+%   [trans_ras_seg, target_ras_seg, trans_mni_pos, target_mni_pos, ...
+%    trans_mni_ras, targ_mni_ras] = neuronav_convert_native_to_MNI( ...
+%       sub_id, parameters, pn, trans_ras, target_ras)
+%   [...] = neuronav_convert_native_to_MNI(..., side_order)
 %
-% OUTPUTS:
-%   trans_ras_seg   - Nx3 array of transducer coordinates converted to segmentation RAS space (mm)
-%   target_ras_seg  - Nx3 array of target coordinates converted to segmentation RAS space (mm)
-%   trans_mni_pos   - Nx3 array of transducer voxel indices in MNI space (integer)
-%   target_mni_pos  - Nx3 array of target voxel indices in MNI space (integer)
-%   trans_mni_ras   - Nx3 array of transducer continuous RAS coordinates in MNI space (mm)
-%   targ_mni_ras    - Nx3 array of target continuous RAS coordinates in MNI space (mm)
+% Input:
+%   sub_id     - subject identifier string (e.g. 'sub-010')
+%   parameters - (1,1) simulation parameters struct
+%   pn         - (1,1) path names struct
+%   trans_ras  - [Nx3] transducer RAS coordinates in native space [mm]
+%   target_ras - [Nx3] target RAS coordinates in native space [mm]
+%   side_order - cell array of laterality strings {'left','right',...} (optional)
 %
-% STEPS:
-%   1. Load image headers for planning, segmentation, and MNI reference spaces.
-%   2. Load nonlinear warp field transforming native segmentation to MNI.
-%   3. Compute valid coordinate boundaries by mapping MNI voxel bounds back to segmentation space.
-%   4. Transform input native RAS points (transducer and target) to segmentation RAS coordinates.
-%   5. Clamp segmentation coordinates within computed spatial overlap bounds.
-%   6. Use SimNIBS helper functions to map segmentation RAS to MNI RAS space.
-%   7. Convert MNI RAS coordinates to voxel indices using image affine info.
-%   8. Adjust voxel indices laterally based on hemisphere side to compensate for limited MNI field-of-view.
-%   9. Convert adjusted voxel indices back to MNI RAS mm coordinates.
+% Output:
+%   trans_ras_seg  - [Nx3] transducer coordinates in segmentation RAS space [mm]
+%   target_ras_seg - [Nx3] target coordinates in segmentation RAS space [mm]
+%   trans_mni_pos  - [Nx3] transducer voxel indices in MNI space
+%   target_mni_pos - [Nx3] target voxel indices in MNI space
+%   trans_mni_ras  - [Nx3] transducer RAS coordinates in MNI space [mm]
+%   targ_mni_ras   - [Nx3] target RAS coordinates in MNI space [mm]
 %
-% NOTES:
-%   - Input and output coordinates use the RAS convention (Right-Anterior-Superior)
-%   - Voxel indices are 1-based MATLAB indexing (x, y, z)
-%   - side_order input influences lateral voxel adjustments to correct for partial MNI coverage
-%   - Coordinates reported in multiple spaces enable precise spatial localization and group comparisons
-%
-% DEPENDENCIES:
-%   - niftiinfo, niftiread (MATLAB NIfTI toolbox)
-%   - mni2subject_coords_LDfix.m (SimNIBS coordinate transformation)
-%   - ras_to_grid.m (convert RAS mm to voxel indices)
+% See also: NEURONAV_CONVERT_MNI_TO_NATIVE, NEURONAV_GET_GROUP_MEAN_MNI
 
     % Number of positions
     Npos = size(trans_ras,1);

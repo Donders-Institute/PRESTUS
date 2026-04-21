@@ -1,58 +1,56 @@
 function create_group_MNI_plots(subject_list, parameters, options)
-%--------------------------------------------------------------------------
-% CREATE_GROUP_MNI_PLOTS
+% CREATE_GROUP_MNI_PLOTS  Generate group-level simulation plots in MNI space
 %
-% Generates group-level plots in MNI space for multiple subjects.
+% Processes per-subject ISPPA, pressure, and heating maps, extracts
+% orthogonal slices or peak-intensity slices, and generates composite
+% plots with optional ROI/FWHM overlays and statistics. Saves montaged
+% images and updates group CSV tables.
 %
-% This function processes per-subject simulation output files (e.g. ISPPA,
-% pressure, heating maps), extracts relevant slices or statistics, and 
-% generates composite plots for visual inspection or publication. All 
-% masking and statistical operations (e.g. FWHM, ROI overlap) are applied.
+% Use as:
+%   create_group_MNI_plots(subject_list, parameters)
+%   create_group_MNI_plots(subject_list, parameters, options)
 %
 % Supported features:
-% - Wildcard support in filenames using `parameters.io.output_affix`
-% - Optional use of subfolders per subject (`parameters.path.subject_subfolder`)
-% - Heatmap plotting, FWHM mask logic, ROI overlays and statistics
+%   - Wildcard support in filenames via parameters.io.output_affix
+%   - Optional per-subject subfolders via parameters.path.subject_subfolder
+%   - Heatmap plotting, FWHM mask logic, ROI overlays and statistics
 %
-% INPUTS
-%   subject_list : array of subject IDs (numeric) to include
+% Input:
+%   subject_list - array of subject IDs (numeric)
+%   parameters   - (1,1) simulation parameters struct; required fields:
+%                    .path.temp_output_dir  — path to subject image outputs
+%                    .layers.brain          — label values for brain tissue mask
+%                    .layers.water          — label values for water tissue mask
+%                    .io.output_affix       — filename suffix/wildcard (e.g. '_ses-*')
+%                    .simulation.medium     — used in table filenames
+%                    .path.subject_subfolder — (optional) files in sub-NNN/ folders
+%                    .path.seg_path / .path.data_path — SimNIBS m2m segmentation paths
+%                    .thermal.temp_0        — baseline temp; scalar or struct with .skin/.water
+%   options      - name-value options:
+%                    ROI_MNI_mask (3D logical) — binary ROI volume in MNI space
+%                    slice_to_plot (int)        — slice index to display
+%                    plot_max_intensity (bool)  — use slice with peak ISPPA (conflicts with slice_to_plot)
+%                    slice_label ('x'|'y'|'z') — axis to slice along
+%                    rotation (deg)             — image rotation for display
+%                    plot_heating (bool)        — include heating map plots
+%                    outputs_suffix (string)    — suffix for output files
+%                    intensity_thresholds ([lo hi]) — manual ISPPA colorbar range
+%                    add_FWHM_boundary (bool)   — outline ISPPA > half-max region
+%                    add_ROI_boundary (bool)    — overlay and compute ROI stats
+%                    skip_missing (bool)        — skip subjects with missing files
+%                    brightness_correction (bool) — normalise brightness across subjects
+%                    average_target_brightness (float) — target mean brightness value
 %
-%   parameters : struct containing required config values:
-%     - temp_output_dir [string]               : Path to output folder for subject images
-%     - layers.brain [array]             : Label values of brain tissue (for binary mask)
-%     - layers.water [array]             : Label values of water tissue (mask heating)
-%     - io.output_affix [string/wildcard]: e.g., '_ses-*'.
-%     - simulation.medium [string]             : Used in table filenames
-%     - subject_subfolder [bool, optional]     : If files are in subfolders like sub-001/sub-001_...
-%     - seg_path / data_path [string]          : Path to SimNIBS m2m segmentation data
-%     - thermal.temp_0 [scalar or struct]      : Baseline temp, or struct with .skin and .water
-%
-%   options : struct with additional parameters, including:
-%     - ROI_MNI_mask (3D logical)             : Binary ROI volume in MNI space
-%     - slice_to_plot (int)                   : Slice to show (cannot be used with plot_max_intensity)
-%     - plot_max_intensity (bool)             : Use slice with peak ISPPA (conflict w/ above)
-%     - slice_label ('x','y','z')             : Axis to slice along
-%     - rotation (deg)                        : Rotation of image for display
-%     - plot_heating (bool)                   : Whether to include heating map plots
-%     - outputs_suffix (string)               : Suffix for output files
-%     - intensity_thresholds ([low high])         : Manual ISPPA colorbar range
-%     - add_FWHM_boundary (bool)              : Outline region with ISPPA > half max
-%     - add_ROI_boundary (bool)               : Overlap and ROI stats/outline
-%     - skip_missing (bool)                   : If true, skip subjects
-%     missing files  
-%     - brightness_correction (bool)          : Normalize brightness across subjects
-%     - average_target_brightness (float)     : Target average brightness value
-%
-% OUTPUT
+% Output:
 %   - ISPPA and optionally heating plots per subject in MNI space
 %   - CSV tables updated with ROI and FWHM statistics
 %   - Montaged image per modality across all subjects
 %
-%--------------------------------------------------------------------------
+% See also: COMBINE_PLOTS_BY_SUFFIX
 
 arguments
-    subject_list 
-    parameters struct
+    subject_list
+    parameters   (1,1) struct
     options.ROI_MNI_mask (:,:,:)
     options.slice_to_plot = 0 
     options.plot_max_intensity = 0

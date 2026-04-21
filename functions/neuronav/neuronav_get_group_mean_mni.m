@@ -1,8 +1,26 @@
 function [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ_vox] = ...
     neuronav_get_group_mean_mni(session_target, parameters)
-% NEURONAV_GET_GROUP_MEAN_MNI
-% Compute group-level average MNI coordinates (both mm and voxel).
-% Only includes rows where interpolated == 0.
+% NEURONAV_GET_GROUP_MEAN_MNI  Compute group-level average MNI coordinates
+%
+% Reads per-subject session CSVs from parameters.path.sim, filters to
+% non-interpolated rows, and returns mean transducer and target positions
+% for the specified target label in both RAS mm and voxel MNI coordinates.
+%
+% Use as:
+%   [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ_vox] = ...
+%       neuronav_get_group_mean_mni(session_target, parameters)
+%
+% Input:
+%   session_target - target label string to average over
+%   parameters     - (1,1) simulation parameters struct with path.sim field
+%
+% Output:
+%   mean_mni_trans_mm  - [1x3] mean transducer position in MNI RAS space [mm]
+%   mean_mni_targ_mm   - [1x3] mean target position in MNI RAS space [mm]
+%   mean_mni_trans_vox - [1x3] mean transducer position in MNI voxel space
+%   mean_mni_targ_vox  - [1x3] mean target position in MNI voxel space
+%
+% See also: NEURONAV_EXPORT_SESSION_CSV, NEURONAV_CONVERT_NATIVE_TO_MNI
 
 % Load all subject session CSVs
 csv_files = dir(fullfile(parameters.path.sim, 'sub-*', '*_info.csv'));

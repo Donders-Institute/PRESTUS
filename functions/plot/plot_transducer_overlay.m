@@ -1,15 +1,24 @@
 function plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, max_data_pos, options, overlay_weight, overlay_color)
-%PLOT_TRANSDUCER_OVERLAY Complete transducer visualization with rectangles and labels
-% Inputs:
-%   parameters     - Struct with .transducer(1).{curv_radius_mm, dist_geom_ep_mm, 
-%                    elem_od_mm, grid.resolution_mm, trans_pos, grid_dims}
-%   trans_pos      - [2x1] Transducer center position (grid units)  
-%   focus_pos      - [2x1] Acoustic focus position (grid units)
-%   natural_foc    - [2x1] Natural focus position (grid units)
-%   max_data_pos   - [2x1] Max data position for visualization context
-%   options        - Struct with .grid_step, .show_rectangles, .rect_size
-%   overlay_weight - [0,1] Blend weight for overlay_color
-%   overlay_color  - [1x3] RGB color for blending
+% PLOT_TRANSDUCER_OVERLAY  Draw transducer geometry with labelled rectangles on the current axes
+%
+% Draws the transducer bowl, exit plane, and focus position on the current
+% axes using the computed geometry, with optional weighted colour blending.
+%
+% Use as:
+%   plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, ...
+%       max_data_pos, options, overlay_weight, overlay_color)
+%
+% Input:
+%   parameters     - (1,1) simulation parameters struct with transducer geometry
+%   trans_pos      - [2x1] transducer centre position [grid units]
+%   focus_pos      - [2x1] acoustic focus position [grid units]
+%   natural_foc    - [2x1] natural focus position [grid units]
+%   max_data_pos   - [2x1] maximum data position for visualisation context
+%   options        - struct with .grid_step, .show_rectangles, .rect_size
+%   overlay_weight - blend weight in [0, 1] for overlay_color
+%   overlay_color  - [1x3] RGB colour for blending
+%
+% See also: PLOT_OVERLAY_2D, GET_TRANSDUCER_BOX
 
 if isempty(trans_pos)
     return;

@@ -1,40 +1,39 @@
 function params_thermal = thermal_parameters(parameters, silent)
-% THERMAL_PARAMETERS computes time stepping parameters for multi-level thermal ultrasound protocol.
+% THERMAL_PARAMETERS  Compute time-stepping parameters for a multi-level thermal sonication protocol
 %
-% This function discretizes a hierarchical thermal sonication protocol into integer 
-% time steps at two temporal resolutions: fine steps for pulse trains (pt_timestep) 
-% and coarse steps for inter-train OFF periods (post_pt_timestep). The protocol 
-% consists of pulses → pulse trains (PT) → pulse-train repetitions (PTRI within PTRD) 
-% → optional post-PTRD steady-state.
+% Discretizes a hierarchical pulse protocol into integer time steps at two
+% temporal resolutions: fine steps (pt_timestep) covering each pulse ON
+% and OFF interval within a pulse train (PT), and coarse steps
+% (post_pt_timestep) covering the inter-train OFF periods (PTRI-OFF) and
+% the optional post-PTRD steady-state cool-off. All step counts are
+% verified to be integers (error if not). The hierarchy is:
+%   pulse (pd / pri) -> pulse train (ptd) -> PTRI reps (ptrd) -> post-PTRD
 %
 % Use as:
-%   params_thermal = thermal_parameters(cfg)
+%   params_thermal = thermal_parameters(parameters)
+%   params_thermal = thermal_parameters(parameters, silent)
 %
-% Required input (in parameters.timing):
-%   .pd              - pulse duration [s]
-%   .pri             - pulse repetition interval [s]
-%   .ptd             - pulse train duration [s]
-%   .pt_timestep     - fine timestep for PT [s]
-%   .ptri            - pulse train repetition interval [s]
-%   .ptrd            - pulse train repetition duration [s]
-%   .post_pt_timestep- coarse timestep for OFF periods [s]
-%   .post_ptri_dur   - post-PTRD steady-state duration [s]
-%   .equal_step_duration - 0: fixed 1-step ON/OFF; 1: equal dt steps
+% Input:
+%   parameters - PRESTUS config; must contain timing sub-struct:
+%                timing.pd [s], timing.pri [s], timing.ptd [s],
+%                timing.pt_timestep [s], timing.ptri [s], timing.ptrd [s],
+%                timing.post_pt_timestep [s], timing.post_ptri_dur [s],
+%                timing.equal_step_duration
+%   silent     - suppress console summary printout (optional, default: false)
 %
-% Output structure params_thermal contains:
-%   .pri, .pd, .ptd, .pt_dt              - input values
-%   .dc                                  - duty cycle = pd/pri
-%   .prf                                 - pulse repetition frequency = 1/pri [Hz]
-%   .pt_on_steps_n, .pt_on_steps_dur     - pulse ON discretization within PT
-%   .pt_off_steps_n, .pt_off_steps_dur   - pulse OFF discretization within PT  
-%   .n_pulses_per_pt                     - integer pulses per pulse train
-%   .ptri_off, .ptri_off_steps_n         - PTRI-OFF duration & coarse steps
-%   .n_ptri_reps                         - integer PTRI repetitions in PTRD
-%   .post_ptri_steps_n, .post_ptri_step_dur - post-PTRD cool-off discretization
+% Output:
+%   params_thermal - struct with fields:
+%                    pri, pd, ptd, pt_dt [s], dc (duty cycle), prf [Hz],
+%                    pt_on_steps_n, pt_on_steps_dur [s],
+%                    pt_off_steps_n, pt_off_steps_dur [s],
+%                    n_pulses_per_pt, ptri_off [s], ptri_off_steps_n,
+%                    n_ptri_reps, post_ptri_steps_n, post_ptri_step_dur [s]
+%
+% See also: THERMAL_SIMULATION, THERMAL_PLOT_PROTOCOL
 
 arguments
-    parameters struct
-    silent (1,1) logical = false  % Default: show summary
+    parameters (1,1) struct
+    silent     (1,1) logical = false
 end
 
 if ~silent

@@ -1,8 +1,23 @@
 function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmented_img)
-    
-    % parameters | parameter structure
-    % BW | Binary skull mask
-    % medium_masks | medium mask (Note: originally differentiated segmentation)
+% SKULL_RUBBER_WRAP  Fill local holes in the skull layer using a balloon inflation approach
+%
+% Iteratively inflates a balloon from the skin surface inward to fill gaps
+% in the binary skull mask, producing a watertight skull layer for
+% simulation. Saves the result as a NIfTI file.
+%
+% Use as:
+%   SKULL_BALLON = skull_rubber_wrap(parameters, BW, medium_masks, segmented_img)
+%
+% Input:
+%   parameters    - (1,1) simulation configuration struct
+%   BW            - [Nx x Ny x Nz] binary skull mask
+%   medium_masks  - [Nx x Ny x Nz] medium label array
+%   segmented_img - [Nx x Ny x Nz] SimNIBS tissue label volume
+%
+% Output:
+%   SKULL_BALLON - [Nx x Ny x Nz] filled binary skull mask
+%
+% See also: SKULL_FILL_HOLES, PCT_SKULLEXPAND
 
     disp('Using rubber wrap to fill potential local holes in skull layer...')
 

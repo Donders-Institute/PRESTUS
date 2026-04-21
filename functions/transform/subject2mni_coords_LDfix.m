@@ -1,20 +1,31 @@
 function coords_sub = subject2mni_coords_LDfix(coords_mni, subdir, parameters, transformation_type)
-
-% Transforms a set of coordinates in MNI space to subject space
-% This function calls the command line tool "mni2subject_coords", so it has
-% a large overhead.
-% coords_mni: MNI coordinates, in Nx3 format
-% subdir: path to subject directory, example: 'm2m_ernie/'
-% transformation_type (optional): type of trasfomation to use,
-%                                 can be {'nonl' (non-linear),
-%                                '12dof', '6dof' (6 and 12 degrees of freedom)}
-% Returns: coordinates in subject space
-% Guilherme B Saturnino, 2019
-
-% Note: This is a hotfix that was necessary to fix the call of the bash
-% script via the parameters structure. The issue is described here: 
-% https://github.com/simnibs/simnibs/issues/106
-% Only use if there is no general fix to this issue.
+% SUBJECT2MNI_COORDS_LDFIX  Transform subject RAS+ coordinates to MNI space via SimNIBS CLI (LD_LIBRARY_PATH hotfix)
+%
+% Writes coords_mni to a temporary CSV in SimNIBS Generic format, calls the
+% subject2mni_coords command-line tool, and reads back the result. An optional
+% LD_LIBRARY_PATH export is prepended to the system call when
+% parameters.hpc.ld_library_path is set — this hotfix is required on some HPC
+% systems where SimNIBS bash scripts do not inherit the library path correctly
+% (see: https://github.com/simnibs/simnibs/issues/106). Has a large per-call
+% overhead due to the system() call; do not call inside tight loops.
+% Note: despite the function name, this converts subject → MNI (forward direction).
+%
+% Use as:
+%   coords_sub = subject2mni_coords_LDfix(coords_mni, subdir, parameters)
+%   coords_sub = subject2mni_coords_LDfix(coords_mni, subdir, parameters, transformation_type)
+%
+% Input:
+%   coords_mni          - [Nx3] coordinates in subject RAS+ space [mm]
+%   subdir              - path to SimNIBS m2m subject directory (e.g. 'm2m_ernie/')
+%   parameters          - PRESTUS config; uses hpc.ld_library_path and
+%                         startup.simnibs_bin_path
+%   transformation_type - transform type: 'nonl' | '12dof' | '6dof'
+%                         (optional, default: 'nonl')
+%
+% Output:
+%   coords_sub - [Nx3] coordinates in MNI space [mm]
+%
+% See also: MNI2SUBJECT_COORDS_LDFIX, TRANSFORM_COORDINATES, CONVERT_FINAL_TO_MNI_SIMNIBS
 
 if nargin < 4
     transformation_type = 'nonl';

@@ -1,21 +1,25 @@
 function tp_plot_candidate_positions(img, target, trans_candidate, ...
     pixel_size, parameters, subject_id, target_name)
-    % TP_PLOT_CANDIDATE_POSITIONS Plot transducer candidate positions on skull surface slice
+    % TP_PLOT_CANDIDATE_POSITIONS  Plot transducer candidate positions on a skull surface slice
     %
-    % Creates bounds visualization showing target (red), random transducer candidate (blue),
-    % and search sphere intersection with skull surface.
+    % Creates a bounds visualisation showing the target (red), a random
+    % transducer candidate (blue), and the search sphere intersection with
+    % the skull surface. Saves the figure to disk.
     %
-    % INPUT
-    %   img             - 3D tissue segmentation image
-    %   target          - 1x3 target coordinates [x,y,z]
-    %   trans_candidate - Structure with info on transducer candidate
-    %   pixel_size      - Voxel size (mm)
-    %   parameters      - Transducer parameters for get_transducer_box
-    %   subject_id      - Scalar ID for filename
-    %   target_name     - String for filename
+    % Use as:
+    %   tp_plot_candidate_positions(img, target, trans_candidate, ...
+    %       pixel_size, parameters, subject_id, target_name)
     %
-    % OUTPUT
-    %   Saves: sub-XXX_bounds_TARGET.png
+    % Input:
+    %   img             - [Nx x Ny x Nz] tissue segmentation volume
+    %   target          - [1x3] target coordinates in voxel space
+    %   trans_candidate - struct with transducer candidate position fields
+    %   pixel_size      - voxel size [mm]
+    %   parameters      - (1,1) simulation parameters struct
+    %   subject_id      - subject identifier used in output filename
+    %   target_name     - target label string used in output filename
+    %
+    % See also: TP_FIND_INITIAL_CANDIDATE, TP_PLOT_GEOMETRY_OVERLAY
 
     disp("[TP] Plotting initial candidate position ...")
 

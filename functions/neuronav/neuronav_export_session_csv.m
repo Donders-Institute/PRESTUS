@@ -6,19 +6,32 @@ function neuronav_export_session_csv( ...
     trans_mni_vox, target_mni_vox, ...
     trans_mni_mm, target_mni_mm, ...
     interpolated)
-% NEURONAV_EXPORT_SESSION_CSV
-% Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions.
-
-% INPUTS:
-%   sub_id, session          : ID strings
-%   session_target           : {N x 1} cell array with target labels
-%   outputs_folder           : path to save the output CSV
-%   trans_vox, target_vox    : [N x 3] voxel coordinates in native (segmentation) space
-%   trans_mm, target_mm      : [N x 3] RAS mm coordinates in native segmentation space
-%   trans_mni_vox, target_mni_vox : [N x 3] voxel coordinates in MNI space
-%   trans_mni_mm, target_mni_mm   : [N x 3] RAS mm coordinates in MNI space
-%   interpolated                  : [logical] recorded (0) or inteprolated (1) coordinates 
-% ---
+% NEURONAV_EXPORT_SESSION_CSV  Export per-session coordinates to a labelled CSV file
+%
+% Assembles native voxel, native RAS mm, MNI voxel, and MNI RAS mm
+% coordinates into a table and writes it to CSV for downstream analyses.
+%
+% Use as:
+%   neuronav_export_session_csv(sub_id, session, session_target, ...
+%       outputs_folder, trans_vox, target_vox, trans_mm, target_mm, ...
+%       trans_mni_vox, target_mni_vox, trans_mni_mm, target_mni_mm, interpolated)
+%
+% Input:
+%   sub_id          - subject identifier string
+%   session         - session identifier string
+%   session_target  - {Nx1} cell array of target label strings
+%   outputs_folder  - path to save the output CSV
+%   trans_vox       - [Nx3] transducer voxel coordinates in native space
+%   target_vox      - [Nx3] target voxel coordinates in native space
+%   trans_mm        - [Nx3] transducer RAS coordinates in native space [mm]
+%   target_mm       - [Nx3] target RAS coordinates in native space [mm]
+%   trans_mni_vox   - [Nx3] transducer voxel coordinates in MNI space
+%   target_mni_vox  - [Nx3] target voxel coordinates in MNI space
+%   trans_mni_mm    - [Nx3] transducer RAS coordinates in MNI space [mm]
+%   target_mni_mm   - [Nx3] target RAS coordinates in MNI space [mm]
+%   interpolated    - logical flag: 0 = recorded, 1 = interpolated
+%
+% See also: NEURONAV_CONVERT_NATIVE_TO_MNI, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
 N = size(trans_vox, 1);
 

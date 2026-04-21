@@ -1,27 +1,43 @@
 function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_intensity(...
     parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity, simulated_analytical_scaling)
-% fit_velocity_to_intensity - Correct velocity so peak intensity matches desired intensity.
+% FIT_VELOCITY_TO_INTENSITY  Analytically correct particle velocity to match desired peak intensity
 %
-% After global search optimizes profile shape (phases + velocity), the peak
-% intensity may not exactly equal desired_intensity. Since I ∝ v², we can
-% analytically correct velocity: v_new = v_old * sqrt(I_desired / I_peak).
-%
+% After global search optimises profile shape (phases and velocity), the
+% peak intensity may not exactly equal desired_intensity. Since I ∝ v²,
+% velocity is corrected analytically: v_new = v_old * sqrt(I_desired / I_peak).
 % Because opt_source_amp divides by simulated_analytical_scaling, the
-% analytical target must be desired_intensity * scaling so that the final
-% simulation's Isppa equals desired_intensity.
+% analytical target is desired_intensity * scaling so that the final
+% simulation Isppa equals desired_intensity.
 %
-% Arguments:
-%   parameters                   - Structure with transducer and medium parameters.
-%   profile_oneil                - Structure with .axial_distance_bowl (mm from bowl).
-%   opt_phases                   - Optimized phases for each element [rad].
-%   opt_velocity                 - Optimized particle velocity from global search [m/s].
-%   desired_intensity            - Target peak intensity [W/cm^2].
-%   simulated_analytical_scaling - Ratio of simulated to analytical peak intensity.
+% Use as:
+%   [corrected_velocity, I_peak_before, I_peak_after] = ...
+%       fit_velocity_to_intensity(parameters, profile_oneil, opt_phases, ...
+%                                 opt_velocity, desired_intensity, simulated_analytical_scaling)
 %
-% Returns:
-%   corrected_velocity - Velocity adjusted to yield desired peak intensity [m/s].
-%   I_peak_before      - Peak intensity before correction [W/cm^2].
-%   I_peak_after       - Peak intensity after correction [W/cm^2].
+% Input:
+%   parameters                   - PRESTUS config with transducer.annular geometry and
+%                                  medium_properties.water, calibration.skip_front_peak_mm [mm]
+%   profile_oneil                - struct with axial_distance_bowl [mm]
+%   opt_phases                   - optimised phases per element [rad]
+%   opt_velocity                 - optimised particle velocity from global search [m/s]
+%   desired_intensity            - target peak intensity [W/cm²]
+%   simulated_analytical_scaling - ratio of simulated to analytical peak intensity
+%
+% Output:
+%   corrected_velocity - velocity adjusted to yield desired peak intensity [m/s]
+%   I_peak_before      - peak intensity before correction [W/cm²]
+%   I_peak_after       - peak intensity after correction [W/cm²]
+%
+% See also: PERFORM_GLOBAL_SEARCH, COMPUTE_ONEIL_SOLUTION, CALIBRATION_TRANSDUCER
+
+arguments
+    parameters                   (1,1) struct
+    profile_oneil                (1,1) struct
+    opt_phases                   (1,:) {mustBeNumeric}
+    opt_velocity                 (1,1) {mustBeNumeric}
+    desired_intensity            (1,1) {mustBeNumeric}
+    simulated_analytical_scaling (1,1) {mustBeNumeric}
+end
 
     axial_position = profile_oneil.axial_distance_bowl;
 

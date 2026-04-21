@@ -1,38 +1,24 @@
 function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
-% skull_fill_holes Expands skull mask and fills gaps to skin.
+% SKULL_FILL_HOLES  Expand skull mask and fill gaps to maintain continuity
 %
-% This function processes a 3D medium mask used in ultrasound brain stimulation simulations (e.g., k-Wave).
-% It ensures skull continuity by expanding the skull region using bone perimeter detection and filling 
-% gaps, while preserving trabecular bone and excluding eyes from bone labeling.
-% Debug plots are generated if enabled, showing changes at the focus position slice.
+% Expands the skull region using morphological perimeter detection and
+% fills gaps between bone and skin, while preserving trabecular bone and
+% setting eye voxels to water. Debug slice figures are saved when enabled.
 %
-% Inputs:
-%   parameters      - Struct with simulation parameters:
-%                     - debug                      (1/0) Enable debug plots.
-%                     - debug_dir                  (string) Directory for saving debug images.
-%                     - subject_id                 (numeric) Subject ID for filename.
-%                     - simulation.medium          (string) Medium type (e.g., 'water').
-%                     - io.output_affix            (string) Affix for output filenames.
-%                     - seg_labels.eye             (optional int) Label index for eye tissue.
-%   medium_masks    - 3D array of initial medium labels (updated in-place and returned).
-%   focus_pos_grid  - 1x3 vector [x,y,z] indices of focus position for debug slice (y-slice used).
-%   segmented_img   - 3D array of original segmentation labels.
+% Use as:
+%   [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
 %
-% Outputs:
-%   medium_masks    - Updated 3D medium mask with expanded skull and filled gaps.
-%   skull_i         - Integer label value for skull tissue.
+% Input:
+%   parameters     - (1,1) simulation configuration struct
+%   medium_masks   - [Nx x Ny x Nz] medium label array
+%   focus_pos_grid - [1x3] focus position in voxel coordinates
+%   segmented_img  - [Nx x Ny x Nz] SimNIBS tissue label volume
 %
-% Dependencies:
-%   - Image Processing Toolbox: imerode, strel, imfill, bwlabeln, regionprops, label2rgb, imshowpair, montage.
+% Output:
+%   medium_masks - updated medium label array with skull gaps filled
+%   skull_i      - integer label index for skull tissue
 %
-% Example:
-%   medium_masks = skull_fill_holes(params, medium_masks, 2, bone_img, focus_pos, seg_img, trab_mask, 3);
-%
-% Notes:
-%   - Assumes voxel-based 3D head model from neuroimaging (e.g., CT/MRI segmentation).
-%   - Expansion uses morphological perimeter (3-voxel cube structuring element).
-%   - Gap filling identifies largest non-skin-skull blob (likely CSF/air) and ignores it.
-%   - Eyes default to water (label 0) to avoid erroneous bone assignment.
+% See also: SKULL_RUBBER_WRAP, PREPROC_MEDIUM_MASK
 
     labels_medium = fieldnames(parameters.medium_properties);
     labels_requested = fieldnames(parameters.layers);

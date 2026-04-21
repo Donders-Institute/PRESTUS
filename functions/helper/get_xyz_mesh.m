@@ -1,17 +1,23 @@
 function coord_mesh_xyz = get_xyz_mesh(img)
-
-% GET_XYZ_MESH Generates a mesh of 3D coordinates for a given image.
+% GET_XYZ_MESH  Generate an [Nx3] coordinate mesh for all voxels in a 3D image
 %
-% This function creates an Nx3 array of point coordinates for a 3D image (`img`).
-% Each row in the output corresponds to the (x, y, z) coordinates of a voxel in 
-% the image, where N is the total number of voxels.
+% Creates an Nx3 array where each row contains the (x, y, z) integer grid
+% indices of one voxel, with N = numel(img).
+%
+% Use as:
+%   coord_mesh_xyz = get_xyz_mesh(img)
 %
 % Input:
-%   img - [Nx x Ny x Nz] matrix representing the 3D image.
+%   img - [Nx x Ny x Nz] 3D volume
 %
 % Output:
-%   coord_mesh_xyz - [N x 3] array of voxel coordinates, where each row contains 
-%                    the (x, y, z) coordinates of a voxel in the image.
+%   coord_mesh_xyz - [Nx3] voxel coordinate array [voxels]
+%
+% See also: NDGRID, RESHAPE
+
+arguments
+    img (:,:,:) {mustBeNumeric}
+end
 
     %% Generate coordinate grids for each dimension
     % Create 3D grids for x, y, and z dimensions using `ndgrid`

@@ -1,45 +1,29 @@
 function [transducer_mask, source_label, tr] = ...
     transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm)
 
-% TRANSDUCER_SETUP Creates a transducer mask and label matrix for a computational grid.
+% TRANSDUCER_SETUP  Create a transducer mask and label matrix for a k-Wave grid
 %
-% This function generates a binary mask (`transducer_mask`) and a labeled matrix 
-% (`source_label`) for a multi-element ultrasound transducer. It computes these 
-% based on the transducer's geometric parameters and its position relative to 
-% a computational grid. Additionally, it updates the `tr` structure 
-% with converted values (e.g., diameters in grid points).
+% Generates a binary transducer mask and element-labelled source matrix
+% for a multi-element ultrasound transducer, and updates the transducer
+% struct with grid-unit equivalents of the geometric parameters.
 %
-% Use this function to define the geometry of a transducer and map it to a 
-% computational grid for numerical simulations.
+% Use as:
+%   [transducer_mask, source_label, tr] = ...
+%       transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm)
 %
 % Input:
-%   tr   - Struct containing geometric parameters of the transducer:
-%                       * elem_n: Number of elements in the transducer.
-%                       * elem_od_mm: Outer diameter of each element (in mm).
-%                       * elem_id_mm: Inner diameter of each element (in mm).
-%                       * curv_radius_mm: Curvature radius of the elements (in mm).
-%
-%   trans_pos         - [1x2/3] or [2/3x1] array specifying the Cartesian coordinates 
-%                       of the transducer position.
-%
-%   focus_pos         - [1x2/3] or [2/3x1] array specifying the Cartesian coordinates 
-%                       of the geometric focus position.
-%
-%   grid_dims         - [Nx, Ny, Nz] array defining the dimensions of the computational grid.
-%
-%   grid_res_mm       - Scalar specifying the step size of the computational grid (in mm).
+%   tr          - (1,1) transducer parameter struct
+%   trans_pos   - [1x2/3] transducer position in grid coordinates
+%   focus_pos   - [1x2/3] focus position in grid coordinates
+%   grid_dims   - [1x2/3] computational grid dimensions [voxels]
+%   grid_res_mm - grid step size [mm]
 %
 % Output:
-%   transducer_mask   - Binary matrix of size `grid_dims`. Non-zero values represent 
-%                       active regions of specific elements in the transducer.
+%   transducer_mask - grid array with non-zero values at active element voxels
+%   source_label    - grid array with unique integer label per element
+%   tr              - updated transducer struct with grid-unit geometry fields
 %
-%   source_label      - Labeled matrix of size `grid_dims`. Each non-zero value uniquely 
-%                       identifies an individual element in the transducer.
-%
-%   tr   - Updated struct with additional fields:
-%                       * Elements_OD: Outer diameter in grid points.
-%                       * Elements_ID: Inner diameter in grid points.
-%                       * radius_grid: Curvature radius in grid points.
+% See also: FOCAL_DISTANCE_CALCULATION, CONVERT_TO_ELEMENT_POS
 
     % Check if the transducer positions and focus positions have matching dimensions
     if ~isequal(size(focus_pos), size(trans_pos))

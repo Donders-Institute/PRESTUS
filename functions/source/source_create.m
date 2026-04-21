@@ -1,21 +1,41 @@
 function [source, source_labels, tr_arr] = source_create(parameters, kgrid, trans_pos, focus_pos)
-
-% SOURCE_CREATE Creates a source for k-Wave simulations based on transducer parameters.
+% SOURCE_CREATE  Build a k-Wave source struct from PRESTUS transducer parameters
 %
-% Supports:
-%   - multiple transducers, each with multiple elements (use_kWaveArray == 0)
-%   - single transducer with kWaveArray-based setup (use_kWaveArray ~= 0)
+% Dispatches to one of two branches:
+%   Branch 1 (use_kWaveArray == 0): Supports multiple transducers. Each
+%     annular element is placed with makeBowl / makeArc. CW signals are
+%     built with createCWSignals and assigned row-by-row to source.p.
+%   Branch 2 (use_kWaveArray ~= 0): Single transducer only. kWaveArray
+%     handles element geometry; grid weights distribute signals. For 2-D
+%     axisymmetric annular arrays a mirrored grid approach is used.
+% Element diameters are converted from mm to odd-integer grid points before
+% geometry creation.
+%
+% Use as:
+%   [source, source_labels, tr_arr] = source_create(parameters, kgrid, trans_pos, focus_pos)
 %
 % Input:
-%   parameters      - struct containing simulation parameters (must contain parameters.transducer)
-%   kgrid           - k-Wave grid struct (e.g., kWaveGrid)
-%   trans_pos       - [transducer_N x n_sim_dims] or [1 x n_sim_dims] / [n_sim_dims x 1]
-%   focus_pos       - same shape rules as trans_pos
+%   parameters - PRESTUS config; must contain grid.dims, grid.resolution_mm [mm],
+%                grid.use_kWaveArray, and transducer (struct array)
+%   kgrid      - kWaveGrid object
+%   trans_pos  - [transducer_N x n_dims] or [1 x n_dims] transducer positions
+%                in grid indices (broadcast to all transducers if 1-row)
+%   focus_pos  - [transducer_N x n_dims] or [1 x n_dims] focus positions in grid indices
 %
 % Output:
-%   source          - struct with source.p_mask and source.p
-%   source_labels   - grid of integer labels identifying active source regions
-%   tr_arr - struct array of transducer parameters with grid-based fields
+%   source        - struct with fields source.p_mask (logical grid) and source.p
+%   source_labels - grid array of integer element labels (0 = inactive)
+%   tr_arr        - transducer struct array updated with grid-point element dimensions
+%                   and phase/amplitude fields
+%
+% See also: SOURCE_SENSOR_SETUP, CREATE_MATRIX_KARRAY, CREATE_CLOVER_ARRAY
+
+arguments
+    parameters (1,1) struct
+    kgrid      (1,1)
+    trans_pos  (:,:) {mustBeNumeric}
+    focus_pos  (:,:) {mustBeNumeric}
+end
 
     transducer_N = numel(parameters.transducer);
 
@@ -89,7 +109,7 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
                 tr.(tr.type).elem_amp, ...
                 tr.(tr.type).elem_phase_rad);       % [elem_n x Nt]
 
-            n_elements_per_T(it) = tr.elem_n;
+            n_elements_per_T(it) = tr.(tr.type).elem_n;
         end
 
         % global element indexing: each (transducer, element) → unique index
@@ -289,13 +309,13 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
                 y_shift = (el_i - (tr.annular.elem_n+1)/2) * el_OD_m;
                 element_pos = position_base + [0, y_shift];
 
-                karray_full.addArcElement(element_pos, tr.curv_radius_mm * 1e-3, el_OD_m, focus_pos_full);
+                karray_full.addArcElement(element_pos, tr.annular.curv_radius_mm * 1e-3, el_OD_m, focus_pos_full);
             end
 
             source_mask_full = false(kgrid_mirrored.Nx, kgrid_mirrored.Ny);
-            grid_weights_3d  = zeros(tr.elem_n, kgrid_mirrored.Nx, kgrid_mirrored.Ny);
+            grid_weights_3d  = zeros(tr.(tr.type).elem_n, kgrid_mirrored.Nx, kgrid_mirrored.Ny);
 
-            for el_i = 1:tr.elem_n
+            for el_i = 1:tr.(tr.type).elem_n
                 grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
                 % Update the mask
                 source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0.25);
@@ -310,7 +330,7 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 
             source.p = zeros(num_points, nTime);
 
-            for el_i = 1:tr.elem_n
+            for el_i = 1:tr.(tr.type).elem_n
                 weights_el = squeeze(grid_weights_cropped(el_i, :, :));
                 weights_vec = weights_el(source_idx);
                 source.p = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));

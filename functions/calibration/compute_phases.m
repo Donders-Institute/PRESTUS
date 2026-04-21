@@ -1,14 +1,30 @@
 function phases = compute_phases(SOUND_SPEED_WATER, tran, desired_focal_distance_ep, tran_ini_data)
-    % Computes the phases necessary to aim at the specified focal point.
-    %
-    % Arguments:
-    % - SOUND_SPEED_WATER: Speed of sound in water [m/s].
-    % - tran: Structure containing transducer parameters and element data.
-    % - desired_focal_distance_ep: Focal depth relative to the transducer exit plane [mm].
-    % - tran_ini_data: Ini data structure containing transducer element positions.
-    %
-    % Returns:
-    % - phases: Computed phase values [degrees] for each transducer element.
+% COMPUTE_PHASES  Compute element steering phases for a target focal depth
+%
+% Calculates the per-element phase delays required to focus an annular
+% transducer at a specified depth by computing geometric path lengths from
+% element positions to the target point.
+%
+% Use as:
+%   phases = compute_phases(SOUND_SPEED_WATER, tran, desired_focal_distance_ep, tran_ini_data)
+%
+% Input:
+%   SOUND_SPEED_WATER     - sound speed in water [m/s]
+%   tran                  - struct with transducer parameters and element data
+%   desired_focal_distance_ep - focal depth relative to the exit plane [mm]
+%   tran_ini_data         - ini data struct with element positions under tran_ini_data.elements
+%
+% Output:
+%   phases - [1xN] computed phase values per element [°]
+%
+% See also: PHASE_OPTIMIZATION_ANNULUS, CALIBRATION_TRANSDUCER
+
+arguments
+    SOUND_SPEED_WATER     (1,1) {mustBeNumeric}
+    tran                  (1,1) struct
+    desired_focal_distance_ep (1,1) {mustBeNumeric}
+    tran_ini_data         (1,1) struct
+end
 
     % Calculate wavelength based on sound speed and source frequency
     wavelen = SOUND_SPEED_WATER / tran.prestus.transducer.freq_hz; % [m]

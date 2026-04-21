@@ -1,33 +1,67 @@
 function [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, CEM43_max, CEM43_focal, CEM43_cur, timeseries, CEM43_iso_max, CEM43_iso_focal, CEM43_iso_cur] = ...
     thermal_simulation(...
     parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
-
-% THERMAL_SIMULATION Simulates thermal effects of ultrasound using k-Wave.
+% THERMAL_SIMULATION  Simulate thermal effects of transcranial ultrasound using k-Wave
 %
-% This function runs heating simulations based on acoustic simulation results 
-% from k-Wave. It models the temperature rise and thermal dose (CEM43) caused 
-% by ultrasound transducers over multiple trials and pulses.
+% Converts the acoustic pressure field (p_max_all from sensor_data) into a
+% volumetric heat source Q via Q = alpha_np * p^2 / (rho * c). Runs
+% kWaveDiffusion over the pulse protocol defined by thermal_parameters,
+% looping through PT ON, PT OFF, PTRI-OFF, and post-PTRD cool-off phases.
+% At each recorded step, temperature (T) and two CEM43 variants (k-Wave
+% native; ISO 13 threshold) are accumulated into focal-plane snapshots,
+% running maxima, and per-layer timeseries. GPU arrays are used when
+% simulation.code_type is 'matlab_gpu' or 'cpp_gpu'.
+%
+% Use as:
+%   [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, ...
+%    CEM43_max, CEM43_focal, CEM43_cur, timeseries, ...
+%    CEM43_iso_max, CEM43_iso_focal, CEM43_iso_cur] = ...
+%       thermal_simulation(parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
 %
 % Input:
-%   parameters   - Struct containing simulation parameters (e.g., thermal properties).
-%   sensor_data  - Struct containing acoustic simulation results (e.g., pressure fields).
-%   kgrid        - Struct representing the k-Wave computational grid (e.g., `kWaveGrid`).
-%   kwave_medium - Struct containing medium properties (e.g., density, sound speed).
-%   sensor       - Struct defining the sensor mask for thermal simulations.
-%   source       - Struct defining the heat deposition source for thermal simulations.
-%   transf
-%   medium_masks
+%   parameters   - PRESTUS config; must contain thermal, timing, grid.dims,
+%                  transducer(1).trans_pos, transducer(1).freq_hz [Hz],
+%                  pct.enabled, simulation.code_type, simulation.precision,
+%                  simulation.interactive, io.adopted_cem43 (optional)
+%   sensor_data  - struct from acoustic simulation; must contain p_max_all [Pa]
+%   kgrid        - kWaveGrid object
+%   kwave_medium - struct with fields: alpha_coeff, alpha_power,
+%                  density [kg/m^3], sound_speed [m/s],
+%                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
+%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C]
+%   sensor       - struct with sensor.mask (used to define focal axis recording window)
+%   source       - struct; Q is overwritten internally from p_max_all
+%   transf       - affine forward transform from T1 to simulation grid
+%                  (used only when io.adopted_cem43 is specified)
+%   medium_masks - layer label map for per-tissue timeseries
 %
 % Output:
-%   thermal_diff_obj - kWaveDiffusion object used for thermal simulations.
-%   time_status_seq  - Struct array tracking the status of each time step (e.g., on/off).
-%   T_max            - Maximum temperature reached during the simulation.
-%   T_focal          - Temperature at the focal plane over time. [x,z,time]
-%   T_cur             - Temperature reached at the end of simulation or the optional cooling period.
-%   CEM43_max        - Maximum cumulative equivalent minutes at 43°C (CEM43) during the simulation.
-%   CEM43_focal      - CEM43 values at the focal plane over time. [x,z,time]
-%   CEM43_cur         - Maximum cumulative equivalent minutes at 43°C (CEM43) at the end of simulation or the optional cooling period.
-%   timeseries       - Temeperature, Trise, and CEM43 for different layers. [time]
+%   thermal_diff_obj  - kWaveDiffusion object after simulation
+%   time_status_seq   - struct array with fields time [s], step, status, recorded
+%   T_max             - maximum temperature over all time steps [°C]
+%   T_focal           - temperature in focal plane [x, z, time] [°C]
+%   T_cur             - temperature at the final recorded step [°C]
+%   CEM43_max         - running max CEM43 (k-Wave method) [min]
+%   CEM43_focal       - CEM43 in focal plane [x, z, time] [min]
+%   CEM43_cur         - CEM43 at the final recorded step [min]
+%   timeseries        - struct from THERMAL_UPDATE_TIMESERIES
+%   CEM43_iso_max     - running max ISO CEM43 [min]
+%   CEM43_iso_focal   - ISO CEM43 in focal plane [x, z, time] [min]
+%   CEM43_iso_cur     - ISO CEM43 at the final recorded step [min]
+%
+% See also: THERMAL_PARAMETERS, THERMAL_PLOT_PROTOCOL, THERMAL_UPDATE_TIMESERIES,
+%   THERMAL_ANALYSIS, MEDIUM_SETUP
+
+arguments
+    parameters   (1,1) struct
+    sensor_data  (1,1) struct
+    kgrid        (1,1)
+    kwave_medium (1,1) struct
+    sensor       (1,1) struct
+    source       (1,1) struct
+    transf
+    medium_masks {mustBeNumeric}
+end
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % Notes:                                                            %

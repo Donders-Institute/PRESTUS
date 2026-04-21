@@ -1,28 +1,37 @@
-function elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)    
-% CREATE_CLOVER_ARRAY Generate a multi-leaf clover transducer configuration.
+function elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)
+% CREATE_CLOVER_ARRAY  Replicate a single matrix sub-array into a multi-leaf clover configuration
 %
-% This function replicates a single matrix transducer layout into a clover
-% configuration (multi-aperture arrangement), where multiple identical
-% sub-arrays are distributed on a spherical surface (parent bowl).
+% Each of the N leaves (default 3, 120° apart) is placed on a parent spherical
+% bowl of radius ROC_parent, rotated azimuthally around Z, then tilted in
+% elevation toward the parent bowl center so that all leaves converge on a
+% common natural focus. A least-squares sphere fit is performed per leaf to
+% locate its apex and validate its distance to the intended focus. Optional
+% debug figures show the 3-D leaf arrangement.
 %
-% Each sub-array is:
-%   1) Positioned on a sphere with radius ROC_parent
-%   2) Rotated in azimuth (Z-axis)
-%   3) Tilted toward the natural focus of the multi-leaf configuration
-%      (Y-axis rotation)
+% Use as:
+%   elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)
 %
-% Additionally, a sphere fit is performed per leaf to determine its apex
-% and validate its distance to the intended focus.
+% Input:
+%   parameters  - PRESTUS config; parameters.simulation.debug controls figure generation
+%   tr_matrix   - matrix + clover geometry fields: tr_matrix.clover.n_leaves,
+%                 tr_matrix.clover.ROC_parent [mm], tr_matrix.outer_diameter_mm [mm],
+%                 tr_matrix.curv_radius_mm [mm], tr_matrix.elem_shape
+%   elem_pos_m  - [3xN] element positions of one sub-array [m]
+%   trans_pos_m - [3x1] transducer origin in the simulation grid [m]
+%   focus_pos_m - [3x1] acoustic focus position in the simulation grid [m]
 %
-% INPUTS:
-%   parameters   - global parameter struct (used for debug output)
-%   tr_matrix    - struct containing matrix + clover configuration
-%   elem_pos_m   - [3 x N] element positions (single sub-array) [m]
-%   trans_pos_m  - [3 x 1] transducer origin in simulation grid [m]
-%	focus_pos_m  - [3 x 1] acoustic focus position in simulation grid [m]
+% Output:
+%   elem_pos_m  - [3xN] full clover element positions for all leaves [m]
 %
-% OUTPUTS:
-%   elem_pos_m   - [3 x N_total] full clover element positions [m]
+% See also: CREATE_MATRIX_KARRAY, SOURCE_CREATE
+
+arguments
+    parameters  (1,1) struct
+    tr_matrix   (1,1) struct
+    elem_pos_m  (3,:) {mustBeNumeric}
+    trans_pos_m (3,1) {mustBeNumeric}
+    focus_pos_m (3,1) {mustBeNumeric}
+end
 
     % --------------------------------------------------------------------
     % Clover geometry parameters

@@ -1,12 +1,40 @@
 function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, ...
     translation_matrix] = head_smooth_and_crop(parameters, segmentation, bone_img, ...
     trans_pos_grid, focus_pos_grid)
+% HEAD_SMOOTH_AND_CROP  Convert segmentation to medium masks and crop to simulation grid
+%
+% Converts layered tissue segmentations into medium masks indexed by
+% parameters.medium_properties, smooths layer transitions, fills skull
+% gaps, and crops the volume to a focus-centred bounding box for k-Wave.
+%
+% Use as:
+%   [medium_masks, segmentation_crop, bone_crop, trans_pos_final, ...
+%    focus_pos_final, translation_matrix] = head_smooth_and_crop( ...
+%       parameters, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
+%
+% Input:
+%   parameters     - (1,1) simulation configuration struct
+%   segmentation   - [Nx x Ny x Nz] SimNIBS tissue label volume
+%   bone_img       - [Nx x Ny x Nz] binary bone mask or pseudoCT
+%   trans_pos_grid - [1x3] transducer position in voxel coordinates
+%   focus_pos_grid - [1x3] focus position in voxel coordinates
+%
+% Output:
+%   medium_masks      - [Nx x Ny x Nz] medium label array (cropped)
+%   segmentation_crop - [Nx x Ny x Nz] tissue label array (cropped)
+%   bone_crop         - [Nx x Ny x Nz] bone image (cropped)
+%   trans_pos_final   - [1x3] transducer position in cropped grid
+%   focus_pos_final   - [1x3] focus position in cropped grid
+%   translation_matrix - [4x4] homogeneous translation matrix
+%
+% See also: PREPROC_CROP_GRID, PREPROC_MEDIUM_MASK
+
     arguments
-        parameters struct
-        segmentation (:,:,:) % SimNIBS tissue segmentation
-        bone_img (:,:,:) % binary bone mask or pseudoCT
-        trans_pos_grid
-        focus_pos_grid
+        parameters     (1,1) struct
+        segmentation   (:,:,:) {mustBeNumeric}
+        bone_img       (:,:,:) {mustBeNumeric}
+        trans_pos_grid (1,:)   double
+        focus_pos_grid (1,:)   double
     end
 
     % This function turns the original `layered` segmentations into medium masks such

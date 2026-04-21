@@ -1,39 +1,37 @@
 function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz, crop_at_target, view_angle, open_figure)
-% SHOW_3D_HEAD Visualizes a 3D segmented brain image with multiple transducer and target positions.
+% SHOW_3D_HEAD  Visualise a segmented 3D head with transducer and target positions
 %
-% Visualizes a 3D segmented brain, with:
-%   - Skin, tissue surfaces
-%   - One or more transducer positions and target spheres (in unique colors)
-%   - Transducer exit-plane disks, using an anti-striped direct-downsampling approach
+% Renders skin and tissue surfaces from a segmented volume and overlays
+% one or more transducer/target pairs as coloured spheres and exit-plane
+% disks. All positions must be in voxel index space.
 %
-% INPUTS:
-%   segmented_img    - [Nx x Ny x Nz] volume, segmented tissue labels
-%   target_xyz       - [K x 3] array, each row is a target position (voxel indices)
-%   trans_xyz        - [K x 3] array, each row is a transducer position (voxel indices)
-%   parameters       - struct, must include transducer geometry fields
-%   pixel_size       - scalar, voxel size in mm
-%   coord_mesh_xyz   - [M x 3] grid of all voxels (voxel indices)
-%   crop_at_target   - [1x3], crop along axes (default: [0,0,0])
-%   view_angle       - [1x2], [az, el] for MATLAB view (default: [0,0])
-%   open_figure      - bool, whether to create new figure (default: true)
+% Use as:
+%   show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz)
+%   show_3d_head(..., crop_at_target, view_angle, open_figure)
 %
-% OUTPUT: None—shows a 3D plot with all transducers/targets overlaid.
+% Input:
+%   segmented_img  - [Nx x Ny x Nz] tissue label volume
+%   target_xyz     - [Kx3] target positions in voxel coordinates
+%   trans_xyz      - [Kx3] transducer positions in voxel coordinates
+%   parameters     - (1,1) simulation parameters struct with transducer geometry
+%   pixel_size     - voxel size [mm]
+%   coord_mesh_xyz - [Mx3] voxel coordinate grid
+%   crop_at_target - [1x3] crop flags per axis (default: [0 0 0])
+%   view_angle     - [1x2] [azimuth, elevation] for MATLAB view (default: [0 0])
+%   open_figure    - create a new figure (default: true)
 %
-% NOTE:
-% - All positions must be in voxel (image index) space. Convert before calling!
-% - No stripes: exit-plane masks are generated in the downsampled space.
-% - Up to K pairs of transducers/targets supported, each with its unique color.
+% See also: PLOT_CORONAL_SLICES, SHOW_POSITIONING_PLOTS
 
     arguments
         segmented_img (:,:,:) 
-        target_xyz (:,3)
-        trans_xyz (:,3)
-        parameters struct
-        pixel_size (1,1)
-        coord_mesh_xyz (:,3) 
-        crop_at_target (1,3) = [0,0,0]
-        view_angle (1,2) = [0,0]
-        open_figure (1,1) = 1
+        target_xyz     (:,3)  double
+        trans_xyz      (:,3)  double
+        parameters     (1,1)  struct
+        pixel_size     (1,1)  double
+        coord_mesh_xyz (:,3)  double
+        crop_at_target (1,3)  double = [0,0,0]
+        view_angle     (1,2)  double = [0,0]
+        open_figure    (1,1)  double = 1
     end
 
     % Ensure both target_xyz and trans_xyz are of same number of points

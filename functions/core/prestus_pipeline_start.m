@@ -1,19 +1,29 @@
 function job_id = prestus_pipeline_start(parameters, options)
-%% PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher
+% PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher for MATLAB, SLURM, and qsub
 %
+% Auto-detects the execution platform (matlab / slurm / qsub) via
+% hpc_detect_system and dispatches accordingly. On MATLAB, calls
+% prestus_pipeline directly. On HPC, serialises parameters to a temp .mat
+% file, generates a bootstrap .m script, and submits via hpc_submit_job.
+% When parameters.simulation.uncertainty is true, delegates to
+% uncertainty_pipeline instead of direct submission.
+%
+% Use as:
 %   prestus_pipeline_start(parameters)
 %   prestus_pipeline_start(parameters, options)
 %   job_id = prestus_pipeline_start(parameters)
+%   job_id = prestus_pipeline_start(parameters, options)
 %
-%   Auto-detects platform and handles direct MATLAB, SLURM, or qsub execution.
-%   Subject ID must be set as parameters.subject_id before calling.
+% Input:
+%   parameters - PRESTUS config; must contain subject_id; platform field
+%                controls dispatch ('matlab','slurm','qsub','auto')
+%   options    - pipeline options (optional, default: struct());
+%                .sequential_configs — cell array of config paths for sequential runs
 %
-%   Inputs:
-%     parameters  - Struct; must contain parameters.subject_id
-%     options     - Struct with sequential_configs (default: empty)
+% Output:
+%   job_id     - HPC scheduler job ID; [] when platform is 'matlab'
 %
-%   Outputs:
-%     job_id      - Submitted HPC job id ([] when running on MATLAB platform)
+% See also: PRESTUS_PIPELINE, UNCERTAINTY_PIPELINE, LOAD_PARAMETERS, PATH_LOG_SETUP
 
     arguments
         parameters struct

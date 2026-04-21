@@ -1,16 +1,22 @@
 function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsample_factor)
-% skull_rubber_wrap_visualize
-% Faster + more robust multi-view 3D visualization for HPC:
-% - Default downsample_factor = 1
-% - Uses tiledlayout (faster/cleaner axes creation) [web:126][web:139]
-% - Uses explicit patch(Faces,Vertices,...) to avoid "Not enough input arguments" issues
-% - Reduces rendering load: no edges, no gouraud, optional point cap
+% SKULL_RUBBER_WRAP_VISUALIZE  3-D visualisation of skull balloon expansion
 %
-% Inputs:
-%   parameters.io.debug_dir
-%   parameters.io.output_affix
-%   SKULL, ZADDED, BALLOON : 3-D logical or numeric masks (same size)
-%   downsample_factor      : (optional) integer >=1
+% Renders multi-view surface plots of the original skull, added voxels,
+% and inflated balloon mask. Designed for HPC use with optional
+% downsampling and tiledlayout rendering.
+%
+% Use as:
+%   skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON)
+%   skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsample_factor)
+%
+% Input:
+%   parameters        - (1,1) simulation parameters struct with io fields
+%   SKULL             - [Nx x Ny x Nz] original binary skull mask
+%   ZADDED            - [Nx x Ny x Nz] binary mask of voxels added by rubber wrap
+%   BALLOON           - [Nx x Ny x Nz] inflated balloon mask
+%   downsample_factor - integer downsampling factor for rendering (default: 1)
+%
+% See also: SKULL_RUBBER_WRAP, SKULL_FILL_HOLES
 
     disp('Plotting skull rubber expansion');
 

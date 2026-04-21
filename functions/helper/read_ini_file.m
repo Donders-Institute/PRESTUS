@@ -1,11 +1,24 @@
 function iniData = read_ini_file(filename)
-    % Reads an INI file into a MATLAB struct.
-    % 
-    % Arguments:
-    % - filename: Path to the INI file.
+% READ_INI_FILE  Parse an INI file into a MATLAB struct
+%
+% Reads section headers ([section]) and key=value pairs, grouping fields
+% under a struct named after each section. Skips blank lines and comments
+% (lines beginning with ; or #).
+%
+% Use as:
+%   iniData = read_ini_file(filename)
+%
+% Input:
+%   filename - path to the INI file
+%
+% Output:
+%   iniData - struct with one field per section, each containing key-value pairs
+%
+% See also: SET_REAL_PHASES
 
-    % Returns:
-    % - iniData: Struct containing the parsed data.
+arguments
+    filename (1,:) char
+end
 
     % Open the file
     fid = fopen(filename, 'r');

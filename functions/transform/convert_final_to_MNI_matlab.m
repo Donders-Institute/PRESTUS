@@ -1,28 +1,40 @@
 function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matlab(final_img, headreco_folder, inv_final_transformation_matrix, parameters, options)
-
-% CONVERT_FINAL_TO_MNI_MATLAB Converts an image from subject space to MNI space.
+% CONVERT_FINAL_TO_MNI_MATLAB  Transform a 3D image from subject simulation space to MNI space
 %
-% This function transforms a 3D image (`final_img`) from subject-specific space 
-% to MNI space using affine transformations derived from the `headreco_folder`. 
-% The transformed image can be saved as a NIfTI file or loaded if it already exists.
+% Chains three affine transforms: (1) simulation-space to original T1 conform
+% space via inv_final_transformation_matrix, (2) T1 conform to MNI via the
+% 12-DOF registration matrix in headreco_folder/toMNI/MNI2conform_12DOF.txt,
+% and (3) MNI template voxel space via the MNI header affine. The result is
+% resampled to the MNI template grid with nearest-neighbour interpolation and
+% optionally saved as a compressed NIfTI. If the output file already exists and
+% overwriting is disabled, the existing file is loaded instead.
+%
+% Use as:
+%   [img_mni, final_to_mni_affine, mni_header] = ...
+%       convert_final_to_MNI_matlab(final_img, headreco_folder, ...
+%                                   inv_final_transformation_matrix, parameters)
+%   [img_mni, final_to_mni_affine, mni_header] = ...
+%       convert_final_to_MNI_matlab(..., 'nifti_filename', fname, 'nifti_data_type', 'uint8')
 %
 % Input:
-%   final_img                     - [Nx x Ny x Nz] matrix representing the 3D image in subject space.
-%   headreco_folder               - String specifying the folder containing headreco outputs.
-%   inv_final_transformation_matrix - [4x3] matrix representing the inverse transformation from final space to subject space.
-%   parameters                    - Struct containing pipeline configuration parameters (e.g., overwrite settings).
-%
-% Options:
-%   check_nifti_on_disk           - Boolean flag to check if the output NIfTI file exists on disk (default: 1).
-%   nifti_filename                - String specifying the filename for the output NIfTI file (default: '').
-%   nifti_data_type               - Datatype for the output NIfTI file (default: 'single').
-%   BitsPerPixel                  - Bits per pixel for the output NIfTI file (default: taken from MNI header).
-%   fill_value                    - Value used to fill empty regions during transformation (default: 0).
+%   final_img                       - 3D image in simulation (subject) space
+%   headreco_folder                 - path to headreco m2m folder containing
+%                                     toMNI/T1fs_nu_12DOF_MNI.nii.gz and T1fs_conform.nii.gz
+%   inv_final_transformation_matrix - [4x3] inverse affine tform from simulation grid
+%                                     to T1 conform space
+%   parameters                      - PRESTUS config (overwrite settings)
+%   options.check_nifti_on_disk     - whether to check/write disk file (default: 1)
+%   options.nifti_filename          - output NIfTI path (default: '')
+%   options.nifti_data_type         - output datatype (default: 'single')
+%   options.BitsPerPixel            - bits per pixel (default: from MNI header)
+%   options.fill_value              - fill value outside FOV (default: 0)
 %
 % Output:
-%   img_mni                       - Transformed image in MNI space as a matrix.
-%   final_to_mni_affine           - [4x4] affine transformation matrix mapping final space to MNI space.
-%   mni_header                    - Header information for the MNI template image.
+%   img_mni            - image resampled to MNI template grid
+%   final_to_mni_affine- [4x4] composite affine from simulation space to MNI voxels
+%   mni_header         - niftiinfo header of the MNI template
+%
+% See also: SIMULATION_NIFTI, CONVERT_FINAL_TO_MNI_SIMNIBS, RAS_TO_GRID
 
     arguments
         final_img(:,:,:)

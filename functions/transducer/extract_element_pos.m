@@ -1,22 +1,23 @@
-function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m) 
-% EXTRACT_ELEMENT_POS Extracts matrix transducer element positions from file.
+function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
+% EXTRACT_ELEMENT_POS  Read matrix transducer element positions from file
 %
-% This function reads element position coordinates from an external file
-% and converts them into expected element position coordinates. The 
-% positions are defined in physical space (typically in millimetres) and
-% are transformed into metres relative to the simulation grid.
+% Reads element position coordinates from an external file and converts
+% them to metres relative to the simulation grid. Positions are
+% optionally projected onto a new radius of curvature before being
+% shifted to the transducer location in the k-Wave grid.
 %
-% The resulting element coordinates are shifted to the desired transducer
-% location within the k-Wave simulation grid.
+% Use as:
+%   elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
 %
 % Input:
-%   parameters  Global simulation parameters
-%   tr        - Struct containing transducer parameters.
-%   trans_pos_m  [3x1] transducer position in meters
+%   parameters  - (1,1) simulation parameters struct
+%   tr          - (1,1) transducer parameter struct
+%   trans_pos_m - [3x1] transducer position [m]
 %
 % Output:
-%   elem_pos_m - 3 x N matrix containing element positions in metres,
-%                expressed in simulation coordinates.
+%   elem_pos_m - [3xN] element positions in simulation coordinates [m]
+%
+% See also: CONVERT_TO_ELEMENT_POS, TRANSDUCER_SETUP
 
     % Extract file-based matrix shape parameters for reading element positions
     file_ext = tr.matrix.matrix_shape.extract_from_file;

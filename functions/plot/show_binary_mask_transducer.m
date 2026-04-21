@@ -1,16 +1,18 @@
 function show_binary_mask_transducer(karray, kgrid, parameters)
-% SHOW_BINARY_MASK_TRANSDUCER Visualizes the binary mask of a transducer in the simulation grid.
+% SHOW_BINARY_MASK_TRANSDUCER  Visualise the binary mask of a matrix transducer on the simulation grid
 %
-% The resulting figure is saved to the debug directory defined in the
-% simulation parameters for inspection and debugging purposes.
+% Generates an isosurface (3D) or image (2D) of the binary element mask
+% from a kWaveArray object and saves the figure to the debug directory.
+%
+% Use as:
+%   show_binary_mask_transducer(karray, kgrid, parameters)
 %
 % Input:
-%   karray     - kWaveArray object defining the transducer geometry.
-%   kgrid      - kWaveGrid object describing the simulation grid.
-%   parameters - Struct containing simulation parameters.
+%   karray     - kWaveArray object defining the transducer geometry
+%   kgrid      - kWaveGrid object describing the simulation grid
+%   parameters - (1,1) simulation parameters struct
 %
-% Output:
-%   (none) The generated visualization is saved to disk.
+% See also: TRANSDUCER_SETUP, PLOT_OVERLAY
 
     % Generate binary mask of transducer elements on the simulation grid
     source_mask = karray.getArrayBinaryMask(kgrid);

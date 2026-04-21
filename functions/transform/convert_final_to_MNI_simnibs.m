@@ -1,24 +1,25 @@
 function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters, options)
-
-% CONVERT_FINAL_TO_MNI_SIMNIBS Converts an image to MNI space using SimNIBS.
+% CONVERT_FINAL_TO_MNI_SIMNIBS  Transform an image to MNI space using the SimNIBS subject2mni command
 %
-% This function uses the SimNIBS `subject2mni` command to transform an image 
-% from subject-specific space to MNI space. It also removes unnecessary affixes 
-% added by SimNIBS to the output filename.
+% Calls the SimNIBS subject2mni CLI tool to warp a NIfTI image from
+% subject-specific (T1 conform) space to MNI space. An optional
+% LD_LIBRARY_PATH export is prepended when parameters.hpc.ld_library_path
+% is set. Because SimNIBS appends '_MNI' to the output filename by default,
+% the result is renamed to path_to_output_img after the system call.
+%
+% Use as:
+%   convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters)
+%   convert_final_to_MNI_simnibs(..., 'interpolation_order', 0)
 %
 % Input:
-%   path_to_input_img  - String specifying the path to the input image in subject space.
-%   m2m_folder         - String specifying the path to the `m2m` folder containing transformation data.
-%   path_to_output_img - String specifying the desired path for the output image in MNI space.
-%   parameters         - Struct containing pipeline configuration parameters:
-%                        * simnibs_bin_path: Path to SimNIBS binaries.
-%                        * ld_library_path: Optional path for library linking (if required).
+%   path_to_input_img  - path to input NIfTI in subject space
+%   m2m_folder         - path to SimNIBS m2m folder with registration data (toMNI subdirectory)
+%   path_to_output_img - desired output path in MNI space (.nii.gz)
+%   parameters         - PRESTUS config; uses startup.simnibs_bin_path and hpc.ld_library_path
+%   options.interpolation_order - resampling order passed to subject2mni
+%                                 (0=nearest, 1=linear; default: 1)
 %
-% Options:
-%   interpolation_order - Integer specifying the interpolation order for resampling (default: 1).
-%
-% Output:
-%   The transformed image is saved at `path_to_output_img`.
+% See also: SIMULATION_NIFTI, CONVERT_FINAL_TO_MNI_MATLAB, SUBJECT2MNI_COORDS_LDFIX
 
     arguments
         path_to_input_img string

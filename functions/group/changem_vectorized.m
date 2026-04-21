@@ -1,18 +1,28 @@
 function B = changem_vectorized(A, newval, oldval)
 
-% CHANGEM_VECTORIZED Replace values in an array using vectorized operations.
+% CHANGEM_VECTORIZED  Replace specified values in an array using vectorised operations
 %
-% This function replaces elements in array `A` that match values in `oldval` 
-% with corresponding values from `newval`. It uses vectorized operations for 
-% efficient computation.
+% Replaces elements in A that match oldval with the corresponding elements
+% of newval. Equivalent to the Mapping Toolbox changem but vectorised.
+%
+% Use as:
+%   B = changem_vectorized(A, newval, oldval)
 %
 % Input:
-%   A       - [MxN] array of input values.
-%   newval  - [1xP] array of new values to replace matching elements in `A`.
-%   oldval  - [1xP] array of old values to be replaced in `A`.
+%   A      - input array
+%   newval - [1xP] replacement values
+%   oldval - [1xP] values to replace
 %
 % Output:
-%   B       - [MxN] array with replaced values.
+%   B - array with matching elements replaced
+%
+% See also: CREATE_GROUP_MNI_PLOTS
+
+arguments
+    A      {mustBeNumeric}
+    newval (1,:) {mustBeNumeric}
+    oldval (1,:) {mustBeNumeric}
+end
 
     %% Step 1: Initialize output array
     % Start by copying the input array `A` to the output array `B`.

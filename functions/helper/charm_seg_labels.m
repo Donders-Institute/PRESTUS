@@ -1,13 +1,15 @@
 function labels = charm_seg_labels()
-% CHARM_SEG_LABELS  Returns the fixed SimNIBS charm tissue label indices.
-%
-%   labels = charm_seg_labels()
+% CHARM_SEG_LABELS  Return the fixed SimNIBS charm tissue label indices
 %
 %   Returns a struct with named fields mapping tissue names to their integer
 %   label values as produced by SimNIBS charm segmentation. These values
 %   are fixed by the charm pipeline and should not need to be changed.
 %
-%   Fields:
+% Use as:
+%   labels = charm_seg_labels()
+%
+% Output:
+%   labels - [1x1] struct with fields:
 %     bonemask        - All tissues within the skull [1,2,3,4,7,8,9]
 %     intracranial    - Intracranial tissues (skull excluded) [1,2,3,9]
 %     external        - Background / external [0]
@@ -21,6 +23,8 @@ function labels = charm_seg_labels()
 %     skull_trabecular- Trabecular bone [8]
 %     blood           - Blood vessels [9]
 %     muscle          - Muscle [10]
+%
+% See also: GETIDX, CHECK_LAYERS
 
 labels.bonemask         = [1, 2, 3, 4, 7, 8, 9];
 labels.intracranial     = [1, 2, 3, 9];

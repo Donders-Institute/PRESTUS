@@ -1,13 +1,19 @@
 classdef html_utils
-% html_utils  HTML utility methods for PRESTUS report generation.
+% HTML_UTILS  Static HTML utility methods for PRESTUS report generation
 %
-%   html_utils.escape(str)                        — escape HTML entities
-%   html_utils.base64(filepath)                   — encode file as base64
-%   html_utils.embed_image(filepath,alt,caption)  — <figure> with embedded image
-%   html_utils.collapsible(title,html,open,id)    — <details> collapsible section
-%   html_utils.section_error(name,ME)             — error fallback section
-%   html_utils.lightbox()                         — lightbox overlay markup + JS
-%   html_utils.format_cell(val)                   — format table cell value
+% All methods are static; call as html_utils.method_name(...).
+% Images are embedded as base64 data URIs so reports are self-contained.
+%
+% Methods:
+%   html_utils.escape(str)                       — escape <, >, &, " for safe HTML
+%   html_utils.base64(filepath)                  — encode a file as a base64 string
+%   html_utils.embed_image(filepath, alt, cap)   — <figure> with inline base64 image
+%   html_utils.collapsible(title, html, open, id)— <details>/<summary> collapsible block
+%   html_utils.section_error(name, ME)           — error fallback <section> with message
+%   html_utils.lightbox()                        — lightbox overlay markup + JS
+%   html_utils.format_cell(val)                  — format a value for a table cell
+%
+% See also: GENERATE_SIMULATION_REPORT, GENERATE_UNCERTAINTY_REPORT, CSS_STYLES_BASE
 
     methods (Static)
 

@@ -1,31 +1,31 @@
 function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ...
     neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters, pn)
-% NEURONAV_CONVERT_TRIGGER_TO_VOXELS - Convert Localite trigger positions to voxel coordinates.
+% NEURONAV_CONVERT_TRIGGER_TO_VOXELS  Convert Localite trigger positions to voxel coordinates
 %
-% USAGE:
+% Extracts the mean 4×4 matrix from each requested series, derives
+% transducer and focus positions via LOCALITE_MATRIX_TO_POSITIONS, and
+% returns native-space RAS mm and voxel ijk coordinates. Outputs are in
+% native scanner space; apply NEURONAV_CONVERT_NATIVE_TO_MNI for MNI.
+%
+% Use as:
 %   [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ...
 %       neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters, pn)
 %
-% INPUT:
-%   sub_id       - Subject identifier string (e.g., 'sub-001')
-%   positions    - Array of stimulation position indices (e.g., 1:2 for two sides)
-%   outputStruct - Cell array of series structs from neuronav_compute_series_statistics;
-%                  each cell contains a matrix4d_mean field ([1×4×4])
-%   parameters   - Simulation config with transducer geometry
-%   pn           - Path struct; pn.data_prelocalite must point to the folder
-%                  containing the subject T1 NIfTI
+% Input:
+%   sub_id       - subject identifier string (e.g. 'sub-001')
+%   positions    - array of series indices to process
+%   outputStruct - cell array of series structs from NEURONAV_COMPUTE_SERIES_STATISTICS
+%   parameters   - (1,1) simulation config struct with transducer geometry
+%   pn           - (1,1) path names struct with data_prelocalite field
 %
-% OUTPUT:
-%   transducer_ras - [N×3] transducer positions in RAS space (mm), rounded
-%   transducer_pos - [N×3] transducer positions in voxel space (ijk)
-%   target_ras     - [N×3] acoustic focus positions in RAS space (mm), rounded
-%   target_pos     - [N×3] acoustic focus positions in voxel space (ijk)
-%   t1_image       - Loaded T1 MRI volume (3D matrix)
+% Output:
+%   transducer_ras - [Nx3] transducer positions in native RAS space [mm]
+%   transducer_pos - [Nx3] transducer positions in voxel space (ijk)
+%   target_ras     - [Nx3] acoustic focus positions in native RAS space [mm]
+%   target_pos     - [Nx3] acoustic focus positions in voxel space (ijk)
+%   t1_image       - [Nx x Ny x Nz] T1 MRI volume
 %
-% COORDINATE SYSTEM NOTE:
-%   All outputs are in native scanner/MRI space (RAS mm or voxel ijk). They are
-%   NOT in MNI space. For standard-space coordinates apply a normalisation step
-%   post hoc (e.g., via neuronav_convert_native_to_MNI).
+% See also: NEURONAV_COMPUTE_SERIES_STATISTICS, LOCALITE_MATRIX_TO_POSITIONS
 
     % --- Load T1 MRI ---
     t1_file   = dir(fullfile(pn.data_prelocalite, sprintf('%s_*T1*.nii*', sub_id)));

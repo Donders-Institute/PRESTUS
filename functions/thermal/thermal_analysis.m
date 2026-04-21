@@ -1,9 +1,44 @@
 function [results_thermal] = thermal_analysis(parameters, results_heating, ...
     time_status_seq, medium_masks, highlighted_pos, segmentation)
+% THERMAL_ANALYSIS  Summarise and visualise results of a thermal ultrasound simulation
+%
+% Reads the existing output table, appends scalar thermal metrics (maxT,
+% endT, maxCEM43, ISO CEM43), and for layered / phantom simulations adds
+% per-tissue-layer breakdowns (brain, skull, skin). Calls thermal_plot_sim
+% to generate time-course and CEM43 plots along the focal axis, and
+% plot_overlay / plot_overlay_2d to render max-temperature overlays on the
+% segmentation for each cardinal slice (3-D) or the sagittal plane (2-D).
+%
+% Use as:
+%   [results_thermal] = thermal_analysis(parameters, results_heating, ...
+%       time_status_seq, medium_masks, highlighted_pos, segmentation)
+%
+% Input:
+%   parameters      - PRESTUS config; must contain io.filename_output_table,
+%                     io.output_dir, io.output_affix, transducer(1).trans_pos,
+%                     transducer(1).focus_pos, simulation.medium, thermal.temp_0
+%   results_heating - struct from THERMAL_SIMULATION; must contain
+%                     maxT, heating_endT, CEM43, CEM43_end,
+%                     CEM43_iso, CEM43_iso_end, focal_planeT,
+%                     focal_planeCEM43, focal_planeCEM43_iso, timeseries
+%   time_status_seq - struct array with fields time, status, recorded
+%   medium_masks    - layer label map (may be empty)
+%   highlighted_pos - position to highlight in overlay plots
+%   segmentation    - tissue label map for overlay background
+%
+% Output:
+%   results_thermal - extended output table with scalar and per-tissue thermal metrics
+%
+% See also: THERMAL_SIMULATION, THERMAL_PLOT_SIM, TISSUEMASK_BINARY
 
-    % Process results of thermal simulation
-    % Provide time plot of heating
-    % Save key values in output table
+arguments
+    parameters      (1,1) struct
+    results_heating (1,1) struct
+    time_status_seq (1,:) struct
+    medium_masks    {mustBeNumeric}
+    highlighted_pos
+    segmentation    {mustBeNumeric}
+end
 
     disp('Processing the results of thermal simulations...')
 

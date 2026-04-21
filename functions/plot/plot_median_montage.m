@@ -1,16 +1,21 @@
 function plot_median_montage(t1_image)
 
-% PLOT_MEDIAN_MONTAGE Creates a montage of central slices from a 3D T1 image.
+% PLOT_MEDIAN_MONTAGE  Display a montage of central orthogonal slices from a 3D image
 %
-% This function extracts the central slices along the x, y, and z axes from 
-% a 3D T1-weighted image (`t1_image`) and creates a montage for visualization. 
-% The slices are normalized for display using `mat2gray`.
+% Extracts the central slices along x, y, and z from a 3D image, normalises
+% each slice with mat2gray, and displays them as a montage.
+%
+% Use as:
+%   plot_median_montage(t1_image)
 %
 % Input:
-%   t1_image - [Nx x Ny x Nz] matrix representing the 3D T1-weighted image.
+%   t1_image - [Nx x Ny x Nz] 3D image volume
 %
-% Output:
-%   None. The function displays a montage of the central slices.
+% See also: PLOT_CORONAL_SLICES, PLOT_OVERLAY
+
+arguments
+    t1_image (:,:,:) {mustBeNumeric}
+end
 
     % Compute the center position of the image
     t1_center = round((size(t1_image) + 1) / 2);

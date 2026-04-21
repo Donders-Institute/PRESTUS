@@ -1,24 +1,39 @@
 function [upsampled_image, transformation_matrix, trans_pos_new, focus_pos_new] = ...
     upsample_to_grid(nii_image, previous_transformation_matrix, resample_factor, trans_pos_grid, focus_pos_grid)
 
-% UPSAMPLE_TO_GRID Upsamples a 3D image to a higher resolution grid.
+% UPSAMPLE_TO_GRID  Resample a 3D image and update grid positions to a higher-resolution grid
 %
-% This function resamples a 3D image (`nii_image`) to a higher resolution grid 
-% using a specified resample factor. It also updates the transformation matrix 
-% and computes the new positions for the transducer and focus points in the upsampled grid.
+% Scales the affine transform by resample_factor, computes new grid
+% dimensions, resamples with nearest-neighbour interpolation, and
+% transforms transducer/focus grid positions to the new coordinates.
+%
+% Use as:
+%   [upsampled_image, transformation_matrix, trans_pos_new, focus_pos_new] = ...
+%       upsample_to_grid(nii_image, previous_transformation_matrix, ...
+%                        resample_factor, trans_pos_grid, focus_pos_grid)
 %
 % Input:
-%   nii_image                   - [Nx x Ny x Nz] matrix representing the 3D image to be upsampled.
-%   previous_transformation_matrix - [4x4] affine transformation matrix used for the previous grid.
-%   resample_factor             - Scalar specifying the resampling factor (e.g., 2 for doubling resolution).
-%   trans_pos_grid              - [nx3] array specifying the transducer position in the original grid.
-%   focus_pos_grid              - [nx3] array specifying the focus position in the original grid.
+%   nii_image                      - [Nx x Ny x Nz] 3D image to resample
+%   previous_transformation_matrix - [4x4] affine transform for the original grid
+%   resample_factor                - resampling factor (e.g., 2 to double resolution)
+%   trans_pos_grid                 - [Nx3] transducer positions in the original grid [voxels]
+%   focus_pos_grid                 - [Nx3] focus positions in the original grid [voxels]
 %
 % Output:
-%   upsampled_image             - [Mx x My x Mz] matrix representing the upsampled 3D image.
-%   transformation_matrix       - [4x4] affine transformation matrix for the new grid.
-%   trans_pos_new               - [nx3] array specifying the transducer position in the upsampled grid.
-%   focus_pos_new               - [nx3] array specifying the focus position in the upsampled grid.
+%   upsampled_image       - [Mx x My x Mz] resampled 3D image
+%   transformation_matrix - [4x4] affine transform for the new grid
+%   trans_pos_new         - [Nx3] transducer positions in the upsampled grid [voxels]
+%   focus_pos_new         - [Nx3] focus positions in the upsampled grid [voxels]
+%
+% See also: TFORMARRAY, MAKETFORM
+
+arguments
+    nii_image                      (:,:,:) {mustBeNumeric}
+    previous_transformation_matrix (4,4)   {mustBeNumeric}
+    resample_factor                (1,1)   {mustBeNumeric}
+    trans_pos_grid                 (:,3)   {mustBeNumeric}
+    focus_pos_grid                 (:,3)   {mustBeNumeric}
+end
 
     % Update transformation matrix to include resampling
     transformation_matrix = diag([repmat(resample_factor, [1 3]), 1]) * previous_transformation_matrix;

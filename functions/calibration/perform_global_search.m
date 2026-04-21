@@ -1,16 +1,33 @@
 function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, profile_target, velocity)
-    % Perform a global search to optimize transducer phases and particle velocity.
-    %
-    % Arguments:
-    % - parameters: Structure containing simulation and transducer parameters.
-    % - profile_target.axial_distance_bowl: Distance vector for the intensity profile [mm from transducer bowl].
-    % - profile_target.axial_intensity: Adjusted desired intensity profile [W/cm^2].
-    % - velocity: Initial particle velocity estimate [m/s].
-    %
-    % Returns:
-    % - opt_phases: Optimized phases for each transducer element [rad].
-    % - opt_velocity: Optimized particle velocity [m/s].
-    % - min_err: Minimum error achieved during optimization.
+% PERFORM_GLOBAL_SEARCH  Global optimisation of transducer phases and particle velocity
+%
+% Runs a global search (surrogate or genetic algorithm) to minimise the
+% difference between the O'Neil analytical profile and the target empirical
+% profile across the optimisation distance range.
+%
+% Use as:
+%   [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, profile_target, velocity)
+%
+% Input:
+%   parameters     - PRESTUS config with transducer.annular geometry and
+%                    calibration.opt_limits [mm], calibration.opt_weights,
+%                    calibration.opt_seed, calibration.opt_upper_velocity [m/s]
+%   profile_target - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
+%   velocity       - initial particle velocity estimate [m/s]
+%
+% Output:
+%   opt_phases   - optimised phases per element [rad]
+%   opt_velocity - optimised particle velocity [m/s]
+%   min_err      - minimum error achieved during optimisation
+%
+% See also: FIT_VELOCITY_TO_INTENSITY, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE,
+%           CALIBRATION_TRANSDUCER
+
+arguments
+    parameters     (1,1) struct
+    profile_target (1,1) struct
+    velocity       (1,1) {mustBeNumeric}
+end
     
     if ~isfield(parameters.calibration, 'opt_limits') || isempty(parameters.calibration.opt_limits)
         % By default set to min and max distance with non-NAN intensity

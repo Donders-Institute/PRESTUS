@@ -1,13 +1,50 @@
 function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
-    
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                  Set up the transducer and sensor                 %
-    %                                                                   %
-    % This function sets up the transducer in the grid, the timeperiod  %
-    % during which simulations will take place and the sensor that      %
-    % records the pressure-levels in the grid.                          %     
-    % Time axis is set from the (first) transducer source frequency.    %
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+% SOURCE_SENSOR_SETUP  Create kWaveGrid, CW source, and full-grid sensor for a TUS simulation
+%
+% Builds the k-Wave computational grid (kWaveGrid) in 2-D or 3-D from
+% parameters.grid.dims and resolution_mm. The time axis is chosen from
+% the first transducer frequency: dt is derived from points-per-wavelength
+% (PPW) and the CFL number (grid.source_cfl, default 0.3) so that the
+% temporal sampling is an integer divisor of the wave period. A PPW
+% check against grid.min_ppw (default 6) warns when the grid is too
+% coarse. If grid_time_step is supplied (non-empty), that value is used
+% directly (retry after instability). The sensor records p_max_all and
+% p_final over the last 3 wave periods to capture steady state.
+%
+% Use as:
+%   [kgrid, source, sensor, source_labels] = ...
+%       source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final)
+%   [kgrid, source, sensor, source_labels] = ...
+%       source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
+%   [kgrid, source, sensor, source_labels] = ...
+%       source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
+%
+% Input:
+%   parameters      - PRESTUS config; must contain grid.dims, grid.resolution_mm [mm],
+%                     grid.source_cfl, grid.min_ppw, grid.use_kWaveArray, io.cache_dir,
+%                     and transducer(1).freq_hz [Hz]
+%   max_sound_speed - maximum sound speed across all media [m/s]
+%   trans_pos_final - transducer position in grid indices
+%   focus_pos_final - focus position in grid indices
+%   grid_time_step  - override dt [s] (optional, default: auto)
+%   min_sound_speed - minimum sound speed for PPW check [m/s] (optional, default: max_sound_speed)
+%
+% Output:
+%   kgrid         - kWaveGrid with time axis set
+%   source        - struct with source.p_mask and source.p
+%   sensor        - struct with sensor.mask, sensor.record, sensor.record_start_index
+%   source_labels - grid of integer element labels (0 = inactive)
+%
+% See also: SOURCE_CREATE, GRID_TISSUE_SETUP, GRID_TRANSDUCER_LOCATION
+
+arguments
+    parameters      (1,1) struct
+    max_sound_speed (1,1) {mustBeNumeric, mustBePositive}
+    trans_pos_final (1,:) {mustBeNumeric}
+    focus_pos_final (1,:) {mustBeNumeric}
+    grid_time_step  (1,1) {mustBeNumeric} = []
+    min_sound_speed (1,1) {mustBeNumeric} = []
+end
 
     % Creates a simulation grid in 3 or 2 dimensions
     if numel(parameters.grid.dims) == 3

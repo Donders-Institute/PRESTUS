@@ -1,21 +1,23 @@
 function report_path = generate_simulation_report(parameters)
-% GENERATE_SIMULATION_REPORT creates a self-contained HTML report consolidating
-% all PRESTUS simulation outputs (CSV data, images, logs) into a single portable file.
+% GENERATE_SIMULATION_REPORT  Generate a self-contained HTML simulation report
 %
-% Features a safety dashboard at the top with color-coded metrics against
-% ITRUSST consensus limits (Aubry et al., 2025).
+% Consolidates all PRESTUS simulation outputs (CSV data, images, logs)
+% into a single portable HTML file with a safety dashboard showing
+% colour-coded metrics against ITRUSST consensus limits.
 %
 % Use as:
 %   report_path = generate_simulation_report(parameters)
 %
-% Inputs:
-%   parameters       - PRESTUS parameters struct (required)
+% Input:
+%   parameters - (1,1) simulation parameters struct
 %
 % Output:
-%   report_path      - Path to the generated HTML file
+%   report_path - path to the generated HTML file
+%
+% See also: GENERATE_UNCERTAINTY_REPORT, CSS_STYLES_BASE
 
 arguments
-    parameters      struct
+    parameters (1,1) struct
 end
 
 report_path = '';

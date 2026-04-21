@@ -1,59 +1,45 @@
 function a0_fit = fitPowerLawParamsMulti(a0, y, c0, f_ref, y_ref, plot_fit)
-%FITPOWERLAWPARAMS Fit power law absorption parameters for highly absorbing media.
+% FITPOWERLAWPARAMSMULTI  Fit power-law absorption prefactors for the k-Wave fractional Laplacian solver
 %
-% DESCRIPTION:
-%     fitPowerLawParamsMulti calculates the absorption parameters that
-%     should be defined in the simulation functions given the desired
-%     absorption behaviour (defined by a0 and y) at a given frequency
-%     (f_ref). This takes into account the actual absorption behaviour 
-%     exhibited by the fractional Laplacian wave equation (see Eq. 40 in
-%     [1]), and the restriction that k-Wave only allows a single value for
-%     the power law exponent medium.alpha_power (given here by y_ref).
+% k-Wave's fractional Laplacian wave equation enforces a single global
+% alpha_power (y_ref). When the true tissue power law a = a0 * f^y differs
+% from this reference, or when attenuation values are large, the naive
+% prefactor a0 must be rescaled so that the simulated absorption at f_ref
+% matches the user-specified value. The rescaling follows Eq. 40 of Treeby
+% & Cox (2014) and accounts for second-order dispersive corrections. If
+% spatially varying y is provided (matrix a0 and y), a separate a0_fit is
+% computed for each voxel.
 %
-%     This fitting is required when using large absorption values or high
-%     frequencies, as the fractional Laplacian wave equation solved in
-%     kspaceFirstOrderND and kspaceSecondOrder no longer encapsulates
-%     absorption of the form a = a0*f^y (see Fig. 2 in [1]). It is also
-%     required if using a spatially varying power law exponent y.
+% Use as:
+%   a0_fit = fitPowerLawParamsMulti(a0, y, c0, f_ref, y_ref)
+%   a0_fit = fitPowerLawParamsMulti(a0, y, c0, f_ref, y_ref, plot_fit)
 %
-%     The returned values should be used to define medium.alpha_coeff
-%     within the simulation functions, with medium.alpha_power = y_ref. The
-%     absorption behaviour at the frequency f_ref will then match the
-%     absorption given by the power law parameters a0 and y.
+% Input:
+%   a0       - desired power-law absorption prefactors [dB/(MHz^y cm)]
+%   y        - same size as a0, desired power-law exponents (0 <= y <= 3)
+%   c0       - same size as a0, medium sound speed [m/s]
+%   f_ref    - reference frequency [Hz]
+%   y_ref    - reference power-law exponent (0 <= y_ref <= 3, must not equal 1)
+%   plot_fit - display fit comparison plot (optional, default: false)
 %
-% USAGE:
-%     a0_fit = fitPowerLawParamsMulti(a0, y, c0, f_ref, y_ref)
-%     a0_fit = fitPowerLawParamsMulti(a0, y, c0, f_ref, y_ref, plot_fit)
+% Output:
+%   a0_fit - same size as a0, rescaled prefactor for use as
+%            medium.alpha_coeff with medium.alpha_power = y_ref
 %
-% INPUTS:
-%     a0          - matrix of desired power law absorption prefactors
-%                   [dB/(MHz^y cm)] 
-%     y           - matrix of desired power law exponents
-%     c0          - matrix of medium sound speed [m/s]
-%     f_ref       - reference frequency [Hz]
-%     y_ref       - reference power law exponent
+% Reference:
+%   Treeby & Cox (2014), J. Acoust. Soc. Am. 136(4):1499-1510.
+%   https://doi.org/10.1121/1.4894790
 %
-% OPTIONAL INPUTS
-%     plot_fit    - Boolean controlling whether the final fit is
-%                   displayed (default = false)
-%
-% OUTPUTS:
-%     a0_fit      - power law absorption prefactor that should be used to
-%                   define medium.alpha_coeff in the simulation functions
-%
-% ABOUT:
-%     author      - Bradley E. Treeby
-%     date        - 8th March 2018
-%     last update - 26th April 2020
-%
-% REFERENCES:
-%     [1] Treeby, B. E., & Cox, B. T. (2014). Modeling power law absorption
-%     and dispersion in viscoelastic solids using a split-field and the
-%     fractional Laplacian. The Journal of the Acoustical Society of
-%     America, 136(4), 1499-1510.   
-%
-% This function is part of the k-Wave Toolbox (http://www.k-wave.org)
-% Copyright (C) 2018-2020 Bradley Treeby
+% See also: MEDIUM_SETUP, GET_ALPHA_COEFF
+
+arguments
+    a0       {mustBeNumeric, mustBeNonnegative}
+    y        {mustBeNumeric}
+    c0       {mustBeNumeric, mustBeNonnegative}
+    f_ref    (1,1) {mustBeNumeric, mustBeNonnegative}
+    y_ref    (1,1) {mustBeNumeric}
+    plot_fit (1,1) logical = false
+end
 
 % This file is part of k-Wave. k-Wave is free software: you can
 % redistribute it and/or modify it under the terms of the GNU Lesser

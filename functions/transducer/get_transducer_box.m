@@ -1,34 +1,41 @@
 function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ...
     get_transducer_box(trans_pos, focus_pos, natural_foc, grid_step, parameters, is_plot)
 
-% GET_TRANSDUCER_BOX Computes the transducer box dimensions and positions.
+% GET_TRANSDUCER_BOX  Compute transducer bounding box, exit plane, and geometric focus
 %
-% This function calculates the bounding box of a transducer based on its position 
-% (`trans_pos`), focus position (`focus_pos`), and transducer parameters. It also 
-% computes the geometric focus position, exit plane position, and distance to the 
-% exit plane. Optionally, it can visualize the transducer box on a plot.
+% Calculates the 2-D bounding box of a transducer from its grid position,
+% focus position, and transducer parameters. Also returns the geometric
+% focus position, exit plane position, and distance to the exit plane.
+%
+% Use as:
+%   [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ...
+%       get_transducer_box(trans_pos, focus_pos, natural_foc, grid_step, parameters)
+%   [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ...
+%       get_transducer_box(trans_pos, focus_pos, natural_foc, grid_step, parameters, is_plot)
 %
 % Input:
-%   trans_pos   - [1x2] array specifying the transducer position in grid coordinates.
-%   focus_pos   - [1x2] array specifying the focus position in grid coordinates.
-%   natural_foc - [1x2] array specifying the natural focus position in grid coordinates.
-%   grid_step   - Scalar specifying the grid step size (in mm).
-%   parameters  - Struct containing transducer properties (e.g., curvature radius, element diameters).
-%   plot        - Boolean flag to enable/disable visualization of the transducer box (default: 1).
+%   trans_pos   - [1x2] transducer position in grid coordinates
+%   focus_pos   - [1x2] focus position in grid coordinates
+%   natural_foc - [1x2] natural focus position in grid coordinates
+%   grid_step   - grid step size [mm]
+%   parameters  - (1,1) simulation parameters struct with transducer properties
+%   is_plot     - enable/disable bounding box visualisation (default: 1)
 %
 % Output:
-%   transducer_box     - [4x2] matrix specifying the coordinates of the bounding box corners.
-%   ex_plane_pos_trig  - [1x2] array specifying the exit plane position in grid coordinates.
-%   geom_focus_pos     - [1x2] array specifying the geometric focus position in grid coordinates.
-%   dist_to_ep_mm      - Scalar specifying the distance to the exit plane (in mm).
+%   transducer_box    - [4x2] bounding box corner coordinates
+%   ex_plane_pos_trig - [1x2] exit plane position in grid coordinates
+%   geom_focus_pos    - [1x2] geometric focus position in grid coordinates
+%   dist_to_ep_mm     - distance to exit plane [mm]
+%
+% See also: TRANSDUCER_SETUP, GET_ARC
 
     arguments
-        trans_pos (1, 2) % Transducer position in grid coordinates
-        focus_pos (1, 2) % Focus position in grid coordinates
-        natural_foc double % Natural focus position in grid coordinates
-        grid_step (1, 1) % Grid step size in mm
-        parameters struct % Struct containing transducer properties
-        is_plot = 1 % Enable/disable visualization (default: enabled)
+        trans_pos   (1,2) double
+        focus_pos   (1,2) double
+        natural_foc (:,:) double
+        grid_step   (1,1) double
+        parameters  (1,1) struct
+        is_plot     (1,1) double = 1
     end
 
     %% Compute focal slope0

@@ -1,28 +1,34 @@
 function [prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull] = transducer_analyze_position_fast(i, norm_v, ex_plane_pos, coord_mesh_gpu, full_skull_mask_idx, skin_boundary_coords, skull_boundary_coords, max_od)
 
-% TRANSDUCER_ANALYZE_POSITION_FAST Analyzes the transducer position relative to the skull and skin.
+% TRANSDUCER_ANALYZE_POSITION_FAST  GPU-accelerated transducer position analysis
 %
-% This function computes the proportion of intersection between a transducer's 
-% orthogonal plane and the skull mask. It also calculates statistical measures 
-% (mean and variance) of distances from non-intersecting voxels to the skin and 
-% skull boundaries.
+% Computes the fraction of exit-plane area intersecting the skull mask and
+% mean/variance distances to skin and skull boundaries. Designed to be
+% called via arrayfun for parallel evaluation of all candidates.
+%
+% Use as:
+%   [prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull] = ...
+%       transducer_analyze_position_fast(i, norm_v, ex_plane_pos, coord_mesh_gpu, ...
+%           full_skull_mask_idx, skin_boundary_coords, skull_boundary_coords, max_od)
 %
 % Input:
-%   i                     - Index of the current transducer element.
-%   norm_v                - [Nx3] matrix of normal vectors for each transducer element.
-%   ex_plane_pos          - [Nx3] matrix of positions for each transducer element's exit plane.
-%   coord_mesh_gpu        - Struct containing x, y, z coordinates of the computational grid on GPU.
-%   full_skull_mask_idx   - Indices of voxels belonging to the skull mask.
-%   skin_boundary_coords  - [Mx3] array of coordinates defining the skin boundary.
-%   skull_boundary_coords - [Px3] array of coordinates defining the skull boundary.
-%   max_od                - Maximum outer diameter of the transducer elements (in grid units).
+%   i                     - candidate index into norm_v and ex_plane_pos rows
+%   norm_v                - [Nx3] unit normal vectors for each candidate (gpuArray)
+%   ex_plane_pos          - [Nx3] exit plane centre positions (gpuArray)
+%   coord_mesh_gpu        - struct with x, y, z grid coordinates (gpuArray)
+%   full_skull_mask_idx   - linear indices of skull mask voxels (gpuArray)
+%   skin_boundary_coords  - [Mx3] skin boundary coordinates (gpuArray)
+%   skull_boundary_coords - [Px3] skull boundary coordinates (gpuArray)
+%   max_od                - aperture diameter in voxels
 %
 % Output:
-%   prop_intersect        - Proportion of intersection between the orthogonal plane and the skull mask.
-%   mean_dist_skin        - Mean distance from non-intersecting voxels to the skin boundary.
-%   var_dist_skin         - Variance of distances from non-intersecting voxels to the skin boundary.
-%   mean_dist_skull       - Mean distance from intersecting voxels to the skull boundary.
-%   var_dist_skull        - Variance of distances from intersecting voxels to the skull boundary.
+%   prop_intersect   - fraction of exit-plane area intersecting skull mask
+%   mean_dist_skin   - mean distance to skin boundary [voxels]
+%   var_dist_skin    - variance of distances to skin boundary
+%   mean_dist_skull  - mean distance to skull boundary [voxels]
+%   var_dist_skull   - variance of distances to skull boundary
+%
+% See also: TRANSDUCER_ANALYZE_POSITION, TP_EVALUATE_CANDIDATE_POSITIONS
 
     %% Step 1: Define orthogonal plane for the current transducer element
     % Compute distance `d` for the plane equation using dot product of normal vector and position

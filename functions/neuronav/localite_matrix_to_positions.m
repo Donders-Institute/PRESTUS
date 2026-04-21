@@ -2,10 +2,14 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
     localite_matrix_to_positions(coord_matrix, t1_header, parameters)
 % LOCALITE_MATRIX_TO_POSITIONS  Convert a Localite 4×4 matrix to voxel positions.
 %
-%   Shared position computation used by position_transducer_localite and
-%   neuronav_convert_trigger_to_voxels. Accepts a single 4×4 transformation
-%   matrix (typically the mean across a trigger series) and returns transducer
-%   and focus positions in both RAS (mm) and voxel space.
+% Shared position computation used by position_transducer_localite and
+% neuronav_convert_trigger_to_voxels. Accepts a single 4×4 transformation
+% matrix (typically the mean across a trigger series) and returns transducer
+% and focus positions in both RAS (mm) and voxel space.
+%
+% Use as:
+%   [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
+%       localite_matrix_to_positions(coord_matrix, t1_header, parameters)
 %
 % Input:
 %   coord_matrix - [4×4] Localite transformation matrix (RAS mm):
@@ -24,6 +28,14 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
 %   focus_pos      - [1×3] acoustic focus position in voxel coordinates (ijk)
 %   trans_pos_ras  - [1×3] bowl rear-centre position in RAS space (mm)
 %   focus_pos_ras  - [1×3] acoustic focus position in RAS space (mm)
+%
+% See also: POSITION_TRANSDUCER_LOCALITE, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
+
+    arguments
+        coord_matrix (4,4) double
+        t1_header    (1,1) struct
+        parameters   (1,1) struct
+    end
 
     ref_pos = coord_matrix(:, 4);   % origin / reference position in RAS mm [4×1]
     ref_vec = coord_matrix(:, 1);   % direction: coil centre → head [4×1]

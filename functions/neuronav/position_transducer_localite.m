@@ -2,14 +2,18 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
     position_transducer_localite(localite_file, t1_header, parameters)
 % POSITION_TRANSDUCER_LOCALITE  Determine transducer/focus positions from a Localite XML file.
 %
-%   Parses a TriggerMarkers or GUMMarkers XML file using the neuronav pipeline
-%   (neuronav_compute_series_statistics) and converts the resulting mean 4×4
-%   transformation matrix to voxel and RAS positions via localite_matrix_to_positions.
+% Parses a TriggerMarkers or GUMMarkers XML file using the neuronav pipeline
+% (neuronav_compute_series_statistics) and converts the resulting mean 4×4
+% transformation matrix to voxel and RAS positions via localite_matrix_to_positions.
 %
-%   When a TriggerMarkers file contains multiple series (e.g., repeated trigger
-%   trains per position), only the first series is used. For multi-position or
-%   multi-series workflows use neuronav_compute_series_statistics +
-%   neuronav_convert_trigger_to_voxels directly.
+% When a TriggerMarkers file contains multiple series (e.g., repeated trigger
+% trains per position), only the first series is used. For multi-position or
+% multi-series workflows use neuronav_compute_series_statistics +
+% neuronav_convert_trigger_to_voxels directly.
+%
+% Use as:
+%   [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
+%       position_transducer_localite(localite_file, t1_header, parameters)
 %
 % Input:
 %   localite_file - Path to a Localite XML file (TriggerMarkers or GUMMarkers).
@@ -23,6 +27,14 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
 %   focus_pos      - [1×3] focus position in voxel coordinates (ijk)
 %   trans_pos_ras  - [1×3] transducer position in RAS space (mm)
 %   focus_pos_ras  - [1×3] focus position in RAS space (mm)
+%
+% See also: NEURONAV_COMPUTE_SERIES_STATISTICS, LOCALITE_MATRIX_TO_POSITIONS
+
+    arguments
+        localite_file (1,:) char
+        t1_header     (1,1) struct
+        parameters    (1,1) struct
+    end
 
     % --- Detect marker type from filename ---
     [~, fname] = fileparts(localite_file);

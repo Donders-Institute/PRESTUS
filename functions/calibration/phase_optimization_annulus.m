@@ -1,22 +1,35 @@
 function error = phase_optimization_annulus(phase, parameters, velocity, axial_position, desired_focal_dist_mm)
 
-% PHASE_OPTIMIZATION_ANNULUS Computes the focal distance error for a focused annular transducer.
+% PHASE_OPTIMIZATION_ANNULUS  Compute focal-distance error for an annular transducer
 %
-% This function calculates the acoustic pressure profile along the axial direction 
-% for a focused annular transducer using O'Neil's model. It identifies the focal 
-% distance based on the full-width half-maximum (FWHM) of the pressure profile and 
-% computes the error relative to a desired focal distance.
+% Evaluates the O'Neil axial pressure model, locates the focal distance via
+% the FWHM centre of the pressure profile, and returns the absolute error
+% relative to the desired focal distance. Used as an objective function in
+% single-point focal-depth optimisation.
+%
+% Use as:
+%   error = phase_optimization_annulus(phase, parameters, velocity, axial_position, desired_focal_dist_mm)
 %
 % Input:
-%   phase                 - Array specifying the phase shifts for each transducer element.
-%   parameters            - Struct containing transducer and medium properties.
-%   velocity              - Array specifying particle velocities for each transducer element.
-%   axial_position        - Array specifying axial positions (0 = transducer surface).
-%   desired_focal_dist_mm - Scalar specifying the desired focal distance in mm.
+%   phase                 - phase shifts per transducer element [rad]
+%   parameters            - PRESTUS config with transducer.annular geometry and
+%                           medium_properties.water
+%   velocity              - particle velocities per element [m/s]
+%   axial_position        - axial positions along the beam axis [mm]
+%   desired_focal_dist_mm - desired focal distance [mm]
 %
 % Output:
-%   error                 - Scalar value representing the absolute error between 
-%                           the actual and desired focal distances.
+%   error - absolute error between actual and desired focal distances [mm]
+%
+% See also: PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE, PERFORM_GLOBAL_SEARCH
+
+arguments
+    phase                 (1,:) {mustBeNumeric}
+    parameters            (1,1) struct
+    velocity              (1,1) {mustBeNumeric}
+    axial_position        (1,:) {mustBeNumeric}
+    desired_focal_dist_mm (1,1) {mustBeNumeric}
+end
 
     %% Compute acoustic pressure profile using O'Neil's model
     % Focused annulus model based on transducer geometry and medium properties

@@ -1,9 +1,29 @@
 function timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43, curCEM43_iso)
-    % THERMAL_UPDATE_TIMESERIES Track max T/CEM43/CEM43_iso per tissue layer
-    %
-    % timeseries = thermal_update_timeseries(params, medium_masks)            — init
-    % timeseries = thermal_update_timeseries(params, medium_masks, ts, T, CEM43)
-    % timeseries = thermal_update_timeseries(params, medium_masks, ts, T, CEM43, CEM43_iso)
+% THERMAL_UPDATE_TIMESERIES  Accumulate per-tissue-layer thermal metric timeseries
+%
+% Initialises or extends a timeseries struct tracking peak temperature,
+% temperature rise, CEM43 (k-Wave), and ISO CEM43 per tissue layer.
+% Called with 2 arguments to initialise; called with 5-6 arguments to
+% append one time step.
+%
+% Use as:
+%   timeseries = thermal_update_timeseries(parameters, medium_masks)
+%   timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43)
+%   timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, curT, curCEM43, curCEM43_iso)
+%
+% Input:
+%   parameters   - PRESTUS config; must contain thermal.temp_0 per-layer baseline [°C]
+%   medium_masks - layer label map
+%   timeseries   - existing timeseries struct to extend (omit or [] to initialise)
+%   curT         - current temperature volume [°C]
+%   curCEM43     - current k-Wave CEM43 volume [min]
+%   curCEM43_iso - current ISO CEM43 volume [min] (optional)
+%
+% Output:
+%   timeseries - struct with fields T, Tdiff, CEM43, CEM43_iso,
+%                each a struct of per-layer row vectors
+%
+% See also: THERMAL_SIMULATION, TISSUEMASK_BINARY
 
     % Get masks
     mask = tissuemask_binary(parameters, medium_masks);

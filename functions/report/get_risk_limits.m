@@ -1,10 +1,21 @@
 function limits = get_risk_limits(is_layered)
-% GET_RISK_LIMITS  Returns struct with ITRUSST consensus non-significant risk limits (Aubry et al., 2025).
+% GET_RISK_LIMITS  Return ITRUSST consensus non-significant risk limits
 %
-%   limits = get_risk_limits(true)   — tissue-specific limits (layered/phantom simulations)
-%   limits = get_risk_limits(false)  — global-only limits (water/free-field simulations)
+% Returns a struct of acoustic and thermal safety limits based on the
+% ITRUSST consensus (Aubry et al., 2025). Tissue-specific limits are
+% returned for layered/phantom simulations; global-only limits for
+% water/free-field simulations.
 %
-% Color thresholds: green < 50% of limit <= amber < limit <= red.
+% Use as:
+%   limits = get_risk_limits(is_layered)
+%
+% Input:
+%   is_layered - true for tissue-specific limits, false for global-only (default: true)
+%
+% Output:
+%   limits - struct with fields MI_tc, MI_brain, Isppa, Ispta, etc.
+%
+% See also: GENERATE_SIMULATION_REPORT, RISK_COLOR
 
     arguments
         is_layered (1,1) logical = true

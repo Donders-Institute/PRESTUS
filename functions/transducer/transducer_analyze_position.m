@@ -1,28 +1,35 @@
 function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] = transducer_analyze_position(trans_pos, pos_shift_mm, target, pixel_size, parameters, coord_mesh, full_skull_mask, skin_boundary_coords)
 
-% TRANSDUCER_ANALYZE_POSITION Computes geometric and statistical measures for a transducer position.
+% TRANSDUCER_ANALYZE_POSITION  Compute geometric and statistical measures for a transducer position
 %
-% This function analyzes the position of a transducer relative to a target and 
-% computes various measures such as the distance to the target, proportion of 
-% intersection with the skull mask, and statistical measures (mean and variance) 
-% of distances to the skin boundary.
+% Analyses a transducer position relative to a target, computing distance
+% to target, proportion of exit-plane intersection with the skull mask,
+% and mean/variance of distances from non-intersecting voxels to the skin
+% boundary.
+%
+% Use as:
+%   [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] = ...
+%       transducer_analyze_position(trans_pos, pos_shift_mm, target, pixel_size, ...
+%           parameters, coord_mesh, full_skull_mask, skin_boundary_coords)
 %
 % Input:
-%   trans_pos           - [1x3] array specifying the transducer position in grid coordinates.
-%   pos_shift_mm        - Scalar specifying the positional shift applied to the transducer (in mm).
-%   target              - [1x3] array specifying the target position in grid coordinates.
-%   pixel_size          - Scalar specifying the voxel size (in mm).
-%   parameters          - Struct containing transducer properties (e.g., curvature radius, diameters).
-%   coord_mesh          - Struct containing x, y, z coordinates of the computational grid.
-%   full_skull_mask     - Binary mask indicating voxels belonging to the skull.
-%   skin_boundary_coords- [Mx3] array of coordinates defining the skin boundary.
+%   trans_pos            - [1x3] transducer position in grid coordinates
+%   pos_shift_mm         - positional shift applied to the transducer [mm]
+%   target               - [1x3] target position in grid coordinates
+%   pixel_size           - voxel size [mm]
+%   parameters           - (1,1) simulation parameters struct
+%   coord_mesh           - struct with x, y, z grid coordinate fields
+%   full_skull_mask      - [Nx x Ny x Nz] binary skull mask
+%   skin_boundary_coords - [Mx3] skin boundary coordinates
 %
 % Output:
-%   dist_to_target      - Scalar distance from transducer to target (in grid units).
-%   dist_to_target_mm   - Distance from transducer to target (in mm).
-%   prop_intersect      - Proportion of intersection between the orthogonal plane and the skull mask.
-%   mean_dts            - Mean distance from non-intersecting voxels to the skin boundary.
-%   var_dts             - Variance of distances from non-intersecting voxels to the skin boundary.
+%   dist_to_target    - transducer-to-target distance [grid units]
+%   dist_to_target_mm - transducer-to-target distance [mm]
+%   prop_intersect    - fraction of exit-plane area intersecting skull mask
+%   mean_dts          - mean distance from non-intersecting voxels to skin boundary
+%   var_dts           - variance of distances to skin boundary
+%
+% See also: TRANSDUCER_ANALYZE_POSITION_FAST, TP_EVALUATE_CANDIDATE_POSITIONS
 
     %% Step 1: Compute maximum outer diameter and exit plane distance
     % Calculate maximum outer diameter of transducer elements

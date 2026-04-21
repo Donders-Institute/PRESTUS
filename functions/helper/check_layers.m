@@ -1,6 +1,31 @@
 function [parameters] = check_layers(parameters, segmentation)
+% CHECK_LAYERS  Validate requested medium layers against available segmentation values
+%
+%   Compares each layer defined in parameters.layers against the unique tissue
+%   labels present in the segmentation volume. Layers whose labels are absent
+%   are removed from parameters with a warning. The water layer is also pruned
+%   to exclude all voxels already claimed by other tissue layers. When pCT is
+%   enabled, cortical and trabecular skull layers are merged into a single skull
+%   layer before the availability check.
+%
+% Use as:
+%   parameters = check_layers(parameters, segmentation)
+%
+% Input:
+%   parameters   - PRESTUS config; must contain parameters.layers (fieldnames = tissue names)
+%                  and parameters.pct.enabled
+%   segmentation - [Nx x Ny x Nz] segmentation label volume
+%
+% Output:
+%   parameters   - updated with unavailable layer fields removed and
+%                  parameters.layers.water pruned
+%
+% See also: GETIDX, CHARM_SEG_LABELS
 
-% Function to check and remove unavailable segmentation layers.
+arguments
+    parameters   (1,1) struct
+    segmentation {mustBeNumeric}
+end
 
     % Get all non-negative segmentation values
     seg_values = unique(segmentation(segmentation >= 0));

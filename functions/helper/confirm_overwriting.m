@@ -1,19 +1,23 @@
 function overwrite = confirm_overwriting(filename, parameters)
-
-% CONFIRM_OVERWRITING Handles file overwriting based on user preferences and interactivity.
+% CONFIRM_OVERWRITING  Decide whether an existing file should be overwritten
 %
-% This function checks whether a file should be overwritten based on its existence, 
-% user-defined parameters (`parameters.io.overwrite_files`), and interactive mode settings. 
-% If interactive mode is enabled, the user is prompted to confirm overwriting.
+%   Returns 1 (overwrite) if the file does not exist or if
+%   parameters.io.overwrite_files is 'always'. Returns 0 if it is 'never'.
+%   In interactive mode, prompts the user via a dialog. Raises an error in
+%   non-interactive mode if overwrite_files is neither 'always' nor 'never'.
+%
+% Use as:
+%   overwrite = confirm_overwriting(filename, parameters)
 %
 % Input:
-%   filename    - String specifying the name of the file to check.
-%   parameters  - Struct containing overwrite preferences and interactivity settings:
-%                 * overwrite_files: 'always', 'never', or interactive confirmation.
-%                 * interactive: 1 for interactive mode, 0 for non-interactive mode.
+%   filename   - path of the file to check
+%   parameters - PRESTUS config with io.overwrite_files ('always'|'never'|'')
+%                and simulation.interactive
 %
 % Output:
-%   overwrite   - Boolean flag indicating whether the file should be overwritten (1 = yes, 0 = no).
+%   overwrite  - [1x1] 1 = proceed with writing, 0 = skip
+%
+% See also: CONFIRMATION_DLG
 
     % Check if the file does not exist or if overwriting is set to 'always'
     if ~exist(filename, 'file') || strcmp(parameters.io.overwrite_files, 'always')

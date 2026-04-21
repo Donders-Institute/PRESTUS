@@ -1,10 +1,32 @@
 function varargout = log_timer(action, label, varargin)
-% LOG_TIMER - Track time, RAM, drive space usage
-% Usage:
-% log_timer('start', 'func1', '/path/to/monitor');
-% log_timer('start', 'func2');  % Independent!
-% log_timer('stop', 'func2');
-% log_timer('stop', 'func1');
+% LOG_TIMER  Track elapsed time, peak RAM, and drive space for labelled code blocks
+%
+% Persistent timers accumulate per-label state, so multiple independent
+% blocks can be timed concurrently. A background MATLAB timer samples RAM
+% every 0.5 s to capture peak usage.
+%
+% Use as:
+%   log_timer('start', 'label')
+%   log_timer('start', 'label', '/path/to/monitor')
+%   result = log_timer('stop', 'label')
+%
+% Input:
+%   action   - 'start' | 'stop'
+%   label    - string identifier for the timed block; must match between start/stop
+%   varargin - (start only) optional path to monitor for free disk space
+%
+% Output (stop only):
+%   varargout{1} - struct with fields:
+%                    .elapsed_s    — wall-clock time [s]
+%                    .peak_ram_gb  — peak RAM usage during block [GB]
+%                    .free_disk_gb — free disk space at stop (if path provided) [GB]
+%
+% Note:
+%   Uses MATLAB persistent variables and timer() objects. If MATLAB exits
+%   unexpectedly during a timed block, background samplers may not be cleaned
+%   up. Call log_timer('stop', label) explicitly to release timers.
+%
+% See also: PATH_LOG_SETUP
 
 persistent TIMER_STATES COUNTER MONITOR_PATH SAMPLER_TIMERS
 

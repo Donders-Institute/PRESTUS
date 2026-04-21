@@ -1,25 +1,23 @@
 % from https://nl.mathworks.com/matlabcentral/fileexchange/48231-structure-cat-merge-and-override
 
 function A = mergeStructure(varargin)
-%% MERGE_STRUCT Merge fields in scalar structures
+% MERGESTRUCTURE  Merge fields from multiple scalar structs into one
 %
-% Syntax:
-%     A = MERGE_STRUCT(A, B)
-%     A = MERGE_STRUCT(A1, A2, A3, A4, ...)
+% Later structs overwrite fields with the same name from earlier structs.
+% All inputs must be scalar structs. Adapted from Johan Winges (2014),
+% MATLAB File Exchange 48231.
+%
+% Use as:
+%   A = mergeStructure(A, B)
+%   A = mergeStructure(A1, A2, A3, ...)
 %
 % Input:
-%     A,B...   - structures to merge
+%   varargin - two or more scalar structs to merge
 %
 % Output:
-%     A        - merged structure
+%   A - merged struct containing all fields from all inputs
 %
-% Comments:
-%     Merges multiple scalar structures resulting in a single structure with the
-%     fieldnames and values from all the input structures. 
-%
-% See also struct, fieldnames
-%   Created by: Johan Winges
-%   $Revision: 1.0$  $Date: 2014-10-21 16:00:00$
+% See also: STRUCT, FIELDNAMES, MERGESTRUCT
 
 %% Merge structures:
 % Find fieldnames of structures:

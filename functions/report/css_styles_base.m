@@ -1,6 +1,16 @@
 function css = css_styles_base()
-% CSS_STYLES_BASE  CSS rules common to all PRESTUS HTML reports.
-% Each per-report css_styles() calls this function and appends its own rules.
+% CSS_STYLES_BASE  CSS rules common to all PRESTUS HTML reports
+%
+% Returns a character array with the shared CSS rules. Each per-report
+% css_styles function calls this function and appends its own rules.
+%
+% Use as:
+%   css = css_styles_base()
+%
+% Output:
+%   css - character array of CSS rules
+%
+% See also: GENERATE_SIMULATION_REPORT, GENERATE_UNCERTAINTY_REPORT
 css = [...
 ':root { --green: #22c55e; --amber: #f59e0b; --red: #ef4444; --gray: #9ca3af; --info: #3b82f6; }' newline ...
 'html { scroll-behavior: smooth; scroll-padding-top: 60px; }' newline ...

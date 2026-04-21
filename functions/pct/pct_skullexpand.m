@@ -1,11 +1,18 @@
 function pct_skullexpand(seg_path, path_pct)
-%PCT_SKULLEXPAND Load SimNIBS NIfTIs + headers, run skull rubber wrap, save output.
+% PCT_SKULLEXPAND  Load SimNIBS NIfTIs, run skull rubber wrap, and save output
 %
-% Expected inputs under seg_path:
-%   - final_tissues.nii.gz            (SimNIBS tissue labels)
-%   - final_tissues_skull.nii.gz      (binary skull mask; or skull label image)
+% Loads tissue labels and skull mask from seg_path, constructs the
+% parameters struct for skull_rubber_wrap, runs the balloon inflation, and
+% saves the updated skull mask back to pct_path.
 %
-% Output written under pct_path (and/or parameters.debug_dir).
+% Use as:
+%   pct_skullexpand(seg_path, path_pct)
+%
+% Input:
+%   seg_path - path containing final_tissues.nii.gz (SimNIBS tissue labels)
+%   path_pct - pCT processing folder containing skull_mask.nii.gz
+%
+% See also: SKULL_RUBBER_WRAP, PCT_SKULLMAPPING
 
     arguments
         seg_path (1,:) char

@@ -1,25 +1,24 @@
 function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, threshold, method)
-%SMOOTH_IMG - Smooth image with FWHM [mm]
+% SMOOTH_IMG  Smooth an image with a Gaussian or box kernel defined by FWHM
 %
-% SYNOPSIS:
-%   smoothed = smooth_img(binary_mask, 1.0, 0.5, 0.5, 'gaussian')
+% Converts FWHM in mm to voxel units and applies either a Gaussian
+% (imgaussfilt) or box-average filter. Optionally binarises the output
+% with a user-specified threshold.
 %
-% INPUT:
-%   unsmoothed_img  - Input image [Nx Ny Nz] or [Nx Ny]
-%   fwhm_mm         - FWHM in mm (scalar → isotropic, or 1xN per dim)
-%   voxel_size_mm   - Voxel spacing in mm (scalar or [dx dy (dz)])
-%   threshold       - Post-smoothing binarization [0.1-0.9] | 0: continuous
-%   method          - ['gaussian'|'box']
+% Use as:
+%   thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, threshold, method)
 %
-% OUTPUT:
-%   thresholded_img - Smoothed (binary if threshold > 0)
+% Input:
+%   unsmoothed_img - N-D numeric or logical image
+%   fwhm_mm        - smoothing kernel FWHM [mm]; scalar or [1xNdim] (default: 1.0)
+%   voxel_size_mm  - voxel spacing [mm]; scalar or [1xNdim] (default: 0.5)
+%   threshold      - binarisation threshold 0–1; 0 returns continuous output (default: 0.5)
+%   method         - 'gaussian' or 'box' (default: 'gaussian')
 %
-% DEFAULT: fwhm_mm=1.0, voxel_size_mm=0.5
+% Output:
+%   thresholded_img - smoothed image, binary when threshold > 0
 %
-% HOW IT WORKS:
-%   Convert FWHM(mm) → FWHM(voxels) = fwhm_mm ./ voxel_size_mm
-%   GAUSSIAN: FWHM(voxels) → σ(voxels) = fwhm_voxels/2.35482 → imgaussfilt(3)
-%   BOX:      Kernel size = round(FWHM(voxels)) per dim (no min size)
+% See also: SKULL_FILL_HOLES, HEAD_SMOOTH_AND_CROP
 
     arguments
         unsmoothed_img {mustBeNumericOrLogical}

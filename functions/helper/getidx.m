@@ -1,22 +1,26 @@
 function idx = getidx(parameters_fields, string)
-
-% GETIDX Retrieves indices for requested tissues from a parameter structure.
+% GETIDX  Return tissue label indices matching a name string from a layers struct
 %
-% This function searches for tissue labels in a parameter structure (`parameters_fields`) 
-% that match a specified string (`string`). It returns the indices associated with 
-% the matching labels.
+% Searches the fieldnames of parameters_fields for entries that contain
+% string and concatenates their values. Returns empty when nothing matches.
+%
+% Use as:
+%   idx = getidx(parameters_fields, string)
 %
 % Input:
-%   parameters_fields - Struct containing tissue labels and their associated indices.
-%                       Example: `parameters.layers`.
-%   string            - String specifying the tissue name to search for.
-%                       Example: `'skin'`.
+%   parameters_fields - struct whose fields map tissue names to label arrays
+%                       (e.g., parameters.layers)
+%   string            - tissue name to search for (e.g., 'skin')
 %
 % Output:
-%   idx               - Array of indices corresponding to the matching tissue labels.
+%   idx - concatenated label indices for all matching fields
 %
-% Notes:
-%   - If no matching labels are found, the function returns an empty array.
+% See also: CHARM_SEG_LABELS, CHECK_LAYERS
+
+arguments
+    parameters_fields (1,1) struct
+    string            (1,:) char
+end
 
     % Initialize output array
     idx = [];

@@ -1,22 +1,21 @@
 function out_img = get_slice_by_label(img, slice_label, slice_n)
-
-% GET_SLICE_BY_LABEL Extracts a specific slice from a 3D image based on axis label and slice number.
+% GET_SLICE_BY_LABEL  Extract a 2D slice from a 3D volume along a named axis
 %
-% This function extracts a 2D slice from a 3D image (`img`) along the specified 
-% axis (`slice_label`) at the given slice number (`slice_n`). The axis can be 
-% 'x', 'y', or 'z'.
+%   Returns the slice at position slice_n along the axis specified by
+%   slice_label ('x', 'y', or 'z'). Singleton dimensions are removed with squeeze.
+%
+% Use as:
+%   out_img = get_slice_by_label(img, slice_label, slice_n)
 %
 % Input:
-%   img         - [Nx x Ny x Nz] matrix representing the 3D image.
-%   slice_label - String specifying the axis along which to extract the slice ('x', 'y', or 'z').
-%   slice_n     - Integer specifying the slice number along the specified axis.
+%   img         - [Nx x Ny x Nz] numeric, 3D image volume
+%   slice_label - [1x1] char, axis to slice along: 'x', 'y', or 'z'
+%   slice_n     - [1x1] positive integer, slice index along slice_label axis
 %
 % Output:
-%   out_img     - [Mx x My] matrix representing the extracted 2D slice.
+%   out_img     - [Mx x My] numeric, extracted 2D slice
 %
-% Notes:
-%   - If an invalid `slice_label` is provided, an error is raised.
-%   - The function uses MATLAB's `squeeze` to remove singleton dimensions.
+% See also: SQUEEZE, NDGRID
 
     % Initialize ranges for slicing along each axis
     slice_x = 1:size(img,1); % Range for x-axis

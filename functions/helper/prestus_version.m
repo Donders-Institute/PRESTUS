@@ -1,4 +1,18 @@
 function prestus_version(prestus_path)
+% PRESTUS_VERSION  Print PRESTUS version, git commit hash, and branch to console
+%
+% Resolves the PRESTUS root (via GET_PRESTUSPATH if not supplied), then uses
+% git to retrieve the short commit hash, branch name, and commit date.
+%
+% Use as:
+%   prestus_version()
+%   prestus_version(prestus_path)
+%
+% Input:
+%   prestus_path - path to the PRESTUS root directory (optional, default: get_prestus_path)
+%
+% See also: KWAVE_VERSION, SIMNIBS_VERSION, PATH_LOG_SETUP
+
     if nargin == 0
         prestus_path = get_prestus_path;
     end

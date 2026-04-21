@@ -1,17 +1,26 @@
 function x = round_if_integer(x, err_msg)
-
-% ROUND_IF_INTEGER Rounds a value if it is sufficiently close to an integer.
+% ROUND_IF_INTEGER  Round a value to the nearest integer or error if not close enough
 %
-% This function checks whether the input value `x` is sufficiently close to an integer 
-% (within a tolerance of 1e-6). If the condition is met, it rounds `x` to the nearest integer. 
-% Otherwise, it raises an error with the provided error message.
+% Asserts that x is within 1e-6 of an integer, then rounds. Used to
+% validate time-step count calculations where non-integer counts indicate
+% an invalid protocol configuration.
+%
+% Use as:
+%   x = round_if_integer(x, err_msg)
 %
 % Input:
-%   x        - Numeric value or array to be checked and rounded.
-%   err_msg  - String specifying the error message to display if `x` is not close to an integer.
+%   x       - value or array to check and round
+%   err_msg - error message to display if x is not close to an integer
 %
 % Output:
-%   x        - Rounded numeric value or array.
+%   x - rounded value
+%
+% See also: THERMAL_PARAMETERS
+
+arguments
+    x       {mustBeNumeric}
+    err_msg (1,:) char
+end
 
     % Assert that the input value is sufficiently close to an integer
     assert(abs(round(x) - x) < 1e-6, err_msg);

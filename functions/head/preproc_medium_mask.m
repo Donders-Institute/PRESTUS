@@ -1,18 +1,27 @@
 function medium_masks = preproc_medium_mask(segmented_img, parameters)
-%MEDIUM_MASK_CREATE Convert SimNibs segmentation to smoothed label indices.
+% PREPROC_MEDIUM_MASK  Convert SimNIBS segmentation to smoothed medium label indices
 %
-% INPUT:
-%   segmented_img  - [Nx Ny Nz] SimNibs tissue layer_labels (1=wm,2=gm,3=csf,...)
-%   parameters     - Struct with .layers, smoothing params
+% Maps SimNIBS tissue labels to medium property indices defined in
+% parameters.medium_properties. Applies layer-specific smoothing and
+% handles cortical/trabecular skull differentiation when both are
+% requested.
 %
-% OUTPUT:
-%   medium_masks   - [Nx Ny Nz] Integer label indices (per layers order)
+% Use as:
+%   medium_masks = preproc_medium_mask(segmented_img, parameters)
 %
-% LOGIC:
-% Create a list of all requested layers. 
-% Remove the water layer from the loop. 
-% If skull_cortical is requested, remove skull and skull_trabecular from the loop. 
-% In the skull_cortical loop proceed sequentially with whole skull smoothing and then insert trabecular layer.
+% Input:
+%   segmented_img - [Nx x Ny x Nz] SimNIBS tissue label volume
+%   parameters    - (1,1) simulation configuration struct with .layers and .medium_properties
+%
+% Output:
+%   medium_masks - [Nx x Ny x Nz] integer medium label array
+%
+% See also: HEAD_SMOOTH_AND_CROP, PREPROC_HEAD
+
+arguments
+    segmented_img (:,:,:) {mustBeNumeric}
+    parameters    (1,1) struct
+end
 
     % remove unavailable layers, unify skull for pCT
     [parameters] = check_layers(parameters, segmented_img);

@@ -1,7 +1,46 @@
 function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
                                 segmentation, source_labels)
-    
+% ACOUSTIC_ANALYSIS  Compute acoustic intensity metrics and generate output plots and tables
+%
+% Derives spatial pressure, intensity (Isppa), and mechanical index (MI) maps
+% from k-Wave sensor output. For layered and phantom media, computes per-tissue
+% peak values (skin, skull, brain) and transcranial MI. Writes a summary CSV and
+% saves overlay plots of the intensity on the segmentation.
+%
+% Use as:
+%   [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
+%       acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
+%                         segmentation, source_labels)
+%
+% Input:
+%   parameters   - PRESTUS config with transducer, grid, analysis, io fields
+%   kwave_medium - spatial medium property maps (sound_speed, density, etc.)
+%   medium_masks - voxel-wise tissue layer label map
+%   sensor_data  - k-Wave output; requires p_max_all [Pa]
+%   segmentation - CHARM tissue label map
+%   source_labels- transducer element label map (for overlay plots)
+%
+% Output:
+%   results          - struct with fields: Isppa, Isppa_after_exit_plane, Psptp,
+%                      Ipa_target, Ipa_target_radius, real_focal_distance, and per-tissue
+%                      Isppa/Psptp/MI fields for layered/phantom media [W/cm², Pa, -]
+%   acoustic_Ipa     - spatial Isppa map [W/cm²]
+%   acoustic_MI      - spatial mechanical index map [-]
+%   acoustic_pressure- temporal peak pressure map [Pa]
+%   highlighted_pos  - [1x3] grid coordinates of peak intensity for plots [voxels]
+%
+% See also: ACOUSTIC_WRAPPER, ACOUSTIC_SIMULATION, SIMULATION_NIFTI, MASKED_MAX_3D
+
+arguments
+    parameters   (1,1) struct
+    kwave_medium (1,1) struct
+    medium_masks (:,:,:) {mustBeNumeric}
+    sensor_data  (1,1) struct
+    segmentation (:,:,:) {mustBeNumeric}
+    source_labels(:,:,:) {mustBeNumeric}
+end
+
     disp('Processing the results of acoustic simulations...')
 
     % select transducer info

@@ -6,21 +6,31 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     equipment_name, ...
     dist_from_exit_plane)
 
-    % Extracts or interpolates the intensity profile at a specific focal depth.
-    %
-    % Arguments:
-    % - parameters
-    %   parameters.calibration.skip_front_peak_mm: Distance to skip near-field peaks when finding the maximum intensity [mm].
-    %   parameters.calibration.path_output_profiles: Directory path for saving results.
-    % - available_foci_wrt_exit_plane: Array of available focal depths relative to the exit plane [mm].
-    % - desired_focal_distance_ep: Desired focal depth relative to the exit plane [mm].
-    % - intens_data: Matrix containing intensity profiles for different focal depths.
-    % - equipment_name: Name of the equipment for labeling plots.
-    % - dist_from_exit_plane: Distance vector from the transducer [mm].
-    %
-    % Returns:
-    % - profile_focus: Extracted or interpolated intensity profile at the desired focal depth.
-    % - max_intens: Maximum intensity in the profile beyond the specified skip distance.
+% EXTRACT_REAL_INTENSITY_PROFILE  Extract or interpolate an empirical axial intensity profile
+%
+% Selects the intensity profile for the desired focal depth from the
+% available measured profiles, interpolating linearly between the two
+% nearest depths when an exact match is not found.
+%
+% Use as:
+%   [norm_profile_focus, max_intens] = extract_real_intensity_profile( ...
+%       parameters, available_foci_wrt_exit_plane, desired_focal_distance_ep, ...
+%       intens_data, equipment_name, dist_from_exit_plane)
+%
+% Input:
+%   parameters                  - PRESTUS config; uses calibration.skip_front_peak_mm [mm]
+%                                 and calibration.path_output_profiles
+%   available_foci_wrt_exit_plane - available focal depths relative to exit plane [mm]
+%   desired_focal_distance_ep   - desired focal depth relative to exit plane [mm]
+%   intens_data                 - matrix of intensity profiles per focal depth [W/cm²]
+%   equipment_name              - equipment name for plot labelling
+%   dist_from_exit_plane        - distance vector from transducer [mm]
+%
+% Output:
+%   norm_profile_focus - extracted or interpolated intensity profile [W/cm²]
+%   max_intens         - maximum intensity beyond the skip-front-peak distance [W/cm²]
+%
+% See also: SCALE_REAL_INTENSITY_PROFILE, EXTRACT_SIMULATED_PROFILE, CALIBRATION_TRANSDUCER
 
     % Check if the exact focal depth is available
     col_index = find(available_foci_wrt_exit_plane == desired_focal_distance_ep);

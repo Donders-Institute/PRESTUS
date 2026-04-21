@@ -1,25 +1,27 @@
 function [flhm_center, flhm_center_index] = get_flhm_center_position(x, y)
-
-% GET_FLHM_CENTER_POSITION Computes the center position of the full-length half-maximum (FLHM).
+% GET_FLHM_CENTER_POSITION  Compute the centre of the full-length half-maximum (FLHM)
 %
-% This function calculates the center position of the FLHM for a given dataset 
-% defined by `x` (independent variable) and `y` (dependent variable). The FLHM 
-% is defined as the region where `y` values are greater than or equal to half 
-% the maximum value of `y`.
+%   Locates the FLHM region (where y >= half-max) and returns the midpoint
+%   between the left and right FLHM crossing positions, along with its index.
+%   Assumes y has a single peak with monotonically decreasing flanks.
+%
+% Use as:
+%   [flhm_center, flhm_center_index] = get_flhm_center_position(x, y)
 %
 % Input:
-%   x - [1xN] array of independent variable values.
-%   y - [1xN] array of dependent variable values corresponding to `x`.
+%   x - [1xN] independent variable (e.g., spatial coordinate) [mm]
+%   y - [1xN] dependent variable (e.g., pressure or intensity profile)
 %
 % Output:
-%   flhm_center        - Scalar value representing the center position of the FLHM.
-%   flhm_center_index  - Index of `x` corresponding to the FLHM center.
+%   flhm_center       - [1x1] coordinate value at the FLHM centre
+%   flhm_center_index - [1x1] index into x closest to flhm_center
 %
-% Notes:
-%   - The function assumes that `y` has a single peak and monotonically decreases 
-%     on both sides of the peak.
-%   - The FLHM is calculated as the midpoint between the first point below half-max 
-%     on the left side and the last point below half-max on the right side.
+% See also: GET_SLICE_BY_LABEL, MASKED_MAX_3D
+
+arguments
+    x (1,:) {mustBeNumeric}
+    y (1,:) {mustBeNumeric}
+end
 
     % Compute half of the maximum range (half-max value)
     halfMax = (min(y) + max(y)) / 2;

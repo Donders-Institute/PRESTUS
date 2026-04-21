@@ -1,20 +1,35 @@
 function display_info = hpc_job_info(platform, job_id, job_name, ...
     memory_gb, timelimit, log_dir, visualize)
-%% HPC_JOB_INFO  Generate formatted job display information
+% HPC_JOB_INFO  Build a formatted job-info struct and optionally print it
 %
-%   Creates structured display info for job submission feedback.
+% Constructs display_info from submission metadata and, when visualize=true,
+% prints a formatted summary to the console with job ID, check commands,
+% memory, time limit, and log path.
 %
-%   Inputs:
-%     platform      - 'slurm' or 'qsub'
-%     job_id        - Raw job ID from submission
-%     job_name      - Job name string (encodes subject ID)
-%     memory_gb     - Memory allocation (GB)
-%     timelimit     - Time limit string
-%     log_dir       - Log directory path
-%     visualize     - Display job info?
+% Use as:
+%   display_info = hpc_job_info(platform, job_id, job_name, ...
+%       memory_gb, timelimit, log_dir, visualize)
 %
-%   Output:
-%     display_info  - Struct with all formatted display fields
+% Input:
+%   platform   - scheduler type: 'slurm' or 'qsub'
+%   job_id     - raw job ID returned by the scheduler (numeric for SLURM)
+%   job_name   - job name string (typically encodes subject ID and affix)
+%   memory_gb  - memory allocation in GB
+%   timelimit  - wall-time limit string (e.g. '06:00:00')
+%   log_dir    - path to the batch_job_logs directory
+%   visualize  - logical; if true, print job summary to console
+%
+% Output:
+%   display_info - struct with fields:
+%                    .id          — formatted job ID string
+%                    .name        — job name
+%                    .check_cmd   — shell command to check job status
+%                    .detail_cmd  — shell command for detailed job info
+%                    .memory_gb   — memory allocation (GB)
+%                    .timelimit   — wall-time limit string
+%                    .log_dir     — log directory path
+%
+% See also: HPC_SUBMIT_JOB, HPC_JOB_NAME
 
     % Format job ID
     if strcmp(platform, 'slurm') && isnumeric(job_id)

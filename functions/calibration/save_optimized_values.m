@@ -1,12 +1,25 @@
 function save_optimized_values(parameters)
-    % Save optimized phases and amplitude values to a CSV file.
-    %
-    % Arguments:
-    % - parameters: Structure containing optimized parameters, including transducer values.
-    %   .calibration.path_output: Path to the output for saving optimized values.
-    %   .calibration.desired_focal_distance_ep: Target focal distance with respect to the exit plane [mm].
-    %   .calibration.desired_intensity: Target intensity for optimization [W/cm^2].
-    %   .calibration.equipment_name: Serial number of the driving system & transducer.
+% SAVE_OPTIMIZED_VALUES  Save optimised transducer phases and amplitude to a CSV file
+%
+% Writes or updates a calibration CSV where rows correspond to intensity
+% targets and columns to focal depths. Each cell stores a string of
+% element phases and amplitude.
+%
+% Use as:
+%   save_optimized_values(parameters)
+%
+% Input:
+%   parameters - PRESTUS config; uses calibration.path_output_profiles,
+%                calibration.filename_calibrated_CSV,
+%                calibration.desired_focal_distance_ep [mm],
+%                calibration.desired_intensity [W/cm²],
+%                calibration.equipment_name, and transducer.annular phases/amplitude
+%
+% See also: CALIBRATION_TRANSDUCER, SET_REAL_PHASES
+
+arguments
+    parameters (1,1) struct
+end
     
     disp('Saving optimized values to CSV file...');
 

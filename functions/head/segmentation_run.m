@@ -1,4 +1,21 @@
 function segmentation_run(data_path, subject_id, filename_t1, filename_t2, parameters)
+% SEGMENTATION_RUN  Submit a SimNIBS charm segmentation job
+%
+% Constructs the SimNIBS charm command for the given subject and dispatches
+% it either directly in MATLAB or via an HPC batch scheduler (Slurm or
+% PBS/qsub) depending on parameters.platform.
+%
+% Use as:
+%   segmentation_run(data_path, subject_id, filename_t1, filename_t2, parameters)
+%
+% Input:
+%   data_path   - base output directory for segmentation results
+%   subject_id  - numeric subject identifier
+%   filename_t1 - path to T1-weighted NIfTI file
+%   filename_t2 - path to T2-weighted NIfTI file (empty string if not available)
+%   parameters  - (1,1) simulation configuration struct
+%
+% See also: PREPROC_SEGMENTATION, PREPROC_HEAD
 
     % set segmentation path to data_path if no specific seg_path is defined
     if ~isfield(parameters, 'path') || ~isfield(parameters.path, 'seg') || isempty(parameters.path.seg)

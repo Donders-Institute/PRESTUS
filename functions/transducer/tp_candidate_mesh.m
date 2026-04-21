@@ -1,32 +1,26 @@
 function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
-% TP_CANDIDATE_MESH Build coordinate mesh and candidate transducer geometry
+% TP_CANDIDATE_MESH  Build coordinate mesh and candidate transducer geometry
 %
-% Constructs:
-%   - Full 3D voxel coordinate grid (CPU + GPU)
-%   - Skin and skull boundary point clouds (GPU)
-%   - Candidate outer-surface positions within tp_dist_close of target
-%   - Geometry for transducer axis, geometric focus, and exit plane (all candidates)
+% Constructs the full 3-D voxel coordinate grid, skin and skull boundary
+% point clouds, and candidate outer-surface positions within tp_dist_close
+% of the target. Computes transducer axis, geometric focus, and exit plane
+% for all candidate positions.
 %
-% INPUT
-%   img        - Segmented head volume [Nx Ny Nz]
-%   target     - 1x3 target position [x y z] in voxel space
-%   parameters - Struct with fields:
-%                  .tp_dist_close (mm), .transducer.curv_radius_mm,
-%                  .transducer.elem_od_mm (vector of element ODs in mm)
-%   pixel_size - Scalar voxel size in mm
+% Use as:
+%   mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
 %
-% OUTPUT (struct mesh)
-%   mesh.coord_mesh      - struct with fields x,y,z,xyz (all gpuArray)
-%   mesh.skin_coords     - [N_skin x 3] gpuArray skin boundary points
-%   mesh.skull_coords    - [N_skull x 3] gpuArray skull boundary points
-%   mesh.outer_boundary  - logical volume (CPU) outer surface mask
-%   mesh.close_enough_idx- linear indices of candidate positions (CPU)
-%   mesh.trans_pos       - [N_cand x 3] gpuArray shifted transducer positions
-%   mesh.norm_v          - [N_cand x 3] gpuArray unit direction vectors
-%   mesh.geom_focus      - [N_cand x 3] gpuArray geometric focus positions
-%   mesh.ex_plane        - [N_cand x 3] gpuArray exit plane centers
-%   mesh.max_od_grid     - scalar, aperture diameter in voxels
-%   mesh.all_masks_idx   - gpuArray linear indices of tissue voxels
+% Input:
+%   img        - [Nx x Ny x Nz] segmented head volume
+%   target     - [1x3] target position in voxel space
+%   parameters - (1,1) simulation parameters struct
+%   pixel_size - voxel size [mm]
+%
+% Output:
+%   mesh - struct with fields: coord_mesh, skin_coords, skull_coords,
+%          outer_boundary, close_enough_idx, trans_pos, norm_v,
+%          geom_focus, ex_plane, max_od_grid, all_masks_idx
+%
+% See also: TP_EVALUATE_CANDIDATE_POSITIONS, TP_SELECT_HEURISTIC_POSITION
 
     %--- 3D voxel grid (CPU + GPU) ---------------------------------------
     sz = size(img);

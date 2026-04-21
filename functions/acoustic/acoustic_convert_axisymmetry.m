@@ -1,6 +1,46 @@
 function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
             acoustic_convert_axisymmetry(...
             parameters, sensor_data, segmentation, medium_masks, kwave_medium, source, source_labels)
+% ACOUSTIC_CONVERT_AXISYMMETRY  Route axisymmetric simulation fields to 2D or 3D expansion
+%
+% Selects between radial 3D expansion and 2D bilateral mirroring based on
+% whether a follow-up heating simulation is requested. When
+% parameters.modules.run_heating_sims == 1, calls convert_axisymmetric_to_3d;
+% otherwise calls convert_axisymmetric_to_2d. This is an older entry-point
+% that predates the inline dispatch in acoustic_wrapper; prefer acoustic_wrapper
+% for new code.
+%
+% Use as:
+%   [sensor_data, parameters, segmentation, medium_masks, ...
+%    kwave_medium, kgrid, source, source_labels] = ...
+%       acoustic_convert_axisymmetry(parameters, sensor_data, segmentation, ...
+%                                    medium_masks, kwave_medium, source, source_labels)
+%
+% Input:
+%   parameters   - PRESTUS config; modules.run_heating_sims controls dispatch
+%   sensor_data  - k-Wave sensor output with p_final, p_max_all [Pa]
+%   segmentation - tissue label map [Nz x Nr]
+%   medium_masks - medium layer label map [Nz x Nr]
+%   kwave_medium - spatial medium property maps [Nz x Nr] each
+%   source       - k-Wave source with field p_mask [Nz x Nr]
+%   source_labels- transducer element label map [Nz x Nr]
+%
+% Output:
+%   All inputs returned with spatial fields expanded to 3D [2*Nr x 2*Nr x Nz]
+%   (heating requested) or mirrored to 2D [2*Nr x Nz] (no heating).
+%   parameters.grid.dims and kgrid updated to match.
+%
+% See also: CONVERT_AXISYMMETRIC_TO_3D, CONVERT_AXISYMMETRIC_TO_2D, ACOUSTIC_WRAPPER
+
+arguments
+    parameters   (1,1) struct
+    sensor_data  (1,1) struct
+    segmentation (:,:) {mustBeNumeric}
+    medium_masks (:,:) {mustBeNumeric}
+    kwave_medium (1,1) struct
+    source       (1,1) struct
+    source_labels(:,:) {mustBeNumeric}
+end
 
     % if using axisymmetric settings and requesting heating simulations, reshape output to 3D
     if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims==1

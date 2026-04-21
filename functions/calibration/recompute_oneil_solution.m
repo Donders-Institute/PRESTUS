@@ -1,20 +1,34 @@
 function profile_oneil_opt = recompute_oneil_solution(parameters, profile_oneil, profile_target, opt_phases, opt_velocity)
-    % Recalculate analytical solution based on optimized phases and velocity.
-    %
-    % Arguments:
-    % - parameters: Structure containing simulation and transducer parameters.
-    % -     .calibration.desired_focal_distance_ep: Focal depth with respect to the transducer exit plane [mm].
-    % -     .calibration.desired_intensity: Target intensity for optimization [W/cm^2].
-    % -     .calibration.equipment_name: Name of the equipment used.
-    % - profile_oneil.axial_distance_bowl: Axial position vector [mm from bowl].
-    % - profile_oneil.axial_intensity: Initial O'Neil solution for intensity [W/cm2].
-    % - profile_target.axial_intensity: Adjusted desired intensity profile [W/cm^2].
-    % - opt_phases: Optimized phases for each transducer element [rad].
-    % - opt_velocity: Optimized particle velocity [m/s].
-    %
-    % Returns:
-    % - profile_oneil_opt.axial_intensity: Optimized O'Neil solution for intensity along the beam axis [W/cm2].
-    % - profile_oneil_opt.axial_distance_bowl: Axial position vector [mm from bowl].
+% RECOMPUTE_ONEIL_SOLUTION  Recompute and plot O'Neil solution with optimised phases and velocity
+%
+% Evaluates the focusedAnnulusONeil model with the optimised parameters,
+% plots the result alongside the original analytical and target profiles,
+% and saves the figure.
+%
+% Use as:
+%   profile_oneil_opt = recompute_oneil_solution(parameters, profile_oneil, profile_target, opt_phases, opt_velocity)
+%
+% Input:
+%   parameters     - PRESTUS config; uses transducer.annular geometry,
+%                    medium_properties.water, calibration.desired_focal_distance_ep [mm],
+%                    calibration.desired_intensity [W/cm²], calibration.equipment_name
+%   profile_oneil  - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
+%   profile_target - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
+%   opt_phases     - optimised phases per element [rad]
+%   opt_velocity   - optimised particle velocity [m/s]
+%
+% Output:
+%   profile_oneil_opt - struct with axial_intensity [W/cm²] and axial_distance_bowl [mm]
+%
+% See also: COMPUTE_ONEIL_SOLUTION, PLOT_OPT_SIM_RESULTS, CALIBRATION_TRANSDUCER
+
+arguments
+    parameters     (1,1) struct
+    profile_oneil  (1,1) struct
+    profile_target (1,1) struct
+    opt_phases     (1,:) {mustBeNumeric}
+    opt_velocity   (1,1) {mustBeNumeric}
+end
 
     % Get axial position
     axial_position = profile_oneil.axial_distance_bowl;

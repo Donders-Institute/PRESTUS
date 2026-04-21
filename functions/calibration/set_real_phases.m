@@ -1,15 +1,30 @@
 function elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters)
-    % Set the manufacturer-specified phases of the transducer for a given focal depth.
-    %
-    % Arguments:
-    % - phase_table: Additional data for phase calculations.
-    % - tran: Transducer structure containing manufacturer and element details.
-    % - focal_distance_ep: Desired focal depth with respect to the transducer exit plane [mm].
-    % - parameters
-    %       .medium.water.sound_speed: Speed of sound in water [m/s].
-    %
-    % Returns:
-    % - elem_phase_deg: new phase values.
+% SET_REAL_PHASES  Look up or compute manufacturer-specified steering phases for a focal depth
+%
+% For Sonic Concepts transducers, reads phase values directly from phase_table.
+% For Imasonic transducers, calls COMPUTE_PHASES. Interpolates to virtual
+% element count when the number of real and virtual elements differs.
+%
+% Use as:
+%   elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters)
+%
+% Input:
+%   phase_table       - phase data table or ini struct (format depends on tran.manufact)
+%   tran              - transducer struct with manufact, n_elem, prestus.transducer fields
+%   focal_distance_ep - desired focal depth relative to exit plane [mm]
+%   parameters        - PRESTUS config; uses medium_properties.water.sound_speed [m/s]
+%
+% Output:
+%   elem_phase_deg - [1xN] element phases [°]
+%
+% See also: COMPUTE_PHASES, SAVE_OPTIMIZED_VALUES, CALIBRATION_TRANSDUCER
+
+arguments
+    phase_table
+    tran              (1,1) struct
+    focal_distance_ep (1,1) {mustBeNumeric}
+    parameters        (1,1) struct
+end
 
     % Extract or interpolate phases for the given focal depth
     if isequal(tran.manufact, "Sonic Concepts")

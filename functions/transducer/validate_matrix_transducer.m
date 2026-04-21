@@ -1,28 +1,25 @@
 function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
-% VALIDATE_MATRIX_TRANSDUCER Validates configuration of a matrix transducer.
+% VALIDATE_MATRIX_TRANSDUCER  Validate and normalise configuration of a matrix transducer
 %
-% This function checks that all required fields for a matrix transducer
-% definition are present in the input transducer structure. 
-
-% The function also supports optional configurations such as Clover array
-% layouts, sparse Fibonacci grids, random element subsets, and projection
-% of element positions onto a new radius of curvature.
+% Checks required fields for a matrix transducer, copies them to
+% standardised pipeline fields, and computes derived values such as
+% element count and equivalent annular diameters. Supports optional
+% Clover array layouts, Fibonacci grids, random element subsets, and
+% projection onto a new radius of curvature.
 %
-% After validation, the relevant parameters are copied to standardized
-% fields used throughout the simulation pipeline. Additional derived values
-% such as the number of elements and equivalent annular element diameters
-% (for visualization compatibility) are calculated.
+% Use as:
+%   [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 %
 % Input:
-%   parameters - Struct containing global simulation parameters.
-%   tr         - Struct containing a single transducer definition.
-%   t_i        - Index of the transducer in the configuration (used for
-%                informative error messages).
+%   parameters - (1,1) simulation parameters struct
+%   tr         - (1,1) transducer definition struct
+%   t_i        - transducer index used in error messages
 %
 % Output:
-%   parameters - Updated parameters struct (e.g., enabling kWaveArray).
-%   tr         - Transducer struct with validated and normalized fields,
-%                including geometry, grid configuration, and derived values.
+%   parameters - updated struct with use_kWaveArray enabled
+%   tr         - validated and normalised transducer struct
+%
+% See also: VALIDATE_ANNULAR_TRANSDUCER, TRANSDUCER_SETUP
 
     matrix_tr = tr.matrix;
 

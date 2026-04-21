@@ -1,23 +1,29 @@
 function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, plot_options)
 
-% PLOT_T1_WITH_TRANSDUCER Creates a plot of a T1 slice oriented along the transducer's axis.
+% PLOT_T1_WITH_TRANSDUCER  Plot a T1 slice with transducer mask overlaid
 %
-% This function generates a visualization of a T1-weighted image slice overlaid with 
-% the transducer mask and focus position. The slice is oriented along the transducer's axis.
+% Generates a visualisation of a T1 image slice oriented along the
+% transducer axis, with the transducer bowl mask and focus position
+% overlaid as an RGB image.
+%
+% Use as:
+%   [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, ...
+%       trans_pos_grid, focus_pos_grid, parameters)
+%   [res_image, tr] = plot_t1_with_transducer(..., plot_options)
 %
 % Input:
-%   t1_image        - [Nx x Ny x Nz] matrix representing the T1-weighted image.
-%   voxel_size_mm   - Scalar specifying the voxel size in mm.
-%   trans_pos_grid  - [1x3] array specifying the transducer position in grid coordinates.
-%   focus_pos_grid  - [1x3] array specifying the focus position in grid coordinates.
-%   parameters      - Struct containing transducer configuration parameters.
-%   plot_options    - Struct containing optional plotting settings:
-%                     * slice_dim: Dimension for slicing (default: 2).
-%                     * slice_ind: Index of the slice along the specified dimension (default: transducer position).
+%   t1_image       - [Nx x Ny x Nz] T1-weighted image volume
+%   voxel_size_mm  - voxel size [mm]
+%   trans_pos_grid - [1x3] transducer position in grid coordinates
+%   focus_pos_grid - [1x3] focus position in grid coordinates
+%   parameters     - (1,1) simulation parameters struct
+%   plot_options   - name-value plotting options (slice_dim, slice_ind)
 %
 % Output:
-%   res_image       - [Mx x My x 3] RGB image matrix representing the T1 slice with overlays.
-%   tr - Struct containing parameters of the transducer setup.
+%   res_image - [Mx x My x 3] RGB image of the T1 slice with overlays
+%   tr        - transducer parameter struct from transducer_setup
+%
+% See also: PLOT_OVERLAY, TRANSDUCER_SETUP
 
     % Checks if all data is in the right format
     arguments
@@ -25,7 +31,7 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
         voxel_size_mm (1,1) double
         trans_pos_grid (1,:) double
         focus_pos_grid (1,:) double
-        parameters struct
+        parameters (1,1) struct
         plot_options.slice_dim (1,1) double = 2 % Default slicing dimension (y-axis)
         plot_options.slice_ind (1,1) double = 0 % Default slice index (transducer position)
     end

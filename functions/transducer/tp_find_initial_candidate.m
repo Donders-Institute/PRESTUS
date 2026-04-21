@@ -1,22 +1,28 @@
 function [trans_candidate, outer_sphere_3d, parameters] = ...
     tp_find_initial_candidate(img, target, pixel_size, parameters)
 
-% TP_FIND_INITIAL_CANDIDATE Find candidate transducer positions on skull surface
+% TP_FIND_INITIAL_CANDIDATE  Find an initial candidate transducer position on the skull surface
 %
-% Finds candidate transducer positions by expanding a sphere from target until it intersects 
-% skull exterior surface (air-tissue boundary). Generates initial positioning plots and computes
-% geometric properties (focus, exit plane, normal vector).
+% Expands a sphere outward from the target until it intersects the skull
+% exterior (air-tissue boundary). Returns a randomly sampled intersection
+% point as the initial candidate position.
 %
-% INPUT
-%   img           - Segmented head image (nifti final_tissues.nii.gz)
-%   target        - 1x3 target coordinates [x,y,z] in voxel space
-%   pixel_size    - Scalar voxel size in mm (mean of PixelDimensions)
-%   parameters    - Struct with transducer properties (.transducer.curv_radius_mm, etc.)
+% Use as:
+%   [trans_candidate, outer_sphere_3d, parameters] = ...
+%       tp_find_initial_candidate(img, target, pixel_size, parameters)
 %
-% OUTPUT
-%   trans_candidate - Initial random transducer position [x,y,z]
-%   outer_sphere_3d - 3D logical mask of valid transducer positions on skull surface
-%   parameters      - Parameters with updated min_focal_distance_mm
+% Input:
+%   img        - [Nx x Ny x Nz] segmented head volume
+%   target     - [1x3] target coordinates in voxel space
+%   pixel_size - voxel size [mm]
+%   parameters - (1,1) simulation parameters struct with transducer properties
+%
+% Output:
+%   trans_candidate - struct with initial candidate position fields
+%   outer_sphere_3d - [Nx x Ny x Nz] logical mask of valid skull surface positions
+%   parameters      - updated struct with min_focal_distance_mm
+%
+% See also: TP_EVALUATE_CANDIDATE_POSITIONS, TP_PLOT_CANDIDATE_POSITIONS
 
 disp("[TP] Finding candidate position via intersection of skull with expanding sphere ...")
 

@@ -1,71 +1,55 @@
 function uncertainty_pipeline(parameters, options)
-% UNCERTAINTY_PIPELINE  Run the full PRESTUS uncertainty quantification workflow.
+% UNCERTAINTY_PIPELINE  Run the full PRESTUS uncertainty quantification workflow
 %
 % Rather than a single simulation with one set of tissue properties, this
-% pipeline runs three variants — default, liberal, conservative — and
-% combines them into a unified uncertainty HTML report.
+% pipeline runs three variants (default, liberal, conservative) and combines
+% them into a unified uncertainty HTML report.
 %
-% Pipeline stages
-% ---------------
+% Pipeline stages:
 %   Stage 1  Preprocessing & source setup          (always serial)
 %   Stage 2  Default simulation      ─┐
 %   Stage 3  Liberal simulation       ├─ parallel on HPC, sequential in MATLAB
 %   Stage 4  Conservative simulation ─┘
 %   Stage 5  Uncertainty report generation         (after stages 2–4)
 %
-% Variant definitions
-% -------------------
+% Variant definitions:
 %   Default      Best-estimate medium properties (reference)
 %   Liberal      Low skull impedance / attenuation → higher intracranial
 %                intensity; represents the worst-case safety scenario
 %   Conservative High skull impedance / attenuation → lower intracranial
 %                intensity; represents the lower plausible bound
 %
-% Usage
-% -----
-%   uncertainty_pipeline(parameters)
-%   uncertainty_pipeline(parameters, options)
-%
-%   Typically called indirectly via prestus_pipeline_start when
-%   parameters.simulation.uncertainty = true.
-%
-% Inputs
-% ------
-%   parameters   Base PRESTUS parameters struct. Must have subject_id,
-%                simulation.medium, path.sim, and all transducer/grid
-%                settings configured.
-%                Do NOT set io.output_affix — this function manages it.
-%
-%   options      Optional struct:
-%     .affixes             Struct with fields .default / .liberal / .conservative
-%                          controlling the filename suffix for each variant.
-%                          Defaults: '' / '_liberal' / '_conservative'
-%     .liberal_config      Path to liberal medium YAML override file.
-%                          Default: <prestus_root>/configs/uncertainty/
-%                                   config_medium_liberal.yaml
-%     .conservative_config Path to conservative medium YAML override file.
-%                          Default: <prestus_root>/configs/uncertainty/
-%                                   config_medium_conservative.yaml
-%     .stage1_timelimit    HPC wall time for stage 1    (default '12:00:00')
-%     .sim_timelimit       HPC wall time for stages 2–4 (default '06:00:00')
-%     .report_timelimit    HPC wall time for stage 5    (default '00:30:00')
-%     .stage1_memorylimit  RAM in GB for stage 1        (default: 16 GB)
-%     .stage1_partition   Partition for stage 1         (default: scheduler default)
-%     .report_partition   Partition for stage 5         (default: scheduler default)
-%                          Set either to 'gpu' to avoid a busy batch queue.
-%     .sim_memorylimit     RAM in GB for stages 2–4     (default: inherit)
-%     .report_memorylimit  RAM in GB for stage 5        (default: inherit)
-%
-% Platform behaviour
-% ------------------
+% Platform behaviour:
 %   matlab       Stages run sequentially in the current MATLAB session.
 %   slurm/qsub   All five jobs are submitted immediately. Stages 2–4 carry
 %                an afterok dependency on stage 1; stage 5 carries afterok
-%                dependencies on all three simulation jobs. No MATLAB session
-%                blocking is required.
+%                dependencies on all three simulation jobs.
+%                prestus_pipeline_start must return the submitted job id as
+%                its first output argument.
 %
-% Note: on HPC, prestus_pipeline_start must return the submitted job id as
-% its first output argument.
+% Use as:
+%   uncertainty_pipeline(parameters)
+%   uncertainty_pipeline(parameters, options)
+%
+% Input:
+%   parameters - base PRESTUS config; must have subject_id, simulation.medium,
+%                path.sim, and transducer/grid settings;
+%                do NOT set io.output_affix — this function manages it
+%   options    - pipeline knobs (optional, default: struct()):
+%                .affixes             — struct(.default, .liberal, .conservative)
+%                                       filename suffixes per variant
+%                .liberal_config      — path to liberal medium YAML override
+%                .conservative_config — path to conservative medium YAML override
+%                .stage1_timelimit    — HPC wall time for stage 1 (default '12:00:00')
+%                .sim_timelimit       — HPC wall time for stages 2-4 (default '06:00:00')
+%                .report_timelimit    — HPC wall time for stage 5 (default '00:30:00')
+%                .stage1_memorylimit  — RAM in GB for stage 1 (default: scheduler default)
+%                .stage1_partition    — partition for stage 1 (default: scheduler default)
+%                .report_partition    — partition for stage 5 (default: scheduler default)
+%                .sim_memorylimit     — RAM in GB for stages 2-4 (default: inherit)
+%                .report_memorylimit  — RAM in GB for stage 5 (default: inherit)
+%
+% See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE, GENERATE_UNCERTAINTY_REPORT
 
 arguments
     parameters   struct

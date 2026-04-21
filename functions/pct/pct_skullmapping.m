@@ -1,19 +1,24 @@
 function pct_skullmapping(subject_id, base_path)
-
-% PCT_SKULLMAPPING Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms.
+% PCT_SKULLMAPPING  Compute pseudo-CT mapping for cortical and trabecular bone from UTE histograms
 %
-% This function processes UTE (ultrashort echo time) images and tissue masks 
-% to compute pseudo-CT mappings for cortical and trabecular bone. It identifies 
-% key points such as maxima, FWHM widths, and crossover points between cortical 
-% and trabecular histograms. The function also generates visualizations and 
-% exports the mapping formula to a text file.
+% Analyses UTE image histograms for cortical and trabecular bone,
+% identifies peak positions, FWHM widths, and crossover points, fits a
+% piecewise linear pCT mapping, and saves visualisations and coefficients
+% to the subject folder.
+%
+% Use as:
+%   pct_skullmapping(subject_id, base_path)
 %
 % Input:
-%   subject_id - String specifying the subject ID.
-%   base_path  - String specifying the base path to the subject's m2m folder.
+%   subject_id - subject identifier string
+%   base_path  - path to the subject's m2m folder
 %
-% Output:
-%   None. The function saves visualizations and mapping coefficients in the subject's folder.
+% See also: PCT_SOFT_TISSUE_PEAK, FIT_PAIRWISELINEAR, PCT_SKULLEXPAND
+
+arguments
+    subject_id (1,:) char
+    base_path  (1,:) char
+end
 
     %% Load UTE image and tissue mask
     subject_folder = fullfile(base_path, sprintf('m2m_sub-%03s', subject_id));

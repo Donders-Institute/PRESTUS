@@ -1,7 +1,39 @@
 function [parameters, segmentation, bone, medium_masks] = ...
     grid_axisymmetry(parameters, segmentation, bone, medium_masks)
-    % adapt grid dimensions to axisymmetry (if requested)
-    % grid should be specified as [axial, radial x 2]
+% GRID_AXISYMMETRY  Adapt grid and tissue masks for k-Wave axisymmetric simulation
+%
+% When parameters.grid.axisymmetric == 1 and a 2D focus position is specified,
+% the full bilateral grid is halved along the radial axis so that column 1
+% of the returned arrays corresponds to r = 0 (the axis of symmetry), as
+% required by kspaceFirstOrderAS. Transducer and focus positions are updated
+% accordingly. Has no effect when axisymmetric mode is not requested.
+%
+% Use as:
+%   [parameters, segmentation, bone, medium_masks] = ...
+%       grid_axisymmetry(parameters, segmentation, bone, medium_masks)
+%
+% Input:
+%   parameters   - (struct) PRESTUS config; must contain grid.dims [1x2],
+%                    grid.axisymmetric, and transducer(1).trans_pos / focus_pos
+%   segmentation - [Nx x Ny] numeric, tissue label map
+%   bone         - [Nx x Ny] numeric, binary skull mask
+%   medium_masks - [Nx x Ny] numeric, medium layer label map
+%
+% Output:
+%   parameters   - updated: grid.dims halved along radial axis;
+%                    trans_pos and focus_pos set to radial midline (r = 1)
+%   segmentation - [Naxial x Nr] numeric, halved along radial axis
+%   bone         - [Naxial x Nr] numeric, halved along radial axis
+%   medium_masks - [Naxial x Nr] numeric, halved along radial axis
+%
+% See also: CONVERT_AXISYMMETRIC_TO_3D, CONVERT_AXISYMMETRIC_TO_2D
+
+arguments
+    parameters   (1,1) struct
+    segmentation (:,:) {mustBeNumeric}
+    bone         (:,:) {mustBeNumeric}
+    medium_masks (:,:) {mustBeNumeric}
+end
     if numel(parameters.transducer(1).focus_pos) == 2 && ...
             isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
         if numel(parameters.transducer) > 1

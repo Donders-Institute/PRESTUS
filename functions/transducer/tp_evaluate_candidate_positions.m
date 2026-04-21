@@ -1,24 +1,27 @@
 function [tpos_pars, mesh] = tp_evaluate_candidate_positions(img, target, parameters, pixel_size)
-%% TP_EVALUATE_CANDIDATE_POSITIONS Evaluate candidate transducer positions
-%  SEARCH CRITERIA:
-%  1. Skull exterior surface points (img==0 → imdilate gradient)
-%  2. Within parameters.placement.heuristic.dist_close mm Euclidean distance from target
-%  3. Exit aperture intersects skin surface (>0% overlap required)
-%  4. Scores: skin_distance uniformity, skull_distance uniformity, intersection fraction
+% TP_EVALUATE_CANDIDATE_POSITIONS  Evaluate candidate transducer positions on skull surface
 %
-%  Exhaustively evaluates all candidate transducer positions within distance threshold using GPU.
-%  Computes intersection fraction, skin/skull distances, and variance metrics for position optimization.
+% Exhaustively evaluates all candidate positions within a distance
+% threshold of the target using GPU acceleration. Computes intersection
+% fraction, skin/skull distance metrics, and variance scores for position
+% optimisation.
 %
-% INPUT
-%   img        - Segmented head image (nifti final_tissues.nii.gz)  
-%   target     - 1x3 target coordinates [x,y,z] in voxel space
-%   parameters - Struct with .tp_dist_close, .transducer properties
-%   pixel_size - Scalar voxel size in mm
+% Use as:
+%   [tpos_pars, mesh] = tp_evaluate_candidate_positions(img, target, parameters, pixel_size)
 %
-% OUTPUT
-%   tpos_pars  - Table with columns: idx, trans_x/y/z, targ_x/y/z, dist_to_target, 
-%                prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull
-%   mesh       - Structure with mesh information
+% Input:
+%   img        - [Nx x Ny x Nz] segmented head volume
+%   target     - [1x3] target coordinates in voxel space
+%   parameters - (1,1) simulation parameters struct
+%   pixel_size - voxel size [mm]
+%
+% Output:
+%   tpos_pars - table with columns: idx, trans_x/y/z, targ_x/y/z,
+%               dist_to_target, prop_intersect, mean_dist_skin,
+%               var_dist_skin, mean_dist_skull, var_dist_skull
+%   mesh      - struct with mesh information (see TP_CANDIDATE_MESH)
+%
+% See also: TP_CANDIDATE_MESH, TP_SELECT_HEURISTIC_POSITION
 
 disp("[TP] Evaluating candidate position via intersection of skull with expanding sphere ...")
 

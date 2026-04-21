@@ -1,27 +1,37 @@
 function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, ...
     t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preproc_head(parameters)
 
-% PREPROC_HEAD Preprocessing of structural data for simulations.
+% PREPROC_HEAD  Preprocess structural MRI for k-Wave simulation
 %
-% This function combines MATLAB and SimNIBS to segment, realign, and crop structural data 
-% for use in simulations. It prepares the data for k-wave simulations by segmenting tissues 
-% (e.g., skin, bone, neural tissue), aligning the transducer's axis, and creating figures 
-% to visualize simulation results.
+% Combines SimNIBS segmentation, focal-axis alignment, and grid cropping
+% to prepare tissue masks, bone images, and transducer/focus positions for
+% k-Wave simulation. Produces diagnostic figures and saves intermediate
+% outputs.
+%
+% Use as:
+%   [medium_masks, segmentation_crop, bone_crop, trans_pos_final, ...
+%    focus_pos_final, t1_image, t1_header, final_transformation_matrix, ...
+%    inv_final_transformation_matrix] = preproc_head(parameters)
 %
 % Input:
-%   parameters  - Struct containing simulation parameters (e.g., paths, transducer settings).
-%   .subject_id  - Integer specifying the subject ID.
+%   parameters - (1,1) simulation configuration struct
 %
 % Output:
-%   medium_masks                - Processed masks for different tissue types.
-%   segmentation_crop           - Cropped segmented image after preprocessing.
-%   bone_crop                   - Cropped bone / pCT image after preprocessing.
-%   trans_pos_final             - Final transducer position after preprocessing.
-%   focus_pos_final             - Final focus position after preprocessing.
-%   t1_image                    - Original T1-weighted image.
-%   t1_header                   - Header information for the T1-weighted image.
-%   final_transformation_matrix - Transformation matrix combining alignment and cropping steps.
-%   inv_final_transformation_matrix - Inverse transformation matrix.
+%   medium_masks                    - [Nx x Ny x Nz] tissue medium label array
+%   segmentation_crop               - [Nx x Ny x Nz] cropped tissue segmentation
+%   bone_crop                       - [Nx x Ny x Nz] cropped bone/pCT image
+%   trans_pos_final                 - [1x3] transducer position in final grid
+%   focus_pos_final                 - [1x3] focus position in final grid
+%   t1_image                        - [Nx x Ny x Nz] T1-weighted image
+%   t1_header                       - NIfTI header struct
+%   final_transformation_matrix     - [4x4] combined alignment + crop transform
+%   inv_final_transformation_matrix - [4x4] inverse of final_transformation_matrix
+%
+% See also: PREPROC_ALIGN_TO_FOCAL_AXIS, HEAD_SMOOTH_AND_CROP, PREPROC_CROP_GRID
+
+    arguments
+        parameters (1,1) struct
+    end
 
     %% CHECK INPUTS
 
@@ -378,7 +388,11 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
             if ~isfile(segmented_file)
-                niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
+                try
+                    niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
+                catch ME
+                    warning(ME)
+                end
             end
             clear segmented_file plotdata orig_hdr;
     
@@ -390,7 +404,11 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
             if ~isfile(segmentation_file)
-                niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
+                try
+                    niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
+                catch ME
+                    warning(ME)
+                end
             end
             clear segmentation_file plotdata orig_hdr;
 
@@ -402,7 +420,11 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             plotdata = double(tformarray(bone_crop, inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
             if ~isfile(skull_mask_file)
-                niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
+                try
+                    niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
+                catch ME
+                    warning(ME)
+                end
             end
             clear skull_mask_file plotdata orig_hdr;
         end

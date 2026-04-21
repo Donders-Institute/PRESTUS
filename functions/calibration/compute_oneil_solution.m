@@ -1,22 +1,32 @@
 function [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(parameters, profile_sim, profile_target)
+% COMPUTE_ONEIL_SOLUTION  Compute the O'Neil analytical solution and compare with simulation
+%
+% Evaluates the focusedAnnulusONeil axial pressure model, converts to
+% intensity, and plots the result alongside the simulated and target profiles.
+% Returns the O'Neil profile and a scaling factor for aligning simulation to
+% the analytical solution.
+%
+% Use as:
+%   [profile_oneil, simulated_oneil_scaling] = compute_oneil_solution(parameters, profile_sim, profile_target)
+%
+% Input:
+%   parameters   - PRESTUS config; uses transducer.annular geometry,
+%                  medium_properties.water, calibration.desired_focal_distance_ep [mm],
+%                  calibration.desired_intensity [W/cm²], calibration.equipment_name
+%   profile_sim  - struct with axial_intensity [W/cm²], axial_distance_bowl [mm], velocity [m/s]
+%   profile_target - struct with axial_intensity and axial_distance_bowl [mm]
+%
+% Output:
+%   profile_oneil          - struct with axial_intensity [W/cm²] and axial_distance_bowl [mm]
+%   simulated_oneil_scaling - scaling factor to align simulated intensity with analytical solution
+%
+% See also: CALIBRATION_TRANSDUCER, FIT_VELOCITY_TO_INTENSITY, RECOMPUTE_ONEIL_SOLUTION
 
-    % Compute O'Neil solution and plot it along with comparisons
-    %
-    % Arguments:
-    % - parameters: Structure containing simulation and transducer parameters.
-    %       .calibration.path_output: Directory for saving results and figures.
-    %       .calibration.desired_focal_distance_ep: Focal distance relative to the exit plane [mm]. Will be used only for labelling.
-    %       .calibration.desired_intensity: Desired intensity at the focal point [W/cm^2].
-    %       .calibration.equipment_name: Name of the equipment for labeling results.
-    % - profile_sim.axial_intensity: Simulated axial intensity [W/cm2].
-    % - profile_sim.axial_distance_bowl: Axial distance of simulated pressure [mm from bowl]
-    % - profile_sim.velocity: Particle profile_sim.velocity [m/s].
-    % - profile_target.axial_intensity: Adjusted intensity profile for the focus.
-    %
-    % Returns:
-    % - profile_oneil.axial_intensity: Computed O'Neil solution for pressure along the beam axis [Pa].
-    % - profile_oneil.axial_distance_bowl: Axial position vector [mm from bowl].
-    % - simulated_oneil_scaling: Adjustment factor to align simulated intensity with analytical solution.
+arguments
+    parameters   (1,1) struct
+    profile_sim  (1,1) struct
+    profile_target (1,1) struct
+end
     
     % Define the axial position vector [mm]
     axial_position = profile_sim.axial_distance_bowl;

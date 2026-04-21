@@ -1,17 +1,23 @@
 function pct_soft_tissue_peak(simnibs_folder, path_pct)
-
-% PCT_SOFT_TISSUE_PEAK Identifies the soft tissue peak from a UTE image's intensity distribution.
+% PCT_SOFT_TISSUE_PEAK  Identify the soft tissue peak from a UTE image intensity distribution
 %
-% This function processes a bias field-corrected UTE image constrained to grey and white matter 
-% to analyze its intensity distribution. It identifies the soft tissue peak by analyzing the 
-% logarithmic distribution of intensity values and saves the result in a text file.
+% Constrains a bias-corrected UTE image to grey and white matter voxels,
+% finds the peak of the log-intensity distribution, and saves the peak
+% value and histogram figure to path_pct.
+%
+% Use as:
+%   pct_soft_tissue_peak(simnibs_folder, path_pct)
 %
 % Input:
-%   simnibs_folder  - String specifying path of the subject's m2m folder.
-%   path_pct  - pCT processing folder.
+%   simnibs_folder - path to the subject's m2m folder (contains final_tissues.nii.gz)
+%   path_pct       - pCT processing folder (contains UTE_reg_thr0_corr.nii.gz)
 %
-% Output:
-%   None. The function saves histograms and the soft tissue peak value in the subject's folder.
+% See also: PCT_SKULLMAPPING, FIT_PAIRWISELINEAR
+
+arguments
+    simnibs_folder (1,:) char
+    path_pct       (1,:) char
+end
 
     % Define paths to subject-specific files
     ute_file = fullfile(path_pct, 'UTE_reg_thr0_corr.nii.gz');

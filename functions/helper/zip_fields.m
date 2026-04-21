@@ -1,15 +1,20 @@
 function cell_arr = zip_fields(input_struct)
 
-% ZIP_FIELDS Converts a structure's fields and values into a cell array.
+% ZIP_FIELDS  Convert a struct into an alternating {field, value, field, value, ...} cell array
 %
-% This function takes a structure (`input_struct`) and creates a cell array where 
-% each pair of elements corresponds to a field name and its associated value. 
+% Useful for passing struct contents as name-value pairs to functions that
+% accept varargin-style arguments.
+%
+% Use as:
+%   cell_arr = zip_fields(input_struct)
 %
 % Input:
-%   input_struct - Struct whose fields and values will be converted into a cell array.
+%   input_struct - scalar struct with any field types
 %
 % Output:
-%   cell_arr     - Cell array containing field names and their corresponding values in alternating order.
+%   cell_arr - [1×2N] cell array: {field1, value1, field2, value2, ...}
+%
+% See also: FIELDNAMES, STRUCT2CELL
 
     % Initialize the output cell array
     cell_arr = {};

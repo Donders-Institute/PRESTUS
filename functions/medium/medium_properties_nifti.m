@@ -1,11 +1,36 @@
 function medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, property)
-    arguments
-        parameters struct
-        kwave_medium struct
-        inv_final_transformation_matrix
-        t1_header
-        property % string of the tissue property field 
-    end
+% MEDIUM_PROPERTIES_NIFTI  Transform a simulation-grid medium property map to T1 space and save as NIfTI
+%
+% Applies the inverse affine transformation (inv_final_transformation_matrix)
+% to the requested field of kwave_medium using nearest-neighbour resampling,
+% then writes the result as a gzip-compressed NIfTI file in
+% parameters.io.cache_dir. The output filename is <cache_dir>/<property>.nii.gz.
+% To avoid repeated writes on re-runs the function skips the write if the
+% file already exists. Uses a two-step write (niftiwrite then gzip) rather
+% than Compressed=true to work reliably on network filesystems.
+%
+% Use as:
+%   medium_properties_nifti(parameters, kwave_medium, inv_final_transformation_matrix, t1_header, property)
+%
+% Input:
+%   parameters                      - PRESTUS config; must contain io.cache_dir
+%   kwave_medium                    - medium property maps; must contain a field named property
+%   inv_final_transformation_matrix - affine inverse transform from simulation grid
+%                                     back to T1 space (as expected by tformarray)
+%   t1_header                       - NIfTI header of the original T1 image
+%                                     (ImageSize used as output dimensions)
+%   property                        - field name of the property to export
+%                                     (e.g., 'sound_speed', 'density')
+%
+% See also: MEDIUM_SETUP, NIFTIWRITE
+
+arguments
+    parameters                     (1,1) struct
+    kwave_medium                   (1,1) struct
+    inv_final_transformation_matrix
+    t1_header
+    property                       (1,:) char
+end
 
     orig_hdr = t1_header; % header based on original T1w
     orig_hdr.Datatype = 'single';

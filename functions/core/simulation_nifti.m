@@ -1,22 +1,49 @@
 function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, ...
                          medium_masks, results_heating, kwave_medium, highlighted_pos)
+% SIMULATION_NIFTI  Export k-Wave simulation results to NIfTI in native and MNI space
+%
+% For layered and phantom media, writes compressed NIfTI files for each
+% requested data type (medium_masks, intensity, MI, pressure, and — if heating
+% was run — heating, heatrise, CEM43, and their end-of-train variants). For
+% layered (non-phantom) media each volume is back-transformed to the original
+% T1 image space via tformarray before being converted to MNI space with
+% SimNIBS subject2mni. Intensity overlays on the T1 are saved as PNG. Thermal
+% back-transforms include edge-artifact removal using morphological erosion.
+%
+% Use as:
+%   simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, ...
+%                    acoustic_MI, acoustic_pressure, medium_masks, ...
+%                    results_heating, kwave_medium, highlighted_pos)
+%
+% Input:
+%   parameters      - (1,1) struct, PRESTUS config with io.output_dir,
+%                     simulation.medium, io.output_affix, modules flags, etc.
+%   planimg         - (1,1) struct, SimNIBS planning data: t1_image_orig,
+%                     inv_transf (affine tform), t1_header
+%   results_acoustic- (1,1) struct, acoustic analysis results (Isppa_brain, Isppa, etc.)
+%   acoustic_Ipa    - (:,:,:) single, Isppa map [W/cm²]
+%   acoustic_MI     - (:,:,:) single, mechanical index map [-]
+%   acoustic_pressure- (:,:,:) single, temporal peak pressure map [Pa]
+%   medium_masks    - (:,:,:) uint8, voxel-wise tissue label map
+%   results_heating - (1,1) struct, heating results: maxT, heating_endT, CEM43,
+%                     CEM43_end, CEM43_iso, CEM43_iso_end [°C / CEM43 units]
+%   kwave_medium    - (1,1) struct, k-Wave medium properties; used for temp_0 [°C]
+%   highlighted_pos - [1x3] numeric, grid-space position of peak intensity [voxels]
+%
+% See also: ACOUSTIC_ANALYSIS, CONVERT_FINAL_TO_MNI_SIMNIBS, PLOT_OVERLAY
 
-% SIMULATION_NIFTI - Export k-Wave simulation results to NIfTI (native + MNI space).
-%
-%   simulation_nifti(PARAMETERS, PLANIMG, ACOUSTIC_ISPPA, ACOUSTIC_MI, ACOUSTIC_PRESSURE, ...
-%                   MEDIUM_MASKS, HEATING_MAXT, HEATING_CEM43, KWAVE_MEDIUM, HIGHLIGHTED_POS)
-%
-% Inputs:
-%   - parameters (struct) - Simulation config: io.output_dir, simulation.medium,
-%                           io.output_affix, modules.run_heating_sims, etc.
-%   - planimg (struct) - SimNibs planning: t1_image_orig, inv_transf, t1_header
-%   - acoustic_Ipa (array) - Peak spatial-average intensity [W/cm²], from acoustic_analysis
-%   - acoustic_MI (array) - Mechanical Index grid
-%   - acoustic_pressure (array) - Peak pressure [Pa]
-%   - medium_masks (array) - Layer label mask (uint8)
-%   - results_heating.maxT (array) - Max temperature from thermal sim [°C] (if run_heating_sims)
-%   - results_heating.CEM43 (array) - Cumulative Equivalent Minutes at 43°C
-%   - kwave_medium (struct) - k-Wave medium (for temp_0)
+arguments
+    parameters       (1,1) struct
+    planimg          (1,1) struct
+    results_acoustic (1,1) struct
+    acoustic_Ipa     (:,:,:) {mustBeNumeric}
+    acoustic_MI      (:,:,:) {mustBeNumeric}
+    acoustic_pressure(:,:,:) {mustBeNumeric}
+    medium_masks     (:,:,:) {mustBeNumeric}
+    results_heating  (1,1) struct
+    kwave_medium     (1,1) struct
+    highlighted_pos  (1,3) {mustBeNumeric}
+end
 
     if contains(parameters.simulation.medium, {'layered'; 'phantom'})
 

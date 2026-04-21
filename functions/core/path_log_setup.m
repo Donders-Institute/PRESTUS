@@ -1,4 +1,30 @@
 function [parameters] = path_log_setup(parameters, prestus_path)
+% PATH_LOG_SETUP  Add PRESTUS paths, create output directories, and start diary logging
+%
+% Adds PRESTUS functions and toolbox folders to the MATLAB path (filtering hidden
+% directories via safe_addpath), creates the simulation output directory tree
+% (output, cache, debug/preproc, debug/medium, debug/source), saves a parameter
+% snapshot to cache, opens a diary log file, and writes an initial parameter
+% summary. Also verifies k-Wave is on the path and prints version information.
+%
+% Use as:
+%   parameters = path_log_setup(parameters, prestus_path)
+%
+% Input:
+%   parameters   - PRESTUS config; io.output_dir and io.log_file may be absent
+%                  on entry and are created by this function
+%   prestus_path - absolute path to the PRESTUS root directory
+%
+% Output:
+%   parameters   - input extended with io.output_dir, io.cache_dir,
+%                  io.debug_dir (and subdirs), io.log_file, io.filename_output_table
+%
+% See also: LOAD_PARAMETERS, PRINT_PARAMETER_SUMMARY, PRESTUS_PIPELINE_START
+
+arguments
+    parameters   (1,1) struct
+    prestus_path (1,:) char
+end
 
     % currentLoc | Root of PRESTUS' 'functions' folder
 

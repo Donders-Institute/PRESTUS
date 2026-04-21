@@ -1,28 +1,30 @@
 function [profile_sim] = extract_simulated_profile(initial_res, parameters)
-%--------------------------------------------------------------------------
+% EXTRACT_SIMULATED_PROFILE  Extract axial intensity profile from a k-Wave simulation result
 %
-% PURPOSE:
-%   This function extracts and visualizes simulated acoustic pressure data
-%   (e.g., from a k-Wave simulation). It generates a 2D intensity map at
-%   the focal plane and extracts the axial pressure profile along the
-%   acoustic axis passing through the transducer center.
+% Gathers the p_max_all field, generates a 2D focal-plane intensity map,
+% and extracts the axial pressure profile through the transducer centre.
+% Works for both 2D and 3D simulations.
 %
-% INPUTS:
-%   initial_res       - simulation results structure (contains sensor_data)
-%   parameters    - structure containing simulation and grid parameters
-%       .calibration.desired_focal_distance_ep - desired focal distance (for labeling)
-%       .calibration.desired_intensity - numeric target intensity (for output naming)
-%       .calibration.equipment_name    - string identifying the experimental setup
-%       .calibration.prefix            - prefix for figure output
+% Use as:
+%   [profile_sim] = extract_simulated_profile(initial_res, parameters)
 %
-% OUTPUT:
-%   profile_sim.axial_intensity - simulated intensity values along the focal axis (from transducer bowl) [W/cm^2]
-%   profile_sim.axial_distance_bowl - corresponding distances from transducer bowl [mm]
-%   profile_sim.velocity - simulated particle velocity [m/s]
+% Input:
+%   initial_res - simulation results struct with initial_res.sensor_data.p_max_all [Pa]
+%   parameters  - PRESTUS config; uses grid.resolution_mm [mm], grid.dims,
+%                 transducer(1).trans_pos, calibration.desired_focal_distance_ep [mm],
+%                 calibration.desired_intensity [W/cm²], calibration.equipment_name,
+%                 calibration.prefix
 %
-% NOTE:
-%   The code works for both 2D and 3D simulations
-%--------------------------------------------------------------------------
+% Output:
+%   profile_sim - struct with fields:
+%                 axial_intensity [W/cm²], axial_distance_bowl [mm], velocity [m/s]
+%
+% See also: EXTRACT_REAL_INTENSITY_PROFILE, COMPUTE_ONEIL_SOLUTION
+
+arguments
+    initial_res  (1,1) struct
+    parameters   (1,1) struct
+end
 
     %% Retrieve and prepare pressure data
 

@@ -1,7 +1,25 @@
 function tp_plot_geometry_overlay(img, target_pos, trans_pos, pixel_size, parameters, subject_id, target_name, outer_sphere_3d)
-%% TP_PLOT_GEOMETRY_OVERLAY Visualize transducer geometry on skin segmentation slice
-%  Overlays transducer positions, geometric focus, exit plane, and ray path
-%  on central Y-slice through target for positioning validation
+% TP_PLOT_GEOMETRY_OVERLAY  Visualise transducer geometry on a skin segmentation slice
+%
+% Overlays transducer position, geometric focus, exit plane, and ray path
+% on the central Y-slice through the target for positioning validation.
+% Saves the resulting figure to disk.
+%
+% Use as:
+%   tp_plot_geometry_overlay(img, target_pos, trans_pos, pixel_size, ...
+%       parameters, subject_id, target_name, outer_sphere_3d)
+%
+% Input:
+%   img             - [Nx x Ny x Nz] tissue segmentation volume
+%   target_pos      - [1x3] target position in voxel space
+%   trans_pos       - [1x3] transducer position in voxel space
+%   pixel_size      - voxel size [mm]
+%   parameters      - (1,1) simulation parameters struct
+%   subject_id      - subject identifier used in output filename
+%   target_name     - target label string used in output filename
+%   outer_sphere_3d - [Nx x Ny x Nz] logical mask of skull surface positions
+%
+% See also: TP_PLOT_CANDIDATE_POSITIONS, TP_FIND_INITIAL_CANDIDATE
 
 disp("[TP] Generating and visualizing geometric overlay ...")
 

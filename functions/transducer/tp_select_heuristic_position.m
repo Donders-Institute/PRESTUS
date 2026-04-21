@@ -1,24 +1,29 @@
 function [trans_pos_grid, target_pos_grid, best_trans_pos] = ...
     tp_select_heuristic_position(locs, subject_id, target_name, parameters, img_header)
-%% TP_SELECT_HEURISTIC_POSITION Select optimal transducer position and export Localite coordinates
+% TP_SELECT_HEURISTIC_POSITION  Select optimal transducer position and export Localite coordinates
 %
-% Multi-step HEURISTIC selection:
-% 1. Filter by intersection fraction < criterion_intersection (default 0.05)
-% 2. Auto-expand criterion if no candidates found
-% 3. Select minimum distance to target from valid candidates
+% Applies a multi-step heuristic: filters candidates by intersection
+% fraction, auto-expands the criterion if no candidates survive, then
+% selects the position with minimum distance to the target. Exports
+% Localite-compatible coordinates.
 %
-% INPUT
-%   locs        - Table with transducer candidate metrics (from tp_evaluate_candidate_positions)
-%   subject_id  - Scalar subject ID
-%   target_name - String target identifier (e.g. 'right_PUL')
-%   parameters  - [OPTIONAL] Struct with .tp_criterion_intersection, .output_dir, .localite_path
-%   img_header  - Header of planning image
+% Use as:
+%   [trans_pos_grid, target_pos_grid, best_trans_pos] = ...
+%       tp_select_heuristic_position(locs, subject_id, target_name, parameters, img_header)
 %
-% OUTPUT
-%   trans_pos_grid   - [1x3] integer voxel coordinates [x y z]
-%   target_pos_grid  - [1x3] integer voxel coordinates [x y z]  
-%   best_trans_pos   - Full table row of chosen HEURISTIC position with
-%                       added Localite & RAS conversions
+% Input:
+%   locs        - table of candidate metrics (from TP_EVALUATE_CANDIDATE_POSITIONS)
+%   subject_id  - subject identifier used in output files
+%   target_name - target label string
+%   parameters  - (1,1) simulation parameters struct
+%   img_header  - NIfTI header struct (from niftiinfo)
+%
+% Output:
+%   trans_pos_grid  - [1x3] transducer position in voxel coordinates
+%   target_pos_grid - [1x3] target position in voxel coordinates
+%   best_trans_pos  - table row of the selected position
+%
+% See also: TP_EVALUATE_CANDIDATE_POSITIONS, TP_REMOVE_EAR_LOCATIONS
 
 %% Select heuristic position (multi-criteria heuristic)
 

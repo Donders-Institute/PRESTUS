@@ -1,18 +1,46 @@
 function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT)
+% MEDIUM_SETUP  Build the k-Wave medium property struct from tissue masks and config
+%
+% Starting from uniform NaN grids, assigns acoustic and thermal properties
+% layer-by-layer based on medium_masks. Skull bone properties are
+% optionally overridden with pseudo-CT-derived values using the algorithms
+% specified in parameters.pct (density, sound speed, attenuation). Alpha
+% coefficients are remapped via fitPowerLawParamsMulti to correct for the
+% fractional Laplacian second-order dispersion at the source frequency. For
+% layered simulations, property maps are also smoothed if
+% headmodel.smooth_properties is set. Medium property NIfTIs (in T1 space)
+% are saved unconditionally for layered simulations; raw grid matrices are
+% saved only in debug mode.
+%
+% Use as:
+%   kwave_medium = medium_setup(parameters, medium_masks, planimg)
+%   kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT)
+%
+% Input:
+%   parameters   - PRESTUS config; must contain medium_properties, layers,
+%                  grid.dims, grid.resolution_mm [mm], pct.enabled, fit_alpha_power,
+%                  and transducer(1).freq_hz [Hz]
+%   medium_masks - layer label map (values = medium index)
+%   planimg      - planning image info from GRID_TISSUE_SETUP;
+%                  may be empty for non-layered simulations
+%   pseudoCT     - pseudo-CT Hounsfield values (same size as medium_masks);
+%                  required when pct.enabled == 1 (optional, default: [])
+%
+% Output:
+%   kwave_medium - struct with fields: sound_speed [m/s], density [kg/m^3],
+%                  alpha_coeff [dB/(MHz cm)], alpha_power,
+%                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
+%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C]
+%
+% See also: MEDIUM_PCT_DENSITY, MEDIUM_PCT_SOUNDSPEED, MEDIUM_PCT_ATTENUATION,
+%   FITPOWERLAWPARAMSMULTI, MEDIUM_PROPERTIES_NIFTI
 
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-    %                         Setup k-wave medium                       %
-    %                                                                   %
-    % This function sets up the medium for k-wave simulations to take   %
-    % place in. The way this mask is set up is by starting with an      %
-    % empty grid and adjust the acoustic and thermal parameters in the  %
-    % shape of the provided mask. This can be repeated to incorporate   %
-    % different kinds of tissue (see 'layered').                        %
-    %                                                                   %
-    % Some notes:                                                       %
-    % - The alpha value is converted at the end of this script.         %
-    % - pseudoCT is an optional input when using pseudoCTs              %
-    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+arguments
+    parameters   (1,1) struct
+    medium_masks {mustBeNumeric}
+    planimg      (1,1) struct
+    pseudoCT     {mustBeNumeric} = []
+end
 
     % Set residual unmapped medium voxels to water
     medium_masks(medium_masks==0) = find(strcmp(fieldnames(parameters.medium_properties), 'water'));

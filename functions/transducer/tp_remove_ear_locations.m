@@ -1,7 +1,21 @@
 function [locs] = tp_remove_ear_locations(parameters, locs)
-%% Exclude ear entries from heuristic transducer positions
-%  Removes transducer positions within tp_ear_radius of ear centers
-%  Only runs if all three ear parameters are specified in parameters struct
+% TP_REMOVE_EAR_LOCATIONS  Exclude candidate positions near ear centres
+%
+% Removes transducer candidates that fall within a specified radius of
+% the left or right ear centre. Only runs when all three ear parameters
+% (ear_radius, left_ear_center, right_ear_center) are set.
+%
+% Use as:
+%   locs = tp_remove_ear_locations(parameters, locs)
+%
+% Input:
+%   parameters - (1,1) simulation parameters struct with placement.heuristic fields
+%   locs       - table of candidate positions (from TP_EVALUATE_CANDIDATE_POSITIONS)
+%
+% Output:
+%   locs - table with ear-region candidates removed
+%
+% See also: TP_EVALUATE_CANDIDATE_POSITIONS, TP_SELECT_HEURISTIC_POSITION
 
 % Only run if all three ear parameters are specified
 if isfield(parameters, 'placement') && isfield(parameters.placement, 'heuristic') && ...

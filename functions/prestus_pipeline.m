@@ -1,10 +1,5 @@
 function [parameters] = prestus_pipeline(parameters, options)
-    arguments
-        parameters struct
-        options struct = struct()
-    end
-
-% PRESTUS_PIPELINE  End-to-end transcranial focused ultrasound simulation pipeline.
+% PRESTUS_PIPELINE  End-to-end transcranial focused ultrasound simulation pipeline
 %
 % Executes the full PRESTUS workflow for a single subject and transducer
 % configuration, from head model construction through acoustic and thermal
@@ -24,28 +19,35 @@ function [parameters] = prestus_pipeline(parameters, options)
 %   9. Free-water sim    Repeat acoustic simulation in homogeneous water medium
 %  10. Report            Self-contained HTML summary report
 %
-% Usage:
+% Use as:
 %   parameters = prestus_pipeline(parameters)
 %   parameters = prestus_pipeline(parameters, options)
 %
 %   Typically invoked via prestus_pipeline_start, which handles platform
 %   selection (MATLAB / SLURM / qsub) and uncertainty mode dispatch.
 %
-% Inputs:
-%   parameters  Struct built from default_config.yaml and a subject-specific
-%               override config. Must include subject_id, path.sim, and all
-%               transducer/grid settings. See configs/default_config.yaml for
-%               the full list of available fields.
-%   options     Optional struct. Currently supports:
-%                 .sequential_configs  Cell array of additional YAML config
-%                                      paths merged in sequence before running.
+% Input:
+%   parameters - struct built from default_config.yaml and a subject-specific
+%                override config; must include subject_id, path.sim, and all
+%                transducer/grid settings; see configs/default_config.yaml for
+%                the full list of available fields
+%   options    - (optional) struct; currently supports:
+%                  .sequential_configs  cell array of additional YAML config
+%                                       paths merged in sequence before running
 %
 % Output:
-%   parameters  Updated struct with fields added by path_log_setup and
-%               intermediate processing steps (e.g., io.output_dir,
-%               io.kwave_source_filename, transducer positions).
+%   parameters - updated struct with fields added by path_log_setup and
+%                intermediate processing steps (e.g. io.output_dir,
+%                io.kwave_source_filename, transducer positions)
 %
 % Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB >= 2023b
+%
+% See also: PRESTUS_PIPELINE_START, LOAD_PARAMETERS, UNCERTAINTY_PIPELINE
+
+    arguments
+        parameters struct
+        options struct = struct()
+    end
     
     % ====================================================================
     %% PATH & LOG setup

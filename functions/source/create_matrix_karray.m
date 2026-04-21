@@ -1,17 +1,45 @@
 function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
-%CREATE_MATRIX_KARRAY Adds elements of a matrix transducer to a kWave array.
+% CREATE_MATRIX_KARRAY  Add matrix transducer elements to a kWaveArray object
 %
-% Inputs:
-%   kgrid            - kWave grid object
-%   karray           - kWaveArray object to which elements are added
-%   parameters       - Simulation parameters struct
-%   tr  - Struct containing transducer geometry, type, curvature, and element properties
-%   elem_pos_m          - Nx3 matrix of element positions in meters
-%   trans_pos        - 1x3 transducer reference position (indices in kgrid)
-%   focus_pos        - 1x3 focus position (indices in kgrid)
+% For each element in elem_pos_m, computes the rotation matrix that aligns
+% the default element normal [0;0;1] with the vector from the element to
+% the natural focus (defined by the radius of curvature along Z). The
+% per-element Euler angles (ZYX) are passed to kWaveArray.addRectElement,
+% addDiscElement, or addBowlElement depending on tr.matrix.elem_shape.
+% Phase delays for steering to the requested focus_pos are also computed
+% and stored in tr.elem_phase_rad.
+%
+% Use as:
+%   [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
+%
+% Input:
+%   kgrid      - kWaveGrid object
+%   karray     - kWaveArray object to which elements are added
+%   parameters - PRESTUS config; must contain medium_properties.water.sound_speed [m/s]
+%                and simulation.debug
+%   tr         - transducer geometry: tr.matrix.elem_shape, tr.matrix.curv_radius_mm [mm],
+%                tr.matrix.elem_height_mm [mm], tr.matrix.elem_width_mm [mm],
+%                tr.matrix.elem_amp, tr.freq_hz [Hz]
+%   elem_pos_m - [3xN] element positions [m]
+%   trans_pos  - [1x3] transducer reference position (grid indices)
+%   focus_pos  - [1x3] desired focus position (grid indices)
 %
 % Output:
-%   karray           - Updated kWaveArray object with elements added
+%   karray - kWaveArray with all elements added
+%   tr     - updated with tr.elem_phase_rad, tr.elem_phase_deg,
+%            tr.matrix.elem_n, tr.matrix.elem_amp
+%
+% See also: CREATE_CLOVER_ARRAY, SOURCE_CREATE
+
+arguments
+    kgrid      (1,1)
+    karray     (1,1)
+    parameters (1,1) struct
+    tr         (1,1) struct
+    elem_pos_m (3,:) {mustBeNumeric}
+    trans_pos  (1,3) {mustBeNumeric}
+    focus_pos  (1,3) {mustBeNumeric}
+end
 
     % Convert positions from kgrid indices to meters
     trans_pos_m = [kgrid.x_vec(trans_pos(1)), ...

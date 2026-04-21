@@ -1,9 +1,26 @@
 function transducer_positioning_start(parameters, pn, target_name, mni_targets)
+% TRANSDUCER_POSITIONING_START  Dispatch transducer positioning to MATLAB or HPC
+%
+% Entry point for transducer positioning. Detects the execution platform
+% (MATLAB, Slurm, or PBS/qsub) and dispatches accordingly. On HPC
+% platforms, bundles the job and submits it via the appropriate scheduler.
+%
+% Use as:
+%   transducer_positioning_start(parameters, pn, target_name, mni_targets)
+%
+% Input:
+%   parameters  - (1,1) simulation configuration struct
+%   pn          - (1,1) path names struct
+%   target_name - target label string
+%   mni_targets - (1,1) MNI target coordinates struct
+%
+% See also: TRANSDUCER_POSITIONING, HPC_DETECT_SYSTEM
+
     arguments
-        parameters struct
-        pn struct
-        target_name string
-        mni_targets struct
+        parameters  (1,1) struct
+        pn          (1,1) struct
+        target_name (1,:) char
+        mni_targets (1,1) struct
     end
 
     % ========== PLATFORM SELECTION ==========

@@ -1,28 +1,28 @@
 function report_path = generate_uncertainty_report(parameters, affixes)
-% GENERATE_UNCERTAINTY_REPORT  Produce an uncertainty-range HTML report.
+% GENERATE_UNCERTAINTY_REPORT  Generate an uncertainty-range HTML simulation report
 %
-% Loads acoustic+thermal CSV tables and heating .mat files from three
+% Loads acoustic and thermal CSV tables and heating .mat files from three
 % simulation variants (default, liberal, conservative), computes ranges
 % across them, and writes a self-contained HTML report.
 %
-% Usage:
+% Use as:
 %   report_path = generate_uncertainty_report(parameters)
 %   report_path = generate_uncertainty_report(parameters, affixes)
 %
-% Inputs:
-%   parameters  - PRESTUS parameters struct (from any of the three runs).
-%                 parameters.io.output_dir must point to the shared output folder.
-%   affixes     - (optional) struct with fields:
-%                   .default       (default: '')
-%                   .liberal       (default: '_liberal')
-%                   .conservative  (default: '_conservative')
+% Input:
+%   parameters - (1,1) simulation parameters struct; parameters.io.output_dir
+%                must point to the shared output folder
+%   affixes    - struct with fields .default, .liberal, .conservative
+%                (defaults: '', '_liberal', '_conservative')
 %
 % Output:
-%   report_path - Path to the generated HTML report file.
+%   report_path - path to the generated HTML report file
+%
+% See also: GENERATE_SIMULATION_REPORT, GET_RISK_LIMITS
 
 arguments
-    parameters  struct
-    affixes     struct = struct('default', '', 'liberal', '_liberal', 'conservative', '_conservative')
+    parameters  (1,1) struct
+    affixes     (1,1) struct = struct('default', '', 'liberal', '_liberal', 'conservative', '_conservative')
 end
 
 report_path = '';

@@ -1,24 +1,25 @@
 function plot_coronal_slices(img, coord, options)
 
-% PLOT_CORONAL_SLICES Visualizes coronal slices of a 3D image.
+% PLOT_CORONAL_SLICES  Visualise coronal, sagittal, and axial slices of a 3D image
 %
-% This function displays coronal, sagittal, and axial slices of a 3D image (`img`) 
-% at specified coordinates (`coord`). It supports integer-labeled images (e.g., 
-% segmented masks) and applies a colormap with labels if provided. The function 
-% also rescales intensity values if required.
+% Displays three orthogonal slices of a 3D image at specified coordinates.
+% Supports integer-labelled images with custom colormaps and legends.
+%
+% Use as:
+%   plot_coronal_slices(img)
+%   plot_coronal_slices(img, coord)
+%   plot_coronal_slices(img, coord, options)
 %
 % Input:
-%   img    - [Nx x Ny x Nz] 3D matrix representing the image to visualize.
-%   coord  - [3x1] array specifying the slice coordinates for coronal, sagittal, 
-%            and axial views (default: center of the image).
-%   options:
-%     * cmap    - Custom colormap for integer-labeled images (default: SimNIBS-based colors).
-%     * rescale - Boolean flag to rescale intensity values to the range [1, 255] (default: 0).
-%     * labels  - Cell array of strings specifying labels for integer-labeled images 
-%                 (default: SimNIBS tissue labels).
+%   img     - [Nx x Ny x Nz] 3D image volume
+%   coord   - [3x1] slice coordinates for coronal/sagittal/axial views
+%             (default: image centre)
+%   options - name-value pairs:
+%               cmap    - colormap for integer-labelled images (default: SimNIBS colours)
+%               rescale - rescale intensity to [1, 255] (default: 0)
+%               labels  - cell array of tissue label strings
 %
-% Output:
-%   None. The function displays the slices in a montage with optional legends.
+% See also: PLOT_OVERLAY, SHOW_3D_HEAD
 
     arguments
         img (:,:,:)

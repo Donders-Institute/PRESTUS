@@ -1,28 +1,34 @@
 function parameters = load_transducer_parameters(parameters)
-
-% LOAD_TRANSDUCER_PARAMETERS Validates and normalizes transducer parameters.
+% LOAD_TRANSDUCER_PARAMETERS  Validate, normalize, and derive transducer parameters from config
 %
-% This function processes the 'transducer' field of the input parameters struct.
-% It validates required fields, ensures backward compatibility with legacy 
-% annular-only configurations, and normalizes parameters into a consistent format 
-% for simulation use. For matrix transducers, it validates element geometry, 
-% curvature, steering, grid definitions, and optional Clover or sparse grid setups. 
-% For annular transducers, it validates element diameters, curvature, and phases. 
-% The function also calculates derived values such as source phases in radians, 
-% element counts, and distances to the transducer plane.
+% Iterates over all entries in parameters.transducer, dispatching to
+% validate_matrix_transducer or validate_annular_transducer depending on
+% tr.type. Derived scalar fields (elem_n, elem_phase_rad, focal distances)
+% are computed and stored back into each transducer struct. Warns when
+% multiple transducers have mismatched frequencies. Absorbs any legacy top-level
+% expected_focal_distance_mm into per-transducer focal_distance_ep.
+%
+% Use as:
+%   parameters = load_transducer_parameters(parameters)
 %
 % Input:
-%   parameters - Struct containing simulation parameters, expected to include
-%                a 'transducer' field with one or more transducer definitions.
+%   parameters - PRESTUS config containing a 'transducer' array of structs
+%                with at minimum a 'type' field ('matrix' or 'annular')
 %
 % Output:
-%   parameters - Struct with validated and normalized transducer parameters,
-%                including additional derived fields such as:
-%                * elem_n, elem_id_mm, elem_od_mm
-%                * elem_phase_rad, elem_phase_deg
-%                * curv_radius_mm, dist_geom_ep_mm
-%                * elem_n_row, elem_n_col (for matrix grids)
-%                * sparsity_factor, clover setup fields, etc.
+%   parameters - identical to input but with each transducer entry validated
+%                and extended with derived fields including:
+%                elem_n, elem_id_mm, elem_od_mm, elem_phase_rad, elem_phase_deg,
+%                curv_radius_mm, dist_geom_ep_mm, focal_distance_ep,
+%                focal_distance_bowl; matrix grids also get elem_n_row, elem_n_col,
+%                sparsity_factor, clover fields
+%
+% See also: LOAD_PARAMETERS, VALIDATE_MATRIX_TRANSDUCER, VALIDATE_ANNULAR_TRANSDUCER,
+%           FOCAL_DISTANCE_CALCULATION
+
+arguments
+    parameters (1,1) struct
+end
 
     if isfield(parameters, 'transducer')
 

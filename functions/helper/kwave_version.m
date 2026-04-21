@@ -1,4 +1,18 @@
 function kwave_version(kpath)
+% KWAVE_VERSION  Print k-Wave toolbox version and git commit information
+%
+% Queries getComputerInfo for the k-Wave version string and the kpath git
+% repository for the short commit hash and date.
+%
+% Use as:
+%   kwave_version()
+%   kwave_version(kpath)
+%
+% Input:
+%   kpath - path to the k-Wave root directory (optional, default: getkWavePath)
+%
+% See also: PRESTUS_VERSION, SIMNIBS_VERSION
+
     if nargin == 0
         kpath = getkWavePath;
     end

@@ -1,5 +1,23 @@
 function [medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmented_img, trans_pos_grid)
-% Expand CSF to mask areas away from the brain (e.g., exclude distant bone)
+% PREPROC_CROP_ECSF  Expand CSF mask to exclude distant bone from the simulation grid
+%
+% Dilates the CSF tissue label and sets all voxels outside the expanded
+% CSF region to water, effectively removing distant bone from the medium
+% masks before grid cropping.
+%
+% Use as:
+%   medium_masks = preproc_crop_eCSF(parameters, medium_masks, segmented_img, trans_pos_grid)
+%
+% Input:
+%   parameters     - (1,1) simulation configuration struct
+%   medium_masks   - [Nx x Ny x Nz] medium label array
+%   segmented_img  - [Nx x Ny x Nz] SimNIBS tissue label volume
+%   trans_pos_grid - [1x3] transducer position in voxel coordinates
+%
+% Output:
+%   medium_masks - updated medium label array with distant bone set to water
+%
+% See also: PREPROC_CROP_GRID, HEAD_SMOOTH_AND_CROP
 
     seg_labels = charm_seg_labels();
     if isfield(seg_labels, 'csf')

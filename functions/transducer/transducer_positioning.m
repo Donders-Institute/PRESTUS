@@ -1,10 +1,26 @@
 function transducer_positioning(parameters, pn, target_name, mni_targets)
-% TRANSDUCER_POSITIONING Heuristic transducer placement for MNI targets
+% TRANSDUCER_POSITIONING  Heuristic transducer placement for MNI targets
+%
+% Loads a subject segmentation, evaluates candidate positions on the skull
+% surface, selects the optimal position using heuristic criteria, and
+% exports the result for downstream simulation and Localite navigation.
+%
+% Use as:
+%   transducer_positioning(parameters, pn, target_name, mni_targets)
+%
+% Input:
+%   parameters  - (1,1) simulation configuration struct
+%   pn          - (1,1) path names struct
+%   target_name - target label string
+%   mni_targets - (1,1) MNI target coordinates struct
+%
+% See also: TRANSDUCER_POSITIONING_START, TP_EVALUATE_CANDIDATE_POSITIONS
+
 arguments
-    parameters struct
-    pn struct
-    target_name string
-    mni_targets struct
+    parameters  (1,1) struct
+    pn          (1,1) struct
+    target_name (1,:) char
+    mni_targets (1,1) struct
 end
 
 %% 1. PATHS & VALIDATION

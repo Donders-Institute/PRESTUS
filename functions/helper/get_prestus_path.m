@@ -1,13 +1,19 @@
 function prestus_path = get_PRESTUSpath()
-%get_PRESTUSpath Return pathname to the PRESTUS Toolbox.
+% GET_PRESTUSPATH  Return the absolute path to the PRESTUS toolbox root
 %
-% DESCRIPTION:
-%     get_PRESTUSpath returns the full directory pathname to the root 
-%     directory in the PRESTUS Toolbox using the slash direction native to
-%     the users operating system. 
+% Resolves the PRESTUS root directory at runtime from mfilename('fullpath'),
+% so it works regardless of the current working directory or how the toolbox
+% was added to the MATLAB path. Errors if 'PRESTUS' does not appear in the
+% resolved path (e.g. if the toolbox folder has been renamed).
 %
-% USAGE:
-%     path = get_PRESTUSpath()
+% Use as:
+%   prestus_path = get_PRESTUSpath()
+%
+% Output:
+%   prestus_path - char; absolute path to the PRESTUS root directory
+%                  using the OS-native file separator
+%
+% See also: MFILENAME, LOAD_PARAMETERS, SAFE_ADDPATH
 
 % get the full pathname of the toolbox directory
 full_path = mfilename('fullpath');

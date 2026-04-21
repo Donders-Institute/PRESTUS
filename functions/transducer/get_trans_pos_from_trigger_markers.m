@@ -1,31 +1,35 @@
 function [transducer_pos, target_pos] = get_trans_pos_from_trigger_markers(trigger_markers_file, trigger_index, reference_to_transducer_distance, reference_to_target_distance)
 
-% GET_TRANS_POS_FROM_TRIGGER_MARKERS Computes transducer and target positions from Localite trigger marker files.
+% GET_TRANS_POS_FROM_TRIGGER_MARKERS  Compute transducer/target positions from a Localite XML file
 %
-% This function calculates the positions of the transducer and target based on 
-% a specified trigger marker in a Localite XML file. The transducer position is 
-% computed relative to a reference point, and the target position is optionally 
-% calculated based on an additional distance parameter.
+% Calculates transducer and target positions from a specified trigger marker
+% in a Localite XML file. The transducer position is derived by projecting
+% a reference point along the approach direction by the given distance.
+%
+% Use as:
+%   [transducer_pos, target_pos] = get_trans_pos_from_trigger_markers( ...
+%       trigger_markers_file, trigger_index, reference_to_transducer_distance)
+%   [transducer_pos, target_pos] = get_trans_pos_from_trigger_markers( ...
+%       trigger_markers_file, trigger_index, reference_to_transducer_distance, ...
+%       reference_to_target_distance)
 %
 % Input:
-%   trigger_markers_file          - Path to the Localite XML file containing trigger markers.
-%   trigger_index                 - Index of the trigger marker to use for position calculations.
-%   reference_to_transducer_distance - Distance from the reference point to the transducer (in mm).
-%   reference_to_target_distance  - Distance from the reference point to the target (optional, default: 0 mm).
+%   trigger_markers_file             - path to Localite XML file with trigger markers
+%   trigger_index                    - index of the trigger marker to use
+%   reference_to_transducer_distance - distance from reference point to transducer [mm]
+%   reference_to_target_distance     - distance from reference point to target [mm] (default: 0)
 %
 % Output:
-%   transducer_pos                - [1x3] array specifying the transducer position in Cartesian coordinates.
-%   target_pos                    - [1x3] array specifying the target position in Cartesian coordinates.
+%   transducer_pos - [1x3] transducer position in Cartesian coordinates
+%   target_pos     - [1x3] target position in Cartesian coordinates
 %
-% Notes:
-%   - Assumes that the center of the radius of the transducer is the target.
-%   - Requires `xml2struct` (https://github.com/joe-of-all-trades/xml2struct) for parsing XML files.
+% See also: POSITION_TRANSDUCER_LOCALITE, LOCALITE_MATRIX_TO_POSITIONS
 
     arguments
-        trigger_markers_file
-        trigger_index
-        reference_to_transducer_distance
-        reference_to_target_distance = 0; % Default distance to target is 0 mm
+        trigger_markers_file             (1,:) char
+        trigger_index                    (1,1) double
+        reference_to_transducer_distance (1,1) double
+        reference_to_target_distance     (1,1) double = 0
     end
 
     % Parse the XML file using `xml2struct`
