@@ -58,7 +58,7 @@ subplot(1,3,1);
         [trans_xyz_rotated(1) target_xyz_rotated(1)], 'Color', 'white');
 
     get_transducer_box(...
-        trans_xyz_rotated([1,3]), target_xyz_rotated([1,3]), pixel_size, parameters);
+        trans_xyz_rotated([1,3]), target_xyz_rotated([1,3]), [], pixel_size, parameters);
 
 subplot(1,3,2);
 
