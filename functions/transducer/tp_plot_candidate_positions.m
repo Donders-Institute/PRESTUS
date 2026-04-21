@@ -39,7 +39,7 @@ function tp_plot_candidate_positions(img, target, trans_candidate, ...
         'EdgeColor','b', 'LineWidth',2, 'LineStyle','-');
 
     % Transducer visualization box
-    get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
+    get_transducer_box(trans_xz, target_xz, [], pixel_size, parameters);
 
     % Save
     output_plot = fullfile(parameters.io.output_dir, ...
