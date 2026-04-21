@@ -1,30 +1,40 @@
 function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_final, ...
          focus_pos_final, translation_matrix] = preproc_crop_grid( ...
          parameters, medium_masks, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
-% preproc_crop_grid Crops 3D head model grid to simulation-relevant region for k-Wave efficiency.
+% PREPROC_CROP_GRID  Crop 3-D head model to the simulation-relevant region
 %
-% Crops full-head model to CSF-guided + transducer-inclusive bounding box, excluding distant bone.
-% Adds user-controlled symmetric padding BEFORE transducer_setup to prevent out-of-bounds.
-% Optimizes grid dimensions for FFT performance. Computes skull edges and adjustments.
+% Crops the full-head model to a CSF-guided, transducer-inclusive bounding
+% box, adds symmetric user padding, optimises dimensions for FFT, and
+% applies conditional pre/post padding to prevent out-of-bounds access.
+% The PML is always applied outside the returned grid (PMLInside=false).
+% Symmetric padding (parameters.headmodel.head_pad_mm) is applied BEFORE
+% transducer_setup to prevent out-of-bounds access. Grid dimensions are
+% then adjusted to be FFT-efficient. Skull edges are computed to derive
+% the crop bounding box.
 %
-% Inputs:
-%   parameters      - Struct with .headmodel.head_pad_mm (symmetric padding mm), .grid.resolution_mm, .pml_size,
-%                     .headmodel.csf_expansion, .grid.max_expand, .simulation.debug, etc.
-%   medium_masks    - 3D array: Current medium labels (non-CSF regions zeroed).
-%   segmentation    - 3D array: Original segmentation/pseudoCT.
-%   bone_img        - 3D array: Bone property image.
-%   trans_pos_grid  - 1x3: Transducer position [x y z] grid indices.
-%   focus_pos_grid  - 1x3: Focus position [x y z] grid indices.
+% Use as:
+%   [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_final, ...
+%    focus_pos_final, translation_matrix] = preproc_crop_grid( ...
+%       parameters, medium_masks, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
 %
-% Outputs:
-%   medium_masks          - Cropped 3D medium labels.
-%   segmentation_crop     - Cropped original segmentation.
-%   bone_crop             - Cropped bone image.
-%   parameters            - Updated with .grid_dims = [Nx Ny Nz].
-%   trans_pos_final       - 1x3: Adjusted transducer pos in cropped grid.
-%   focus_pos_final       - 1x3: Adjusted focus pos in cropped grid.
-%   translation_matrix    - 4x4: Homogeneous translation (original → cropped coordinates).
+% Input:
+%   parameters     - (1,1) simulation configuration struct
+%   medium_masks   - [Nx x Ny x Nz] medium label array
+%   segmentation   - [Nx x Ny x Nz] tissue segmentation / pseudoCT
+%   bone_img       - [Nx x Ny x Nz] bone property image
+%   trans_pos_grid - [1x3] transducer position in voxel coordinates
+%   focus_pos_grid - [1x3] focus position in voxel coordinates
 %
+% Output:
+%   medium_masks       - cropped medium label array
+%   segmentation_crop  - cropped tissue segmentation
+%   bone_crop          - cropped bone image
+%   parameters         - updated struct with .grid.dims = [Nx Ny Nz]
+%   trans_pos_final    - [1x3] transducer position in cropped grid
+%   focus_pos_final    - [1x3] focus position in cropped grid
+%   translation_matrix - [4x4] homogeneous translation matrix
+%
+% See also: PREPROC_CROP_ECSF, HEAD_SMOOTH_AND_CROP
 
 % === USER SYMMETRIC PADDING (BOTH SIDES) ===
 if ~isfield(parameters.headmodel, 'head_pad_mm') || isempty(parameters.headmodel.head_pad_mm)
@@ -50,8 +60,8 @@ end
 % Expand CSF mask to crop the layered medium
 [medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmentation, trans_pos_grid);
 
-% Set PML buffer as crop margin
-crop_margin = parameters.grid.pml_size + 1;
+% Minimal fixed crop margin — PML is added outside the grid by k-Wave (PMLInside=false)
+crop_margin = 1;
 
 % Include transducer bowl geometry (safe with padding)
 i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));

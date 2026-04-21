@@ -1,5 +1,35 @@
 function [parameters] = grid_transducer_location(parameters, planimg)
-% Position transducer(s) in the grid
+% GRID_TRANSDUCER_LOCATION  Map transducer and focus positions into the simulation grid
+%
+% For layered simulations, applies the affine transform stored in
+% planimg.transf to map T1-space coordinates of every transducer to
+% simulation-grid indices. For non-layered (water / phantom) simulations,
+% positions are either taken directly from parameters or placed
+% automatically: the transducer at the near face of the grid, the focus at
+% the expected focal distance along the axial dimension. All positions are
+% validated to lie within [1, grid.dims] (the PML is added outside by
+% k-Wave so no internal clearance is required).
+%
+% Use as:
+%   [parameters] = grid_transducer_location(parameters, planimg)
+%
+% Input:
+%   parameters - PRESTUS config; must contain simulation.medium, grid.dims,
+%                grid.resolution_mm [mm], transducer(i).trans_pos, transducer(i).focus_pos
+%   planimg    - planning image info from GRID_TISSUE_SETUP; must contain
+%                planimg.transf (affine matrix) for layered simulations;
+%                may be empty for water/phantom
+%
+% Output:
+%   parameters - updated: transducer(i).trans_pos and transducer(i).focus_pos
+%                set to integer grid indices
+%
+% See also: GRID_TISSUE_SETUP, GRID_AXISYMMETRY, FOCAL_DISTANCE_CALCULATION
+
+arguments
+    parameters (1,1) struct
+    planimg    (1,1) struct
+end
 
     if contains(parameters.simulation.medium, {'layered'})
         % map all transducers from T1 grid to sim grid using the same transform
@@ -44,11 +74,11 @@ function [parameters] = grid_transducer_location(parameters, planimg)
         % set transducer position in grid
         if ~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)
             % transducer positioned arbitrarily (2D only)
-            % y: first position beyond pml layer
-            % x: halfway
+            % axial: first interior voxel (PML is added outside the grid by k-Wave)
+            % lateral: centred
             trans_pos = round(...
                 [parameters.grid.dims(1:(numel(parameters.grid.dims)-1))/2, ...
-                parameters.grid.pml_size+1]);
+                2]);
         else
             trans_pos = parameters.transducer.trans_pos;
             % Adjust if the positions are transposed
@@ -62,7 +92,6 @@ function [parameters] = grid_transducer_location(parameters, planimg)
             % no focus point specified
             % position focus at expected distance from transducer
             % index dimension depends on 2D/3D
-            % this already accounts for PML size
             parameters = focal_distance_calculation(parameters);
             focus_pos = trans_pos;
             focus_pos(numel(parameters.grid.dims)) = ...
@@ -82,16 +111,16 @@ function [parameters] = grid_transducer_location(parameters, planimg)
         parameters.transducer(1).focus_pos = focus_pos;
     end
     
-    % If a PML layer is used to absorb waves reaching the edge of the grid,
-    % this will check if there is enough room for a PML layer between the
-    % transducers and the edge of the grid
+    % Verify that transducer and focus positions lie within the interior grid.
+    % The PML is added outside the grid by k-Wave (PMLInside=false), so positions
+    % only need to be in [1, dims] — no in-grid PML clearance is required.
     for ti = 1:numel(parameters.transducer)
         tp = parameters.transducer(ti).trans_pos;
         fp = parameters.transducer(ti).focus_pos;
-        assert(min(abs([repmat(0, 1, numel(parameters.grid.dims));parameters.grid.dims]-...
-            tp ),[],'all') > parameters.grid.pml_size, ...
-            sprintf('The minimal distance between the transducer %i and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size', ti))
-        assert(min(abs([repmat(0, 1, numel(parameters.grid.dims));parameters.grid.dims]-...
-            fp ),[],'all') > parameters.grid.pml_size, ...
-            sprintf('The minimal distance between the focus position of transducer %i and the simulation grid boundary should be larger than the PML size. Adjust transducer position or the PML size', ti))
+        assert(all(tp >= 1) && all(tp <= parameters.grid.dims), ...
+            sprintf('Transducer %i position %s is outside the grid [1, %s]. Adjust trans_pos.', ...
+            ti, mat2str(tp), mat2str(parameters.grid.dims)))
+        assert(all(fp >= 1) && all(fp <= parameters.grid.dims), ...
+            sprintf('Focus position of transducer %i (%s) is outside the grid [1, %s]. Adjust focus_pos.', ...
+            ti, mat2str(fp), mat2str(parameters.grid.dims)))
     end
