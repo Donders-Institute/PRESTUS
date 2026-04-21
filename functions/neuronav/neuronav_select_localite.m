@@ -1,15 +1,24 @@
 function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
-% NEURONAV_SELECT_LOCALITE - Select most recent Localite XML for a session.
-% Compares against Localite files from the immediately preceding session (if available) to skip duplicates.
+% NEURONAV_SELECT_LOCALITE  Select the most recent Localite XML file for a session
 %
-% INPUT:
-%   pn         - struct with .data_postlocalite field (FIRST input)
-%   sub_id     - e.g., 'sub-010'
-%   ses_id     - e.g., 3 (numeric) or 'ses-03'
-%   markertype - 'TriggerMarkers' (default) or 'GUMMarkers'
+% Identifies the appropriate Localite XML file for a given subject and
+% session. Compares against files from the preceding session to avoid
+% duplicates and returns the parsed struct.
 %
-% OUTPUT:
-%   localite - struct parsed from selected Localite XML file ([] if none match)
+% Use as:
+%   localite = neuronav_select_localite(pn, sub_id, ses_id)
+%   localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
+%
+% Input:
+%   pn         - (1,1) path names struct with data_postlocalite field
+%   sub_id     - subject identifier string (e.g. 'sub-010')
+%   ses_id     - session identifier; numeric or string (e.g. 3 or 'ses-03')
+%   markertype - 'TriggerMarkers' (default), 'GUMMarkers', or 'InstrumentMarker'
+%
+% Output:
+%   localite - struct parsed from selected Localite XML file ([] if none found)
+%
+% See also: NEURONAV_COMPUTE_SERIES_STATISTICS, POSITION_TRANSDUCER_LOCALITE
 
     if nargin < 4 || isempty(markertype)
         markertype = 'TriggerMarkers';  % Default
@@ -40,19 +49,23 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
     end
 
     % --- Helper function to list valid Localite files ---
-    function [files, datetimes] = list_valid_localite_files(basepath, markertype)
+    function [files, datetimes] = list_valid_localite_files(ses_path, markertype)
+        % ses_path is always <data_postlocalite>/<sub_id>/<ses_id>
         datetimes = datetime.empty;
-        
+
         if strcmp(markertype, 'TriggerMarkers')
             pattern = 'TriggerMarkers_Coil0*.xml';
-            search_path = fullfile(basepath, 'localite', '*', 'TMSTrigger');
+            search_path = fullfile(ses_path, 'localite', '*', 'TMSTrigger');
             files = dir(fullfile(search_path, pattern));
-            files = files([files.bytes] > 10000);  % 10kB ONLY for TriggerMarkers
-        else  % GUMMarkers
-            pattern = 'GUMMarkers*.xml';  % Matches GUMMarkers_sub-003_VS.xml
-            search_path = fullfile(basepath, 'localite');
+            files = files([files.bytes] > 10000);  % 10kB minimum for TriggerMarkers
+        elseif strcmp(markertype, 'GUMMarkers')
+            pattern = 'GUMMarkers*.xml';
+            search_path = fullfile(ses_path, 'localite');
             files = dir(fullfile(search_path, pattern));
-            % No size criterion for GUMMarkers
+        else  % InstrumentMarker
+            pattern = 'InstrumentMarker*.xml';
+            search_path = fullfile(ses_path, 'localite');
+            files = dir(fullfile(search_path, pattern));
         end
         
         for i = 1:length(files)
@@ -81,18 +94,16 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
     end
 
     % --- List files for current session ---
-    if strcmp(markertype, 'TriggerMarkers')
-        localite_path_later = fullfile(pn.data_postlocalite, sub_id, session, 'localite', '*', 'TMSTrigger');
-    else
-        localite_path_later = fullfile(pn.data_postlocalite, sub_id, session);  % Session level for GUMMarkers
-    end
+    % Always pass session-level path; list_valid_localite_files appends the
+    % marker-type-specific subfolder(s) internally.
+    localite_path_later = fullfile(pn.data_postlocalite, sub_id, session);
     [localite_files, dt_later] = list_valid_localite_files(localite_path_later, markertype);
 
     if isempty(localite_files)
         if strcmp(markertype, 'TriggerMarkers')
-            warning("⚠ No %s files >10kB with valid timestamps found for %s %s", markertype, sub_id, session);
+            warning("No %s files >10kB with valid timestamps found for %s %s", markertype, sub_id, session);
         else
-            warning("⚠ No %s files found for %s %s", markertype, sub_id, session);
+            warning("No %s files found for %s %s", markertype, sub_id, session);
         end
         return;
     end
@@ -100,11 +111,7 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
     % --- List files for previous session (if it exists) ---
     compare_files = [];
     if ~isempty(session_earlier)
-        if strcmp(markertype, 'TriggerMarkers')
-            localite_path_earlier = fullfile(pn.data_postlocalite, sub_id, session_earlier, 'localite', '*', 'TMSTrigger');
-        else
-            localite_path_earlier = fullfile(pn.data_postlocalite, sub_id, session_earlier);
-        end
+        localite_path_earlier = fullfile(pn.data_postlocalite, sub_id, session_earlier);
         [compare_files, dt_earlier] = list_valid_localite_files(localite_path_earlier, markertype);
         if ~isempty(compare_files)
             [~, sidx] = sort(dt_earlier, 'descend');
