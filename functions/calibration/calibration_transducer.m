@@ -6,32 +6,32 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     parameters, ...
     sim_id)
 
-% calibration_transducer - Simulate and optimize ultrasonic transducer acoustic profile
+% CALIBRATION_TRANSDUCER  Calibrate transducer phases and amplitude to match a target intensity profile
 %
-% Inputs:
-%   profile_empirical
-%       axial_intensity     - Measured or theoretical intensity profile along beam axis
-%       axial_distance_bowl - Distance from transducer reference point (mm)
-%   equipment_name          - Name/identifier for the transducer or equipment
-%   desired_intensity       - Target focal intensity (W/cm^2)
-%   desired_focal_distance_ep - Desired focal distance from transducer exit plane (mm)
-%   parameters              - Structure with simulation parameters and paths
-%   parameters.calibration  - Structure with calibration settings
-%   sim_id                  - Numeric ID of the subject (or simulation)
+% Scales an empirical intensity profile to the desired intensity, runs an
+% initial water simulation, optimises element phases and amplitude to match
+% the target, reruns with optimised parameters, and saves the results.
 %
-% Outputs:
-%   opt_source_amp          | Optimized amplitude
-%   opt_source_phase_deg    | Optimized phases (degrees)
-%   opt_source_phase_rad    | Optimized phases (radians)
+% Use as:
+%   [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = ...
+%       calibration_transducer(profile_empirical, equipment_name, ...
+%                              desired_intensity, desired_focal_distance_ep, parameters, sim_id)
 %
-% Description:
-%   This function scales the input intensity profile to the desired value,
-%   runs an initial simulation using the specified submission method,
-%   computes analytical and simulated intensity profiles,
-%   performs optimization of transducer element phases and amplitudes 
-%   to match the desired acoustic profile,
-%   reruns the simulation with optimized parameters,
-%   visualizes results, and saves optimized values.
+% Input:
+%   profile_empirical         - struct with axial_intensity and axial_distance_bowl [mm]
+%   equipment_name            - name/identifier for the transducer or equipment
+%   desired_intensity         - target focal intensity [W/cm²]
+%   desired_focal_distance_ep - desired focal distance from transducer exit plane [mm]
+%   parameters                - PRESTUS config with calibration settings
+%   sim_id                    - numeric subject or simulation ID
+%
+% Output:
+%   opt_source_amp        - optimised source amplitude
+%   opt_source_phase_deg  - optimised element phases [°]
+%   opt_source_phase_rad  - optimised element phases [rad]
+%
+% See also: SCALE_REAL_INTENSITY_PROFILE, COMPUTE_PHASES, PERFORM_GLOBAL_SEARCH,
+%           SAVE_OPTIMIZED_VALUES
 
     %% Attach more information to parameters
 
@@ -98,7 +98,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     %% Load initial results
 
-    initial_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
+    initial_res = load(sprintf('%s/cache/sub-%03d_water_results%s.mat', ...
         sim_param.io.outputs_folder, sim_id, sim_param.io.output_affix));
 
     initial_params = initial_res.acoustic_info.parameters;
@@ -165,7 +165,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     prestus_pipeline_start(opt_param);
 
     %% Load optimized simulation results
-    opt_res = load(sprintf('%s/sub-%03d_water_results%s.mat', ...
+    opt_res = load(sprintf('%s/cache/sub-%03d_water_results%s.mat', ...
         opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix));
 
     opt_params = opt_res.acoustic_info.parameters;
