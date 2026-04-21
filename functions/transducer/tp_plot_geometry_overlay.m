@@ -56,7 +56,7 @@ rectangle('Position', [flip(target_xz)-2, 4, 4], 'Curvature', [0,0], 'EdgeColor'
 line([trans_xz(2) target_xz(2)], [trans_xz(1) target_xz(1)], 'Color', 'white', 'LineWidth', 2);
 
 % Add 3D transducer bowl visualization
-get_transducer_box(trans_xz, target_xz, pixel_size, parameters);
+get_transducer_box(trans_xz, target_xz, [], pixel_size, parameters);
 
 % Save geometry validation plot
 saveas(h, fullfile(parameters.io.output_dir, sprintf('sub-%03d_geometry_%s.png', subject_id, target_name)), 'png'); 
