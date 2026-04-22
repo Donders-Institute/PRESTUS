@@ -66,13 +66,16 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     end
 
     if parameters.pct.enabled == 1
-        % Load pseudoCT
-        filename_pseudoCT = fullfile(segmentation_folder,'pseudoCT.nii.gz');
+        % Load pseudoCT from the resolved pCT directory (parameters.io.pct_dir).
+        % path_log_setup sets this to the SimNIBS m2m folder by default, or to
+        % {path.pct}/sub-NNN/ when a dedicated pCT base directory is configured.
+        pct_dir = parameters.io.pct_dir;
+        filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
         pseudoCT_header = niftiinfo(filename_pseudoCT);
-        
+
         % Load pseudoCT tissues mask
-        filename_tissues_mask = fullfile(segmentation_folder,'tissues_mask.nii.gz');
+        filename_tissues_mask = fullfile(pct_dir, 'tissues_mask.nii.gz');
         tissues_mask_image = niftiread(filename_tissues_mask);
         tissues_mask_header = niftiinfo(filename_tissues_mask);
     else

@@ -120,6 +120,19 @@ end
     if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg) && ~isfolder(parameters.path.seg)
         mkdir(parameters.path.seg);
     end
+
+    % Resolve the subject-specific pCT output directory into parameters.io.pct_dir.
+    % path.pct is a user-configured base directory (preserved as-is).
+    %   empty    → io.pct_dir = {path.seg}/m2m_sub-NNN/  (uses existing SimNIBS m2m folder)
+    %   non-empty → io.pct_dir = {path.pct}/sub-NNN/     (dedicated dir, PRESTUS naming)
+    if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
+        if ~isfield(parameters.path, 'pct') || isempty(parameters.path.pct)
+            parameters.io.pct_dir = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
+        else
+            parameters.io.pct_dir = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
+        end
+        if ~isfolder(parameters.io.pct_dir); mkdir(parameters.io.pct_dir); end
+    end
     
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
         % Save parameter snapshot to cache (regenerable, not a primary output)

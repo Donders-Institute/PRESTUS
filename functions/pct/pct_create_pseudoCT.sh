@@ -16,17 +16,27 @@ function pct_create_pseudoCT()
     local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default)]
     local debug=${5:-"1"}    # Save intermediate images [yes: "1" (default); no: "0"]
     local path_fun="${6:-$(dirname "$(realpath "$0")")}" # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
+    local path_pct_out="${7:-}"  # Dedicated pCT output directory; defaults to m2m subject folder when empty
     local path_fun_pct="${path_fun}/pct"
     local path_fun_head="${path_fun}/head"
 
     # shift simnibs path to sub-id
     path_simnibs="${path_simnibs}/m2m_sub-${sub_id}"
 
-    # create dedicated pCT directory for intermediate backups under the SimNIBS path
-    path_pct="${path_simnibs}/pseudoCT"
-    mkdir -p "$path_pct"
+    # Determine output root: use path_pct_out when provided, otherwise default to
+    # the SimNIBS m2m folder (legacy fallback when called without PRESTUS pipeline).
+    if [ -n "$path_pct_out" ]; then
+        path_pct_root="$path_pct_out"
+    else
+        path_pct_root="${path_simnibs}"
+    fi
 
-    # Create a log
+    # Final outputs (pseudoCT.nii.gz, tissues_mask.nii.gz) go directly in path_pct_root.
+    # All intermediate/debug files go into a debug_pct/ subdirectory.
+    path_pct="${path_pct_root}/debug_pct"
+    mkdir -p "$path_pct_root" "$path_pct"
+
+    # Create a log in the debug directory
     exec > >(tee -a "${path_pct}/pct_create_${sub_id}_$(date +%Y%m%d_%H%M%S).log") 2>&1
 
     echo "=== PCT Creation Log ==="
@@ -34,17 +44,18 @@ function pct_create_pseudoCT()
     echo "Subject: $sub_id"
     echo "Starting pseudoCT creation"
     echo "SimNIBS path: $path_simnibs"
-    echo "pCT path: $path_pct"
+    echo "pCT output root: $path_pct_root"
+    echo "pCT debug dir: $path_pct"
     echo "MATLAB binary: $path_matlab"
     echo "Function path: $path_fun"
     echo "Function PCT path: $path_fun_pct"
     echo "Function Head path: $path_fun_head"
 
-    # Key file names
+    # Key file names — final outputs land in path_pct_root, intermediates in path_pct (debug_pct/)
     segmentation="${path_simnibs}/final_tissues.nii.gz"
     skull_mask="${path_pct}/skull_mask.nii.gz"
-    pCT="${path_pct}/pseudoCT.nii.gz"
-    tissues_mask="${path_pct}/tissues_mask.nii.gz"
+    pCT="${path_pct_root}/pseudoCT.nii.gz"
+    tissues_mask="${path_pct_root}/tissues_mask.nii.gz"
 
     # Temporary file names
     t2w_reg="${path_simnibs}/T2_reg.nii.gz"
@@ -354,9 +365,6 @@ function pct_create_pseudoCT()
     fslmaths tmp_smooth_non_skull.nii.gz -add tmp_skull_raw.nii.gz "$pCT" -odt float        # Final: smooth(non-skull) + raw(skull)
     rm tmp_non_skull_mask.nii.gz tmp_smooth_non_skull.nii.gz tmp_skull_raw.nii.gz           # Cleanup
 
-    # Copy pCT to simnibs root
-    cp "$pCT" "${path_simnibs}/pseudoCT.nii.gz"
-
     # Create and store a final tissue mask for simulations
     # Step 1: Inverse mask (original labels outside skull, 0 inside)
     fslmaths "$skull_mask_PVC_dil" -binv tmp_invmask.nii.gz
@@ -366,14 +374,12 @@ function pct_create_pseudoCT()
     fslmaths "$tissues_mask" -add tmp_skull4.nii.gz "$tissues_mask"
     rm tmp_invmask.nii.gz tmp_skull4.nii.gz
 
-    # Copy tissues_mask to simnibs root
-    cp "$tissues_mask" "${path_simnibs}/tissues_mask.nii.gz"
-
-    # If DEBUG=0, remove nifti images in pseudoCT folder
+    # If DEBUG=0, remove all intermediate nifti images from debug_pct/.
+    # Final outputs (pseudoCT.nii.gz, tissues_mask.nii.gz) are in path_pct_root and are unaffected.
     if [ "$debug" -eq 0 ]; then
-        echo "Cleanup: Removing nifti images in pseudoCT folder"
-        rm ${path_pct}/*.nii.gz
+        echo "Cleanup: Removing intermediate nifti images from debug_pct/"
+        rm -f "${path_pct}"/*.nii.gz
     fi
 
-    echo "Process complete. You can now run the simulation with the pseudoCT. Ensure both 'pseudoCT.nii.gz' and 'tissues_mask.nii.gz' are in the m2m segmentation subject folder."
+    echo "Process complete. pseudoCT.nii.gz and tissues_mask.nii.gz are in: ${path_pct_root}"
 }

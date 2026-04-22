@@ -22,6 +22,9 @@ function pct_create_pCT_run(parameters)
 %   parameters - (1,1) simulation configuration struct with fields:
 %     .subject_id               - numeric subject identifier
 %     .path.seg                 - base SimNIBS output directory
+%     .path.pct                 - (optional) base directory for pCT outputs; empty →
+%                                 path.seg/m2m_sub-NNN/, non-empty → path.pct/sub-NNN/
+%     .io.pct_dir               - (optional) pre-resolved subject pCT dir set by path_log_setup
 %     .pct.skull_mapping        - UTE→HU algorithm (default: 'kosciessa')
 %     .pct.debug                - keep intermediate images (default: 1)
 %     .platform                 - 'matlab'/'slurm'/'qsub'/'auto'
@@ -39,6 +42,20 @@ end
 
     subj_id_string = sprintf('%03d', parameters.subject_id);
     path_seg       = parameters.path.seg;
+
+    % Resolve the subject-specific pCT output directory.
+    % Use io.pct_dir when path_log_setup has already resolved it; otherwise apply the
+    % same resolution logic: empty path.pct → m2m_sub-NNN, non-empty → sub-NNN.
+    if isfield(parameters, 'io') && isfield(parameters.io, 'pct_dir') && ~isempty(parameters.io.pct_dir)
+        path_pct_out = parameters.io.pct_dir;
+    elseif isfield(parameters.path, 'pct') && ~isempty(parameters.path.pct)
+        path_pct_out = fullfile(parameters.path.pct, sprintf('sub-%s', subj_id_string));
+    else
+        path_pct_out = fullfile(path_seg, sprintf('m2m_sub-%s', subj_id_string));
+    end
+    if ~isfolder(path_pct_out)
+        mkdir(path_pct_out);
+    end
 
     % Resolve optional pCT parameters with safe defaults
     skull_mapping = 'kosciessa';
@@ -135,10 +152,10 @@ end
     end
 
     % ── Build the core bash call (no PATH prefix — each platform sets PATH in its own env block)
-    % Arguments: sub_id  path_simnibs  path_matlab  skullmapping  debug  path_fun
-    pct_call = sprintf('source "%s" && pct_create_pseudoCT "%s" "%s" "%s" "%s" "%s" "%s"', ...
+    % Arguments: sub_id  path_simnibs  path_matlab  skullmapping  debug  path_fun  path_pct_out
+    pct_call = sprintf('source "%s" && pct_create_pseudoCT "%s" "%s" "%s" "%s" "%s" "%s" "%s"', ...
         script_path, subj_id_string, path_seg, matlab_bin, ...
-        skull_mapping, debug_flag, path_fun);
+        skull_mapping, debug_flag, path_fun, path_pct_out);
 
     % ── Deploy ────────────────────────────────────────────────────────────
     if strcmp(platform, 'matlab')
@@ -199,7 +216,7 @@ end
         if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'max_wait_checks')
             max_checks = parameters.hpc.max_wait_checks;
         end
-        pseudoCT_file = fullfile(path_seg, sprintf('m2m_sub-%s', subj_id_string), 'pseudoCT.nii.gz');
+        pseudoCT_file = fullfile(path_pct_out, 'pseudoCT.nii.gz');
         if ~isempty(job_id_tok)
             pct_job_id = str2double(job_id_tok);
             fprintf('pseudoCT SLURM job %d submitted — waiting for completion.\n', pct_job_id);
@@ -256,7 +273,7 @@ end
         if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'max_wait_checks')
             max_checks = parameters.hpc.max_wait_checks;
         end
-        pseudoCT_file = fullfile(path_seg, sprintf('m2m_sub-%s', subj_id_string), 'pseudoCT.nii.gz');
+        pseudoCT_file = fullfile(path_pct_out, 'pseudoCT.nii.gz');
         if ~isempty(pct_job_id)
             fprintf('pseudoCT qsub job %s submitted — waiting for completion.\n', pct_job_id);
             hpc_wait_for_completion(pct_job_id, 'qsub', max_checks);
