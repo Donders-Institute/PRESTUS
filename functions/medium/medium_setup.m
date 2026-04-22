@@ -94,7 +94,7 @@ end
 
             % map skull bone density with the desired algorithm
             if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_density')
-                pct_mapping_density = parameters.pct.mapping_density;
+                pct_mapping_density = char(parameters.pct.mapping_density);
             else
                 pct_mapping_density = 'none';
             end
@@ -102,7 +102,7 @@ end
 
             % map skull bone sound speed with the desired algorithm
             if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_soundspeed')
-                pct_mapping_soundspeed = parameters.pct.mapping_soundspeed;
+                pct_mapping_soundspeed = char(parameters.pct.mapping_soundspeed);
             else
                 pct_mapping_soundspeed = 'none';
             end
@@ -110,7 +110,7 @@ end
 
             % map skull bone attenuation with the desired algorithm
             if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_attenuation')
-                pct_mapping_attenuation = parameters.pct.mapping_attenuation;
+                pct_mapping_attenuation = char(parameters.pct.mapping_attenuation);
             else
                 pct_mapping_attenuation = 'none';
             end
