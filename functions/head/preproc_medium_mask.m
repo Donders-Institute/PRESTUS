@@ -19,7 +19,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 % See also: HEAD_SMOOTH_AND_CROP, PREPROC_HEAD
 
 arguments
-    segmented_img (:,:,:) {mustBeNumeric}
+    segmented_img (:,:,:) {mustBeNumericOrLogical}
     parameters    (1,1) struct
 end
 

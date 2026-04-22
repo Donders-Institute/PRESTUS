@@ -35,7 +35,7 @@ arguments
     time_status_seq (1,:) struct
     parameters      (1,1) struct
     trans_pos       (1,:) {mustBeNumeric}
-    medium_masks    {mustBeNumeric}
+    medium_masks    {mustBeNumericOrLogical}
     CEM43           {mustBeNumeric}
     timeseries      (1,1) struct
     CEM43_iso       {mustBeNumeric} = []

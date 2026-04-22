@@ -35,10 +35,10 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 arguments
     parameters   (1,1) struct
     kwave_medium (1,1) struct
-    medium_masks (:,:,:) {mustBeNumeric}
+    medium_masks {mustBeNumericOrLogical}
     sensor_data  (1,1) struct
-    segmentation (:,:,:) {mustBeNumeric}
-    source_labels(:,:,:) {mustBeNumeric}
+    segmentation {mustBeNumericOrLogical}
+    source_labels{mustBeNumericOrLogical}
 end
 
     disp('Processing the results of acoustic simulations...')
@@ -259,7 +259,7 @@ end
                 highlighted_pos);
 
             output_plot = fullfile(parameters.io.output_dir, ...
-                sprintf('sub-%03d_%s_intensity%s_%s%s.png', ...
+                sprintf('sub-%03d_%s_intensity%s%s.png', ...
                 parameters.subject_id, ...
                 parameters.simulation.medium, ...
                 trans_suffix, ...

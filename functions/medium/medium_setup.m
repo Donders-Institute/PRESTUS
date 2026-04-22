@@ -37,7 +37,7 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 
 arguments
     parameters   (1,1) struct
-    medium_masks {mustBeNumeric}
+    medium_masks {mustBeNumericOrLogical}
     planimg      (1,1) struct
     pseudoCT     {mustBeNumeric} = []
 end

@@ -35,12 +35,12 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 arguments
     sensor_data  (1,1) struct
     parameters   (1,1) struct
-    segmentation (:,:) {mustBeNumeric}
-    medium_masks (:,:) {mustBeNumeric}
+    segmentation (:,:) {mustBeNumericOrLogical}
+    medium_masks (:,:) {mustBeNumericOrLogical}
     kwave_medium (1,1) struct
     kgrid        (1,1)
     source       (1,1) struct
-    source_labels(:,:) {mustBeNumeric}
+    source_labels(:,:) {mustBeNumericOrLogical}
 end
 
 %% convert 2d axisymmetry images to 3d

@@ -54,10 +54,10 @@ arguments
     kwave_medium        (1,1) struct
     source              (1,1) struct
     sensor              (1,1) struct
-    medium_masks        {mustBeNumeric}
+    medium_masks        {mustBeNumericOrLogical}
     filename_sensor_data(1,:) char
-    segmentation        {mustBeNumeric}
-    source_labels       {mustBeNumeric}
+    segmentation        {mustBeNumericOrLogical}
+    source_labels       {mustBeNumericOrLogical}
 end
 
     disp('Specifying and Starting acoustic simulations...')

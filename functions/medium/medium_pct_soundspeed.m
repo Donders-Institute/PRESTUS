@@ -33,7 +33,7 @@ arguments
     sound_speed {mustBeNumeric}
     density     {mustBeNumeric}
     pseudoCT    {mustBeNumeric}
-    skull_idx   {mustBeNumeric}
+    skull_idx   {mustBeNumericOrLogical}
     algorithm   (1,:) char {mustBeMember(algorithm, {'k-plan','marsac','aubry','none'})}
 end
 

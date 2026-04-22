@@ -30,7 +30,7 @@ arguments
     alpha_coeff {mustBeNumeric}
     alpha_power {mustBeNumeric}
     pseudoCT    {mustBeNumeric}
-    skull_idx   {mustBeNumeric}
+    skull_idx   {mustBeNumericOrLogical}
     algorithm   (1,:) char {mustBeMember(algorithm, {'k-plan','mueller','aubry','none'})}
 end
 

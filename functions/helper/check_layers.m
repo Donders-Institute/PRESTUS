@@ -24,7 +24,7 @@ function [parameters] = check_layers(parameters, segmentation)
 
 arguments
     parameters   (1,1) struct
-    segmentation {mustBeNumeric}
+    segmentation {mustBeNumericOrLogical}
 end
 
     % Get all non-negative segmentation values

@@ -35,9 +35,9 @@ arguments
     parameters      (1,1) struct
     results_heating (1,1) struct
     time_status_seq (1,:) struct
-    medium_masks    {mustBeNumeric}
+    medium_masks    {mustBeNumericOrLogical}
     highlighted_pos
-    segmentation    {mustBeNumeric}
+    segmentation    {mustBeNumericOrLogical}
 end
 
     disp('Processing the results of thermal simulations...')

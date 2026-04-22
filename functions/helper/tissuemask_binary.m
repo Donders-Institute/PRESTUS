@@ -20,7 +20,7 @@ function mask = tissuemask_binary(parameters, medium_masks)
 
 arguments
     parameters   (1,1) struct
-    medium_masks {mustBeNumeric}
+    medium_masks {mustBeNumericOrLogical}
 end
 
     labels = fieldnames(parameters.medium_properties);

@@ -60,7 +60,7 @@ arguments
     sensor       (1,1) struct
     source       (1,1) struct
     transf
-    medium_masks {mustBeNumeric}
+    medium_masks {mustBeNumericOrLogical}
 end
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %

@@ -37,13 +37,13 @@ arguments
     parameters       (1,1) struct
     planimg          (1,1) struct
     results_acoustic (1,1) struct
-    acoustic_Ipa     (:,:,:) {mustBeNumeric}
-    acoustic_MI      (:,:,:) {mustBeNumeric}
-    acoustic_pressure(:,:,:) {mustBeNumeric}
-    medium_masks     (:,:,:) {mustBeNumeric}
+    acoustic_Ipa     {mustBeNumeric}
+    acoustic_MI      {mustBeNumeric}
+    acoustic_pressure{mustBeNumeric}
+    medium_masks     {mustBeNumericOrLogical}
     results_heating  struct
     kwave_medium     (1,1) struct
-    highlighted_pos  (1,3) {mustBeNumeric}
+    highlighted_pos  (1,:) {mustBeNumeric}
 end
 
     if contains(parameters.simulation.medium, {'layered'; 'phantom'})

@@ -29,7 +29,7 @@ arguments
     parameters (1,1) struct
     density    {mustBeNumeric}
     pseudoCT   {mustBeNumeric}
-    skull_idx  {mustBeNumeric}
+    skull_idx  {mustBeNumericOrLogical}
     algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','none'})}
 end
 

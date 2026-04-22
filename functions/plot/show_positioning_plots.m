@@ -26,11 +26,11 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
 % See also: SHOW_3D_HEAD, PLOT_CORONAL_SLICES
 
     arguments
-        segmented_img_orig  (:,:,:) {mustBeNumeric}
+        segmented_img_orig  (:,:,:) {mustBeNumericOrLogical}
         t1_pixel_size       (1,1)   double
         trans_pos_orig      (:,3)   double
         focus_pos_orig      (:,3)   double
-        segmented_img_final (:,:,:) {mustBeNumeric}
+        segmented_img_final (:,:,:) {mustBeNumericOrLogical}
         trans_pos_final     (:,3)   double
         focus_pos_final     (:,3)   double
         parameters          (1,1)   struct
