@@ -358,6 +358,16 @@ function html = build_methods_boilerplate(parameters, is_layered)
             s = fallback;
         end
     end
+    function s = fmt_pml(val)
+        % Format PML size for report: scalar → '%d', vector → '[a b c]', non-numeric → as-is
+        if isnumeric(val) && ~any(isnan(val))
+            s = ['[' strtrim(num2str(val)) ']'];
+        elseif ischar(val) || isstring(val)
+            s = char(val);
+        else
+            s = '?';
+        end
+    end
     p  = @(text) sprintf('<p>%s</p>\n', text);
     b  = @(text) sprintf('<strong>%s</strong>', text);
     em = @(text) sprintf('<em>%s</em>', text);
@@ -367,7 +377,8 @@ function html = build_methods_boilerplate(parameters, is_layered)
     % ------------------------------------------------------------------ %
     grid_res  = safe_field(parameters.grid, 'resolution_mm', NaN);
     n_dims    = safe_field(parameters.grid, 'n_dims', 3);
-    pml       = safe_field(parameters.grid, 'pml_size', NaN);
+    pml       = safe_field(parameters.grid, 'pml_size_effective', ...
+                  safe_field(parameters.grid, 'pml_size', NaN));
     code_type = safe_field(parameters.simulation, 'code_type', 'MATLAB');
 
     % Transducer (first element)
@@ -488,7 +499,7 @@ function html = build_methods_boilerplate(parameters, is_layered)
         b(['Acoustic simulation and ' em('in situ') ' exposure estimates.']),   ...
         n_dims,                                                                 ...
         fmt(grid_res, '%.2g', '?'),                                            ...
-        fmt(pml, '%d', '?'),                                                   ...
+        fmt_pml(pml),                                                          ...
         medium_desc, seg_sentence, skull_sentence, props_sentence);
 
     % ------------------------------------------------------------------ %
@@ -762,9 +773,12 @@ function html = build_config_summary(parameters)
     if ~isempty(grid_dims)
         html = config_row(html, 'Grid dims', sprintf('[%s]', strtrim(sprintf('%g ', grid_dims))));
     end
-    pml = safe_field(parameters.grid, 'pml_size', NaN);
-    if ~isnan(pml)
-        html = config_row(html, 'PML size', sprintf('%d', pml));
+    pml = safe_field(parameters.grid, 'pml_size_effective', ...
+              safe_field(parameters.grid, 'pml_size', NaN));
+    if isnumeric(pml) && ~isnan(pml)
+        html = config_row(html, 'PML size', sprintf('[%s]', strtrim(num2str(pml))));
+    elseif ischar(pml) || isstring(pml)
+        html = config_row(html, 'PML size', char(pml));
     end
 
     % Transducer (first transducer)

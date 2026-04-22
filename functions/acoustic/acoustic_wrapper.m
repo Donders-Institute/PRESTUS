@@ -67,8 +67,28 @@ end
     % by k-Wave to the original grid dimensions; callers never see the PML voxels.
     % grid.pml_size may be a positive integer or the string 'auto' (k-Wave selects
     % the optimal size for FFT efficiency; only valid with PMLInside=false).
+    %
+    % Resolve 'auto' to the actual size via getOptimalPMLSize so the effective
+    % value is available for reporting and reproducibility.
+    if ischar(parameters.grid.pml_size) && strcmp(parameters.grid.pml_size, 'auto')
+        axisym = isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1;
+        if axisym
+            effective_pml = getOptimalPMLSize(kgrid, [], 'WSWA');
+        else
+            effective_pml = getOptimalPMLSize(kgrid);
+        end
+        parameters.grid.pml_size_effective = effective_pml;
+        fprintf('PML size (auto-selected): [%s]\n', num2str(effective_pml));
+    else
+        effective_pml = parameters.grid.pml_size;
+        parameters.grid.pml_size_effective = effective_pml;
+    end
+
+    % Pass the resolved integer vector so k-Wave uses exactly the same PML
+    % that is recorded in pml_size_effective (passing 'auto' would let k-Wave
+    % resolve it independently, risking a mismatch with our stored value).
     kwave_input_args = struct('PMLInside', false, ...
-        'PMLSize', parameters.grid.pml_size, ...
+        'PMLSize', effective_pml, ...
         'PlotPML', true);
 
     if contains(parameters.simulation.medium, {'layered'}) && ...

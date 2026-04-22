@@ -53,7 +53,24 @@ print_if_field(grid, 'n_dims', '%dD');
 print_if_field(grid, 'resolution_mm', '%.2f mm');
 print_flag(grid, 'axisymmetric');
 print_if_field(grid, 'default_dims', '%s');
-print_if_field(grid, 'pml_size', '%d');
+% Report effective PML if resolved (auto), otherwise the configured value
+if isfield(grid, 'pml_size_effective')
+    pml_val = grid.pml_size_effective;
+    if isnumeric(pml_val)
+        fprintf('  pml_size (effective): [%s]\n', strtrim(num2str(pml_val)));
+    else
+        fprintf('  pml_size (effective): %s\n', char(pml_val));
+    end
+else
+    pml_raw = get_struct_or_default(grid, 'pml_size', []);
+    if ~isempty(pml_raw)
+        if isnumeric(pml_raw)
+            fprintf('  pml_size: %d\n', pml_raw);
+        else
+            fprintf('  pml_size: %s\n', char(pml_raw));
+        end
+    end
+end
 print_if_field(grid, 'max_expand', '%.1f');
 fprintf('\n');
 
