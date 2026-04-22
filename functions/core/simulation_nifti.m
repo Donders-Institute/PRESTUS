@@ -1,5 +1,6 @@
-function simulation_nifti(parameters, planimg, results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, ...
-                         medium_masks, results_heating, kwave_medium, highlighted_pos)
+function simulation_nifti(parameters, planimg, results_acoustic, ...
+    acoustic_Ipa, acoustic_MI, acoustic_pressure, medium_masks, ...
+    results_heating, kwave_medium, highlighted_pos)
 % SIMULATION_NIFTI  Export k-Wave simulation results to NIfTI in native and MNI space
 %
 % For layered and phantom media, writes compressed NIfTI files for each
@@ -40,7 +41,7 @@ arguments
     acoustic_MI      (:,:,:) {mustBeNumeric}
     acoustic_pressure(:,:,:) {mustBeNumeric}
     medium_masks     (:,:,:) {mustBeNumeric}
-    results_heating  (1,1) struct
+    results_heating  struct
     kwave_medium     (1,1) struct
     highlighted_pos  (1,3) {mustBeNumeric}
 end

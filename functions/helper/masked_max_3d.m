@@ -21,7 +21,7 @@ function [val, Ix, Iy, Iz] = masked_max_3d(array_3d, mask)
 
 arguments
     array_3d {mustBeNumeric}
-    mask     {mustBeNumeric}
+    mask     {mustBeNumericOrLogical}
 end
 
     % Exclude values outside the mask by setting them to NaN

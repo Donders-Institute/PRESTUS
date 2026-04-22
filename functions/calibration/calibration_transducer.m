@@ -64,9 +64,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     % if a subfolder is requested, move outputs to subfolders
     if parameters.path.subject_subfolder
-        parameters.io.outputs_folder = sprintf('%s/sub-%03d', parameters.path.sim, sim_id);
+        parameters.io.outputs_folder = fullfile(parameters.path.sim, sprintf('sub-%03d', sim_id));
     else
-        parameters.io.outputs_folder = sprintf('%s', parameters.path.sim);
+        parameters.io.outputs_folder = parameters.path.sim;
     end
 
     % Copy calibration settings to relevant entries in simulation config
@@ -102,8 +102,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     %% Load initial results
 
-    initial_res = load(sprintf('%s/cache/sub-%03d_water_results%s.mat', ...
-        sim_param.io.outputs_folder, sim_id, sim_param.io.output_affix));
+    initial_res = load(fullfile(sim_param.io.outputs_folder, 'cache', ...
+        sprintf('sub-%03d_water_results%s.mat', sim_id, sim_param.io.output_affix)));
 
     initial_params = initial_res.acoustic_info.parameters;
     initial_params.calibration.prefix = 'Initial_';
@@ -169,8 +169,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     prestus_pipeline_start(opt_param);
 
     %% Load optimized simulation results
-    opt_res = load(sprintf('%s/cache/sub-%03d_water_results%s.mat', ...
-        opt_param.io.outputs_folder, sim_id, opt_param.io.output_affix));
+    opt_res = load(fullfile(opt_param.io.outputs_folder, 'cache', ...
+        sprintf('sub-%03d_water_results%s.mat', sim_id, opt_param.io.output_affix)));
 
     opt_params = opt_res.acoustic_info.parameters;
     opt_params.calibration.prefix = 'Opt_';

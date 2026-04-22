@@ -30,9 +30,9 @@ function [parameters, segmentation, bone, medium_masks] = ...
 
 arguments
     parameters   (1,1) struct
-    segmentation (:,:) {mustBeNumeric}
-    bone         (:,:) {mustBeNumeric}
-    medium_masks (:,:) {mustBeNumeric}
+    segmentation {mustBeNumericOrLogical}
+    bone         {mustBeNumericOrLogical}
+    medium_masks {mustBeNumericOrLogical}
 end
     if numel(parameters.transducer(1).focus_pos) == 2 && ...
             isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1

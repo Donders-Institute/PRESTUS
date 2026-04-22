@@ -397,11 +397,11 @@ function [parameters] = prestus_pipeline(parameters, options)
             warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
             parameters.state.heating_available = 0;
             parameters.modules.run_thermal_analysis = 0;
-            results_heating = [];
+            results_heating = struct();
         end
     else
         parameters.state.heating_available = 0;
-        results_heating = [];
+        results_heating = struct();
     end
     log_timer('stop','thermal');
 

@@ -28,8 +28,9 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
     end
 
     % Ensure temporary directory exists for intermediate files
-    if ~exist(sprintf('%s/tmp/', outputs_path), 'dir')
-        mkdir(sprintf('%s/tmp/', outputs_path));
+    tmp_path = fullfile(outputs_path, 'tmp');
+    if ~exist(tmp_path, 'dir')
+        mkdir(tmp_path);
     end
 
     % Loop through each subject in the subject list
@@ -54,16 +55,16 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
             'FontSize', options.font_size, 'BoxOpacity', 0, 'TextColor', 'white');
 
         % Save the modified image to the temporary directory
-        new_name = sprintf('%s/tmp/%i.png', outputs_path, subject_list(subject_i));
+        new_name = fullfile(tmp_path, sprintf('%i.png', subject_list(subject_i)));
         imwrite(I, new_name);
     end
 
     % Combine all modified images into a single montage using the `montage` command-line tool
-    system(sprintf('cd "%s/tmp/"; montage -background black -gravity south -mode concatenate $(ls -1 *.png | sort -g) ../all_%s.png', ...
-        convertCharsToStrings(outputs_path), suffix));
+    system(sprintf('cd "%s"; montage -background black -gravity south -mode concatenate $(ls -1 *.png | sort -g) ../all_%s.png', ...
+        tmp_path, suffix));
 
     % Clean up temporary files and remove the temporary directory
-    system(sprintf('cd "%s/tmp/"; rm *.png', outputs_path));
-    rmdir(sprintf('%s/tmp/', outputs_path));
+    system(sprintf('cd "%s"; rm *.png', tmp_path));
+    rmdir(tmp_path);
 end
 

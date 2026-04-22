@@ -45,7 +45,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 % See also: PREPROC_HEAD, PREPROC_CROP_GRID
 
     arguments
-        nii_image      (:,:,:) {mustBeNumeric}
+        nii_image (:,:,:) {mustBeNumericOrLogical}
         nii_header     (1,1) struct
         trans_pos_grid (1,3) double
         focus_pos_grid (1,3) double

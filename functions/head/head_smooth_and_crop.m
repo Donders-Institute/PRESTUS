@@ -31,8 +31,8 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     arguments
         parameters     (1,1) struct
-        segmentation   (:,:,:) {mustBeNumeric}
-        bone_img       (:,:,:) {mustBeNumeric}
+        segmentation   (:,:,:) {mustBeNumericOrLogical}
+        bone_img       (:,:,:) {mustBeNumericOrLogical}
         trans_pos_grid (1,:)   double
         focus_pos_grid (1,:)   double
     end

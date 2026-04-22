@@ -42,7 +42,7 @@ arguments
     max_sound_speed (1,1) {mustBeNumeric, mustBePositive}
     trans_pos_final (1,:) {mustBeNumeric}
     focus_pos_final (1,:) {mustBeNumeric}
-    grid_time_step  (1,1) {mustBeNumeric} = []
+    grid_time_step  {mustBeNumeric} = []
     min_sound_speed (1,1) {mustBeNumeric} = []
 end
 
