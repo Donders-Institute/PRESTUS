@@ -72,8 +72,12 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
             parameters.path.seg);
 
         % execute simnibs call in segmentation directory
-        full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s/%s" | %s', ...
-            parameters.path.seg, parameters.startup.simnibs_bin_path, segment_call, qsub_call);
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        % Anchor the replacement to the start of segment_call so that 'charm'
+        % appearing inside T1/T2 paths (e.g. /home/user/charm_study/...) isn't mangled.
+        segment_call_full = regexprep(segment_call, '^charm\b', charm_path);
+        full_cmd = sprintf('cd "%s"; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s" | %s', ...
+            parameters.path.seg, segment_call_full, qsub_call);
         
         % 3) submit segmentation job
         fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -107,7 +111,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         % Add segmentation call
         fprintf(fid, 'cd %s\n', parameters.path.seg);
         fprintf(fid, 'charm --version\n');
-        fprintf(fid, '%s\n', [parameters.startup.simnibs_bin_path, '/', segment_call]);
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
+        segment_call_full = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
+        fprintf(fid, '%s\n', segment_call_full);
         fclose(fid);
     
         % Ensure script is executable
@@ -131,8 +138,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
             error('simnibs_bin_path required for local execution');
         end
         
-        % Use FULL PATH to charm (don't rely on PATH)
-        full_segment_call = sprintf('%s/%s', parameters.startup.simnibs_bin_path, segment_call);
+        % Use FULL PATH to charm (don't rely on PATH).
+        % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
+        charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
+        full_segment_call = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
         fprintf('Full command: %s\n', full_segment_call);
         
         orig_dir = pwd;
