@@ -22,6 +22,9 @@ load_parameters
 [source setup]          modules.run_source_setup
       │                 Construct k-Wave source from transducer geometry
       ▼
+[amplitude calibration] modules.run_amplitude_calibration  (default: off)
+      │                 Fast water sim → scale elem_amp to target pressure
+      ▼
 [acoustic simulation]   modules.run_acoustic_sims
       │                 k-Wave pressure field simulation
       ▼
@@ -55,6 +58,7 @@ load_parameters
 | Add thermal simulation to completed acoustic run | `modules.run_heating_sims = 1`; all others can remain `1` |
 | Regenerate analysis outputs only | `run_acoustic_sims = 0`, `run_heating_sims = 0` |
 | Skip free-water reference | `modules.run_posthoc_water_sims = 0` |
+| Scale to a target free-water ISPPA | `modules.run_amplitude_calibration = 1`, `calibration.target_isppa_wcm2: 30` |
 
 > **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`. If they do not exist, disabling an upstream module while enabling a downstream one will error.
 

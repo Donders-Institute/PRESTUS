@@ -203,3 +203,77 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 2. **YAML** (`<equipment_name>-F<focal_depth>mm-I<intensity>wpercm2.yaml`) — the full `transducer` parameter struct with optimized phases and amplitude, ready to be merged into a PRESTUS study config.
 
 ![calibration_optimized_analytical](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_optimized_analytical.png)
+
+---
+
+## In-pipeline amplitude calibration
+
+**Function: `calibration_amplitude_scaling`**
+
+### Purpose and scope
+
+This is a lightweight amplitude normalization step that runs *inside* the main simulation pipeline. It answers a different question than `calibration_transducer`:
+
+| | `calibration_transducer` | `calibration_amplitude_scaling` |
+|---|---|---|
+| **When** | Once per transducer/depth/intensity, before any study | Every pipeline run (optional) |
+| **What is optimized** | Phases **and** amplitude | Amplitude only |
+| **Input** | Empirical hydrophone profile + target intensity [W/cm²] | Target peak free-water pressure [MPa] |
+| **Output** | Calibrated YAML config ready for study use | `elem_amp` scaled in-place; pipeline continues |
+| **Typical use** | Build a calibration library | Normalize a subject simulation to a specific free-water pressure |
+
+Use `calibration_transducer` first to obtain calibrated phases and an initial amplitude. Then, if you want to run the full pipeline at a *specific free-water peak pressure* (e.g., 0.5 MPa), enable `calibration_amplitude_scaling` to fine-tune the amplitude automatically.
+
+### How it works
+
+1. A homogeneous water simulation is run using the current `kgrid`, `source`, and `sensor` (after source setup but before the main acoustic simulation). The backend is forced to `matlab_cpu` regardless of the main simulation's `code_type`.
+2. The peak pressure across all sensor points is measured: `peak_pa = max(sensor_data.p_max_all)`.
+3. A linear scale factor is computed: `scale = target_pa / peak_pa`.
+4. `elem_amp` in all configured transducers is multiplied by `scale`.
+5. The main acoustic simulation proceeds with the scaled amplitude.
+
+The scaling is linear because k-Wave solves the linear wave equation: doubling `elem_amp` doubles peak pressure. No analytical model or phase fitting is involved — the peak is read directly from the simulation, so no `simulated_analytical_scaling` correction is required (unlike `calibration_transducer`, which derives amplitude indirectly via the O'Neil analytical solution).
+
+### Prerequisites
+
+- Phases must already be set correctly in the config (e.g., loaded from a `calibration_transducer` output YAML).
+- `modules.run_source_setup` must be enabled (the calibration water sim reuses the source built in that stage).
+- The sensor mask must cover the focal region so that `max(sensor_data.p_max_all)` captures the true focal peak. This is guaranteed when using the standard PRESTUS sensor setup.
+
+### Configuration
+
+In your study config (or default_config.yaml):
+
+```yaml
+calibration:
+  target_isppa_wcm2: 30   # Target free-water ISPPA [W/cm²]
+
+modules:
+  run_amplitude_calibration: 1   # Enable in-pipeline amplitude calibration
+```
+
+`calibration.target_isppa_wcm2` is required when `run_amplitude_calibration = 1`. The pipeline will error if it is not set.
+
+The target intensity is converted to a peak pressure internally via $p = \sqrt{2 \cdot I \cdot 10^4 \cdot \rho \cdot c}$ using water properties from `medium_properties.water`.
+
+### Output
+
+The calibration step writes two fields back into `parameters.calibration`:
+
+| Field | Description |
+|---|---|
+| `calibration.measured_isppa_wcm2` | Free-water ISPPA measured at the current `elem_amp` before scaling [W/cm²] |
+| `calibration.amplitude_scale_factor` | The multiplicative factor applied to `elem_amp` |
+
+Both fields are available to the simulation report for traceability.
+
+### Runtime cost
+
+The calibration water simulation runs with `matlab_cpu` and uses a homogeneous medium (no tissue mapping), so it is substantially faster than the main simulation. On a typical workstation it adds a few minutes. On HPC, it runs locally on the submission node before the main job is dispatched — set `simulation.code_type` to a GPU or C++ backend for the main sim without concern; the calibration always uses CPU.
+
+### Relationship to `calibration_transducer`
+
+The typical workflow is:
+
+1. **Once per transducer/depth setup**: Run `calibration_transducer` to obtain optimized phases and an initial amplitude at a reference intensity. The output YAML encodes `elem_phase_deg` and `elem_amp`.
+2. **Per subject simulation**: Load the calibration YAML into your study config (overrides default `elem_amp` and `elem_phase_deg`). Enable `run_amplitude_calibration = 1` and set `calibration.target_isppa_wcm2` to fine-tune the amplitude to the exact free-water pressure you want for that simulation.

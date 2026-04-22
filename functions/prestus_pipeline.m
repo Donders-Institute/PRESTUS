@@ -97,6 +97,26 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
 
     % ====================================================================
+    %% TRANSDUCER PLACEMENT
+    % ====================================================================
+    % Resolve trans_pos / focus_pos via manual config, Localite XML, or
+    % heuristic sphere-expansion search. Skipped when placement.mode is
+    % absent or 'manual' (positions already in parameters).
+
+    fprintf('========================================\n');
+    fprintf('TRANSDUCER PLACEMENT \n');
+    fprintf('========================================\n\n');
+    log_timer('start','placement', parameters.io.output_dir);
+
+    if ~isfield(parameters.modules, 'run_transducer_placement') || ...
+            parameters.modules.run_transducer_placement == 1
+        parameters = preproc_transducer_placement(parameters);
+    else
+        disp('Transducer placement stage skipped.');
+    end
+    log_timer('stop','placement');
+
+    % ====================================================================
     %% GRID: PREPROCESS structural MRI & POSITION transducer + target
     % ====================================================================
     % reorient image, determine transducer & target position in image
@@ -207,6 +227,22 @@ function [parameters] = prestus_pipeline(parameters, options)
         disp('No source setup requested...no simulations will be performed.')
     end
     log_timer('stop', 'source');
+
+
+    % ====================================================================
+    %% AMPLITUDE CALIBRATION (optional free-water pressure scaling)
+    % ====================================================================
+    % Runs a fast water simulation with the current source, measures peak
+    % pressure at the sensor, and linearly scales elem_amp to hit
+    % calibration.target_pressure_mpa. Active when modules.run_amplitude_calibration = 1.
+
+    if isfield(parameters.modules, 'run_amplitude_calibration') && ...
+            parameters.modules.run_amplitude_calibration == 1 && ...
+            (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
+        log_timer('start', 'calibration', parameters.io.output_dir);
+        parameters = calibration_amplitude_scaling(parameters, kgrid, source, sensor);
+        log_timer('stop', 'calibration');
+    end
 
     % ====================================================================
     %% ACOUSTIC SIMULATION
