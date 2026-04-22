@@ -293,6 +293,11 @@ end
         error('Platform ''%s'' is not supported for automatic pseudoCT generation.', platform);
     end
 
+    % Write a JSON sidecar alongside pseudoCT.nii.gz recording the generation parameters.
+    % A JSON sidecar (BIDS convention) is used because NIfTI-1 headers have only 80 bytes
+    % for free-text metadata — insufficient for structured provenance.
+    write_pct_sidecar(path_pct_out, parameters, skull_mapping);
+
 end
 
 % ── Helper: quote a string for safe bash -c argument passing ─────────────
@@ -312,4 +317,35 @@ function pct_poll_for_file(filepath, max_checks)
         pause(20);
     end
     warning('File %s not found after %d checks.', filepath, max_checks);
+end
+
+% ── Helper: write pseudoCT.json sidecar with generation provenance ────────
+function write_pct_sidecar(pct_dir, parameters, skull_mapping)
+    sidecar_path = fullfile(pct_dir, 'pseudoCT.json');
+    fid = fopen(sidecar_path, 'w');
+    if fid == -1
+        warning('Could not write pseudoCT.json to %s', pct_dir);
+        return;
+    end
+
+    get_val = @(s, f, def) deal(iif(isfield(s, f) && ~isempty(s.(f)), s.(f), def));
+
+    mapping_density    = get_val(parameters.pct, 'mapping_density',    'unknown');
+    mapping_soundspeed = get_val(parameters.pct, 'mapping_soundspeed', 'unknown');
+    mapping_atten      = get_val(parameters.pct, 'mapping_attenuation','unknown');
+
+    fprintf(fid, '{\n');
+    fprintf(fid, '  "SkullMapping": "%s",\n',          skull_mapping);
+    fprintf(fid, '  "MappingDensity": "%s",\n',         mapping_density);
+    fprintf(fid, '  "MappingSoundSpeed": "%s",\n',      mapping_soundspeed);
+    fprintf(fid, '  "MappingAttenuation": "%s",\n',     mapping_atten);
+    fprintf(fid, '  "GenerationDate": "%s",\n',         char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+    fprintf(fid, '  "SubjectID": %d\n',                 parameters.subject_id);
+    fprintf(fid, '}\n');
+    fclose(fid);
+    fprintf('pseudoCT.json written to %s\n', sidecar_path);
+end
+
+function val = iif(cond, a, b)
+    if cond; val = a; else; val = b; end
 end
