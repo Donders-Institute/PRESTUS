@@ -506,10 +506,6 @@ function [parameters] = prestus_pipeline(parameters, options)
         water_parameters.simulation.debug = 0;
         % run with the same grid dimension as the real simulation
         water_parameters.grid.default_dims = water_parameters.grid.dims;
-        % restore subject-specific path to original path if done earlier in this function
-        if isfield(water_parameters.io,'subject_subfolder') && water_parameters.path.subject_subfolder == 1
-            water_parameters.io.output_dir = fileparts(water_parameters.io.output_dir);
-        end
         % inherit submit medium from main pipeline
         water_parameters.hpc.timelimit = '05:00:00';
         water_parameters.hpc.memorylimit = 40;

@@ -88,14 +88,9 @@ for subject_i = 1:length(full_subject_list)
     subject_id = full_subject_list(subject_i);
 
     % -- Setup subject-specific directory and prefix logic --
-    if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-        subject_dir    = sprintf('sub-%03d', subject_id);
-        file_base      = sprintf('sub-%03d', subject_id);
-        data_dir       = fullfile(outputs_path, subject_dir);
-    else
-        file_base      = sprintf('sub-%03d', subject_id);
-        data_dir       = outputs_path;
-    end
+    subject_dir = sprintf('sub-%03d', subject_id);
+    file_base   = sprintf('sub-%03d', subject_id);
+    data_dir    = fullfile(outputs_path, subject_dir);
 
     fprintf('Subject %i, first pass\n', subject_id)
 
@@ -228,14 +223,9 @@ subject_list(isnan(subject_list)) = [];
 for subject_i = 1:length(subject_list)
     subject_id = subject_list(subject_i);
 
-    if isfield(parameters, 'io') && isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-        subject_dir    = sprintf('sub-%03d', subject_id);
-        file_base      = sprintf('sub-%03d', subject_id);
-        data_dir       = fullfile(outputs_path, subject_dir);
-    else
-        file_base      = sprintf('sub-%03d', subject_id);
-        data_dir       = outputs_path;
-    end
+    subject_dir = sprintf('sub-%03d', subject_id);
+    file_base   = sprintf('sub-%03d', subject_id);
+    data_dir    = fullfile(outputs_path, subject_dir);
 
     fprintf('Subject %i, second pass\n', subject_id)
 

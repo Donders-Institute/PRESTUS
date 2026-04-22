@@ -154,10 +154,7 @@ load_defaults();
         edt(gl, 8, 2, 'path.localite', '', 0);
         brw(gl, 8, 4, 'path.localite', 'dir');
 
-        lbl(gl, 9, 1, 'Subject subfolder');
-        chk(gl, 9, 2, 'path.subject_subfolder', true, 'Create per-subject output subfolder');
-
-        lbl(gl, 10, 1, 'T1 filename pattern');
+        lbl(gl, 9, 1, 'T1 filename pattern');
         edt(gl, 10, 2, 'path.t1_pattern', 'sub-%1$03d_T1w.nii*', 0);
         note_lbl(gl, 11, 'Relative to path.anat. Use %1$03d for subject ID substitution.');
 
@@ -1209,11 +1206,7 @@ load_defaults();
             if isfield(params, 'subject_id') && isnumeric(params.subject_id) && ~isnan(params.subject_id)
                 sub_id = params.subject_id;
             end
-            if isfield(params.path, 'subject_subfolder') && params.path.subject_subfolder
-                params.io.output_dir = fullfile(params.path.sim, sprintf('sub-%03d', sub_id));
-            else
-                params.io.output_dir = params.path.sim;
-            end
+            params.io.output_dir = fullfile(params.path.sim, sprintf('sub-%03d', sub_id));
         end
     end
 

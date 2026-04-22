@@ -9,7 +9,7 @@ function output_dir = get_output_dir(parameters)
 %   output_dir = get_output_dir(parameters)
 %
 % Input:
-%   parameters - PRESTUS config with path.sim, path.subject_subfolder, and subject_id
+%   parameters - PRESTUS config with path.sim and subject_id
 %
 % Output:
 %   output_dir - resolved output directory path
@@ -29,10 +29,5 @@ end
              'Set parameters.path.sim to the simulation output directory before calling the pipeline.']);
     end
 
-    if parameters.path.subject_subfolder == 1
-        output_dir = fullfile(parameters.path.sim, ...
-            sprintf('sub-%03d', parameters.subject_id));
-    else
-        output_dir = parameters.path.sim;
-    end
+    output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', parameters.subject_id));
 end

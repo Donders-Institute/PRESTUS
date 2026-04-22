@@ -90,9 +90,7 @@ end
     if isfield(parameters.path, 'localite') && ...
             (isstring(parameters.path.localite) || ischar(parameters.path.localite)) && ...
             ~any(strcmp(parameters.path.localite, {"", ''}))
-        if isfield(parameters.path, 'subject_subfolder') && parameters.path.subject_subfolder == 1
-            parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
-        end
+        parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
         if ~exist(parameters.path.localite); mkdir(parameters.path.localite); end
     end
 

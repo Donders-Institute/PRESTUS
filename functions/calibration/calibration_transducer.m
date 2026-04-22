@@ -62,12 +62,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     end
     disp(['Saving free-water calibration in ', parameters.path.sim]);
 
-    % if a subfolder is requested, move outputs to subfolders
-    if parameters.path.subject_subfolder
-        parameters.io.outputs_folder = fullfile(parameters.path.sim, sprintf('sub-%03d', sim_id));
-    else
-        parameters.io.outputs_folder = parameters.path.sim;
-    end
+    parameters.io.outputs_folder = fullfile(parameters.path.sim, sprintf('sub-%03d', sim_id));
 
     % Copy calibration settings to relevant entries in simulation config
     sim_param = parameters;

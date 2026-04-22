@@ -35,7 +35,9 @@ path:
   t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
   t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
   localite: ''          # Path to Localite neuronavigation output folder
-  subject_subfolder: 1  # Should each participant's output be stored in a separate folder?
+  pct: ''               # Base output directory for pseudoCT files. Leave empty to write pseudoCT
+                        # outputs into the SimNIBS m2m folder (path.seg/m2m_sub-NNN/). When set,
+                        # outputs go to path.pct/sub-NNN/ using the PRESTUS subject naming.
 
 #------------ Startup (environment & toolbox paths)
 

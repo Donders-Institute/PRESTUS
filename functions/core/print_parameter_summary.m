@@ -62,7 +62,7 @@ if isfield(grid, 'pml_size_effective')
         fprintf('  pml_size (effective): %s\n', char(pml_val));
     end
 else
-    pml_raw = get_struct_or_default(grid, 'pml_size', []);
+    pml_raw = getfield_or_default(grid, 'pml_size', []);
     if ~isempty(pml_raw)
         if isnumeric(pml_raw)
             fprintf('  pml_size: %d\n', pml_raw);

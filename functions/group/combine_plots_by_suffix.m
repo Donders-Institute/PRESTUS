@@ -36,11 +36,7 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
     % Loop through each subject in the subject list
     for subject_i = 1:length(subject_list)
         % Determine the path to the subject's output directory
-        if parameters.path.subject_subfolder
-            sub_path = fullfile(outputs_path, sprintf('sub-%03i', subject_list(subject_i)));
-        else
-            sub_path = fullfile(outputs_path);
-        end
+        sub_path = fullfile(outputs_path, sprintf('sub-%03i', subject_list(subject_i)));
 
         % Construct the filename of the subject's plot
         old_name = fullfile(sub_path, sprintf('sub-%03i_%s.png', subject_list(subject_i), suffix));
