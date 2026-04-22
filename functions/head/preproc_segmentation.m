@@ -52,17 +52,34 @@ end
     % Run segmentation (if necessary)
     if confirm_overwriting(filename_segmented, parameters) && ...
        (~isfield(parameters.io,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ~exist(filename_segmented,'file'))
-        if parameters.pct.enabled == 1
-            % Note: This could be improved by allowing to specify a UTE/CT path in the config...
-            warning("SimNIBS integration not supported when requesting pseudoCT. Please ensure SimNIBS has been run.");
-        end
 
         if parameters.simulation.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
             segmentation_run(parameters.path.anat, parameters.subject_id, filename_t1, filename_t2, parameters);
             parameters = simnibs_version(segmentation_folder, parameters);
+            if parameters.pct.enabled == 1
+                if isempty(filename_t2)
+                    error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
+                end
+                disp('Starting pseudoCT generation...');
+                pct_create_pCT_run(parameters);
+            end
             return;
         end
     else
         disp('Segmentation available...');
         parameters = simnibs_version(segmentation_folder, parameters);
+        if parameters.pct.enabled == 1
+            filename_pseudoCT = fullfile(segmentation_folder, 'pseudoCT.nii.gz');
+            if exist(filename_pseudoCT, 'file')
+                disp('pseudoCT available...');
+            else
+                if isempty(filename_t2)
+                    error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
+                end
+                disp('pseudoCT not found — generating from UTE image...');
+                pct_create_pCT_run(parameters);
+            end
+        end
     end
+
+end

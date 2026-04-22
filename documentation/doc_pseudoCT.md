@@ -27,13 +27,32 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
 
 2. **pseudoCT generation**. 
 
-Run `pct_create_pseudoCT.sh` in bash. An example script to create a pseudoCT is provided at `examples/createPseudoCT.sh`. To run the code you will need to install (or load the following modules):
+    **Dependencies.** pseudoCT generation requires **FSL** (`fslmaths`), **ANTs** (`N4BiasFieldCorrection`, `SmoothImage`), and **MATLAB** on `PATH`. Set `startup.fsl_bin_path` and `startup.ants_bin_path` in your config so PRESTUS can prepend these to `PATH` at runtime. On HPC, also set `startup.matlab_bin_path`.
 
-- SimNIBS
-- FSL
-- ANTs
+    **Automated (default).** When `pct.enabled = 1`, PRESTUS calls `pct_create_pseudoCT.sh` automatically after SimNIBS segmentation — but only if `pseudoCT.nii.gz` is not already present in the `m2m_sub-XXX/` folder. The UTE image is identified via `path.t2_pattern` (the same field used to pass it as the second SimNIBS input). The resulting `pseudoCT.nii.gz` and `tissues_mask.nii.gz` are deposited in `m2m_sub-XXX/`.
 
-The pseudoCT and an associated mask file will be deposited in the `m2m` folder alongside the SimNIBS segmentation. 
+    Minimum config to enable the fully automated workflow:
+    ```yaml
+    path:
+      t2_pattern: 'sub-%1$03d_UTE.nii.gz'  # UTE image (used for both SimNIBS and pseudoCT)
+
+    startup:
+      fsl_bin_path: '/opt/fsl/bin'           # prepended to PATH for fslmaths
+      ants_bin_path: '/opt/ants/bin'          # prepended to PATH for N4BiasFieldCorrection, SmoothImage
+      matlab_bin_path: '/opt/matlab/R2024a/bin/matlab'  # required on HPC; local falls back to matlabroot
+
+    pct:
+      enabled: 1
+      skull_mapping: 'kosciessa' # UTE→HU linear mapping algorithm
+      debug: 1                   # keep intermediate images in pseudoCT/ subfolder
+      mapping_density: 'k-plan'
+      mapping_soundspeed: 'k-plan'
+      mapping_attenuation: 'k-plan'
+    ```
+
+    **Manual fallback.** If `pseudoCT.nii.gz` already exists in the `m2m_sub-XXX/` folder when the pipeline runs, generation is skipped automatically. You can also run `pct_create_pseudoCT.sh` directly in bash before starting PRESTUS. An example wrapper is provided at `examples/createPseudoCT.sh`. Required modules: SimNIBS, FSL, ANTs.
+
+
 
 #### pseudoCT generation
 

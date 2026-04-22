@@ -1,4 +1,4 @@
-function pct_skullmapping(subject_id, base_path)
+function pct_skullmapping(simnibs_path, path_pct)
 % PCT_SKULLMAPPING  Compute pseudo-CT mapping for cortical and trabecular bone from UTE histograms
 %
 % Analyses UTE image histograms for cortical and trabecular bone,
@@ -7,22 +7,21 @@ function pct_skullmapping(subject_id, base_path)
 % to the subject folder.
 %
 % Use as:
-%   pct_skullmapping(subject_id, base_path)
+%   pct_skullmapping(simnibs_path, path_pct)
 %
 % Input:
-%   subject_id - subject identifier string
-%   base_path  - path to the subject's m2m folder
+%   simnibs_path - path to the subject's m2m folder (e.g. .../m2m_sub-009)
+%   path_pct     - path to the pseudoCT working directory
 %
 % See also: PCT_SOFT_TISSUE_PEAK, FIT_PAIRWISELINEAR, PCT_SKULLEXPAND
 
 arguments
-    subject_id (1,:) char
-    base_path  (1,:) char
+    simnibs_path (1,:) char
+    path_pct     (1,:) char
 end
 
     %% Load UTE image and tissue mask
-    subject_folder = fullfile(base_path, sprintf('m2m_sub-%03s', subject_id));
-    ute_file = fullfile(subject_folder, 'UTE_reg_thr0_corr_norm.nii.gz');
+    ute_file = fullfile(path_pct, 'UTE_STnorm.nii.gz');
     ute_corr = niftiread(ute_file);
 
     % Hard-coded SimNIBS labels for tissue types
@@ -31,7 +30,7 @@ end
     idx_air = 0; % Air
 
     % Load tissue mask
-    mask_file = fullfile(subject_folder, 'final_tissues.nii.gz');
+    mask_file = fullfile(simnibs_path, 'final_tissues.nii.gz');
     mask_corr = niftiread(mask_file);
 
     %% Extract UTE values for each tissue type
@@ -217,16 +216,13 @@ end
         legend('boxoff')
 
     figureName = ['pCT_skull_mapping'];
-    saveas(h, fullfile(subject_folder, 'pseudoCT', figureName), 'png');
-    
+    saveas(h, fullfile(path_pct, figureName), 'png');
+
     %% Export values to text
-    
-    % saves coefficients in txt file in m2m folder
     fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(b)]);
 
-    txt_file = fopen(fullfile(subject_folder, 'pseudoCT', 'pCT_skull_mapping.txt'), 'w');
+    txt_file = fopen(fullfile(path_pct, 'pCT_skull_mapping.txt'), 'w');
     fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(b));
     fclose(txt_file);
 
-    exit;
 end

@@ -5,8 +5,9 @@
 # Example usage:
 # pct_create_pseudoCT "001" "${rootpath}/data/simnibs" "/opt/matlab/R2022b/bin/matlab" "kosciessa" "1"
 
-function pct_create_pseudoCT() 
+function pct_create_pseudoCT()
 {
+    set -eo pipefail    # abort on any error or pipe failure
     echo "starting pseudoCT creation"
 
     local sub_id="$1"        # Subject ID (without 'sub-')
@@ -23,9 +24,7 @@ function pct_create_pseudoCT()
 
     # create dedicated pCT directory for intermediate backups under the SimNIBS path
     path_pct="${path_simnibs}/pseudoCT"
-    if [ ! -d $path_pct ]; then
-        mkdir "$path_pct"
-    fi
+    mkdir -p "$path_pct"
 
     # Create a log
     exec > >(tee -a "${path_pct}/pct_create_${sub_id}_$(date +%Y%m%d_%H%M%S).log") 2>&1
@@ -33,7 +32,6 @@ function pct_create_pseudoCT()
     echo "=== PCT Creation Log ==="
     echo "Date: $(date)"
     echo "Subject: $sub_id"
-    echo "Log dir: $log_date_dir"
     echo "Starting pseudoCT creation"
     echo "SimNIBS path: $path_simnibs"
     echo "pCT path: $path_pct"
@@ -80,7 +78,7 @@ function pct_create_pseudoCT()
     echo "========================================================================="
 
     # Create a binary skull mask from final_tissues, thresholding to include skull (value 7 or 8)
-    fslmaths th -thr 7 -uthr 8 -bin $skull_mask
+    fslmaths $segmentation -thr 7 -uthr 8 -bin $skull_mask
 
     # Refine skull mask
     echo "Running MATLAB script pct_skullexpand.m..."
@@ -113,13 +111,19 @@ function pct_create_pseudoCT()
     echo "STEP 2: UTE BIAS FIELD CORRECTION"
     echo "========================================================================="
 
-    # Perform bias field correction using ANTs' N4BiasFieldCorrection to remove intensity inhomogeneity
-    # This step requires ANTs to be installed and available in the environment (e.g., module load ants)
+    # Resolve ANTs call prefix: use singularity exec when ANTS_SIMG is set,
+    # otherwise call the binary directly (requires ANTs on PATH).
+    if [ -n "${ANTS_SIMG:-}" ]; then
+        ants_exec="singularity exec --bind /:/host ${ANTS_SIMG}"
+    else
+        ants_exec=""
+    fi
+
     if [ -f $ute_reg_thr0_corr ]; then
         echo "N4BiasFieldCorrection already run; reusing estimates."
     else
         echo "Running N4BiasFieldCorrection."
-        N4BiasFieldCorrection \
+        ${ants_exec} N4BiasFieldCorrection \
         --image-dimensionality 3 \
         --input-image $ute_reg_thr0 \
         --convergence [50x50x50x50,0.0000001] \
@@ -154,7 +158,26 @@ function pct_create_pseudoCT()
     fslmaths $ute_reg_thr0_corr -div "$peak_value" $ute_norm
 
     # The skull fraction should now be between the noise/air peak (around 0) and the soft tissue peak (1).
-    
+
+    ################################################################################
+    ##### STEP 3.5: SKULL MAPPING (kosciessa only) #####
+    ################################################################################
+
+    if [ "$skullmapping" = "kosciessa" ]; then
+        echo "========================================================================="
+        echo "STEP 3.5: SUBJECT-SPECIFIC UTE→HU SKULL MAPPING"
+        echo "========================================================================="
+        echo "Running MATLAB script pct_skullmapping.m..."
+        cd "${path_fun_pct}" || { echo "Directory not found: $path_fun_pct"; exit 1; }
+        matlab_command="addpath(genpath('${path_fun}')); pct_skullmapping('${path_simnibs}', '${path_pct}'); exit"
+        "$path_matlab" -nodisplay -nosplash -batch "$matlab_command" || { echo "MATLAB pct_skullmapping failed"; exit 1; }
+        cd "${path_pct}" || { echo "Directory not found"; exit 1; }
+        if [ ! -f "${path_pct}/pCT_skull_mapping.txt" ]; then
+            echo "ERROR: pCT_skull_mapping.txt was not created by pct_skullmapping.m"
+            exit 1
+        fi
+    fi
+
     ###############################################################################
     ##### STEP 4: ADVANCED PVC + MAPPING + BOUNDARY SMOOTHING BLOCK
     # Purpose: Generate publication-quality pseudoCT for SimNIBS electromagnetic/acoustic simulations
@@ -301,8 +324,8 @@ function pct_create_pseudoCT()
     treeby)
         fslmaths "$ute_norm" -mul -2929.6 -add 3247.9 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     kosciessa|*)
-        m1=$(awk 'NR==1{print $1}' "${path_pct}/pCTskullmapping.txt")
-        m2=$(awk 'NR==2{print $1}' "${path_pct}/pCTskullmapping.txt")
+        m1=$(awk 'NR==1{print $1}' "${path_pct}/pCT_skull_mapping.txt")
+        m2=$(awk 'NR==2{print $1}' "${path_pct}/pCT_skull_mapping.txt")
         fslmaths "$ute_norm" -mul "$m1" -add "$m2" -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     esac
 
@@ -314,7 +337,7 @@ function pct_create_pseudoCT()
     echo "========================================================================="
     echo ""
 
-    SmoothImage 3 "$pCT_PVC" 0.8 "$pCT_PV_smooth"
+    ${ants_exec} SmoothImage 3 "$pCT_PVC" 0.8 "$pCT_PV_smooth"
 
     echo "========================================================================="
     echo "STEP 4.4: FINAL COMPOSITION: smoothed everywhere except pure skull interior"

@@ -46,8 +46,8 @@ parameters.simnibs_bin_path = fullfile('.conda', 'envs', 'simnibs_env', 'bin');
 For `layered` simulations, specify at least one T1w planning image (and optionally a T2w/UTE image) for the segmentation.
 
 ```
-parameters.t1_path_template = fullfile(sprintf('m2m_sub-%03d', subject_id), "T1.nii.gz");
-parameters.t2_path_template = fullfile(sprintf('m2m_sub-%03d', subject_id), "T2_reg.nii.gz");
+parameters.path.t1_pattern = 'sub-%03d_T1w.nii.gz';
+parameters.path.t2_pattern = 'sub-%03d_UTE.nii.gz';  % optional: T2w or PETRA UTE image
 ```
 
 ### Specify a transducer and target location
@@ -60,11 +60,13 @@ See [Placement](doc_placement.md).
 
 It may be desirable to run an intial SimNIBS call prior to running the full pipeline incl. segmentation postprocessing, source setup, acoustic and thermal simulations. By default, existing segmentations will be reused and not overwritten unless explicitly requested with `overwrite_simnibs` (regardless of `overwrite_files`).
 
-Set `modules.segmentation_only = 1` to stop the pipeline immediately after segmentation, skipping all subsequent steps. This separate step is required to inform the skull layer [using pseudoCTs](doc_pseudoCT.md).
+Set `modules.segmentation_only = 1` to stop the pipeline immediately after segmentation, skipping all subsequent steps.
 
-### [Optional] Create a pseudoCT
+### [Optional] Use a pseudoCT for subject-specific skull properties
 
-See [pseudoCT](doc_pseudoCT.md).
+Point `path.t2_pattern` to a PETRA UTE image and set `pct.enabled = 1`. PRESTUS will pass the UTE image to SimNIBS during segmentation and then automatically generate a pseudoCT (`pseudoCT.nii.gz`) in the SimNIBS output folder. If a pseudoCT already exists in the SimNIBS `m2m` folder, generation is skipped.
+
+See [pseudoCT](doc_pseudoCT.md) for algorithm choices.
 
 ### Run the prestus_pipeline | [Optional] iterate across parameters
 

@@ -605,7 +605,7 @@ load_defaults();
 
     %% ── Tab 8: Advanced ───────────────────────────────────────────────
     function build_tab_advanced(t)
-        gl = tab_grid(t, 56, {220, '1x', 55, 80});
+        gl = tab_grid(t, 58, {220, '1x', 55, 80});
 
         sec(gl, 1, 'Segmentation');
         lbl(gl, 2, 1, 'Force qform reorientation');
@@ -651,52 +651,65 @@ load_defaults();
 
         sec(gl, 18, 'Pseudo-CT Skull Mapping');
         lbl(gl, 19, 1, 'Enable pCT');
-        chk(gl, 19, 2, 'pct.enabled', false, 'Use CT/pseudo-CT to inform skull properties');
+        h_pct_enabled = chk(gl, 19, 2, 'pct.enabled', false, 'Use CT/pseudo-CT to inform skull properties');
 
-        lbl(gl, 20, 1, 'Density mapping');
-        drp(gl, 20, 2, 'pct.mapping_density', {'k-plan','k-wave','marsac','aubry','none'}, 'k-plan');
+        lbl(gl, 20, 1, 'UTE→HU skull mapping');
+        h_skull_map = drp(gl, 20, 2, 'pct.skull_mapping', ...
+            {'kosciessa','miscouridou','carpino','wiesinger','treeby'}, 'kosciessa');
 
-        lbl(gl, 21, 1, 'Sound speed mapping');
-        drp(gl, 21, 2, 'pct.mapping_soundspeed', {'k-plan','marsac','aubry','none'}, 'k-plan');
+        lbl(gl, 21, 1, 'Debug (keep intermediates)');
+        h_debug = chk(gl, 21, 2, 'pct.debug', true, ...
+            'Keep intermediate NIfTI files in pseudoCT/ subfolder');
 
-        lbl(gl, 22, 1, 'Attenuation mapping');
-        drp(gl, 22, 2, 'pct.mapping_attenuation', {'k-plan','mueller','aubry','none'}, 'k-plan');
-        sp(gl, 23);
+        lbl(gl, 22, 1, 'Density mapping');
+        h_dens = drp(gl, 22, 2, 'pct.mapping_density', {'k-plan','k-wave','marsac','aubry','none'}, 'k-plan');
 
-        sec(gl, 24, 'Analysis');
-        lbl(gl, 25, 1, 'Focus area radius');
-        nedt(gl, 25, 2, 'analysis.focus_area_radius', 5); lbl(gl, 25, 3, 'mm');
-        note_lbl(gl, 26, 'Radius around focus for ISPPA averaging in output metrics.');
-        sp(gl, 27);
+        lbl(gl, 23, 1, 'Sound speed mapping');
+        h_ss = drp(gl, 23, 2, 'pct.mapping_soundspeed', {'k-plan','marsac','aubry','none'}, 'k-plan');
 
-        sec(gl, 28, 'Transducer Placement');
-        lbl(gl, 29, 1, 'Localite placement');
-        chk(gl, 29, 2, 'placement.localite.enabled', false, ...
+        lbl(gl, 24, 1, 'Attenuation mapping');
+        h_att = drp(gl, 24, 2, 'pct.mapping_attenuation', {'k-plan','mueller','aubry','none'}, 'k-plan');
+        sp(gl, 25);
+
+        % Enable/disable pCT sub-controls based on the checkbox state
+        pct_sub_controls = [h_skull_map, h_debug, h_dens, h_ss, h_att];
+        cb_pct_toggle(h_pct_enabled, pct_sub_controls);  % set initial state
+        h_pct_enabled.ValueChangedFcn = @(src,~) cb_pct_toggle(src, pct_sub_controls);
+
+        sec(gl, 26, 'Analysis');
+        lbl(gl, 27, 1, 'Focus area radius');
+        nedt(gl, 27, 2, 'analysis.focus_area_radius', 5); lbl(gl, 27, 3, 'mm');
+        note_lbl(gl, 28, 'Radius around focus for ISPPA averaging in output metrics.');
+        sp(gl, 29);
+
+        sec(gl, 30, 'Transducer Placement');
+        lbl(gl, 31, 1, 'Localite placement');
+        chk(gl, 31, 2, 'placement.localite.enabled', false, ...
             'Use position_transducer_localite for placement');
 
-        lbl(gl, 30, 1, 'Localite reference dist.');
-        nedt(gl, 30, 2, 'placement.localite.reference_distance_mm', 15); lbl(gl, 30, 3, 'mm');
-        note_lbl(gl, 31, 'Correct for distance between IR trackers and transducer exit plane.');
+        lbl(gl, 32, 1, 'Localite reference dist.');
+        nedt(gl, 32, 2, 'placement.localite.reference_distance_mm', 15); lbl(gl, 32, 3, 'mm');
+        note_lbl(gl, 33, 'Correct for distance between IR trackers and transducer exit plane.');
 
-        lbl(gl, 32, 1, 'Save Localite-aligned T1');
-        chk(gl, 32, 2, 'placement.heuristic.save_localite_t1', false, ...
+        lbl(gl, 34, 1, 'Save Localite-aligned T1');
+        chk(gl, 34, 2, 'placement.heuristic.save_localite_t1', false, ...
             'Save T1 aligned to Localite header for correction');
 
-        lbl(gl, 33, 1, 'Heuristic dist. close');
-        nedt(gl, 33, 2, 'placement.heuristic.dist_close', NaN); lbl(gl, 33, 3, 'mm');
+        lbl(gl, 35, 1, 'Heuristic dist. close');
+        nedt(gl, 35, 2, 'placement.heuristic.dist_close', NaN); lbl(gl, 35, 3, 'mm');
 
-        lbl(gl, 34, 1, 'Ear radius');
-        nedt(gl, 34, 2, 'placement.heuristic.ear_radius', 35); lbl(gl, 34, 3, 'mm');
-        sp(gl, 35);
+        lbl(gl, 36, 1, 'Ear radius');
+        nedt(gl, 36, 2, 'placement.heuristic.ear_radius', 35); lbl(gl, 36, 3, 'mm');
+        sp(gl, 37);
 
-        sec(gl, 36, 'Simulation Layers');
-        note_lbl(gl, 37, 'Comma-separated SimNIBS label indices assigned to each tissue compartment.');
+        sec(gl, 38, 'Simulation Layers');
+        note_lbl(gl, 39, 'Comma-separated SimNIBS label indices assigned to each tissue compartment.');
 
         layer_names = {'water','brain','skin','skull','skull_cortical','skull_trabecular'};
         layer_defaults = {'0,3,6,9,10', '1,2', '5', '4', '7', '8'};
         for i = 1:numel(layer_names)
-            lbl(gl, 37+i, 1, layer_names{i});
-            edt(gl, 37+i, 2, ['layers.' layer_names{i}], layer_defaults{i}, 0);
+            lbl(gl, 39+i, 1, layer_names{i});
+            edt(gl, 39+i, 2, ['layers.' layer_names{i}], layer_defaults{i}, 0);
         end
     end
 
@@ -828,6 +841,18 @@ load_defaults();
 %% ════════════════════════════════════════════════════════════════════════
 %%  CALLBACKS
 %% ════════════════════════════════════════════════════════════════════════
+
+    function cb_pct_toggle(src, sub_controls)
+        % Enable/disable pCT sub-controls based on the pct.enabled checkbox
+        if src.Value
+            en = 'on';
+        else
+            en = 'off';
+        end
+        for k = 1:numel(sub_controls)
+            sub_controls(k).Enable = en;
+        end
+    end
 
     function cb_load_yaml()
         [f, d] = uigetfile({'*.yaml;*.yml','YAML config'}, 'Load YAML');

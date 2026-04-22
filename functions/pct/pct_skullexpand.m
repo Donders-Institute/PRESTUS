@@ -75,6 +75,15 @@ function pct_skullexpand(seg_path, path_pct)
     parameters.layers.brain = [1, 2];     % GM/WM
     parameters.layers.skin  = [5];        % skin
 
+    % skull_rubber_wrap uses fieldnames(medium_properties) to locate brain/skin
+    % indices — provide the standard ordering expected by that function.
+    parameters.medium_properties.water          = struct();
+    parameters.medium_properties.brain          = struct();
+    parameters.medium_properties.skin           = struct();
+    parameters.medium_properties.skull          = struct();
+    parameters.medium_properties.skull_cortical = struct();
+    parameters.medium_properties.skull_trabecular = struct();
+
     %% --- Run skull wrap (must exist on path) ---
     skull_rubber_wrap(parameters, BW, medium_masks, segmented_img);
 
