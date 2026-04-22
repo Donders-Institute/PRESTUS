@@ -31,17 +31,26 @@ function job_name = hpc_job_name(parameters)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
 
     if ~isfield(parameters.hpc, 'job_prefix')
-        parameters.hpc.job_prefix = 'PRESTUS';
+        parameters.hpc.job_prefix = 'PS';
     end
+    % YAML loading may return strings as cell arrays — coerce to char
+    prefix = char(parameters.hpc.job_prefix);
 
-    job_name = [parameters.hpc.job_prefix '_' subj_id_string];
+    job_name = [prefix '_' subj_id_string];
 
     % Append output affix when present so that uncertainty pipeline variants
     % (default / _liberal / _conservative) produce distinguishable job names.
     if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') && ...
             ~isempty(parameters.io.output_affix)
         % Strip leading underscore for readability: '_liberal' -> 'liberal'
-        affix = regexprep(parameters.io.output_affix, '^_', '');
+        affix = char(parameters.io.output_affix);
+        affix = regexprep(affix, '^_', '');
         job_name = [job_name '_' affix];
+    end
+
+    % SLURM silently truncates beyond 20 chars; enforce here so the printed
+    % name matches what the scheduler stores.
+    if numel(job_name) > 20
+        job_name = job_name(1:20);
     end
 end

@@ -422,7 +422,7 @@ function html = build_methods_boilerplate(parameters, is_layered)
                  isfield(parameters.pct, 'enabled') && parameters.pct.enabled;
     pct_method = '';
     if use_pct
-        pct_method = safe_field(parameters.pct, 'method', 'unknown');
+        pct_method = safe_field(parameters.pct, 'skull_mapping', 'unknown');
     end
 
     % ------------------------------------------------------------------ %

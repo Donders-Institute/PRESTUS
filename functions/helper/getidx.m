@@ -19,8 +19,12 @@ function idx = getidx(parameters_fields, string)
 
 arguments
     parameters_fields (1,1) struct
-    string            (1,:) char
+    string            % char or cell array of char
 end
+
+    if ischar(string)
+        string = {string};
+    end
 
     % Initialize output array
     idx = [];
@@ -28,11 +32,8 @@ end
     % Get all field names from the parameter structure
     labels = fieldnames(parameters_fields);
 
-    % Find indices of field names that contain the specified string
-    idx_label = find(contains(labels, string));
-
-    % If matching labels are found, retrieve their indices
-    if ~isempty(idx_label)
+    for si = 1:numel(string)
+        idx_label = find(contains(labels, string{si}));
         for numidx = 1:numel(idx_label)
             idx = [idx, parameters_fields.(labels{idx_label(numidx)})];
         end
