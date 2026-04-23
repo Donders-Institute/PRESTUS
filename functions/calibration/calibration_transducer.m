@@ -191,5 +191,21 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Save optimized values
     save_optimized_values(...
         opt_param);
-    
+
+    %% Clean up cache folder (optional)
+    % The two free-water simulations (initial + optimized) write large .mat
+    % files into the cache folder. We forced save_acoustic_matrices=1 on
+    % sim_param so the pipeline would save them between runs, but the whole
+    % folder can be removed once calibration is complete.
+    % Set parameters.io.save_acoustic_matrices = 1 to keep the cache for
+    % debugging (e.g. to inspect intermediate simulation results).
+    if ~isfield(parameters.io, 'save_acoustic_matrices') || ...
+            parameters.io.save_acoustic_matrices == 0
+        cache_folder = fullfile(opt_param.io.outputs_folder, 'cache');
+        if isfolder(cache_folder)
+            rmdir(cache_folder, 's');
+            disp(['Calibration cache removed: ', cache_folder]);
+        end
+    end
+
 end
