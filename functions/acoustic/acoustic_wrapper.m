@@ -8,7 +8,8 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
     medium_masks, ...
     filename_sensor_data, ...
     segmentation, ...
-    source_labels)
+    source_labels, ...
+    acoustic_provenance)
 % ACOUSTIC_WRAPPER  Run the acoustic simulation and convert axisymmetric output to 2D or 3D
 %
 % Calls acoustic_simulation with PMLInside=false and an optional skull-edge
@@ -49,15 +50,16 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %           CONVERT_AXISYMMETRIC_TO_2D
 
 arguments
-    parameters          (1,1) struct
-    kgrid               (1,1)
-    kwave_medium        (1,1) struct
-    source              (1,1) struct
-    sensor              (1,1) struct
-    medium_masks        {mustBeNumericOrLogical}
-    filename_sensor_data(1,:) char
-    segmentation        {mustBeNumericOrLogical}
-    source_labels       {mustBeNumericOrLogical}
+    parameters           (1,1) struct
+    kgrid                (1,1)
+    kwave_medium         (1,1) struct
+    source               (1,1) struct
+    sensor               (1,1) struct
+    medium_masks         {mustBeNumericOrLogical}
+    filename_sensor_data (1,:) char
+    segmentation         {mustBeNumericOrLogical}
+    source_labels        {mustBeNumericOrLogical}
+    acoustic_provenance  (1,1) struct = struct()
 end
 
     disp('Specifying and Starting acoustic simulations...')
@@ -70,7 +72,8 @@ end
     %
     % Resolve 'auto' to the actual size via getOptimalPMLSize so the effective
     % value is available for reporting and reproducibility.
-    if ischar(parameters.grid.pml_size) && strcmp(parameters.grid.pml_size, 'auto')
+    pml_size_val = parameters.grid.pml_size;
+    if (ischar(pml_size_val) || isstring(pml_size_val)) && strcmp(pml_size_val, 'auto')
         axisym = isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1;
         if axisym
             effective_pml = getOptimalPMLSize(kgrid, [], 'WSWA');
@@ -80,7 +83,7 @@ end
         parameters.grid.pml_size_effective = effective_pml;
         fprintf('PML size (auto-selected): [%s]\n', num2str(effective_pml));
     else
-        effective_pml = parameters.grid.pml_size;
+        effective_pml = double(pml_size_val);
         parameters.grid.pml_size_effective = effective_pml;
     end
 
@@ -117,7 +120,7 @@ end
                        (isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims == 1);
         if expand_to_3d
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels);
+                convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels);
         else
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
                 convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels);
@@ -144,5 +147,6 @@ end
             'segmentation', ...
             'source_labels', ...
             'medium_masks', ...
-            'acoustic_info' ,'-v7.3')
+            'acoustic_info', ...
+            'acoustic_provenance', '-v7.3')
     end

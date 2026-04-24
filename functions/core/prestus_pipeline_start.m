@@ -54,7 +54,11 @@ function job_id = prestus_pipeline_start(parameters, options)
     switch parameters.platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
-            prestus_pipeline(parameters, options);
+            if is_multi_isppa_mode(parameters)
+                multi_isppa_pipeline(parameters, options);
+            else
+                prestus_pipeline(parameters, options);
+            end
             job_id = [];
 
         case {'auto', 'slurm', 'qsub'}
@@ -63,6 +67,14 @@ function job_id = prestus_pipeline_start(parameters, options)
             % uncertainty_pipeline manages its own multi-stage job graph.
             if isfield(parameters.simulation, 'uncertainty') && parameters.simulation.uncertainty
                 uncertainty_pipeline(parameters, options);
+                job_id = [];
+                return;
+            end
+
+            % Intercept multi-ISPPA mode before single-job submission:
+            % multi_isppa_pipeline manages its own multi-stage job graph.
+            if is_multi_isppa_mode(parameters)
+                multi_isppa_pipeline(parameters, options);
                 job_id = [];
                 return;
             end
@@ -110,4 +122,10 @@ function job_id = prestus_pipeline_start(parameters, options)
             error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
                 parameters.platform);
     end
+end
+
+function tf = is_multi_isppa_mode(parameters)
+    tf = isfield(parameters, 'calibration') && ...
+         isfield(parameters.calibration, 'target_isppa_wcm2') && ...
+         numel(parameters.calibration.target_isppa_wcm2) > 1;
 end

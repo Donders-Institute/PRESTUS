@@ -69,6 +69,17 @@ function [parameters] = prestus_pipeline(parameters, options)
         return;
     end
 
+    % ====================================================================
+    %% MULTI-ISPPA MODE (MATLAB platform only)
+    % ====================================================================
+    % On HPC, multi-ISPPA mode is intercepted earlier in
+    % prestus_pipeline_start before job submission. Here we handle the
+    % MATLAB platform case, after path_log_setup has set output_dir.
+    if is_multi_isppa_mode(parameters)
+        multi_isppa_pipeline(parameters, options);
+        return;
+    end
+
     fprintf('Starting processing for subject %i %s\n',...
         parameters.subject_id, parameters.io.output_affix)
     
@@ -228,20 +239,29 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop', 'source');
 
-
     % ====================================================================
-    %% AMPLITUDE CALIBRATION (optional free-water pressure scaling)
+    %% FREE-WATER BASELINE (provenance for post-hoc ISPPA scaling)
     % ====================================================================
-    % Runs a fast water simulation with the current source, measures peak
-    % pressure at the sensor, and linearly scales elem_amp to hit
-    % calibration.target_pressure_mpa. Active when modules.run_amplitude_calibration = 1.
+    % Runs a fast water simulation at the current source amplitude and
+    % records the resulting free-water ISPPA [W/cm²] as acoustic_provenance.
+    % This value is saved alongside the acoustic cache so that any
+    % target_isppa_wcm2 can later be achieved by post-hoc pressure scaling
+    % (p × sqrt(target/baseline)) without re-running the skull simulation.
+    % Active when modules.run_water_baseline = 1, or automatically when
+    % calibration.target_isppa_wcm2 is set.
 
-    if isfield(parameters.modules, 'run_amplitude_calibration') && ...
-            parameters.modules.run_amplitude_calibration == 1 && ...
+    acoustic_provenance = struct();
+    run_baseline = (isfield(parameters.modules, 'run_water_baseline') && ...
+                    parameters.modules.run_water_baseline == 1) || ...
+                   (isfield(parameters, 'calibration') && ...
+                    isfield(parameters.calibration, 'target_isppa_wcm2') && ...
+                    ~isempty(parameters.calibration.target_isppa_wcm2));
+    if run_baseline && ...
             (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
-        log_timer('start', 'calibration', parameters.io.output_dir);
-        parameters = calibration_amplitude_scaling(parameters, kgrid, source, sensor);
-        log_timer('stop', 'calibration');
+        log_timer('start', 'freefield_baseline', parameters.io.output_dir);
+        acoustic_provenance.freefield_isppa_wcm2 = ...
+            water_baseline(parameters, kgrid, source, sensor);
+        log_timer('stop', 'freefield_baseline');
     end
 
     % ====================================================================
@@ -274,7 +294,8 @@ function [parameters] = prestus_pipeline(parameters, options)
             medium_masks, ...
             filename_sensor_data, ...
             segmentation, ...
-            source_labels);
+            source_labels, ...
+            acoustic_provenance);
 
         parameters.state.acoustics_available = 1;
 
@@ -282,6 +303,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         disp('Skipping acoustic simulation, loading existing output file.')
         load(filename_sensor_data);
         parameters.state.acoustics_available = 1;
+        sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
     else
         disp('No acoustic simulation available or requested ... skipping analysis')
         parameters.state.acoustics_available = 0;
@@ -468,6 +490,15 @@ function [parameters] = prestus_pipeline(parameters, options)
         generate_simulation_report(parameters);
     end
 
+    % Generate multi-ISPPA summary report when requested by multi_isppa_pipeline
+    if isfield(parameters.modules, 'multi_isppa_report') && parameters.modules.multi_isppa_report
+        if isfield(parameters, 'multi_isppa')
+            generate_multi_isppa_report(parameters, parameters.multi_isppa);
+        else
+            warning('multi_isppa_report flag set but parameters.multi_isppa is missing — skipping.');
+        end
+    end
+
     % Generate uncertainty report when requested by uncertainty_pipeline
     if isfield(parameters.modules, 'uncertainty_report') && parameters.modules.uncertainty_report
         if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'affixes')
@@ -544,4 +575,61 @@ function [parameters] = prestus_pipeline(parameters, options)
         prestus_pipeline_start(parameters, options)
     end
 
+end
+
+% =========================================================================
+%% Local helpers
+% =========================================================================
+
+function tf = is_multi_isppa_mode(parameters)
+% True when calibration.target_isppa_wcm2 contains more than one value.
+    tf = isfield(parameters, 'calibration') && ...
+         isfield(parameters.calibration, 'target_isppa_wcm2') && ...
+         numel(parameters.calibration.target_isppa_wcm2) > 1;
+end
+
+function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters)
+% Scale sensor_data.p_max_all (and p_final if present) so that the
+% free-water ISPPA matches parameters.calibration.target_isppa_wcm2.
+% Only applies when both the target and the baseline ISPPA are available
+% and differ by more than 1%.
+%
+% Called after loading a cached acoustic result inside a thermal-only job
+% spawned by multi_isppa_pipeline. The scale factor is derived entirely
+% from the user-facing ISPPA values — elem_amp is never inspected.
+    if ~isfield(parameters, 'calibration') || ...
+            ~isfield(parameters.calibration, 'target_isppa_wcm2') || ...
+            isempty(parameters.calibration.target_isppa_wcm2)
+        return;
+    end
+    if ~isfield(acoustic_provenance, 'freefield_isppa_wcm2') || ...
+            isempty(acoustic_provenance.freefield_isppa_wcm2) || ...
+            acoustic_provenance.freefield_isppa_wcm2 <= 0
+        warning(['apply_isppa_scaling: acoustic_provenance.freefield_isppa_wcm2 is missing ' ...
+                 'or invalid — pressure scaling skipped. Re-run the acoustic stage to ' ...
+                 'generate provenance.']);
+        return;
+    end
+
+    target   = parameters.calibration.target_isppa_wcm2;
+    baseline = acoustic_provenance.freefield_isppa_wcm2;
+    scale_p  = sqrt(target / baseline);
+
+    if abs(scale_p - 1) <= 0.01
+        return;
+    end
+
+    if scale_p > 4 || scale_p < 0.25
+        warning(['apply_isppa_scaling: large pressure scale factor (%.2fx) from %.1f to ' ...
+                 '%.1f W/cm². Verify that the target is in the linear acoustic regime ' ...
+                 'relative to the baseline simulation amplitude.'], ...
+                scale_p, baseline, target);
+    end
+
+    fprintf('Scaling cached pressure field: %.2f → %.2f W/cm² (scale_p = %.4f)\n', ...
+            baseline, target, scale_p);
+    sensor_data.p_max_all = sensor_data.p_max_all * scale_p;
+    if isfield(sensor_data, 'p_final')
+        sensor_data.p_final = sensor_data.p_final * scale_p;
+    end
 end

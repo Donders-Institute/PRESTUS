@@ -67,20 +67,29 @@ io:
   save_thermal_matrices: 1  # heating_res.mat — temperature timeseries and field maps
   save_heatingvideo: 0      # Save a video of incremental heating?
 
-#------------ Amplitude calibration (free-water pressure scaling)
+#------------ ISPPA targeting (free-water pressure scaling)
+#
+# Set target_isppa_wcm2 to a scalar to scale the acoustic output to a specific
+# free-water ISPPA before thermal analysis. Set it to a vector to automatically
+# run one thermal job per target (multi-ISPPA mode); see doc_multi_isppa.md.
+#
+# The acoustic simulation always runs at the elem_amp specified in the transducer
+# config. A fast water baseline sim is run alongside it (modules.run_water_baseline)
+# to record the free-water ISPPA at that drive level. Post-hoc pressure scaling is
+# then applied when loading cached results for thermal analysis.
 
 calibration:
-  target_isppa_wcm2: []  # Target free-water ISPPA [W/cm²]; required when modules.run_amplitude_calibration = 1
+  target_isppa_wcm2: []  # Target free-water ISPPA [W/cm²]; scalar or vector
 
 #------------ Module execution
 
 modules:
-  run_transducer_placement: 1   # Resolve trans_pos/focus_pos via placement.mode (manual/localite/heuristic)?
-  run_grid_setup: 1             # Setup grid and run head processing? Mandatory for simulations.
-  run_medium_setup: 1           # Map medium acoustic properties? Mandatory for simulations.
-  run_source_setup: 1           # Set up acoustic source? Mandatory for simulations.
-  run_amplitude_calibration: 0  # Scale elem_amp to match calibration.target_pressure_mpa in free water?
-  run_acoustic_sims: 1          # Run acoustic simulations?
+  run_transducer_placement: 1 # Resolve trans_pos/focus_pos via placement.mode (manual/localite/heuristic)?
+  run_grid_setup: 1           # Setup grid and run head processing? Mandatory for simulations.
+  run_medium_setup: 1         # Map medium acoustic properties? Mandatory for simulations.
+  run_source_setup: 1         # Set up acoustic source? Mandatory for simulations.
+  run_water_baseline: 0       # Run fast water sim to record free-water ISPPA provenance alongside acoustic cache?
+  run_acoustic_sims: 1        # Run acoustic simulations?
   run_acoustic_analysis: 1    # Run acoustic analysis?
   run_heating_sims: 0         # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
   run_thermal_analysis: 1     # Run thermal analysis?
