@@ -41,7 +41,7 @@ function job_id = prestus_pipeline_start(parameters, options)
     end
 
     % ========== PLATFORM SELECTION ==========
-    if ~isfield(parameters, 'hpc') || ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
+    if ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
         platform = hpc_detect_system();
         parameters.platform = platform;
         fprintf('➤ auto-detected: %s\n', upper(platform));
@@ -93,9 +93,8 @@ function job_id = prestus_pipeline_start(parameters, options)
             fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
             fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
             fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'toolboxes'));
-            if ismember(fieldnames(options), 'sequential_configs')
-                sequential_configs = options.sequential_configs;
-                save(temp_data_path, 'sequential_configs', '-append');
+            if isfield(options, 'sequential_configs')
+                save(temp_data_path, 'options', '-append');
                 fprintf(fid, 'prestus_pipeline(parameters, options);\n');
             else
                 fprintf(fid, 'prestus_pipeline(parameters);\n');

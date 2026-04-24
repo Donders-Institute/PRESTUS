@@ -572,7 +572,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         else
             options = rmfield(options, 'sequential_configs');
         end
-        prestus_pipeline_start(parameters, options)
+        prestus_pipeline_start(sequential_parameters, options)
     end
 
 end

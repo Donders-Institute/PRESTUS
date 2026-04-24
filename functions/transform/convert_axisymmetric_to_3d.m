@@ -83,8 +83,8 @@ focus_pos_final = fliplr(focus_pos_final);
 focus_pos_final = [focus_pos_final(1), focus_pos_final(1), focus_pos_final(2)];
 
 % encode in the transducer position
-parameters.transducer.trans_pos = trans_pos_final;
-parameters.transducer.focus_pos = focus_pos_final;
+parameters.transducer(1).trans_pos = trans_pos_final;
+parameters.transducer(1).focus_pos = focus_pos_final;
 
 %% assert all expanded fields have consistent size
 expected_size = size(sensor_data.p_max_all);
