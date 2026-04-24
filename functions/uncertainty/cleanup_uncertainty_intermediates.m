@@ -20,8 +20,8 @@ arguments
     affixes    (1,1) struct
 end
 %
-% Files removed:
-%   cache/<subj>_<medium>_heating_res<affix>.mat  — thermal matrices for each variant (large)
+% Files removed (subject to io flags):
+%   cache/<subj>_<medium>_heating_res<affix>.mat  — removed unless save_thermal_matrices=1
 %   cache/<subj>_<medium>_after_rotating_and_scaling.mat
 %   cache/<subj>_<medium>_after_cropping_and_smoothing.mat
 %
@@ -37,11 +37,13 @@ end
     cache_dir = fullfile(output_dir, 'cache');
 
     % Heating result matrices for all three variants
-    variant_affixes = {affixes.default, affixes.liberal, affixes.conservative};
-    for i = 1:numel(variant_affixes)
-        af = variant_affixes{i};
-        f  = fullfile(cache_dir, sprintf('%s_%s_heating_res%s.mat', subj, medium, af));
-        delete_if_exists(f);
+    if ~should_save_output(parameters.io, 'save_thermal_matrices')
+        variant_affixes = {affixes.default, affixes.liberal, affixes.conservative};
+        for i = 1:numel(variant_affixes)
+            af = variant_affixes{i};
+            f  = fullfile(cache_dir, sprintf('%s_%s_heating_res%s.mat', subj, medium, af));
+            delete_if_exists(f);
+        end
     end
 
     % Preprocessing cache intermediates

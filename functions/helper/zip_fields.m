@@ -25,7 +25,7 @@ function cell_arr = zip_fields(input_struct)
     % Iterate through each field and append its name and value to the cell array
     for i = 1:length(fields)
         fname = fields{i};
-        cell_arr = [cell_arr, fname]; % Append field name
-        cell_arr = [cell_arr, input_struct.(fname)]; % Append field value
+        cell_arr = [cell_arr, {fname}];                  % Append field name
+        cell_arr = [cell_arr, {input_struct.(fname)}];   % Append field value (preserve type)
     end
 end

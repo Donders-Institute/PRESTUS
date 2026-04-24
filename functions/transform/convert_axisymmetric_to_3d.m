@@ -1,5 +1,5 @@
 function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-    convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels)
+    convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels)
 % CONVERT_AXISYMMETRIC_TO_3D  Expand all axisymmetric simulation fields from 2D to 3D
 %
 % Applies radial expansion to every spatial field produced by a k-Wave
