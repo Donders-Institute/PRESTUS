@@ -206,74 +206,78 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 
 ---
 
-## In-pipeline amplitude calibration
+## In-pipeline ISPPA targeting
 
-**Function: `calibration_amplitude_scaling`**
+Rather than scaling `elem_amp` before the acoustic simulation, PRESTUS uses a two-step approach: a **water baseline measurement** records the free-water ISPPA at the current drive level, and **post-hoc pressure scaling** is applied when loading the cached acoustic results for thermal analysis. This means the acoustic simulation never needs to be repeated when changing the target intensity.
 
-### Purpose and scope
-
-This is a lightweight amplitude normalization step that runs *inside* the main simulation pipeline. It answers a different question than `calibration_transducer`:
-
-| | `calibration_transducer` | `calibration_amplitude_scaling` |
+| | `calibration_transducer` | ISPPA targeting |
 |---|---|---|
-| **When** | Once per transducer/depth/intensity, before any study | Every pipeline run (optional) |
-| **What is optimized** | Phases **and** amplitude | Amplitude only |
-| **Input** | Empirical hydrophone profile + target intensity [W/cm²] | Target peak free-water pressure [MPa] |
-| **Output** | Calibrated YAML config ready for study use | `elem_amp` scaled in-place; pipeline continues |
-| **Typical use** | Build a calibration library | Normalize a subject simulation to a specific free-water pressure |
+| **When** | Once per transducer/depth/intensity, before any study | Per subject, at analysis time |
+| **What is optimized** | Phases **and** amplitude | Neither — scaling is post-hoc |
+| **Input** | Empirical hydrophone profile + target intensity [W/cm²] | Target free-water ISPPA [W/cm²] |
+| **Output** | Calibrated YAML config ready for study use | Scaled pressure field fed into thermal sim |
+| **Typical use** | Build a calibration library | Target a specific sonication intensity |
 
-Use `calibration_transducer` first to obtain calibrated phases and an initial amplitude. Then, if you want to run the full pipeline at a *specific free-water peak pressure* (e.g., 0.5 MPa), enable `calibration_amplitude_scaling` to fine-tune the amplitude automatically.
+---
 
-### How it works
+### Step 1 — Water baseline measurement
 
-1. A homogeneous water simulation is run using the current `kgrid`, `source`, and `sensor` (after source setup but before the main acoustic simulation). The backend is forced to `matlab_cpu` regardless of the main simulation's `code_type`.
-2. The peak pressure across all sensor points is measured: `peak_pa = max(sensor_data.p_max_all)`.
-3. A linear scale factor is computed: `scale = target_pa / peak_pa`.
-4. `elem_amp` in all configured transducers is multiplied by `scale`.
-5. The main acoustic simulation proceeds with the scaled amplitude.
+**Function: `water_baseline`**
 
-The scaling is linear because k-Wave solves the linear wave equation: doubling `elem_amp` doubles peak pressure. No analytical model or phase fitting is involved — the peak is read directly from the simulation, so no `simulated_analytical_scaling` correction is required (unlike `calibration_transducer`, which derives amplitude indirectly via the O'Neil analytical solution).
+Runs a fast homogeneous water simulation at the current `elem_amp` (after source setup, before the main acoustic simulation). The peak free-water ISPPA is computed from the sensor output and stored as `acoustic_provenance.freefield_isppa_wcm2` alongside the acoustic cache file.
 
-### Prerequisites
+This step is **disabled by default** (`modules.run_water_baseline = 0`). Enable it when ISPPA scaling provenance is needed. It adds a few minutes on a typical workstation (no tissue mapping, uses the configured `code_type`):
 
-- Phases must already be set correctly in the config (e.g., loaded from a `calibration_transducer` output YAML).
-- `modules.run_source_setup` must be enabled (the calibration water sim reuses the source built in that stage).
-- The sensor mask must cover the focal region so that `max(sensor_data.p_max_all)` captures the true focal peak. This is guaranteed when using the standard PRESTUS sensor setup.
+```yaml
+modules:
+  run_water_baseline: 1
+```
+
+> If `run_water_baseline` is disabled, `calibration.target_isppa_wcm2` will have no effect and a warning is issued.
+
+---
+
+### Step 2 — Post-hoc pressure scaling
+
+When `calibration.target_isppa_wcm2` is set and the acoustic cache contains valid provenance, the pipeline scales `sensor_data.p_max_all` before acoustic analysis and thermal simulation:
+
+$$p_\mathrm{scaled} = p_\mathrm{cached} \times \sqrt{\frac{I_\mathrm{target}}{I_\mathrm{baseline}}}$$
+
+Intensity-derived fields (used in thermal simulation) then scale as $I \propto p^2$, so heat deposition is correctly proportional to the target intensity without rerunning the skull simulation.
+
+A warning is issued if the scale factor exceeds 4× or is below 0.25×, indicating that the target is far from the simulated amplitude and the linear assumption may not hold.
 
 ### Configuration
-
-In your study config (or default_config.yaml):
 
 ```yaml
 calibration:
   target_isppa_wcm2: 30   # Target free-water ISPPA [W/cm²]
-
-modules:
-  run_amplitude_calibration: 1   # Enable in-pipeline amplitude calibration
 ```
 
-`calibration.target_isppa_wcm2` is required when `run_amplitude_calibration = 1`. The pipeline will error if it is not set.
+`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_amp` is configured in the transducer YAML; `target_isppa_wcm2` controls only the analysis and thermal stages.
 
-The target intensity is converted to a peak pressure internally via $p = \sqrt{2 \cdot I \cdot 10^4 \cdot \rho \cdot c}$ using water properties from `medium_properties.water`.
+### Multiple targets (multi-ISPPA mode)
 
-### Output
+Setting `target_isppa_wcm2` to a vector automatically triggers the multi-ISPPA pipeline, which runs one thermal job per target in parallel without repeating the acoustic simulation:
 
-The calibration step writes two fields back into `parameters.calibration`:
+```yaml
+calibration:
+  target_isppa_wcm2: [10, 20, 30, 50]
+```
+
+See [doc_multi_isppa.md](doc_multi_isppa.md) for full details.
+
+### Provenance fields
+
+The following fields are saved in the acoustic cache alongside `sensor_data`:
 
 | Field | Description |
 |---|---|
-| `calibration.measured_isppa_wcm2` | Free-water ISPPA measured at the current `elem_amp` before scaling [W/cm²] |
-| `calibration.amplitude_scale_factor` | The multiplicative factor applied to `elem_amp` |
-
-Both fields are available to the simulation report for traceability.
-
-### Runtime cost
-
-The calibration water simulation runs with `matlab_cpu` and uses a homogeneous medium (no tissue mapping), so it is substantially faster than the main simulation. On a typical workstation it adds a few minutes. On HPC, it runs locally on the submission node before the main job is dispatched — set `simulation.code_type` to a GPU or C++ backend for the main sim without concern; the calibration always uses CPU.
+| `acoustic_provenance.freefield_isppa_wcm2` | Free-water ISPPA measured at the drive level used for the acoustic simulation [W/cm²] |
 
 ### Relationship to `calibration_transducer`
 
 The typical workflow is:
 
 1. **Once per transducer/depth setup**: Run `calibration_transducer` to obtain optimized phases and an initial amplitude at a reference intensity. The output YAML encodes `elem_phase_deg` and `elem_amp`.
-2. **Per subject simulation**: Load the calibration YAML into your study config (overrides default `elem_amp` and `elem_phase_deg`). Enable `run_amplitude_calibration = 1` and set `calibration.target_isppa_wcm2` to fine-tune the amplitude to the exact free-water pressure you want for that simulation.
+2. **Per subject simulation**: Load the calibration YAML into your study config. Set `calibration.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.

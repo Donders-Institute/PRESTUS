@@ -22,11 +22,17 @@ load_parameters
 [source setup]          modules.run_source_setup
       │                 Construct k-Wave source from transducer geometry
       ▼
-[amplitude calibration] modules.run_amplitude_calibration  (default: off)
-      │                 Fast water sim → scale elem_amp to target pressure
+[water baseline]        modules.run_water_baseline  (default: off)
+      │                 Fast water sim → record free-water ISPPA provenance
+      │                 alongside the acoustic cache; no elem_amp changes
       ▼
 [acoustic simulation]   modules.run_acoustic_sims
-      │                 k-Wave pressure field simulation
+      │                 k-Wave pressure field simulation; cache saved with
+      │                 acoustic_provenance.freefield_isppa_wcm2
+      ▼
+[ISPPA scaling]         Applied automatically on cache load when
+      │                 calibration.target_isppa_wcm2 is set;
+      │                 scales p_max_all by sqrt(target/baseline)
       ▼
 [acoustic analysis]     modules.run_acoustic_analysis
       │                 Extract Isppa, Ispta, focal metrics; write CSV
@@ -58,7 +64,9 @@ load_parameters
 | Add thermal simulation to completed acoustic run | `modules.run_heating_sims = 1`; all others can remain `1` |
 | Regenerate analysis outputs only | `run_acoustic_sims = 0`, `run_heating_sims = 0` |
 | Skip free-water reference | `modules.run_posthoc_water_sims = 0` |
-| Scale to a target free-water ISPPA | `modules.run_amplitude_calibration = 1`, `calibration.target_isppa_wcm2: 30` |
+| Run thermal at a specific free-water ISPPA | `calibration.target_isppa_wcm2: 30` (water baseline runs automatically) |
+| Run thermal at multiple ISPPAs (parallel jobs) | `calibration.target_isppa_wcm2: [10, 20, 30, 50]` — triggers multi-ISPPA mode; see [doc_multi_isppa.md](doc_multi_isppa.md) |
+| Enable the water baseline measurement | `modules.run_water_baseline: 1` (required for ISPPA scaling) |
 
 > **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`. If they do not exist, disabling an upstream module while enabling a downstream one will error.
 

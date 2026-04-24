@@ -30,10 +30,14 @@ Note: Parameters, naming, and default values have changed. Please consult the [d
 #### Changed
 
 - [**refactor**] Pipeline and core processing steps refactored; functions organised by processing stage
+- [**validation**] Function inputs are now consistently validated via MATLAB `arguments` blocks; `help <function>` calls expose header information inline. Some checks may surface new errors — please report unexpected failures
 - [**calibration**] Dedicated config and unified pipeline for transducer calibration [@MaCuinea, @jkosciessa]
 - [**hpc**] HPC submission refactored; platform selection unified under `parameters.platform`
 - [**preproc**] Segmentation smoothing now specified in FWHM mm; grid interpolation updated for continuous data
 - [**pCT**] Updated to new folder structure; skull density and sound speed regularised to water minimum
+- [**pCT**] pCT generation is now fully integrated into the pipeline; pre-generating pCTs beforehand remains possible (e.g. for debugging) but is no longer required — a T1w image, a UTE image, and a mapping algorithm are sufficient
+- [**refactor**] PML (Perfectly Matched Layer) is now added only at the acoustic wave simulation stage, rather than carried through from preprocessing or phantom generation; the default `"auto"` setting optimises PML size automatically
+- [**I/O**] Subject-specific output subfolders are now enforced to simplify the I/O landscape
 - [**axisymmetric**] Axisymmetric acoustic simulations now default to 3D thermal output
 - [**parameter**] Various parameters renamed or restructured; consult `default_config.yaml` and the documentation for current names
 
