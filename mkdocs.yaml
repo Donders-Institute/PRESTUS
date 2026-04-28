@@ -66,6 +66,7 @@ nav:
     - HPC: doc_hpc.md
     - Group: doc_group.md
     - Testing: doc_testing.md
+    - Telemetry: doc_telemetry.md
   - 🆘 Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
     - Code of Conduct: CODE_OF_CONDUCT.md

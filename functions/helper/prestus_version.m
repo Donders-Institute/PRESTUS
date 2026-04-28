@@ -1,40 +1,48 @@
-function prestus_version(prestus_path)
-% PRESTUS_VERSION  Print PRESTUS version, git commit hash, and branch to console
+function hash = prestus_version(prestus_path)
+% PRESTUS_VERSION  Print PRESTUS version info and optionally return the git hash.
 %
 % Resolves the PRESTUS root (via GET_PRESTUSPATH if not supplied), then uses
 % git to retrieve the short commit hash, branch name, and commit date.
 %
 % Use as:
-%   prestus_version()
-%   prestus_version(prestus_path)
+%   prestus_version()           % print only
+%   hash = prestus_version()    % print and return short commit hash
+%   hash = prestus_version(prestus_path)
 %
 % Input:
-%   prestus_path - path to the PRESTUS root directory (optional, default: get_prestus_path)
+%   prestus_path - path to the PRESTUS root directory (optional)
+%
+% Output:
+%   hash - short git commit hash string, or 'unknown' if git is unavailable
 %
 % See also: KWAVE_VERSION, SIMNIBS_VERSION, PATH_LOG_SETUP
 
     if nargin == 0
         prestus_path = get_prestus_path;
     end
-    
+
+    hash = 'unknown';
+
     try
-        cd(prestus_path);
-        
-        % Shell-based git queries
-        [status, git_info] = system('git rev-parse --short HEAD');
-        [~, branch] = system('git branch --show-current');
-        branch = strtrim(branch);
-        [~, date] = system('git --no-pager log -1 --format="%cd" --date=short');
-        
-        fprintf('============================================================ \n');
-        fprintf('PRESTUS 0.4.0 + \n');
-        fprintf('Commit: %s (branch: %s)  \n', ...
-            strtrim(git_info), branch);
-        fprintf('Commit date: %s \n', strtrim(date));
-        fprintf('============================================================ \n');
+        [status, git_info] = system(sprintf('git -C "%s" rev-parse --short HEAD 2>/dev/null', prestus_path));
+        [~,      branch]   = system(sprintf('git -C "%s" branch --show-current 2>/dev/null', prestus_path));
+        [~,      date]     = system(sprintf('git -C "%s" --no-pager log -1 --format="%%cd" --date=short 2>/dev/null', prestus_path));
+
+        if status == 0 && ~isempty(strtrim(git_info))
+            hash = strtrim(git_info);
+        end
+
+        if nargout == 0
+            fprintf('============================================================ \n');
+            fprintf('PRESTUS 0.4.0 + \n');
+            fprintf('Commit: %s (branch: %s)  \n', hash, strtrim(branch));
+            fprintf('Commit date: %s \n', strtrim(date));
+            fprintf('============================================================ \n');
+        end
     catch
-        fprintf('Could not retrieve git repo status\n');
-        return;
+        if nargout == 0
+            fprintf('Could not retrieve git repo status\n');
+        end
     end
 
 end

@@ -58,11 +58,16 @@ function [parameters] = prestus_pipeline(parameters, options)
     [parameters] = path_log_setup(parameters, get_prestus_path);
 
     % ====================================================================
+    %% TELEMETRY (opt-in, anonymous)
+    % ====================================================================
+    telemetry_setup();                    % no-op after first run
+    track_usage('run_start', parameters);
+    telemetry_t0 = tic;
+    try
+
+    % ====================================================================
     %% UNCERTAINTY MODE (MATLAB platform only)
     % ====================================================================
-    % On HPC, uncertainty mode is intercepted earlier in
-    % prestus_pipeline_start before job submission. Here we handle the
-    % MATLAB platform case, after path_log_setup has set output_dir.
     if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
             parameters.simulation.uncertainty
         uncertainty_pipeline(parameters, options);
@@ -72,9 +77,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% MULTI-ISPPA MODE (MATLAB platform only)
     % ====================================================================
-    % On HPC, multi-ISPPA mode is intercepted earlier in
-    % prestus_pipeline_start before job submission. Here we handle the
-    % MATLAB platform case, after path_log_setup has set output_dir.
     if is_multi_isppa_mode(parameters)
         multi_isppa_pipeline(parameters, options);
         return;
@@ -86,7 +88,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% SEGMENT planning image (structural MRI) with SimNIBS
     % ====================================================================
-    % if segmentation is not yet available
 
     fprintf('========================================\n');
     fprintf('SEGMENTATION \n');
@@ -110,9 +111,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% TRANSDUCER PLACEMENT
     % ====================================================================
-    % Resolve trans_pos / focus_pos via manual config, Localite XML, or
-    % heuristic sphere-expansion search. Skipped when placement.mode is
-    % absent or 'manual' (positions already in parameters).
 
     fprintf('========================================\n');
     fprintf('TRANSDUCER PLACEMENT \n');
@@ -130,25 +128,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% GRID: PREPROCESS structural MRI & POSITION transducer + target
     % ====================================================================
-    % Outputs: planimg, medium_masks, segmentation, bone, trans_pos, focus_pos
-    %          and updated parameters.grid / parameters.transducer fields.
-    %
-    % Cache (cache_dir): sub-XXX_MEDIUM_grid_cache.mat
-    %   Written after this stage completes; loaded on re-runs to skip all
-    %   sub-steps (grid_tissue_setup, grid_transducer_location, grid_axisymmetry).
-    %   Uses io.preproc_affix when set (uncertainty/multi-ISPPA thermal stages
-    %   point back to the base run's grid cache via this field).
-    %   Controlled by io.save_grid_cache (falls back to io.save_matrices).
-    %
-    % Internal checkpoints (cache_dir, managed by preproc_head):
-    %   sub-XXX_MEDIUM_after_rotating_and_scaling.mat   — post-rotation/rescale
-    %   sub-XXX_MEDIUM_after_cropping_and_smoothing.mat — post-crop/smooth
-    %   These allow preproc_head to resume after an interruption mid-stage;
-    %   they are not intended to be loaded directly from prestus_pipeline.
-    %
-    % Debug outputs (debug_dir/preproc/): PNGs and intermediate NIfTIs
-    %   (segmented, segmentation, skull_mask) written by preproc_head for
-    %   visual inspection. Written only when simulation.debug == 1.
 
     fprintf('========================================\n');
     fprintf('GRID SETUP & HEAD PREPROC \n');
@@ -168,28 +147,24 @@ function [parameters] = prestus_pipeline(parameters, options)
         if ~confirm_overwriting(filename_grid_cache, parameters)
             disp('Loading grid cache — skipping head preprocessing.')
             load(filename_grid_cache);
-            % Restore parameters fields updated during grid setup.
             parameters.grid       = grid_cache_info.parameters.grid;
             parameters.transducer = grid_cache_info.parameters.transducer;
+            clear grid_cache_info
+            % Re-derive computed transducer fields absent in older cache versions.
+            parameters = load_transducer_parameters(parameters);
             trans_pos = parameters.transducer(1).trans_pos;
             focus_pos = parameters.transducer(1).focus_pos;
-            clear grid_cache_info
         else
-            % Focal distance calculation (if not specified)
             parameters = focal_distance_calculation(parameters);
 
-            % Set up grid by preprocessing the planning image or reading in phantom
             [parameters, medium_masks, segmentation, bone, planimg] = ...
                 grid_tissue_setup(parameters);
 
-            % Position the transducer(s) in the grid
             [parameters] = grid_transducer_location(parameters, planimg);
 
-            % Adapt grid to axisymmetry (if requested)
             [parameters, segmentation, bone, medium_masks] = ...
                 grid_axisymmetry(parameters, segmentation, bone, medium_masks);
 
-            % Extract variables for quick access
             trans_pos = parameters.transducer(1).trans_pos;
             focus_pos = parameters.transducer(1).focus_pos;
 
@@ -209,23 +184,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% SETUP MEDIUM
     % ====================================================================
-    % Outputs: kwave_medium (acoustic/thermal property maps in grid space),
-    %          medium_plus  (temp_0 and absorption_fraction, separated from
-    %          kwave_medium to satisfy k-Wave field validation).
-    %
-    % Cache (cache_dir): sub-XXX_MEDIUM_medium_cache.mat
-    %   Written after this stage completes; loaded on re-runs to skip
-    %   medium_setup. Uses the same preproc_affix as the grid cache so that
-    %   uncertainty/multi-ISPPA thermal stages reuse the base run's medium.
-    %   Controlled by io.save_medium_cache (falls back to io.save_matrices).
-    %
-    % Debug outputs (debug_dir/medium/):
-    %   PNGs of medium property maps and raw grid-space NIfTIs
-    %   (density, sound_speed, alpha_coeff, etc.) written by medium_setup.
-    %   These are diagnostic; T1-space backprojected maps written by
-    %   medium_properties_nifti go to output_dir for user inspection.
-    %
-    % For more documentation, see 'medium_setup'.
 
     fprintf('========================================\n');
     fprintf('MEDIUM PROPERTY MAPPING \n');
@@ -259,11 +217,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% SETUP SOURCE
     % ====================================================================
-    % Outputs: kgrid, source, sensor, source_labels.
-    % No separate cache — these are saved as part of the acoustic cache and
-    % restored from it on re-runs (see ACOUSTIC SIMULATION below).
-    %
-    % For more documentation, see 'source_sensor_setup'.
 
     fprintf('========================================\n');
     fprintf('K-WAVE SOURCE SETUP \n');
@@ -282,18 +235,14 @@ function [parameters] = prestus_pipeline(parameters, options)
             [], ...
             min_sound_speed);
 
-        % Check stability & adjust source time step if necessary
         if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~=0
             disp('Check stability...')
             dt_stability_limit = checkStability(kgrid, kwave_medium);
             fprintf('Stability limit estimate for time step: %.1d.\n', dt_stability_limit);
             if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
 			    disp('Adapt time step for simulation stability...')
-                % Free GPU memory from the first source before recomputing with
-                % the adjusted time step — source.p is a gpuArray and keeping
-                % both in memory simultaneously can exceed device memory.
                 clear source sensor source_labels
-                % Use (by default 90%) fraction of the theoretical limit (which is only an approximation in the heterogenous medium case: http://www.k-wave.org/documentation/checkStability.php)
+                % checkStability is only an approximation for heterogeneous media
                 grid_time_step = dt_stability_limit*parameters.grid.source_limit_fraction;
                 [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
             end
@@ -306,13 +255,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% FREE-WATER BASELINE (provenance for post-hoc ISPPA scaling)
     % ====================================================================
-    % Runs a fast water simulation at the current source amplitude and
-    % records the resulting free-water ISPPA [W/cm²] as acoustic_provenance.
-    % This value is saved alongside the acoustic cache so that any
-    % target_isppa_wcm2 can later be achieved by post-hoc pressure scaling
-    % (p × sqrt(target/baseline)) without re-running the skull simulation.
-    % Active when modules.run_water_baseline = 1, or automatically when
-    % calibration.target_isppa_wcm2 is set.
 
     acoustic_provenance = struct();
     run_baseline = (isfield(parameters.modules, 'run_water_baseline') && ...
@@ -331,27 +273,13 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% ACOUSTIC SIMULATION
     % ====================================================================
-    % Outputs: sensor_data, and post-axisymmetry-expansion versions of
-    %          kgrid, kwave_medium, source, sensor, medium_masks,
-    %          segmentation, source_labels.
-    %
-    % Cache (cache_dir): sub-XXX_MEDIUM_results.mat
-    %   Written by acoustic_wrapper; loaded on re-runs to skip simulation.
-    %   Note: medium_masks and segmentation in this cache are the
-    %   post-expansion (3D) versions — they overwrite the pre-expansion
-    %   versions from the grid cache when loaded.
-    %   Controlled by io.save_acoustic_matrices (falls back to io.save_matrices).
-    %
-    % See 'acoustic_simulation' for more documentation.
 
     fprintf('========================================\n');
     fprintf('ACOUSTIC SIMULATION \n');
     fprintf('========================================\n\n');
     log_timer('start','acoustic', parameters.io.output_dir);
 
-    % Thermal jobs (multi_isppa_pipeline) set output_affix to a per-target
-    % suffix (e.g. '_isppa005') but the acoustic cache was written with
-    % base_affix.  Use acoustic_cache_affix when present so we find the file.
+    % Thermal jobs use a per-target output_affix; acoustic_cache_affix points back to the base run.
     if isfield(parameters.io, 'acoustic_cache_affix')
         acoustic_file_affix = parameters.io.acoustic_cache_affix;
     else
@@ -416,15 +344,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop', 'acoustic_analysis');
 
-    % source_labels no longer needed after acoustic analysis
     clear source_labels
 
     % =========================================================================
     %% THERMAL SIMULATIONS
     % =========================================================================
-    % Cache (cache_dir): sub-XXX_MEDIUM_heating_res.mat
-    %   Written after the thermal simulation completes; loaded on re-runs.
-    %   Controlled by io.save_thermal_matrices (falls back to io.save_matrices).
 
     fprintf('========================================\n');
     fprintf('THERMAL SIMULATIONS \n');
@@ -439,18 +363,12 @@ function [parameters] = prestus_pipeline(parameters, options)
             sprintf('sub-%03d_%s_heating_res%s.mat',...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         
-        % Check whether thermal results axist and - if so - should be overwritten
         if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
             confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
 
-            % Reintegrate thermal-only fields before thermal_simulation.
-            % thermal_simulation handles adopted_heatmap override and
-            % axisymmetric expansion of these fields internally.
             kwave_medium.temp_0              = medium_plus.temp_0;
             kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
             clear medium_plus;
-
-            % Set up and run thermal simulation
             [kwaveDiffusion, ...
                 time_status_seq, ...
                 results_heating.maxT, ...
@@ -485,10 +403,6 @@ function [parameters] = prestus_pipeline(parameters, options)
                     '-v7.3');
             end
 
-            % Free large arrays no longer needed after thermal simulation:
-            % sensor_data (acoustic pressure field), source and sensor
-            % (transducer arrays), kgrid (time/space grid), and
-            % kwaveDiffusion (thermal solver object — large on GPU).
             clear sensor_data source sensor kgrid kwaveDiffusion
 
             parameters.state.heating_available = 1;
@@ -526,13 +440,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','thermal_analysis');
 
-    % time_status_seq and segmentation no longer needed after thermal analysis
     clear time_status_seq segmentation bone
 
     % ================================================================
     %% CREATE NIFTI IMAGES
     % ================================================================
-    % plot various metrics on both the subject-space T1 image & MNI space
     
     fprintf('========================================\n');
     fprintf('NIFTI IMAGES \n');
@@ -549,7 +461,6 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     log_timer('stop','nifti');
 
-    % cleanup to reduce RAM load
     clear acoustic_* results_heating medium_masks kwave_medium planimg
 
     % ====================================================================
@@ -560,18 +471,13 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('END \n');
     fprintf('========================================\n\n');
 
-    % capture time, RAM, & GB load of pipeline
     log_timer('stop','prestus_pipeline')
-
-    % indicate success
     disp('Pipeline finished successfully');
 
-    % Generate HTML simulation report (after all timers, before diary closes)
     if isfield(parameters.modules, 'generate_report') && parameters.modules.generate_report
         generate_simulation_report(parameters);
     end
 
-    % Generate multi-ISPPA summary report when requested by multi_isppa_pipeline
     if isfield(parameters.modules, 'multi_isppa_report') && parameters.modules.multi_isppa_report
         if isfield(parameters, 'multi_isppa')
             generate_multi_isppa_report(parameters, parameters.multi_isppa);
@@ -580,11 +486,9 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
     end
 
-    % Generate uncertainty report when requested by uncertainty_pipeline
     if isfield(parameters.modules, 'uncertainty_report') && parameters.modules.uncertainty_report
         if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'affixes')
             generate_uncertainty_report(parameters, parameters.uncertainty.affixes);
-            % Clean up intermediate files on HPC when save_matrices = 0
             if ~should_save_output(parameters.io, 'save_matrices')
                 cleanup_uncertainty_intermediates(parameters, parameters.uncertainty.affixes);
             end
@@ -593,13 +497,11 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
     end
 
-    % end logging
     diary('off')
 
     % ====================================================================
     %% POST-HOC ACOUSTIC WATER SIMULATION
     % ====================================================================
-    % To check sonication parameters of the transducer in free water
 
     if isfield(parameters.modules, 'run_posthoc_water_sims') && parameters.modules.run_posthoc_water_sims && ...
             contains(parameters.simulation.medium, {'layered', 'phantom'})
@@ -616,9 +518,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         water_parameters.modules.run_heating_sims = 0;
         water_parameters.modules.run_posthoc_water_sims = 0;
         water_parameters.simulation.debug = 0;
-        % run with the same grid dimension as the real simulation
         water_parameters.grid.default_dims = water_parameters.grid.dims;
-        % inherit submit medium from main pipeline
         water_parameters.hpc.timelimit = '05:00:00';
         water_parameters.hpc.memorylimit = 40;
         water_parameters.hpc.wait_for_job = false;
@@ -634,7 +534,6 @@ function [parameters] = prestus_pipeline(parameters, options)
         fprintf('========================================\n');
         fprintf('FOLLOW-UP SIMULATION WITH IDENTICAL MEDIUM \n');
         fprintf('========================================\n\n');
-        % Select the config next in line
         sequential_configs = options.sequential_configs;
         fields = fieldnames(sequential_configs);
         numbers = cellfun(@(x) sscanf(x, 'config_%d'), fields);
@@ -642,7 +541,6 @@ function [parameters] = prestus_pipeline(parameters, options)
         lowestField = fields{minIdx};
         sequential_parameters = sequential_configs.(lowestField);
         sequential_configs = rmfield(sequential_configs, lowestField);
-        % restore subject-specific path to original path if done earlier in this function
         sequential_parameters.io.adopted_heatmap = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
                 parameters.subject_id, 'heating_end', parameters.io.output_affix));
         sequential_parameters.io.adopted_cem43 = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
@@ -656,62 +554,14 @@ function [parameters] = prestus_pipeline(parameters, options)
         prestus_pipeline_start(sequential_parameters, options)
     end
 
-end
+    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success'));
 
-% =========================================================================
-%% Local helpers
-% =========================================================================
-
-function tf = is_multi_isppa_mode(parameters)
-% True when calibration.target_isppa_wcm2 contains more than one value.
-    tf = isfield(parameters, 'calibration') && ...
-         isfield(parameters.calibration, 'target_isppa_wcm2') && ...
-         numel(parameters.calibration.target_isppa_wcm2) > 1;
-end
-
-function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters)
-% Scale sensor_data.p_max_all (and p_final if present) so that the
-% free-water ISPPA matches parameters.calibration.target_isppa_wcm2.
-% Only applies when both the target and the baseline ISPPA are available
-% and differ by more than 1%.
-%
-% Called after loading a cached acoustic result inside a thermal-only job
-% spawned by multi_isppa_pipeline. The scale factor is derived entirely
-% from the user-facing ISPPA values — elem_amp is never inspected.
-    if ~isfield(parameters, 'calibration') || ...
-            ~isfield(parameters.calibration, 'target_isppa_wcm2') || ...
-            isempty(parameters.calibration.target_isppa_wcm2) || ...
-            ~isfinite(parameters.calibration.target_isppa_wcm2)
-        return;
-    end
-    if ~isfield(acoustic_provenance, 'freefield_isppa_wcm2') || ...
-            isempty(acoustic_provenance.freefield_isppa_wcm2) || ...
-            acoustic_provenance.freefield_isppa_wcm2 <= 0
-        warning(['apply_isppa_scaling: acoustic_provenance.freefield_isppa_wcm2 is missing ' ...
-                 'or invalid — pressure scaling skipped. Re-run the acoustic stage to ' ...
-                 'generate provenance.']);
-        return;
+    catch me_
+        track_usage('run_error', parameters, struct( ...
+            'duration_s', toc(telemetry_t0), ...
+            'status',     'error', ...
+            'error_id',   me_.identifier));
+        rethrow(me_);
     end
 
-    target   = parameters.calibration.target_isppa_wcm2;
-    baseline = acoustic_provenance.freefield_isppa_wcm2;
-    scale_p  = sqrt(target / baseline);
-
-    if abs(scale_p - 1) <= 0.01
-        return;
-    end
-
-    if scale_p > 4 || scale_p < 0.25
-        warning(['apply_isppa_scaling: large pressure scale factor (%.2fx) from %.1f to ' ...
-                 '%.1f W/cm². Verify that the target is in the linear acoustic regime ' ...
-                 'relative to the baseline simulation amplitude.'], ...
-                scale_p, baseline, target);
-    end
-
-    fprintf('Scaling cached pressure field: %.2f → %.2f W/cm² (scale_p = %.4f)\n', ...
-            baseline, target, scale_p);
-    sensor_data.p_max_all = sensor_data.p_max_all * scale_p;
-    if isfield(sensor_data, 'p_final')
-        sensor_data.p_final = sensor_data.p_final * scale_p;
-    end
 end

@@ -40,6 +40,10 @@ function job_id = prestus_pipeline_start(parameters, options)
         addpath(helpers_path);
     end
 
+    % Prompt for telemetry consent before any dispatch (interactive context).
+    % prestus_pipeline retains the call as a fallback for direct invocations.
+    telemetry_setup();
+
     % ========== PLATFORM SELECTION ==========
     if ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
         platform = hpc_detect_system();
@@ -121,10 +125,4 @@ function job_id = prestus_pipeline_start(parameters, options)
             error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
                 parameters.platform);
     end
-end
-
-function tf = is_multi_isppa_mode(parameters)
-    tf = isfield(parameters, 'calibration') && ...
-         isfield(parameters.calibration, 'target_isppa_wcm2') && ...
-         numel(parameters.calibration.target_isppa_wcm2) > 1;
 end
