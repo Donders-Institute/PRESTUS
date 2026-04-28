@@ -131,7 +131,14 @@ end
         else
             parameters.io.pct_dir = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
         end
-        if ~isfolder(parameters.io.pct_dir); mkdir(parameters.io.pct_dir); end
+        % Only create the directory when pCT is actually enabled; an unconditional
+        % mkdir here (after cd(prestus_path) above) would create sub-NNN in the
+        % PRESTUS root if path.pct is a relative path.
+        pct_enabled = isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && ...
+                      parameters.pct.enabled;
+        if pct_enabled && ~isfolder(parameters.io.pct_dir)
+            mkdir(parameters.io.pct_dir);
+        end
     end
     
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)

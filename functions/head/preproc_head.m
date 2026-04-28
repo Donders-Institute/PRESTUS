@@ -381,7 +381,9 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
         inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
 
-        % [DEBUG] save transformed medium mask and skull to debug dir
+        % Diagnostic NIfTIs: medium_masks, segmentation, and skull_mask
+        % back-projected to T1 space. Written to debug_dir/preproc/ only
+        % when simulation.debug == 1 — not intended as pipeline outputs.
         if parameters.simulation.debug == 1
             % save medium mask
             orig_hdr = t1_header; % header is based on original T1w (always present)

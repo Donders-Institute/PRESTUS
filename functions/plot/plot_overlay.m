@@ -82,7 +82,12 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         options.overlay_threshold_low = options.overlay_threshold_low - 0.05;
     end
     if isempty(options.overlay_color_range)
-        options.overlay_color_range = [max([options.overlay_threshold_low, min(overlay_image(:)), 0]), max(overlay_image(:))];
+        clim_lo = max([options.overlay_threshold_low, min(overlay_image(:)), 0]);
+        clim_hi = max(overlay_image(:));
+        if clim_hi <= clim_lo
+            clim_hi = clim_lo + 1;  % degenerate range (e.g. all-zero map) — use unit range
+        end
+        options.overlay_color_range = [clim_lo, clim_hi];
     end
 
 
@@ -218,10 +223,14 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     
     imagesc(ax2, overlay_image,'alphadata', intensity_alpha);
 
+    cr = options.overlay_color_range;
+    if cr(2) <= cr(1)
+        cr(2) = cr(1) + 1;
+    end
     if exist("clim")==2 % renamed in R2022a
-        clim(options.overlay_color_range);
+        clim(cr);
     elseif exist("caxis")==2
-        caxis(options.overlay_color_range);
+        caxis(cr);
     end
     % use requested color scale (or revert to MATLAB default)
     try

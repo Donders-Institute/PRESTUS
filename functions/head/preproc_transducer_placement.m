@@ -100,7 +100,7 @@ function localite_file = resolve_localite_file(parameters)
     end
 
     % Fall back to automatic session selection
-    if ~isfield(parameters.path, 'localite') || isempty(parameters.path.localite)
+    if ~isfield(parameters, 'path') || ~isfield(parameters.path, 'localite') || isempty(parameters.path.localite)
         error(['placement.localite.file is empty and path.localite is not set. ' ...
                'Provide one of these to use Localite placement.']);
     end

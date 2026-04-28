@@ -81,8 +81,12 @@ fprintf('🎯 TRANSDUCER SPECIFICATION\n');
 for t_i = 1:numel(parameters.transducer)
 	tr = parameters.transducer(t_i);
 
-    % Determine type
+    % Determine type — skip template entries with no type configured
     tr_type = tr.type;
+    if ~ischar(tr_type) || isempty(tr_type)
+        fprintf('Transducer %d: [not configured]\n', t_i);
+        continue;
+    end
 
     fprintf('Transducer %d (%s):\n', t_i, tr_type);
 

@@ -32,21 +32,30 @@ end
 
     if isfield(parameters, 'transducer')
 
+        % Check whether any transducer has been configured (non-empty type).
+        % The default config contains a template entry with type: [] — skip
+        % the entire validation block when no type has been set.
+        has_type = arrayfun(@(t) isfield(t, 'type') && ischar(t.type) && ~isempty(t.type), ...
+                            parameters.transducer);
+        if ~any(has_type)
+            return;
+        end
+
         new_transducers = struct([]);
-        
+
         for t_i = 1:numel(parameters.transducer)
-    
+
             tr = parameters.transducer(t_i);
-    
+
             % ---------------------------------------------------------------------
             % Validate and initialize transducer parameters
             % ---------------------------------------------------------------------
 
             % Supported transducer geometries: matrix and annular arrays
 
-            % Ensure the type field is defined
-            assert(isfield(tr, 'type'),...
-                'Transducer %i; Missing type field. Please specify either "matrix" or "annular".', t_i);
+            % Ensure the type field is defined and is a non-empty string
+            assert(isfield(tr, 'type') && ischar(tr.type) && ~isempty(tr.type),...
+                'Transducer %i; Missing or empty type field. Please specify either "matrix" or "annular".', t_i);
 
             switch tr.type
 
