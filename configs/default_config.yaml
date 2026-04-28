@@ -257,12 +257,13 @@ placement:
 grid:
   resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
   default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
-  pml_size: 'auto'    # Perfectly Matched Layer (PML) size added outside the grid by k-Wave.
-                      # 'auto' (recommended): k-Wave selects the size that minimises the highest
-                      # prime factor of each computational dimension, maximising FFT speed.
-                      # Integer (e.g. 10): fixed PML thickness in grid points; may produce slow
-                      # FFT dimensions if grid_size + 2*pml_size has large prime factors.
-                      # Integer (3D recommendation: 10) or 'auto' (k-Wave selects optimal size for FFT).
+  pml_size: 'auto'    # Perfectly Matched Layer (PML) thickness [grid points] or 'auto'.
+                      # 'auto': calls getOptimalPMLSize(kgrid) which searches the range [10, 40]
+                      #   and picks the size that minimises the largest prime factor of
+                      #   grid_N + 2*pml_size (independently per dimension), maximising FFT speed.
+                      #   For axisymmetric mode the radial dimension uses the WSWA variant.
+                      # Integer (e.g. 20): fixed thickness; may slow FFT if grid_N + 2*pml_size
+                      #   has large prime factors.
   source_ppw: []      # Points Per Wavelength [default: calculated internally]
   min_ppw: 6          # Minimum acceptable PPW at the fundamental frequency; triggers a warning if violated
   source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction
