@@ -1,0 +1,6 @@
+function tf = is_multi_isppa_mode(parameters)
+% True when calibration.target_isppa_wcm2 contains more than one value.
+    tf = isfield(parameters, 'calibration') && ...
+         isfield(parameters.calibration, 'target_isppa_wcm2') && ...
+         numel(parameters.calibration.target_isppa_wcm2) > 1;
+end
