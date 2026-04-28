@@ -43,7 +43,7 @@ function parameters = make_minimal_parameters(sim_path)
     % Grid — small for speed
     parameters.grid.resolution_mm  = 1.0;
     parameters.grid.default_dims   = [72, 72, 128];
-    parameters.grid.pml_size       = 10;
+    parameters.grid.pml_size       = 'auto';  % getOptimalPMLSize → FFT grids with max prime ≤ 3
     parameters.grid.axisymmetric   = 0;
     parameters.grid.use_kWaveArray = 1;
 
@@ -60,6 +60,7 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.modules.generate_report        = 0;
 
     % Transducer — single-element annular bowl
+    parameters.transducer.type                   = 'annular';
     parameters.transducer.annular.elem_n         = 1;
     parameters.transducer.annular.elem_id_mm     = 0;
     parameters.transducer.annular.elem_od_mm     = 32.0;

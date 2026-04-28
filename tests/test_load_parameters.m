@@ -50,16 +50,18 @@ classdef test_load_parameters < matlab.unittest.TestCase
 
         function test_modules_defaults(tc)
             p = load_parameters();
-            tc.verifyEqual(p.modules.run_grid_setup,     1);
-            tc.verifyEqual(p.modules.run_heating_sims,   0);
-            tc.verifyEqual(p.modules.segmentation_only,  0);
-            tc.verifyEqual(p.modules.generate_report,    1);
+            tc.verifyEqual(p.modules.run_grid_setup,            1);
+            tc.verifyEqual(p.modules.run_heating_sims,          0);
+            tc.verifyEqual(p.modules.segmentation_only,         0);
+            tc.verifyEqual(p.modules.generate_report,           1);
+            tc.verifyEqual(p.modules.run_transducer_placement,  1);
+            tc.verifyEqual(p.modules.run_water_baseline,        0);
         end
 
         function test_grid_defaults(tc)
             p = load_parameters();
             tc.verifyEqual(p.grid.resolution_mm,     0.5);
-            tc.verifyEqual(p.grid.pml_size,          10);
+            tc.verifyEqual(p.grid.pml_size,          "auto");
             tc.verifyEqual(p.grid.use_kWaveArray,    1);
         end
 
