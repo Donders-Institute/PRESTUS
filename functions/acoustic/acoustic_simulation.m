@@ -47,9 +47,12 @@ if ~parameters.simulation.interactive
 end
 
 % Remove fields that are not recognized for acoustic simulations
-medium = rmfield(medium,'thermal_conductivity');
-medium = rmfield(medium,'specific_heat');
-medium = rmfield(medium,'perfusion_coeff');
+thermal_fields = {'thermal_conductivity', 'specific_heat', 'perfusion_coeff'};
+for f = thermal_fields
+    if isfield(medium, f{1})
+        medium = rmfield(medium, f{1});
+    end
+end
 
 % Define scale for plotting
 input_args.PlotScale = [-1, 1] * parameters.transducer(1).(parameters.transducer(1).type).elem_amp(1);

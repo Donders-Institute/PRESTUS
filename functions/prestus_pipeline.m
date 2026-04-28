@@ -130,66 +130,127 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% GRID: PREPROCESS structural MRI & POSITION transducer + target
     % ====================================================================
-    % reorient image, determine transducer & target position in image
-    % For more documentation, see the 'preproc_head' function.
+    % Outputs: planimg, medium_masks, segmentation, bone, trans_pos, focus_pos
+    %          and updated parameters.grid / parameters.transducer fields.
+    %
+    % Cache (cache_dir): sub-XXX_MEDIUM_grid_cache.mat
+    %   Written after this stage completes; loaded on re-runs to skip all
+    %   sub-steps (grid_tissue_setup, grid_transducer_location, grid_axisymmetry).
+    %   Uses io.preproc_affix when set (uncertainty/multi-ISPPA thermal stages
+    %   point back to the base run's grid cache via this field).
+    %   Controlled by io.save_grid_cache (falls back to io.save_matrices).
+    %
+    % Internal checkpoints (cache_dir, managed by preproc_head):
+    %   sub-XXX_MEDIUM_after_rotating_and_scaling.mat   — post-rotation/rescale
+    %   sub-XXX_MEDIUM_after_cropping_and_smoothing.mat — post-crop/smooth
+    %   These allow preproc_head to resume after an interruption mid-stage;
+    %   they are not intended to be loaded directly from prestus_pipeline.
+    %
+    % Debug outputs (debug_dir/preproc/): PNGs and intermediate NIfTIs
+    %   (segmented, segmentation, skull_mask) written by preproc_head for
+    %   visual inspection. Written only when simulation.debug == 1.
 
     fprintf('========================================\n');
     fprintf('GRID SETUP & HEAD PREPROC \n');
     fprintf('========================================\n\n');
     log_timer('start','preproc', parameters.io.output_dir);
 
-    if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup==1
-        % Focal distance calculation (if not specified)
-        parameters = focal_distance_calculation(parameters);
+    if isfield(parameters.io, 'preproc_affix')
+        preproc_affix = parameters.io.preproc_affix;
+    else
+        preproc_affix = parameters.io.output_affix;
+    end
+    filename_grid_cache = fullfile(parameters.io.cache_dir, ...
+        sprintf('sub-%03d_%s_grid_cache%s.mat', ...
+        parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
-        % Set up grid by preprocessing the planning image or reading in phantom
-        [parameters, medium_masks, segmentation, bone, planimg] = ...
-            grid_tissue_setup(parameters);
+    if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup == 1
+        if ~confirm_overwriting(filename_grid_cache, parameters)
+            disp('Loading grid cache — skipping head preprocessing.')
+            load(filename_grid_cache);
+            % Restore parameters fields updated during grid setup.
+            parameters.grid       = grid_cache_info.parameters.grid;
+            parameters.transducer = grid_cache_info.parameters.transducer;
+            trans_pos = parameters.transducer(1).trans_pos;
+            focus_pos = parameters.transducer(1).focus_pos;
+            clear grid_cache_info
+        else
+            % Focal distance calculation (if not specified)
+            parameters = focal_distance_calculation(parameters);
 
-        % Position the transducer(s) in the grid
-        [parameters] = grid_transducer_location(parameters, planimg);
+            % Set up grid by preprocessing the planning image or reading in phantom
+            [parameters, medium_masks, segmentation, bone, planimg] = ...
+                grid_tissue_setup(parameters);
 
-        % Adapt grid to axisymmetry (if requested)
-        [parameters, segmentation, bone, medium_masks] = ...
-            grid_axisymmetry(parameters, segmentation, bone, medium_masks);
+            % Position the transducer(s) in the grid
+            [parameters] = grid_transducer_location(parameters, planimg);
 
-        % Extract variables for quick access
-        trans_pos = parameters.transducer(1).trans_pos;
-        focus_pos = parameters.transducer(1).focus_pos;
+            % Adapt grid to axisymmetry (if requested)
+            [parameters, segmentation, bone, medium_masks] = ...
+                grid_axisymmetry(parameters, segmentation, bone, medium_masks);
+
+            % Extract variables for quick access
+            trans_pos = parameters.transducer(1).trans_pos;
+            focus_pos = parameters.transducer(1).focus_pos;
+
+            if should_save_output(parameters.io, 'save_grid_cache')
+                grid_cache_info.parameters = parameters;
+                save(filename_grid_cache, ...
+                    'planimg', 'medium_masks', 'segmentation', 'bone', ...
+                    'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
+                clear grid_cache_info
+            end
+        end
     else
         disp('No grid setup requested...no simulations will be performed.')
     end
     log_timer('stop','preproc');
-    
+
     % ====================================================================
     %% SETUP MEDIUM
     % ====================================================================
-    % For more documentation, see 'medium_setup'
+    % Outputs: kwave_medium (acoustic/thermal property maps in grid space),
+    %          medium_plus  (temp_0 and absorption_fraction, separated from
+    %          kwave_medium to satisfy k-Wave field validation).
+    %
+    % Cache (cache_dir): sub-XXX_MEDIUM_medium_cache.mat
+    %   Written after this stage completes; loaded on re-runs to skip
+    %   medium_setup. Uses the same preproc_affix as the grid cache so that
+    %   uncertainty/multi-ISPPA thermal stages reuse the base run's medium.
+    %   Controlled by io.save_medium_cache (falls back to io.save_matrices).
+    %
+    % Debug outputs (debug_dir/medium/):
+    %   PNGs of medium property maps and raw grid-space NIfTIs
+    %   (density, sound_speed, alpha_coeff, etc.) written by medium_setup.
+    %   These are diagnostic; T1-space backprojected maps written by
+    %   medium_properties_nifti go to output_dir for user inspection.
+    %
+    % For more documentation, see 'medium_setup'.
 
     fprintf('========================================\n');
     fprintf('MEDIUM PROPERTY MAPPING \n');
     fprintf('========================================\n\n');
     log_timer('start','medium', parameters.io.output_dir);
 
-    if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup==1
-        if parameters.pct.enabled == 1
-            kwave_medium = medium_setup(parameters, medium_masks, planimg, bone);
+    filename_medium_cache = fullfile(parameters.io.cache_dir, ...
+        sprintf('sub-%03d_%s_medium_cache%s.mat', ...
+        parameters.subject_id, parameters.simulation.medium, preproc_affix));
+
+    if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup == 1
+        if ~confirm_overwriting(filename_medium_cache, parameters)
+            disp('Loading medium cache — skipping medium property mapping.')
+            load(filename_medium_cache);
         else
-            kwave_medium = medium_setup(parameters, medium_masks, planimg);
+            if parameters.pct.enabled == 1
+                [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, bone);
+            else
+                [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg);
+            end
+
+            if should_save_output(parameters.io, 'save_medium_cache')
+                save(filename_medium_cache, 'kwave_medium', 'medium_plus', '-v7.3');
+            end
         end
-    
-        % split temp_0 & absorption_fraction from kwave_medium (to pass internal kwave checks)
-        if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_heatmap) && isfile(parameters.io.adopted_heatmap)
-            heatmap_image = niftiread(parameters.io.adopted_heatmap);
-            fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
-            medium_plus.temp_0 = double(tformarray(heatmap_image, maketform("affine", planimg.transf), ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
-        else
-            medium_plus.temp_0 = kwave_medium.temp_0;
-        end
-        kwave_medium = rmfield(kwave_medium, 'temp_0');
-        medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
-        kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
     else
         disp('No medium mapping requested...no simulations will be performed.')
     end
@@ -198,8 +259,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% SETUP SOURCE
     % ====================================================================
+    % Outputs: kgrid, source, sensor, source_labels.
+    % No separate cache — these are saved as part of the acoustic cache and
+    % restored from it on re-runs (see ACOUSTIC SIMULATION below).
+    %
     % For more documentation, see 'source_sensor_setup'.
-    % Precomputed source can be loaded (if available).
 
     fprintf('========================================\n');
     fprintf('K-WAVE SOURCE SETUP \n');
@@ -217,7 +281,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             focus_pos, ...
             [], ...
             min_sound_speed);
-        
+
         % Check stability & adjust source time step if necessary
         if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~=0
             disp('Check stability...')
@@ -267,16 +331,35 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% ACOUSTIC SIMULATION
     % ====================================================================
-    % See 'acoustic_simulation' for more documentation
+    % Outputs: sensor_data, and post-axisymmetry-expansion versions of
+    %          kgrid, kwave_medium, source, sensor, medium_masks,
+    %          segmentation, source_labels.
+    %
+    % Cache (cache_dir): sub-XXX_MEDIUM_results.mat
+    %   Written by acoustic_wrapper; loaded on re-runs to skip simulation.
+    %   Note: medium_masks and segmentation in this cache are the
+    %   post-expansion (3D) versions — they overwrite the pre-expansion
+    %   versions from the grid cache when loaded.
+    %   Controlled by io.save_acoustic_matrices (falls back to io.save_matrices).
+    %
+    % See 'acoustic_simulation' for more documentation.
 
     fprintf('========================================\n');
     fprintf('ACOUSTIC SIMULATION \n');
     fprintf('========================================\n\n');
     log_timer('start','acoustic', parameters.io.output_dir);
 
+    % Thermal jobs (multi_isppa_pipeline) set output_affix to a per-target
+    % suffix (e.g. '_isppa005') but the acoustic cache was written with
+    % base_affix.  Use acoustic_cache_affix when present so we find the file.
+    if isfield(parameters.io, 'acoustic_cache_affix')
+        acoustic_file_affix = parameters.io.acoustic_cache_affix;
+    else
+        acoustic_file_affix = parameters.io.output_affix;
+    end
     filename_sensor_data = fullfile(parameters.io.cache_dir, ...
         sprintf('sub-%03d_%s_results%s.mat',...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        parameters.subject_id, parameters.simulation.medium, acoustic_file_affix));
 
     parameters.state.acoustics_available = 0;
     if isfield(parameters.modules, 'run_acoustic_sims') && parameters.modules.run_acoustic_sims &&...
@@ -339,6 +422,9 @@ function [parameters] = prestus_pipeline(parameters, options)
     % =========================================================================
     %% THERMAL SIMULATIONS
     % =========================================================================
+    % Cache (cache_dir): sub-XXX_MEDIUM_heating_res.mat
+    %   Written after the thermal simulation completes; loaded on re-runs.
+    %   Controlled by io.save_thermal_matrices (falls back to io.save_matrices).
 
     fprintf('========================================\n');
     fprintf('THERMAL SIMULATIONS \n');
@@ -347,9 +433,8 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     parameters.state.heating_available = 0;
     if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims && parameters.state.acoustics_available == 1
-        
+
         disp('Starting thermal simulations...')
-        % Name of thermal simulation output file
         filename_heating_data = fullfile(parameters.io.cache_dir,...
             sprintf('sub-%03d_%s_heating_res%s.mat',...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
@@ -358,16 +443,12 @@ function [parameters] = prestus_pipeline(parameters, options)
         if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
             confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
 
-            % Pass thermally relevant (but kwave-irregular) medium fields
-            kwave_medium.temp_0 = medium_plus.temp_0;
-            kwave_medium.absorption_fraction = medium_plus.absorption_fraction; 
+            % Reintegrate thermal-only fields before thermal_simulation.
+            % thermal_simulation handles adopted_heatmap override and
+            % axisymmetric expansion of these fields internally.
+            kwave_medium.temp_0              = medium_plus.temp_0;
+            kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
             clear medium_plus;
-    
-            % convert medium fields to 3D (if axisymmetry was used)
-            if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
-                kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0);
-                kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction);
-            end
 
             % Set up and run thermal simulation
             [kwaveDiffusion, ...
@@ -599,7 +680,8 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
 % from the user-facing ISPPA values — elem_amp is never inspected.
     if ~isfield(parameters, 'calibration') || ...
             ~isfield(parameters.calibration, 'target_isppa_wcm2') || ...
-            isempty(parameters.calibration.target_isppa_wcm2)
+            isempty(parameters.calibration.target_isppa_wcm2) || ...
+            ~isfinite(parameters.calibration.target_isppa_wcm2)
         return;
     end
     if ~isfield(acoustic_provenance, 'freefield_isppa_wcm2') || ...

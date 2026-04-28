@@ -28,7 +28,9 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, CEM43_max, C
 %   kwave_medium - struct with fields: alpha_coeff, alpha_power,
 %                  density [kg/m^3], sound_speed [m/s],
 %                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
-%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C]
+%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C];
+%                  temp_0 and absorption_fraction are the medium_plus fields
+%                  reintegrated by the caller before this function is invoked
 %   sensor       - struct with sensor.mask (used to define focal axis recording window)
 %   source       - struct; Q is overwritten internally from p_max_all
 %   transf       - affine forward transform from T1 to simulation grid
@@ -108,6 +110,24 @@ if parameters.pct.enabled ==1 && ...
     % [k-Plan] use fixed density for thermal simulation
     kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
     clear skull_i;
+end
+
+% Expand thermal-only fields from 2D axisymmetric to 3D when needed.
+% acoustic_wrapper already expanded the acoustic fields (sound_speed, density,
+% etc.); temp_0 and absorption_fraction were stored separately in medium_plus
+% and were not expanded at that point.
+if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
+    kwave_medium.temp_0              = radialExpand2DTo3D(kwave_medium.temp_0);
+    kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction);
+end
+
+% Override initial temperature from a previous simulation's heatmap.
+% Analogous to adopted_cem43 below.
+if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_heatmap) && isfile(parameters.io.adopted_heatmap)
+    heatmap_image = niftiread(parameters.io.adopted_heatmap);
+    fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
+    kwave_medium.temp_0 = double(tformarray(heatmap_image, maketform("affine", transf), ...
+        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
 end
 
 % convert attenuation into absorption coefficients

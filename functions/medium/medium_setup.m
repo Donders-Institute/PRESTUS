@@ -1,4 +1,4 @@
-function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT)
+function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, pseudoCT)
 % MEDIUM_SETUP  Build the k-Wave medium property struct from tissue masks and config
 %
 % Starting from uniform NaN grids, assigns acoustic and thermal properties
@@ -30,7 +30,11 @@ function kwave_medium = medium_setup(parameters, medium_masks, planimg, pseudoCT
 %   kwave_medium - struct with fields: sound_speed [m/s], density [kg/m^3],
 %                  alpha_coeff [dB/(MHz cm)], alpha_power,
 %                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
-%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C]
+%                  perfusion_coeff [1/s]
+%                  (absorption_fraction and temp_0 are returned in medium_plus)
+%   medium_plus  - struct with fields: absorption_fraction, temp_0 [°C]
+%                  (kept separate because k-Wave rejects these fields in
+%                  kwave_medium during acoustic simulation)
 %
 % See also: MEDIUM_PCT_DENSITY, MEDIUM_PCT_SOUNDSPEED, MEDIUM_PCT_ATTENUATION,
 %   FITPOWERLAWPARAMSMULTI, MEDIUM_PROPERTIES_NIFTI
@@ -261,8 +265,7 @@ end
     end
 
 
-    %% specify the medium as a kWave-compatible structure 
-    % Note: absorption_fraction and temp_0 need to be removed later)
+    %% specify the medium as a kWave-compatible structure
     kwave_medium = struct('sound_speed', sound_speed, ...
                           'density', density, ...
                           'alpha_coeff', alpha_coeff_fixed,...
@@ -273,15 +276,15 @@ end
                           'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
-    %% Save acoustic property NIfTIs in T1 space (always for layered; raw matrices debug-only)
+    %% Save acoustic property NIfTIs
     %
-    % T1-space maps (medium_properties_nifti): written unconditionally for
-    % layered simulations so that they are available for QC and for the
-    % uncertainty report without requiring debug mode.
+    % T1-space maps → cache_dir (e.g. sound_speed.nii.gz, density.nii.gz):
+    %   Written unconditionally for layered simulations via medium_properties_nifti.
+    %   These are user-inspectable QC outputs; skipped if the file already exists.
     %
-    % Raw simulation-grid matrices (matrix_*.nii.gz): debug-only because they
-    % are large, anisotropic, and not directly interpretable without the grid
-    % metadata.
+    % Raw simulation-grid matrices → debug_dir/medium/ (matrix_*.nii.gz):
+    %   Written only when simulation.debug == 1. Large, anisotropic, and only
+    %   interpretable with the grid metadata — not intended as pipeline outputs.
     if contains(parameters.simulation.medium, {'layered'}) && exist('planimg','var') && ~isempty(planimg)
         try
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
@@ -326,5 +329,10 @@ end
             niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
         end
     end
+
+    %% Split fields incompatible with k-Wave acoustic validation
+    medium_plus.temp_0              = kwave_medium.temp_0;
+    medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
+    kwave_medium = rmfield(kwave_medium, {'temp_0', 'absorption_fraction'});
 
 end
