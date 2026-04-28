@@ -46,8 +46,8 @@ These parameters influence the underlying mechanisms of how the thermal simulati
         - When `equal_step_duration` is disabled, every on and off step will be simulated as one simulation step (2\*5 = 10 steps), reducing the computational load.
 - `post_ptri_dur` refers to the duration of a post-stimulation period.
 - `temp_0` refers to the starting temperature in degrees, and can be specified for each tissue separately.
-- `sensory_xy_halfsize` refers to the window along the transducer axis in which temperature changed are recorded.
-- `record_t_at_every_step` can be enabled if there is a need to record temperature changes at every time step, but can lead to `out of memory` errors.
+- `sensor_xy_halfsize` defines the half-size (in grid units) of the rectangular XY sensor window centred on the transducer position. Only voxels within this window are included in the temperature sensor mask passed to `kWaveDiffusion`; voxels outside it are not recorded. The full Z extent of the grid is always included. Reducing this value lowers memory use during thermal simulation.
+- `record_t_at_every_step` controls whether the full sensor window temperature is stored at every simulation time step. When disabled (default, `0`), the sensor is discarded before the simulation and only the final temperature field is retained, which is substantially more memory-efficient. Enable (`1`) only if you need the complete temperature time series, but note that this can cause `out of memory` errors for large grids or many time steps.
 
 ### Thermal dose (CEM43) calculation
 

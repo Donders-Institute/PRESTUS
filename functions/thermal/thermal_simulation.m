@@ -152,9 +152,12 @@ else
 end
 
 % create kWaveDiffusion object
-if isfield(parameters.thermal,'record_t_at_every_step') && ~parameters.thermal.record_t_at_every_step 
+% pass sensor only when per-step recording is explicitly requested; otherwise clear it to save memory
+record_every_step = isfield(parameters.thermal, 'record_t_at_every_step') && parameters.thermal.record_t_at_every_step;
+if ~record_every_step
     sensor = [];
 end
+clear record_every_step;
 
 % Check if DataCast is supported
 try
