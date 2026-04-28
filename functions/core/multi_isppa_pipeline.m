@@ -123,7 +123,7 @@ p_thermal  = cell(1, numel(targets));
 affixes    = cell(1, numel(targets));
 for ti = 1:numel(targets)
     affixes{ti}   = sprintf('%s_isppa%03d', base_affix, round(targets(ti)));
-    p_thermal{ti} = make_thermal_params(parameters, targets(ti), affixes{ti});
+    p_thermal{ti} = make_thermal_params(parameters, targets(ti), affixes{ti}, base_affix);
 end
 
 p_summary = make_summary_params(parameters, targets, affixes, base_affix);
@@ -296,14 +296,15 @@ function p = make_acoustic_params(base, base_affix)
     p.simulation.interactive         = 0;
 end
 
-function p = make_thermal_params(base, target_isppa, affix)
+function p = make_thermal_params(base, target_isppa, affix, base_affix)
 % Stages 2…N: load cached acoustic results, apply pressure scaling to
 % target_isppa, run thermal simulation and analysis, generate HTML report.
     p = clear_multi_isppa_targets(base);
     p.calibration.target_isppa_wcm2  = target_isppa;   % scalar for this job
-    p.modules.run_source_setup       = 1;   % checks cache; skips if present
+    p.io.acoustic_cache_affix        = base_affix;     % points at Stage-1 cache file
+    p.modules.run_source_setup       = 0;   % kgrid/source/sensor come from acoustic cache
     p.modules.run_acoustic_sims      = 0;   % load from cache
-    p.modules.run_water_baseline = 0;
+    p.modules.run_water_baseline     = 0;
     p.modules.run_heating_sims       = 1;
     run_thermal = ~isfield(base.modules, 'run_thermal_analysis') || ...
                   base.modules.run_thermal_analysis;
@@ -325,7 +326,7 @@ function p = make_summary_params(base, targets, affixes, base_affix)
     p = clear_multi_isppa_targets(base);
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
-    p.modules.run_water_baseline = 0;
+    p.modules.run_water_baseline   = 0;
     p.modules.run_heating_sims       = 0;
     p.modules.run_thermal_analysis   = 0;
     p.modules.run_posthoc_water_sims = 0;
