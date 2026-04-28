@@ -40,7 +40,7 @@ function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ..
 
     %% Compute focal slope0
     % Calculate unit vector pointing from focus to transducer
-    if parameters.transducer(1).align_to_focus == 0 && ~isempty(natural_foc)
+    if isfield(parameters.transducer(1), 'align_to_focus') && parameters.transducer(1).align_to_focus == 0 && ~isempty(natural_foc)
         focal_slope = (trans_pos - natural_foc) / norm(trans_pos - natural_foc);
     else
         focal_slope = (trans_pos - focus_pos) / norm(trans_pos - focus_pos);

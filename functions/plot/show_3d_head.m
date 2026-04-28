@@ -124,7 +124,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             % All shapes in downsampled space
             max_od_grid = max_od_mm / pixel_size;
             
-            if tr.align_to_focus
+            if ~isfield(tr, 'align_to_focus') || tr.align_to_focus
                 norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
 
             else

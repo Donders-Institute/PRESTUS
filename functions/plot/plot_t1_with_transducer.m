@@ -67,7 +67,7 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
     %% Create transducer mask and setup parameters
     [transducer_bowl, ~, tr] = transducer_setup(parameters.transducer(1), ...
                                                              trans_pos_grid, focus_pos_grid, ...
-                                                             im_size, voxel_size_mm);
+                                                             im_size, voxel_size_mm, parameters);
 
     %% Define slicing indices based on specified dimension and index
     slice_pointer = repmat({':'}, 1, 3); % Initialize slicing indices for all dimensions

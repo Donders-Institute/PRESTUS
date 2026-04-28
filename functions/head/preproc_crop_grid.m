@@ -66,7 +66,7 @@ crop_margin = 1;
 % Include transducer bowl geometry (safe with padding)
 i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
 transducer_bowl = transducer_setup(parameters.transducer(1), trans_pos_grid, ...
-    focus_pos_grid, size(segmentation), parameters.grid.resolution_mm);
+    focus_pos_grid, size(segmentation), parameters.grid.resolution_mm, parameters);
 
 % Compute crop bounds
 orig_dims = size(medium_masks);

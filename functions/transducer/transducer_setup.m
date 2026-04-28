@@ -1,5 +1,5 @@
 function [transducer_mask, source_label, tr] = ...
-    transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm)
+    transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm, parameters)
 
 % TRANSDUCER_SETUP  Create a transducer mask and label matrix for a k-Wave grid
 %
@@ -9,7 +9,7 @@ function [transducer_mask, source_label, tr] = ...
 %
 % Use as:
 %   [transducer_mask, source_label, tr] = ...
-%       transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm)
+%       transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm, parameters)
 %
 % Input:
 %   tr          - (1,1) transducer parameter struct
@@ -17,6 +17,7 @@ function [transducer_mask, source_label, tr] = ...
 %   focus_pos   - [1x2/3] focus position in grid coordinates
 %   grid_dims   - [1x2/3] computational grid dimensions [voxels]
 %   grid_res_mm - grid step size [mm]
+%   parameters  - (optional) PRESTUS config struct; required for matrix transducers
 %
 % Output:
 %   transducer_mask - grid array with non-zero values at active element voxels
@@ -82,8 +83,8 @@ function [transducer_mask, source_label, tr] = ...
                 source_label = source_label + el_i * bowl;
             end
         case 'matrix'
-            trans_pos_m = trans_pos * grid_step_mm / 1e3;
-            focus_pos_m = focus_pos * grid_step_mm / 1e3;
+            trans_pos_m = trans_pos * grid_res_mm / 1e3;
+            focus_pos_m = focus_pos * grid_res_mm / 1e3;
 
             switch tr.matrix.matrix_shape.type
                 case 'define_here'
@@ -98,15 +99,15 @@ function [transducer_mask, source_label, tr] = ...
 
             % Apply Clover setup if requested
             if tr.is_clover_setup
-                elem_pos_m = create_clover_array(elem_pos_m, tr, trans_pos_m);
+                elem_pos_m = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
             end
 
             tr.elem_n = size(elem_pos_m, 2);
 
             % Convert to grid units
-            elem_pos_grid = round(elem_pos_m * 1e3 / grid_step_mm);
+            elem_pos_grid = round(elem_pos_m * 1e3 / grid_res_mm);
 
-            natural_focus_pos_grid = round(natural_focus_pos_m * 1e3 / grid_step_mm);
+            natural_focus_pos_grid = round(natural_focus_pos_m * 1e3 / grid_res_mm);
 
             % Loop through each transducer element to create its geometry
             for el_i = 1:tr.elem_n
@@ -129,8 +130,8 @@ function [transducer_mask, source_label, tr] = ...
                 diameter = 2 * a_solution;
 
                 % Convert to grid dimensions
-                r_c_grid = r_c * 1e3 / grid_step_mm;
-                diameter_grid = diameter * 1e3 / grid_step_mm;
+                r_c_grid = r_c * 1e3 / grid_res_mm;
+                diameter_grid = diameter * 1e3 / grid_res_mm;
 
                 bowl = makeBowl(grid_dims, el_pos_grid_i, r_c_grid, diameter_grid, natural_focus_pos_grid);
 

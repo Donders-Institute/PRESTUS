@@ -35,7 +35,7 @@ end
         % Check whether any transducer has been configured (non-empty type).
         % The default config contains a template entry with type: [] — skip
         % the entire validation block when no type has been set.
-        has_type = arrayfun(@(t) isfield(t, 'type') && ischar(t.type) && ~isempty(t.type), ...
+        has_type = arrayfun(@(t) isfield(t, 'type') && (ischar(t.type) || isstring(t.type)) && ~isempty(t.type), ...
                             parameters.transducer);
         if ~any(has_type)
             return;
@@ -46,6 +46,12 @@ end
         for t_i = 1:numel(parameters.transducer)
 
             tr = parameters.transducer(t_i);
+
+            % yaml.loadFile returns MATLAB string objects; coerce to char for
+            % consistent field access and switch/strcmp comparisons downstream.
+            if isstring(tr.type)
+                tr.type = char(tr.type);
+            end
 
             % ---------------------------------------------------------------------
             % Validate and initialize transducer parameters

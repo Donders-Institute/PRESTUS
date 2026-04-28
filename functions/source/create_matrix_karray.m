@@ -7,7 +7,7 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 % per-element Euler angles (ZYX) are passed to kWaveArray.addRectElement,
 % addDiscElement, or addBowlElement depending on tr.matrix.elem_shape.
 % Phase delays for steering to the requested focus_pos are also computed
-% and stored in tr.elem_phase_rad.
+% and stored in tr.matrix.elem_phase_rad.
 %
 % Use as:
 %   [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
@@ -26,7 +26,7 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 %
 % Output:
 %   karray - kWaveArray with all elements added
-%   tr     - updated with tr.elem_phase_rad, tr.elem_phase_deg,
+%   tr     - updated with tr.matrix.elem_phase_rad, tr.matrix.elem_phase_deg,
 %            tr.matrix.elem_n, tr.matrix.elem_amp
 %
 % See also: CREATE_CLOVER_ARRAY, SOURCE_CREATE
@@ -137,8 +137,8 @@ end
         elem_phase_rad(ind) = mod(k * distance, 2 * pi);
     end
 
-    tr.elem_phase_rad = elem_phase_rad;
-    tr.elem_phase_deg = rad2deg(elem_phase_rad);
+    tr.matrix.elem_phase_rad = elem_phase_rad;
+    tr.matrix.elem_phase_deg = rad2deg(elem_phase_rad);
 
     % [DEBUG] visualize matrix element orientation
     if parameters.simulation.debug == 1

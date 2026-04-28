@@ -61,7 +61,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     %% Step 1: Compute focal axis
     % The focal axis is defined as a vector from `trans_pos_grid` to `focus_pos_grid`.
     % [Multi-transducer] the preprocessing will be based on the first transducer
-    if parameters.transducer(1).align_to_focus 
+    if ~isfield(parameters.transducer(1), 'align_to_focus') || parameters.transducer(1).align_to_focus
         focal_axis = [focus_pos_grid - trans_pos_grid, 1]';
     else
         % Use the natural focus based on transducer curvature

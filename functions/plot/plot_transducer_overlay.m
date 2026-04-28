@@ -29,7 +29,7 @@ tr = parameters.transducer(1);
 %% 1. GEOMETRY CALCULATIONS (curved transducer details)
 %% Compute focal slope
 % Calculate unit vector pointing from focus to transducer
-if tr.align_to_focus
+if ~isfield(tr, 'align_to_focus') || tr.align_to_focus
     focal_slope = (trans_pos(:) - focus_pos(:)) / norm(trans_pos(:) - focus_pos(:));
 
 else

@@ -293,7 +293,7 @@ end
             kgrid.t_array, ...
             tr.freq_hz, ...
             tr.(tr.type).elem_amp, ...
-            tr.annular.elem_phase_rad);   % [elem_n x Nt]
+            tr.(tr.type).elem_phase_rad);   % [elem_n x Nt]
 
         if axisymmetric == true && strcmp(tr.type, 'annular')
 
@@ -342,9 +342,9 @@ end
 
         else
             % Non-axisymmetric: compute weights and distribute signals manually
-            grid_weights_4d = zeros(tr.annular.elem_n, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            grid_weights_4d = zeros(tr.(tr.type).elem_n, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
 
-            for ind = 1:tr.annular.elem_n
+            for ind = 1:tr.(tr.type).elem_n
                 fprintf('Computing weights for element %i...', ind);
                 grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
                 fprintf(' done\n');
@@ -364,7 +364,7 @@ end
                 distributed_source_signal = gpuArray(distributed_source_signal);
             end
 
-            for ind = 1:tr.annular.elem_n
+            for ind = 1:tr.(tr.type).elem_n
                 source_weights = squeeze(grid_weights_4d(ind,:,:,:));
                 el_binary_mask = source_weights ~= 0;
 
