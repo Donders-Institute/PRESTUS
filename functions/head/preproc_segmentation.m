@@ -24,7 +24,7 @@ end
     %% CHECK INPUTS
 
     disp('Checking inputs...');
-    
+
     % Define paths to T1 and T2 images
     filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
     if isfield(parameters.path, 't2_pattern') && ~isempty(parameters.path.t2_pattern)
@@ -39,11 +39,11 @@ end
         files_to_check{end+1} = filename_t2;
     end
     check_availability(files_to_check)
-    
+
     %% SEGMENTATION USING SIMNIBS
-    
+
     disp('Starting segmentation...');
-    
+
     % Define output folder for segmentation results
     segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 
@@ -55,30 +55,42 @@ end
 
         if parameters.simulation.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
             segmentation_run(parameters.path.anat, parameters.subject_id, filename_t1, filename_t2, parameters);
-            parameters = simnibs_version(segmentation_folder, parameters);
-            if parameters.pct.enabled == 1
-                if isempty(filename_t2)
-                    error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
-                end
-                disp('Starting pseudoCT generation...');
-                pct_create_pCT_run(parameters);
+            % On HPC, segmentation_run submits a job and returns before outputs exist.
+            % Return early and let the next pipeline invocation handle post-processing.
+            if ~exist(filename_segmented, 'file')
+                return;
             end
+        else
             return;
         end
     else
         disp('Segmentation available...');
-        parameters = simnibs_version(segmentation_folder, parameters);
-        if parameters.pct.enabled == 1
-            filename_pseudoCT = fullfile(segmentation_folder, 'pseudoCT.nii.gz');
-            if exist(filename_pseudoCT, 'file')
-                disp('pseudoCT available...');
-            else
-                if isempty(filename_t2)
-                    error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
-                end
-                disp('pseudoCT not found — generating from UTE image...');
-                pct_create_pCT_run(parameters);
-            end
+    end
+
+    %% SEGMENTATION PIPELINE (charm + pseudoCT share the same pipeline)
+
+    parameters = simnibs_version(segmentation_folder, parameters);
+
+    if parameters.pct.enabled == 1
+        if isempty(filename_t2)
+            error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
+        end
+        filename_pseudoCT = fullfile(segmentation_folder, 'pseudoCT.nii.gz');
+        if exist(filename_pseudoCT, 'file')
+            disp('pseudoCT available...');
+        else
+            disp('Starting pseudoCT generation...');
+            pct_create_pCT_run(parameters);
+        end
+    end
+
+    %% MNI SPACE T1
+    % charm does not produce a T1-in-MNI image, so create one post-hoc
+    if ~strcmp(parameters.simulation.medium, 'phantom')
+        path_to_input_img  = fullfile(segmentation_folder, 'T1.nii.gz');
+        path_to_output_img = fullfile(segmentation_folder, 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
+        if ~exist(path_to_output_img, 'file')
+            convert_final_to_MNI_simnibs(path_to_input_img, segmentation_folder, path_to_output_img, parameters);
         end
     end
 
