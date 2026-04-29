@@ -59,8 +59,10 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
             tc.assumeTrue(isfile(cfg_env), ...
                 sprintf('Demo config not found: %s', cfg_env));
 
-            tc.params = load_parameters(cfg_env);
-            tc.params.subject_id            = tc.DEMO_SUBJECT_ID;
+            cfg_struct = yaml.loadFile(cfg_env, 'ConvertToArray', true);
+            cfg_struct.simulation.debug = 0;
+            tc.params = load_parameters(cfg_struct);
+            tc.params.subject_id             = tc.DEMO_SUBJECT_ID;
             tc.params.simulation.interactive = 0;
             tc.params.io.overwrite_files    = 'always';
             tc.params.platform              = 'matlab';
@@ -75,7 +77,11 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
         function test_tutorial_config_loads(tc)
             cfg = fullfile(tc.repo_root, 'configs', 'tutorial_config.yaml');
             tc.assumeTrue(isfile(cfg));
-            p = load_parameters(cfg);
+            % Merge the YAML config with a debug-suppressing struct so that
+            % load_parameters does not print the parameter summary.
+            cfg_struct = yaml.loadFile(cfg, 'ConvertToArray', true);
+            cfg_struct.simulation.debug = 0;
+            p = load_parameters(cfg_struct);
             tc.verifyClass(p, 'struct');
             tc.verifyTrue(isfield(p, 'transducer'));
         end

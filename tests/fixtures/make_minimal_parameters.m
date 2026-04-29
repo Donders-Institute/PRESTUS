@@ -28,6 +28,7 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.path.seg  = sim_path;
 
     % Simulation type
+    parameters.simulation.debug       = 0;
     parameters.simulation.medium      = 'water';
     parameters.simulation.code_type   = 'matlab_cpu';
     parameters.simulation.interactive = 0;
