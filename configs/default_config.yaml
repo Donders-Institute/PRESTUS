@@ -127,6 +127,7 @@ snellius:
 #------------ Target analysis
 analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+  output_mni: 1         # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
 
 #------------ Transducer specification  (no defaults)
 

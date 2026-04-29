@@ -73,8 +73,8 @@ if ~isfield(options, 'affixes')
     end
     options.affixes = struct( ...
         'default',      base_affix, ...
-        'liberal',      [base_affix '_liberal'], ...
-        'conservative', [base_affix '_conservative']);
+        'liberal',      [base_affix '_desc-liberal'], ...
+        'conservative', [base_affix '_desc-conservative']);
 end
 if ~isfield(options, 'liberal_config')
     options.liberal_config      = fullfile(uncertainty_configs, 'config_medium_liberal.yaml');
@@ -186,11 +186,13 @@ output_dir = get_output_dir(parameters);
 subj       = sprintf('sub-%03d', parameters.subject_id);
 medium     = parameters.simulation.medium;
 
-log_files.stage1      = fullfile(output_dir, sprintf('%s_%s_stage1_%s.txt',       subj, medium, run_ts));
-log_files.default     = fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.default,      run_ts));
-log_files.liberal     = fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.liberal,      run_ts));
-log_files.conservative= fullfile(output_dir, sprintf('%s_%s%s_%s.txt',            subj, medium, options.affixes.conservative, run_ts));
-log_files.report      = fullfile(output_dir, sprintf('%s_%s_stage5_report_%s.txt',subj, medium, run_ts));
+logs_dir = fullfile(output_dir, 'logs');
+if ~isfolder(logs_dir); mkdir(logs_dir); end
+log_files.stage1      = fullfile(logs_dir, sprintf('%s_%s_stage1_%s.txt',               subj, medium, run_ts));
+log_files.default     = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.default,      run_ts));
+log_files.liberal     = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.liberal,      run_ts));
+log_files.conservative= fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.conservative, run_ts));
+log_files.report      = fullfile(logs_dir, sprintf('%s_%s_desc-report_%s.txt',          subj, medium, run_ts));
 
 p_stage1.io.log_file       = log_files.stage1;
 p_default.io.log_file      = log_files.default;
@@ -332,7 +334,7 @@ switch platform
             fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));
             fprintf('To cancel         : scancel %s\n', num2str(submitted_ids));
         end
-        fprintf('Logs              : %s/%s/batch_job_logs/\n', parameters.path.sim, subj);
+        fprintf('HPC logs          : %s/%s/hpc_log/\n', parameters.path.sim, subj);
 
     % ---------------------------------------------------------------------
     otherwise
@@ -517,8 +519,8 @@ function assert_variant_outputs_exist(parameters, affixes)
     for v = 1:size(variants, 1)
         label  = variants{v, 1};
         affix  = variants{v, 2};
-        csv    = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, affix));
+        csv    = fullfile(output_dir, 'tabular', ...
+            sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
         if ~isfile(csv)
             warning('uncertainty_pipeline:missingOutput', ...
                 '%s variant output not found — report will be incomplete.\n  Expected: %s', ...

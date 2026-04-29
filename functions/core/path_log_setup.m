@@ -95,21 +95,39 @@ end
     end
 
     % Output subdirectories
-    % ├── cache/         — regenerable intermediates (checkpoints, matrices, T1-space property maps)
-    % └── debug/         — diagnostic artefacts written only when debug=1
-    %     ├── preproc/   — head preprocessing (rotation, cropping, skull visualizations)
-    %     ├── medium/    — medium mapping (grid-space property matrices, pCT)
-    %     └── source/    — source/transducer setup (element distribution plots)
+    % ├── nii/     — NIfTIs (space-T1w and space-MNI, differentiated by filename entity)
+    % ├── img/     — all PNG visualizations (acoustic, thermal, preprocessing)
+    % ├── log/     — diary log files
+    % ├── cache/   — regenerable intermediates (checkpoints, matrices)
+    % └── debug/   — diagnostic artefacts written only when debug=1
+    %     ├── preproc/  — head preprocessing (rotation, cropping, skull visualizations)
+    %     ├── medium/   — medium mapping (grid-space property matrices, pCT)
+    %     └── source/   — source/transducer setup (element distribution plots)
+    % Reports (.html) and tables (.csv) are written directly to output_dir.
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
         out = parameters.io.output_dir;
 
-        parameters.io.cache_dir        = fullfile(out, 'cache');
-        parameters.io.debug_dir        = fullfile(out, 'debug');
-        parameters.io.debug_dir_preproc = fullfile(out, 'debug', 'preproc');
-        parameters.io.debug_dir_medium  = fullfile(out, 'debug', 'medium');
-        parameters.io.debug_dir_source  = fullfile(out, 'debug', 'source');
+        parameters.io.nii_dir              = fullfile(out, 'nii');
+        % nii_T1w_dir and nii_MNI_dir both point to nii/; space is encoded in filenames
+        parameters.io.nii_T1w_dir          = fullfile(out, 'nii');
+        parameters.io.nii_MNI_dir          = fullfile(out, 'nii');
+        parameters.io.img_dir              = fullfile(out, 'img');
+        parameters.io.figures_acoustic_dir = fullfile(out, 'img');
+        parameters.io.figures_thermal_dir  = fullfile(out, 'img');
+        parameters.io.figures_preproc_dir  = fullfile(out, 'img');
+        parameters.io.tabular_dir          = out;
+        parameters.io.reports_dir          = out;
+        parameters.io.logs_dir             = fullfile(out, 'log');
+        parameters.io.cache_dir            = fullfile(out, 'cache');
+        parameters.io.debug_dir            = fullfile(out, 'debug');
+        parameters.io.debug_dir_preproc    = fullfile(out, 'debug', 'preproc');
+        parameters.io.debug_dir_medium     = fullfile(out, 'debug', 'medium');
+        parameters.io.debug_dir_source     = fullfile(out, 'debug', 'source');
 
-        if ~isfolder(parameters.io.cache_dir); mkdir(parameters.io.cache_dir); end
+        for d = {parameters.io.nii_dir, parameters.io.img_dir, ...
+                 parameters.io.logs_dir, parameters.io.cache_dir}
+            if ~isfolder(d{1}); mkdir(d{1}); end
+        end
 
         if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
                 parameters.simulation.debug == 1
@@ -161,7 +179,7 @@ end
         if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
             filename_log = parameters.io.log_file;
         else
-            filename_log = fullfile(parameters.io.output_dir, ...
+            filename_log = fullfile(parameters.io.logs_dir, ...
                 sprintf('sub-%03d_%s%s_%s.txt', ...
                 subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
                 string(datetime('now'), 'yyMMdd_HHmm')));
@@ -176,7 +194,7 @@ end
     % Define the filename of the summary table
     if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
         parameters.io.filename_output_table = ...
-            fullfile(parameters.io.output_dir,sprintf('sub-%03d_%s_output_table%s.csv', ...
+            fullfile(parameters.io.tabular_dir, sprintf('sub-%03d_%s%s.csv', ...
             subject_id, parameters.simulation.medium, parameters.io.output_affix));
     end
 

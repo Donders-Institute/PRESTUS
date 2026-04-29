@@ -122,7 +122,7 @@ p_acoustic = make_acoustic_params(parameters, base_affix);
 p_thermal  = cell(1, numel(targets));
 affixes    = cell(1, numel(targets));
 for ti = 1:numel(targets)
-    affixes{ti}   = sprintf('%s_isppa%03d', base_affix, round(targets(ti)));
+    affixes{ti}   = sprintf('%s_desc-isppa%03d', base_affix, round(targets(ti)));
     p_thermal{ti} = make_thermal_params(parameters, targets(ti), affixes{ti}, base_affix);
 end
 
@@ -165,7 +165,7 @@ switch platform
 
         % ── Stage 1: Acoustic ────────────────────────────────────────────
         acoustic_sentinel = fullfile(output_dir, 'cache', ...
-            sprintf('sub-%03d_%s_results%s.mat', subject_id, medium, base_affix));
+            sprintf('sub-%03d_%s%s_results.mat', subject_id, medium, base_affix));
         p_acoustic.hpc.timelimit = options.acoustic_timelimit;
         p_acoustic.hpc.job_name  = sprintf('PRESTUS-mi1-acoustic_%s', subj);
         p_acoustic               = apply_memorylimit(p_acoustic, options.acoustic_memorylimit);
@@ -188,7 +188,7 @@ switch platform
         for ti = 1:numel(targets)
             affix    = affixes{ti};
             csv_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, affix));
+                sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
             stage_label = sprintf('Stage %d', ti + 1);
             fprintf('[%s] Submitting thermal job (%.0f W/cm²)  ', stage_label, targets(ti));
 
@@ -213,7 +213,7 @@ switch platform
         % ── Stage N+1: Summary ───────────────────────────────────────────
         if options.generate_summary_report
             summary_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s_multi_isppa_report%s.html', subject_id, medium, base_affix));
+                sprintf('sub-%03d_%s%s_desc-multiIsppa_report.html', subject_id, medium, base_affix));
             fprintf('[Stage %d] Submitting summary report  ', numel(targets) + 2);
             if isfile(summary_file)
                 fprintf('— report exists, skipping.\n');

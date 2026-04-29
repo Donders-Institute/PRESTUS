@@ -76,7 +76,7 @@ end
     script_path = fullfile(path_fun, 'pct', 'pct_create_pseudoCT.sh');
 
     % Log directory
-    log_dir = fullfile(path_seg, 'batch_job_logs');
+    log_dir = fullfile(path_seg, 'hpc_log');
     if ~isfolder(log_dir)
         mkdir(log_dir);
     end

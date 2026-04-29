@@ -22,7 +22,7 @@ function report_path = generate_uncertainty_report(parameters, affixes)
 
 arguments
     parameters  (1,1) struct
-    affixes     (1,1) struct = struct('default', '', 'liberal', '_liberal', 'conservative', '_conservative')
+    affixes     (1,1) struct = struct('default', '', 'liberal', '_desc-liberal', 'conservative', '_desc-conservative')
 end
 
 report_path = '';
@@ -46,7 +46,7 @@ try
     tables = cell(1, 3);
     for v = 1:3
         csv_path = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, variant_affixes{v}));
+            sprintf('sub-%03d_%s%s.csv', subject_id, medium, variant_affixes{v}));
         if isfile(csv_path)
             try
                 tables{v} = readtable(csv_path, 'VariableNamingRule', 'preserve');
@@ -67,7 +67,7 @@ try
     heating = cell(1, 3);
     for v = 1:3
         mat_path = fullfile(output_dir, 'cache', ...
-            sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, medium, variant_affixes{v}));
+            sprintf('sub-%03d_%s%s_heating_res.mat', subject_id, medium, variant_affixes{v}));
         if isfile(mat_path)
             try
                 s = load(mat_path, 'results_heating');
@@ -178,7 +178,7 @@ try
     html_parts{end+1} = '</html>';
 
     %% Write file
-    report_filename = sprintf('sub-%03d_%s_uncertainty_report.html', subject_id, medium);
+    report_filename = sprintf('sub-%03d_%s_desc-uncertainty_report.html', subject_id, medium);
     report_path = fullfile(output_dir, report_filename);
     fid = fopen(report_path, 'w', 'n', 'UTF-8');
     if fid == -1
@@ -370,9 +370,8 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
     for v = 1:3
         aff = variant_affixes{v};
         lbl = variant_labels{v};
-        % acoustic_analysis writes sub-NNN_MEDIUM_intensity_y_AFFIX.png
-        img_path = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_%s_intensity_y%s.png', subject_id, medium, aff));
+        img_path = fullfile(parameters.io.figures_acoustic_dir, ...
+            sprintf('sub-%03d_%s%s_intensity_y.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];
@@ -405,8 +404,8 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
     for v = 1:3
         aff = variant_affixes{v};
         lbl = variant_labels{v};
-        img_path = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_%s_thermal_max%s.png', subject_id, medium, aff));
+        img_path = fullfile(parameters.io.figures_thermal_dir, ...
+            sprintf('sub-%03d_%s%s_thermal_max.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];
@@ -426,9 +425,9 @@ function html = build_images_section(variant_affixes, variant_labels, parameters
 
     image_specs = {};
     if is_layered
-        image_specs{end+1} = {sprintf('sub-%03d_%s_maxT_y%%s.png',    subject_id, medium), 'Max Temperature (y-slice)'};
-        image_specs{end+1} = {sprintf('sub-%03d_%s_thermal%%s.png',   subject_id, medium), 'Temperature vs. Time'};
-        image_specs{end+1} = {sprintf('sub-%03d_%s_CEM%%s.png',       subject_id, medium), 'CEM43 vs. Time'};
+        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_maxT_y.png',   subject_id, medium)), 'Max Temperature (y-slice)'};
+        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_thermal.png', subject_id, medium)), 'Temperature vs. Time'};
+        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_CEM.png',     subject_id, medium)), 'CEM43 vs. Time'};
     end
 
     for k = 1:numel(image_specs)
@@ -440,7 +439,7 @@ function html = build_images_section(variant_affixes, variant_labels, parameters
         for v = 1:3
             aff = variant_affixes{v};
             lbl = variant_labels{v};
-            img_path = fullfile(parameters.io.output_dir, sprintf(pattern, aff));
+            img_path = sprintf(pattern, aff);
             img_html = html_utils.embed_image(img_path, lbl, lbl);
             if ~isempty(img_html)
                 html = [html img_html];

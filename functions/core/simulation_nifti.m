@@ -56,10 +56,10 @@ end
             data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"];
         end
         for data_type = data_types
-            orig_file = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
-                parameters.subject_id, data_type, parameters.io.output_affix));
-            mni_file  = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_MNI%s.nii.gz',...
-                parameters.subject_id, data_type, parameters.io.output_affix));
+            orig_file = fullfile(parameters.io.nii_T1w_dir, sprintf('sub-%03d_%s_space-T1w%s_%s',...
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
+            mni_file  = fullfile(parameters.io.nii_MNI_dir, sprintf('sub-%03d_%s_space-MNI%s_%s.nii.gz',...
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
 
             if strcmp(data_type, "medium_masks")
                 data = medium_masks;
@@ -206,10 +206,10 @@ end
             
                     trans_suffix = '';
                     if max_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
-                    output_plot_filename = fullfile(parameters.io.output_dir, ...
-                        sprintf('sub-%03d_%s_intensity_t1%s%s.png', ...
-                        parameters.subject_id, parameters.simulation.medium, trans_suffix, ...
-                        parameters.io.output_affix));
+                    output_plot_filename = fullfile(parameters.io.figures_acoustic_dir, ...
+                        sprintf('sub-%03d_%s%s_intensity_t1%s.png', ...
+                        parameters.subject_id, parameters.simulation.medium, ...
+                        parameters.io.output_affix, trans_suffix));
                     saveas(h, output_plot_filename, 'png')
                     close(h);
                 end
@@ -217,17 +217,20 @@ end
             
             m2m_folder= fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
             
-            % transform outputs to MNI space (using SimNibs or applying transformation matrix)
-            if ~confirm_overwriting(mni_file, parameters) || strcmp(parameters.simulation.medium, 'phantom')
+            % transform outputs to MNI space (unless disabled via analysis.output_mni = 0)
+            output_mni = ~isfield(parameters, 'analysis') || ...
+                         ~isfield(parameters.analysis, 'output_mni') || ...
+                         parameters.analysis.output_mni ~= 0;
+            if ~output_mni || ~confirm_overwriting(mni_file, parameters) || strcmp(parameters.simulation.medium, 'phantom')
                 continue
             end
-            convert_final_to_MNI_simnibs(orig_file_with_ext , m2m_folder, mni_file, parameters, 'interpolation_order', 0);
+            convert_final_to_MNI_simnibs(orig_file_with_ext, m2m_folder, mni_file, parameters, 'interpolation_order', 0);
 
             clear data;
         end
         
         % Since charm does not transform the T1 into MNI space, one is manually created here
-        if ~strcmp(parameters.simulation.medium, 'phantom')
+        if output_mni && ~strcmp(parameters.simulation.medium, 'phantom')
             path_to_input_img = fullfile(m2m_folder,'T1.nii.gz');
             path_to_output_img = fullfile(m2m_folder,'toMNI','T1_to_MNI_post-hoc.nii.gz');
 

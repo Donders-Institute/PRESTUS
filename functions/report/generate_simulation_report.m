@@ -32,7 +32,7 @@ try
         affix = parameters.io.output_affix;
     end
 
-    report_filename = sprintf('sub-%03d_medium-%s%s_report.html', subject_id, medium, affix);
+    report_filename = sprintf('sub-%03d_%s%s_report.html', subject_id, medium, affix);
     report_path = fullfile(parameters.io.reports_dir, report_filename);
 
     %% Load CSV data if available
@@ -908,7 +908,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
 
         % Intensity on segmentation
         img_path = fullfile(parameters.io.figures_acoustic_dir, ...
-            sprintf('sub-%03d_medium-%s%s_intensity%s.png', subject_id, medium, affix, trans_suffix));
+            sprintf('sub-%03d_%s%s_intensity%s.png', subject_id, medium, affix, trans_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Intensity on segmentation%s', trans_suffix), ...
             sprintf('Intensity overlay (segmentation)%s', trans_suffix));
         if ~isempty(img_html)
@@ -917,7 +917,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
 
         % Intensity on T1
         img_path = fullfile(parameters.io.figures_acoustic_dir, ...
-            sprintf('sub-%03d_medium-%s%s_intensity_t1%s.png', subject_id, medium, affix, trans_suffix));
+            sprintf('sub-%03d_%s%s_intensity_t1%s.png', subject_id, medium, affix, trans_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Intensity on T1%s', trans_suffix), ...
             sprintf('Intensity overlay (T1)%s', trans_suffix));
         if ~isempty(img_html)
@@ -955,16 +955,16 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
     % Patterns use new naming: sub-NNN_medium-MEDIUM{affix}_{metric}.png
     td = parameters.io.figures_thermal_dir;
     thermal_images = {
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_maxT.png',            subject_id, medium, affix)), 'Max temperature overlay';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_thermal.png',         subject_id, medium, affix)), 'Temperature vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_thermalrise.png',     subject_id, medium, affix)), 'Temperature rise vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_CEM.png',             subject_id, medium, affix)), 'CEM43 (kWave) vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_CEM_iso.png',         subject_id, medium, affix)), 'CEM43 (ISO) vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_thermal_max.png',     subject_id, medium, affix)), 'Temperature vs time (layer max)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_thermalrise_max.png', subject_id, medium, affix)), 'Temperature rise vs time (layer max)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_CEM_max.png',         subject_id, medium, affix)), 'CEM43 (kWave) vs time (layer max)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_CEM_iso_max.png',     subject_id, medium, affix)), 'CEM43 (ISO) vs time (layer max)';
-        fullfile(td, sprintf('sub-%03d_medium-%s%s_thermal_protocol.png',subject_id, medium, affix)), 'Thermal protocol diagram';
+        fullfile(td, sprintf('sub-%03d_%s%s_maxT.png',            subject_id, medium, affix)), 'Max temperature overlay';
+        fullfile(td, sprintf('sub-%03d_%s%s_thermal.png',         subject_id, medium, affix)), 'Temperature vs time (focal)';
+        fullfile(td, sprintf('sub-%03d_%s%s_thermalrise.png',     subject_id, medium, affix)), 'Temperature rise vs time (focal)';
+        fullfile(td, sprintf('sub-%03d_%s%s_CEM.png',             subject_id, medium, affix)), 'CEM43 (kWave) vs time (focal)';
+        fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso.png',         subject_id, medium, affix)), 'CEM43 (ISO) vs time (focal)';
+        fullfile(td, sprintf('sub-%03d_%s%s_thermal_max.png',     subject_id, medium, affix)), 'Temperature vs time (layer max)';
+        fullfile(td, sprintf('sub-%03d_%s%s_thermalrise_max.png', subject_id, medium, affix)), 'Temperature rise vs time (layer max)';
+        fullfile(td, sprintf('sub-%03d_%s%s_CEM_max.png',         subject_id, medium, affix)), 'CEM43 (kWave) vs time (layer max)';
+        fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso_max.png',     subject_id, medium, affix)), 'CEM43 (ISO) vs time (layer max)';
+        fullfile(td, sprintf('sub-%03d_%s%s_thermal_protocol.png',subject_id, medium, affix)), 'Thermal protocol diagram';
     };
 
     html = [html '<div class="image-grid">'];
@@ -979,7 +979,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     % Note about heating animation
     avi_path = fullfile(parameters.io.figures_thermal_dir, ...
-        sprintf('sub-%03d_medium-%s%s_heating_animation.avi', subject_id, medium, affix));
+        sprintf('sub-%03d_%s%s_heating_animation.avi', subject_id, medium, affix));
     if isfile(avi_path)
         html = [html sprintf('<p class="note">Heating animation available: <code>%s</code></p>', ...
             html_utils.escape(avi_path))];
@@ -1225,7 +1225,7 @@ function log_path = find_log_file(parameters, subject_id, medium, affix)
         return
     end
 
-    pattern = sprintf('sub-%03d_medium-%s%s_*.txt', subject_id, medium, affix);
+    pattern = sprintf('sub-%03d_%s%s_*.txt', subject_id, medium, affix);
     logs_dir = fullfile(parameters.io.output_dir, 'logs');
     files = dir(fullfile(logs_dir, pattern));
     if isempty(files), return; end

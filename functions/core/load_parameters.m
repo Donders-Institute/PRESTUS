@@ -84,12 +84,20 @@ function parameters = load_parameters(varargin)
     if ~ischar(parameters.io.output_affix)
         parameters.io.output_affix = '';
     end
-    sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_]', '_');
+    % Allow hyphens (needed for BIDS entity values like desc-liberal).
+    sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_-]', '_');
     if ~strcmp(sanitized_affix, parameters.io.output_affix)
         fprintf('The original `io.output_affix` was sanitized. "%s" will be used instead of "%s"\n', ...
                 sanitized_affix, parameters.io.output_affix);
-        parameters.io.output_affix = sanitized_affix;
     end
+    % Wrap user-supplied label in the BIDS desc entity (_desc-<label>).
+    % Strip any leading underscore before wrapping so users can write either
+    % 'myRun' or '_myRun' in the config.
+    if ~isempty(sanitized_affix) && ~startsWith(sanitized_affix, '_desc-')
+        label = regexprep(sanitized_affix, '^_+', '');
+        sanitized_affix = ['_desc-' label];
+    end
+    parameters.io.output_affix = sanitized_affix;
 
     %% Validate paths for required libraries and binaries
 

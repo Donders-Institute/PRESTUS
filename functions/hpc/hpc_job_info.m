@@ -16,7 +16,7 @@ function display_info = hpc_job_info(platform, job_id, job_name, ...
 %   job_name   - job name string (typically encodes subject ID and affix)
 %   memory_gb  - memory allocation in GB
 %   timelimit  - wall-time limit string (e.g. '06:00:00')
-%   log_dir    - path to the batch_job_logs directory
+%   log_dir    - path to the hpc_log directory
 %   visualize  - logical; if true, print job summary to console
 %
 % Output:

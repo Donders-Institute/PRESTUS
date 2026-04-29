@@ -1053,7 +1053,7 @@ load_defaults();
     function open_html_report()
         app = fig.UserData;
         if isempty(app.output_dir), return; end
-        reports = dir(fullfile(app.output_dir, '*.html'));
+        reports = dir(fullfile(app.output_dir, '*report*.html'));
         if isempty(reports)
             uialert(fig, 'No HTML report found in output directory.', 'Not found');
             return;
@@ -1231,20 +1231,21 @@ load_defaults();
     function show_results(output_dir)
         % Acoustic PNG maps
         dims = {'x','y','z'};
+        img_dir = fullfile(output_dir, 'img');
         for d = 1:3
-            pngs = dir(fullfile(output_dir, sprintf('*intensity_%s*.png', dims{d})));
+            pngs = dir(fullfile(img_dir, sprintf('*intensity_%s*.png', dims{d})));
             ax   = findobj(fig, 'Tag', sprintf('ax_acoustic_%d', d));
             if ~isempty(pngs) && ~isempty(ax)
-                img = imread(fullfile(output_dir, pngs(end).name));
+                img = imread(fullfile(img_dir, pngs(end).name));
                 imshow(img, 'Parent', ax);
             end
         end
         % Thermal PNG maps
         for d = 1:3
-            pngs = dir(fullfile(output_dir, sprintf('*maxT_%s*.png', dims{d})));
+            pngs = dir(fullfile(img_dir, sprintf('*maxT_%s*.png', dims{d})));
             ax   = findobj(fig, 'Tag', sprintf('ax_thermal_%d', d));
             if ~isempty(pngs) && ~isempty(ax)
-                img = imread(fullfile(output_dir, pngs(end).name));
+                img = imread(fullfile(img_dir, pngs(end).name));
                 imshow(img, 'Parent', ax);
             end
         end
@@ -1255,7 +1256,7 @@ load_defaults();
             viewer.HTMLSource = fullfile(output_dir, reports(end).name);
         end
         % CSV table
-        csvs  = dir(fullfile(output_dir, '*output_table*.csv'));
+        csvs  = dir(fullfile(output_dir, 'sub-*_medium-*.csv'));
         tbl_h = findobj(fig, 'Tag', 'csv_table');
         if ~isempty(csvs) && ~isempty(tbl_h)
             try

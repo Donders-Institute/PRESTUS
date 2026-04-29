@@ -41,7 +41,7 @@ end
         variant_affixes = {affixes.default, affixes.liberal, affixes.conservative};
         for i = 1:numel(variant_affixes)
             af = variant_affixes{i};
-            f  = fullfile(cache_dir, sprintf('%s_%s_heating_res%s.mat', subj, medium, af));
+            f  = fullfile(cache_dir, sprintf('%s_%s%s_heating_res.mat', subj, medium, af));
             delete_if_exists(f);
         end
     end

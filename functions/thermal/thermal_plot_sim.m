@@ -42,12 +42,13 @@ arguments
 end
 
     %% Define output file paths for plots
-    output_plot = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermal%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    output_plot_rise = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermalrise%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    output_plot_CEM = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    td = parameters.io.figures_thermal_dir;
+    sid = parameters.subject_id;
+    med = parameters.simulation.medium;
+    aff = parameters.io.output_affix;
+    output_plot      = fullfile(td, sprintf('sub-%03d_%s%s_thermal.png',     sid, med, aff));
+    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s%s_thermalrise.png', sid, med, aff));
+    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s%s_CEM.png',         sid, med, aff));
 
     %% Convert GPU arrays to CPU if necessary
     if gpuDeviceCount == 0
@@ -225,8 +226,7 @@ end
     %% [focal axis] ISO CEM43 values over time
 
     if nargin >= 8 && ~isempty(CEM43_iso)
-        output_plot_CEM_iso = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_iso%s.png', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        output_plot_CEM_iso = fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso.png', sid, med, aff));
         focal_CEM_iso = squeeze(CEM43_iso(trans_pos(1),:,:));
         g = figure; hold on;
         data2plot = NaN(numel(HEAT.recordedtime), 1);
@@ -265,12 +265,9 @@ end
 
     %% Plot timeseries for maximum in medium
 
-    output_plot = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermal_max%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    output_plot_rise = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_thermalrise_max%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    output_plot_CEM = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_max%s.png', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    output_plot      = fullfile(td, sprintf('sub-%03d_%s%s_thermal_max.png',     sid, med, aff));
+    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s%s_thermalrise_max.png', sid, med, aff));
+    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s%s_CEM_max.png',         sid, med, aff));
 
     % [layer-max] temperature over time
 
@@ -359,8 +356,7 @@ end
 
     % [layer-max] ISO CEM43 over time
     if isfield(timeseries, 'CEM43_iso') && ~isempty(fieldnames(timeseries.CEM43_iso))
-        output_plot_CEM_iso_max = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_CEM_iso_max%s.png', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+        output_plot_CEM_iso_max = fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso_max.png', sid, med, aff));
         h = figure; hold on;
         for i_layer = 1:numel(available_layers)
             if isfield(timeseries.CEM43_iso, available_layers{i_layer})
