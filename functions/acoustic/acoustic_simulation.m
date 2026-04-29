@@ -67,12 +67,13 @@ switch parameters.simulation.code_type
       sensor  = cast_struct(sensor, parameters.simulation.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      input_args.SaveToDisk = char(fullfile(parameters.io.output_dir, ...
+      h5_dir = char(parameters.io.cache_dir);
+      input_args.SaveToDisk = char(fullfile(h5_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
          parameters.simulation.medium, parameters.io.output_affix)));
 
       input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.io.output_affix);
-      input_args.DataPath = char(parameters.io.output_dir);
+      input_args.DataPath = h5_dir;
       input_args.DeleteData = true;
 
       if numel(parameters.grid.dims) == 3
@@ -108,11 +109,12 @@ switch parameters.simulation.code_type
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, as_args_cast{:}, 'RadialSymmetry', 'WSWA-FFT');
       else
          % Pathname for the input and output files
-         input_args.SaveToDisk = char(fullfile(parameters.io.output_dir, ...
+         h5_dir = char(parameters.io.cache_dir);
+         input_args.SaveToDisk = char(fullfile(h5_dir, ...
            sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
            parameters.simulation.medium, parameters.io.output_affix)));
          input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.io.output_affix);
-         input_args.DataPath = char(parameters.io.output_dir);
+         input_args.DataPath = h5_dir;
          input_args.DeleteData = true;
          input_args.FunctionName = 'kspaceFirstOrder3D';
          gpu_id = str2double(getenv('SLURM_LOCALID'));

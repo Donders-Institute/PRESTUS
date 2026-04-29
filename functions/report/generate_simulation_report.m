@@ -1226,7 +1226,11 @@ function log_path = find_log_file(parameters, subject_id, medium, affix)
     end
 
     pattern = sprintf('sub-%03d_%s%s_*.txt', subject_id, medium, affix);
-    logs_dir = fullfile(parameters.io.output_dir, 'logs');
+    if isfield(parameters.io, 'logs_dir')
+        logs_dir = parameters.io.logs_dir;
+    else
+        logs_dir = fullfile(parameters.io.output_dir, 'log');
+    end
     files = dir(fullfile(logs_dir, pattern));
     if isempty(files), return; end
 
