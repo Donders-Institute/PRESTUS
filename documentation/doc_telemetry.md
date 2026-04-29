@@ -1,13 +1,14 @@
-# PRESTUS Anonymous Usage Statistics
+# PRESTUS Telemetry
 
 PRESTUS can optionally send anonymous usage statistics to help the developers
 understand which features and platforms are in active use. Participation is
-entirely voluntary and is requested once on the first pipeline run.
+entirely voluntary. No data is ever sent without an explicit opt-in.
 
 ## Opt-in / opt-out
 
-On first run, PRESTUS prints a short prompt and asks whether to enable
-telemetry. The answer is stored in:
+On each pipeline run PRESTUS prints a short notice and asks whether to enable
+telemetry. The prompt repeats every run until you give an explicit answer.
+Your decision is stored in:
 
 ```
 ~/.prestus/telemetry.json
@@ -19,8 +20,20 @@ You can change your decision at any time:
   `telemetry_setup_reset()` in MATLAB to be asked again on the next run.
 - **Opt in**: set `"opt_in": true` in the same file.
 
-In non-interactive environments (HPC batch jobs) telemetry is silently
-disabled by default.
+### Non-interactive environments (HPC batch jobs)
+
+In non-interactive sessions PRESTUS cannot prompt for input. The full notice
+is printed to stdout (visible in job logs) on every run, but **no decision is
+recorded and no data is sent**. The message will reappear on every run until
+you make an explicit decision.
+
+To opt in from an HPC environment, either:
+
+1. Run PRESTUS once interactively (e.g. on a login node) and answer `y`, or
+2. Create `~/.prestus/telemetry.json` manually:
+   ```json
+   {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
+   ```
 
 ## What is collected
 
@@ -95,12 +108,6 @@ Events are sent via HTTPS POST to a Supabase Edge Function operated by the
 Donders Institute and stored in a private PostgreSQL database. Transmission
 uses a fire-and-forget pattern with a 4-second timeout; a failed request is
 silently discarded and never retries.
-
-## Data retention
-
-Data is retained for a minimum of two years to support longitudinal version
-adoption analysis. No personally identifiable information is stored; records
-cannot be linked back to individuals or institutions.
 
 ## Public aggregate statistics
 
