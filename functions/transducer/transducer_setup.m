@@ -32,10 +32,10 @@ function [transducer_mask, source_label, tr] = ...
     end
 
     % Ensure the positions are formatted as row vectors with size [1, 3]
-    if isequal(size(focus_pos), [3 1]) | isequal(size(focus_pos), [2 1])
+    if isequal(size(focus_pos), [3 1]) || isequal(size(focus_pos), [2 1])
         focus_pos = focus_pos'; % Convert column vector to row vector
         trans_pos = trans_pos'; % Convert column vector to row vector
-    elseif ~isequal(size(focus_pos), [1 3]) & ~isequal(size(focus_pos), [1 2])
+    elseif ~isequal(size(focus_pos), [1 3]) && ~isequal(size(focus_pos), [1 2])
         error('Transducer and focus positions should have the size [1 2] or [1 3]')
     end
 
@@ -45,16 +45,16 @@ function [transducer_mask, source_label, tr] = ...
     switch tr.type
         case 'annular'
             % Convert element diameters from millimeters to grid points and ensure they are odd integers
-			tr.annular.Elements_OD = ...
+            tr.annular.Elements_OD = ...
                 2*floor(tr.annular.elem_od_mm / grid_res_mm / 2) + 1; % Outer diameter in grid points
-			tr.annular.Elements_ID = ...
+            tr.annular.Elements_ID = ...
                 2*floor(tr.annular.elem_id_mm / grid_res_mm / 2) + 1; % Inner diameter in grid points
 
-			% Handle cases where inner diameter is zero (e.g., for flat elements)
-			tr.annular.Elements_ID(tr.annular.elem_id_mm == 0) = 0;
+            % Handle cases where inner diameter is zero (e.g., for flat elements)
+            tr.annular.Elements_ID(tr.annular.elem_id_mm == 0) = 0;
 
-			% Convert the curvature radius from millimeters to grid points
-			tr.annular.radius_grid = round(tr.annular.curv_radius_mm / grid_res_mm); % Radius in grid points
+            % Convert the curvature radius from millimeters to grid points
+            tr.annular.radius_grid = round(tr.annular.curv_radius_mm / grid_res_mm); % Radius in grid points
 
             % Loop through each transducer element to create its geometry
             for el_i = 1:tr.annular.elem_n
