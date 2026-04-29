@@ -18,9 +18,30 @@ See [Transducer] and [Calibration](doc_calibration.md).
 
 ### Create a study-specific config file
 
-Configuration metadata must be fully specified in (a set of) config files (in the .yaml format) placed in the 'config' folder (see [the configuration overview](doc_parameters.md). Some parameters found in the 'default_config' are mandatory for the pipeline to run while others can be left out or are expected to be changed based on the requirements of the analysis. The different parameters that can be used are found in the `config_default.yaml` and in [the configuration overview](doc_parameters.md). The default config is not intended to be altered. Instead, parameter changes should be specified via an application-specific config file (or after loading the default config and before performing the subject call in MATLAB).
+Configuration metadata must be fully specified in (a set of) config files (in the .yaml format). See [the configuration overview](doc_parameters.md) for all available parameters.
 
-The `load_parameters.m` function imports the configuration. Multiple configurations can be read in sequentially to overwrite specific portions of the default configuration.
+**Recommended:** Keep a project-specific config directory outside the PRESTUS toolbox. Use `prestus_config_init` to copy the current toolbox defaults:
+
+```matlab
+% Copy config_default.yaml to your project config dir and create a project override file
+prestus_config_init('/path/to/project/config', project_name='projectX');
+```
+
+This copies `config_default.yaml` from the toolbox into your project directory and creates an empty `config_projectX.yaml` for your overrides. Edit `config_projectX.yaml` to specify only the parameters that differ from the defaults (see [the configuration overview](doc_parameters.md)). To review and adjust parameters interactively, pass `open_gui=true`:
+
+```matlab
+prestus_config_init('/path/to/project/config', project_name='projectX', open_gui=true);
+```
+
+To load parameters in your scripts:
+
+```matlab
+parameters = load_parameters('config_projectX.yaml', '/path/to/project/config');
+```
+
+`load_parameters` always uses `config_default.yaml` as the base (resolved from your project directory if present, otherwise from the toolbox), then deep-merges the project-specific config on top. This means your project config only needs to contain the parameters you want to override.
+
+> **Note:** `config_default.yaml` is not intended to be edited directly in the toolbox. Keeping a project-specific copy also pins the baseline parameter set for reproducibility across toolbox updates.
 
 ### Choose the Simulation Medium
 
