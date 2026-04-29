@@ -67,7 +67,6 @@ ort_angle = atan2(-focal_slope(1), focal_slope(2));
 hold on;
 lineWidth = 1.5;
 boxColor = [235, 185, 47]/255 * (1-overlay_weight) + overlay_color * overlay_weight;
-LineSmoothing = 'on';
 rect_size = options.rect_size;
 
 %% 3. RECTANGLE OVERLAYS (if enabled)
@@ -121,15 +120,15 @@ trans_back = ex_plane_pos_trig + trans_full_depth * focal_slope(:)';
 % BACK PLANE, SIDE WALLS, EXIT CHORD (as before)
 line([trans_back(2)-r*sin(ort_angle), trans_back(2)+r*sin(ort_angle)], ...
      [trans_back(1)-r*cos(ort_angle), trans_back(1)+r*cos(ort_angle)], ...
-     'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+     'LineWidth', lineWidth, 'Color', boxColor);
 
 line([ex_plane_pos_trig(2), trans_back(2)] - r*sin(ort_angle), ...
      [ex_plane_pos_trig(1), trans_back(1)] - r*cos(ort_angle), ...
-     'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+     'LineWidth', lineWidth, 'Color', boxColor);
 
 line([ex_plane_pos_trig(2), trans_back(2)] + r*sin(ort_angle), ...
      [ex_plane_pos_trig(1), trans_back(1)] + r*cos(ort_angle), ...
-     'LineWidth', lineWidth, 'Color', boxColor, 'LineSmoothing', LineSmoothing);
+     'LineWidth', lineWidth, 'Color', boxColor);
 
 % Exit plane chord
 left_edge_x  = ex_plane_pos_trig(2) - r * sin(ort_angle);
@@ -137,13 +136,13 @@ left_edge_y  = ex_plane_pos_trig(1) - r * cos(ort_angle);
 right_edge_x = ex_plane_pos_trig(2) + r * sin(ort_angle);
 right_edge_y = ex_plane_pos_trig(1) + r * cos(ort_angle);
 line([left_edge_x, right_edge_x], [left_edge_y, right_edge_y], ...
-     'LineWidth', lineWidth, 'Color', boxColor, 'LineStyle', ':', 'LineSmoothing', LineSmoothing);
+     'LineWidth', lineWidth, 'Color', boxColor, 'LineStyle', ':');
 
 % Curved front surface
 arc_halfangle = atan((max_od/2) / (dist_to_ep * grid_step));
 [arc_x, arc_y] = get_arc(geom_focus_pos, tr.(tr.type).curv_radius_mm/grid_step, ...
                         focal_angle-arc_halfangle, focal_angle+arc_halfangle);
-plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth, 'LineSmoothing', LineSmoothing);
+plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth);
 
 hold off;
 end
