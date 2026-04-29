@@ -519,6 +519,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         water_parameters.modules.run_posthoc_water_sims = 0;
         water_parameters.simulation.debug = 0;
         water_parameters.grid.default_dims = water_parameters.grid.dims;
+        water_parameters.io.log_file = '';  % force a new log file for the water run
         water_parameters.hpc.timelimit = '05:00:00';
         water_parameters.hpc.memorylimit = 40;
         water_parameters.hpc.wait_for_job = false;
