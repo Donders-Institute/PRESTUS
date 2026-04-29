@@ -62,7 +62,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         options.tick_labels = []
         options.segmented_img = []
         options.bg_range = []
-        options.overlay_segmented = 0  
+        options.overlay_segmented = 0
+        options.do_transpose (1,1) logical = false
+        options.flip_rows    (1,1) logical = false
+        options.flip_cols    (1,1) logical = false
     end
 
     %% Validate input positions against image boundaries
@@ -166,6 +169,53 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
     end
     overlay_image = gather(squeeze(overlay_image(slice_x, slice_y, slice_z)));
+
+    %% Apply NIfTI-derived orientation (transpose + flips) so superior is at top
+    if options.do_transpose || options.flip_rows || options.flip_cols
+        nr = size(bg_slice, 1);
+        nc = size(bg_slice, 2);
+
+        if options.do_transpose
+            bg_slice     = bg_slice';
+            overlay_image = overlay_image';
+            if ~isempty(trans_pos), transducer_bowl = transducer_bowl'; end
+            if options.overlay_segmented, segmented_slice = segmented_slice'; end
+            % swap the two position components
+            focus_pos    = focus_pos([2 1]);
+            max_data_pos = max_data_pos([2 1]);
+            if ~isempty(trans_pos)
+                trans_pos     = trans_pos([2 1]);
+                natural_focus = natural_focus([2 1]);
+            end
+            [nr, nc] = deal(nc, nr);
+        end
+
+        if options.flip_rows
+            bg_slice      = flipud(bg_slice);
+            overlay_image  = flipud(overlay_image);
+            if ~isempty(trans_pos), transducer_bowl = flipud(transducer_bowl); end
+            if options.overlay_segmented, segmented_slice = flipud(segmented_slice); end
+            focus_pos(1)    = nr + 1 - focus_pos(1);
+            max_data_pos(1) = nr + 1 - max_data_pos(1);
+            if ~isempty(trans_pos)
+                trans_pos(1)     = nr + 1 - trans_pos(1);
+                natural_focus(1) = nr + 1 - natural_focus(1);
+            end
+        end
+
+        if options.flip_cols
+            bg_slice      = fliplr(bg_slice);
+            overlay_image  = fliplr(overlay_image);
+            if ~isempty(trans_pos), transducer_bowl = fliplr(transducer_bowl); end
+            if options.overlay_segmented, segmented_slice = fliplr(segmented_slice); end
+            focus_pos(2)    = nc + 1 - focus_pos(2);
+            max_data_pos(2) = nc + 1 - max_data_pos(2);
+            if ~isempty(trans_pos)
+                trans_pos(2)     = nc + 1 - trans_pos(2);
+                natural_focus(2) = nc + 1 - natural_focus(2);
+            end
+        end
+    end
 
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];
