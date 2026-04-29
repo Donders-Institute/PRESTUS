@@ -239,12 +239,12 @@ switch platform
 
         % ── Stage 1 ──────────────────────────────────────────────────────
         % Skip if the head preprocessing cache already exists.
-        % Sentinel: cache/sub-NNN_<medium>_after_cropping_and_smoothing.mat
+        % Sentinel: cache/sub-NNN_<medium>_cropped_smoothed.mat
         % (written by preproc_head with preproc_affix = '').
         % When skipped, stages 2–4 are submitted without an afterok
         % dependency so they can start immediately.
         preproc_sentinel = fullfile(output_dir, 'cache', ...
-            sprintf('sub-%03d_%s_after_cropping_and_smoothing.mat', subject_id, medium));
+            sprintf('sub-%03d_%s_cropped_smoothed.mat', subject_id, medium));
         p_stage1.hpc.timelimit = options.stage1_timelimit;
         p_stage1.hpc.job_name  = sprintf('PRESTUS-u1-preproc_%s', subj);
         p_stage1               = apply_memorylimit(p_stage1, options.stage1_memorylimit);

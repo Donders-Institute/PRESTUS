@@ -176,7 +176,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         preproc_affix = parameters.io.output_affix;
     end
     filename_reoriented_scaled_data = fullfile(parameters.io.cache_dir, ...
-        sprintf('sub-%03d_%s_after_rotating_and_scaling%s.mat', ...
+        sprintf('sub-%03d_%s_rotated_scaled%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
@@ -205,7 +205,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 imshow(t1_rr_img_montage)
                 title('Original (left) and rotated (right) planning image');
                 output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
-                    sprintf('sub-%03d_t1_after_rotating_and_scaling%s.png',...
+                    sprintf('sub-%03d_t1_rotated_scaled%s.png',...
                     parameters.subject_id, parameters.io.output_affix));
                 saveas(h, output_plot_filename, 'png');
                 close(h);
@@ -234,7 +234,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             imshow(segm_img_montage)
             title('Original (left) and rotated (right) tissue segmentation');
             output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
-                sprintf('sub-%03d_segmented_after_rotating_and_scaling%s.png',...
+                sprintf('sub-%03d_segmented_rotated_scaled%s.png',...
                 parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png');
             close(h);
@@ -270,7 +270,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             imshow(bone_img_montage)
             title('Original (left) and rotated (right) original bone mask');
             output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
-                sprintf('sub-%03d_after_rotating_and_scaling_orig%s.png',...
+                sprintf('sub-%03d_rotated_scaled_orig%s.png',...
                 parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
             close(h);
@@ -287,7 +287,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         % Once file 2 exists they are never used again, so we omit them from
         % the checkpoint to save disk space.
         filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.cache_dir, ...
-            sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat',...
+            sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
             parameters.subject_id, parameters.simulation.medium, preproc_affix));
         if ~isfile(filename_cropped_smoothed_skull_data_check)
             % File 2 does not yet exist — include volumes so the next block
@@ -315,7 +315,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         % Only load the large volumes if file 2 does not yet exist —
         % they are only needed as inputs to the smoothing/cropping step.
         filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.cache_dir, ...
-            sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat',...
+            sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
             parameters.subject_id, parameters.simulation.medium, preproc_affix));
         cropped_exists = isfile(filename_cropped_smoothed_skull_data_check);
         if ~cropped_exists
@@ -329,7 +329,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     % volumes_available tracks whether t1_img_rr / segmented_img_rr /
     % bone_img_rr are in the workspace (they are omitted on load when
-    % after_cropping_and_smoothing.mat already exists).
+    % cropped_smoothed.mat already exists).
     volumes_available = exist('t1_img_rr', 'var');
 
     %% [DEBUG] Plot the skin & skull from the segmented image and an overlay for comparison
@@ -367,7 +367,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     % Defines output file location and name
     filename_cropped_smoothed_skull_data = fullfile(parameters.io.cache_dir, ...
-        sprintf('sub-%03d_%s_after_cropping_and_smoothing%s.mat',...
+        sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
     
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)

@@ -22,8 +22,8 @@ end
 %
 % Files removed (subject to io flags):
 %   cache/<subj>_<medium>_heating_res<affix>.mat  — removed unless save_thermal_matrices=1
-%   cache/<subj>_<medium>_after_rotating_and_scaling.mat
-%   cache/<subj>_<medium>_after_cropping_and_smoothing.mat
+%   cache/<subj>_<medium>_rotated_scaled.mat
+%   cache/<subj>_<medium>_cropped_smoothed.mat
 %
 % Files always kept:
 %   output_table<affix>.csv, *_report<affix>.html, *.png,
@@ -47,8 +47,8 @@ end
     end
 
     % Preprocessing cache intermediates
-    delete_if_exists(fullfile(cache_dir, sprintf('%s_%s_after_rotating_and_scaling.mat', subj, medium)));
-    delete_if_exists(fullfile(cache_dir, sprintf('%s_%s_after_cropping_and_smoothing.mat', subj, medium)));
+    delete_if_exists(fullfile(cache_dir, sprintf('%s_%s_rotated_scaled.mat', subj, medium)));
+    delete_if_exists(fullfile(cache_dir, sprintf('%s_%s_cropped_smoothed.mat', subj, medium)));
 end
 
 function delete_if_exists(f)

@@ -1014,9 +1014,9 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
 
     % Preprocessing debug images
     preproc_images = {
-        'sub-%03d_t1_after_rotating_and_scaling%s.png',          'T1 rotation & scaling';
-        'sub-%03d_segmented_after_rotating_and_scaling%s.png',   'Segmentation rotation & scaling';
-        'sub-%03d_after_rotating_and_scaling_orig%s.png',        'Bone mask rotation & scaling';
+        'sub-%03d_t1_rotated_scaled%s.png',          'T1 rotation & scaling';
+        'sub-%03d_segmented_rotated_scaled%s.png',   'Segmentation rotation & scaling';
+        'sub-%03d_rotated_scaled_orig%s.png',        'Bone mask rotation & scaling';
         'sub-%03d_t1_skin_skull%s.png',                          'T1 skin/skull overlay';
     };
 
