@@ -769,7 +769,7 @@ function html = build_config_summary(parameters)
 
     % Grid
     grid_step = safe_field(parameters.grid, 'resolution_mm', NaN);
-    if ~isnan(grid_step)
+    if isnumeric(grid_step) && isscalar(grid_step) && ~isnan(grid_step)
         html = config_row(html, 'Grid step', sprintf('%.2f mm', grid_step));
     end
     grid_dims = safe_field(parameters.grid, 'default_dims', []);
@@ -778,7 +778,7 @@ function html = build_config_summary(parameters)
     end
     pml = safe_field(parameters.grid, 'pml_size_effective', ...
               safe_field(parameters.grid, 'pml_size', NaN));
-    if isnumeric(pml) && ~isnan(pml)
+    if isnumeric(pml) && ~any(isnan(pml))
         html = config_row(html, 'PML size', sprintf('[%s]', strtrim(num2str(pml))));
     elseif ischar(pml) || isstring(pml)
         html = config_row(html, 'PML size', char(pml));
@@ -788,13 +788,15 @@ function html = build_config_summary(parameters)
     if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
         td = parameters.transducer(1);
         html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td, 'freq_hz', NaN)));
-        html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'elem_n', NaN)));
-        html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td.(td.type), 'curv_radius_mm', NaN)));
-        html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'elem_amp', NaN)));
-    end
-    focal = safe_field(parameters.transducer(1), 'focal_distance_bowl', NaN);
-    if ~isnan(focal)
-        html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
+        if isfield(td, 'type') && isfield(td, td.type)
+            html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'elem_n', NaN)));
+            html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td.(td.type), 'curv_radius_mm', NaN)));
+            html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'elem_amp', NaN)));
+        end
+        focal = safe_field(td, 'focal_distance_bowl', NaN);
+        if isnumeric(focal) && isscalar(focal) && ~isnan(focal)
+            html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
+        end
     end
 
     % Modules
@@ -804,7 +806,7 @@ function html = build_config_summary(parameters)
                'run_posthoc_water_sims', 'Post-hoc water'};
     for i = 1:size(modules, 1)
         val = safe_field(parameters.modules, modules{i,1}, 0);
-        if val
+        if any(val)
             status = 'Enabled';
         else
             status = 'Disabled';
@@ -820,7 +822,7 @@ function html = build_config_summary(parameters)
                           'ptrd', 'Pulse train rep. duration'; 'post_ptri_dur', 'Steady-state duration'};
         for i = 1:size(thermal_fields, 1)
             val = safe_field(th, thermal_fields{i,1}, NaN);
-            if ~isnan(val)
+            if isnumeric(val) && isscalar(val) && ~isnan(val)
                 html = config_row(html, thermal_fields{i,2}, sprintf('%.3f s', val));
             end
         end
