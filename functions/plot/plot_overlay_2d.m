@@ -105,7 +105,7 @@ function [h] = plot_overlay_2d(...
         colormap(ax2, options.color_scale);
     catch
         colormap(ax2, 'parula');  % Built-in MATLAB default
-        warning('Using parula instead of %s', options.color_scale);
+        warn('Using parula instead of %s', options.color_scale);
     end
 
     ax2.Visible = 'off'; % Hide second axes visibility

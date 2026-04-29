@@ -423,7 +423,7 @@ end
                 frame = getframe(gcf);
                 writeVideo(v,frame);
             catch
-                warning("Some parameter is out of bounds");
+                warn("Some parameter is out of bounds");
                 disp(['k:', num2str(k)]);
                 disp(['dim focal plane (3):', num2str(size(focal_planeT,3))]);
                 disp(['dim tss_recorded:', num2str(size(tss_recorded) )]);

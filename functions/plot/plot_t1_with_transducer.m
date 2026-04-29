@@ -87,7 +87,7 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
     res_image(focus_pos_grid(focus_pos_ind(1)) + (-2:2), ... % Draw square around focus position in green channel
               focus_pos_grid(focus_pos_ind(2)) + (-2:2), ...
               2) = 1;
-    catch warning('Boxes may be out of bounds...');
+    catch warn('Boxes may be out of bounds...');
     end
 
 end

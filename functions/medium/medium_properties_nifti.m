@@ -38,7 +38,7 @@ end
     file_name = fullfile(char(parameters.io.debug_dir_medium), [char(property) '_t1']);
     
     if ~isfield(kwave_medium, property)
-        warning('Missing field: %s', property);
+        warn('Missing field: %s', property);
     else
         % Transform and save if file doesn't exist
         % niftiwrite with 'Compressed',true produces file_name.nii.gz;

@@ -101,9 +101,9 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
 
     if isempty(localite_files)
         if strcmp(markertype, 'TriggerMarkers')
-            warning("No %s files >10kB with valid timestamps found for %s %s", markertype, sub_id, session);
+            warn("No %s files >10kB with valid timestamps found for %s %s", markertype, sub_id, session);
         else
-            warning("No %s files found for %s %s", markertype, sub_id, session);
+            warn("No %s files found for %s %s", markertype, sub_id, session);
         end
         return;
     end
@@ -134,7 +134,7 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
         end
 
         if isempty(current_file)
-            warning("⚠ No %s file could be selected for %s %s", markertype, sub_id, session);
+            warn("⚠ No %s file could be selected for %s %s", markertype, sub_id, session);
             return;
         end
 
@@ -142,7 +142,7 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
         try
             current_localite = readstruct(sel_file_path);
         catch
-            warning("⚠ Failed to read file: %s", sel_file_path);
+            warn("⚠ Failed to read file: %s", sel_file_path);
             excludeFile(end+1).name = current_file.name;
             continue;
         end
@@ -172,6 +172,6 @@ function localite = neuronav_select_localite(pn, sub_id, ses_id, markertype)
     end
 
     if isempty(localite)
-        warning("⚠ No valid %s XML could be selected for %s %s", markertype, sub_id, session);
+        warn("⚠ No valid %s XML could be selected for %s %s", markertype, sub_id, session);
     end
 end

@@ -144,7 +144,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         end
     else
         if numel(parameters.transducer) > 1
-            warning('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
+            warn('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
         end
         trans_pos_grid = parameters.transducer(1).trans_pos;
         focus_pos_grid = parameters.transducer(1).focus_pos;
@@ -153,7 +153,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     % ensure that dimensions of transducer in grid are sensible
     % transducer position should be [1 x 2/3]
     if size(trans_pos_grid, 1) > size(trans_pos_grid, 2)
-        warning('Transducer may be incorrectly specified. Switching dimensions ...')
+        warn('Transducer may be incorrectly specified. Switching dimensions ...')
         trans_pos_grid = trans_pos_grid';
         focus_pos_grid = focus_pos_grid';
     end
@@ -212,7 +212,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             end; clear t1_rr_img_montage;
 
         else
-            warning('Currently no support for reorienting 2D planning image...');
+            warn('Currently no support for reorienting 2D planning image...');
         end
         
         %% [Tissue segmentation]
@@ -396,7 +396,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 try
                     niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
                 catch ME
-                    warning(ME)
+                    warn(ME)
                 end
             end
             clear segmented_file plotdata orig_hdr;
@@ -412,7 +412,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 try
                     niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
                 catch ME
-                    warning(ME)
+                    warn(ME)
                 end
             end
             clear segmentation_file plotdata orig_hdr;
@@ -428,7 +428,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 try
                     niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
                 catch ME
-                    warning(ME)
+                    warn(ME)
                 end
             end
             clear skull_mask_file plotdata orig_hdr;
@@ -460,14 +460,14 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     diff_voxels = abs(backtransf_coordinates - [trans_pos_grid; focus_pos_grid]);
     
     if any(diff_voxels(:) > 1)
-        warning('Backtransformed positions exceed 1-voxel tolerance.');
+        warn('Backtransformed positions exceed 1-voxel tolerance.');
         disp('Original coordinates:'); disp([trans_pos_grid; focus_pos_grid]);
         disp('Final local:'); disp([trans_pos_final; focus_pos_final]);
         disp('Backtransformed:'); disp(backtransf_coordinates);
         disp('Voxel differences:'); disp(diff_voxels);
         error('Coordinate mismatch >1 voxel/dim—check cropping/padding.');
     elseif any(diff_voxels(:) > 0)
-        warning('Minor backtransform offset (≤1 voxel): %s', mat2str(diff_voxels));
+        warn('Minor backtransform offset (≤1 voxel): %s', mat2str(diff_voxels));
     end
 
     %% Plot placement of up to 2 Transducers
@@ -477,7 +477,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     max_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > max_plots
-        warning('More than two transducers defined; only the first 2 will be shown in debug plots');
+        warn('More than two transducers defined; only the first 2 will be shown in debug plots');
     end
     for ti = 1:max_plots            
         if ti == 1

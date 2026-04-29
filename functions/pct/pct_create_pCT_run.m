@@ -223,7 +223,7 @@ end
             hpc_wait_for_completion(pct_job_id, 'slurm', max_checks);
         else
             % Fallback: no job ID parseable — poll for the output file directly
-            warning('Could not parse SLURM job ID from sbatch output:\n%s\nPolling for pseudoCT.nii.gz instead.', out);
+            warn('Could not parse SLURM job ID from sbatch output:\n%s\nPolling for pseudoCT.nii.gz instead.', out);
             pct_poll_for_file(pseudoCT_file, max_checks);
         end
         % Final guard: error if the file still does not exist after waiting
@@ -278,7 +278,7 @@ end
             fprintf('pseudoCT qsub job %s submitted — waiting for completion.\n', pct_job_id);
             hpc_wait_for_completion(pct_job_id, 'qsub', max_checks);
         else
-            warning('Empty qsub job ID — polling for pseudoCT.nii.gz instead.');
+            warn('Empty qsub job ID — polling for pseudoCT.nii.gz instead.');
             pct_poll_for_file(pseudoCT_file, max_checks);
         end
         if ~exist(pseudoCT_file, 'file')
@@ -316,7 +316,7 @@ function pct_poll_for_file(filepath, max_checks)
         fprintf('  check %d/%d — not yet present\n', k, max_checks);
         pause(20);
     end
-    warning('File %s not found after %d checks.', filepath, max_checks);
+    warn('File %s not found after %d checks.', filepath, max_checks);
 end
 
 % ── Helper: write pseudoCT.json sidecar with generation provenance ────────
@@ -324,7 +324,7 @@ function write_pct_sidecar(pct_dir, parameters, skull_mapping)
     sidecar_path = fullfile(pct_dir, 'pseudoCT.json');
     fid = fopen(sidecar_path, 'w');
     if fid == -1
-        warning('Could not write pseudoCT.json to %s', pct_dir);
+        warn('Could not write pseudoCT.json to %s', pct_dir);
         return;
     end
 

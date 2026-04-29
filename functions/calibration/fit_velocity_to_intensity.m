@@ -69,7 +69,7 @@ end
 
     % Guard against zero/near-zero peak
     if I_peak_before < eps
-        warning('fit_velocity_to_intensity: Peak intensity is near zero. Returning original velocity.');
+        warn('fit_velocity_to_intensity: Peak intensity is near zero. Returning original velocity.');
         corrected_velocity = opt_velocity;
         I_peak_after = I_peak_before;
         return;
@@ -87,7 +87,7 @@ end
     % Warn if corrected velocity exceeds upper bound
     if isfield(parameters.calibration, 'opt_upper_velocity') && ...
             corrected_velocity > parameters.calibration.opt_upper_velocity
-        warning('fit_velocity_to_intensity: Corrected velocity (%.4f m/s) exceeds opt_upper_velocity (%.4f m/s).', ...
+        warn('fit_velocity_to_intensity: Corrected velocity (%.4f m/s) exceeds opt_upper_velocity (%.4f m/s).', ...
             corrected_velocity, parameters.calibration.opt_upper_velocity);
     end
 

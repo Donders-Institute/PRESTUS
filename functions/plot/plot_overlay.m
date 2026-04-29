@@ -76,7 +76,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         error('Transducer point is outside of image boundaries');
     end
     if any(max_data_pos > size(bg_image))
-        warning('Max intensity point is outside of image boundaries. Regularizing to max. of dimensions');
+        warn('Max intensity point is outside of image boundaries. Regularizing to max. of dimensions');
         max_data_pos = min([max_data_pos; size(bg_image)]);
     end
 
@@ -287,7 +287,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         colormap(ax2, options.color_scale);
     catch
         colormap(ax2, 'parula');  % Built-in MATLAB default
-        warning('Using parula instead of %s', options.color_scale);
+        warn('Using parula instead of %s', options.color_scale);
     end
 
     ax2.Visible = 'off';

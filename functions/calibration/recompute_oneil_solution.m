@@ -92,7 +92,7 @@ end
         fprintf('Estimated distance to the center of half-maximum range: %.2f mm\n', ...
             get_flhm_center_position(axial_position_adj, i_axial_oneil_opt_summary))
     catch
-        warning('Could not estimated distance to the center of half-maximum range');
+        warn('Could not estimated distance to the center of half-maximum range');
     end
 
     %% Collect in structure

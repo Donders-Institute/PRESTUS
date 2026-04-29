@@ -53,7 +53,7 @@ for ti = 1:numel(parameters.transducer)
                   isfield(tr, 'focus_pos') && ~isempty(tr.focus_pos);
 
         if ~has_pos
-            warning('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
+            warn('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
         else
             focal_distance = norm(tr.focus_pos - tr.trans_pos);
 
@@ -63,7 +63,7 @@ for ti = 1:numel(parameters.transducer)
                 t1_resolution_mm = round(mean(t1_header.PixelDimensions(1:3)));
                 tr.focal_distance_bowl = focal_distance * t1_resolution_mm;
             catch
-                warning('Could not load T1 header to determine resolution; assuming grid resolution.');
+                warn('Could not load T1 header to determine resolution; assuming grid resolution.');
                 tr.focal_distance_bowl = focal_distance * parameters.grid.resolution_mm;
             end
 

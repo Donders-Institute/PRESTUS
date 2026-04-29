@@ -60,7 +60,7 @@ end
 %% Resolve options — fill in defaults for any unset fields
 % =========================================================================
 
-uncertainty_configs = fullfile(get_prestus_path(), 'configs', 'uncertainty');
+uncertainty_configs = fullfile(get_prestus_path(), 'config', 'uncertainty');
 
 if ~isfield(options, 'affixes')
     % If the caller has already set io.output_affix on the base parameters,
@@ -522,7 +522,7 @@ function assert_variant_outputs_exist(parameters, affixes)
         csv    = fullfile(output_dir, 'tabular', ...
             sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
         if ~isfile(csv)
-            warning('uncertainty_pipeline:missingOutput', ...
+            warn('uncertainty_pipeline:missingOutput', ...
                 '%s variant output not found — report will be incomplete.\n  Expected: %s', ...
                 label, csv);
         end

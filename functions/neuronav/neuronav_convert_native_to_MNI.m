@@ -92,7 +92,7 @@ function [trans_ras_seg, ...
 
     for i = 1:max(Npos)
         if any(isnan(trans_ras(i,:))) || any(isnan(target_ras(i,:)))
-            warning('Side %d: native coordinate missing, skipping warp.', i);
+            warn('Side %d: native coordinate missing, skipping warp.', i);
             continue;
         end
 
@@ -124,7 +124,7 @@ function [trans_ras_seg, ...
         trans_mni_mm = [0 0 0];
         trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
         while all(trans_mni_mm==0)
-            warning('MNI space too contrained for original segmentation-space locations ... adjusting')
+            warn('MNI space too contrained for original segmentation-space locations ... adjusting')
             trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
             if trans_ras_seg(i,1)>0
                 trans_ras_seg(i,1) = trans_ras_seg(i,1)-1; % change the right-left location to fall within the frame

@@ -25,7 +25,7 @@ end
     log_file = fullfile(segmentation_folder, 'charm_log.html');
     
     if ~exist(log_file, 'file')
-        warning('charm_log.html not found in %s', segmentation_folder);
+        warn('charm_log.html not found in %s', segmentation_folder);
         parameters.simnibs_version = 'unknown';
         fprintf('LOG: SimNIBS version: UNKNOWN (no charm_log.html)\n');
         return;
@@ -51,7 +51,7 @@ end
         end
         
     catch ME
-        warning('Error parsing %s: %s', log_file, ME.message);
+        warn('Error parsing %s: %s', log_file, ME.message);
         parameters.simnibs_version = 'error';
         fprintf('SimNIBS version: ERROR\n');
     end

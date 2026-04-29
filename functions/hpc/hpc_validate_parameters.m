@@ -18,7 +18,7 @@ function hpc_validate_parameters(parameters, hpc_type)
 % See also: HPC_DETECT_SYSTEM, HPC_SUBMIT_JOB
 
 if parameters.simulation.interactive
-    warning('Interactive mode disabled for %s jobs.', upper(hpc_type));
+    warn('Interactive mode disabled for %s jobs.', upper(hpc_type));
     parameters.simulation.interactive = false;
 end
 assert(matches(parameters.io.overwrite_files, ["always", "never"]), ...

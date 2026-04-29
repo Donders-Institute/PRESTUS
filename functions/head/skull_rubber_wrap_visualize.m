@@ -57,7 +57,7 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
 
     % Guard: empty surface (e.g., mask empty)
     if ~isfield(fv,'faces') || isempty(fv.faces) || ~isfield(fv,'vertices') || isempty(fv.vertices)
-        warning('skull_rubber_wrap_visualize:EmptySurface', 'Isosurface empty; skipping plot.');
+        warn('skull_rubber_wrap_visualize:EmptySurface', 'Isosurface empty; skipping plot.');
         return;
     end
 

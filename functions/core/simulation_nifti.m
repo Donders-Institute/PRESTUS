@@ -146,7 +146,7 @@ end
             
                 max_plots = min(2, numel(parameters.transducer));
                 if numel(parameters.transducer) > max_plots
-                    warning('More than two transducers: intensity-over-T1 plots will be created only for the first 2 transducers');
+                    warn('More than two transducers: intensity-over-T1 plots will be created only for the first 2 transducers');
                 end
 
                 % define the maximum value to plot

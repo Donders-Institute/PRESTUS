@@ -41,5 +41,5 @@ function [medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmented_
             close(h);
         end
     else
-        warning("CSF layer not specified or unknown ... will not use expanded CSF mask...");
+        warn("CSF layer not specified or unknown ... will not use expanded CSF mask...");
     end

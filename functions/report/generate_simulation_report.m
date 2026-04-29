@@ -200,7 +200,7 @@ try
     %% Write HTML file
     fid = fopen(report_path, 'w', 'n', 'UTF-8');
     if fid == -1
-        warning('generate_simulation_report:fileOpen', 'Cannot open %s for writing.', report_path);
+        warn('generate_simulation_report:fileOpen', 'Cannot open %s for writing.', report_path);
         return
     end
     fprintf(fid, '%s\n', html_parts{:});
@@ -209,7 +209,7 @@ try
     fprintf('HTML report saved to: %s\n', report_path);
 
 catch ME
-    warning('generate_simulation_report:failed', ...
+    warn('generate_simulation_report:failed', ...
         'Report generation failed: %s\n%s', ME.message, getReport(ME, 'extended'));
     report_path = '';
 end

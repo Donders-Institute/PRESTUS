@@ -124,7 +124,7 @@ end
         else
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
                 convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels);
-            warning('Axisymmetry setup was requested for acoustic simulation without follow-up heating simulation. Follow-up thermal simulations loading these 2D results may not work as expected (e.g., 3D thermal diffusion).')
+            warn('Axisymmetry setup was requested for acoustic simulation without follow-up heating simulation. Follow-up thermal simulations loading these 2D results may not work as expected (e.g., 3D thermal diffusion).')
         end
     end
 

@@ -93,7 +93,7 @@ end
 
         freqs = [tr_arr.freq_hz];
         if numel(unique(freqs)) > 1
-            warning('Multiple source frequencies not yet supported. Using %i Hz.', freqs(1));
+            warn('Multiple source frequencies not yet supported. Using %i Hz.', freqs(1));
         end
 
         cw_signals_all    = cell(1, transducer_N);

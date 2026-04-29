@@ -53,7 +53,7 @@ end
         % this is a known limitation
 
         if numel(parameters.transducer)>1
-            warning("Non-skull and/or non-layered simulations currently only support a single transducer. Only the first specified transducer will be retained...");
+            warn("Non-skull and/or non-layered simulations currently only support a single transducer. Only the first specified transducer will be retained...");
             parameters.transducer = parameters.transducer(1);
         end
 
@@ -83,7 +83,7 @@ end
             trans_pos = parameters.transducer.trans_pos;
             % Adjust if the positions are transposed
             if size(trans_pos,1)>size(trans_pos, 2)
-                warning('Specified transducer position appears transposed...adjusting');
+                warn('Specified transducer position appears transposed...adjusting');
                 trans_pos = trans_pos';
             end
         end
@@ -102,7 +102,7 @@ end
             % Adjust if the positions are transposed (2D only)
             % In 2D, we expect the second index as the axial dimension
             if numel(parameters.grid.dims) == 2 && focus_pos(1)>focus_pos(2)
-                warning('Specified focus position appears transposed...adjusting');
+                warn('Specified focus position appears transposed...adjusting');
                 focus_pos = focus_pos';
             end
         end

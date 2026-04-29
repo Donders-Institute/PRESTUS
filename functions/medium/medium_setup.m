@@ -196,7 +196,7 @@ end
         source_freq = all_freqs(1);
 
         if numel(unique(all_freqs)) > 1
-            warning('Transducers have different frequencies (%s Hz). Using %i Hz from first transducer.', ...
+            warn('Transducers have different frequencies (%s Hz). Using %i Hz from first transducer.', ...
                     num2str(unique(all_freqs)), source_freq);
         end
         
@@ -216,7 +216,7 @@ end
             close(gcf);
         end
     else
-        warning('Attenuation power-law is not remapped (as requested).')
+        warn('Attenuation power-law is not remapped (as requested).')
         alpha_coeff_fixed = alpha_coeff;
         alpha_power_fixed = alpha_power;
     end
@@ -296,8 +296,10 @@ end
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'perfusion_coeff')
             medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'absorption_fraction')
         catch ME
-            warning('medium_setup:niftiWrite', ...
+            prev = warning('off', 'backtrace');
+            warn('medium_setup:niftiWrite', ...
                 'Could not write medium property NIfTIs: %s', ME.message);
+            warning(prev);
         end
     end
 
@@ -319,7 +321,7 @@ end
             filename_absorption = fullfile(parameters.io.debug_dir_medium,'matrix_absorption');
             niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
         catch
-            warning('medium_setup:debugNifti', ...
+            warn('medium_setup:debugNifti', ...
                 'Error saving debug grid matrices — may result from concurrent write attempts.');
         end
 

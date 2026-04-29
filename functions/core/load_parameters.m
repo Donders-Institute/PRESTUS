@@ -1,7 +1,7 @@
 function parameters = load_parameters(varargin)
 % LOAD_PARAMETERS  Load default PRESTUS config and merge with one or more extra YAML files or structs
 %
-% Reads configs/default_config.yaml relative to the PRESTUS root (resolved from
+% Reads config/config_default.yaml relative to the PRESTUS root (resolved from
 % this file's location so CWD is irrelevant), then deep-merges any caller-supplied
 % YAML files or parameter structs on top. After merging, runs validation:
 % interactive-mode check, transducer parameter derivation, thermal timing check,
@@ -30,7 +30,7 @@ function parameters = load_parameters(varargin)
     % load_parameters works correctly regardless of the caller's CWD.
     this_dir     = fileparts(mfilename('fullpath'));          % functions/core/
     prestus_root = fileparts(fileparts(this_dir));            % PRESTUS root
-    default_config_path = fullfile(prestus_root, 'configs', 'default_config.yaml');
+    default_config_path = fullfile(prestus_root, 'config', 'config_default.yaml');
     parameters = yaml.loadFile(default_config_path, "ConvertToArray", true);
 
     %% Merge with additional configuration files or structures
@@ -115,7 +115,7 @@ function parameters = load_parameters(varargin)
                                             parameters.startup.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
     elseif (~isfield(parameters.startup, 'simnibs_bin_path') || strcmp(parameters.startup.simnibs_bin_path, "")) && contains(parameters.simulation.medium, {'layered'})
-        warning('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
+        warn('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
 
     %% Default segmentation path fallback

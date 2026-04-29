@@ -34,7 +34,7 @@ end
     % safe_addpath filters out hidden directories (e.g. .claude, .git) to
     % prevent stale file copies from shadowing the current versions.
     functionsLoc = fullfile(prestus_path, 'functions');
-    toolboxesLoc = fullfile(prestus_path, 'toolboxes');
+    externalLoc = fullfile(prestus_path, 'external');
     allPaths = regexp(path, pathsep, 'Split');
 
     if ~any(ismember(fullfile(functionsLoc, 'helper'), allPaths))
@@ -42,9 +42,9 @@ end
         disp(['Adding ', functionsLoc, ' and subfolders']);
     end
 
-    if ~any(ismember(toolboxesLoc, allPaths))
-        safe_addpath(toolboxesLoc);
-        disp(['Adding ', toolboxesLoc, ' and subfolders']);
+    if ~any(ismember(externalLoc, allPaths))
+        safe_addpath(externalLoc);
+        disp(['Adding ', externalLoc, ' and subfolders']);
     end
 
     % If there are paths to be added, add them; this is mostly for batch runs

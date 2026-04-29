@@ -69,7 +69,7 @@ end
 
     % Creates the foundation for a mask before the exit plane to calculate max values outside of it
     if numel(parameters.transducer) > 1
-        warning(['Multi-transducer: exit-plane related metrics (after_exit_plane_mask, ' ...
+        warn(['Multi-transducer: exit-plane related metrics (after_exit_plane_mask, ' ...
                     'max_Isppa_after_exit_plane, real_focal_distance, etc.) are computed ' ...
                     'only w.r.t. the canonical first transducer.']);
     end
@@ -203,7 +203,7 @@ end
     % Plot intensity on the segmented image (up to 2 transducers)
     n_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > n_plots
-        warning('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
+        warn('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
     end
     for ti = 1:n_plots
 

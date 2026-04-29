@@ -33,7 +33,7 @@ end
         end
 
         if ~isfile(filename)
-            warning('File does not exist: \r\n%s', filename);
+            warn('File does not exist: \r\n%s', filename);
         end
     end
 end

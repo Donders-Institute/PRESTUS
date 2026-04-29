@@ -102,7 +102,7 @@ switch parameters.simulation.code_type
       if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          % No CUDA binary supports axisymmetric geometry; fall back to matlab_gpu path
          % (kspaceFirstOrderAS with GPU data cast) which preserves GPU acceleration.
-         warning('kspaceFirstOrder-CUDA does not support axisymmetric simulations. Falling back to matlab_gpu (kspaceFirstOrderAS with gpuArray).');
+         warn('kspaceFirstOrder-CUDA does not support axisymmetric simulations. Falling back to matlab_gpu (kspaceFirstOrderAS with gpuArray).');
          as_args = zip_fields(rmfield(input_args, intersect(fieldnames(input_args), ...
              {'SaveToDisk','DataName','DataPath','DeleteData','FunctionName','DeviceNum','NumThreads'})));
          as_args_cast = [as_args, {'DataCast', ['gpuArray-', char(parameters.simulation.precision)]}];

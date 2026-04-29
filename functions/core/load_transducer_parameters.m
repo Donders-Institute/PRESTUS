@@ -88,7 +88,7 @@ end
         % Warn if transducers have mismatched frequencies
         all_freqs = [parameters.transducer.freq_hz];
         if numel(unique(all_freqs)) > 1
-            warning('Transducers have different frequencies: %s Hz. This is not fully supported.', ...
+            warn('Transducers have different frequencies: %s Hz. This is not fully supported.', ...
                 num2str(unique(all_freqs)));
         end
 

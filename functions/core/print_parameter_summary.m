@@ -184,7 +184,7 @@ fprintf('💀 MEDIUM PROPERTIES (requested layers)\n');
 
 % Use parameters.layers (e.g. {'tissues', 'skull', 'brain'})
 if ~isfield(parameters, 'layers') || isempty(parameters.layers)
-    warning('No parameters.layers defined. Using all: water, skull, brain, skin...');
+    warn('No parameters.layers defined. Using all: water, skull, brain, skin...');
     tissues = {'water', 'skull', 'brain', 'skin', 'skull_trabecular', 'skull_cortical'};
 else
     tissues = fieldnames(parameters.layers);

@@ -40,10 +40,10 @@ for k = 1:numel(csv_files)
         if all(ismember(expected_vars, T.Properties.VariableNames))
             all_data = [all_data; T(:, expected_vars)];
         else
-            warning('Skipping file with missing fields: %s', csv_files(k).name);
+            warn('Skipping file with missing fields: %s', csv_files(k).name);
         end
     catch
-        warning('Could not read: %s', csv_files(k).name);
+        warn('Could not read: %s', csv_files(k).name);
     end
 end
 
@@ -82,7 +82,7 @@ for i = 1:n_targets
             all_data.target_MNI_vox_y(idx), ...
             all_data.target_MNI_vox_z(idx) ], 1, 'omitnan');
     else
-        warning('No data found for target %s with interpolated == 0', name);
+        warn('No data found for target %s with interpolated == 0', name);
     end
 end
 

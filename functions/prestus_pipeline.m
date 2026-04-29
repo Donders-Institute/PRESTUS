@@ -27,9 +27,9 @@ function [parameters] = prestus_pipeline(parameters, options)
 %   selection (MATLAB / SLURM / qsub) and uncertainty mode dispatch.
 %
 % Input:
-%   parameters - struct built from default_config.yaml and a subject-specific
+%   parameters - struct built from config_default.yaml and a subject-specific
 %                override config; must include subject_id, path.sim, and all
-%                transducer/grid settings; see configs/default_config.yaml for
+%                transducer/grid settings; see config/config_default.yaml for
 %                the full list of available fields
 %   options    - (optional) struct; currently supports:
 %                  .sequential_configs  cell array of additional YAML config
@@ -411,7 +411,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             load(filename_heating_data);
             parameters.state.heating_available = 1;
         else
-            warning('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
+            warn('Heating simulations requested, but no acoustic results available. Other misspecification is possible.')
             parameters.state.heating_available = 0;
             parameters.modules.run_thermal_analysis = 0;
             results_heating = struct();
@@ -482,7 +482,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters, 'multi_isppa')
             generate_multi_isppa_report(parameters, parameters.multi_isppa);
         else
-            warning('multi_isppa_report flag set but parameters.multi_isppa is missing — skipping.');
+            warn('multi_isppa_report flag set but parameters.multi_isppa is missing — skipping.');
         end
     end
 
@@ -509,7 +509,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         fprintf('POST-HOC ACOUSTIC WATER SIMULATION \n');
 
         if numel(parameters.transducer) > 1
-            warning(['Post-hoc water simulations are not implemented for multiple transducers. ' ...
+            warn(['Post-hoc water simulations are not implemented for multiple transducers. ' ...
                      'Post-hoc water simulation will be run only for the first specified transducer. ' ...
                      'Consider running separate configs to test individual transducers.']);
         end

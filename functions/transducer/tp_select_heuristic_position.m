@@ -111,7 +111,7 @@ if ~isempty(tppf)
     i = find(locs.idx == tppf.idx(1));
     fprintf('[TP_HEURISTIC] Selected %d final candidate(s).\n', size(tppf,1));
 else
-    warning('[TP_HEURISTIC] No candidates remain.');
+    warn('[TP_HEURISTIC] No candidates remain.');
     i = [];
 end
 

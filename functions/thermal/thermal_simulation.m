@@ -150,7 +150,7 @@ if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.
         filename_absorption = fullfile(parameters.io.debug_dir_medium, 'matrix_absorption_np');
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
     catch
-        warning("Error with saving absorption debug image...")
+        warn("Error with saving absorption debug image...")
     end
 end
 
@@ -183,10 +183,10 @@ clear record_every_step;
 try
     use_datacast = any(regexp(fileread(which('kWaveDiffusion')), '''DataCast'''));
     if ~use_datacast
-        warning('MATLAB GPU support requested but kWaveDiffusion lacks ''DataCast'' (kWave ≥1.4.1 required).');
+        warn('MATLAB GPU support requested but kWaveDiffusion lacks ''DataCast'' (kWave ≥1.4.1 required).');
     end
 catch
-    warning('Cannot verify kWaveDiffusion DataCast support; assuming GPU-compatible version.');
+    warn('Cannot verify kWaveDiffusion DataCast support; assuming GPU-compatible version.');
     use_datacast = true;
 end
 

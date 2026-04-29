@@ -124,7 +124,7 @@ end
 
     % Check if crossIdx is empty
     if isempty(crossIdx)
-        warning('No crossover point found within the restricted range. Choosing the midway point between tissue peaks. Visual inspection recommended.');
+        warn('No crossover point found within the restricted range. Choosing the midway point between tissue peaks. Visual inspection recommended.');
         xCross = round(mean([xMax1, xMax2]));
     else
         xCross = x(crossIdx + find(rangeIdx, 1, 'first')-1);

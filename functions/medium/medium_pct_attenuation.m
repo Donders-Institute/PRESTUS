@@ -44,7 +44,7 @@ switch algorithm
         % Throw a warning in the case of deviations.
         if parameters.medium_properties.skull.alpha_coeff ~= kPlan_alpha || ...
             parameters.medium_properties.skull.alpha_power ~= kPlan_alpha_power
-            warning('Specified attenuation varies from k-Plan setup.')
+            warn('Specified attenuation varies from k-Plan setup.')
         end
         alpha_coeff(skull_idx) = parameters.medium_properties.skull.alpha_coeff;
         alpha_power(skull_idx) = parameters.medium_properties.skull.alpha_power;

@@ -176,7 +176,7 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
     end
 
     if isempty(segments)
-        warning("⚠ No valid %s segments found", markertype);
+        warn("⚠ No valid %s segments found", markertype);
         stats = {};
         return;
     end

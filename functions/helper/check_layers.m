@@ -51,11 +51,11 @@ end
         % Remove differentiated skull
         if isfield(parameters.layers, 'skull_cortical')
             parameters.layers = rmfield(parameters.layers, 'skull_cortical');
-            warning('pCT requested with skull_cortical layer, unifying into a single skull layer ...');
+            warn('pCT requested with skull_cortical layer, unifying into a single skull layer ...');
         end
         if isfield(parameters.layers, 'skull_trabecular')
             parameters.layers = rmfield(parameters.layers, 'skull_trabecular');
-            warning('pCT requested with skull_trabecular layer, unifying into a single skull layer ...');
+            warn('pCT requested with skull_trabecular layer, unifying into a single skull layer ...');
         end
     end
     
@@ -68,7 +68,7 @@ end
         if any(ismember(unique(segmentation), parameters.layers.(layers_requested{i_layer})))
             layers_available(i_layer) = 1;
         else
-            warning(['[Layer] ', layers_requested{i_layer}, ' requested but not available in segmentation. Removing it...']);
+            warn(['[Layer] ', layers_requested{i_layer}, ' requested but not available in segmentation. Removing it...']);
         end
     end
     
