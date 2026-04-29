@@ -41,6 +41,7 @@
   opt_weights: 0                    # Weighting of the original profile during fitting (0 = uniform weighting, >1 increasingly narrow Gaussian FWHM)
   opt_seed: 251024                  # Random seed for optimization
   opt_upper_velocity: 0.2           # Upper velocity in global search
+  opt_phase_precession: false       # false (default) | 'linear' (strict ramp: phase_start + i*step, 2 params) | 'monotonic' (ordered via cumulative increments, N params but monotonically constrained)
   fit_velocity_to_intensity: true   # Correct velocity after global search to match desired peak intensity
   
   # Other

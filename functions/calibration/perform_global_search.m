@@ -45,20 +45,45 @@ end
         weights = parameters.calibration.opt_weights;
     end
 
-    % Define the objective function for optimization.
-    % This function evaluates the error based on the current phases and velocity.
-    optimize_phases = @(phases_and_velocity) phase_optimization_annulus_full_curve(...
-        phases_and_velocity(1:end-1), ... % Phases for transducer elements
-        parameters, ... % Simulation and transducer parameters
-        phases_and_velocity(end), ... % Particle velocity
-        profile_target.axial_distance_bowl, ... % Distance vector
-        profile_target.axial_intensity,... % Desired intensity profile
-        0, ... % Disable plotting
+    % Phase precession mode (calibration.opt_phase_precession):
+    %   false      - independent per-element phases (default)
+    %   'linear'   - strict linear ramp: phase[i] = phase_start + i * phase_step
+    %                (2 free phase parameters)
+    %   'monotonic'- ordered phases via cumulative increments: phase[i] = phase[i-1] + delta[i]
+    %                with delta[i] >= 0 (N free phase parameters, but monotonically constrained)
+    if isfield(parameters.calibration, 'opt_phase_precession')
+        precession_mode = parameters.calibration.opt_phase_precession;
+    else
+        precession_mode = false;
+    end
+
+    n_elem = parameters.transducer.annular.elem_n;
+
+    % Helper: reconstruct full phase vector from optimisation parameters
+    switch precession_mode
+        case 'linear'
+            % [phase_start, phase_step, velocity]
+            phases_from_params = @(p) mod(p(1) + (0:n_elem-1) * p(2), 2*pi);
+        case 'monotonic'
+            % [phase_start, delta_1, ..., delta_{N-1}, velocity]
+            % delta_i >= 0 ensures monotonic ordering; mod wraps to [0, 2pi]
+            phases_from_params = @(p) mod(p(1) + [0, cumsum(p(2:n_elem))], 2*pi);
+        otherwise
+            phases_from_params = @(p) p(1:end-1);
+    end
+
+    optimize_phases = @(p) phase_optimization_annulus_full_curve(...
+        phases_from_params(p), ...
+        parameters, ...
+        p(end), ...
+        profile_target.axial_distance_bowl, ...
+        profile_target.axial_intensity, ...
+        0, ...
         opt_limits, ...
         weights);
-    
+
     % Set a random seed for reproducibility.
-    if isfield(parameters.calibration, 'opt_seed') 
+    if isfield(parameters.calibration, 'opt_seed')
         rng(parameters.calibration.opt_seed, 'twister');
     end
 
@@ -66,9 +91,23 @@ end
     if ~isfield(parameters.calibration, 'opt_upper_velocity') || isempty(parameters.calibration.opt_upper_velocity)
         parameters.calibration.opt_upper_velocity = 0.2; % set default for upper velocity to 20 mm/s;
     end
-    initial_guess = [randi(360, [1, parameters.transducer.annular.elem_n]) / 180 * pi, velocity];
-    lower_bounds = [zeros(1, parameters.transducer.annular.elem_n), 0.001]; % Lower bounds: [0 rad, 1 mm/s]
-    upper_bounds = [2 * pi * ones(1, parameters.transducer.annular.elem_n), parameters.calibration.opt_upper_velocity]; % Upper bounds: [2pi rad, 200 mm/s]
+
+    switch precession_mode
+        case 'linear'
+            % [phase_start (rad), phase_step (rad/elem), velocity (m/s)]
+            initial_guess = [rand() * 2*pi, (rand()-0.5) * 2*pi, velocity];
+            lower_bounds  = [0,    -2*pi, 0.001];
+            upper_bounds  = [2*pi,  2*pi, parameters.calibration.opt_upper_velocity];
+        case 'monotonic'
+            % [phase_start, delta_1, ..., delta_{N-1}, velocity]
+            initial_guess = [rand() * 2*pi, rand(1, n_elem-1) * 2*pi/(n_elem-1), velocity];
+            lower_bounds  = [0,    zeros(1, n_elem-1), 0.001];
+            upper_bounds  = [2*pi, 2*pi * ones(1, n_elem-1), parameters.calibration.opt_upper_velocity];
+        otherwise
+            initial_guess = [randi(360, [1, n_elem]) / 180 * pi, velocity];
+            lower_bounds  = [zeros(1, n_elem), 0.001];
+            upper_bounds  = [2*pi * ones(1, n_elem), parameters.calibration.opt_upper_velocity];
+    end
 
     if ~isfield(parameters.calibration, 'opt_method') || strcmp(parameters.calibration.opt_method, 'FEXminimize')
         % by default use FEXminimize
@@ -97,14 +136,26 @@ end
             'lb', lower_bounds, ...
             'ub', upper_bounds, ...
             'options', optimoptions('fmincon', 'OptimalityTolerance', 1e-8));
-        
+
         % Perform the global search to find optimal phases and velocity.
         [opt_phases_and_velocity, min_err] = run(gs, problem);
     end
 
     % Extract optimized phases and velocity from the result.
-    opt_phases = opt_phases_and_velocity(1:end-1);
+    opt_phases   = phases_from_params(opt_phases_and_velocity);
     opt_velocity = opt_phases_and_velocity(end);
+
+    switch precession_mode
+        case 'linear'
+            fprintf('Precession params (linear): start=%.2f deg, step=%.2f deg/elem\n', ...
+                opt_phases_and_velocity(1)/pi*180, opt_phases_and_velocity(2)/pi*180);
+        case 'monotonic'
+            deltas = opt_phases_and_velocity(2:n_elem);
+            fprintf('Precession params (monotonic): start=%.2f deg, increments=%s deg\n', ...
+                opt_phases_and_velocity(1)/pi*180, mat2str(round(deltas/pi*180)));
+        otherwise
+            % unconstrained: phases reported below via standard output
+    end
 
     % Plot and evaluate the optimization result.
     phase_optimization_annulus_full_curve(...

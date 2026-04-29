@@ -417,4 +417,5 @@ A separate `config_calibration.yaml` applies for calibration workflows and is lo
 | `opt_limits` | Distance limits for optimisation [mm]. | |
 | `opt_weights` | Weighting of original profile during fitting. | `1` = equal; `>1` = Gaussian (narrower with larger values) |
 | `opt_seed` | Random seed for optimisation. | |
+| `opt_phase_precession` | Constrain element phases during optimisation. | `false` (default) = independent; `'linear'` = strict ramp (`phase_start + i * phase_step`, 2 free params); `'monotonic'` = ordered phases via cumulative non-negative increments (N params, monotonically constrained). |
 | `skip_front_peak_mm` | Distance from profile start to ignore [mm]. | Avoids near-field artefacts in peak/FWHM calculations. |
