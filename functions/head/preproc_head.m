@@ -515,9 +515,14 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         end
 
         % Plot positioning of transducer on segmentation
+        if numel(parameters.transducer) > 1
+            tnn_suffix = sprintf('_T%02d', ti);
+        else
+            tnn_suffix = '';
+        end
         output_plot_filename = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_positioning_T%02d%s.png', ...
-            parameters.subject_id, ti, parameters.io.output_affix));
+            sprintf('sub-%03d_positioning%s%s.png', ...
+            parameters.subject_id, tnn_suffix, parameters.io.output_affix));
 
         % Subplot 1: Original segmentation with initial transducer and focus positions
         % Subplot 2: Original segmentation with slice cap applied

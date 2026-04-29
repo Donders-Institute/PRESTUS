@@ -840,10 +840,16 @@ function html = build_positioning_section(parameters, subject_id, affix)
     found_any = false;
     html = [html '<div class="image-grid image-grid--wide">'];
     for t = 1:n_trans
+        if n_trans > 1
+            tnn_suffix = sprintf('_T%02d', t);
+            cap = sprintf('Transducer %d positioning', t);
+        else
+            tnn_suffix = '';
+            cap = 'Transducer positioning';
+        end
         img_path = fullfile(parameters.io.output_dir, ...
-            sprintf('sub-%03d_positioning_T%02d%s.png', subject_id, t, affix));
-        img_html = html_utils.embed_image(img_path, sprintf('Positioning T%02d', t), ...
-            sprintf('Transducer %d positioning', t));
+            sprintf('sub-%03d_positioning%s%s.png', subject_id, tnn_suffix, affix));
+        img_html = html_utils.embed_image(img_path, sprintf('Positioning%s', tnn_suffix), cap);
         if ~isempty(img_html)
             html = [html img_html];
             found_any = true;
