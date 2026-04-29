@@ -813,7 +813,7 @@ function html = build_config_summary(parameters)
     end
 
     % Thermal protocol (if enabled)
-    if isfield(parameters, 'thermal') && isfield(parameters, 'modules') && safe_field(parameters.modules, 'run_heating_sims', 0)
+    if isfield(parameters, 'thermal') && isfield(parameters, 'modules') && any(safe_field(parameters.modules, 'run_heating_sims', 0))
         th = parameters.thermal;
         thermal_fields = {'pd', 'Pulse duration'; 'pri', 'Pulse repetition interval'; ...
                           'ptd', 'Pulse train duration'; 'ptri', 'Pulse train rep. interval'; ...
