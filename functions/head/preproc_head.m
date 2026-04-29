@@ -66,10 +66,10 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     end
 
     if parameters.pct.enabled == 1
-        % Load pseudoCT from the resolved pCT directory (parameters.io.pct_dir).
+        % Load pseudoCT from the resolved pCT directory (parameters.io.dir_pct).
         % path_log_setup sets this to the SimNIBS m2m folder by default, or to
         % {path.pct}/sub-NNN/ when a dedicated pCT base directory is configured.
-        pct_dir = parameters.io.pct_dir;
+        pct_dir = parameters.io.dir_pct;
         filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
         pseudoCT_header = niftiinfo(filename_pseudoCT);
@@ -175,13 +175,13 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     else
         preproc_affix = parameters.io.output_affix;
     end
-    filename_reoriented_scaled_data = fullfile(parameters.io.cache_dir, ...
+    filename_reoriented_scaled_data = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s_rotated_scaled%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
     if confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
-        log_timer('start','preproc_rotscale', parameters.io.output_dir);
+        log_timer('start','preproc_rotscale', parameters.io.dir_output);
 
         %% [Planning image] (rotation matrix will be established for planning image)
 
@@ -204,7 +204,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 h = figure;
                 imshow(t1_rr_img_montage)
                 title('Original (left) and rotated (right) planning image');
-                output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+                output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
                     sprintf('sub-%03d_t1_rotated_scaled%s.png',...
                     parameters.subject_id, parameters.io.output_affix));
                 saveas(h, output_plot_filename, 'png');
@@ -233,7 +233,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             h = figure;
             imshow(segm_img_montage)
             title('Original (left) and rotated (right) tissue segmentation');
-            output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
                 sprintf('sub-%03d_segmented_rotated_scaled%s.png',...
                 parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png');
@@ -269,7 +269,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             h = figure;
             imshow(bone_img_montage)
             title('Original (left) and rotated (right) original bone mask');
-            output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
                 sprintf('sub-%03d_rotated_scaled_orig%s.png',...
                 parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
@@ -286,7 +286,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         % are only needed as inputs to the smoothing/cropping step (file 2).
         % Once file 2 exists they are never used again, so we omit them from
         % the checkpoint to save disk space.
-        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.cache_dir, ...
+        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.dir_cache, ...
             sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
             parameters.subject_id, parameters.simulation.medium, preproc_affix));
         if ~isfile(filename_cropped_smoothed_skull_data_check)
@@ -314,7 +314,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         disp('Skipping reorientation; the file already exists. Loading it instead.');
         % Only load the large volumes if file 2 does not yet exist —
         % they are only needed as inputs to the smoothing/cropping step.
-        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.cache_dir, ...
+        filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.dir_cache, ...
             sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
             parameters.subject_id, parameters.simulation.medium, preproc_affix));
         cropped_exists = isfile(filename_cropped_smoothed_skull_data_check);
@@ -352,7 +352,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         montage(cat(4,t1_slice*255 ,skin_skull_img*255 ,...
             imfuse(mat2gray(t1_slice), skin_skull_img,'blend')) ,'size',[1 NaN]);
         title('T1 and SimNIBS skin (green) and skull (blue) masks');
-        output_plot_filename = fullfile(parameters.io.debug_dir_preproc,...
+        output_plot_filename = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('sub-%03d_t1_skin_skull%s.png',parameters.subject_id, parameters.io.output_affix));
         saveas(h ,output_plot_filename ,'png')
         close(h);
@@ -366,12 +366,12 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     disp('Creating layered medium by smoothing and cropping the head segmentation...')
 
     % Defines output file location and name
-    filename_cropped_smoothed_skull_data = fullfile(parameters.io.cache_dir, ...
+    filename_cropped_smoothed_skull_data = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
     
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
-        log_timer('start','preproc_skullsmooth', parameters.io.output_dir);
+        log_timer('start','preproc_skullsmooth', parameters.io.dir_output);
         % postprocess skull segmentation
         [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
             head_smooth_and_crop(...
@@ -388,7 +388,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             % save medium mask
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
-            segmented_file = fullfile(parameters.io.debug_dir_preproc,...
+            segmented_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
             plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -404,7 +404,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             % save segmentation skull mask/pseudoCT
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
-            segmentation_file = fullfile(parameters.io.debug_dir_preproc,...
+            segmentation_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_segmentation_final', parameters.subject_id));
             plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -420,7 +420,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             % save skull mask/pseudoCT
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'double';
-            skull_mask_file = fullfile(parameters.io.debug_dir_preproc,...
+            skull_mask_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_skull_final', parameters.subject_id));
             plotdata = double(tformarray(bone_crop, inv_final_transformation_matrix, ...
                 makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
@@ -507,7 +507,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             h = figure;
             imshow(seg_with_trans_img);
             title('Segmentation with transducer');
-            output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
                 sprintf('sub-%03d_%s_segmented_brain_final_T%02d%s.png',...
                 parameters.subject_id, parameters.simulation.medium, ti, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
@@ -520,7 +520,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         else
             tnn_suffix = '';
         end
-        output_plot_filename = fullfile(parameters.io.figures_preproc_dir, ...
+        output_plot_filename = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d%s%s_positioning.png', ...
             parameters.subject_id, parameters.io.output_affix, tnn_suffix));
 

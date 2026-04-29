@@ -10,7 +10,7 @@ function report_path = generate_uncertainty_report(parameters, affixes)
 %   report_path = generate_uncertainty_report(parameters, affixes)
 %
 % Input:
-%   parameters - (1,1) simulation parameters struct; parameters.io.output_dir
+%   parameters - (1,1) simulation parameters struct; parameters.io.dir_output
 %                must point to the shared output folder
 %   affixes    - struct with fields .default, .liberal, .conservative
 %                (defaults: '', '_liberal', '_conservative')
@@ -30,7 +30,7 @@ report_path = '';
 try
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
-    output_dir = parameters.io.output_dir;
+    output_dir = parameters.io.dir_output;
 
     % Determine whether this is a layered (tissue) simulation based on the
     % medium name. The modules.run_heating_sims flag reflects whether heating
@@ -210,7 +210,7 @@ function html = build_header(subject_id, medium, parameters, affixes)
     html = [html sprintf('<tr><th>Default affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.default))];
     html = [html sprintf('<tr><th>Liberal affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.liberal))];
     html = [html sprintf('<tr><th>Conservative affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.conservative))];
-    html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.output_dir))];
+    html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.dir_output))];
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     html = [html '</table>'];
     html = [html '</section>'];
@@ -370,7 +370,7 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
     for v = 1:3
         aff = variant_affixes{v};
         lbl = variant_labels{v};
-        img_path = fullfile(parameters.io.figures_acoustic_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_intensity_y.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
@@ -404,7 +404,7 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
     for v = 1:3
         aff = variant_affixes{v};
         lbl = variant_labels{v};
-        img_path = fullfile(parameters.io.figures_thermal_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_thermal_max.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
@@ -425,9 +425,9 @@ function html = build_images_section(variant_affixes, variant_labels, parameters
 
     image_specs = {};
     if is_layered
-        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_maxT_y.png',   subject_id, medium)), 'Max Temperature (y-slice)'};
-        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_thermal.png', subject_id, medium)), 'Temperature vs. Time'};
-        image_specs{end+1} = {fullfile(parameters.io.figures_thermal_dir,  sprintf('sub-%03d_%s%%s_CEM.png',     subject_id, medium)), 'CEM43 vs. Time'};
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_maxT_y.png',   subject_id, medium)), 'Max Temperature (y-slice)'};
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_thermal.png', subject_id, medium)), 'Temperature vs. Time'};
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_CEM.png',     subject_id, medium)), 'CEM43 vs. Time'};
     end
 
     for k = 1:numel(image_specs)

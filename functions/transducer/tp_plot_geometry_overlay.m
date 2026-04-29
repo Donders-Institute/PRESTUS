@@ -77,7 +77,7 @@ line([trans_xz(2) target_xz(2)], [trans_xz(1) target_xz(1)], 'Color', 'white', '
 get_transducer_box(trans_xz, target_xz, [], pixel_size, parameters);
 
 % Save geometry validation plot
-saveas(h, fullfile(parameters.io.figures_preproc_dir, sprintf('sub-%03d_geometry_%s.png', subject_id, target_name)), 'png');
+saveas(h, fullfile(parameters.io.dir_img, sprintf('sub-%03d_geometry_%s.png', subject_id, target_name)), 'png');
 close(h);
 
 end

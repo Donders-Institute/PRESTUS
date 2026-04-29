@@ -17,7 +17,7 @@ function simulation_nifti(parameters, planimg, results_acoustic, ...
 %                    results_heating, kwave_medium, highlighted_pos)
 %
 % Input:
-%   parameters      - (1,1) struct, PRESTUS config with io.output_dir,
+%   parameters      - (1,1) struct, PRESTUS config with io.dir_output,
 %                     simulation.medium, io.output_affix, modules flags, etc.
 %   planimg         - (1,1) struct, SimNIBS planning data: t1_image_orig,
 %                     inv_transf (affine tform), t1_header
@@ -56,9 +56,9 @@ end
             data_types  = [data_types, "heating", "heating_end", "heatrise", "heatrise_end", "CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"];
         end
         for data_type = data_types
-            orig_file = fullfile(parameters.io.nii_T1w_dir, sprintf('sub-%03d_%s_space-T1w%s_%s',...
+            orig_file = fullfile(parameters.io.dir_nii_T1w, sprintf('sub-%03d_%s_space-T1w%s_%s',...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
-            mni_file  = fullfile(parameters.io.nii_MNI_dir, sprintf('sub-%03d_%s_space-MNI%s_%s.nii.gz',...
+            mni_file  = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_space-MNI%s_%s.nii.gz',...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
 
             if strcmp(data_type, "medium_masks")
@@ -206,7 +206,7 @@ end
             
                     trans_suffix = '';
                     if max_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
-                    output_plot_filename = fullfile(parameters.io.figures_acoustic_dir, ...
+                    output_plot_filename = fullfile(parameters.io.dir_img, ...
                         sprintf('sub-%03d_%s%s_intensity_t1%s.png', ...
                         parameters.subject_id, parameters.simulation.medium, ...
                         parameters.io.output_affix, trans_suffix));

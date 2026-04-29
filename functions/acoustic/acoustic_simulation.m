@@ -19,7 +19,7 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 %   sensor     - k-Wave sensor definition (mask, record)
 %   input_args - additional k-Wave key-value options (PMLInside, PMLSize, etc.)
 %   parameters - PRESTUS config with simulation.code_type, simulation.interactive,
-%                grid.dims, io.output_dir, transducer, simulation.precision
+%                grid.dims, io.dir_output, transducer, simulation.precision
 %
 % Output:
 %   sensor_data - k-Wave sensor output (p_max_all, p_final, etc.) [Pa]
@@ -67,7 +67,7 @@ switch parameters.simulation.code_type
       sensor  = cast_struct(sensor, parameters.simulation.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      h5_dir = char(parameters.io.cache_dir);
+      h5_dir = char(parameters.io.dir_cache);
       input_args.SaveToDisk = char(fullfile(h5_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
          parameters.simulation.medium, parameters.io.output_affix)));
@@ -109,7 +109,7 @@ switch parameters.simulation.code_type
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, as_args_cast{:}, 'RadialSymmetry', 'WSWA-FFT');
       else
          % Pathname for the input and output files
-         h5_dir = char(parameters.io.cache_dir);
+         h5_dir = char(parameters.io.dir_cache);
          input_args.SaveToDisk = char(fullfile(h5_dir, ...
            sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
            parameters.simulation.medium, parameters.io.output_affix)));

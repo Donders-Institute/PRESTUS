@@ -145,7 +145,7 @@ end
                     xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 1);
                     xline(medium.skull.alpha_coeff, 'k', 'LineWidth', 2);
                     title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
-                output_plot = fullfile(parameters.io.debug_dir_medium,...
+                output_plot = fullfile(parameters.io.dir_debug_medium,...
                     sprintf('pCT_histograms%s.png',parameters.io.output_affix));
                 exportgraphics(h, output_plot, 'Resolution', 150);
                 close(h);
@@ -210,7 +210,7 @@ end
     
         % DEBUG mode: save plot of fitted attenuation values
         if parameters.simulation.debug == 1
-            fig_path = fullfile(parameters.io.debug_dir_medium,...
+            fig_path = fullfile(parameters.io.dir_debug_medium,...
             ['attenuation_fit', char(parameters.io.output_affix), '.png']);
             saveas(gcf, fig_path);
             close(gcf);
@@ -253,7 +253,7 @@ end
             end
             subplot(1,2,1); imagesc(density_pre); title('Original density')
             subplot(1,2,2); imagesc(density_post); title('Smoothed density')
-            output_plot_filename = fullfile(parameters.io.debug_dir_medium,...
+            output_plot_filename = fullfile(parameters.io.dir_debug_medium,...
                 sprintf('sub-%03d_%s_density_smoothing_changes%s.png', ...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
@@ -306,19 +306,19 @@ end
     if parameters.simulation.debug == 1
         % [debug] save raw simulation-grid medium matrices as NIfTIs
         try
-            filename_density = fullfile(parameters.io.debug_dir_medium,'matrix_density');
+            filename_density = fullfile(parameters.io.dir_debug_medium,'matrix_density');
             niftiwrite(density, filename_density, 'Compressed',true); pause(0.1);
-            filename_sound_speed = fullfile(parameters.io.debug_dir_medium,'matrix_sound_speed');
+            filename_sound_speed = fullfile(parameters.io.dir_debug_medium,'matrix_sound_speed');
             niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_coeff');
+            filename_alpha_coeff = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_coeff');
             niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true); pause(0.1);
-            filename_alpha_power = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_power');
+            filename_alpha_power = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_power');
             niftiwrite(alpha_power, filename_alpha_power, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff_fixed = fullfile(parameters.io.debug_dir_medium,'matrix_alpha_coeff_fixed');
+            filename_alpha_coeff_fixed = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_coeff_fixed');
             niftiwrite(alpha_coeff_fixed, filename_alpha_coeff_fixed, 'Compressed',true); pause(0.1);
-            filename_perfusion = fullfile(parameters.io.debug_dir_medium,'matrix_perfusion');
+            filename_perfusion = fullfile(parameters.io.dir_debug_medium,'matrix_perfusion');
             niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
-            filename_absorption = fullfile(parameters.io.debug_dir_medium,'matrix_absorption');
+            filename_absorption = fullfile(parameters.io.dir_debug_medium,'matrix_absorption');
             niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
         catch
             warn('medium_setup:debugNifti', ...
@@ -327,7 +327,7 @@ end
 
         % [debug] save pCT (if used)
         if parameters.pct.enabled == 1
-            filename_pct = fullfile(parameters.io.debug_dir_medium,sprintf('pct%s', parameters.io.output_affix));
+            filename_pct = fullfile(parameters.io.dir_debug_medium,sprintf('pct%s', parameters.io.output_affix));
             niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
         end
     end

@@ -21,7 +21,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %
 % Input:
 %   parameters      - PRESTUS config; must contain grid.dims, grid.resolution_mm [mm],
-%                     grid.source_cfl, grid.min_ppw, grid.use_kWaveArray, io.cache_dir,
+%                     grid.source_cfl, grid.min_ppw, grid.use_kWaveArray, io.dir_cache,
 %                     and transducer(1).freq_hz [Hz]
 %   max_sound_speed - maximum sound speed across all media [m/s]
 %   trans_pos_final - transducer position in grid indices
@@ -129,10 +129,10 @@ end
     % NOT used here — it only applies to head-preprocessing file lookups in
     % preproc_head.m.
     source_affix = parameters.io.output_affix;
-    parameters.io.kwave_source_filename  = fullfile(parameters.io.cache_dir, ...
+    parameters.io.filename_kwave_source  = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s%s_kwave_source.mat', ...
         parameters.subject_id, parameters.simulation.medium, source_affix));
-    if confirm_overwriting(parameters.io.kwave_source_filename, parameters)
+    if confirm_overwriting(parameters.io.filename_kwave_source, parameters)
 
         % build per-transducer positions for geometry when not using kWaveArray
         if numel(parameters.transducer)>1 && parameters.grid.use_kWaveArray == 0
@@ -175,12 +175,12 @@ end
         % Save the source matrix (controlled by io.save_source_matrices,
         % falling back to io.save_matrices, defaulting to true)
         if should_save_output(parameters.io, 'save_source_matrices')
-            save(parameters.io.kwave_source_filename, 'source', 'source_labels','-v7.3');
+            save(parameters.io.filename_kwave_source, 'source', 'source_labels','-v7.3');
         else
             disp('Not saving kwave source matrix ...')
         end
     else
-        load(parameters.io.kwave_source_filename);
+        load(parameters.io.filename_kwave_source);
     end
 
     % Creates a sensor that records the the maximum and final pressure

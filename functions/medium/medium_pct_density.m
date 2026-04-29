@@ -45,7 +45,7 @@ switch algorithm
 
         % plot the mapping
         if parameters.simulation.debug == 1
-            output_plot = fullfile(parameters.io.debug_dir_medium,...
+            output_plot = fullfile(parameters.io.dir_debug_medium,...
                 sprintf('pCT_hounsfield-density_kplan.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
         end
@@ -71,7 +71,7 @@ switch algorithm
         
         % plot the mapping
         if parameters.simulation.debug == 1
-            output_plot = fullfile(parameters.io.debug_dir_medium,...
+            output_plot = fullfile(parameters.io.dir_debug_medium,...
                 sprintf('pCT_hounsfield-density_kwave.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
         end

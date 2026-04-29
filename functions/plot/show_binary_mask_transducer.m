@@ -45,8 +45,8 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         title('3D Visualization of Transducer Binary Mask');
 
         % Save figure
-        saveas(h, fullfile(parameters.io.debug_dir_source, [base_filename '.fig']));
-        saveas(h, fullfile(parameters.io.debug_dir_source, [base_filename '.png']));
+        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.fig']));
+        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.png']));
 
         close(h);
     else
@@ -63,7 +63,7 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         title('Transducer Binary Mask in Simulation Grid');
 
         % Save figure
-        saveas(h, fullfile(parameters.io.debug_dir_source, [base_filename '.png']));
+        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.png']));
 
         close(h);
     end

@@ -76,7 +76,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % [debug] save balloon wrap mask
     if parameters.simulation.debug == 1
 
-        outNii = fullfile(parameters.io.debug_dir_preproc,...
+        outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask%s.nii', parameters.io.output_affix));
 
         infoOut = info;
@@ -194,7 +194,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     if parameters.simulation.debug == 1
 
-        outNii = fullfile(parameters.io.debug_dir_preproc,...
+        outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask_final%s.nii', parameters.io.output_affix));
 
         infoOut = info;

@@ -68,10 +68,22 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 | **Field** | **Description** |
 |---|---|
-| `output_dir` | Resolved per-subject output directory. Set from `path.sim` (+ subject subfolder if `path.subject_subfolder = 1`). |
-| `debug_dir` | Debug subfolder within `output_dir`. Created automatically. |
-| `filename_output_table` | Path to the per-subject CSV results table. |
-| `kwave_source_filename` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
+| `dir_output` | Resolved per-subject output directory. Set from `path.sim` (+ subject subfolder if `path.subject_subfolder = 1`). |
+| `dir_nii` | NIfTI output subfolder (`nii/`). Created automatically. |
+| `dir_nii_T1w` | Alias for `dir_nii`; space encoded in filename. |
+| `dir_nii_MNI` | Alias for `dir_nii`; space encoded in filename. |
+| `dir_img` | Image/figure output subfolder (`img/`). Used for all acoustic, thermal, and preprocessing figures. Created automatically. |
+| `dir_tabular` | Directory for per-subject CSV results tables (same as `dir_output`). |
+| `dir_reports` | Directory for simulation reports (same as `dir_output`). |
+| `dir_logs` | Log subfolder (`log/`). Created automatically. |
+| `dir_cache` | Cache subfolder (`cache/`). Created automatically. |
+| `dir_debug` | Debug subfolder (`debug/`). Created when `simulation.debug = 1`. |
+| `dir_debug_preproc` | Debug subfolder for preprocessing (`debug/preproc/`). |
+| `dir_debug_medium` | Debug subfolder for medium setup (`debug/medium/`). |
+| `dir_debug_source` | Debug subfolder for source setup (`debug/source/`). |
+| `dir_pct` | Resolved subject pCT directory. Set from `path.seg` or `path.pct`. |
+| `filename_table` | Path to the per-subject CSV results table. |
+| `filename_kwave_source` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
 
 ---
 
@@ -156,7 +168,7 @@ Warning: The `define_here` options are experimental and may contain bugs due to 
 |---|---|---|
 | `grid_shape.type` | Grid distribution type. | Options: `rect`, `fibonacci`, `fermat`. |
 
-####### Rectangular Grid
+###### Rectangular Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
@@ -166,14 +178,14 @@ Warning: The `define_here` options are experimental and may contain bugs due to 
 | `elem_spacing_width_mm` | Spacing between elements in width direction [mm]. | Edge-to-edge spacing. |
 | `sparsity_factor` | Fraction of active elements. | Range: 0.1–1.0. |
 
-####### Fibonacci Grid
+###### Fibonacci Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
 | `elem_n` | Total number of elements. | |
 | `kerf_mm` | Minimum spacing between elements [mm]. | |
 
-####### Fermat Grid
+###### Fermat Grid
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|

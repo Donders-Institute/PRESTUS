@@ -149,7 +149,7 @@ function parameters = run_heuristic_placement(parameters)
     pn.sim_path  = parameters.path.sim;
 
     % Expected output file from tp_select_heuristic_position (rows2vars txt)
-    tpos_file = fullfile(parameters.io.output_dir, ...
+    tpos_file = fullfile(parameters.io.dir_output, ...
         sprintf('sub-%03d_%s.txt', parameters.subject_id, target_name));
 
     % Detect platform

@@ -24,7 +24,7 @@ function pct_create_pCT_run(parameters)
 %     .path.seg                 - base SimNIBS output directory
 %     .path.pct                 - (optional) base directory for pCT outputs; empty →
 %                                 path.seg/m2m_sub-NNN/, non-empty → path.pct/sub-NNN/
-%     .io.pct_dir               - (optional) pre-resolved subject pCT dir set by path_log_setup
+%     .io.dir_pct               - (optional) pre-resolved subject pCT dir set by path_log_setup
 %     .pct.skull_mapping        - UTE→HU algorithm (default: 'kosciessa')
 %     .pct.debug                - keep intermediate images (default: 1)
 %     .platform                 - 'matlab'/'slurm'/'qsub'/'auto'
@@ -44,10 +44,10 @@ end
     path_seg       = parameters.path.seg;
 
     % Resolve the subject-specific pCT output directory.
-    % Use io.pct_dir when path_log_setup has already resolved it; otherwise apply the
+    % Use io.dir_pct when path_log_setup has already resolved it; otherwise apply the
     % same resolution logic: empty path.pct → m2m_sub-NNN, non-empty → sub-NNN.
-    if isfield(parameters, 'io') && isfield(parameters.io, 'pct_dir') && ~isempty(parameters.io.pct_dir)
-        path_pct_out = parameters.io.pct_dir;
+    if isfield(parameters, 'io') && isfield(parameters.io, 'pct_dir') && ~isempty(parameters.io.dir_pct)
+        path_pct_out = parameters.io.dir_pct;
     elseif isfield(parameters.path, 'pct') && ~isempty(parameters.path.pct)
         path_pct_out = fullfile(parameters.path.pct, sprintf('sub-%s', subj_id_string));
     else

@@ -123,8 +123,8 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
             fig_name = sprintf('sub-%03d_%s_transducer_redone_element_distribution%s', ...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
 
-            saveas(h, fullfile(parameters.debug_dir, [fig_name '.fig']));
-            saveas(h, fullfile(parameters.debug_dir, [fig_name '.png']));
+            saveas(h, fullfile(parameters.dir_debug, [fig_name '.fig']));
+            saveas(h, fullfile(parameters.dir_debug, [fig_name '.png']));
 
             close(h);
         end

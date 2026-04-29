@@ -26,7 +26,7 @@ report_path = '';
 try
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
-    output_dir = parameters.io.output_dir;
+    output_dir = parameters.io.dir_output;
     base_affix = '';
     if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix')
         base_affix = parameters.io.output_affix;
@@ -246,7 +246,7 @@ function html = build_acoustic_section(tables, targets, affixes, parameters, sub
     any_found = false;
     for ti = 1:numel(targets)
         lbl = sprintf('%.0f W/cm²', targets(ti));
-        img_path = fullfile(parameters.io.figures_acoustic_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_intensity_y.png', subject_id, medium, affixes{ti}));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
@@ -275,7 +275,7 @@ function html = build_thermal_section(tables, targets, affixes, parameters, subj
     any_found = false;
     for ti = 1:numel(targets)
         lbl = sprintf('%.0f W/cm²', targets(ti));
-        img_path = fullfile(parameters.io.figures_thermal_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_thermal_max.png', subject_id, medium, affixes{ti}));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)

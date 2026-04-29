@@ -18,7 +18,7 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 % Input:
 %   focal_planeT    - temperature in focal plane over time [°C]
 %   time_status_seq - struct array with fields time [s], status, recorded
-%   parameters      - PRESTUS config; must contain io.output_dir, io.output_affix,
+%   parameters      - PRESTUS config; must contain io.dir_output, io.output_affix,
 %                     subject_id, simulation.medium, transducer(1).trans_pos,
 %                     transducer(1).focus_pos, thermal.temp_0, io.save_heatingvideo
 %   trans_pos       - [1x3] transducer position in grid indices
@@ -42,7 +42,7 @@ arguments
 end
 
     %% Define output file paths for plots
-    td = parameters.io.figures_thermal_dir;
+    td = parameters.io.dir_img;
     sid = parameters.subject_id;
     med = parameters.simulation.medium;
     aff = parameters.io.output_affix;
@@ -382,7 +382,7 @@ end
 
     %% Save values for post-hoc group analysis
 
-    output_HEAT = fullfile(parameters.io.output_dir, sprintf('sub-%03d_%s_HEAT%s.mat', ...
+    output_HEAT = fullfile(parameters.io.dir_cache, sprintf('sub-%03d_%s_HEAT%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
     save(output_HEAT, 'HEAT', 'timeseries');
 
@@ -398,7 +398,7 @@ end
         elseif ndims(medium_masks) == 2
             brain_slice = mat2gray(squeeze(medium_masks));
         end
-        output_video_name = fullfile(parameters.io.output_dir,...
+        output_video_name = fullfile(parameters.io.dir_output,...
             sprintf('sub-%03d_%s_heating_animation%s.avi', ...
             parameters.subject_id, ...
             parameters.simulation.medium, ...

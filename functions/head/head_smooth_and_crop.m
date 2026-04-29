@@ -48,7 +48,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 
     % create "medium_masks" that contains indices according to the label order in parameters.layers
     % each mask will be smoothed in the process
-    log_timer('start','preproc_medium_mask', parameters.io.output_dir);
+    log_timer('start','preproc_medium_mask', parameters.io.dir_output);
     [medium_masks] = preproc_medium_mask(segmentation, parameters);
     log_timer('stop','preproc_medium_mask');
 
@@ -65,7 +65,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         imshowpair(label2rgb(squeeze(segmentation(:,trans_pos_grid(2),:))), ...
             label2rgb(squeeze(medium_masks(:,trans_pos_grid(2),:))), 'montage')
         title('Original segmentation (left) and smoothed medium mask (right)')
-        output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+        output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
             sprintf('sub-%03d_%s_segmented_img_smoothing_changes%s.png', ...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         saveas(h, output_plot_filename, 'png')
@@ -83,7 +83,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             plot_t1_with_transducer(medium_masks, grid.resolution_mm, trans_pos_final, focus_pos_final, parameters),...
             'montage')
         title('Original segmentation (left) and Cropped, padded, & smoothed medium mask (right)')
-        output_plot_filename = fullfile(parameters.io.debug_dir_preproc, ...
+        output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
             sprintf('sub-%03d_%s_seg_smoothing_and_cropping_%s.png', ...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         saveas(h, output_plot_filename, 'png')

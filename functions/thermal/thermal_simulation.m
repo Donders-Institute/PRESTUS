@@ -147,7 +147,7 @@ clear w a0_np;
 % save absorption coefficient [Np] for debugging
 if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.simulation.debug == 1
     try
-        filename_absorption = fullfile(parameters.io.debug_dir_medium, 'matrix_absorption_np');
+        filename_absorption = fullfile(parameters.io.dir_debug_medium, 'matrix_absorption_np');
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
     catch
         warn("Error with saving absorption debug image...")

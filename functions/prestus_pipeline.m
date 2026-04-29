@@ -37,8 +37,8 @@ function [parameters] = prestus_pipeline(parameters, options)
 %
 % Output:
 %   parameters - updated struct with fields added by path_log_setup and
-%                intermediate processing steps (e.g. io.output_dir,
-%                io.kwave_source_filename, transducer positions)
+%                intermediate processing steps (e.g. io.dir_output,
+%                io.filename_kwave_source, transducer positions)
 %
 % Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB >= 2023b
 %
@@ -115,7 +115,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('TRANSDUCER PLACEMENT \n');
     fprintf('========================================\n\n');
-    log_timer('start','placement', parameters.io.output_dir);
+    log_timer('start','placement', parameters.io.dir_output);
 
     if ~isfield(parameters.modules, 'run_transducer_placement') || ...
             parameters.modules.run_transducer_placement == 1
@@ -132,14 +132,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('GRID SETUP & HEAD PREPROC \n');
     fprintf('========================================\n\n');
-    log_timer('start','preproc', parameters.io.output_dir);
+    log_timer('start','preproc', parameters.io.dir_output);
 
     if isfield(parameters.io, 'preproc_affix')
         preproc_affix = parameters.io.preproc_affix;
     else
         preproc_affix = parameters.io.output_affix;
     end
-    filename_grid_cache = fullfile(parameters.io.cache_dir, ...
+    filename_grid_cache = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s%s_grid_cache.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
@@ -188,9 +188,9 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('MEDIUM PROPERTY MAPPING \n');
     fprintf('========================================\n\n');
-    log_timer('start','medium', parameters.io.output_dir);
+    log_timer('start','medium', parameters.io.dir_output);
 
-    filename_medium_cache = fullfile(parameters.io.cache_dir, ...
+    filename_medium_cache = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s%s_medium_cache.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
@@ -221,7 +221,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('K-WAVE SOURCE SETUP \n');
     fprintf('========================================\n\n');
-    log_timer('start','source', parameters.io.output_dir);
+    log_timer('start','source', parameters.io.dir_output);
 
     if ~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1
         max_sound_speed = max(kwave_medium.sound_speed(:));
@@ -264,7 +264,7 @@ function [parameters] = prestus_pipeline(parameters, options)
                     ~isempty(parameters.calibration.target_isppa_wcm2));
     if run_baseline && ...
             (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
-        log_timer('start', 'freefield_baseline', parameters.io.output_dir);
+        log_timer('start', 'freefield_baseline', parameters.io.dir_output);
         acoustic_provenance.freefield_isppa_wcm2 = ...
             water_baseline(parameters, kgrid, source, sensor);
         log_timer('stop', 'freefield_baseline');
@@ -277,7 +277,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC SIMULATION \n');
     fprintf('========================================\n\n');
-    log_timer('start','acoustic', parameters.io.output_dir);
+    log_timer('start','acoustic', parameters.io.dir_output);
 
     % Thermal jobs use a per-target output_affix; acoustic_cache_affix points back to the base run.
     if isfield(parameters.io, 'acoustic_cache_affix')
@@ -285,7 +285,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     else
         acoustic_file_affix = parameters.io.output_affix;
     end
-    filename_sensor_data = fullfile(parameters.io.cache_dir, ...
+    filename_sensor_data = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s%s_results.mat',...
         parameters.subject_id, parameters.simulation.medium, acoustic_file_affix));
 
@@ -329,7 +329,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('ACOUSTIC ANALYSIS \n');
     fprintf('========================================\n\n');
-    log_timer('start','acoustic_analysis', parameters.io.output_dir);
+    log_timer('start','acoustic_analysis', parameters.io.dir_output);
 
     if (~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis)
         [results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
@@ -353,13 +353,13 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL SIMULATIONS \n');
     fprintf('========================================\n\n');
-    log_timer('start','thermal', parameters.io.output_dir);
+    log_timer('start','thermal', parameters.io.dir_output);
 
     parameters.state.heating_available = 0;
     if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims && parameters.state.acoustics_available == 1
 
         disp('Starting thermal simulations...')
-        filename_heating_data = fullfile(parameters.io.cache_dir,...
+        filename_heating_data = fullfile(parameters.io.dir_cache,...
             sprintf('sub-%03d_%s%s_heating_res.mat',...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
         
@@ -429,7 +429,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('THERMAL ANALYSIS \n');
     fprintf('========================================\n\n');
-    log_timer('start','thermal_analysis', parameters.io.output_dir);
+    log_timer('start','thermal_analysis', parameters.io.dir_output);
 
     if parameters.state.heating_available == 1 && ...
             (~isfield(parameters.modules, 'run_thermal_analysis') || parameters.modules.run_thermal_analysis)
@@ -449,7 +449,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n');
     fprintf('NIFTI IMAGES \n');
     fprintf('========================================\n\n');
-    log_timer('start','nifti', parameters.io.output_dir);
+    log_timer('start','nifti', parameters.io.dir_output);
 
     if ~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation==1
         simulation_nifti(parameters, planimg, results_acoustic, ...
@@ -541,9 +541,9 @@ function [parameters] = prestus_pipeline(parameters, options)
         lowestField = fields{minIdx};
         sequential_parameters = sequential_configs.(lowestField);
         sequential_configs = rmfield(sequential_configs, lowestField);
-        sequential_parameters.io.adopted_heatmap = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+        sequential_parameters.io.adopted_heatmap = fullfile(parameters.io.dir_output, sprintf('sub-%03d_final_%s_orig_coord%s',...
                 parameters.subject_id, 'heating_end', parameters.io.output_affix));
-        sequential_parameters.io.adopted_cem43 = fullfile(parameters.io.output_dir, sprintf('sub-%03d_final_%s_orig_coord%s',...
+        sequential_parameters.io.adopted_cem43 = fullfile(parameters.io.dir_output, sprintf('sub-%03d_final_%s_orig_coord%s',...
                 parameters.subject_id, 'CEM43_end', parameters.io.output_affix));
         fprintf('Running subsequent heating simulation on %s\n', lowestField);
         if ~isempty(fieldnames(sequential_configs))

@@ -6,7 +6,7 @@ function thermal_plot_protocol(params_thermal, parameters, varargin)
 % panel shows rectangular patches for each PT repetition across the full
 % PTRD duration (up to 20 equidistant patches are drawn when many
 % repetitions exist). The figure is saved as a PNG to
-% parameters.io.output_dir and closed.
+% parameters.io.dir_output and closed.
 %
 % Use as:
 %   thermal_plot_protocol(params_thermal, parameters)
@@ -20,7 +20,7 @@ function thermal_plot_protocol(params_thermal, parameters, varargin)
 %                    ptri_off_steps_n, post_ptri_step_dur [s],
 %                    post_ptri_steps_n, pd [s], pri [s], ptd [s],
 %                    ptri [s], ptrd [s], dc, prf [Hz]
-%   parameters     - PRESTUS config; must contain io.output_dir, io.output_affix,
+%   parameters     - PRESTUS config; must contain io.dir_output, io.output_affix,
 %                    subject_id, simulation.medium
 %
 % Optional name-value pairs:
@@ -167,7 +167,7 @@ subplot(2,1,2);
         'FontSize', 15, 'FontWeight', 'bold');
 
 % save plot
-output_plot_filename = fullfile(parameters.io.output_dir,...
+output_plot_filename = fullfile(parameters.io.dir_img,...
     sprintf('sub-%03d_%s_thermal_protocol%s.png',...
     parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 saveas(h, output_plot_filename, 'png')

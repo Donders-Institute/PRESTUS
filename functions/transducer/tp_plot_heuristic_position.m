@@ -87,7 +87,7 @@ subplot(1,3,3);
     view([-175,0])
 
 % save figure in output directory 
-output_plot = fullfile(parameters.io.figures_preproc_dir,...
+output_plot = fullfile(parameters.io.dir_img,...
     sprintf('sub-%03d_heuristic_%s.png', subject_id, target_name));
 saveas(h, output_plot, 'png')
 

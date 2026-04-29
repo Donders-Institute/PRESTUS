@@ -11,13 +11,13 @@ function [parameters] = path_log_setup(parameters, prestus_path)
 %   parameters = path_log_setup(parameters, prestus_path)
 %
 % Input:
-%   parameters   - PRESTUS config; io.output_dir and io.log_file may be absent
+%   parameters   - PRESTUS config; io.dir_output and io.log_file may be absent
 %                  on entry and are created by this function
 %   prestus_path - absolute path to the PRESTUS root directory
 %
 % Output:
-%   parameters   - input extended with io.output_dir, io.cache_dir,
-%                  io.debug_dir (and subdirs), io.log_file, io.filename_output_table
+%   parameters   - input extended with io.dir_output, io.dir_cache,
+%                  io.dir_debug (and subdirs), io.log_file, io.filename_table
 %
 % See also: LOAD_PARAMETERS, PRINT_PARAMETER_SUMMARY, PRESTUS_PIPELINE_START
 
@@ -82,8 +82,8 @@ end
     if isfield(parameters.path, 'sim') && ~isempty(parameters.path.sim) && ...
             (isstring(parameters.path.sim) || ischar(parameters.path.sim)) && ...
             ~any(strcmp(parameters.path.sim, {"", ''}))
-        parameters.io.output_dir = get_output_dir(parameters);
-        if ~isfolder(parameters.io.output_dir); mkdir(parameters.io.output_dir); end
+        parameters.io.dir_output = get_output_dir(parameters);
+        if ~isfolder(parameters.io.dir_output); mkdir(parameters.io.dir_output); end
     end
 
     % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
@@ -103,36 +103,33 @@ end
     %     ├── preproc/  — head preprocessing (rotation, cropping, skull visualizations)
     %     ├── medium/   — medium mapping (grid-space property matrices, pCT)
     %     └── source/   — source/transducer setup (element distribution plots)
-    % Reports (.html) and tables (.csv) are written directly to output_dir.
-    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
-        out = parameters.io.output_dir;
+    % Reports (.html) and tables (.csv) are written directly to dir_output.
+    if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
+        out = parameters.io.dir_output;
 
-        parameters.io.nii_dir              = fullfile(out, 'nii');
+        parameters.io.dir_nii              = fullfile(out, 'nii');
         % nii_T1w_dir and nii_MNI_dir both point to nii/; space is encoded in filenames
-        parameters.io.nii_T1w_dir          = fullfile(out, 'nii');
-        parameters.io.nii_MNI_dir          = fullfile(out, 'nii');
-        parameters.io.img_dir              = fullfile(out, 'img');
-        parameters.io.figures_acoustic_dir = fullfile(out, 'img');
-        parameters.io.figures_thermal_dir  = fullfile(out, 'img');
-        parameters.io.figures_preproc_dir  = fullfile(out, 'img');
-        parameters.io.tabular_dir          = out;
-        parameters.io.reports_dir          = out;
-        parameters.io.logs_dir             = fullfile(out, 'log');
-        parameters.io.cache_dir            = fullfile(out, 'cache');
-        parameters.io.debug_dir            = fullfile(out, 'debug');
-        parameters.io.debug_dir_preproc    = fullfile(out, 'debug', 'preproc');
-        parameters.io.debug_dir_medium     = fullfile(out, 'debug', 'medium');
-        parameters.io.debug_dir_source     = fullfile(out, 'debug', 'source');
+        parameters.io.dir_nii_T1w          = fullfile(out, 'nii');
+        parameters.io.dir_nii_MNI          = fullfile(out, 'nii');
+        parameters.io.dir_img              = fullfile(out, 'img');
+        parameters.io.dir_tabular          = out;
+        parameters.io.dir_reports          = out;
+        parameters.io.dir_logs             = fullfile(out, 'log');
+        parameters.io.dir_cache            = fullfile(out, 'cache');
+        parameters.io.dir_debug            = fullfile(out, 'debug');
+        parameters.io.dir_debug_preproc    = fullfile(out, 'debug', 'preproc');
+        parameters.io.dir_debug_medium     = fullfile(out, 'debug', 'medium');
+        parameters.io.dir_debug_source     = fullfile(out, 'debug', 'source');
 
-        for d = {parameters.io.nii_dir, parameters.io.img_dir, ...
-                 parameters.io.logs_dir, parameters.io.cache_dir}
+        for d = {parameters.io.dir_nii, parameters.io.dir_img, ...
+                 parameters.io.dir_logs, parameters.io.dir_cache}
             if ~isfolder(d{1}); mkdir(d{1}); end
         end
 
         if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
                 parameters.simulation.debug == 1
-            for d = {parameters.io.debug_dir, parameters.io.debug_dir_preproc, ...
-                     parameters.io.debug_dir_medium, parameters.io.debug_dir_source}
+            for d = {parameters.io.dir_debug, parameters.io.dir_debug_preproc, ...
+                     parameters.io.dir_debug_medium, parameters.io.dir_debug_source}
                 if ~isfolder(d{1}); mkdir(d{1}); end
             end
         end
@@ -143,29 +140,29 @@ end
         mkdir(parameters.path.seg);
     end
 
-    % Resolve the subject-specific pCT output directory into parameters.io.pct_dir.
+    % Resolve the subject-specific pCT output directory into parameters.io.dir_pct.
     % path.pct is a user-configured base directory (preserved as-is).
-    %   empty    → io.pct_dir = {path.seg}/m2m_sub-NNN/  (uses existing SimNIBS m2m folder)
-    %   non-empty → io.pct_dir = {path.pct}/sub-NNN/     (dedicated dir, PRESTUS naming)
+    %   empty    → io.dir_pct = {path.seg}/m2m_sub-NNN/  (uses existing SimNIBS m2m folder)
+    %   non-empty → io.dir_pct = {path.pct}/sub-NNN/     (dedicated dir, PRESTUS naming)
     if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
         if ~isfield(parameters.path, 'pct') || isempty(parameters.path.pct)
-            parameters.io.pct_dir = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
+            parameters.io.dir_pct = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
         else
-            parameters.io.pct_dir = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
+            parameters.io.dir_pct = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
         end
         % Only create the directory when pCT is actually enabled; an unconditional
         % mkdir here (after cd(prestus_path) above) would create sub-NNN in the
         % PRESTUS root if path.pct is a relative path.
         pct_enabled = isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && ...
                       parameters.pct.enabled;
-        if pct_enabled && ~isfolder(parameters.io.pct_dir)
-            mkdir(parameters.io.pct_dir);
+        if pct_enabled && ~isfolder(parameters.io.dir_pct)
+            mkdir(parameters.io.dir_pct);
         end
     end
     
-    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
+    if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
         % Save parameter snapshot to cache (regenerable, not a primary output)
-        filename_parameters = fullfile(parameters.io.cache_dir, ...
+        filename_parameters = fullfile(parameters.io.dir_cache, ...
             sprintf('sub-%03d_%s%s_parameters_%s.mat', ...
             subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
             string(datetime('now'), 'yyMMdd_HHmm')));
@@ -179,7 +176,7 @@ end
         if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
             filename_log = parameters.io.log_file;
         else
-            filename_log = fullfile(parameters.io.logs_dir, ...
+            filename_log = fullfile(parameters.io.dir_logs, ...
                 sprintf('sub-%03d_%s%s_%s.txt', ...
                 subject_id, parameters.simulation.medium, parameters.io.output_affix, ...
                 string(datetime('now'), 'yyMMdd_HHmm')));
@@ -192,9 +189,9 @@ end
     print_parameter_summary(parameters)
 
     % Define the filename of the summary table
-    if isfield(parameters.io, 'output_dir') && ~isempty(parameters.io.output_dir)
-        parameters.io.filename_output_table = ...
-            fullfile(parameters.io.tabular_dir, sprintf('sub-%03d_%s%s.csv', ...
+    if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
+        parameters.io.filename_table = ...
+            fullfile(parameters.io.dir_tabular, sprintf('sub-%03d_%s%s.csv', ...
             subject_id, parameters.simulation.medium, parameters.io.output_affix));
     end
 
@@ -211,4 +208,4 @@ end
     end
 
     % set initial time, RAM, GB state
-    log_timer('start','prestus_pipeline', parameters.io.output_dir);
+    log_timer('start','prestus_pipeline', parameters.io.dir_output);

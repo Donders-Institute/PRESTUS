@@ -29,7 +29,7 @@ fig = uifigure( ...
     'AutoResizeChildren', 'off');
 
 % App state stored in UserData
-app.output_dir  = '';
+app.dir_output  = '';
 app.config_path = '';
 fig.UserData    = app;
 
@@ -918,9 +918,9 @@ end
         app = fig.UserData;
         out_dir = '';
         if isfield(params, 'io') && isfield(params.io, 'output_dir')
-            out_dir = params.io.output_dir;
+            out_dir = params.io.dir_output;
         end
-        app.output_dir = out_dir;
+        app.dir_output = out_dir;
         app.log_path   = '';
         if ~isempty(out_dir)
             sub_id = 1;
@@ -963,7 +963,7 @@ end
             set_status('✓  Done', st.success);
             append_log('✓ Simulation completed.');
             app = fig.UserData;
-            app.output_dir = out_dir;
+            app.dir_output = out_dir;
             fig.UserData = app;
             refresh_results();
         catch ME
@@ -1056,43 +1056,43 @@ end
 
     function refresh_results()
         app = fig.UserData;
-        if isempty(app.output_dir) || ~isfolder(app.output_dir)
+        if isempty(app.dir_output) || ~isfolder(app.dir_output)
             try
                 params = collect_params();
-                if isfield(params, 'io') && isfield(params.io, 'output_dir') && ~isempty(params.io.output_dir)
-                    app.output_dir = params.io.output_dir;
+                if isfield(params, 'io') && isfield(params.io, 'output_dir') && ~isempty(params.io.dir_output)
+                    app.dir_output = params.io.dir_output;
                     fig.UserData   = app;
                 end
             catch; end
         end
-        if ~isempty(app.output_dir) && isfolder(app.output_dir)
-            try; show_results(app.output_dir); catch; end
+        if ~isempty(app.dir_output) && isfolder(app.dir_output)
+            try; show_results(app.dir_output); catch; end
         end
     end
 
     function open_html_report()
         app = fig.UserData;
-        if isempty(app.output_dir), return; end
-        reports = dir(fullfile(app.output_dir, '*report*.html'));
+        if isempty(app.dir_output), return; end
+        reports = dir(fullfile(app.dir_output, '*report*.html'));
         if isempty(reports)
             uialert(fig, 'No HTML report found in output directory.', 'Not found');
             return;
         end
-        web(fullfile(app.output_dir, reports(end).name), '-browser');
+        web(fullfile(app.dir_output, reports(end).name), '-browser');
     end
 
     function open_output_folder()
         app = fig.UserData;
-        if isempty(app.output_dir) || ~isfolder(app.output_dir)
+        if isempty(app.dir_output) || ~isfolder(app.dir_output)
             uialert(fig, 'Output directory not set or does not exist.', 'Not found');
             return;
         end
         if ispc
-            system(['explorer "' app.output_dir '"']);
+            system(['explorer "' app.dir_output '"']);
         elseif ismac
-            system(['open "' app.output_dir '"']);
+            system(['open "' app.dir_output '"']);
         else
-            system(['xdg-open "' app.output_dir '"']);
+            system(['xdg-open "' app.dir_output '"']);
         end
     end
 
@@ -1235,7 +1235,7 @@ end
             if isfield(params, 'subject_id') && isnumeric(params.subject_id) && ~isnan(params.subject_id)
                 sub_id = params.subject_id;
             end
-            params.io.output_dir = fullfile(params.path.sim, sprintf('sub-%03d', sub_id));
+            params.io.dir_output = fullfile(params.path.sim, sprintf('sub-%03d', sub_id));
         end
     end
 

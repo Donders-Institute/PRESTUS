@@ -33,13 +33,13 @@ try
     end
 
     report_filename = sprintf('sub-%03d_%s%s_report.html', subject_id, medium, affix);
-    report_path = fullfile(parameters.io.reports_dir, report_filename);
+    report_path = fullfile(parameters.io.dir_reports, report_filename);
 
     %% Load CSV data if available
     csv_table = [];
-    if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_output_table)
+    if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_table)
         try
-            csv_table = readtable(parameters.io.filename_output_table, 'VariableNamingRule', 'preserve');
+            csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
         catch
             csv_table = [];
         end
@@ -329,7 +329,7 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     end
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     if isfield(parameters, 'output_dir')
-        html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.output_dir))];
+        html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.dir_output))];
     end
     html = [html '</table>'];
     html = [html '</section>'];
@@ -846,7 +846,7 @@ function html = build_positioning_section(parameters, subject_id, affix)
             tnn_suffix = '';
             cap = 'Transducer positioning';
         end
-        img_path = fullfile(parameters.io.figures_preproc_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d%s%s_positioning.png', subject_id, affix, tnn_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Positioning%s', tnn_suffix), cap);
         if ~isempty(img_html)
@@ -907,7 +907,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         if n_trans > 1; trans_suffix = sprintf('_T%02d', t); end
 
         % Intensity on segmentation
-        img_path = fullfile(parameters.io.figures_acoustic_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_intensity%s.png', subject_id, medium, affix, trans_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Intensity on segmentation%s', trans_suffix), ...
             sprintf('Intensity overlay (segmentation)%s', trans_suffix));
@@ -916,7 +916,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         end
 
         % Intensity on T1
-        img_path = fullfile(parameters.io.figures_acoustic_dir, ...
+        img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s%s_intensity_t1%s.png', subject_id, medium, affix, trans_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Intensity on T1%s', trans_suffix), ...
             sprintf('Intensity overlay (T1)%s', trans_suffix));
@@ -953,7 +953,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     % Thermal images — {filename_pattern, label}
     % Patterns use new naming: sub-NNN_medium-MEDIUM{affix}_{metric}.png
-    td = parameters.io.figures_thermal_dir;
+    td = parameters.io.dir_img;
     thermal_images = {
         fullfile(td, sprintf('sub-%03d_%s%s_maxT.png',            subject_id, medium, affix)), 'Max temperature overlay';
         fullfile(td, sprintf('sub-%03d_%s%s_thermal.png',         subject_id, medium, affix)), 'Temperature vs time (focal)';
@@ -978,7 +978,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
     html = [html '</div>'];
 
     % Note about heating animation
-    avi_path = fullfile(parameters.io.figures_thermal_dir, ...
+    avi_path = fullfile(parameters.io.dir_img, ...
         sprintf('sub-%03d_%s%s_heating_animation.avi', subject_id, medium, affix));
     if isfile(avi_path)
         html = [html sprintf('<p class="note">Heating animation available: <code>%s</code></p>', ...
@@ -993,14 +993,14 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
     debug_dir_preproc = '';
     debug_dir_medium  = '';
     if isfield(parameters.io, 'debug_dir_preproc')
-        debug_dir_preproc = parameters.io.debug_dir_preproc;
+        debug_dir_preproc = parameters.io.dir_debug_preproc;
     elseif isfield(parameters.io, 'debug_dir')
-        debug_dir_preproc = fullfile(parameters.io.debug_dir, 'preproc');
+        debug_dir_preproc = fullfile(parameters.io.dir_debug, 'preproc');
     end
     if isfield(parameters.io, 'debug_dir_medium')
-        debug_dir_medium = parameters.io.debug_dir_medium;
+        debug_dir_medium = parameters.io.dir_debug_medium;
     elseif isfield(parameters.io, 'debug_dir')
-        debug_dir_medium = fullfile(parameters.io.debug_dir, 'medium');
+        debug_dir_medium = fullfile(parameters.io.dir_debug, 'medium');
     end
     if isempty(debug_dir_preproc) || ~isfolder(debug_dir_preproc)
         html = '<p class="placeholder">Debug directory not found.</p>';
@@ -1128,9 +1128,9 @@ function html = build_pseudoCT_section(parameters)
         affix = parameters.io.output_affix;
     end
     if isfield(parameters.io, 'debug_dir_medium')
-        debug_path = parameters.io.debug_dir_medium;
+        debug_path = parameters.io.dir_debug_medium;
     else
-        debug_path = fullfile(parameters.io.output_dir, 'debug', 'medium');
+        debug_path = fullfile(parameters.io.dir_output, 'debug', 'medium');
     end
     
     % 1. MAPPING ALGORITHMS TABLE FIRST
@@ -1221,15 +1221,15 @@ end
 function log_path = find_log_file(parameters, subject_id, medium, affix)
 % Find the most recent diary log file.
     log_path = '';
-    if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'output_dir') || ~isfolder(parameters.io.output_dir)
+    if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'output_dir') || ~isfolder(parameters.io.dir_output)
         return
     end
 
     pattern = sprintf('sub-%03d_%s%s_*.txt', subject_id, medium, affix);
     if isfield(parameters.io, 'logs_dir')
-        logs_dir = parameters.io.logs_dir;
+        logs_dir = parameters.io.dir_logs;
     else
-        logs_dir = fullfile(parameters.io.output_dir, 'log');
+        logs_dir = fullfile(parameters.io.dir_output, 'log');
     end
     files = dir(fullfile(logs_dir, pattern));
     if isempty(files), return; end
@@ -1276,8 +1276,8 @@ function html = build_toc(parameters, is_layered)
     % Safety status dot: determine worst-case color
     worst = 'green';
     try
-        if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_output_table)
-            csv_table = readtable(parameters.io.filename_output_table, 'VariableNamingRule', 'preserve');
+        if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_table)
+            csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
             if is_layered
                 limits = get_risk_limits(is_layered);
             else

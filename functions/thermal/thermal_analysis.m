@@ -14,8 +14,8 @@ function [results_thermal] = thermal_analysis(parameters, results_heating, ...
 %       time_status_seq, medium_masks, highlighted_pos, segmentation)
 %
 % Input:
-%   parameters      - PRESTUS config; must contain io.filename_output_table,
-%                     io.output_dir, io.output_affix, transducer(1).trans_pos,
+%   parameters      - PRESTUS config; must contain io.filename_table,
+%                     io.dir_output, io.output_affix, transducer(1).trans_pos,
 %                     transducer(1).focus_pos, simulation.medium, thermal.temp_0
 %   results_heating - struct from THERMAL_SIMULATION; must contain
 %                     maxT, heating_endT, CEM43, CEM43_end,
@@ -65,7 +65,7 @@ end
     mask = tissuemask_binary(parameters, medium_masks);
 
     % Creates an output table for temperature readings
-    results_thermal = readtable(parameters.io.filename_output_table);
+    results_thermal = readtable(parameters.io.filename_table);
 
     results_thermal.maxT = max(results_heating.maxT, [], 'all');
     results_thermal.endT = max(results_heating.heating_endT, [], 'all');
@@ -111,7 +111,7 @@ end
     end
     
     % Save overview table
-    writetable(results_thermal, parameters.io.filename_output_table);
+    writetable(results_thermal, parameters.io.filename_table);
 
     % Creates a visual overlay of the transducer (if 3D T1 image is available)
     if exist('planimg') && isfield(planimg, 't1_header')
@@ -167,7 +167,7 @@ end
                 'overlay_color_range', temp_color_range);
 
             % Construct output filename
-            output_plot_filename = fullfile(parameters.io.figures_thermal_dir,...
+            output_plot_filename = fullfile(parameters.io.dir_img,...
                 sprintf('sub-%03d_%s%s_maxT_%s.png',...
                 parameters.subject_id, ...
                 parameters.simulation.medium, ...
@@ -189,7 +189,7 @@ end
                 'overlay_color_range', temp_color_range, ...
                 'bg_bw_range', [0, numel(fieldnames(parameters.layers))]);
 
-        output_plot_filename = fullfile(parameters.io.figures_thermal_dir,...
+        output_plot_filename = fullfile(parameters.io.dir_img,...
             sprintf('sub-%03d_%s%s_maxT.png',...
             parameters.subject_id, ...
             parameters.simulation.medium, ...
