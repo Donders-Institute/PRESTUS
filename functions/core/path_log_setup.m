@@ -95,7 +95,7 @@ end
     end
 
     % Output subdirectories
-    % ├── nii/     — NIfTIs (space-T1w and space-MNI, differentiated by filename entity)
+    % ├── nii/     — NIfTIs (T1w and MNI, differentiated by filename entity)
     % ├── img/     — all PNG visualizations (acoustic, thermal, preprocessing)
     % ├── log/     — diary log files
     % ├── cache/   — regenerable intermediates (checkpoints, matrices)
