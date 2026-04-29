@@ -30,7 +30,58 @@ function parameters = load_parameters(varargin)
     % load_parameters works correctly regardless of the caller's CWD.
     this_dir     = fileparts(mfilename('fullpath'));          % functions/core/
     prestus_root = fileparts(fileparts(this_dir));            % PRESTUS root
-    default_config_path = fullfile(prestus_root, 'config', 'config_default.yaml');
+    toolbox_default = fullfile(prestus_root, 'config', 'config_default.yaml');
+
+    % Ensure yaml (and other external dependencies) are on the path.
+    % This makes load_parameters callable before a full PRESTUS path setup.
+    external_dir = fullfile(prestus_root, 'external');
+    if exist(external_dir, 'dir') && ~exist('yaml.loadFile', 'file')
+        addpath(genpath(external_dir));
+    end
+
+    % Prefer config_default.yaml from the project config directory over the
+    % toolbox copy. Check (in order):
+    %   1. Explicit location argument (filename, location) pair
+    %   2. Directory of a single full-path config file argument
+    %   3. Current working directory
+    %   4. Fall back to toolbox default
+    default_config_path = toolbox_default;
+    using_toolbox_default = true;
+
+    if nargin >= 2 && ischar(varargin{2})
+        % (filename, location) form — look for config_default in that location
+        candidate = fullfile(varargin{2}, 'config_default.yaml');
+        if exist(candidate, 'file')
+            default_config_path = candidate;
+            using_toolbox_default = false;
+        end
+    elseif nargin >= 1 && ischar(varargin{1})
+        % Single full-path argument — check the file's own directory
+        candidate = fullfile(fileparts(varargin{1}), 'config_default.yaml');
+        if exist(candidate, 'file')
+            default_config_path = candidate;
+            using_toolbox_default = false;
+        end
+    end
+
+    if using_toolbox_default
+        % Check current working directory as a last resort before toolbox fallback
+        candidate = fullfile(pwd, 'config_default.yaml');
+        if exist(candidate, 'file')
+            default_config_path = candidate;
+            using_toolbox_default = false;
+        end
+    end
+
+    if using_toolbox_default
+        warning('prestus:toolboxDefault', ...
+            ['Loading config_default.yaml from the PRESTUS toolbox directory.\n' ...
+             'For reproducible, project-specific setups, run prestus_config_init() once:\n' ...
+             '  prestus_config_init(''/path/to/project/config'', project_name=''projectX'');\n' ...
+             'Then load parameters with:\n' ...
+             '  parameters = load_parameters(''config_projectX.yaml'', ''/path/to/project/config'');']);
+    end
+
     parameters = yaml.loadFile(default_config_path, "ConvertToArray", true);
 
     %% Merge with additional configuration files or structures
