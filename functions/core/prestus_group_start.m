@@ -40,7 +40,7 @@ function prestus_group_start(subject_list, config, options)
 %
 % Example:
 %   % Using a YAML file
-%   prestus_group_start(1:10, 'configs/config_study.yaml', ...
+%   prestus_group_start(1:10, 'config/config_study.yaml', ...
 %       slice_label='y', plot_max_intensity=true, skip_missing=true);
 %
 %   % Using an existing parameters struct

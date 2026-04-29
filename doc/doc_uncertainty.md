@@ -82,7 +82,7 @@ All five stages are managed automatically when `parameters.simulation.uncertaint
 prestus_path = '/path/to/PRESTUS';
 addpath(fullfile(prestus_path, 'functions', 'helper'));
 safe_addpath(fullfile(prestus_path, 'functions'));
-safe_addpath(fullfile(prestus_path, 'toolboxes'));
+safe_addpath(fullfile(prestus_path, 'external'));
 
 parameters = load_parameters('config_study.yaml');
 parameters.subject_id             = 1;
@@ -141,7 +141,7 @@ The medium override YAMLs are merged on top of the base parameters using `MergeS
 
 > **Resuming a partial run.** On HPC, each stage is skipped automatically if its sentinel output already exists (see [Resuming a partial run](#resuming-a-partial-run) below). Only the missing stages are resubmitted, and scheduler dependencies are set only for jobs that were actually submitted.
 
-The built-in medium override configs live in `configs/uncertainty/`:
+The built-in medium override configs live in `config/uncertainty/`:
 
 - `config_medium_liberal.yaml` — low-impedance, low-attenuation skull; higher brain intensity
 - `config_medium_conservative.yaml` — high-impedance, high-attenuation skull; lower brain intensity
@@ -218,7 +218,7 @@ This requires that `hpc_submit_job` supports the `parameters.hpc.depend_job_id` 
 
 ## Customising medium property ranges
 
-The built-in overrides are in `configs/uncertainty/`. To use study-specific ranges, copy and edit either file:
+The built-in overrides are in `config/uncertainty/`. To use study-specific ranges, copy and edit either file:
 
 ```yaml
 # my_medium_liberal.yaml — only override what you want to change

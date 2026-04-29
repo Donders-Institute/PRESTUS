@@ -26,10 +26,10 @@ func_path = fullfile(fileparts(mfilename('fullpath')), '..', '..');
 main_folder = fileparts(func_path);
 cd(main_folder); % Change directory to the main folder
 
-% Add necessary paths for functions and toolboxes
+% Add necessary paths for functions and external
 addpath(genpath('functions'));
-addpath(genpath('configs'));
-addpath(genpath('toolboxes'));
+addpath(genpath('config'));
+addpath(genpath('external'));
 
 %% Load configuration settings
 
@@ -41,11 +41,11 @@ else
 end
 
 % Load equipment parameters from the YAML configuration file
-equip_param = yaml.loadFile('equipment_config.yaml', 'ConvertToArray', true);
+equip_param = yaml.loadFile('config_equipment.yaml', 'ConvertToArray', true);
 % Equipment information (by default Donders-specific)
-parameters = yaml.loadFile('default_config.yaml', 'ConvertToArray', true);
+parameters = yaml.loadFile('config_default.yaml', 'ConvertToArray', true);
 % User-defined calibration parameters
-parameters.calibration = yaml.loadFile('calibration_config.yaml');
+parameters.calibration = yaml.loadFile('config_calibration.yaml');
 
 % Display available equipment combinations (Donders equipment)
 available_combos = fieldnames(equip_param.combos);

@@ -20,15 +20,15 @@ Transducer calibration relies on an additional config (`calibration_config`) tha
 
 - Measured/estimated axial profiles (`path_input_axial`)
 - Manufacturer-provided phase tables (`path_input_phase`)
-- Entries in the equipment configuration (`PRESTUS/configs/equipment/equipment_config.yaml`)
+- Entries in the equipment configuration (`PRESTUS/config/equipment/config_equipment.yaml`)
 
 For the Donders, the empirical profiles (steering tables) can be found on the [FUSInitiative OneDrive](https://radbouduniversiteit.sharepoint.com/:f:/r/sites/FUSInitiative-SHAREDResearchinformation/Shared%20Documents/Software/PRESTUS/Acoustic%20profiling/)
 
-Requested calibrations for unique TPO-transducer & focal depth & intensity combinations can be specified in `calibration_config.yaml` via `combinations`, `focal_depths_wrt_exit_plane`, and `desired_intensities`.
+Requested calibrations for unique TPO-transducer & focal depth & intensity combinations can be specified in `config_calibration.yaml` via `combinations`, `focal_depths_wrt_exit_plane`, and `desired_intensities`.
 
 Each line in the configuration corresponds to a unique TPO-transducer setup. In the following example, an IGT transducer with ID `PCD15287_01001` would be emulated for two focal depths of 40 and 50 mm from the exit plane, each for free-water intensities of 30 and 60 W/cm² respectively. For a second transducer (`PCD15473_01001`), emulated phases and amplitudes would be provided for a depth of 40 mm at an intensity of 30 W/cm².
 
-> This example fits a 32-channel transducer with 10 artificial channels. The number of emulated channels can impact the stability of the fitting solution. It is governed by the setup in `equipment_config.yaml`.
+> This example fits a 32-channel transducer with 10 artificial channels. The number of emulated channels can impact the stability of the fitting solution. It is governed by the setup in `config_equipment.yaml`.
 
 Transducer-TPO setups to be characterized:
 ```yaml

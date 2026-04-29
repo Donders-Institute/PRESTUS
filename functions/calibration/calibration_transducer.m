@@ -69,7 +69,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Force water medium
     sim_param.simulation.medium = 'water';
     % Force save result matrices. save_acoustic_matrices is set explicitly
-    % because default_config.yaml sets it to 0, and per-field flags take
+    % because config_default.yaml sets it to 0, and per-field flags take
     % precedence over the global save_matrices fallback in should_save_output.
     % Calibration requires the acoustic sensor_data .mat between runs.
     sim_param.io.save_matrices = 1;

@@ -22,7 +22,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
 %     - Set environment variable PRESTUS_TEST_DATA to the folder containing
 %       the demo subject's T1/T2 and SimNIBS m2m_* output.
 %     - Set PRESTUS_DEMO_CONFIG to the path of the demo study config YAML.
-%       (Defaults to configs/tutorial_config.yaml if not set.)
+%       (Defaults to config/config_tutorial.yaml if not set.)
 
     properties (Constant)
         DEMO_SUBJECT_ID = 1
@@ -39,7 +39,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
             test_dir      = fileparts(mfilename('fullpath'));
             tc.repo_root  = fileparts(test_dir);
             addpath(genpath(fullfile(tc.repo_root, 'functions')));
-            addpath(fullfile(tc.repo_root, 'configs'));
+            addpath(fullfile(tc.repo_root, 'config'));
         end
     end
 
@@ -54,7 +54,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
 
             cfg_env = getenv('PRESTUS_DEMO_CONFIG');
             if isempty(cfg_env)
-                cfg_env = fullfile(tc.repo_root, 'configs', 'tutorial_config.yaml');
+                cfg_env = fullfile(tc.repo_root, 'config', 'config_tutorial.yaml');
             end
             tc.assumeTrue(isfile(cfg_env), ...
                 sprintf('Demo config not found: %s', cfg_env));
@@ -75,7 +75,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
     methods (Test, TestTags = {'smoke_config'})
 
         function test_tutorial_config_loads(tc)
-            cfg = fullfile(tc.repo_root, 'configs', 'tutorial_config.yaml');
+            cfg = fullfile(tc.repo_root, 'config', 'config_tutorial.yaml');
             tc.assumeTrue(isfile(cfg));
             % Merge the YAML config with a debug-suppressing struct so that
             % load_parameters does not print the parameter summary.

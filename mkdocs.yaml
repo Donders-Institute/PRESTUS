@@ -1,5 +1,5 @@
 site_name: PRESTUS - Ultrasound Simulation Toolbox
-docs_dir: documentation
+docs_dir: doc
 site_description: 'PREprocessing & Simulations Toolbox for transcranial Ultrasound neuromodulation'
 site_url: https://donders-institute.github.io/PRESTUS
 site_author: Donders Institute for Brain, Cognition and Behaviour

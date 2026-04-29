@@ -39,14 +39,14 @@ Note: Parameters, naming, and default values have changed. Please consult the [d
 - [**refactor**] PML (Perfectly Matched Layer) is now added only at the acoustic wave simulation stage, rather than carried through from preprocessing or phantom generation; the default `"auto"` setting optimises PML size automatically
 - [**I/O**] Subject-specific output subfolders are now enforced to simplify the I/O landscape
 - [**axisymmetric**] Axisymmetric acoustic simulations now default to 3D thermal output
-- [**parameter**] Various parameters renamed or restructured; consult `default_config.yaml` and the documentation for current names
+- [**parameter**] Various parameters renamed or restructured; consult `config_default.yaml` and the documentation for current names
 
 #### Fixed
 
 Not all (hot-)fixes are reported here.
 
 - [**source**] Each uncertainty variant now recomputes its own k-Wave source with its own time axis; shared caching across variants with different medium sound speeds could produce incorrect pressure maps
-- [**paths**] `load_parameters` resolves `default_config.yaml` via an absolute path, preventing stray output folders when called from an unexpected working directory
+- [**paths**] `load_parameters` resolves `config_default.yaml` via an absolute path, preventing stray output folders when called from an unexpected working directory
 - [**calibration**] Potential bugs with transducer distance calculation
 - [**savemat**] k-Wave source matrix saving can now be correctly deactivated; water simulations force-save matrix outputs
 

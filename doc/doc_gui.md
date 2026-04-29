@@ -10,13 +10,13 @@ The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click 
 prestus_gui
 ```
 
-Use **⬆ Load** to populate fields from an existing YAML, **⬇ Save** to export the current state, and **↺ Defaults** to reset to `default_config.yaml`.
+Use **⬆ Load** to populate fields from an existing YAML, **⬇ Save** to export the current state, and **↺ Defaults** to reset to `config_default.yaml`.
 
 ### Configuration loading
 
 The GUI and the pipeline share the same two-layer loading logic:
 
-1. `default_config.yaml` is always loaded first and provides values for every parameter.
+1. `config_default.yaml` is always loaded first and provides values for every parameter.
 2. A study-specific YAML is merged on top via `MergeStruct` — only keys present in the study file overwrite the defaults; everything else retains its default value.
 
 **In the GUI**, clicking **⬆ Load** calls `apply_params_to_gui` on the loaded file directly (no prior reset to defaults). This means:
@@ -26,7 +26,7 @@ The GUI and the pipeline share the same two-layer loading logic:
 
 To get a clean state before loading, click **↺ Defaults** first, then **⬆ Load**.
 
-**When running**, the GUI writes the current field values to a temporary YAML and passes it to `load_parameters`, which merges it on top of `default_config.yaml`. Fields left blank in the GUI are omitted from the saved YAML and therefore fall back to the default. The exception is `path.t2_pattern` — leaving it blank disables T2 entirely (`charm` is run with T1 only).
+**When running**, the GUI writes the current field values to a temporary YAML and passes it to `load_parameters`, which merges it on top of `config_default.yaml`. Fields left blank in the GUI are omitted from the saved YAML and therefore fall back to the default. The exception is `path.t2_pattern` — leaving it blank disables T2 entirely (`charm` is run with T1 only).
 
 ---
 

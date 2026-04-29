@@ -37,7 +37,7 @@ PRESTUS supports homo- and heterogeneous medium configurations. These can be spe
 
 Accurate modeling of wave propagation through heterogeneous media requires valid assignment of acoustic parameters such as speed of sound, density, and attenuation to the separate tissue media. PRESTUS provides defaults based on the literature, while providing flexibility to alter assigned parameter values, e.g., to implement more conservative or liberal assumptions. 
 
-The following default medium properties applt in a full layered simulation. Parameters are specified in the default_config.yaml file (see doc_parameters.md). While PRESTUS’s default parameters are chosen to align with commercially available tools and prior benchmarks, these should not be regarded as ground truths, and may need to be adjusted according to the goals at hand (e.g., a more conservative assessment of intensity and/or heating).
+The following default medium properties applt in a full layered simulation. Parameters are specified in the config_default.yaml file (see doc_parameters.md). While PRESTUS’s default parameters are chosen to align with commercially available tools and prior benchmarks, these should not be regarded as ground truths, and may need to be adjusted according to the goals at hand (e.g., a more conservative assessment of intensity and/or heating).
 
 | Tissue           | Density [kg/m³] | Sound Speed [m/s] | Attenuation Coefficient [dB/(cm·MHzy)]      | Attenuation Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption Fraction |
 |-----------------------|--------|----------|----------|-------|--------|------|-------|---|

@@ -6,7 +6,7 @@ Download and install these tools:
 
 - `MATLAB (R2023b)`. Other versions may work as well, but R2023b is the current default deployment. Especially on HPCs with GPUs, more recent MATLAB versions can cause issues. The HPC scripts currently hardcode the MATLAB R2023b module on the Donders HPC.
 - [`SimNIBS 4`](https://github.com/simnibs/simnibs) (see [SimNIBS installation](#simnibs-installation))
-- toolboxes | They are automatically included as submodules if this repository is recursively cloned (see below). They must be added on MATLAB startup.
+- external | They are automatically included as submodules if this repository is recursively cloned (see below). They must be added on MATLAB startup.
     - [`k-Wave (1.4.1)`](https://github.com/ucl-bug/k-wave.git). While k-Wave 1.4 is supported, version 1.4.1 (currently [GitHub exclusive](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) introduced GPU support for thermal simulations with kWaveDiffusion. We therefore recommend cloning k-Wvae 1.4.1 from GitHub.
     - [`export_fig`](https://github.com/altmany/export_fig)
     - [`FEX-minimize`](https://github.com/rodyo/FEX-minimize.git)
@@ -23,7 +23,7 @@ If you want to recursively clone the `development` branch, you can use the follo
 git clone --recurse-submodules -b development https://github.com/Donders-Institute/PRESTUS.git
 ```
 
-*Note: If you do not clone this repository, you must manually download the toolboxes specified above, and place them in the respective PRESTUS subdirectory.*
+*Note: If you do not clone this repository, you must manually download the external dependencies listed above, and place them in the respective PRESTUS subdirectory.*
 
 If you cloned this repository in the past, and updated it, you can retrieve submodules as follows:
 ```

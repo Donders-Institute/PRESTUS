@@ -11,7 +11,7 @@
 %
 %   Environment variables (for integration levels >= 'head'):
 %     PRESTUS_TEST_DATA   — path to folder with demo subject data & m2m_* output
-%     PRESTUS_DEMO_CONFIG — path to study config YAML  (default: tutorial_config.yaml)
+%     PRESTUS_DEMO_CONFIG — path to study config YAML  (default: config_tutorial.yaml)
 %
 %   The script exits with a non-zero status on any failure, making it
 %   suitable for CI:
@@ -27,8 +27,8 @@ function run_all_tests(level)
     here      = fileparts(mfilename('fullpath'));
     repo_root = fileparts(here);
     addpath(genpath(fullfile(repo_root, 'functions')));
-    addpath(fullfile(repo_root, 'configs'));
-    addpath(genpath(fullfile(repo_root, 'toolboxes')));
+    addpath(fullfile(repo_root, 'config'));
+    addpath(genpath(fullfile(repo_root, 'external')));
     addpath(fullfile(here, 'fixtures'));
 
     % ---- Select test files and tags by level --------------------------

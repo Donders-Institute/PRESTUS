@@ -1,7 +1,7 @@
 classdef test_load_parameters < matlab.unittest.TestCase
 % TEST_LOAD_PARAMETERS  Unit tests for load_parameters() config merging.
 %
-%   These tests operate on default_config.yaml only (no SimNIBS/k-Wave needed).
+%   These tests operate on config_default.yaml only (no SimNIBS/k-Wave needed).
 %   Run with:   results = runtests('tests/test_load_parameters.m');
 
     methods (TestClassSetup)
@@ -10,9 +10,9 @@ classdef test_load_parameters < matlab.unittest.TestCase
             test_dir   = fileparts(mfilename('fullpath'));
             repo_root  = fileparts(test_dir);
             addpath(genpath(fullfile(repo_root, 'functions')));
-            addpath(genpath(fullfile(repo_root, 'toolboxes')));
-            % load_parameters expects to find default_config.yaml on the path
-            addpath(fullfile(repo_root, 'configs'));
+            addpath(genpath(fullfile(repo_root, 'external')));
+            % load_parameters expects to find config_default.yaml on the path
+            addpath(fullfile(repo_root, 'config'));
         end
     end
 

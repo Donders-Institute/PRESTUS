@@ -50,7 +50,7 @@ Each level is a superset of the one above; `run_all_tests('acoustic')` also runs
 
 ```bash
 export PRESTUS_TEST_DATA=/path/to/demo/data     # folder containing m2m_sub-001/
-export PRESTUS_DEMO_CONFIG=/path/to/config.yaml  # optional; defaults to tutorial_config.yaml
+export PRESTUS_DEMO_CONFIG=/path/to/config.yaml  # optional; defaults to config_tutorial.yaml
 ```
 
 ### Running a specific level

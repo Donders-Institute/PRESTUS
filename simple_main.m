@@ -8,10 +8,10 @@ clear; close all;
 
 % add paths
 addpath(genpath('functions'))
-addpath(genpath('configs')) 
-addpath(genpath('toolboxes'))
+addpath(genpath('config')) 
+addpath(genpath('external'))
 
-parameters = load_parameters('tutorial_config.yaml'); % load the configuration file
+parameters = load_parameters('config_tutorial.yaml'); % load the configuration file
 
 parameters.subject_id = 1;                      % subject number
 parameters.simulation.medium = 'layered';       % water or layered

@@ -96,7 +96,7 @@ function job_id = prestus_pipeline_start(parameters, options)
             % without including hidden directories (e.g. .claude worktrees).
             fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
             fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
-            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'toolboxes'));
+            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'external'));
             if isfield(options, 'sequential_configs')
                 save(temp_data_path, 'options', '-append');
                 fprintf(fid, 'prestus_pipeline(parameters, options);\n');

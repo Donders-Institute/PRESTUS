@@ -62,7 +62,7 @@ Tests are tagged by pipeline depth. Each level is a superset of the one above.
 
 ```bash
 export PRESTUS_TEST_DATA=/path/to/demo/data    # folder containing m2m_sub-001/
-export PRESTUS_DEMO_CONFIG=/path/to/tutorial_config.yaml   # optional; defaults to configs/tutorial_config.yaml
+export PRESTUS_DEMO_CONFIG=/path/to/config_tutorial.yaml   # optional; defaults to config/config_tutorial.yaml
 ```
 
 ### Running a specific level

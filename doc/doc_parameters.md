@@ -1,6 +1,6 @@
 ## PRESTUS parameters
 
-Parameters are organised in nested structs that map directly to YAML keys. PRESTUS uses a two-layer configuration system: `default_config.yaml` defines all parameters and their default values and should not be edited. A study-specific config (e.g. `config_study.yaml`) is loaded on top and only needs to specify values that differ from the defaults. Parameters can also be set or overridden programmatically in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
+Parameters are organised in nested structs that map directly to YAML keys. PRESTUS uses a two-layer configuration system: `config_default.yaml` defines all parameters and their default values and should not be edited. A study-specific config (e.g. `config_study.yaml`) is loaded on top and only needs to specify values that differ from the defaults. Parameters can also be set or overridden programmatically in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
 
 ---
 
@@ -385,7 +385,7 @@ See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 
 See [doc_calibration.md](doc_calibration.md).
 
-A separate `calibration_config.yaml` applies for calibration workflows and is loaded as `parameters.calibration`.
+A separate `config_calibration.yaml` applies for calibration workflows and is loaded as `parameters.calibration`.
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
@@ -395,7 +395,7 @@ A separate `calibration_config.yaml` applies for calibration workflows and is lo
 | `path_output_profiles` | Directory for saving optimised profile data. | |
 | `filename_calibrated_CSV` | Filename of calibrated CSV data. | Mandatory only when not generated within standalone script. |
 | `save_in_calibration_folder` | Save in `path_output` (`TRUE`) or `sim_path` (`FALSE`). | If `TRUE`, results are appended to existing calibration data. |
-| `combinations` | Equipment combinations (must refer to entries in `equipment_config.yaml`). | Multiple combinations can be specified. |
+| `combinations` | Equipment combinations (must refer to entries in `config_equipment.yaml`). | Multiple combinations can be specified. |
 | `focal_depths_wrt_exit_plane` | List of focal depths to characterise [mm]. | |
 | `desired_intensities` | Desired free-water intensities [W/cm²]. | |
 | `add_FDO` | Append Focal Distance Offset (bowl-to-exit-plane distance)? | Set to `1` if zero point in profiles reflects exit plane rather than bowl. |

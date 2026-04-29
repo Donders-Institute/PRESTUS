@@ -4,7 +4,7 @@ config_path = fileparts(mfilename('fullpath'));
 main_folder = fileparts(fileparts(config_path));
 
 % add yaml toolbox to path
-addpath(fullfile(main_folder,'toolboxes','yaml'));
+addpath(fullfile(main_folder,'external','yaml'));
 
 % go to correct directory to save config in
 cd(config_path)
@@ -385,4 +385,4 @@ config.combos.(split_combo).ds_serial = field_name_ds_4;
 config.combos.(split_combo).char_data_path = strcat(config.gen.charac_folder, config.gen.axial_prof_name,  'IS_PCD15473_01003_OPM~IGT_32_ch_comb_10_ch.csv');
 config.combos.(split_combo).phase_table = strcat(config.gen.phase_table_folder,  'transducer_15473_10_300kHz.ini');
 
-yaml.dumpFile('equipment_config.yaml', config)
+yaml.dumpFile('config_equipment.yaml', config)

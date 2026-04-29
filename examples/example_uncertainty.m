@@ -26,7 +26,7 @@ clear; close all; clc;
 
 % --- Paths ---
 prestus_path  = fileparts(fileparts(mfilename('fullpath')));  % PRESTUS root
-config_path   = fullfile(prestus_path, 'configs');            % adjust if your config lives elsewhere
+config_path   = fullfile(prestus_path, 'config');            % adjust if your config lives elsewhere
 config_file   = 'config_study.yaml';                          % your study config
 
 % --- Subject ---
@@ -38,7 +38,7 @@ subject_id = 1;
 
 addpath(fullfile(prestus_path, 'functions', 'helper'));
 safe_addpath(fullfile(prestus_path, 'functions'));
-safe_addpath(fullfile(prestus_path, 'toolboxes'));
+safe_addpath(fullfile(prestus_path, 'external'));
 
 % Load base parameters from your study config.
 % Do NOT set io.output_affix here — the pipeline manages it per variant.
@@ -67,9 +67,9 @@ options.affixes.conservative  = '_conservative';
 % Medium property overrides (YAML files merged on top of base parameters).
 % The built-in files are a reasonable starting point; copy and edit them
 % to reflect the uncertainty range relevant to your study population.
-options.liberal_config = fullfile(prestus_path, 'configs', 'uncertainty', ...
+options.liberal_config = fullfile(prestus_path, 'config', 'uncertainty', ...
     'config_medium_liberal.yaml');
-options.conservative_config = fullfile(prestus_path, 'configs', 'uncertainty', ...
+options.conservative_config = fullfile(prestus_path, 'config', 'uncertainty', ...
     'config_medium_conservative.yaml');
 
 % HPC wall-time limits (ignored when running locally in MATLAB):

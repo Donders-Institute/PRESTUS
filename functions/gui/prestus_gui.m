@@ -2,7 +2,7 @@ function prestus_gui()
 %PRESTUS_GUI  Interactive parameter setup and simulation launcher.
 %
 %   Opens a single-window tabbed GUI that:
-%     - Loads default_config.yaml and highlights mandatory/optional fields
+%     - Loads config_default.yaml and highlights mandatory/optional fields
 %     - Allows loading and saving study-specific YAML configs
 %     - Submits simulations (local via backgroundPool, or HPC via scheduler)
 %     - Displays simulation images and the HTML report inline
@@ -1083,7 +1083,7 @@ load_defaults();
     function load_defaults()
         try
             prestus_root  = get_prestus_path();
-            default_yaml  = fullfile(prestus_root, 'configs', 'default_config.yaml');
+            default_yaml  = fullfile(prestus_root, 'config', 'config_default.yaml');
             params        = yaml.loadFile(default_yaml, 'ConvertToArray', true);
             apply_params_to_gui(params);
         catch ME
@@ -1157,7 +1157,7 @@ load_defaults();
             val = get_widget_value(all_widgets(i));
             % Skip empty strings: yaml.dumpFile serialises '' as [] (null),
             % which breaks pipeline code that expects char. Empty fields
-            % intentionally fall back to the default_config.yaml value.
+            % intentionally fall back to the config_default.yaml value.
             if ischar(val) && isempty(val), continue; end
             params = set_nested(params, tag, val);
         end

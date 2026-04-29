@@ -27,12 +27,12 @@ rootpath = '/project/2425122.01/kplan_example/';  % Root directory of data and t
 % Indicate whether to compute and include MNI-space coordinates (optional)
 mni_coords_requested = 0;
 
-% Define key path structure for data and toolboxes
+% Define key path structure for data and external
 pn.tuSIM = fullfile('/project/2425122.01/v05/', 'tools', 'PRESTUS');           % PRESTUS toolbox path
 addpath(pn.tuSIM);
 pn.tuSIM_fun = fullfile(pn.tuSIM, 'functions');              % PRESTUS functions path
 addpath(genpath(pn.tuSIM_fun));
-pn.tuSIM_tools = fullfile(pn.tuSIM, 'toolboxes');            % PRESTUS toolboxes path
+pn.tuSIM_tools = fullfile(pn.tuSIM, 'external');            % PRESTUS external path
 addpath(genpath(pn.tuSIM_tools));
 
 % [Optional, MNI transform] Set user/environment-specific paths and parameters
@@ -57,7 +57,7 @@ pn.data_path = fullfile(rootpath, 'data');                      % Base data path
 pn.data_postlocalite = fullfile(pn.data_path, 'localite');      % Folder [1] where localite XML are stored
 pn.data_prelocalite = fullfile(pn.data_path, 'localite');       % Folder [2] containing T1 planning images
 pn.data_seg = fullfile(pn.data_path, 'simnibs');                % Folder [3] Segmentation files for SIMNIBS
-pn.configs = fullfile(pn.data_path, 'configs');                 % Folder [4] containing config YAMLs
+pn.configs = fullfile(pn.data_path, 'config');                 % Folder [4] containing config YAMLs
 
 % Load stimulation parameters from the transducer YAML config
 cd(pn.configs);
