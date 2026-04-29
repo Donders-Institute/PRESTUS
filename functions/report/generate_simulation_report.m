@@ -67,11 +67,11 @@ try
         html_parts{end+1} = html_utils.section_error('Table of Contents', ME);
     end
 
-    % Section 1: Safety Dashboard (always open, no toggle)
+    % Section 1: Exposure Dashboard (always open, no toggle)
     try
         html_parts{end+1} = build_safety_dashboard(csv_table, parameters, is_layered);
     catch ME
-        html_parts{end+1} = html_utils.section_error('Safety Dashboard', ME);
+        html_parts{end+1} = html_utils.section_error('Exposure Dashboard', ME);
     end
 
     % Section 2: Header (always open, no toggle)
@@ -237,7 +237,7 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
         'CEM43_skin',  'CEM43iso_skin');
 
     html = '<section class="report-section" id="safety">';
-    html = [html '<h2>Safety Dashboard</h2>'];
+    html = [html '<h2>Exposure Dashboard</h2>'];
 
     if ~is_layered
         html = [html '<div class="medium-banner medium-water">' ...
@@ -296,9 +296,12 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
     end
 
     html = [html '</div>'];
-    html = [html '<p class="safety-footnote">Non-significant risk limits: ITRUSST consensus ' ...
+    html = [html '<p class="safety-footnote">NSR limits per ITRUSST consensus ' ...
             '(Aubry et al., 2025; ' ...
             '<a href="https://doi.org/10.1016/j.brs.2025.10.007">DOI: 10.1016/j.brs.2025.10.007</a>). ' ...
+            'For thermal metrics, NSR may be indicated by either of multiple indices (temperature rise, absolute temperature, CEM43, or exposure duration). ' ...
+            'A red tile for any individual metric does therefore not indicate that NSR cannot be assumed. ' ...
+            'Always refer to current community guidelines when interpreting values and allow for uncertainty about simulated outcomes. ' ...
             'Green: &lt; 50% of limit. ' ...
             'Amber: 50&ndash;100% of limit. Red: exceeds limit.</p>'];
     html = [html '</section>'];
@@ -1287,11 +1290,11 @@ function html = build_toc(parameters, is_layered)
         end
     catch
     end
-    html = [html sprintf('<span class="toc-status" style="background:var(--%s);" title="Overall safety: %s"></span>', worst, worst)];
+    html = [html sprintf('<span class="toc-status" style="background:var(--%s);" title="Overall NSR status: %s"></span>', worst, worst)];
 
     % Always-present links
     links = {
-        'safety',      'Safety';
+        'safety',      'Exposure';
         'header',      'Header';
         'methods',     'Methods';
         'summary',     'Summary';
