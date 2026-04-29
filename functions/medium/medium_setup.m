@@ -278,9 +278,9 @@ end
     
     %% Save acoustic property NIfTIs
     %
-    % T1-space maps → cache_dir (e.g. sound_speed.nii.gz, density.nii.gz):
+    % T1-space maps → debug_dir_medium (e.g. sound_speed_t1.nii.gz, density_t1.nii.gz):
     %   Written unconditionally for layered simulations via medium_properties_nifti.
-    %   These are user-inspectable QC outputs; skipped if the file already exists.
+    %   These are QC/debug outputs; skipped if the file already exists.
     %
     % Raw simulation-grid matrices → debug_dir/medium/ (matrix_*.nii.gz):
     %   Written only when simulation.debug == 1. Large, anisotropic, and only
