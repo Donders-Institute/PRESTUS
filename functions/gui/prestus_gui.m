@@ -1,4 +1,4 @@
-function prestus_gui()
+function prestus_gui(init_params)
 %PRESTUS_GUI  Interactive parameter setup and simulation launcher.
 %
 %   Opens a single-window tabbed GUI that:
@@ -9,8 +9,13 @@ function prestus_gui()
 %
 %   Usage:
 %     prestus_gui()
+%     prestus_gui(parameters)   % pre-load a parameter struct
 %
 %   Requirements: MATLAB R2023b, PRESTUS on the MATLAB path.
+
+    if nargin < 1
+        init_params = [];
+    end
 
 %% ── Figure ────────────────────────────────────────────────────────────────
 
@@ -25,6 +30,7 @@ fig = uifigure( ...
 
 % App state stored in UserData
 app.output_dir  = '';
+app.config_path = '';
 fig.UserData    = app;
 
 %% ── Header bar ────────────────────────────────────────────────────────────
@@ -48,6 +54,13 @@ uilabel(hdr, ...
     'FontName',   st.font, ...
     'FontSize',   st.fs_sm, ...
     'FontColor',  [0.65 0.75 0.78]);   % teal-tinted grey
+
+lbl_config = uilabel(hdr, ...
+    'Text',       'Config: defaults', ...
+    'Position',   [130 -4 480 16], ...
+    'FontName',   st.font, ...
+    'FontSize',   10, ...
+    'FontColor',  [0.5 0.6 0.63]);
 
 % Toolbar buttons (top-right)
 btn_load = uibutton(hdr, ...
@@ -122,6 +135,13 @@ end
 %% ── Load defaults ─────────────────────────────────────────────────────────
 
 load_defaults();
+
+if ~isempty(init_params) && isstruct(init_params)
+    apply_params_to_gui(init_params);
+    if isfield(init_params, 'config_path') && ~isempty(init_params.config_path)
+        set_config_label(init_params.config_path);
+    end
+end
 
 %% ════════════════════════════════════════════════════════════════════════
 %%  TAB BUILDERS
@@ -1086,6 +1106,7 @@ load_defaults();
             default_yaml  = fullfile(prestus_root, 'config', 'config_default.yaml');
             params        = yaml.loadFile(default_yaml, 'ConvertToArray', true);
             apply_params_to_gui(params);
+            set_config_label(default_yaml);
         catch ME
             append_log(sprintf('Could not load defaults: %s', ME.message));
         end
@@ -1095,11 +1116,19 @@ load_defaults();
         try
             params = yaml.loadFile(filepath, 'ConvertToArray', true);
             apply_params_to_gui(params);
+            set_config_label(filepath);
             set_status(sprintf('Loaded: %s', filepath), st.success);
         catch ME
             fprintf('\n=== PRESTUS GUI Load Error ===\n%s\n==============================\n', ME.getReport('extended'));
             uialert(fig, ME.message, 'Load Error', 'Icon', 'error');
         end
+    end
+
+    function set_config_label(filepath)
+        lbl_config.Text = sprintf('Config: %s', filepath);
+        app = fig.UserData;
+        app.config_path = filepath;
+        fig.UserData = app;
     end
 
     function apply_params_to_gui(params)
