@@ -109,10 +109,14 @@ end
         parameters.io.debug_dir_medium  = fullfile(out, 'debug', 'medium');
         parameters.io.debug_dir_source  = fullfile(out, 'debug', 'source');
 
-        for d = {parameters.io.cache_dir, parameters.io.debug_dir, ...
-                 parameters.io.debug_dir_preproc, parameters.io.debug_dir_medium, ...
-                 parameters.io.debug_dir_source}
-            if ~isfolder(d{1}); mkdir(d{1}); end
+        if ~isfolder(parameters.io.cache_dir); mkdir(parameters.io.cache_dir); end
+
+        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
+                parameters.simulation.debug == 1
+            for d = {parameters.io.debug_dir, parameters.io.debug_dir_preproc, ...
+                     parameters.io.debug_dir_medium, parameters.io.debug_dir_source}
+                if ~isfolder(d{1}); mkdir(d{1}); end
+            end
         end
     end
 

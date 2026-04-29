@@ -385,7 +385,9 @@ end
             source.p_mask = binary_mask;
             source.p      = distributed_source_signal;
 
-            show_binary_mask_transducer(karray, kgrid, parameters);
+            if parameters.simulation.debug == 1
+                show_binary_mask_transducer(karray, kgrid, parameters);
+            end
         end
         tr_arr(1) = tr;
     end
