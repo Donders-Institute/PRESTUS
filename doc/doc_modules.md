@@ -19,6 +19,10 @@ load_parameters
 [medium setup]          modules.run_medium_setup
       │                 Map tissue labels → acoustic/thermal properties
       ▼
+[NIfTI export — medium] modules.run_nifti_creation
+      │                 Write medium_masks + property maps (sound_speed,
+      │                 density, alpha_coeff) in subject and MNI space
+      ▼
 [source setup]          modules.run_source_setup
       │                 Construct k-Wave source from transducer geometry
       ▼
@@ -37,14 +41,17 @@ load_parameters
 [acoustic analysis]     modules.run_acoustic_analysis
       │                 Extract Isppa, Ispta, focal metrics; write CSV
       ▼
+[NIfTI export — acoustic] modules.run_nifti_creation
+      │                 Write intensity, MI, pressure maps
+      ▼
 [thermal simulation]    modules.run_heating_sims
       │                 k-Wave heat diffusion; requires acoustic results
       ▼
 [thermal analysis]      (run automatically when heating results available)
       │
       ▼
-[NIfTI export]          modules.run_nifti_creation
-      │                 Write pressure/temperature maps in subject space
+[NIfTI export — thermal] modules.run_nifti_creation
+      │                 Write heating, heatrise, CEM43 maps
       ▼
 [report]                modules.generate_report
       │                 Self-contained HTML report

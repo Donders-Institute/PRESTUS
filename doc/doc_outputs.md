@@ -124,16 +124,33 @@ For thermal estimates, non-significant risk can be characterized by a, b, or c. 
 
 ## NIfTI images
 
-PRESTUS exports 3D volumes (or 2D for axisymmetric simulations) in NIfTI format, provided in subject-native space (`_orig_coord`) and MNI-152 space (`_MNI`).
+PRESTUS exports 3D volumes (or 2D for axisymmetric simulations) in NIfTI format, provided in subject-native T1 space and MNI-152 space. NIfTI export is staged: medium property maps are written after medium setup, acoustic maps after acoustic analysis, and thermal maps after thermal analysis.
 
-Filename pattern: `sub-XXX_final_<type>_MNI<affix>.nii.gz`
+Filename patterns:
+- Subject T1 space: `sub-XXX_<medium>_T1w<affix>_<type>.nii.gz`
+- MNI space: `sub-XXX_<medium>_MNI<affix>_<type>.nii.gz`
+
+### Medium maps *(written after medium setup)*
+
+| Type | Resampling | Description |
+|---|---|---|
+| `medium_masks` | nearest | Tissue label mask (integer indices) |
+| `sound_speed` | nearest | Speed of sound [m/s]; edges filled with water value |
+| `density` | nearest | Mass density [kg/m³]; edges filled with water value |
+| `alpha_coeff` | nearest | Absorption coefficient [dB/MHz/cm]; edges filled with water value |
+
+### Acoustic maps *(written after acoustic analysis)*
 
 | Type | Description |
 |---|---|
-| `medium_masks` | Tissue label mask (integer indices) |
 | `intensity` | Pulse-average intensity (IPA) [W/cm²] |
 | `MI` | Mechanical index |
 | `pressure` | Peak pressure [Pa] |
+
+### Thermal maps *(written after thermal analysis)*
+
+| Type | Description |
+|---|---|
 | `heating` | Maximum temperature during sonication [°C] |
 | `heating_end` | Temperature at end of last pulse [°C] |
 | `heatrise` | Temperature rise above baseline [°C] |
