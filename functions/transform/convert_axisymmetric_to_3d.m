@@ -48,6 +48,10 @@ end
 % Continuous fields: linear interpolation preserves smooth spatial variation
 sensor_data.p_final   = radialExpand2DTo3D(sensor_data.p_final);
 sensor_data.p_max_all = radialExpand2DTo3D(sensor_data.p_max_all);
+if isfield(sensor_data, 'p_complex')
+    sensor_data.p_complex = radialExpand2DTo3D(real(sensor_data.p_complex)) + ...
+                        1i .* radialExpand2DTo3D(imag(sensor_data.p_complex));
+end
 fields = fieldnames(kwave_medium);
 for i = 1:numel(fields)
     if size(kwave_medium.(fields{i}), 2) > 1

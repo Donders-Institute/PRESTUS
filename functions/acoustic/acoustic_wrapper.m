@@ -110,6 +110,17 @@ end
     % perform the acoustic simulation
     sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
 
+    % Extract complex pressure amplitude at the fundamental frequency from the
+    % recorded steady-state time series, then discard the raw time series.
+    % p_complex = amp * exp(1i * phase) preserves interference information for
+    % coherent multi-transducer superposition in post-hoc analyses.
+    if isfield(sensor_data, 'p')
+        freq_hz = parameters.transducer(1).freq_hz;
+        [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, freq_hz, ndims(sensor_data.p));
+        sensor_data.p_complex = amp .* exp(1i .* phase);
+        sensor_data = rmfield(sensor_data, 'p');
+    end
+
     % convert media and results to 2D/3D (if axisymmetry was used)
     if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
         % Phantom simulations always expand to 3D so that output NIfTIs have
@@ -131,6 +142,19 @@ end
     % keep 'parameters' in info so not to confuse future runs when saving
     acoustic_info.parameters = parameters;
     acoustic_info.kwave_input_args = kwave_input_args;
+
+    % Save p_complex to a separate cache file when explicitly requested.
+    % Kept out of the main results file to avoid bloating it by default.
+    if isfield(sensor_data, 'p_complex')
+        if isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex
+            [fdir, fname, fext] = fileparts(filename_sensor_data);
+            filename_p_complex = fullfile(fdir, [strrep(fname, '_results', '_p_complex'), fext]);
+            p_complex = sensor_data.p_complex; %#ok<NASGU>
+            save(filename_p_complex, 'p_complex', '-v7.3');
+            fprintf('Saved complex pressure field to %s\n', filename_p_complex);
+        end
+        sensor_data = rmfield(sensor_data, 'p_complex');
+    end
 
     if ~should_save_output(parameters.io, 'save_acoustic_matrices')
         disp('Not saving acoustic output matrices ...')

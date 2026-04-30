@@ -40,7 +40,7 @@ Status: *experimental support*
 
 Multiple transducers can be specified in layered simulations. See [this pull request](https://github.com/Donders-Institute/PRESTUS/pull/100) for examples.
 
-```
+```yaml
 transducer:
   - name: right
     elem_n: 10
@@ -51,9 +51,70 @@ transducer:
     ...
 ```
 
-Limitations: 
-- simulations that do not inclue a skull or layered setup (e.g., 'water') only model the first transducer
-- setup with kWaveArray not supported
-- different source frequencies not supported (see `source_sensor_setup.m`)
-- exit-plane related metrics refer to the first transducer
-- Thermal diffusion is simulated for the COMBINED field, but ALL focal-plane time-course heating plots reflect ONLY the focal plane of the first transducer and MAY MISS HOTSPOTS near other beams. DO NOT use these 1D/2D plots as an exhaustive safety check, but ALWAYS inspect 3D maxT and CEM43 volumes (NIfTIs).
+##### Temporal relation of multi-transducer firing
+
+In practice, multiple transducers may fire simultaneously, with some temporal offset, or fully independently with different duty cycles or pulse sequences. PRESTUS has native support only for the simultaneous coherent case. The other scenarios require workarounds described below.
+
+**Simultaneous coherent firing (native support)**
+
+When multiple transducers are listed in the configuration, PRESTUS combines them into a single k-Wave source matrix. Their pressure fields superpose implicitly as k-Wave solves the linear acoustic PDE — this is the physically correct treatment for transducers that fire at the same frequency with a known phase relationship. All transducers must share the same fundamental frequency; a warning is issued if they differ.
+
+This is the default mode and requires no additional configuration.
+
+**Independent / incoherent firing**
+
+If the transducers fire independently (no fixed phase relationship), their pressures do not coherently interfere. In this case the correct quantity to sum is intensity, not pressure:
+
+$$I_\text{total} = \frac{|p_1|^2}{2 \rho c} + \frac{|p_2|^2}{2 \rho c}$$
+
+To simulate this scenario, run a separate PRESTUS simulation for each transducer individually (each config contains only that transducer). The resulting `Isppa` volumes can then be summed voxelwise in post-processing to obtain the combined intensity field.
+
+The combined intensity field can then serve as input to a single thermal simulation. Note that running independent thermal simulations and summing the resulting temperature maps is **not** valid: thermal diffusion is a global coupled process, not the sum of two independently computed fields.
+
+**Staggered / time-offset firing**
+
+If the transducers fire in sequence (one after another, or with partial temporal overlap), the closest approximation within the current framework is to use the [Sequential Simulations](#sequential-simulations) mechanism. Run one transducer's heating simulation, carry over the resulting temperature and CEM43 maps via `adopted_heatmap` / `adopted_cem43`, then run the next transducer's heating simulation starting from that thermal state. This correctly captures the cumulative thermal history but assumes the acoustic fields do not overlap in time.
+
+##### Complex Pressure Field
+
+PRESTUS extracts the complex pressure amplitude (magnitude and phase at the fundamental frequency) from the steady-state time series recorded by k-Wave and makes it available as an optional cache output. This is not needed for the two scenarios above — but it enables a third workflow described here.
+
+To save the complex field alongside the main results, set:
+
+```yaml
+io:
+  save_p_complex: true
+```
+
+This writes a separate file `sub-XXX_<medium>_p_complex<affix>.mat` containing a single variable `p_complex` — a complex-valued array of the same spatial dimensions as `p_max_all`, where magnitude encodes peak pressure amplitude and phase encodes the spatial phase of the wavefield at the fundamental frequency. The main results file is not affected.
+
+**When is this useful?**
+
+For the two scenarios above, `p_complex` does not need to be combined manually:
+- *Simultaneous coherent firing* runs both transducers in one k-Wave simulation, so their interference is computed internally. The resulting `p_complex` already reflects the combined field.
+- *Independent / incoherent firing* requires summing intensities, not complex fields. `p_complex` per transducer gives `|p|²` for that purpose, but the combination step uses magnitudes only.
+
+The main use case for `p_complex` is a **post-hoc coherent phase sweep**: run each transducer as a separate single-transducer simulation, then combine their complex fields in post-processing with a variable inter-transducer phase offset, without re-running k-Wave. Because the acoustic medium is linear, this combination is exact:
+
+```matlab
+d1 = load('sub-001_layered_p_complex_T1.mat');
+d2 = load('sub-001_layered_p_complex_T2.mat');
+
+% sweep inter-transducer phase offset to find optimal configuration
+for delta_phi = linspace(0, 2*pi, 36)
+    p_combined = d1.p_complex + exp(1i * delta_phi) * d2.p_complex;
+    Isppa = abs(p_combined).^2 ./ (2 .* rho .* c);
+    % evaluate focal peak, off-target heating, etc.
+end
+```
+
+This assumes both transducers fire at the same frequency and that their individual fields were simulated in the same medium (same segmentation and grid).
+
+##### Known Limitations
+
+- Simulations without a skull or layered setup (e.g. `medium: water`) only model the first transducer.
+- `kWaveArray` mode is incompatible with multiple transducers.
+- Different carrier frequencies across transducers are not supported.
+- Exit-plane metrics (focal distance, `max_Isppa_after_exit_plane`, `real_focal_distance`) are computed only with respect to the first transducer.
+- Focal-plane time-course heating plots reflect only the focal plane of the first transducer and may miss hotspots near other beams. Always inspect the 3D `maxT` and `CEM43` NIfTI volumes for a complete safety assessment.
+- Post-hoc water-only simulations are not implemented for multiple transducers.

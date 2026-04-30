@@ -41,6 +41,10 @@ arguments
 end
 sensor_data.p_final = cat(2, fliplr(sensor_data.p_final), sensor_data.p_final);
 sensor_data.p_max_all = cat(2, fliplr(sensor_data.p_max_all), sensor_data.p_max_all);
+if isfield(sensor_data, 'p_complex')
+    sensor_data.p_complex = cat(2, fliplr(real(sensor_data.p_complex)), real(sensor_data.p_complex)) + ...
+                        1i .* cat(2, fliplr(imag(sensor_data.p_complex)), imag(sensor_data.p_complex));
+end
 segmentation = cat(2, fliplr(segmentation), segmentation);
 medium_masks = cat(2, fliplr(medium_masks), medium_masks);
 source.p_mask = cat(2, fliplr(source.p_mask), source.p_mask);
@@ -70,6 +74,9 @@ segmentation = segmentation';
 medium_masks = medium_masks';
 sensor_data.p_max_all = sensor_data.p_max_all';
 sensor_data.p_final = sensor_data.p_final';
+if isfield(sensor_data, 'p_complex')
+    sensor_data.p_complex = sensor_data.p_complex.';
+end
 source.p_mask = source.p_mask';
 source_labels = source_labels';
 fields = fieldnames(kwave_medium);
