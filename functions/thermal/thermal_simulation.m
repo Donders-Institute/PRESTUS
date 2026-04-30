@@ -205,6 +205,9 @@ if use_datacast
     thermal_args = [thermal_args, {'DataCast', datacast}];
 end
 
+log_thermal_updates = isfield(parameters, 'thermal') && isfield(parameters.thermal, 'log_thermal_updates') && parameters.thermal.log_thermal_updates;
+is_first_thermal_step = true;
+
 % Run simulation
 thermal_diff_obj = kWaveDiffusion(...
     kgrid, ...
@@ -288,8 +291,16 @@ for rep_i = 1:n_ptri_reps
         % PULSE ON
         thermal_diff_obj.Q = source.Q;
         tmp_status = 'on';
-        
-        thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
+
+        if log_thermal_updates || is_first_thermal_step
+            thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
+            if is_first_thermal_step && ~log_thermal_updates
+                fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+            end
+            is_first_thermal_step = false;
+        else
+            evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur)');
+        end
         
         % CEM43 iso update — R uses T_max so that any voxel that has previously
         % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
@@ -328,7 +339,11 @@ for rep_i = 1:n_ptri_reps
         % PULSE OFF (within PT)
         if params_thermal.pt_off_steps_n > 0
             thermal_diff_obj.Q(:,:,:) = 0;
-            thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur);
+            if log_thermal_updates
+                thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur);
+            else
+                evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur)');
+            end
             
             % CEM43 iso update — see ON-phase comment above for R=T_max rationale.
             tmp_obj.cem43_iso = tmp_obj.cem43_iso + params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur ./ 60 .* ...
@@ -369,7 +384,11 @@ for rep_i = 1:n_ptri_reps
     if params_thermal.ptri_off_steps_n > 0
         thermal_diff_obj.Q(:,:,:) = 0;
         for i_step = 1:params_thermal.ptri_off_steps_n
-            thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur);
+            if log_thermal_updates
+                thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur);
+            else
+                evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur)');
+            end
             
             % CEM43 iso — see ON-phase comment for R=T_max rationale.
             tmp_obj.cem43_iso = tmp_obj.cem43_iso + 1*params_thermal.ptri_off_step_dur ./ 60 .* ...
@@ -412,7 +431,11 @@ if params_thermal.post_ptri_steps_n > 0
     fprintf('Post-PTRD cooloff: %d steps\n', params_thermal.post_ptri_steps_n);
     thermal_diff_obj.Q(:,:,:) = 0;
     for i_step = 1:params_thermal.post_ptri_steps_n
-        thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur);
+        if log_thermal_updates
+            thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur);
+        else
+            evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur)');
+        end
         
         % CEM43 iso update — see ON-phase comment for R=T_max rationale.
         tmp_obj.cem43_iso = tmp_obj.cem43_iso + 1*params_thermal.post_ptri_step_dur ./ 60 .* ...
