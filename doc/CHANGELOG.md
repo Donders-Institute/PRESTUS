@@ -26,6 +26,11 @@ Note: Parameters, naming, and default values have changed. Please consult the [d
 - [**thermal**] More flexible and standardised protocol timing specification with output plot
 - [**thermal**] Additional thermal timeseries outputs (max per tissue, heating at focus)
 - [**doc**] GitHub Pages [documentation](https://donders-institute.github.io/PRESTUS/) covering parameters, functions, installation, quick start, and processing steps
+- [**feature**] `prestus_config_init` — bootstraps a project-specific config directory and `config_default.yaml`; `load_parameters` now resolves the project config automatically so PRESTUS can be called from any working directory; `prestus_gui` accepts an optional parameter struct and shows the active config path
+- [**feature**] `prestus_group_start` — new entry point for group-level MNI-space analysis
+- [**calibration**] `calibration.opt_phase_precession` — optional constraint on element phases during amplitude/phase optimisation
+- [**thermal**] `simulation.log_thermal_updates` — suppress verbose per-step k-Wave progress output (default: off)
+- [**telemetry**] Opt-in anonymous usage telemetry (disabled by default; see documentation)
 
 #### Changed
 
@@ -39,6 +44,12 @@ Note: Parameters, naming, and default values have changed. Please consult the [d
 - [**refactor**] PML (Perfectly Matched Layer) is now added only at the acoustic wave simulation stage, rather than carried through from preprocessing or phantom generation; the default `"auto"` setting optimises PML size automatically
 - [**I/O**] Subject-specific output subfolders are now enforced to simplify the I/O landscape
 - [**axisymmetric**] Axisymmetric acoustic simulations now default to 3D thermal output
+- [**I/O**] Outputs reorganised into BIDS-inspired typed subdirectories (`acoustic/`, `thermal/`, `cache/`, `debug/`, etc.)
+- [**I/O**] `simulation_nifti` split into per-pipeline-stage calls; bone mask separated from pseudoCT NIfTIs; `space-` prefix removed from output filenames
+- [**I/O**] `parameters.io` dir/filename fields renamed to `dir_*/filename_*` convention; preprocessing cache files follow a consistent `res_N_descriptor` naming scheme
+- [**I/O**] C++ backend HDF5 intermediates now routed to `cache/`; thermal sensor data cleared by default to reduce memory footprint (`save_thermal_matrices` retains it)
+- [**config**] `simulation.debug` defaults to `0`; property-map and MNI NIfTI export flags added to `config_default.yaml`; duplicate `output_mni` key removed
+- [**report**] Safety Dashboard renamed to **Exposure Dashboard**; water-medium limits now populated
 - [**parameter**] Various parameters renamed or restructured; consult `config_default.yaml` and the documentation for current names
 
 #### Fixed
@@ -49,6 +60,11 @@ Not all (hot-)fixes are reported here.
 - [**paths**] `load_parameters` resolves `config_default.yaml` via an absolute path, preventing stray output folders when called from an unexpected working directory
 - [**calibration**] Potential bugs with transducer distance calculation
 - [**savemat**] k-Wave source matrix saving can now be correctly deactivated; water simulations force-save matrix outputs
+- [**nifti**] Property map export: corrected datatype mismatch, scalar `alpha_power` handling, and `FillValue` assignment
+- [**plots**] T1 intensity overlay orientation corrected using NIfTI sform; deprecated `LineSmoothing` property removed from transducer overlay and box plots
+- [**debug**] Debug directory creation and debug plots are now skipped when `simulation.debug = 0`
+- [**logging**] Post-hoc water simulation writes to its own independent log file; PPW warning no longer emits a backtrace
+- [**hpc**] Transducer index suffix omitted from positioning filenames for single-transducer runs
 
 #### Deprecated/Removed
 
