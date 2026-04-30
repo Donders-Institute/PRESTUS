@@ -40,10 +40,7 @@ end
         return
     end
 
-    is_layered = ~strcmp(parameters.simulation.medium, 'phantom');
-    output_mni = ~isfield(parameters, 'analysis') || ...
-                 ~isfield(parameters.analysis, 'output_mni') || ...
-                 parameters.analysis.output_mni ~= 0;
+    is_layered = strcmp(parameters.simulation.medium, 'layered');
     m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 
     data_types = ["intensity", "MI", "pressure"];
@@ -61,8 +58,8 @@ end
             case "pressure",  data = single(acoustic_pressure);
         end
 
-        nifti_write_volume(data, orig_file, parameters, planimg, 'IsLayered', is_layered);
-        nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, output_mni, m2m_folder);
+        nifti_to_t1w(data, orig_file, parameters, planimg, 'IsLayered', is_layered);
+        nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder);
 
         if strcmp(data_type, "intensity") && is_layered && isfile(orig_file_gz)
             plot_intensity_t1_overlay(niftiread(orig_file_gz), planimg, parameters, results_acoustic, highlighted_pos);

@@ -11,6 +11,8 @@ function tf = should_save_output(io, specific_field)
 %   tf = should_save_output(parameters.io, 'save_acoustic_matrices')
 %   tf = should_save_output(parameters.io, 'save_thermal_matrices')
 %   tf = should_save_output(parameters.io, 'save_grid_cache')
+%   tf = should_save_output(parameters.io, 'save_property_maps')
+%   tf = should_save_output(parameters.io, 'save_MNI')
 %
 % Input:
 %   io             - parameters.io struct

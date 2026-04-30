@@ -1,13 +1,13 @@
-function nifti_write_volume(data, orig_file, parameters, planimg, opts)
-% NIFTI_WRITE_VOLUME  Back-transform one volume to T1 space and write NIfTI
+function nifti_to_t1w(data, orig_file, parameters, planimg, opts)
+% NIFTI_TO_T1W  Back-transform one volume to T1 space and write NIfTI
 %
 % Confirms overwriting, applies tformarray to bring data from simulation-grid
 % space to T1 space, and writes a compressed NIfTI. MNI conversion is the
 % caller's responsibility (see NIFTI_TO_MNI).
 %
 % Use as:
-%   nifti_write_volume(data, orig_file, parameters, planimg)
-%   nifti_write_volume(..., 'Datatype', 'uint8', 'BitsPerPixel', 8, 'Resampler', 'nearest')
+%   nifti_to_t1w(data, orig_file, parameters, planimg)
+%   nifti_to_t1w(..., 'Datatype', 'uint8', 'BitsPerPixel', 8, 'Resampler', 'nearest')
 %
 % Input:
 %   data       - numeric array in simulation-grid space

@@ -278,8 +278,11 @@ end
     
     %% Save raw simulation-grid medium matrices (debug only)
     %
-    % T1-space property maps are written by nifti_medium (called from prestus_pipeline)
-    % after medium_setup returns, so they are not duplicated here.
+    % NOTE: T1-space property maps (back-transformed, with output_affix, in
+    % dir_output/ap/) are written by nifti_medium_properties when
+    % io.save_property_maps is set. The matrices here are complementary:
+    % they are in raw simulation-grid space, named matrix_*, and only
+    % interpretable alongside the grid metadata. They are NOT duplicates.
     %
     % Raw simulation-grid matrices → debug_dir/medium/ (matrix_*.nii.gz):
     %   Written only when simulation.debug == 1. Large, anisotropic, and only

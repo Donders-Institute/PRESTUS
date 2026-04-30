@@ -1,14 +1,12 @@
 function nifti_medium(parameters, planimg, medium_masks, kwave_medium, pseudoCT)
 % NIFTI_MEDIUM  Export medium-stage data to NIfTI
 %
-% Pipeline outputs (dir_nii_T1w + optional MNI):
-%   medium_masks  - voxel-wise tissue label map (always)
-%   pseudoCT      - Hounsfield-unit skull map (only when parameters.pct.enabled == 1)
-%
-% Debug outputs (dir_debug_medium):
-%   sound_speed, density, alpha_coeff, alpha_power, thermal_conductivity,
-%   specific_heat, perfusion_coeff, absorption_fraction
-%   All back-transformed to T1 space; skipped if file already exists.
+% Coordinates four distinct export steps:
+%   1. Pipeline outputs  — medium_masks (see NIFTI_MEDIUM_MASKS)
+%   2. Pipeline outputs  — pseudoCT, only when parameters.pct.enabled == 1 (see NIFTI_PCT)
+%   3. Property maps     — per-tissue acoustic/thermal properties (see NIFTI_MEDIUM_PROPERTIES)
+%                          only written when parameters.io.save_property_maps is true
+%   4. T1-in-MNI         — registers the subject T1 to MNI if not yet done (see SIMNIBS_T1_TO_MNI)
 %
 % Use as:
 %   nifti_medium(parameters, planimg, medium_masks, kwave_medium)
@@ -21,7 +19,7 @@ function nifti_medium(parameters, planimg, medium_masks, kwave_medium, pseudoCT)
 %   kwave_medium - struct with medium property fields
 %   pseudoCT     - (:,:,:) numeric, simulation-grid Hounsfield values (optional)
 %
-% See also: NIFTI_ACOUSTIC, NIFTI_THERMAL, CONVERT_FINAL_TO_MNI_SIMNIBS
+% See also: NIFTI_MEDIUM_MASKS, NIFTI_PCT, NIFTI_MEDIUM_PROPERTIES, SIMNIBS_T1_TO_MNI, NIFTI_ACOUSTIC, NIFTI_THERMAL
 
 arguments
     parameters   (1,1) struct
@@ -41,83 +39,19 @@ end
         return
     end
 
-    is_layered = ~strcmp(parameters.simulation.medium, 'phantom');
-    output_mni = ~isfield(parameters, 'analysis') || ...
-                 ~isfield(parameters.analysis, 'output_mni') || ...
-                 parameters.analysis.output_mni ~= 0;
+    is_layered = strcmp(parameters.simulation.medium, 'layered');
     m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 
-    % ---- pipeline outputs ------------------------------------------------
+    nifti_medium_masks(parameters, planimg, medium_masks, is_layered, m2m_folder);
 
-    masks_file    = fullfile(parameters.io.dir_nii_T1w, sprintf('sub-%03d_%s_T1w%s_medium_masks', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    masks_file_gz = strcat(masks_file, '.nii.gz');
-    mni_masks_file = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_MNI%s_medium_masks.nii.gz', ...
-        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-
-    nifti_write_volume(uint8(medium_masks), masks_file, parameters, planimg, ...
-        'IsLayered', is_layered, 'Datatype', 'uint8', 'BitsPerPixel', 8, 'Resampler', 'nearest');
-    nifti_to_mni(masks_file_gz, mni_masks_file, parameters, is_layered, output_mni, m2m_folder);
-
-    % pseudoCT (pipeline output: goes to dir_nii_T1w)
     if is_layered && isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && ...
             parameters.pct.enabled == 1 && ~isempty(pseudoCT)
-        pct_file    = fullfile(parameters.io.dir_nii_T1w, sprintf('sub-%03d_%s_T1w%s_pseudoCT', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-        pct_file_gz = strcat(pct_file, '.nii.gz');
-        pct_mni_file = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_MNI%s_pseudoCT.nii.gz', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-
-        nifti_write_volume(single(pseudoCT), pct_file, parameters, planimg, ...
-            'IsLayered', is_layered, 'Resampler', 'nearest');
-        nifti_to_mni(pct_file_gz, pct_mni_file, parameters, is_layered, output_mni, m2m_folder);
+        nifti_pct(parameters, planimg, pseudoCT, m2m_folder);
     end
 
-    % ---- debug outputs ---------------------------------------------------
-
-    if is_layered
-        debug_properties = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
-                            'thermal_conductivity', 'specific_heat', 'perfusion_coeff', 'absorption_fraction'};
-        try
-            out_dir = char(parameters.io.dir_debug_medium);
-            if ~isfolder(out_dir); mkdir(out_dir); end
-
-            orig_hdr = planimg.t1_header;
-            orig_hdr.Datatype = 'single';
-
-            for prop = debug_properties
-                prop = char(prop); %#ok<FXSET>
-                if ~isfield(kwave_medium, prop)
-                    continue
-                end
-                file_name = fullfile(out_dir, [prop '_t1']);
-                if isfile([file_name '.nii.gz']) || isfile([file_name '.nii'])
-                    continue
-                end
-                data_t1 = single(tformarray(kwave_medium.(prop), planimg.inv_transf, ...
-                    makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], ...
-                    orig_hdr.ImageSize, [], 0));
-                niftiwrite(data_t1, file_name, orig_hdr);
-                nii_file = [file_name '.nii'];
-                if isfile(nii_file)
-                    gzip(nii_file);
-                    delete(nii_file);
-                end
-            end
-        catch ME
-            prev = warning('off', 'backtrace');
-            warn('nifti_medium:debugWrite', ...
-                'Could not write medium property debug NIfTIs: %s', ME.message);
-            warning(prev);
-        end
+    if is_layered && should_save_output(parameters.io, 'save_property_maps')
+        nifti_medium_properties(parameters, planimg, kwave_medium, m2m_folder);
     end
 
-    % T1 in MNI space (charm does not produce one; written once, existence-guarded)
-    if is_layered && output_mni
-        path_to_input_img  = fullfile(m2m_folder, 'T1.nii.gz');
-        path_to_output_img = fullfile(m2m_folder, 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
-        if ~exist(path_to_output_img, 'file')
-            convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters);
-        end
-    end
+    simnibs_t1_to_mni(parameters, is_layered, m2m_folder);
 end
