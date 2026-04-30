@@ -1,5 +1,5 @@
-function [parameters, segmentation, bone, medium_masks] = ...
-    grid_axisymmetry(parameters, segmentation, bone, medium_masks)
+function [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
+    grid_axisymmetry(parameters, segmentation, bone_mask, pseudoCT, medium_masks)
 % GRID_AXISYMMETRY  Adapt grid and tissue masks for k-Wave axisymmetric simulation
 %
 % When parameters.grid.axisymmetric == 1 and a 2D focus position is specified,
@@ -9,21 +9,23 @@ function [parameters, segmentation, bone, medium_masks] = ...
 % accordingly. Has no effect when axisymmetric mode is not requested.
 %
 % Use as:
-%   [parameters, segmentation, bone, medium_masks] = ...
-%       grid_axisymmetry(parameters, segmentation, bone, medium_masks)
+%   [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
+%       grid_axisymmetry(parameters, segmentation, bone_mask, pseudoCT, medium_masks)
 %
 % Input:
 %   parameters   - (struct) PRESTUS config; must contain grid.dims [1x2],
 %                    grid.axisymmetric, and transducer(1).trans_pos / focus_pos
 %   segmentation - [Nx x Ny] numeric, tissue label map
-%   bone         - [Nx x Ny] numeric, binary skull mask
+%   bone_mask    - [Nx x Ny] logical, binary skull mask
+%   pseudoCT     - [Nx x Ny] numeric, Hounsfield-unit skull image ([] when unused)
 %   medium_masks - [Nx x Ny] numeric, medium layer label map
 %
 % Output:
 %   parameters   - updated: grid.dims halved along radial axis;
 %                    trans_pos and focus_pos set to radial midline (r = 1)
 %   segmentation - [Naxial x Nr] numeric, halved along radial axis
-%   bone         - [Naxial x Nr] numeric, halved along radial axis
+%   bone_mask    - [Naxial x Nr] logical, halved along radial axis
+%   pseudoCT     - [Naxial x Nr] numeric, halved along radial axis ([] when unused)
 %   medium_masks - [Naxial x Nr] numeric, halved along radial axis
 %
 % See also: CONVERT_AXISYMMETRIC_TO_3D, CONVERT_AXISYMMETRIC_TO_2D
@@ -31,7 +33,8 @@ function [parameters, segmentation, bone, medium_masks] = ...
 arguments
     parameters   (1,1) struct
     segmentation {mustBeNumericOrLogical}
-    bone         {mustBeNumericOrLogical}
+    bone_mask    {mustBeNumericOrLogical}
+    pseudoCT     {mustBeNumericOrLogical}
     medium_masks {mustBeNumericOrLogical}
 end
     if numel(parameters.transducer(1).focus_pos) == 2 && ...
@@ -44,10 +47,11 @@ end
         % ensure that radial(y) dim is shorter than axial (x) dim
         if parameters.grid.dims(2) > parameters.grid.dims(1)
             parameters.grid.dims = fliplr(parameters.grid.dims);
-            trans_pos = fliplr(trans_pos);
-            focus_pos = fliplr(focus_pos);
+            trans_pos    = fliplr(trans_pos);
+            focus_pos    = fliplr(focus_pos);
             segmentation = segmentation';
-            bone = bone';
+            bone_mask    = bone_mask';
+            if ~isempty(pseudoCT); pseudoCT = pseudoCT'; end
             medium_masks = medium_masks';
         end
         % halve the grid along the radial axis
@@ -55,7 +59,8 @@ end
         Ny_half = floor(parameters.grid.dims(2)/2);
         parameters.grid.dims(2) = Ny_half;
         segmentation = segmentation(:,Ny_half+1:end);
-        bone = bone(:,Ny_half+1:end);
+        bone_mask    = bone_mask(:,Ny_half+1:end);
+        if ~isempty(pseudoCT); pseudoCT = pseudoCT(:,Ny_half+1:end); end
         medium_masks = medium_masks(:,Ny_half+1:end);
         % set transducer and focus position to the radial midline
         trans_pos(2) = 1; 

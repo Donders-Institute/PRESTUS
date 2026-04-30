@@ -1,6 +1,6 @@
-function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_final, ...
+function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, ...
          focus_pos_final, translation_matrix] = preproc_crop_grid( ...
-         parameters, medium_masks, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
+         parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
 % PREPROC_CROP_GRID  Crop 3-D head model to the simulation-relevant region
 %
 % Crops the full-head model to a CSF-guided, transducer-inclusive bounding
@@ -13,28 +13,35 @@ function [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_fina
 % the crop bounding box.
 %
 % Use as:
-%   [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_final, ...
+%   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, ...
 %    focus_pos_final, translation_matrix] = preproc_crop_grid( ...
-%       parameters, medium_masks, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
+%       parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid)
+%   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, ...
+%    focus_pos_final, translation_matrix] = preproc_crop_grid( ...
+%       parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
 %
 % Input:
 %   parameters     - (1,1) simulation configuration struct
 %   medium_masks   - [Nx x Ny x Nz] medium label array
-%   segmentation   - [Nx x Ny x Nz] tissue segmentation / pseudoCT
-%   bone_img       - [Nx x Ny x Nz] bone property image
+%   segmentation   - [Nx x Ny x Nz] tissue segmentation
+%   bone_mask_img  - [Nx x Ny x Nz] binary skull mask
 %   trans_pos_grid - [1x3] transducer position in voxel coordinates
 %   focus_pos_grid - [1x3] focus position in voxel coordinates
+%   pseudoCT_img   - [Nx x Ny x Nz] Hounsfield-unit skull image (optional, [] if unused)
 %
 % Output:
 %   medium_masks       - cropped medium label array
 %   segmentation_crop  - cropped tissue segmentation
-%   bone_crop          - cropped bone image
+%   bone_mask_crop     - cropped binary skull mask
+%   pseudoCT_crop      - cropped pseudoCT image ([] when pseudoCT_img is not provided)
 %   parameters         - updated struct with .grid.dims = [Nx Ny Nz]
 %   trans_pos_final    - [1x3] transducer position in cropped grid
 %   focus_pos_final    - [1x3] focus position in cropped grid
 %   translation_matrix - [4x4] homogeneous translation matrix
 %
 % See also: PREPROC_CROP_ECSF, HEAD_SMOOTH_AND_CROP
+
+if nargin < 7; pseudoCT_img = []; end
 
 % === USER SYMMETRIC PADDING (BOTH SIDES) ===
 if ~isfield(parameters.headmodel, 'head_pad_mm') || isempty(parameters.headmodel.head_pad_mm)
@@ -48,9 +55,12 @@ total_pre_offset = zeros(1,3);
 
 % Apply symmetric padding BEFORE transducer_setup
 if any(pad_pre_post > 0)
-    segmentation = padarray(segmentation, pad_pre_post, 0, 'both');
-    medium_masks = padarray(medium_masks, pad_pre_post, 0, 'both');
-    bone_img = padarray(bone_img, pad_pre_post, 0, 'both');
+    segmentation    = padarray(segmentation,    pad_pre_post, 0, 'both');
+    medium_masks    = padarray(medium_masks,    pad_pre_post, 0, 'both');
+    bone_mask_img   = padarray(bone_mask_img,   pad_pre_post, 0, 'both');
+    if ~isempty(pseudoCT_img)
+        pseudoCT_img = padarray(pseudoCT_img,   pad_pre_post, 0, 'both');
+    end
     total_pre_offset = total_pre_offset + pad_pre_post;  % User padding contribution
     % Positions shift by PRE-padding amount ('both' adds pre first)
     trans_pos_grid = trans_pos_grid + pad_pre_post;
@@ -77,9 +87,12 @@ clear combinedmask;
 % === CONDITIONAL PRE-PADDING if min_dims < 1 ===
 if any(min_dims < 1)
     pad_amount = abs(min(min_dims, [1 1 1]));
-    segmentation = padarray(segmentation, pad_amount, 0, 'pre');
-    medium_masks = padarray(medium_masks, pad_amount, i_water, 'pre');
-    bone_img = padarray(bone_img, pad_amount, 0, 'pre');
+    segmentation  = padarray(segmentation,  pad_amount, 0,       'pre');
+    medium_masks  = padarray(medium_masks,  pad_amount, i_water, 'pre');
+    bone_mask_img = padarray(bone_mask_img, pad_amount, 0,       'pre');
+    if ~isempty(pseudoCT_img)
+        pseudoCT_img = padarray(pseudoCT_img, pad_amount, 0, 'pre');
+    end
     total_pre_offset = total_pre_offset + pad_amount;  % Add conditional padding
     min_dims = max(min_dims, [1 1 1]);
     max_dims = max_dims + pad_amount;
@@ -97,16 +110,24 @@ max_dims = min_dims + new_grid_dims - 1;
 % === CONDITIONAL POST-PADDING if FFT expansion exceeds padding ===
 if any(max_dims > size(medium_masks))
     pad_post_amount = max(0, max_dims - size(medium_masks));
-    segmentation = padarray(segmentation, pad_post_amount, 0, 'post');
-    medium_masks = padarray(medium_masks, pad_post_amount, i_water, 'post');
-    bone_img = padarray(bone_img, pad_post_amount, 0, 'post');
+    segmentation  = padarray(segmentation,  pad_post_amount, 0,       'post');
+    medium_masks  = padarray(medium_masks,  pad_post_amount, i_water, 'post');
+    bone_mask_img = padarray(bone_mask_img, pad_post_amount, 0,       'post');
+    if ~isempty(pseudoCT_img)
+        pseudoCT_img = padarray(pseudoCT_img, pad_post_amount, 0, 'post');
+    end
     fprintf('Post-padding applied: [%d %d %d] voxels\n', pad_post_amount);
 end
 
 % Apply final crop
-medium_masks = medium_masks(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
+medium_masks    = medium_masks(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
 segmentation_crop = segmentation(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
-bone_crop = bone_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
+bone_mask_crop  = bone_mask_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
+if ~isempty(pseudoCT_img)
+    pseudoCT_crop = pseudoCT_img(min_dims(1):max_dims(1), min_dims(2):max_dims(2), min_dims(3):max_dims(3));
+else
+    pseudoCT_crop = [];
+end
 
 % Update parameters
 parameters.grid.dims = size(medium_masks);

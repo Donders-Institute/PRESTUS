@@ -1,5 +1,5 @@
-function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, ...
-    t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preproc_head(parameters)
+function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
+    focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preproc_head(parameters)
 
 % PREPROC_HEAD  Preprocess structural MRI for k-Wave simulation
 %
@@ -9,7 +9,7 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 % outputs.
 %
 % Use as:
-%   [medium_masks, segmentation_crop, bone_crop, trans_pos_final, ...
+%   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
 %    focus_pos_final, t1_image, t1_header, final_transformation_matrix, ...
 %    inv_final_transformation_matrix] = preproc_head(parameters)
 %
@@ -19,7 +19,9 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 % Output:
 %   medium_masks                    - [Nx x Ny x Nz] tissue medium label array
 %   segmentation_crop               - [Nx x Ny x Nz] cropped tissue segmentation
-%   bone_crop                       - [Nx x Ny x Nz] cropped bone/pCT image
+%   bone_mask_crop                  - [Nx x Ny x Nz] cropped binary skull mask (always present)
+%   pseudoCT_crop                   - [Nx x Ny x Nz] cropped Hounsfield-unit skull image
+%                                     ([] when parameters.pct.enabled ~= 1)
 %   trans_pos_final                 - [1x3] transducer position in final grid
 %   focus_pos_final                 - [1x3] focus position in final grid
 %   t1_image                        - [Nx x Ny x Nz] T1-weighted image
@@ -240,10 +242,23 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             close(h);
         end;  clear segm_img_montage;
         
-        %% [bone mask/pCT]
+        %% [bone mask and pseudoCT]
 
+        % Binary skull mask is always derived from the segmentation labels.
+        bone_img = ismember(tissues_mask_image, charm_seg_labels().bonemask);
+        [bone_mask_img_rr, ~, ~, ~, ~, ~, ~, bone_mask_montage] = ...
+            preproc_align_to_focal_axis(...
+            bone_img, ...
+            tissues_mask_header, ...
+            trans_pos_grid, ...
+            focus_pos_grid, ...
+            tissues_mask_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
+            parameters);
+        clear bone_img;
+
+        % pseudoCT (HU values) is only available in the pCT pipeline variant.
         if parameters.pct.enabled == 1
-            [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = ...
+            [pseudoCT_img_rr, ~, ~, ~, ~, ~, ~, pseudoCT_montage] = ...
                 preproc_align_to_focal_axis(...
                 pseudoCT_image, ...
                 pseudoCT_header, ...
@@ -252,29 +267,30 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                 pseudoCT_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
                 parameters);
         else
-            % create filled bone mask (charm doesn't produce one directly)
-            bone_img = ismember(tissues_mask_image, charm_seg_labels().bonemask);
-            [bone_img_rr, ~, ~, ~, ~, ~, ~, bone_img_montage] = ...
-                preproc_align_to_focal_axis(...
-                bone_img, ...
-                tissues_mask_header, ...
-                trans_pos_grid, ...
-                focus_pos_grid, ...
-                tissues_mask_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
-                parameters);
+            pseudoCT_img_rr = [];
         end
 
-        % [DEBUG] visualize original and rotated bone mask image
+        % [DEBUG] visualize original and rotated bone mask
         if parameters.simulation.debug == 1
             h = figure;
-            imshow(bone_img_montage)
-            title('Original (left) and rotated (right) original bone mask');
+            imshow(bone_mask_montage)
+            title('Original (left) and rotated (right) bone mask');
             output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
                 sprintf('sub-%03d_rotated_scaled_orig%s.png',...
                 parameters.subject_id, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
             close(h);
-        end; clear bone_img_montage;
+            if parameters.pct.enabled == 1
+                h = figure;
+                imshow(pseudoCT_montage)
+                title('Original (left) and rotated (right) pseudoCT');
+                output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
+                    sprintf('sub-%03d_rotated_scaled_pseudoCT%s.png',...
+                    parameters.subject_id, parameters.io.output_affix));
+                saveas(h, output_plot_filename, 'png')
+                close(h);
+            end
+        end; clear bone_mask_montage pseudoCT_montage;
 
         assert(isequal(size(trans_pos_rescaled(1:2)),size(focus_pos_rescaled(1:2))),...
             "After reorientation, the first two coordinates of the focus and the transducer should be the same")
@@ -295,7 +311,8 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             save(filename_reoriented_scaled_data, ...
                 't1_img_rr', ...
                 'segmented_img_rr', ...
-                'bone_img_rr', ...
+                'bone_mask_img_rr', ...
+                'pseudoCT_img_rr', ...
                 'trans_pos_rescaled', ...
                 'focus_pos_rescaled', ...
                 'scale_rotate_recenter_matrix', ...
@@ -320,6 +337,19 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
         cropped_exists = isfile(filename_cropped_smoothed_skull_data_check);
         if ~cropped_exists
             load(filename_reoriented_scaled_data);   % includes volumes + matrices
+            % Backward compat: old caches stored bone_img_rr as the dual-purpose variable.
+            if exist('bone_img_rr', 'var') && ~exist('bone_mask_img_rr', 'var')
+                if parameters.pct.enabled == 1
+                    error('prestus:preproc:oldCacheFormat', ...
+                        ['Cache %s uses the old bone_img_rr format (pseudoCT and bone mask ' ...
+                         'were combined). Delete it to regenerate with separated variables.'], ...
+                        filename_reoriented_scaled_data);
+                else
+                    bone_mask_img_rr = bone_img_rr;
+                    pseudoCT_img_rr  = [];
+                    clear bone_img_rr;
+                end
+            end
         else
             load(filename_reoriented_scaled_data, ...
                 'trans_pos_rescaled', 'focus_pos_rescaled', ...
@@ -373,9 +403,9 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.io.dir_output);
         % postprocess skull segmentation
-        [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
+        [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
             head_smooth_and_crop(...
-            parameters, segmented_img_rr, bone_img_rr, trans_pos_rescaled, focus_pos_rescaled);
+            parameters, segmented_img_rr, bone_mask_img_rr, trans_pos_rescaled, focus_pos_rescaled, pseudoCT_img_rr);
 
         % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
@@ -417,13 +447,13 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
             end
             clear segmentation_file plotdata orig_hdr;
 
-            % save skull mask/pseudoCT
+            % save binary skull mask
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'double';
             skull_mask_file = fullfile(parameters.io.dir_debug_preproc,...
-                sprintf('sub-%03d_skull_final', parameters.subject_id));
-            plotdata = double(tformarray(bone_crop, inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+                sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
+            plotdata = double(tformarray(bone_mask_crop, inv_final_transformation_matrix, ...
+                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
             if ~isfile(skull_mask_file)
                 try
                     niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
@@ -431,24 +461,56 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
                     warn(ME)
                 end
             end
-            clear skull_mask_file plotdata orig_hdr;
+            clear skull_mask_file plotdata;
+
+            % save pseudoCT (if available)
+            if ~isempty(pseudoCT_crop)
+                orig_hdr.Datatype = 'single';
+                pseudoCT_file = fullfile(parameters.io.dir_debug_preproc,...
+                    sprintf('sub-%03d_pseudoCT_final', parameters.subject_id));
+                plotdata = single(tformarray(pseudoCT_crop, inv_final_transformation_matrix, ...
+                    makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
+                if ~isfile(pseudoCT_file)
+                    try
+                        niftiwrite(plotdata, pseudoCT_file, orig_hdr, 'Compressed',true);
+                    catch ME
+                        warn(ME)
+                    end
+                end
+                clear pseudoCT_file plotdata;
+            end
+            clear orig_hdr;
         end
 
         % save cropped and smoothed skull data
         save(filename_cropped_smoothed_skull_data, ...
             'medium_masks', ...
             'segmentation_crop', ...
-            'bone_crop', ...
+            'bone_mask_crop', ...
+            'pseudoCT_crop', ...
             'trans_pos_final', ...
             'focus_pos_final', ...
             'crop_translation_matrix',...
             'final_transformation_matrix',...
             'inv_final_transformation_matrix')
         log_timer('stop','preproc_skullsmooth');
-    else 
+    else
         disp('Skipping head smoothing and cropping, the file already exists, loading it instead.')
         load(filename_cropped_smoothed_skull_data);
-    end    
+        % Backward compat: old caches used bone_crop for the dual-purpose variable.
+        if exist('bone_crop', 'var') && ~exist('bone_mask_crop', 'var')
+            if parameters.pct.enabled == 1
+                error('prestus:preproc:oldCacheFormat', ...
+                    ['Cache %s uses the old bone_crop format (pseudoCT and bone mask were ' ...
+                     'combined). Delete it to regenerate with separated variables.'], ...
+                    filename_cropped_smoothed_skull_data);
+            else
+                bone_mask_crop = bone_crop;
+                pseudoCT_crop  = [];
+                clear bone_crop;
+            end
+        end
+    end
     
     %% Sanity-check transformations
 

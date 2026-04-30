@@ -157,13 +157,13 @@ function [parameters] = prestus_pipeline(parameters, options)
         else
             parameters = focal_distance_calculation(parameters);
 
-            [parameters, medium_masks, segmentation, bone, planimg] = ...
+            [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
                 grid_tissue_setup(parameters);
 
             [parameters] = grid_transducer_location(parameters, planimg);
 
-            [parameters, segmentation, bone, medium_masks] = ...
-                grid_axisymmetry(parameters, segmentation, bone, medium_masks);
+            [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
+                grid_axisymmetry(parameters, segmentation, bone_mask, pseudoCT, medium_masks);
 
             trans_pos = parameters.transducer(1).trans_pos;
             focus_pos = parameters.transducer(1).focus_pos;
@@ -171,7 +171,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             if should_save_output(parameters.io, 'save_grid_cache')
                 grid_cache_info.parameters = parameters;
                 save(filename_grid_cache, ...
-                    'planimg', 'medium_masks', 'segmentation', 'bone', ...
+                    'planimg', 'medium_masks', 'segmentation', 'bone_mask', 'pseudoCT', ...
                     'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
                 clear grid_cache_info
             end
@@ -199,11 +199,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             disp('Loading medium cache — skipping medium property mapping.')
             load(filename_medium_cache);
         else
-            if parameters.pct.enabled == 1
-                [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, bone);
-            else
-                [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg);
-            end
+            [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, pseudoCT);
 
             if should_save_output(parameters.io, 'save_medium_cache')
                 save(filename_medium_cache, 'kwave_medium', 'medium_plus', '-v7.3');
@@ -216,7 +212,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % -- NIfTI: medium --
     log_timer('start', 'nifti_medium', parameters.io.dir_output);
-    simulation_nifti('medium', parameters, planimg, medium_masks, kwave_medium);
+    nifti_medium(parameters, planimg, medium_masks, kwave_medium, pseudoCT);
     log_timer('stop', 'nifti_medium');
 
     % ====================================================================
@@ -352,8 +348,8 @@ function [parameters] = prestus_pipeline(parameters, options)
     if parameters.state.acoustics_available
         % -- NIfTI: acoustic --
         log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
-        simulation_nifti('acoustic', parameters, planimg, ...
-            results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        nifti_acoustic(parameters, planimg, results_acoustic, ...
+            acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
         log_timer('stop', 'nifti_acoustic');
     end
 
@@ -456,11 +452,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     if parameters.state.heating_available
         % -- NIfTI: thermal --
         log_timer('start', 'nifti_thermal', parameters.io.dir_output);
-        simulation_nifti('thermal', parameters, planimg, results_heating, kwave_medium);
+        nifti_thermal(parameters, planimg, results_heating, kwave_medium);
         log_timer('stop', 'nifti_thermal');
     end
 
-    clear time_status_seq segmentation bone acoustic_* results_heating medium_masks kwave_medium planimg
+    clear time_status_seq segmentation bone_mask pseudoCT acoustic_* results_heating medium_masks kwave_medium planimg
 
     % ====================================================================
     %% END OF THIS SIMULATION

@@ -1,4 +1,4 @@
-function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_setup(parameters)
+function [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = grid_tissue_setup(parameters)
 % GRID_TISSUE_SETUP  Set up computational grid and tissue masks for TUS simulation
 %
 % Dispatches to one of three setup paths depending on parameters.simulation.medium:
@@ -7,7 +7,7 @@ function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_s
 %   other      - initialises a homogeneous water grid of default_dims
 %
 % Use as:
-%   [parameters, medium_masks, segmentation, bone, planimg] = ...
+%   [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
 %       grid_tissue_setup(parameters)
 %
 % Input:
@@ -21,7 +21,9 @@ function [parameters, medium_masks, segmentation, bone, planimg] = grid_tissue_s
 %   parameters   - updated: grid.dims set from loaded/created mask
 %   medium_masks - [Nx x Ny (x Nz)] uint8, medium layer label map
 %   segmentation - [Nx x Ny (x Nz)] uint8, tissue label map
-%   bone         - [Nx x Ny (x Nz)] logical, binary skull mask
+%   bone_mask    - [Nx x Ny (x Nz)] logical, binary skull mask (always present)
+%   pseudoCT     - [Nx x Ny (x Nz)] numeric, Hounsfield-unit skull image
+%                  ([] when parameters.pct.enabled ~= 1 or medium is not layered)
 %   planimg      - (struct) planning image data (t1_image_orig, t1_header,
 %                    transf, inv_transf); fields are empty for non-layered media
 %
@@ -44,7 +46,7 @@ if contains(parameters.simulation.medium, {'layered'})
     % matrix.
 
     % Preprocess layered head
-    [medium_masks, segmentation, bone, ~, ~, planimg.t1_image_orig, ...
+    [medium_masks, segmentation, bone_mask, pseudoCT, ~, ~, planimg.t1_image_orig, ...
         planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
         preproc_head(parameters);
 
@@ -81,7 +83,8 @@ else
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
         segmentation = segmented_img; clear segmented_img;
         mask = tissuemask_binary(parameters, medium_masks);
-        bone = mask.skull;
+        bone_mask = mask.skull;
+        pseudoCT  = [];
         % update present layers (following medium mask creation)
         [parameters] = check_layers(parameters, segmentation);
     else % e.g., water
@@ -93,7 +96,8 @@ else
         % set up empty medium masks and segmentations
         medium_masks = ones(parameters.grid.dims); % single water layer
         segmentation = zeros(parameters.grid.dims);
-        bone = zeros(parameters.grid.dims);
+        bone_mask = zeros(parameters.grid.dims);
+        pseudoCT  = [];
         % update present layer (only water)
         [parameters] = check_layers(parameters, segmentation);
     end

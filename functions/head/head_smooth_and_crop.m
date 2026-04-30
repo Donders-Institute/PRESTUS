@@ -1,6 +1,6 @@
-function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos_final, ...
-    translation_matrix] = head_smooth_and_crop(parameters, segmentation, bone_img, ...
-    trans_pos_grid, focus_pos_grid)
+function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
+    focus_pos_final, translation_matrix] = head_smooth_and_crop(parameters, segmentation, ...
+    bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
 % HEAD_SMOOTH_AND_CROP  Convert segmentation to medium masks and crop to simulation grid
 %
 % Converts layered tissue segmentations into medium masks indexed by
@@ -8,21 +8,26 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
 % gaps, and crops the volume to a focus-centred bounding box for k-Wave.
 %
 % Use as:
-%   [medium_masks, segmentation_crop, bone_crop, trans_pos_final, ...
+%   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
 %    focus_pos_final, translation_matrix] = head_smooth_and_crop( ...
-%       parameters, segmentation, bone_img, trans_pos_grid, focus_pos_grid)
+%       parameters, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid)
+%   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
+%    focus_pos_final, translation_matrix] = head_smooth_and_crop( ...
+%       parameters, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
 %
 % Input:
 %   parameters     - (1,1) simulation configuration struct
 %   segmentation   - [Nx x Ny x Nz] SimNIBS tissue label volume
-%   bone_img       - [Nx x Ny x Nz] binary bone mask or pseudoCT
+%   bone_mask_img  - [Nx x Ny x Nz] binary skull mask
 %   trans_pos_grid - [1x3] transducer position in voxel coordinates
 %   focus_pos_grid - [1x3] focus position in voxel coordinates
+%   pseudoCT_img   - [Nx x Ny x Nz] Hounsfield-unit skull image (optional, [] if unused)
 %
 % Output:
 %   medium_masks      - [Nx x Ny x Nz] medium label array (cropped)
 %   segmentation_crop - [Nx x Ny x Nz] tissue label array (cropped)
-%   bone_crop         - [Nx x Ny x Nz] bone image (cropped)
+%   bone_mask_crop    - [Nx x Ny x Nz] binary skull mask (cropped)
+%   pseudoCT_crop     - [Nx x Ny x Nz] pseudoCT image (cropped; [] when not provided)
 %   trans_pos_final   - [1x3] transducer position in cropped grid
 %   focus_pos_final   - [1x3] focus position in cropped grid
 %   translation_matrix - [4x4] homogeneous translation matrix
@@ -32,9 +37,10 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     arguments
         parameters     (1,1) struct
         segmentation   (:,:,:) {mustBeNumericOrLogical}
-        bone_img       (:,:,:) {mustBeNumericOrLogical}
+        bone_mask_img  (:,:,:) {mustBeNumericOrLogical}
         trans_pos_grid (1,:)   double
         focus_pos_grid (1,:)   double
+        pseudoCT_img           {mustBeNumericOrLogical} = []
     end
 
     % This function turns the original `layered` segmentations into medium masks such
@@ -73,8 +79,8 @@ function [medium_masks, segmentation_crop, bone_crop, trans_pos_final, focus_pos
     end
 
     % Crop the simulation grid outside layered medium + transducer + PML for efficiency
-    [medium_masks, segmentation_crop, bone_crop, parameters, trans_pos_final, focus_pos_final, translation_matrix] = ...
-         preproc_crop_grid(parameters, medium_masks, segmentation, bone_img, trans_pos_grid, focus_pos_grid);
+    [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, focus_pos_final, translation_matrix] = ...
+         preproc_crop_grid(parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img);
 
     % [DEBUG] plot the smoothed and unsmoothed skull segmentation with transducer and focus locations
     if parameters.simulation.debug == 1

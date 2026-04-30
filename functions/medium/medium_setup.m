@@ -276,33 +276,14 @@ end
                           'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
-    %% Save acoustic property NIfTIs
+    %% Save raw simulation-grid medium matrices (debug only)
     %
-    % T1-space maps → debug_dir_medium (e.g. sound_speed_t1.nii.gz, density_t1.nii.gz):
-    %   Written unconditionally for layered simulations via medium_properties_nifti.
-    %   These are QC/debug outputs; skipped if the file already exists.
+    % T1-space property maps are written by nifti_medium (called from prestus_pipeline)
+    % after medium_setup returns, so they are not duplicated here.
     %
     % Raw simulation-grid matrices → debug_dir/medium/ (matrix_*.nii.gz):
     %   Written only when simulation.debug == 1. Large, anisotropic, and only
     %   interpretable with the grid metadata — not intended as pipeline outputs.
-    if contains(parameters.simulation.medium, {'layered'}) && exist('planimg','var') && ~isempty(planimg)
-        try
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'sound_speed')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'density')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_coeff')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'alpha_power')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'thermal_conductivity')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'specific_heat')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'perfusion_coeff')
-            medium_properties_nifti(parameters, kwave_medium, planimg.inv_transf, planimg.t1_header, 'absorption_fraction')
-        catch ME
-            prev = warning('off', 'backtrace');
-            warn('medium_setup:niftiWrite', ...
-                'Could not write medium property NIfTIs: %s', ME.message);
-            warning(prev);
-        end
-    end
-
     if parameters.simulation.debug == 1
         % [debug] save raw simulation-grid medium matrices as NIfTIs
         try
