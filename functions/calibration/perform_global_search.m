@@ -169,7 +169,9 @@ end
         weights);
 
     % Save the figure
-    fig_path = fullfile(parameters.io.outputs_folder, sprintf('GlobalSearch.png'));
+    img_folder = fullfile(parameters.io.outputs_folder, 'img_calibration');
+    if ~exist(img_folder, 'dir'); mkdir(img_folder); end
+    fig_path = fullfile(img_folder, sprintf('GlobalSearch.png'));
     saveas(gcf, fig_path);
     close(gcf);
 

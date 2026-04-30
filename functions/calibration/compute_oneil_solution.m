@@ -76,7 +76,9 @@ end
     xlim([0 inf]);
 
     % Save the figure
-    fig_path = fullfile(parameters.io.outputs_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
+    img_folder = fullfile(parameters.io.outputs_folder, 'img_calibration');
+    if ~exist(img_folder, 'dir'); mkdir(img_folder); end
+    fig_path = fullfile(img_folder, sprintf('Initial_Simulation_F_%.2f_I_%.2f_%s.png', ...
         parameters.calibration.desired_focal_distance_ep, parameters.calibration.desired_intensity, parameters.calibration.equipment_name));
     saveas(gcf, fig_path);
     close(gcf);
