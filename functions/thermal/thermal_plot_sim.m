@@ -46,9 +46,9 @@ end
     sid = parameters.subject_id;
     med = parameters.simulation.medium;
     aff = parameters.io.output_affix;
-    output_plot      = fullfile(td, sprintf('sub-%03d_%s%s_thermal.png',     sid, med, aff));
-    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s%s_thermalrise.png', sid, med, aff));
-    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s%s_CEM.png',         sid, med, aff));
+    output_plot      = fullfile(td, sprintf('sub-%03d_%s_thermal%s.png',     sid, med, aff));
+    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s_thermalrise%s.png', sid, med, aff));
+    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s_CEM%s.png',         sid, med, aff));
 
     %% Convert GPU arrays to CPU if necessary
     if gpuDeviceCount == 0
@@ -226,7 +226,7 @@ end
     %% [focal axis] ISO CEM43 values over time
 
     if nargin >= 8 && ~isempty(CEM43_iso)
-        output_plot_CEM_iso = fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso.png', sid, med, aff));
+        output_plot_CEM_iso = fullfile(td, sprintf('sub-%03d_%s_CEM_iso%s.png', sid, med, aff));
         focal_CEM_iso = squeeze(CEM43_iso(trans_pos(1),:,:));
         g = figure; hold on;
         data2plot = NaN(numel(HEAT.recordedtime), 1);
@@ -265,15 +265,16 @@ end
 
     %% Plot timeseries for maximum in medium
 
-    output_plot      = fullfile(td, sprintf('sub-%03d_%s%s_thermal_max.png',     sid, med, aff));
-    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s%s_thermalrise_max.png', sid, med, aff));
-    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s%s_CEM_max.png',         sid, med, aff));
+    output_plot      = fullfile(td, sprintf('sub-%03d_%s_thermal_max%s.png',     sid, med, aff));
+    output_plot_rise = fullfile(td, sprintf('sub-%03d_%s_thermalrise_max%s.png', sid, med, aff));
+    output_plot_CEM  = fullfile(td, sprintf('sub-%03d_%s_CEM_max%s.png',         sid, med, aff));
 
     % [layer-max] temperature over time
 
     HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
     HEAT.recordedtime = HEAT.recordedtime(2:end);
     available_layers = fieldnames(timeseries.T);
+    available_layer_labels = strrep(available_layers, '_', ' ');
 
     h = figure; hold on;
     for i_layer = 1:numel(available_layers)
@@ -294,7 +295,7 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layers);
+    legend(available_layer_labels);
     legend('boxoff');
     title('Temperature (overall tissue max.)');
     saveas(h, [output_plot], 'png');
@@ -321,7 +322,7 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layers);
+    legend(available_layer_labels);
     legend('boxoff');
     title('Temperature change (overall tissue max.)');
     saveas(h, [output_plot_rise], 'png');
@@ -348,7 +349,7 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layers);
+    legend(available_layer_labels);
     legend('boxoff');
     title('Thermal Index CEM43 kWave (overall tissue max.)');
     saveas(h, [output_plot_CEM], 'png');
@@ -356,7 +357,7 @@ end
 
     % [layer-max] ISO CEM43 over time
     if isfield(timeseries, 'CEM43_iso') && ~isempty(fieldnames(timeseries.CEM43_iso))
-        output_plot_CEM_iso_max = fullfile(td, sprintf('sub-%03d_%s%s_CEM_iso_max.png', sid, med, aff));
+        output_plot_CEM_iso_max = fullfile(td, sprintf('sub-%03d_%s_CEM_iso_max%s.png', sid, med, aff));
         h = figure; hold on;
         for i_layer = 1:numel(available_layers)
             if isfield(timeseries.CEM43_iso, available_layers{i_layer})
@@ -374,7 +375,7 @@ end
             a.FaceAlpha = 0.1;
         end
         xlim([1, HEAT.recordedtime(end)]); hold off
-        legend(available_layers); legend('boxoff');
+        legend(available_layer_labels); legend('boxoff');
         title('Thermal Index CEM43 ISO (overall tissue max.)');
         saveas(h, output_plot_CEM_iso_max, 'png');
         close(h);

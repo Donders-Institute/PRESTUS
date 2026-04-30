@@ -67,7 +67,7 @@ try
     heating = cell(1, 3);
     for v = 1:3
         mat_path = fullfile(output_dir, 'cache', ...
-            sprintf('sub-%03d_%s%s_heating_res.mat', subject_id, medium, variant_affixes{v}));
+            sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, medium, variant_affixes{v}));
         if isfile(mat_path)
             try
                 s = load(mat_path, 'results_heating');
@@ -371,7 +371,7 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
         aff = variant_affixes{v};
         lbl = variant_labels{v};
         img_path = fullfile(parameters.io.dir_img, ...
-            sprintf('sub-%03d_%s%s_intensity_y.png', subject_id, medium, aff));
+            sprintf('sub-%03d_%s_intensity_y%s.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];
@@ -405,7 +405,7 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
         aff = variant_affixes{v};
         lbl = variant_labels{v};
         img_path = fullfile(parameters.io.dir_img, ...
-            sprintf('sub-%03d_%s%s_thermal_max.png', subject_id, medium, aff));
+            sprintf('sub-%03d_%s_thermal_max%s.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];

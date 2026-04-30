@@ -165,7 +165,7 @@ switch platform
 
         % ── Stage 1: Acoustic ────────────────────────────────────────────
         acoustic_sentinel = fullfile(output_dir, 'cache', ...
-            sprintf('sub-%03d_%s%s_results.mat', subject_id, medium, base_affix));
+            sprintf('sub-%03d_%s_results%s.mat', subject_id, medium, base_affix));
         p_acoustic.hpc.timelimit = options.acoustic_timelimit;
         p_acoustic.hpc.job_name  = sprintf('PRESTUS-mi1-acoustic_%s', subj);
         p_acoustic               = apply_memorylimit(p_acoustic, options.acoustic_memorylimit);
@@ -213,7 +213,7 @@ switch platform
         % ── Stage N+1: Summary ───────────────────────────────────────────
         if options.generate_summary_report
             summary_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s%s_desc-multiIsppa_report.html', subject_id, medium, base_affix));
+                sprintf('sub-%03d_%s_desc-multiIsppa_report%s.html', subject_id, medium, base_affix));
             fprintf('[Stage %d] Submitting summary report  ', numel(targets) + 2);
             if isfile(summary_file)
                 fprintf('— report exists, skipping.\n');

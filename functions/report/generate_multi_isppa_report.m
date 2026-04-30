@@ -109,7 +109,7 @@ try
     html_parts{end+1} = '</html>';
 
     %% Write file
-    report_filename = sprintf('sub-%03d_%s%s_desc-multiIsppa_report.html', subject_id, medium, base_affix);
+    report_filename = sprintf('sub-%03d_%s_desc-multiIsppa_report%s.html', subject_id, medium, base_affix);
     report_path = fullfile(output_dir, report_filename);
     fid = fopen(report_path, 'w', 'n', 'UTF-8');
     if fid == -1
@@ -247,7 +247,7 @@ function html = build_acoustic_section(tables, targets, affixes, parameters, sub
     for ti = 1:numel(targets)
         lbl = sprintf('%.0f W/cm²', targets(ti));
         img_path = fullfile(parameters.io.dir_img, ...
-            sprintf('sub-%03d_%s%s_intensity_y.png', subject_id, medium, affixes{ti}));
+            sprintf('sub-%03d_%s_intensity_y%s.png', subject_id, medium, affixes{ti}));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];
@@ -276,7 +276,7 @@ function html = build_thermal_section(tables, targets, affixes, parameters, subj
     for ti = 1:numel(targets)
         lbl = sprintf('%.0f W/cm²', targets(ti));
         img_path = fullfile(parameters.io.dir_img, ...
-            sprintf('sub-%03d_%s%s_thermal_max.png', subject_id, medium, affixes{ti}));
+            sprintf('sub-%03d_%s_thermal_max%s.png', subject_id, medium, affixes{ti}));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
         if ~isempty(img_html)
             html = [html img_html];
