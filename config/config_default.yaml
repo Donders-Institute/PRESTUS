@@ -24,7 +24,7 @@ simulation:
                         #   C++ GPU code 'cpp_gpu'
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
-  debug: 1            # Activate debug mode with additional intermediate outputs?
+  debug: 0            # Activate debug mode with additional intermediate outputs?
 
 #------------ Paths
 
@@ -66,6 +66,8 @@ io:
   save_acoustic_matrices: 0 # Acoustic sensor_data + kgrid + kwave_medium + source (can be very large)
   save_thermal_matrices: 1  # heating_res.mat — temperature timeseries and field maps
   save_heatingvideo: 0      # Save a video of incremental heating?
+  save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
+  save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
 
 #------------ ISPPA targeting (free-water pressure scaling)
 #
@@ -127,7 +129,6 @@ snellius:
 #------------ Target analysis
 analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
-  output_mni: 1         # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
 
 #------------ Transducer specification  (no defaults)
 
@@ -343,6 +344,7 @@ thermal:
     skull_cortical: 37
   sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
+  log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
 
 #------------  Medium properties
 # References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);

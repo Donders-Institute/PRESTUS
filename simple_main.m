@@ -3,12 +3,12 @@
 % This script is used to perform and to debug the simulation.             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Set medium, submit medium, subject number and configuration file 
+% Set medium, submit medium, subject number and configuration file
 clear; close all;
 
 % add paths
 addpath(genpath('functions'))
-addpath(genpath('config')) 
+addpath(genpath('config'))
 addpath(genpath('external'))
 
 parameters = load_parameters('config_tutorial.yaml'); % load the configuration file
