@@ -88,7 +88,12 @@ for t_i = 1:numel(parameters.transducer)
         continue;
     end
 
-    fprintf('Transducer %d (%s):\n', t_i, tr_type);
+    tr_name = getfield_or_default(tr, 'name', '');
+    if ischar(tr_name) && ~isempty(tr_name)
+        fprintf('Transducer %d — %s (%s):\n', t_i, tr_name, tr_type);
+    else
+        fprintf('Transducer %d (%s):\n', t_i, tr_type);
+    end
 
     switch tr_type
         case 'annular'

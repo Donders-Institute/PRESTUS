@@ -85,7 +85,7 @@ function payload = build_payload(event, parameters, options)
     % --- transducer (model/type only, no geometry) ---
     payload.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
     payload.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
-    payload.transducer_name       = safe_get(parameters, {'transducer_name'}, '');
+    payload.transducer_name       = safe_get(parameters, {'transducer', 'name'}, '');
     payload.n_transducer_elements = safe_get(parameters, {'transducer', 'elem_n'}, NaN);
 
     % --- modules enabled ---

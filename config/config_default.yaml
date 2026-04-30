@@ -133,6 +133,7 @@ analysis:
 #------------ Transducer specification  (no defaults)
 
 transducer:
+  name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
 

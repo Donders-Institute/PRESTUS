@@ -386,6 +386,7 @@ function html = build_methods_boilerplate(parameters, is_layered)
     freq_hz  = safe_field(td, 'freq_hz', NaN);
     freq_khz = fmt(freq_hz / 1e3, '%.0f', '?');
     td_type  = safe_field(td, 'type', '');
+    td_name  = safe_field(td, 'name', '');
     n_elem   = NaN;  curv_mm = NaN;  ap_mm = NaN;
     if ~isempty(td_type) && isfield(td, td_type)
         n_elem  = safe_field(td.(td_type), 'elem_n',           NaN);
@@ -445,13 +446,19 @@ function html = build_methods_boilerplate(parameters, is_layered)
     if ~isnan(focal_mm);geom_parts{end+1} = sprintf('nominal focal distance: %.0f mm', focal_mm); end
     geom_str = iff(~isempty(geom_parts), [' (' strjoin(geom_parts, '; ') ')'], '');
 
+    if ischar(td_name) && ~isempty(td_name)
+        td_name_str = sprintf(' (%s)', html_utils.escape(td_name));
+    else
+        td_name_str = '';
+    end
     para1 = sprintf([...
-        '%s The transducer was a %s-element %s array operating at a centre '   ...
+        '%s The transducer%s was a %s-element %s array operating at a centre ' ...
         'frequency of %s kHz%s. '                                              ...
         'The transducer was modelled within the k-Wave Toolbox '               ...
         '(Treeby &amp; Cox, 2010) using the kWaveArray discrete source '       ...
         'approach (Bell et al., 2022).'],                                       ...
         b('Transducer and drive system.'),                                      ...
+        td_name_str,                                                            ...
         fmt(n_elem, '%d', '?'), html_utils.escape(td_type),                    ...
         freq_khz, geom_str);
 
@@ -784,6 +791,10 @@ function html = build_config_summary(parameters)
     % Transducer (first transducer)
     if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
         td = parameters.transducer(1);
+        td_name_cfg = safe_field(td, 'name', '');
+        if ischar(td_name_cfg) && ~isempty(td_name_cfg)
+            html = config_row(html, 'Transducer name', td_name_cfg);
+        end
         html = config_row(html, 'Frequency', sprintf('%.0f Hz', safe_field(td, 'freq_hz', NaN)));
         if isfield(td, 'type') && isfield(td, td.type)
             html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'elem_n', NaN)));
