@@ -24,7 +24,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
 
     % Create log directory in segmentaion folder (if it does not exist)
 
-    log_dir = fullfile(parameters.path.seg, 'hpc_log');
+    log_dir = fullfile(parameters.path.seg, 'log_hpc');
     if ~isfolder(log_dir)
         mkdir(log_dir)
     end

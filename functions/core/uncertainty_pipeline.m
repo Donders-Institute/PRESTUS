@@ -334,7 +334,7 @@ switch platform
             fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));
             fprintf('To cancel         : scancel %s\n', num2str(submitted_ids));
         end
-        fprintf('HPC logs          : %s/%s/hpc_log/\n', parameters.path.sim, subj);
+        fprintf('HPC logs          : %s/%s/log_hpc/\n', parameters.path.sim, subj);
 
     % ---------------------------------------------------------------------
     otherwise

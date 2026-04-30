@@ -2,7 +2,7 @@ function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
     hpc_setup_temp_files(parameters)
 % HPC_SETUP_TEMP_FILES  Create output/log directories and timestamped temp files
 %
-% Creates the simulation output directory and a hpc_log/ subdirectory,
+% Creates the simulation output directory and a log_hpc/ subdirectory,
 % then generates uniquely named temporary files for passing parameters to the
 % HPC worker (a .mat data file) and as the submitted MATLAB script (a .m file).
 % File names are timestamped and randomised to avoid collisions between
@@ -17,7 +17,7 @@ function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
 %                used by get_output_dir
 %
 % Output:
-%   log_dir        - path to <output_dir>/hpc_log/
+%   log_dir        - path to <output_dir>/log_hpc/
 %   prestus_path   - absolute path to the PRESTUS root (from get_prestus_path)
 %   temp_data_path - full path to the temporary .mat file (written by caller)
 %   temp_m_path    - full path to the temporary .m script (written by caller)
@@ -31,7 +31,7 @@ output_dir = get_output_dir(parameters);
 if ~isfolder(output_dir), mkdir(output_dir); end
 
 % Setup HPC log directory
-log_dir = fullfile(output_dir, 'hpc_log');
+log_dir = fullfile(output_dir, 'log_hpc');
 if ~isfolder(log_dir), mkdir(log_dir); end
 
 prestus_path = get_prestus_path;
