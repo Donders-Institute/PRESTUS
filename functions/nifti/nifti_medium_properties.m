@@ -2,7 +2,7 @@ function nifti_medium_properties(parameters, planimg, kwave_medium, m2m_folder)
 % NIFTI_MEDIUM_PROPERTIES  Write medium acoustic/thermal property maps to NIfTI
 %
 % Writes per-property NIfTIs back-transformed to T1 space into
-% dir_output/ap/. Filenames inherit the run's output_affix. MNI
+% dir_output/nii/properties/. Filenames inherit the run's output_affix. MNI
 % conversions follow parameters.io.save_MNI and are written to the same
 % folder with 'MNI' encoded in the filename.
 %
@@ -20,25 +20,43 @@ function nifti_medium_properties(parameters, planimg, kwave_medium, m2m_folder)
 %
 % See also: NIFTI_MEDIUM, NIFTI_TO_T1W, NIFTI_TO_MNI, SHOULD_SAVE_OUTPUT
 
-properties = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
-              'thermal_conductivity', 'specific_heat', 'perfusion_coeff', 'absorption_fraction'};
+% Water baseline fill values for out-of-FOV voxels (values outside the
+% simulation grid should reflect the water medium, not zero).
+w = parameters.medium_properties.water;
+water_fill = struct( ...
+    'sound_speed',         w.sound_speed, ...
+    'density',             w.density, ...
+    'alpha_coeff',         w.alpha_coeff, ...
+    'alpha_power',         w.alpha_power, ...
+    'thermal_conductivity', w.thermal_conductivity, ...
+    'specific_heat',       w.specific_heat_capacity, ...
+    'perfusion_coeff',     (w.perfusion / 60) * w.density * 1e-6, ...
+    'absorption_fraction', w.absorption_fraction);
+
+properties = fieldnames(water_fill);
 
 try
-    out_dir = fullfile(char(parameters.io.dir_output), 'ap');
+    out_dir = fullfile(char(parameters.io.dir_output), 'nii', 'properties');
     if ~isfolder(out_dir); mkdir(out_dir); end
 
     affix = parameters.io.output_affix;
 
-    for prop = properties
-        prop = char(prop); %#ok<FXSET>
+    for i = 1:numel(properties)
+        prop = properties{i};
         if ~isfield(kwave_medium, prop)
             continue
         end
         t1w_file = fullfile(out_dir, sprintf('%s_T1w%s', prop, affix));
         mni_file = fullfile(out_dir, sprintf('%s_MNI%s.nii.gz', prop, affix));
 
-        nifti_to_t1w(single(kwave_medium.(prop)), t1w_file, parameters, planimg, ...
-            'Resampler', 'nearest');
+        prop_data = single(kwave_medium.(prop));
+        if isscalar(prop_data)
+            prop_data = repmat(prop_data, size(kwave_medium.sound_speed));
+        end
+
+        nifti_to_t1w(prop_data, t1w_file, parameters, planimg, ...
+            'Resampler', 'nearest', ...
+            'FillValue', water_fill.(prop));
         nifti_to_mni(strcat(t1w_file, '.nii.gz'), mni_file, parameters, true, m2m_folder);
     end
 catch ME

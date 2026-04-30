@@ -27,6 +27,7 @@ arguments
     opts.Datatype     (1,:) char    = 'single'
     opts.BitsPerPixel               = []
     opts.Resampler    (1,:) char    = 'cubic'
+    opts.FillValue    (1,1) double  = 0
 end
 
 orig_file_gz = strcat(orig_file, '.nii.gz');
@@ -43,7 +44,7 @@ if opts.IsLayered
     end
     data_backtransf = tformarray(data, planimg.inv_transf, ...
         makeresampler(opts.Resampler, 'fill'), [1 2 3], [1 2 3], ...
-        size(planimg.t1_image_orig), [], 0);
+        size(planimg.t1_image_orig), [], opts.FillValue);
     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
 else
     niftiwrite(data, orig_file, 'Compressed', true);
