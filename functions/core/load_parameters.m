@@ -166,7 +166,7 @@ function parameters = load_parameters(varargin)
                                             parameters.startup.simnibs_bin_path), ...
                                     'Yes', 'No')), 'Exiting');
     elseif (~isfield(parameters.startup, 'simnibs_bin_path') || strcmp(parameters.startup.simnibs_bin_path, "")) && contains(parameters.simulation.medium, {'layered'})
-        warn('No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
+        warn('prestus:noSimNIBS', 'No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
 
     %% Default segmentation path fallback

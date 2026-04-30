@@ -80,8 +80,14 @@ function run_all_tests(level)
     end
 
     % ---- Run ----------------------------------------------------------
+    % Suppress warnings that are expected/irrelevant during testing
+    prev_warn = warning('off', 'prestus:toolboxDefault');
+    warning('off', 'prestus:noSimNIBS');
+
     runner  = matlab.unittest.TestRunner.withNoPlugins();
     results = runner.run(suites);
+
+    warning(prev_warn);
 
     % ---- Per-test output ----------------------------------------------
     descriptions = build_descriptions();
@@ -115,7 +121,7 @@ function run_all_tests(level)
 
         fprintf('  [%s]  %s\n', status, label);
 
-        if r.Failed && ~isempty(r.Details.DiagnosticRecord)
+        if r.Failed && isfield(r.Details, 'DiagnosticRecord') && ~isempty(r.Details.DiagnosticRecord)
             for d = r.Details.DiagnosticRecord
                 if ~isempty(d.Exception)
                     fprintf('         -> %s\n', d.Exception.message);
