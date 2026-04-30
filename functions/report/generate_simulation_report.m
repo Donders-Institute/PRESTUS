@@ -37,7 +37,7 @@ try
 
     %% Load CSV data if available
     csv_table = [];
-    if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_table)
+    if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
         try
             csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
         catch
@@ -1276,7 +1276,7 @@ function html = build_toc(parameters, is_layered)
     % Safety status dot: determine worst-case color
     worst = 'green';
     try
-        if isfield(parameters.io, 'filename_output_table') && isfile(parameters.io.filename_table)
+        if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
             csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
             if is_layered
                 limits = get_risk_limits(is_layered);
