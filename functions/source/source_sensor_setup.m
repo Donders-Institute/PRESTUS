@@ -187,7 +187,7 @@ end
     % values in every point of the grid
     sensor = struct();
     sensor.mask = ones(parameters.grid.dims);
-    sensor.record = {'p_max_all','p_final','p'};
+    sensor.record = {'p_max_all','p_final'};
 
     % Record the last 3 cycles in steady state (when sonic waves have traversed the entire medium)
     num_periods = 3;

@@ -107,6 +107,13 @@ end
         error('Source setup not requested. Not able to proceed with acoustic simulation.')
     end
 
+    % Record the steady-state time series only when the complex pressure field
+    % is explicitly requested — storing p for an all-grid sensor is large.
+    save_p_complex = isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex;
+    if save_p_complex && ~ismember('p', sensor.record)
+        sensor.record{end+1} = 'p';
+    end
+
     % perform the acoustic simulation
     sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
 
@@ -116,7 +123,7 @@ end
     % coherent multi-transducer superposition in post-hoc analyses.
     if isfield(sensor_data, 'p')
         freq_hz = parameters.transducer(1).freq_hz;
-        [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, freq_hz, ndims(sensor_data.p));
+        [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, freq_hz, 'Dim', ndims(sensor_data.p));
         sensor_data.p_complex = amp .* exp(1i .* phase);
         sensor_data = rmfield(sensor_data, 'p');
     end
