@@ -1221,12 +1221,12 @@ end
 function log_path = find_log_file(parameters, subject_id, medium, affix)
 % Find the most recent diary log file.
     log_path = '';
-    if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'output_dir') || ~isfolder(parameters.io.dir_output)
+    if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'dir_output') || ~isfolder(parameters.io.dir_output)
         return
     end
 
     pattern = sprintf('sub-%03d_%s%s_*.txt', subject_id, medium, affix);
-    if isfield(parameters.io, 'logs_dir')
+    if isfield(parameters.io, 'dir_logs')
         logs_dir = parameters.io.dir_logs;
     else
         logs_dir = fullfile(parameters.io.dir_output, 'log');
