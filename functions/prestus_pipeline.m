@@ -214,6 +214,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','medium');
 
+    % -- NIfTI: medium --
+    log_timer('start', 'nifti_medium', parameters.io.dir_output);
+    simulation_nifti('medium', parameters, planimg, medium_masks, kwave_medium);
+    log_timer('stop', 'nifti_medium');
+
     % ====================================================================
     %% SETUP SOURCE
     % ====================================================================
@@ -344,6 +349,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop', 'acoustic_analysis');
 
+    if parameters.state.acoustics_available
+        % -- NIfTI: acoustic --
+        log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
+        simulation_nifti('acoustic', parameters, planimg, ...
+            results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        log_timer('stop', 'nifti_acoustic');
+    end
+
     clear source_labels
 
     % =========================================================================
@@ -440,28 +453,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','thermal_analysis');
 
-    clear time_status_seq segmentation bone
-
-    % ================================================================
-    %% CREATE NIFTI IMAGES
-    % ================================================================
-    
-    fprintf('========================================\n');
-    fprintf('NIFTI IMAGES \n');
-    fprintf('========================================\n\n');
-    log_timer('start','nifti', parameters.io.dir_output);
-
-    if ~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation==1
-        simulation_nifti(parameters, planimg, results_acoustic, ...
-                                acoustic_Ipa, acoustic_MI, acoustic_pressure, ...
-                                medium_masks, results_heating, kwave_medium, highlighted_pos)
-    else
-        disp('No nifti creation requested...')
+    if parameters.state.heating_available
+        % -- NIfTI: thermal --
+        log_timer('start', 'nifti_thermal', parameters.io.dir_output);
+        simulation_nifti('thermal', parameters, planimg, results_heating, kwave_medium);
+        log_timer('stop', 'nifti_thermal');
     end
 
-    log_timer('stop','nifti');
-
-    clear acoustic_* results_heating medium_masks kwave_medium planimg
+    clear time_status_seq segmentation bone acoustic_* results_heating medium_masks kwave_medium planimg
 
     % ====================================================================
     %% END OF THIS SIMULATION
