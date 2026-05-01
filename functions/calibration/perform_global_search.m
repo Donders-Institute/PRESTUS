@@ -1,4 +1,4 @@
-function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, profile_target, velocity)
+function [opt_phases, opt_velocity, min_err, opt_params_raw] = perform_global_search(parameters, profile_target, velocity)
 % PERFORM_GLOBAL_SEARCH  Global optimisation of transducer phases and particle velocity
 %
 % Runs a global search (surrogate or genetic algorithm) to minimise the
@@ -7,6 +7,7 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
 %
 % Use as:
 %   [opt_phases, opt_velocity, min_err] = perform_global_search(parameters, profile_target, velocity)
+%   [opt_phases, opt_velocity, min_err, opt_params_raw] = perform_global_search(...)
 %
 % Input:
 %   parameters     - PRESTUS config with transducer.annular geometry and
@@ -16,9 +17,13 @@ function [opt_phases, opt_velocity, min_err] = perform_global_search(parameters,
 %   velocity       - initial particle velocity estimate [m/s]
 %
 % Output:
-%   opt_phases   - optimised phases per element [rad]
-%   opt_velocity - optimised particle velocity [m/s]
-%   min_err      - minimum error achieved during optimisation
+%   opt_phases      - optimised phases per element [rad]
+%   opt_velocity    - optimised particle velocity [m/s]
+%   min_err         - minimum error achieved during optimisation
+%   opt_params_raw  - raw optimisation parameter vector before phase expansion:
+%                     'linear':   [phase_start_rad, phase_step_rad_per_elem, velocity_m_s]
+%                     'monotonic':[phase_start_rad, delta_1..delta_{N-1}_rad, velocity_m_s]
+%                     otherwise:  [phase_1..phase_N_rad, velocity_m_s]
 %
 % See also: FIT_VELOCITY_TO_INTENSITY, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE,
 %           CALIBRATION_TRANSDUCER
@@ -142,8 +147,9 @@ end
     end
 
     % Extract optimized phases and velocity from the result.
-    opt_phases   = phases_from_params(opt_phases_and_velocity);
-    opt_velocity = opt_phases_and_velocity(end);
+    opt_phases      = phases_from_params(opt_phases_and_velocity);
+    opt_velocity    = opt_phases_and_velocity(end);
+    opt_params_raw  = opt_phases_and_velocity;
 
     switch precession_mode
         case 'linear'

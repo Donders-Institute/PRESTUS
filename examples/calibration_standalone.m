@@ -148,73 +148,71 @@ for i = 1:N_i
 
         % figure; plot(dist_from_exit_plane, profile_focus_ep); hold on; xline(focal_distance_ep)
 
-        % Iterate across intensities
-        N_k = length(parameters.calibration.desired_intensities{i});
-        for k = 1:N_k
-            desired_intensity = parameters.calibration.desired_intensities{i}{k};
-            desired_focal_distance_ep = focal_distance_ep;
-            
-            % assign a loop-specific simulation id
-            sim_id = (i-1)*N_j*N_k + (j-1)*N_k + (k-1) + 1;
+        % Collect all desired intensities for this combo as a vector
+        desired_intensities = cell2mat(parameters.calibration.desired_intensities{i});
+        desired_focal_distance_ep = focal_distance_ep;
 
-            % By default, values are reported from the exit plane of the transducer
-            % For simulations, we need to implement the distance from the bowl
+        % assign a loop-specific simulation id (one per focal depth)
+        sim_id = (i-1)*N_j + (j-1) + 1;
 
-            % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
-            if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
-                dist_bowl_exit_plane = parameters.transducer.annular.curv_radius_mm - ...
-                    parameters.transducer.annular.dist_geom_ep_mm;
-            else
-                dist_bowl_exit_plane = 0;
-            end
-            dist_bowl_focus = dist_from_exit_plane + dist_bowl_exit_plane;
+        % By default, values are reported from the exit plane of the transducer
+        % For simulations, we need to implement the distance from the bowl
 
-            % Set the expected focal distance to exit plane 
-            % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
-            parameters.transducer.focal_distance_ep = focal_distance_ep;
-            parameters.transducer.focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
-
-            % if the original profiles are measured from the exit plane,
-            % we do not model the space until the exit plane; this can lead
-            % to suboptimal solutions; assume that the amplitude is zero in
-            % that space (i.e., no strong near-field interference)
-
-            % add distance values prior to the exit plane
-            if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
-                Nvals = round(dist_bowl_focus(1)/(dist_bowl_focus(2)-dist_bowl_focus(1)));
-                dist_bowl_focus = cat(1, linspace(0, dist_bowl_focus(1), Nvals)',dist_bowl_focus);
-                % set those to zero in amplitude profile
-                profile_focus = cat(1, repmat(0, Nvals,1), profile_focus_ep');
-            else
-                profile_focus = profile_focus_ep;
-            end
-
-            % regularize lower values to 0 [possible after interpolation]
-            profile_focus(profile_focus<0) = 0;
-
-            % collect data on empirical profile
-            profile_empirical.axial_intensity = profile_focus;
-            profile_empirical.axial_distance_bowl = dist_bowl_focus;
-
-            % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus); 
-            % hold on; xline(parameters.focal_distance_bowl)
-
-            % Show current iteration
-            disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
-                ' F ', num2str(desired_focal_distance_ep), ' I ', num2str(desired_intensity)])
-
-            % Set to always overwrite existing calibration files
-            parameters.io.overwrite_files = 'always';
-
-            % perform the calibration
-            calibration_transducer(...
-                profile_empirical, ...
-                equipment_name, ...
-                desired_intensity, ...
-                desired_focal_distance_ep,...
-                parameters,...
-                sim_id)
-
+        % If the profile is taken from the bowl: add the distance from the exit plane (if requested)
+        if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
+            dist_bowl_exit_plane = parameters.transducer.annular.curv_radius_mm - ...
+                parameters.transducer.annular.dist_geom_ep_mm;
+        else
+            dist_bowl_exit_plane = 0;
         end
+        dist_bowl_focus = dist_from_exit_plane + dist_bowl_exit_plane;
+
+        % Set the expected focal distance to exit plane
+        % Account for the potential distance between bowl (actual focal distance) and exit plane (axial profile definition)
+        parameters.transducer.focal_distance_ep = focal_distance_ep;
+        parameters.transducer.focal_distance_bowl = focal_distance_ep + dist_bowl_exit_plane;
+
+        % if the original profiles are measured from the exit plane,
+        % we do not model the space until the exit plane; this can lead
+        % to suboptimal solutions; assume that the amplitude is zero in
+        % that space (i.e., no strong near-field interference)
+
+        % add distance values prior to the exit plane
+        if isfield(parameters.calibration, 'add_FDO') && parameters.calibration.add_FDO == 1
+            Nvals = round(dist_bowl_focus(1)/(dist_bowl_focus(2)-dist_bowl_focus(1)));
+            dist_bowl_focus = cat(1, linspace(0, dist_bowl_focus(1), Nvals)',dist_bowl_focus);
+            % set those to zero in amplitude profile
+            profile_focus = cat(1, repmat(0, Nvals,1), profile_focus_ep');
+        else
+            profile_focus = profile_focus_ep;
+        end
+
+        % regularize lower values to 0 [possible after interpolation]
+        profile_focus(profile_focus<0) = 0;
+
+        % collect data on empirical profile
+        profile_empirical.axial_intensity = profile_focus;
+        profile_empirical.axial_distance_bowl = dist_bowl_focus;
+
+        % figure; plot(profile_empirical.axial_distance_bowl, profile_empirical.profile_focus);
+        % hold on; xline(parameters.focal_distance_bowl)
+
+        % Show current iteration
+        disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
+            ' F ', num2str(desired_focal_distance_ep), ' I ', mat2str(desired_intensities)])
+
+        % Set to always overwrite existing calibration files
+        parameters.io.overwrite_files = 'always';
+
+        % perform the calibration for all intensities in one call
+        % calibration_pipeline_start dispatches to HPC or runs locally
+        % depending on parameters.platform ('matlab'/'slurm'/'qsub'/'auto')
+        calibration_pipeline_start(...
+            profile_empirical, ...
+            equipment_name, ...
+            desired_intensities, ...
+            desired_focal_distance_ep,...
+            parameters,...
+            sim_id)
     end
 end
