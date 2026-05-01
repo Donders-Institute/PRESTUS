@@ -61,6 +61,12 @@ end
     yaml.dumpFile(yaml_path, data);
     fprintf('Parametric model saved: %s\n', yaml_path);
 
+    %% Update transducer library YAML (if combo is specified)
+    if isfield(parameters.calibration, 'library_combo') && ...
+            ~isempty(parameters.calibration.library_combo)
+        update_transducer_library(parameters, opt_params_raw, precession_mode);
+    end
+
     %% Also write per-element CSV entry for compatibility with set_real_phases
     save_optimized_values(parameters);
 
