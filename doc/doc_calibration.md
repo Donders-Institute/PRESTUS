@@ -144,7 +144,7 @@ The `FEXminimize` backend uses fixed internal settings: `popsize = 5000`, `FinDi
 ![calibration_fitting](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_fitting.png)
 Example profile fit with uniform `opt_weights`.
 
-##### Step 5b — Amplitude correction to match desired peak intensity exactly (optional)
+##### Step 5b — Amplitude correction to match desired peak intensity exactly
 
 After the global search optimises profile **shape**, the peak intensity of the analytical profile may not exactly equal `desired_intensity` because the search jointly optimises phases and velocity without a hard intensity constraint.
 
@@ -158,19 +158,11 @@ The `simulated_analytical_scaling` factor is included because `opt_source_amp` i
 
 A warning is issued if `corrected_velocity` exceeds `opt_upper_velocity`.
 
-This step is **enabled by default**. To disable:
-```yaml
-calibration:
-  fit_velocity_to_intensity: false
-```
-
-When disabled, the velocity from the global search is used as-is, and the peak intensity of the optimized simulation may deviate from `desired_intensity`.
-
 ##### Step 6 — Recalculate the analytical O'Neil solution with optimized parameters
 
 `recompute_oneil_solution` calls `focusedAnnulusONeil` with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to produce the final analytical profile. This profile is plotted against the target and the original O'Neil solution for visual inspection.
 
-##### Step 7 — Calculate the optimized source amplitude
+##### Step 7 — Calculate the optimized source amplitude [Desired intensity loop]
 
 The amplitude that yields the corrected velocity in the k-Wave simulation is:
 
@@ -178,9 +170,14 @@ $$\mathrm{elem\_amp\_optimized} = \mathrm{round}\!\left( \frac{v_\mathrm{correct
 
 where `v_original` and `elem_amp_original` come from the initial simulation (Steps 2–3), and `simulated_analytical_scaling` is from Step 4.
 
-##### Step 8 — Rerun water simulation with optimized phases and amplitude
+##### Step 8 — Rerun water simulation with optimized phases and amplitude (Optional)
 
 The pipeline reruns `prestus_pipeline_start` with `elem_amp = elem_amp_optimized`, `elem_phase_rad = opt_phases`, and `output_affix = '_optimized'`.
+
+Whether a free-water simulation is run to verify the calibration results is governed by parameter `opt_amp_validation`.
+By default, this is set to always, but it can also be set to 'never', 'initial' (only for the first target intensity), or 'final'.
+
+If the validation simulation is not run, profiles from the initial simulation will be rescaled analytically.
 
 ##### Step 9 — Extract simulated optimized intensity along the focal axis
 

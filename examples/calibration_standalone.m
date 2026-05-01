@@ -40,8 +40,8 @@ else
     cd(config_folder) % move to local folder containing configs
 end
 
-% Load equipment parameters from the YAML configuration file
-equip_param = yaml.loadFile('config_equipment.yaml', 'ConvertToArray', true);
+% Load equipment parameters from individual YAML files under config/equipment/
+equip_param = load_equipment_config();
 % Equipment information (by default Donders-specific)
 parameters = yaml.loadFile('config_default.yaml', 'ConvertToArray', true);
 % User-defined calibration parameters
@@ -64,15 +64,14 @@ for i = 1:N_i
     combo = equip_param.combos.(combo_name);
     
     % Extract equipment details
-    ds_serial = combo.ds_serial; % - Driving System serial number or identifier
-    ds = equip_param.ds.(ds_serial);
     tran_serial = combo.tran_serial; % - Transducer serial number or identifier
     tran = equip_param.trans.(tran_serial);
+    ds = combo.ds;                   % - Driving System metadata (inlined in combo)
 
     % Configure transducer parameters
-    parameters.transducer = tran.prestus.transducer;
-    parameters.transducer.annular.elem_phase_deg = zeros(1, tran.prestus.transducer.annular.elem_n); % initial phases
-    parameters.transducer.annular.elem_amp = repmat(200000, 1, tran.prestus.transducer.annular.elem_n); % initial amplitude
+    parameters.transducer = tran.transducer;
+    parameters.transducer.annular.elem_phase_deg = zeros(1, tran.transducer.annular.elem_n); % initial phases
+    parameters.transducer.annular.elem_amp = repmat(200000, 1, tran.transducer.annular.elem_n); % initial amplitude
 
     % Construct output directory for final profiles
     if ~isfield(parameters.calibration, 'path_output_profiles') || isempty(parameters.calibration)

@@ -147,21 +147,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         amp_calibration = 'scale';
     end
 
-    if strcmp(amp_calibration, 'scale')
-        precession_mode = '';
-        if isfield(parameters.calibration, 'opt_phase_precession')
-            precession_mode = parameters.calibration.opt_phase_precession;
-        end
-        if ~ischar(precession_mode)
-            precession_mode = '';
-        end
-        if ~ismember(precession_mode, {'linear', 'monotonic'})
-            error(['calibration_transducer: amp_calibration=''scale'' requires ' ...
-                'calibration.opt_phase_precession to be ''linear'' or ''monotonic''.']);
-        end
-    end
-
-    %% Per-intensity loop: velocity fit, (one) validation rerun, save
+    %% Intensity calibration loop
 
     opt_source_amp = zeros(1, N_intensities);
 
@@ -181,14 +167,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             parameters, profile_empirical, desired_intensity_k);
 
         % Fit velocity to match desired peak intensity exactly
-        if ~isfield(parameters.calibration, 'fit_velocity_to_intensity') || ...
-                parameters.calibration.fit_velocity_to_intensity
-            [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
-                initial_params, profile_oneil, opt_phases, opt_velocity_ref, ...
-                desired_intensity_k, simulated_analytical_scaling);
-        else
-            opt_velocity_k = opt_velocity_ref;
-        end
+        [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
+            initial_params, profile_oneil, opt_phases, opt_velocity_ref, ...
+            desired_intensity_k, simulated_analytical_scaling);
 
         % Calculate optimised source amplitude for this intensity
         opt_source_amp_k = round(opt_velocity_k / profile_sim.velocity * ...
@@ -225,73 +206,75 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         opt_param.io.output_affix                   = intensity_affix;
         opt_param.calibration.desired_intensity     = desired_intensity_k;
 
-        if strcmp(amp_calibration, 'scale')
-            %% Parametric mode: no validation rerun
-            % Save the compact precession model and amplitude; skip simulation.
-            save_parametric_model(opt_param, opt_params_raw, ...
-                parameters.calibration.opt_phase_precession);
+        % Choose whether to run a free-water simulation to validate
+        % intensity or rescale profile analytically
+        if isfield(opt_param.calibration, 'opt_amp_validation')
+            opt_amp_validation = opt_param.calibration.opt_amp_validation;
+        else
+            opt_amp_validation = 'always';
+        end
+
+        if strcmp(opt_amp_validation, 'always') || ...
+                (strcmp(opt_amp_validation, 'initial') && k == 1) || ...
+                (strcmp(opt_amp_validation, 'final') && k == N_intensities)
+
+            % Run free-water validation simulation
+
+            opt_param.subject_id       = sim_id;
+            opt_param.hpc.wait_for_job = true;
+            prestus_pipeline_start(opt_param);
+
+            opt_res = load(fullfile(opt_param.io.outputs_folder, 'cache', ...
+                sprintf('sub-%03d_water_results%s.mat', sim_id, opt_param.io.output_affix)));
+
+            opt_params_ref              = opt_res.acoustic_info.parameters;
+            opt_params_ref.calibration.prefix = 'Opt_';
+            profile_sim_opt_ref         = extract_simulated_profile(opt_res, opt_params_ref);
+
+            profile_sim_opt_k = profile_sim_opt_ref;
 
         else
-            %% Full mode: run validation simulation (first intensity only)
+            % Derive scaled profile analytically (no simulation-based validation)
+            % Intensity scales as (I_k / I_ref); all profile fields that carry
+            % intensity units are scaled accordingly.  Fields with pressure units
+            % scale as sqrt(I_k / I_ref).
 
-            if k == 1
-                opt_param.subject_id       = sim_id;
-                opt_param.hpc.wait_for_job = true;
-                prestus_pipeline_start(opt_param);
+            scale_I  = desired_intensity_k / intensity_ref;
+            scale_p  = sqrt(scale_I);
 
-                opt_res = load(fullfile(opt_param.io.outputs_folder, 'cache', ...
-                    sprintf('sub-%03d_water_results%s.mat', sim_id, opt_param.io.output_affix)));
+            profile_sim_opt_k = profile_sim_opt_ref;
 
-                opt_params_ref              = opt_res.acoustic_info.parameters;
-                opt_params_ref.calibration.prefix = 'Opt_';
-                profile_sim_opt_ref         = extract_simulated_profile(opt_res, opt_params_ref);
-
-                profile_sim_opt_k = profile_sim_opt_ref;
-
-            else
-                %% Derive scaled profile analytically — no simulation needed
-                % Intensity scales as (I_k / I_ref); all profile fields that carry
-                % intensity units are scaled accordingly.  Fields with pressure units
-                % scale as sqrt(I_k / I_ref).
-
-                scale_I  = desired_intensity_k / intensity_ref;
-                scale_p  = sqrt(scale_I);
-
-                profile_sim_opt_k = profile_sim_opt_ref;
-
-                % Intensity fields
-                intensity_fields = {'Isppa', 'Ispta', 'Ita'};
-                for f = intensity_fields
-                    fn = f{1};
-                    if isfield(profile_sim_opt_k, fn)
-                        profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_I;
-                    end
-                end
-
-                % Pressure fields
-                pressure_fields = {'p_max', 'p_min', 'p_rms'};
-                for f = pressure_fields
-                    fn = f{1};
-                    if isfield(profile_sim_opt_k, fn)
-                        profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_p;
-                    end
+            % Intensity fields
+            intensity_fields = {'Isppa', 'Ispta', 'Ita'};
+            for f = intensity_fields
+                fn = f{1};
+                if isfield(profile_sim_opt_k, fn)
+                    profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_I;
                 end
             end
 
-            % Plot optimized simulation results
-            plot_opt_sim_results(...
-                opt_param, ...
-                profile_target_k, ...
-                profile_oneil, ...
-                profile_oneil_opt_k, ...
-                profile_sim, ...
-                profile_sim_opt_k, ...
-                min_err)
+            % Pressure fields
+            pressure_fields = {'p_max', 'p_min', 'p_rms'};
+            for f = pressure_fields
+                fn = f{1};
+                if isfield(profile_sim_opt_k, fn)
+                    profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_p;
+                end
+            end
+        end
 
-            % Save optimized values (full CSV + YAML)
-            save_optimized_values(opt_param);
+        % Plot optimized simulation results
+        plot_opt_sim_results(...
+            opt_param, ...
+            profile_target_k, ...
+            profile_oneil, ...
+            profile_oneil_opt_k, ...
+            profile_sim, ...
+            profile_sim_opt_k, ...
+            min_err)
 
-        end % amp_calibration branch
+        % Save optimized values (full CSV + YAML)
+        save_optimized_values(opt_param);
 
     end % intensity loop
 

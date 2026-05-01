@@ -42,7 +42,7 @@
   opt_seed: 251024                  # Random seed for optimization
   opt_upper_velocity: 0.2           # Upper velocity in global search
   opt_phase_precession: false       # false (default) | 'linear' (strict ramp: phase_start + i*step, 2 params) | 'monotonic' (ordered via cumulative increments, N params but monotonically constrained)
-  fit_velocity_to_intensity: true   # Correct velocity after global search to match desired peak intensity
-  
+  opt_amp_validation: 'always'      # 'always' (default) | 'never' | 'initial' (only for the first target intensity) | 'final' (only for the final target intensity)
+
   # Other
   skip_front_peak_mm: 10            # Distance to ignore from the start of axial profile (mm) to avoid near-field peak artifacts in reporting
