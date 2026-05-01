@@ -82,7 +82,10 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Calibration requires the acoustic sensor_data .mat between runs.
     sim_param.io.save_matrices = 1;
     sim_param.io.save_acoustic_matrices = 1;
-    sim_param.io.save_MNI = 0;
+    % Never run nifti creation for calibration 
+    sim_param.modules.run_nifti_creation = 0;
+    % Never run thermal simulation for calibration 
+    sim_param.modules.run_heating_sims = 0;
     % Overwrite transducer kwavearray modeling (if specified)
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
@@ -262,7 +265,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Set parameters.io.save_acoustic_matrices = 1 to keep the cache for
     % debugging (e.g. to inspect intermediate simulation results).
     if ~isfield(parameters.io, 'save_acoustic_matrices') || ...
-            parameters.io.save_acoustic_matrices == 0
+            parameters.io.save_acoustic_matrices == 0 || ...
+            ~isfield(parameters.io, 'save_matrices') || ...
+            parameters.io.save_matrices == 0
         cache_folder = fullfile(sim_param.io.outputs_folder, 'cache');
         if isfolder(cache_folder)
             rmdir(cache_folder, 's');
