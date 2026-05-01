@@ -64,6 +64,7 @@ nav:
     - Advanced Workflows: doc_advanced.md
     - Backend: doc_backend.md
     - HPC: doc_hpc.md
+    - Multi-ISPPA: doc_multi_ISPPA.md
     - Group: doc_group.md
     - Testing: doc_testing.md
     - Telemetry: doc_telemetry.md

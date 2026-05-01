@@ -92,29 +92,4 @@ an unhandled exception). The table below lists every field that may be sent.
 | `status` | `"success"` or `"error"` |
 | `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`) — **no message text** is transmitted |
 
-## What is never collected
-
-- Subject IDs, file paths, or directory names
-- Coordinates, focus targets, or geometry parameters
-- Acoustic pressure values or simulation outputs
-- Tissue property values (only whether they differ from defaults)
-- Error message text or stack traces
-- IP addresses or hostnames
-- Any free-text field from the configuration
-
-## Where data goes
-
-Events are sent via HTTPS POST to a Supabase Edge Function operated by the
-Donders Institute and stored in a private PostgreSQL database. Transmission
-uses a fire-and-forget pattern with a 4-second timeout; a failed request is
-silently discarded and never retries.
-
-## Public aggregate statistics
-
-A read-only view of aggregate statistics is published at:
-
-> https://lruelxwhkjibezkgipme.supabase.co/functions/v1/public-stats
-
-This endpoint returns a JSON summary of platform distributions, MATLAB version
-adoption, module usage rates, and run counts over time. It is updated
-continuously from the same database that receives your events.
+Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected. 
