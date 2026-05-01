@@ -1,7 +1,7 @@
 function hash = prestus_version(prestus_path)
 % PRESTUS_VERSION  Print PRESTUS version info and optionally return the git hash.
 %
-% Resolves the PRESTUS root (via GET_PRESTUSPATH if not supplied), then uses
+% Resolves the PRESTUS root (via get_prestus_path if not supplied), then uses
 % git to retrieve the short commit hash, branch name, and commit date.
 %
 % Use as:

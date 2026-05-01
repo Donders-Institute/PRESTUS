@@ -1,0 +1,36 @@
+type: transducer
+serial: IS_PCD15287_01002
+name: Imasonic 10 ch. IS_PCD15287_01002
+manufact: Imasonic
+n_elem: 10
+min_foc: 6.1
+max_foc: 93.2
+transducer:
+  annular:
+    elem_n: 30
+    elem_id_mm: [10.0, 13.7667, 17.5333, 22.3, 24.5667, 26.8333, 30.0, 31.7667, 33.5333,
+      36.3, 37.7667, 39.2333, 41.7, 43.0, 44.3, 46.5, 47.6667, 48.8333, 51.0, 52.0333,
+      53.0667, 55.1, 56.0667, 57.0333, 58.9, 59.8, 60.7, 62.5, 63.3333, 64.1667]
+    elem_od_mm: [13.7667, 17.5333, 21.3, 24.5667, 26.8333, 29.1, 31.7667, 33.5333, 35.3,
+      37.7667, 39.2333, 40.7, 43.0, 44.3, 45.6, 47.6667, 48.8333, 50.0, 52.0333, 53.0667,
+      54.1, 56.0667, 57.0333, 58.0, 59.8, 60.7, 61.6, 63.3333, 64.1667, 65.0]
+    curv_radius_mm: 75.0
+    dist_geom_ep_mm: 65.3
+  freq_hz: 300000.0
+combos:
+  IGT_128_ch_comb_10_ch:
+    ds:
+      serial: IGT_128_ch_comb_10_ch
+      name: IGT 128 ch. - 10 ch.
+      manufact: IGT
+      available_ch: 128
+    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_128_ch_comb_10_ch.csv
+    phase_table: transducer_15287_10_300kHz.ini
+  IGT_32_ch_comb_10_ch:
+    ds:
+      serial: IGT_32_ch_comb_10_ch
+      name: IGT 32 ch. - 10 ch.
+      manufact: IGT
+      available_ch: 32
+    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_32_ch_comb_10_ch.csv
+    phase_table: transducer_15287_10_300kHz.ini

@@ -152,6 +152,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         if isfield(parameters.calibration, 'opt_phase_precession')
             precession_mode = parameters.calibration.opt_phase_precession;
         end
+        if ~ischar(precession_mode)
+            precession_mode = '';
+        end
         if ~ismember(precession_mode, {'linear', 'monotonic'})
             error(['calibration_transducer: amp_calibration=''scale'' requires ' ...
                 'calibration.opt_phase_precession to be ''linear'' or ''monotonic''.']);

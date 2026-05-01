@@ -1,4 +1,4 @@
-function prestus_path = get_PRESTUSpath()
+function prestus_path = get_prestus_path()
 % GET_PRESTUSPATH  Return the absolute path to the PRESTUS toolbox root
 %
 % Resolves the PRESTUS root directory at runtime from mfilename('fullpath'),
@@ -7,7 +7,7 @@ function prestus_path = get_PRESTUSpath()
 % resolved path (e.g. if the toolbox folder has been renamed).
 %
 % Use as:
-%   prestus_path = get_PRESTUSpath()
+%   prestus_path = get_prestus_path()
 %
 % Output:
 %   prestus_path - char; absolute path to the PRESTUS root directory

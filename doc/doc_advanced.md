@@ -86,29 +86,7 @@ io:
   save_p_complex: true
 ```
 
-This writes a separate file `sub-XXX_<medium>_p_complex<affix>.mat` containing a single variable `p_complex` — a complex-valued array of the same spatial dimensions as `p_max_all`, where magnitude encodes peak pressure amplitude and phase encodes the spatial phase of the wavefield at the fundamental frequency. The main results file is not affected.
-
-**When is this useful?**
-
-For the two scenarios above, `p_complex` does not need to be combined manually:
-- *Simultaneous coherent firing* runs both transducers in one k-Wave simulation, so their interference is computed internally. The resulting `p_complex` already reflects the combined field.
-- *Independent / incoherent firing* requires summing intensities, not complex fields. `p_complex` per transducer gives `|p|²` for that purpose, but the combination step uses magnitudes only.
-
-The main use case for `p_complex` is a **post-hoc coherent phase sweep**: run each transducer as a separate single-transducer simulation, then combine their complex fields in post-processing with a variable inter-transducer phase offset, without re-running k-Wave. Because the acoustic medium is linear, this combination is exact:
-
-```matlab
-d1 = load('sub-001_layered_p_complex_T1.mat');
-d2 = load('sub-001_layered_p_complex_T2.mat');
-
-% sweep inter-transducer phase offset to find optimal configuration
-for delta_phi = linspace(0, 2*pi, 36)
-    p_combined = d1.p_complex + exp(1i * delta_phi) * d2.p_complex;
-    Isppa = abs(p_combined).^2 ./ (2 .* rho .* c);
-    % evaluate focal peak, off-target heating, etc.
-end
-```
-
-This assumes both transducers fire at the same frequency and that their individual fields were simulated in the same medium (same segmentation and grid).
+This writes a separate file `sub-XXX_<medium>_p_complex<affix>.mat` containing a single variable `p_complex` — a complex-valued array of the same spatial dimensions as `p_max_all`, where magnitude encodes peak pressure amplitude and phase encodes the spatial phase of the wavefield at the fundamental frequency. This may allow more complex results integration.
 
 ##### Known Limitations
 

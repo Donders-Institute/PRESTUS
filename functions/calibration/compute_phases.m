@@ -27,18 +27,18 @@ arguments
 end
 
     % Calculate wavelength based on sound speed and source frequency
-    wavelen = SOUND_SPEED_WATER / tran.prestus.transducer.freq_hz; % [m]
+    wavelen = SOUND_SPEED_WATER / tran.transducer.freq_hz; % [m]
     
     % Initialize phases array for all transducer elements
     phases = zeros(1, tran.n_elem);
     
     % Convert focal distance relative to the exit plane to relative to the mid-bowl
-    dist_to_mid_bowl = tran.prestus.transducer.annular.curv_radius_mm - ...
-        tran.prestus.transducer.annular.dist_geom_ep_mm;
+    dist_to_mid_bowl = tran.transducer.annular.curv_radius_mm - ...
+        tran.transducer.annular.dist_geom_ep_mm;
     focus_wrt_mid_bowl = desired_focal_distance_ep + dist_to_mid_bowl;
 
     % Compute the target point in relation to the natural focus [mm]
-    aim_wrt_natural_focus = tran.prestus.transducer.annular.curv_radius_mm - focus_wrt_mid_bowl;
+    aim_wrt_natural_focus = tran.transducer.annular.curv_radius_mm - focus_wrt_mid_bowl;
     point_mm = [0, 0, aim_wrt_natural_focus]; % Target point coordinates [x, y, z] in mm
 
     % Target point in meters

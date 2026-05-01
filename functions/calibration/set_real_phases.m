@@ -10,7 +10,7 @@ function elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, 
 %
 % Input:
 %   phase_table       - phase data table or ini struct (format depends on tran.manufact)
-%   tran              - transducer struct with manufact, n_elem, prestus.transducer fields
+%   tran              - transducer struct with manufact, n_elem, transducer fields
 %   focal_distance_ep - desired focal depth relative to exit plane [mm]
 %   parameters        - PRESTUS config; uses medium_properties.water.sound_speed [m/s]
 %
@@ -42,13 +42,13 @@ end
     end
 
     % Adjust phases for virtual elements if necessary
-    if tran.n_elem ~= tran.prestus.transducer.annular.elem_n
+    if tran.n_elem ~= tran.transducer.annular.elem_n
         % Map real elements to virtual elements
         original_pos = linspace(1, tran.n_elem, tran.n_elem);
 
         % Convert phases to radians, unwrap, and interpolate
         unwrapped_phases = unwrap(init_phases * pi / 180) * 180 / pi;
-        virtual_pos = linspace(1, tran.n_elem, tran.prestus.transducer.annular.elem_n);
+        virtual_pos = linspace(1, tran.n_elem, tran.transducer.annular.elem_n);
         virtual_phases = interp1(original_pos, unwrapped_phases, virtual_pos, 'linear');
 
         % Convert back to degrees and apply modulo operation

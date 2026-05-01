@@ -2,7 +2,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % LOAD_TRANSDUCER_FROM_LIBRARY  Load calibrated transducer parameters from library
 %
 % Reads the calibration library YAML for the given equipment combination and
-% the geometry from equip_param (config_equipment.yaml). Reconstructs per-
+% the geometry from equip_param (load_equipment_config). Reconstructs per-
 % element phases from the fitted parametric model and looks up (or scales)
 % the amplitude for the desired intensity.
 %
@@ -22,7 +22,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %                        'IS_PCD15473_01001_IGT_32_ch_comb_10_ch'
 %   focal_distance_ep  - desired focal distance from exit plane [mm]
 %   desired_intensity  - target ISPPA [W/cm²]
-%   equip_param        - struct from yaml.loadFile('config_equipment.yaml')
+%   equip_param        - struct from load_equipment_config()
 %   library_path       - (optional) path to transducer library folder;
 %                        defaults to config/transducer/ under PRESTUS root
 %
@@ -35,7 +35,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % See also: UPDATE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER
 
     if nargin < 5 || isempty(library_path)
-        library_path = fullfile(get_PRESTUSpath(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
     end
 
     %% Load calibration library entry
@@ -51,7 +51,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
         error('load_transducer_from_library: transducer ''%s'' not found in equip_param.', tran_serial);
     end
     tran = equip_param.trans.(tran_serial);
-    parameters.transducer = tran.prestus.transducer;
+    parameters.transducer = tran.transducer;
 
     %% Find closest calibrated focal depth
     cal = lib.calibration.focal_depths;
@@ -74,7 +74,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     end
 
     entry  = cal.(used_key);
-    n_elem = tran.prestus.transducer.annular.elem_n;
+    n_elem = tran.transducer.annular.elem_n;
 
     %% Reconstruct per-element phases from parametric model
     phase_start_rad = entry.phase_start_deg / 180 * pi;
@@ -118,8 +118,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     %% Focal distance bookkeeping
     parameters.transducer.focal_distance_ep   = focal_distance_ep;
     parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
-        (tran.prestus.transducer.annular.curv_radius_mm - ...
-         tran.prestus.transducer.annular.dist_geom_ep_mm);
+        (tran.transducer.annular.curv_radius_mm - ...
+         tran.transducer.annular.dist_geom_ep_mm);
     parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
 
     %% Provenance

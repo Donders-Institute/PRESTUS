@@ -23,7 +23,7 @@ function update_transducer_library(parameters, opt_params_raw, precession_mode, 
 % See also: SAVE_PARAMETRIC_MODEL, LOAD_TRANSDUCER_FROM_LIBRARY
 
     if nargin < 4 || isempty(library_path)
-        library_path = fullfile(get_PRESTUSpath(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
     end
 
     combo_name = parameters.calibration.library_combo;
