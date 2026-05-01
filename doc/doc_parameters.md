@@ -60,6 +60,12 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `ask`. Does NOT apply to SimNIBS segmentations. |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
+| `save_source_matrices` | |
+| `save_acoustic_matrices` | |
+| `save_thermal_matrices` | |
+| `save_source_matrices` | |
+| `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | 0 |
+| `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
 | `adopted_heatmap` | Path to an existing intensity heatmap NIfTI to reuse instead of re-running acoustics. | — | Optional. Used for sequential multi-target runs. |
 | `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. | — | Optional. Used for sequential multi-target runs. |

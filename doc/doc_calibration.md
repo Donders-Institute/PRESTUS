@@ -144,40 +144,43 @@ The `FEXminimize` backend uses fixed internal settings: `popsize = 5000`, `FinDi
 ![calibration_fitting](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_fitting.png)
 Example profile fit with uniform `opt_weights`.
 
-##### Step 5b — Amplitude correction to match desired peak intensity exactly
+#### Desired intensity loop
+
+
+##### Step 5b — Amplitude correction to match target ISPPA
 
 After the global search optimises profile **shape**, the peak intensity of the analytical profile may not exactly equal `desired_intensity` because the search jointly optimises phases and velocity without a hard intensity constraint.
 
-`fit_velocity_to_intensity` corrects this analytically. Since intensity scales with velocity squared ($I \propto v^2$), the corrected velocity is:
+If only amplitude needs to be calibrated, this also does not require phase recalibration.
 
-$$v_\mathrm{corrected} = v_\mathrm{opt} \cdot \sqrt{\frac{I_\mathrm{desired} \cdot \mathrm{simulated\_analytical\_scaling}}{I_\mathrm{peak}}}$$
+`fit_velocity_to_intensity` scales the velocity to match the target intensity. Since intensity scales with velocity squared ($I \propto v^2$), the scaled target velocity is:
 
-The `simulated_analytical_scaling` factor is included because `opt_source_amp` in Step 7 divides by it, so the analytical target must overshoot by that factor to yield the correct intensity in the final simulation.
+$$v_\mathrm{target} = v_\mathrm{opt} \cdot \sqrt{\frac{I_\mathrm{target}}{I_\mathrm{peak}}}$$
 
 `skip_front_peak_mm` is applied when finding $I_\mathrm{peak}$.
 
 A warning is issued if `corrected_velocity` exceeds `opt_upper_velocity`.
 
-##### Step 6 — Recalculate the analytical O'Neil solution with optimized parameters
+##### Step 6 — Recalculate analytical O'Neil solution with optimized parameters
 
-`recompute_oneil_solution` calls `focusedAnnulusONeil` with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to produce the final analytical profile. This profile is plotted against the target and the original O'Neil solution for visual inspection.
+`recompute_oneil_solution` calls `focusedAnnulusONeil` with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to calculate an optimized analytical profile. This profile is plotted against the target and the original O'Neil solution for visual inspection.
 
-##### Step 7 — Calculate the optimized source amplitude [Desired intensity loop]
+##### Step 7 — Calculate the optimized source amplitude
 
-The amplitude that yields the corrected velocity in the k-Wave simulation is:
+The amplitude that yields the corrected velocity for use in the k-Wave simulation is:
 
-$$\mathrm{elem\_amp\_optimized} = \mathrm{round}\!\left( \frac{v_\mathrm{corrected}}{v_\mathrm{original}} \cdot \frac{\mathrm{elem\_amp\_original}}{\mathrm{simulated\_analytical\_scaling}} \right)$$
+$$
+\mathrm{amp}_\text{optimized} = \mathrm{round}\!\left( \frac{v_\text{corrected}}{v_\text{original}} \cdot \sqrt{\frac{I_\text{O'Neil}}{I_\text{sim}}} \cdot \mathrm{amp}_\text{original} \right)
+$$
 
-where `v_original` and `elem_amp_original` come from the initial simulation (Steps 2–3), and `simulated_analytical_scaling` is from Step 4.
+where `v_original` and `amp_original` come from the initial simulation (Steps 2–3), `v_corrected` is the velocity that yields an analytic match. To correct for minor mismatches between analytical and simulated intensities, the velocity scaling is corercted via the square root of analytical/simulated intensity ratio (i.e., the sqrt of 1/`simulated_analytical_scaling` from Step 4).
 
-##### Step 8 — Rerun water simulation with optimized phases and amplitude (Optional)
+##### Step 8 — Rerun water simulation with optimized settings (Optional)
 
 The pipeline reruns `prestus_pipeline_start` with `elem_amp = elem_amp_optimized`, `elem_phase_rad = opt_phases`, and `output_affix = '_optimized'`.
 
 Whether a free-water simulation is run to verify the calibration results is governed by parameter `opt_amp_validation`.
-By default, this is set to always, but it can also be set to 'never', 'initial' (only for the first target intensity), or 'final'.
-
-If the validation simulation is not run, profiles from the initial simulation will be rescaled analytically.
+By default, this is set to always, but it can also be set to 'never', 'initial' (only for the first target intensity), or 'final' (only for the final target intensity).
 
 ##### Step 9 — Extract simulated optimized intensity along the focal axis
 

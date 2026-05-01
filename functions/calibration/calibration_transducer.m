@@ -82,6 +82,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % Calibration requires the acoustic sensor_data .mat between runs.
     sim_param.io.save_matrices = 1;
     sim_param.io.save_acoustic_matrices = 1;
+    sim_param.io.save_MNI = 0;
     % Overwrite transducer kwavearray modeling (if specified)
     if isfield(parameters.calibration, 'force_kwavearray') && ...
             parameters.calibration.force_kwavearray == 1
@@ -115,6 +116,8 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     [profile_sim] = extract_simulated_profile(initial_res, initial_params);
 
+    clear initial_res;
+
     %% Optimization (run once — phases are intensity-independent)
 
     % Compute analytical O'Neil solution and scaling factor to simulated intensity
@@ -125,7 +128,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         profile_target_ref);
 
     % Optimize phases [rad] and source amplitude to match real profile shape
-    [opt_phases, opt_velocity_ref, min_err, opt_params_raw] = ...
+    [opt_phases, opt_velocity_ref, min_err, ~] = ...
         perform_global_search(...
         initial_params, ...
         profile_target_ref, ...
@@ -135,46 +138,27 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     opt_source_phase_rad = opt_phases;
     opt_source_phase_deg = opt_phases / pi * 180;
 
-    %% Determine amplitude calibration strategy
-    % 'scale'   (default) — skip validation reruns; save compact precession
-    %                       model. Requires opt_phase_precession = 'linear'
-    %                       or 'monotonic'.
-    % 'compute'           — run validation simulation per intensity (original
-    %                       high-fidelity path).
-    if isfield(parameters.calibration, 'amp_calibration')
-        amp_calibration = parameters.calibration.amp_calibration;
-    else
-        amp_calibration = 'scale';
-    end
-
     %% Intensity calibration loop
 
     opt_source_amp = zeros(1, N_intensities);
 
-    % profile_sim_opt_ref: cached from the first validation rerun.
-    % For k > 1, the simulated field scales linearly with source amplitude
-    % (k-Wave operates in the linear regime), so I ∝ v² means
-    %   profile_sim_opt_k.Isppa = profile_sim_opt_ref.Isppa * (I_k / I_ref)
-    % No additional k-Wave runs are needed.
-    profile_sim_opt_ref = [];
-    intensity_ref       = desired_intensities(1);
-
     for k = 1:N_intensities
         desired_intensity_k = desired_intensities(k);
 
-        % Scale empirical profile to this intensity
+        % Scale empirical profile to target intensity
         [profile_target_k, ~] = scale_real_intensity_profile(...
             parameters, profile_empirical, desired_intensity_k);
 
-        % Fit velocity to match desired peak intensity exactly
+        % Scale velocity to match ISPPA
         [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
             initial_params, profile_oneil, opt_phases, opt_velocity_ref, ...
-            desired_intensity_k, simulated_analytical_scaling);
+            desired_intensity_k);
 
-        % Calculate optimised source amplitude for this intensity
-        opt_source_amp_k = round(opt_velocity_k / profile_sim.velocity * ...
-            initial_params.transducer.annular.elem_amp / ...
-            simulated_analytical_scaling);
+        % Scale optimised source amplitude to match ISPPA
+        velocity_scaling = opt_velocity_k / profile_sim.velocity;
+        opt_source_amp_k = round(velocity_scaling * ...
+            (initial_params.transducer.annular.elem_amp / ...
+            sqrt(simulated_analytical_scaling)));
         opt_source_amp(k) = opt_source_amp_k(1);
 
         fprintf('The optimized elem_amp = %i (intensity %g W/cm²)\n', ...
@@ -229,27 +213,20 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
             opt_params_ref              = opt_res.acoustic_info.parameters;
             opt_params_ref.calibration.prefix = 'Opt_';
-            profile_sim_opt_ref         = extract_simulated_profile(opt_res, opt_params_ref);
+            profile_sim_opt_k           = extract_simulated_profile(opt_res, opt_params_ref);
 
-            profile_sim_opt_k = profile_sim_opt_ref;
+            clear opt_res;
 
         else
-            % Derive scaled profile analytically (no simulation-based validation)
-            % Intensity scales as (I_k / I_ref); all profile fields that carry
-            % intensity units are scaled accordingly.  Fields with pressure units
-            % scale as sqrt(I_k / I_ref).
 
-            scale_I  = desired_intensity_k / intensity_ref;
-            scale_p  = sqrt(scale_I);
-
-            profile_sim_opt_k = profile_sim_opt_ref;
+            % Create dummy simulation fields
 
             % Intensity fields
             intensity_fields = {'Isppa', 'Ispta', 'Ita'};
             for f = intensity_fields
                 fn = f{1};
                 if isfield(profile_sim_opt_k, fn)
-                    profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_I;
+                    profile_sim_opt_k.(fn) = NaN;
                 end
             end
 
@@ -258,7 +235,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             for f = pressure_fields
                 fn = f{1};
                 if isfield(profile_sim_opt_k, fn)
-                    profile_sim_opt_k.(fn) = profile_sim_opt_ref.(fn) * scale_p;
+                    profile_sim_opt_k.(fn) = NaN;
                 end
             end
         end

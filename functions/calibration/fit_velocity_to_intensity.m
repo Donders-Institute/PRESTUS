@@ -1,18 +1,20 @@
 function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_intensity(...
-    parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity, simulated_analytical_scaling)
+    parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity)
 % FIT_VELOCITY_TO_INTENSITY  Analytically correct particle velocity to match desired peak intensity
 %
 % After global search optimises profile shape (phases and velocity), the
-% peak intensity may not exactly equal desired_intensity. Since I ∝ v²,
-% velocity is corrected analytically: v_new = v_old * sqrt(I_desired / I_peak).
-% Because opt_source_amp divides by simulated_analytical_scaling, the
-% analytical target is desired_intensity * scaling so that the final
-% simulation Isppa equals desired_intensity.
+% peak intensity may not perectly match the desired_intensity. 
+% 
+% If only amplitude needs to be calibrated, this also does not require a
+% recalibration of phases.
+%
+% Since I ∝ v², velocity for a target amplitude can be computed analytically: 
+% v_new = v_old * sqrt(I_desired / I_peak).
 %
 % Use as:
 %   [corrected_velocity, I_peak_before, I_peak_after] = ...
 %       fit_velocity_to_intensity(parameters, profile_oneil, opt_phases, ...
-%                                 opt_velocity, desired_intensity, simulated_analytical_scaling)
+%                                 opt_velocity, desired_intensity)
 %
 % Input:
 %   parameters                   - PRESTUS config with transducer.annular geometry and
@@ -21,7 +23,6 @@ function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_int
 %   opt_phases                   - optimised phases per element [rad]
 %   opt_velocity                 - optimised particle velocity from global search [m/s]
 %   desired_intensity            - target peak intensity [W/cm²]
-%   simulated_analytical_scaling - ratio of simulated to analytical peak intensity
 %
 % Output:
 %   corrected_velocity - velocity adjusted to yield desired peak intensity [m/s]
@@ -36,7 +37,6 @@ arguments
     opt_phases                   (1,:) {mustBeNumeric}
     opt_velocity                 (1,1) {mustBeNumeric}
     desired_intensity            (1,1) {mustBeNumeric}
-    simulated_analytical_scaling (1,1) {mustBeNumeric}
 end
 
     axial_position = profile_oneil.axial_distance_bowl;
@@ -75,9 +75,8 @@ end
         return;
     end
 
-    % Analytical target accounts for scaling: simulation divides velocity by
-    % scaling, so analytical peak must overshoot by that factor.
-    analytical_target = desired_intensity * simulated_analytical_scaling;
+    % Analytical target
+    analytical_target = desired_intensity;
 
     % Correct velocity analytically: I ∝ v² => v_new = v_old * sqrt(I_target / I_peak)
     correction_factor = sqrt(analytical_target / I_peak_before);
@@ -93,8 +92,8 @@ end
 
     fprintf('Velocity correction: %.4f -> %.4f m/s (factor: %.4f)\n', ...
         opt_velocity, corrected_velocity, correction_factor);
-    fprintf('Analytical target: %.2f W/cm^2 (desired_intensity * scaling = %.2f * %.4f)\n', ...
-        analytical_target, desired_intensity, simulated_analytical_scaling);
+    fprintf('Analytical target: %.2f W/cm^2 (desired_intensity = %.2f)\n', ...
+        analytical_target, desired_intensity);
     fprintf('Expected Isppa in simulation: %.2f W/cm^2\n', desired_intensity);
 
 end
