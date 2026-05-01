@@ -1,63 +1,15 @@
-%% Main script to deploy transducer calibrations
-%
-% This script configures and executes calibration simulations 
-% using equipment configurations and user-defined input parameters. 
-% By performing focal adjustments, intensity scaling, and interpolating
-% acoustic profiles, it determines the real axial profile. This profile
-% is then used to optimize the virtual transducer's amplitude and phases
-% to replicate the behavior of the actual transducer measured in a water tank.
-%
-% Due to model constraints, additional virtual elements might be required 
-% to mimic the actual transducer behavior accurately. The script
-% calc_virtual_elem.m in functions/calibration can be used for this purpose.
-% 
-% This preprocessing step generates optimized amplitude and phase values, 
-% which serve as inputs for subsequent acoustic and/or heating simulations.
+function calibration_setup(parameters, equip_param)
 
-% Clear workspace and close all figures
-close all; clear;
-format long; % Ensures accurate display of intensity values
+% Set up calibration for multiple setup and depth requests.
 
-%% Initialization
-
-% Set up paths
-% Determine the current and main folder paths
-func_path = fullfile(fileparts(mfilename('fullpath')), '..', '..');
-main_folder = fileparts(func_path);
-cd(main_folder); % Change directory to the main folder
-
-% Add necessary paths for functions and external
-addpath(genpath('functions'));
-addpath(genpath('config'));
-addpath(genpath('external'));
-
-%% Load configuration settings
-
-config_folder = ""; % [optional] specify a application-specific config folder
-if strcmp(config_folder, "")
-    warning("Using configurations in PRESTUS config folder. It is recommended that you work with a local copy instead...");
-else
-    cd(config_folder) % move to local folder containing configs
-end
-
-% Load equipment parameters from individual YAML files under config/equipment/
-equip_param = load_equipment_config();
-% Equipment information (by default Donders-specific)
-parameters = yaml.loadFile('config_default.yaml', 'ConvertToArray', true);
-% User-defined calibration parameters
-parameters.calibration = yaml.loadFile('config_calibration.yaml');
-
-% Display available equipment combinations (Donders equipment)
-available_combos = fieldnames(equip_param.combos);
-disp('Available Equipment Combinations:');
-disp(available_combos);
+% TO DO: Make independent from Donders equipment info.
 
 % Create output folder (if not yet available)
 if ~exist(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
 end
 
-%% Iterate through equipment combinations
+% Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
 for i = 1:N_i
     combo_name = parameters.calibration.combinations{i};
@@ -199,9 +151,6 @@ for i = 1:N_i
         % Show current iteration
         disp(['Profiling: ', num2str(sim_id), ' - ', equipment_name{1}, ...
             ' F ', num2str(desired_focal_distance_ep), ' I ', mat2str(desired_intensities)])
-
-        % Set to always overwrite existing calibration files
-        parameters.io.overwrite_files = 'always';
 
         % perform the calibration for all intensities in one call
         % calibration_pipeline_start dispatches to HPC or runs locally
