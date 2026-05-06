@@ -31,6 +31,11 @@ addpath(genpath('functions'));
 addpath(genpath('config'));
 addpath(genpath('external'));
 
+%% Telemetry consent
+if ~exist('~/.prestus/telemetry.json', 'file')
+    telemetry_func();
+end
+
 %% Load configuration settings
 
 config_folder = ""; % [optional] specify a application-specific config folder
