@@ -12,7 +12,6 @@ function create_group_MNI_plots(subject_list, parameters, options)
 %
 % Supported features:
 %   - Wildcard support in filenames via parameters.io.output_affix
-%   - Optional per-subject subfolders via parameters.path.subject_subfolder
 %   - Heatmap plotting, FWHM mask logic, ROI overlays and statistics
 %
 % Input:
@@ -23,7 +22,6 @@ function create_group_MNI_plots(subject_list, parameters, options)
 %                    .layers.water          — label values for water tissue mask
 %                    .io.output_affix       — filename suffix/wildcard (e.g. '_ses-*')
 %                    .simulation.medium     — used in table filenames
-%                    .path.subject_subfolder — (optional) files in sub-NNN/ folders
 %                    .path.seg_path / .path.data_path — SimNIBS m2m segmentation paths
 %                    .thermal.temp_0        — baseline temp; scalar or struct with .skin/.water
 %   options      - name-value options:

@@ -35,7 +35,6 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `localite` | Path to Localite neuronavigation output folder. | — | Optional |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `'sub-%1$03d_T2w.nii*'` | Optional |
-| `subject_subfolder` | Store outputs in subject-specific subdirectories? | `1` | `1 = yes`, `0 = no` |
 
 ---
 
@@ -74,7 +73,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 | **Field** | **Description** |
 |---|---|
-| `dir_output` | Resolved per-subject output directory. Set from `path.sim` (+ subject subfolder if `path.subject_subfolder = 1`). |
+| `dir_output` | Resolved per-subject output directory. Set from `path.sim` (+ subject subfolder). |
 | `dir_nii` | NIfTI output subfolder (`nii/`). Created automatically. |
 | `dir_nii_T1w` | Alias for `dir_nii`; space encoded in filename. |
 | `dir_nii_MNI` | Alias for `dir_nii`; space encoded in filename. |
