@@ -57,7 +57,8 @@ try
         nifti_to_t1w(prop_data, t1w_file, parameters, planimg, ...
             'Resampler', 'nearest', ...
             'FillValue', water_fill.(prop));
-        nifti_to_mni(strcat(t1w_file, '.nii.gz'), mni_file, parameters, true, m2m_folder);
+        nifti_to_mni(strcat(t1w_file, '.nii.gz'), mni_file, parameters, true, m2m_folder, ...
+            'FillValue', water_fill.(prop));
     end
 catch ME
     prev = warning('off', 'backtrace');

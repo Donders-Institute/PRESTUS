@@ -58,6 +58,7 @@ if contains(parameters.simulation.medium, {'layered'})
     end
     
     parameters.grid.dims  = size(medium_masks);
+    planimg.origin_ras_mm = [];   % defined by T1 header for layered grids
 
 else
     % In case simulations are not run in a skull of layered tissue, 
@@ -102,10 +103,16 @@ else
         [parameters] = check_layers(parameters, segmentation);
     end
 
-    % specify that no transformation was applied
+    % no planning image transform for non-layered grids
     planimg.t1_image_orig = [];
-    planimg.t1_header = [];
-    planimg.transf = zeros(parameters.grid.dims);
-    planimg.inv_transf = zeros(parameters.grid.dims);
+    planimg.t1_header     = [];
+    planimg.transf        = [];
+    planimg.inv_transf    = [];
+    % optional RAS world-space anchor (set via parameters.grid.origin_ras_mm)
+    if isfield(parameters, 'grid') && isfield(parameters.grid, 'origin_ras_mm')
+        planimg.origin_ras_mm = parameters.grid.origin_ras_mm(:)';
+    else
+        planimg.origin_ras_mm = [];
+    end
 
 end
