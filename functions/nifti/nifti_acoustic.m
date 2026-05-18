@@ -27,7 +27,7 @@ arguments
     acoustic_Ipa
     acoustic_MI
     acoustic_pressure
-    highlighted_pos   (1,3)
+    highlighted_pos   (1,:) {mustBeNumeric}
 end
 
     if isfield(parameters.modules, 'run_nifti_creation') && ...

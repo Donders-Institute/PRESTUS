@@ -3,6 +3,11 @@ function nifti_pct(parameters, planimg, pseudoCT, m2m_folder)
 %
 % Back-transforms Hounsfield-unit skull map to T1 space and writes to
 % dir_nii_T1w. Optionally converts to MNI space (controlled by parameters.io.save_MNI).
+%
+% In-grid voxels are resampled with linear interpolation (HU values are
+% continuous; nearest-neighbour would snap to zero-padded boundary voxels).
+% Out-of-simulation-grid voxels are filled with NaN.
+%
 % Only called when parameters.pct.enabled == 1 (caller's responsibility).
 %
 % Use as:
@@ -22,6 +27,8 @@ pct_file_gz  = strcat(pct_file, '.nii.gz');
 pct_mni_file = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_MNI%s_pseudoCT.nii.gz', ...
     parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
-nifti_to_t1w(single(pseudoCT), pct_file, parameters, planimg, 'Resampler', 'nearest');
+nifti_to_t1w(single(pseudoCT), pct_file, parameters, planimg, ...
+    'Resampler', 'linear', 'FillValue', NaN);
+
 nifti_to_mni(pct_file_gz, pct_mni_file, parameters, true, m2m_folder);
 end

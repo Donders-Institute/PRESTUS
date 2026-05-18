@@ -68,9 +68,9 @@ if opts.IsLayered
         end
         data_backtransf = cast(data_backtransf, opts.Datatype);
     else
-        data_backtransf = tformarray(data, planimg.inv_transf, ...
+        data_backtransf = cast(tformarray(single(data), planimg.inv_transf, ...
             makeresampler(opts.Resampler, 'fill'), [1 2 3], [1 2 3], ...
-            size(planimg.t1_image_orig), [], opts.FillValue);
+            size(planimg.t1_image_orig), [], double(opts.FillValue)), opts.Datatype);
     end
 
     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);

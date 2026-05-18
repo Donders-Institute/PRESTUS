@@ -8,13 +8,25 @@ function nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder
 % MNI output is controlled by parameters.io.save_MNI (default: true via
 % should_save_output; global fallback: parameters.io.save_matrices).
 %
-% When FillValue is provided, voxels in the MNI output with value 0 (the
-% SimNIBS background default for out-of-FOV regions) are replaced with that
-% value after warping.
+% Two optional fill modes address out-of-T1w-FOV voxels (those SimNIBS
+% zero-fills because they fall outside the T1w image boundary):
+%
+%   'constant'  Replace out-of-FOV voxels with FillValue. When FovMask is
+%               provided it identifies background precisely; otherwise voxels
+%               equal to 0 are replaced. FillValue=NaN (default) means no
+%               fill when FovMask is absent; when FovMask is provided, NaN
+%               is written to background voxels.
+%               Safe when 0 cannot be a valid voxel value, or when FovMask
+%               is available (e.g. pCT, acoustic properties).
+%
+%   'nearest'   Replace out-of-FOV voxels (identified via FovMask) with the
+%               value of the nearest in-FOV voxel. Requires FovMask.
 %
 % Use as:
 %   nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder)
-%   nifti_to_mni(..., 'FillValue', water_value)
+%   nifti_to_mni(..., 'FillMethod', 'constant', 'FillValue', val)
+%   nifti_to_mni(..., 'FillMethod', 'constant', 'FillValue', NaN, 'FovMask', mask)
+%   nifti_to_mni(..., 'FillMethod', 'nearest',  'FovMask',  mask)
 %
 % Input:
 %   orig_file_gz - path to source NIfTI in T1 space (with '.nii.gz' extension)
@@ -24,18 +36,23 @@ function nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder
 %   m2m_folder   - path to SimNIBS m2m folder
 %
 % Options:
-%   FillValue    - scalar; replaces zero-valued voxels (SimNIBS background)
-%                  in the MNI output with this value (default: [], no fill)
+%   FillMethod   - 'constant' or 'nearest' (default: 'constant')
+%   FillValue    - scalar used when FillMethod='constant' (default: NaN)
+%   FovMask      - logical MNI-space array; 1=valid T1w source, 0=background
+%                  Required for FillMethod='nearest'; optional for 'constant'.
+%                  See MNI_FOV_MASK.
 %
-% See also: NIFTI_WRITE_VOLUME, CONVERT_FINAL_TO_MNI_SIMNIBS, SHOULD_SAVE_OUTPUT
+% See also: NIFTI_WRITE_VOLUME, CONVERT_FINAL_TO_MNI_SIMNIBS, MNI_FOV_MASK
 
 arguments
-    orig_file_gz  string
-    mni_file      string
-    parameters    struct
-    is_layered    logical
-    m2m_folder    string
-    options.FillValue (1,1) double = NaN  % NaN sentinel = "no fill"
+    orig_file_gz   string
+    mni_file       string
+    parameters     struct
+    is_layered     logical
+    m2m_folder     string
+    options.FillMethod  string        = 'constant'
+    options.FillValue   (1,1) double  = NaN    % NaN = no fill
+    options.FovMask                   = []
 end
 
 if ~is_layered || ~should_save_output(parameters.io, 'save_MNI') || ...
@@ -44,13 +61,42 @@ if ~is_layered || ~should_save_output(parameters.io, 'save_MNI') || ...
 end
 convert_final_to_MNI_simnibs(orig_file_gz, m2m_folder, mni_file, parameters, 'interpolation_order', 0);
 
-% Replace zero-fill voxels (SimNIBS background for out-of-T1-FOV regions)
-% with the requested water property value so the MNI map is consistent with
-% the T1w map, where nifti_to_t1w already applies the same fill.
-if ~isnan(options.FillValue) && isfile(mni_file)
-    hdr  = niftiinfo(mni_file);
-    vol  = niftiread(hdr);
-    vol(vol == 0) = cast(options.FillValue, class(vol));
-    niftiwrite(vol, mni_file, hdr, 'Compressed', true);
+if ~isfile(mni_file)
+    return
+end
+
+switch options.FillMethod
+    case 'constant'
+        if isnan(options.FillValue) && isempty(options.FovMask)
+            return
+        end
+        hdr = niftiinfo(mni_file);
+        vol = niftiread(hdr);
+        if ~isempty(options.FovMask)
+            bg = ~options.FovMask;
+        else
+            bg = (vol == 0);
+        end
+        if isnan(options.FillValue)
+            % NaN requires a float type; cast if necessary
+            if ~isfloat(vol); vol = single(vol); hdr.Datatype = 'single'; hdr.BitsPerPixel = 32; end
+            vol(bg) = single(NaN);
+        else
+            vol(bg) = cast(options.FillValue, class(vol));
+        end
+        niftiwrite(vol, strrep(mni_file, '.nii.gz', ''), hdr, 'Compressed', true);
+
+    case 'nearest'
+        if isempty(options.FovMask)
+            return
+        end
+        hdr = niftiinfo(mni_file);
+        vol = niftiread(hdr);
+        bg  = ~options.FovMask;
+        if any(bg, 'all')
+            [~, idx]    = bwdist(options.FovMask);
+            vol(bg)     = vol(idx(bg));
+            niftiwrite(vol, strrep(mni_file, '.nii.gz', ''), hdr, 'Compressed', true);
+        end
 end
 end
