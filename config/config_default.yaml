@@ -230,7 +230,8 @@ transducer:
 placement:
   mode: 'manual'    # Placement mode: 'manual' (use trans_pos/focus_pos as provided) |
                     #   'localite' (derive from Localite XML; set placement.localite.file or path.localite) |
-                    #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name)
+                    #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
+                    #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer?
     # --- Simple mode: provide a direct path to a single Localite XML file ---

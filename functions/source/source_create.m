@@ -300,8 +300,7 @@ end
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
 
-            x_offset     = (trans_pos_1(1)-1) * (1/parameters.grid.resolution_mm);
-            position_base = [kgrid.x_vec(1) + x_offset*kgrid.dx, 0+eps];
+            position_base = [kgrid.x_vec(trans_pos_1(1)), 0+eps];
             focus_pos_full = [0, 0+eps];
             
             for el_i = 1:tr.annular.elem_n
