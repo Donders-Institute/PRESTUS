@@ -63,7 +63,21 @@ For more information on installing, (potentially) compiling, and specifying C++ 
 You additionally need to install [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4). We recommend installing SimNIBS within an **anaconda environment** (especially on HPC clusters that often constrict individual user permissions). This allows for the flexible installation of multiple SimNIBS versions.
 You can follow the [official installation guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
 
-The following is a step-by-step guide to install SIMNIBS on the Linus computing cluster. Some steps and filepaths may differ between computing environments.
+#### Automated setup script
+
+For convenience, an example bash script is provided that creates a self-contained `PRESTUS_env_4.6.0` conda environment with SimNIBS and all optional dependencies (PlanTUS, Connectome Workbench) in one step:
+
+```bash
+bash examples/setup_PRESTUS_env.sh
+```
+
+Optional flags:
+- `--no-plantus` — skip PlanTUS Python dependencies (`nilearn`, `vtk`, `h5py`)
+- `--no-workbench` — skip Connectome Workbench (e.g. if `wb_command` is available as an HPC module)
+
+The script prints the exact `simnibs_bin_path` and `env_path` values to add to your PRESTUS config once complete.
+
+The following is a step-by-step guide to install SIMNIBS on the Linux computing cluster. Some steps and filepaths may differ between computing environments.
 
 1. Log in to the cluster
 2. Open terminal
@@ -145,3 +159,42 @@ In PRESTUS, specify either in the config or directly in MATLAB both the path to 
 parameters.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.conda', 'envs', 'simnibs_v4.6.0', 'bin');
 parameters.ld_library_path = "/opt/gcc/7.2.0/lib64";
 ```
+
+#### [Optional: PlanTUS dependencies]
+
+If you intend to use the `PLANTUS` transducer placement mode, additional Python packages are required in the SimNIBS environment. These are not included in the default SimNIBS installation.
+
+Activate the SimNIBS environment and install the missing packages:
+
+```bash
+source activate simnibs_v4.6.0
+pip install nilearn vtk h5py
+```
+
+Verify the installation:
+
+```bash
+python -c "import nilearn; import vtk; import h5py; print('PlanTUS dependencies OK')"
+```
+
+> **Note on `wb_command`**  
+> PlanTUS also requires `wb_command` (Connectome Workbench) for surface processing and volume operations (e.g. `volume-fill-holes`). Although PlanTUS only prints a warning when it is missing rather than aborting immediately, the absence of `wb_command` causes intermediate files to not be created and the pipeline will fail.
+>
+> **Option 1 — Install into the conda environment (recommended):**  
+> If you install `connectome-workbench` into the same environment as SimNIBS (e.g. `PRESTUS_env_4.6.0`), no additional path configuration is needed. PRESTUS automatically searches the environment's `bin/` directory:
+> ```bash
+> conda install -c conda-forge connectome-workbench
+> ```
+>
+> **Option 2 — Load as an HPC module and specify the path in PRESTUS:**  
+> On HPC clusters, Connectome Workbench is often available as a module but may not be loaded when MATLAB spawns the Python subprocess. Set `connectome_wb_path` to the directory containing the `wb_command` binary:
+> ```yaml
+> placement:
+>   plantus:
+>     connectome_wb_path: "/path/to/workbench/bin_linux64"
+> ```
+> or in MATLAB:
+> ```matlab
+> parameters.placement.plantus.connectome_wb_path = '/path/to/workbench/bin_linux64';
+> ```
+> To find the correct path after loading the module: `module load connectome-workbench && which wb_command`.
