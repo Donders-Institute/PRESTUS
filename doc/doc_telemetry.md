@@ -92,4 +92,142 @@ an unhandled exception). The table below lists every field that may be sent.
 | `status` | `"success"` or `"error"` |
 | `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`) — **no message text** is transmitted |
 
-Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected. 
+Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected.
+
+## Usage statistics
+
+The charts below are populated live from the anonymised telemetry database.
+
+<style>
+.telem-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.75rem; margin:1.2rem 0; }
+.telem-stat  { background:var(--md-code-bg-color,#f5f5f5); border-radius:8px; padding:1rem; text-align:center; }
+.telem-stat .tv { font-size:1.8rem; font-weight:700; line-height:1.1; }
+.telem-stat .tl { font-size:.72rem; color:var(--md-default-fg-color--light,#666); text-transform:uppercase; letter-spacing:.04em; margin-top:.2rem; }
+.telem-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1rem; margin:1rem 0; }
+.telem-chart  { background:var(--md-code-bg-color,#f5f5f5); border-radius:8px; padding:1rem; }
+.telem-chart h4 { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--md-default-fg-color--light,#666); margin:0 0 .75rem; }
+.telem-chart canvas { max-height:200px; }
+#telem-error { display:none; color:#c0392b; font-size:.85rem; padding:.5rem 0; }
+#telem-loading { color:var(--md-default-fg-color--light,#666); font-size:.85rem; }
+</style>
+
+<div id="telem-loading">Loading usage data…</div>
+<div id="telem-error"></div>
+
+<div class="telem-stats" id="telem-stats" style="display:none"></div>
+
+<div class="telem-charts" id="telem-charts" style="display:none">
+  <div class="telem-chart" style="grid-column:1/-1"><h4>Simulations per month</h4><canvas id="tc-timeline"></canvas></div>
+  <div class="telem-chart"><h4>Status</h4><canvas id="tc-status"></canvas></div>
+  <div class="telem-chart"><h4>Execution backend</h4><canvas id="tc-codetype"></canvas></div>
+</div>
+
+<script>
+(function () {
+  const URL = 'https://lruelxwhkjibezkgipme.supabase.co';
+  const KEY = 'sb_publishable_p18tafIOjIJuGwXb4szLSg_84vF3FL2';
+  const PAL = ['#6366f1','#22d3ee','#f59e0b','#10b981','#f43f5e','#a855f7','#14b8a6','#fb923c','#84cc16','#e879f9'];
+
+  function fg()   { return getComputedStyle(document.body).getPropertyValue('--md-default-fg-color')        || '#333'; }
+  function fgL()  { return getComputedStyle(document.body).getPropertyValue('--md-default-fg-color--light')  || '#999'; }
+  function gridC(){ return getComputedStyle(document.body).getPropertyValue('--md-default-fg-color--lightest')|| '#e0e0e0'; }
+
+  function countBy(arr, key) {
+    return arr.reduce((a, r) => { const v = r[key] ?? '(unknown)'; a[v] = (a[v]||0)+1; return a; }, {});
+  }
+
+  function doughnutChart(id, labels, data) {
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: PAL.slice(0, labels.length), borderWidth: 2 }] },
+      options: { plugins: { legend: { position: 'right', labels: { color: fg(), boxWidth: 12, font: { size: 11 } } } }, cutout: '60%' }
+    });
+  }
+
+  async function init() {
+    const client = supabase.createClient(URL, KEY);
+    const { data, error } = await client
+      .from('events')
+      .select('received_at,status,prestus_ver,duration_s,uuid,code_type')
+      .order('received_at', { ascending: false })
+      .limit(5000);
+
+    document.getElementById('telem-loading').style.display = 'none';
+
+    if (error) {
+      const el = document.getElementById('telem-error');
+      el.textContent = 'Could not load telemetry data: ' + error.message;
+      el.style.display = 'block';
+      return;
+    }
+
+    // stat cards
+    const total    = data.length;
+    const durs     = data.map(r => r.duration_s).filter(Boolean);
+    const avgDur   = durs.length ? (durs.reduce((a,b)=>a+b,0)/durs.length/60).toFixed(1)+'min' : '—';
+    const versions = [...new Set(data.map(r => r.prestus_ver).filter(Boolean))];
+    const users    = new Set(data.map(r => r.uuid).filter(Boolean)).size;
+
+    const statsEl = document.getElementById('telem-stats');
+    statsEl.style.display = 'grid';
+    [['Run count', total], ['Unique users', users], ['Avg duration', avgDur], ['Versions', versions.length]]
+      .forEach(([label, val]) => {
+        statsEl.insertAdjacentHTML('beforeend',
+          `<div class="telem-stat"><div class="tv">${val}</div><div class="tl">${label}</div></div>`);
+      });
+
+    document.getElementById('telem-charts').style.display = 'grid';
+
+    // ── Simulations per month, stacked by PRESTUS version ──────────
+    const allVersions = [...new Set(data.map(r => r.prestus_ver).filter(Boolean))].sort();
+    const monthSet = new Set();
+    data.forEach(r => { if (r.received_at) monthSet.add(r.received_at.slice(0, 7)); });
+    const months = [...monthSet].sort();
+
+    // count per (month, version)
+    const mvCount = {};
+    data.forEach(r => {
+      if (!r.received_at || !r.prestus_ver) return;
+      const key = r.received_at.slice(0, 7) + '|' + r.prestus_ver;
+      mvCount[key] = (mvCount[key] || 0) + 1;
+    });
+
+    new Chart(document.getElementById('tc-timeline'), {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: allVersions.map((ver, i) => ({
+          label: ver,
+          data: months.map(m => mvCount[m + '|' + ver] || 0),
+          backgroundColor: PAL[i % PAL.length],
+          borderRadius: 2,
+          borderSkipped: false,
+        }))
+      },
+      options: {
+        plugins: { legend: { position: 'right', labels: { color: fg(), boxWidth: 12, font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, ticks: { color: fgL(), maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
+          y: { stacked: true, ticks: { color: fgL() }, grid: { color: gridC() }, beginAtZero: true }
+        }
+      }
+    });
+
+    // ── Status donut ───────────────────────────────────────────────
+    const sc = countBy(data, 'status');
+    doughnutChart('tc-status', Object.keys(sc), Object.values(sc));
+
+    // ── Execution backend (code_type) ──────────────────────────────
+    const cc = countBy(data, 'code_type');
+    const ck = ['matlab_cpu','matlab_gpu','cpp_cpu','cpp_gpu'].filter(k => cc[k]);
+    doughnutChart('tc-codetype', ck, ck.map(k => cc[k]));
+
+  }
+
+  if (typeof Chart !== 'undefined' && typeof supabase !== 'undefined') {
+    init();
+  } else {
+    window.addEventListener('load', init);
+  }
+})();
+</script>
