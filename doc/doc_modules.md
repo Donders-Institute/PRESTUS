@@ -35,7 +35,7 @@ load_parameters
       │                 acoustic_provenance.freefield_isppa_wcm2
       ▼
 [ISPPA scaling]         Applied automatically on cache load when
-      │                 calibration.target_isppa_wcm2 is set;
+      │                 transducer.target_isppa_wcm2 is set;
       │                 scales p_max_all by sqrt(target/baseline)
       ▼
 [acoustic analysis]     modules.run_acoustic_analysis
@@ -71,8 +71,9 @@ load_parameters
 | Add thermal simulation to completed acoustic run | `modules.run_heating_sims = 1`; all others can remain `1` |
 | Regenerate analysis outputs only | `run_acoustic_sims = 0`, `run_heating_sims = 0` |
 | Skip free-water reference | `modules.run_posthoc_water_sims = 0` |
-| Run thermal at a specific free-water ISPPA | `calibration.target_isppa_wcm2: 30` (water baseline runs automatically) |
-| Run thermal at multiple ISPPAs (parallel jobs) | `calibration.target_isppa_wcm2: [10, 20, 30, 50]` — triggers multi-ISPPA mode; see [doc_multi_isppa.md](doc_multi_isppa.md) |
+| Run thermal at a specific free-water ISPPA | `transducer.target_isppa_wcm2: 30` (water baseline runs automatically) |
+| Run thermal at multiple ISPPAs (parallel jobs) | `transducer.target_isppa_wcm2: [10, 20, 30, 50]` — triggers multi-ISPPA mode; see [doc_multi_isppa.md](doc_multi_isppa.md) |
+| Simulate two or more transducers asynchronously | `simulation.transducer_coupling: async` with multiple `transducer` entries; see [doc_async_transducer.md](doc_async_transducer.md) |
 | Enable the water baseline measurement | `modules.run_water_baseline: 1` (required for ISPPA scaling) |
 
 > **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`. If they do not exist, disabling an upstream module while enabling a downstream one will error.

@@ -233,13 +233,13 @@ modules:
   run_water_baseline: 1
 ```
 
-> If `run_water_baseline` is disabled, `calibration.target_isppa_wcm2` will have no effect and a warning is issued.
+> If `run_water_baseline` is disabled, `transducer.target_isppa_wcm2` will have no effect and a warning is issued.
 
 ---
 
 ### Step 2 — Post-hoc pressure scaling
 
-When `calibration.target_isppa_wcm2` is set and the acoustic cache contains valid provenance, the pipeline scales `sensor_data.p_max_all` before acoustic analysis and thermal simulation:
+When `transducer.target_isppa_wcm2` is set and the acoustic cache contains valid provenance, the pipeline scales `sensor_data.p_max_all` before acoustic analysis and thermal simulation:
 
 $$p_\mathrm{scaled} = p_\mathrm{cached} \times \sqrt{\frac{I_\mathrm{target}}{I_\mathrm{baseline}}}$$
 
@@ -249,20 +249,26 @@ A warning is issued if the scale factor exceeds 4× or is below 0.25×, indicati
 
 ### Configuration
 
+`target_isppa_wcm2` is set **per transducer** in the transducer block:
+
 ```yaml
-calibration:
+transducer:
   target_isppa_wcm2: 30   # Target free-water ISPPA [W/cm²]
+  elem_amp: ...
+  # ... other transducer fields
 ```
 
-`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_amp` is configured in the transducer YAML; `target_isppa_wcm2` controls only the analysis and thermal stages.
+`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_amp` is configured; `target_isppa_wcm2` controls only the analysis and thermal stages.
+
+> **Backwards compatibility:** The older form `calibration.target_isppa_wcm2` is still accepted and is automatically migrated to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning. Update configs to use the per-transducer form.
 
 ### Multiple targets (multi-ISPPA mode)
 
 Setting `target_isppa_wcm2` to a vector automatically triggers the multi-ISPPA pipeline, which runs one thermal job per target in parallel without repeating the acoustic simulation:
 
 ```yaml
-calibration:
-  target_isppa_wcm2: [10, 20, 30, 50]
+transducer:
+  target_isppa_wcm2: [10, 20, 30, 50]   # W/cm² — triggers multi-ISPPA mode
 ```
 
 See [doc_multi_isppa.md](doc_multi_isppa.md) for full details.
@@ -280,4 +286,4 @@ The following fields are saved in the acoustic cache alongside `sensor_data`:
 The typical workflow is:
 
 1. **Once per transducer/depth setup**: Run `calibration_transducer` to obtain optimized phases and an initial amplitude at a reference intensity. The output YAML encodes `elem_phase_deg` and `elem_amp`.
-2. **Per subject simulation**: Load the calibration YAML into your study config. Set `calibration.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.
+2. **Per subject simulation**: Load the calibration YAML into your study config. Set `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.
