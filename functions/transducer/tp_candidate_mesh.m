@@ -56,7 +56,7 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
 
     % Default dist_close to focal distance + 20 mm if not set
     if ~isfield(parameters.placement.heuristic, 'dist_close') || isempty(parameters.placement.heuristic.dist_close)
-        parameters.placement.heuristic.dist_close = parameters.expected_focal_distance_bowl + 20;
+        parameters.placement.heuristic.dist_close = parameters.transducer(1).focal_distance_bowl + 20;
     end
     close_enough_idx = outer_idx(distances_to_target < (parameters.placement.heuristic.dist_close / pixel_size));
     trans_pos_coords = coord_mesh.xyz(close_enough_idx, :);  % [N_cand x 3]

@@ -328,24 +328,11 @@ function write_pct_sidecar(pct_dir, parameters, skull_mapping)
         return;
     end
 
-    get_val = @(s, f, def) deal(iif(isfield(s, f) && ~isempty(s.(f)), s.(f), def));
-
-    mapping_density    = get_val(parameters.pct, 'mapping_density',    'unknown');
-    mapping_soundspeed = get_val(parameters.pct, 'mapping_soundspeed', 'unknown');
-    mapping_atten      = get_val(parameters.pct, 'mapping_attenuation','unknown');
-
     fprintf(fid, '{\n');
     fprintf(fid, '  "SkullMapping": "%s",\n',          skull_mapping);
-    fprintf(fid, '  "MappingDensity": "%s",\n',         mapping_density);
-    fprintf(fid, '  "MappingSoundSpeed": "%s",\n',      mapping_soundspeed);
-    fprintf(fid, '  "MappingAttenuation": "%s",\n',     mapping_atten);
     fprintf(fid, '  "GenerationDate": "%s",\n',         char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
     fprintf(fid, '  "SubjectID": %d\n',                 parameters.subject_id);
     fprintf(fid, '}\n');
     fclose(fid);
     fprintf('pseudoCT.json written to %s\n', sidecar_path);
-end
-
-function val = iif(cond, a, b)
-    if cond; val = a; else; val = b; end
 end

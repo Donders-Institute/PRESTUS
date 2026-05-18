@@ -79,18 +79,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask%s.nii', parameters.io.output_affix));
 
-        infoOut = info;
-        infoOut.ImageSize = size(BW);
-        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(BW)));
-        infoOut.Datatype = 'uint8';
-        infoOut.BitsPerPixel = 8;
-        infoOut.Filename = outNii;
-        infoOut.Filemoddate = char(datetime("now"));
-
-        niftiwrite(BW, outNii, infoOut, 'Compressed', false);
-
-        gzip(outNii);
-        delete(outNii);   % remove uncompressed .nii
+        niftiwrite(BW, outNii, 'Compressed', true);
     end
 
     %% Manage layered head tissues
@@ -197,19 +186,9 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask_final%s.nii', parameters.io.output_affix));
 
-        infoOut = info;
-        infoOut.ImageSize = size(SKULL_BALLON);
-        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(SKULL_BALLON)));
-        infoOut.Datatype = 'uint8';
-        infoOut.BitsPerPixel = 8;
-        infoOut.Filename = outNii;
-        infoOut.Filemoddate = char(datetime("now"));
+        niftiwrite(uint8(SKULL_BALLON), outNii, 'Compressed', true);
 
-        niftiwrite(uint8(SKULL_BALLON), outNii, infoOut, 'Compressed', false);
-        gzip(outNii);
-        delete(outNii);
-
-        % fprintf("Saved: %s.gz\n", outNii);
+        % fprintf("Saved: %s\n", outNii);
     end
 
     %% [DEBUG] Visualize the expanded skull
