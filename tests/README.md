@@ -1,6 +1,6 @@
 # PRESTUS Test Suite
 
-Tests are organised into two tiers.
+Tests are organised into four tiers.
 
 ## Tier 1 — Unit tests (no data required)
 
@@ -81,7 +81,82 @@ runtests('tests/test_integration_pipeline.m', 'Tag', 'smoke_head')
 
 ---
 
+## Tier 4 — Demo-data tests (real subject, all placement modes)
+
+File: `test_integration_demo.m`
+
+Uses a real demo subject (sub-009) with pre-computed SimNIBS segmentation, UTE-derived
+pCT, and Localite neuronavigation data stored in a standardised folder outside the repo
+(`prestus_testdata/`). Three placement modes are covered — manual, Localite, and
+heuristic — and pCT-based skull mapping is verified as a separate tag.
+
+| Tag | What it checks | Typical duration |
+|---|---|---|
+| `demo_inputs` | All required input files exist | ~1 s |
+| `demo_config` | All three placement-mode configs load without error | ~1 s |
+| `demo_localite` | Localite XML parses to finite voxel positions | ~1 s |
+| `demo_pct` | pCT NIfTIs are present and readable | ~1 s |
+| `demo_head` | Head preprocessing end-to-end (manual + pCT variants) | 1–5 min |
+| `demo_acoustic` | Full acoustic pipeline | 10–60 min |
+| `demo_thermal` | Thermal pipeline on cached acoustic outputs | 10–60 min |
+
+### Demo data layout (`prestus_testdata/`)
+
+```
+prestus_testdata/
+├── bids/sub-009/anat/
+│   ├── sub-009_T1w.nii.gz       ← symlink → simnibs/m2m_sub-009/T1.nii.gz
+│   └── sub-009_UTE.nii.gz       ← symlink → simnibs/m2m_sub-009/UTE_reg.nii.gz
+├── simnibs/
+│   └── m2m_sub-009/             ← symlink → SimNIBS output (incl. pCT, MNI transforms)
+├── localite/
+│   └── sub-009/ses-02/localite/
+│       └── Session_*/TMSTrigger/TriggerMarkers_Coil0*.xml
+├── coords/
+│   └── sub-009_heuristic_target.json   ← {"target_name": "MD_thalamus", "mni_target_mm": [-6,-16,4]}
+├── configs/
+│   ├── config_demo_manual.yaml
+│   ├── config_demo_localite.yaml
+│   └── config_demo_heuristic.yaml
+└── sim_outputs/                 ← written by the pipeline
+```
+
+### Prerequisites
+
+1. Validate the layout using the diagnostic script:
+
+```matlab
+setup_demo_data('/path/to/prestus_testdata')
+```
+
+2. Set the environment variable before running tests:
+
+```bash
+export PRESTUS_DEMO_DATA=/path/to/prestus_testdata
+```
+
+### Running
+
+```matlab
+run_all_tests('demo_inputs')    % file checks only (~1 s)
+run_all_tests('demo_localite')  % inputs + config + XML parsing
+run_all_tests('demo_head')      % all fast checks + head preprocessing
+run_all_tests('demo_acoustic')  % full pipeline up to acoustics
+run_all_tests('demo_thermal')   % thermal on cached acoustics
+```
+
+Or run a single tag directly:
+
+```matlab
+runtests('tests/test_integration_demo.m', 'Tag', 'demo_localite')
+```
+
+Tests skip gracefully when `PRESTUS_DEMO_DATA` is not set.
+
+---
+
 ## Adding new tests
 
 - **New pure function** → add a `methods (Test)` block to the relevant `test_*.m` file, or create a new one following the same `matlab.unittest.TestCase` pattern.
 - **New pipeline stage** → add a tagged method to `test_integration_pipeline.m` and a case in `run_all_tests.m` if it warrants its own level.
+- **New demo subject or placement mode** → extend `test_integration_demo.m`; add a helper method in the `Access = private` section to load and configure the new variant.

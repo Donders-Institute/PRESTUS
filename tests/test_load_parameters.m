@@ -111,7 +111,8 @@ classdef test_load_parameters < matlab.unittest.TestCase
             override.io.output_affix = 'bad/chars!here';
             override.simulation.interactive = 0;
             p = load_parameters(override);
-            tc.verifyMatches(p.io.output_affix, '^[a-zA-Z0-9_]+$');
+            % Illegal chars are replaced and value is wrapped in _desc- entity
+            tc.verifyEqual(p.io.output_affix, '_desc-bad_chars_here');
         end
 
         function test_output_affix_valid_passthrough(tc)
@@ -119,7 +120,8 @@ classdef test_load_parameters < matlab.unittest.TestCase
             override.io.output_affix = 'run_01';
             override.simulation.interactive = 0;
             p = load_parameters(override);
-            tc.verifyEqual(p.io.output_affix, 'run_01');
+            % Valid affix is wrapped in _desc- entity
+            tc.verifyEqual(p.io.output_affix, '_desc-run_01');
         end
 
     end
