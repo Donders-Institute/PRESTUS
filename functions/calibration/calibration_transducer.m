@@ -121,25 +121,74 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
     clear initial_res;
 
-    %% Optimization (run once — phases are intensity-independent)
+    %% Phase determination and O'Neil solution (run once — phases are intensity-independent)
+    %
+    % Two modes, selected by parameters.calibration.elem_phase_correction_deg:
+    %
+    %   Geometric correction (non-empty):
+    %     Phases = geometric phases at this depth (already in initial_params)
+    %              + pre-calibrated per-element hardware correction.
+    %     Skips perform_global_search; only velocity is fit per intensity.
+    %     Enable by setting parameters.calibration.elem_correction_file in
+    %     calibration_standalone.m (loaded by calibration_setup).
+    %
+    %   Global search (default, empty correction):
+    %     Existing behaviour: perform_global_search optimises phases and
+    %     velocity jointly against the empirical profile.
+    %     To also save the correction for future use at other depths, set
+    %     parameters.calibration.save_elem_correction = true.
 
-    % Compute analytical O'Neil solution and scaling factor to simulated intensity
-    [profile_oneil, simulated_analytical_scaling] = ...
-        compute_oneil_solution(...
-        initial_params, ...
-        profile_sim, ...
-        profile_target_ref);
+    use_geo_correction = isfield(parameters.calibration, 'elem_phase_correction_deg') && ...
+        ~isempty(parameters.calibration.elem_phase_correction_deg);
 
-    % Optimize phases [rad] and source amplitude to match real profile shape
-    [opt_phases, opt_velocity_ref, min_err, ~] = ...
-        perform_global_search(...
-        initial_params, ...
-        profile_target_ref, ...
-        profile_sim.velocity);
+    if use_geo_correction
+        % --- Geometric steering + pre-calibrated hardware correction ----------
+        correction_deg = parameters.calibration.elem_phase_correction_deg(:)';
 
-    % Shared phase outputs (same for all intensities)
-    opt_source_phase_rad = opt_phases;
-    opt_source_phase_deg = opt_phases / pi * 180;
+        if numel(correction_deg) ~= parameters.transducer.annular.elem_n
+            error(['calibration_transducer: elem_phase_correction_deg has %d elements ' ...
+                'but transducer has %d elements.'], ...
+                numel(correction_deg), parameters.transducer.annular.elem_n);
+        end
+
+        geo_phases_deg = initial_params.transducer.annular.elem_phase_deg;
+        combined_deg   = mod(geo_phases_deg + correction_deg, 360);
+        combined_rad   = combined_deg * pi / 180;
+
+        % Update a parameter copy so O'Neil is evaluated with the corrected phases
+        params_corrected = initial_params;
+        params_corrected.transducer.annular.elem_phase_deg = combined_deg;
+        params_corrected.transducer.annular.elem_phase_rad = combined_rad;
+
+        [profile_oneil, simulated_analytical_scaling] = compute_oneil_solution(...
+            params_corrected, profile_sim, profile_target_ref);
+
+        opt_source_phase_rad = combined_rad;
+        opt_source_phase_deg = combined_deg;
+        opt_velocity_ref     = profile_sim.velocity;
+        min_err              = NaN;
+
+        fprintf('Geometric correction mode: geo + correction phases [deg]: %s\n', ...
+            mat2str(round(combined_deg)));
+
+    else
+        % --- Existing global search path --------------------------------------
+        [profile_oneil, simulated_analytical_scaling] = compute_oneil_solution(...
+            initial_params, profile_sim, profile_target_ref);
+
+        [opt_source_phase_rad, opt_velocity_ref, min_err, ~] = perform_global_search(...
+            initial_params, profile_target_ref, profile_sim.velocity);
+
+        opt_source_phase_deg = opt_source_phase_rad / pi * 180;
+    end
+
+    %% Save per-element correction (only during a reference-depth global-search run)
+    if ~use_geo_correction && ...
+            isfield(parameters.calibration, 'save_elem_correction') && ...
+            parameters.calibration.save_elem_correction
+        save_elem_correction(parameters.calibration.equipment_yaml_path, opt_source_phase_deg, ...
+            initial_params.transducer.annular.elem_phase_deg, desired_focal_distance_ep);
+    end
 
     %% Intensity calibration loop
 
@@ -154,7 +203,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
         % Scale velocity to match ISPPA
         [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
-            initial_params, profile_oneil, opt_phases, opt_velocity_ref, ...
+            initial_params, profile_oneil, opt_source_phase_rad, opt_velocity_ref, ...
             desired_intensity_k);
 
         % Scale optimised source amplitude to match ISPPA
@@ -176,7 +225,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
             params_k, ...
             profile_oneil, ...
             profile_target_k, ...
-            opt_phases, ...
+            opt_source_phase_rad, ...
             opt_velocity_k);
 
         % Use a per-intensity output affix when calibrating multiple intensities
@@ -222,7 +271,12 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
 
         else
 
-            % Create dummy simulation fields
+            % Create dummy simulation fields (copy structure from profile_sim if
+            % profile_sim_opt_k does not yet exist, e.g. when validation is skipped
+            % on the very first iteration)
+            if ~exist('profile_sim_opt_k', 'var')
+                profile_sim_opt_k = profile_sim;
+            end
 
             % Intensity fields
             intensity_fields = {'Isppa', 'Ispta', 'Ita'};

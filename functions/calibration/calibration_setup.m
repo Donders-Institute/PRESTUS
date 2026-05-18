@@ -18,6 +18,7 @@ for i = 1:N_i
     % Extract equipment details
     tran_serial = combo.tran_serial; % - Transducer serial number or identifier
     tran = equip_param.trans.(tran_serial);
+    parameters.calibration.equipment_yaml_path = fullfile(equip_param.path, [char(tran_serial), '.yaml']);
     ds = combo.ds;                   % - Driving System metadata (inlined in combo)
 
     % Configure transducer parameters
@@ -39,14 +40,31 @@ for i = 1:N_i
     parameters.calibration.filename_calibrated_CSV = ...
         strcat(equip_param.gen.prestus_virt_name, equipment_name, '.csv');
 
-    % Load manufacturer-provided phase data (only possible if phase tables are available)
-    combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
-    if isequal(tran.manufact, "Sonic Concepts")
+    % Load manufacturer-provided phase data.
+    % Sonic Concepts and Imasonic require an external phase-table file.
+    % For any other manufacturer ('generic' or custom), phases are computed
+    % geometrically from the ring dimensions in the YAML — no file needed.
+    if isequal(tran.manufact, 'Sonic Concepts')
+        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
         phase_table = readtable(combo.phase_table);
-    elseif isequal(tran.manufact, "Imasonic")
+    elseif isequal(tran.manufact, 'Imasonic')
+        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
         phase_table = read_ini_file(combo.phase_table);
     else
-        error('Unsupported transducer manufacturer: %s | Please reach out to the developers.', tran.manufact);
+        phase_table = struct();   % unused; set_real_phases calls generate_tran_ini_from_geometry
+    end
+
+    % Load pre-calibrated per-element correction from the transducer equipment YAML.
+    % Written there by save_elem_correction after a reference-depth calibration.
+    % When present, activates geometric steering mode for all depths in this combo:
+    %   phases(depth) = compute_phases(depth) + elem_phase_correction
+    % Leave absent to use the default global-search path.
+    parameters.calibration.elem_phase_correction_deg = [];
+    if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
+        parameters.calibration.elem_phase_correction_deg = tran.elem_phase_correction.deg(:)';
+        fprintf('Loaded element correction (%d elements, ref depth %.2f mm) from transducer YAML.\n', ...
+            numel(parameters.calibration.elem_phase_correction_deg), ...
+            tran.elem_phase_correction.ref_depth_ep_mm);
     end
 
     % Load characterization data

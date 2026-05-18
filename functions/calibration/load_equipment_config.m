@@ -19,6 +19,7 @@ function equip = load_equipment_config(equipment_path)
         equipment_path = fullfile(get_prestus_path(), 'config', 'equipment');
     end
 
+    equip.path   = equipment_path;
     equip.gen    = yaml.loadFile(fullfile(equipment_path, 'equipment_info.yaml'), 'ConvertToArray', true);
     equip.trans  = struct();
     equip.combos = struct();
