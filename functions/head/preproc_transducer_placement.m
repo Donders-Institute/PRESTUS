@@ -23,6 +23,17 @@ function parameters = preproc_transducer_placement(parameters)
 %               pipeline exits so the user can re-run after the job finishes
 %               (same pattern as segmentation_only).
 %
+%   'plantus'   Call the external PlanTUS tool (Lueckel et al., Mainz) to
+%               optimise transducer placement against five geometric objectives:
+%               beam–target overlap, angle at skin, skin–skull angle, skull
+%               thickness, and distance to target. Requires
+%               placement.plantus.script_path, placement.plantus.env_path,
+%               placement.plantus.focal_distance_list, placement.plantus.flhm_list,
+%               and placement.plantus.target_name. The target can be specified
+%               as placement.plantus.mni_target_mm (MNI space) or via a
+%               pre-set transducer.focus_pos. PlanTUS must be installed
+%               separately (see https://github.com/mlueckel/PlanTUS).
+%
 % The resolved positions are written into parameters.transducer(ti).trans_pos
 % and parameters.transducer(ti).focus_pos for every configured transducer.
 %
@@ -36,8 +47,8 @@ function parameters = preproc_transducer_placement(parameters)
 %   parameters - updated struct; on HPC heuristic mode the function does not
 %                return (pipeline exits after job submission)
 %
-% See also: POSITION_TRANSDUCER_LOCALITE, TRANSDUCER_POSITIONING_START,
-%           NEURONAV_SELECT_LOCALITE
+% See also: POSITION_TRANSDUCER_LOCALITE, POSITION_TRANSDUCER_PLANTUS,
+%           TRANSDUCER_POSITIONING_START, NEURONAV_SELECT_LOCALITE
 
 arguments
     parameters (1,1) struct
@@ -80,9 +91,13 @@ end
         case 'heuristic'
             parameters = run_heuristic_placement(parameters);
 
+        % ── PLANTUS ───────────────────────────────────────────────────────
+        case 'plantus'
+            parameters = run_plantus_placement(parameters);
+
         otherwise
             error(['Unknown placement.mode ''%s''. ' ...
-                   'Use ''manual'', ''localite'', or ''heuristic''.'], mode);
+                   'Use ''manual'', ''localite'', ''heuristic'', or ''plantus''.'], mode);
     end
 
 end
@@ -214,4 +229,29 @@ function parameters = read_tpos_file(tpos_file, parameters)
         parameters.transducer(ti).trans_pos = trans_pos;
         parameters.transducer(ti).focus_pos = focus_pos;
     end
+end
+
+% ── PlanTUS placement dispatcher ─────────────────────────────────────────
+function parameters = run_plantus_placement(parameters)
+% Call position_transducer_plantus and write results back into parameters.
+
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'plantus')
+        error('PRESTUS:placement:missingConfig', ...
+            'placement.plantus sub-struct is missing. See config_default.yaml for required fields.');
+    end
+
+    filename_t1 = fullfile(parameters.path.anat, ...
+        sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    t1_header = niftiinfo(filename_t1);
+
+    [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
+        position_transducer_plantus(parameters, t1_header);
+
+    for ti = 1:numel(parameters.transducer)
+        parameters.transducer(ti).trans_pos     = trans_pos;
+        parameters.transducer(ti).focus_pos     = focus_pos;
+        parameters.transducer(ti).trans_pos_ras = trans_pos_ras;
+        parameters.transducer(ti).focus_pos_ras = focus_pos_ras;
+    end
+    parameters.placement.plantus.target_ras = target_ras;
 end

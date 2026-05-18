@@ -47,6 +47,7 @@ nav:
     - Transducer Placement: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
     - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
+    - Transducer Placement (PLANTUS): doc_placement_plantus.md
     - Coordinate Systems: doc_coordinate_systems.md
     - Head Processing: doc_preproc.md
     - Medium Setup: doc_medium.md
