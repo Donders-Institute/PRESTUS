@@ -66,6 +66,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         t1_image = niftiread(filename_t1_simnibs);
         t1_header = niftiinfo(filename_t1_simnibs);
     end
+    [t1_image, t1_header] = ensure_ras_plus(t1_image, t1_header);
 
     if parameters.pct.enabled == 1
         % Load pseudoCT from the resolved pCT directory (parameters.io.dir_pct).
@@ -75,15 +76,18 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
         pseudoCT_header = niftiinfo(filename_pseudoCT);
+        [pseudoCT_image, pseudoCT_header] = ensure_ras_plus(pseudoCT_image, pseudoCT_header);
 
         % Load pseudoCT tissues mask
         filename_tissues_mask = fullfile(pct_dir, 'tissues_mask.nii.gz');
         tissues_mask_image = niftiread(filename_tissues_mask);
         tissues_mask_header = niftiinfo(filename_tissues_mask);
+        [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
     else
         % Load traditional SimNIBS segmentation
         tissues_mask_image = niftiread(filename_segmented);
         tissues_mask_header = niftiinfo(filename_segmented);
+        [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
     end
 
     %% Determine transducer position in T1 grid
