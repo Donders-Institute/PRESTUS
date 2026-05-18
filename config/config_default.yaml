@@ -25,6 +25,12 @@ simulation:
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
   debug: 0            # Activate debug mode with additional intermediate outputs?
+  transducer_coupling: coherent # How multiple transducers interact acoustically:
+                                #   'coherent'  — pressure fields are superposed in a single k-Wave run
+                                #                 (models interference; current default behaviour)
+                                #   'async'     — each transducer is simulated independently and
+                                #                 intensities are summed incoherently before thermal
+                                #                 simulation (models asynchronous / non-overlapping firing)
 
 #------------ Paths
 

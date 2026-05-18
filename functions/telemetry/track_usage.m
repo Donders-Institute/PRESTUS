@@ -82,6 +82,9 @@ function payload = build_payload(event, parameters, options)
     payload.pct_atten     = safe_get(parameters, {'pct', 'mapping_attenuation'}, '');
     payload.layers        = get_layer_names(parameters);
 
+    % --- pipeline mode ---
+    payload.pipeline_mode = detect_pipeline_mode(parameters);
+
     % --- transducer (model/type only, no geometry) ---
     payload.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
     payload.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
@@ -147,6 +150,17 @@ function val = safe_get(s, keys, default)
             val = default;
             return
         end
+    end
+end
+
+% -------------------------------------------------------------------------
+function mode = detect_pipeline_mode(parameters)
+    if is_async_mode(parameters)
+        mode = 'async';
+    elseif is_multi_isppa_mode(parameters)
+        mode = 'multi_isppa';
+    else
+        mode = 'single';
     end
 end
 

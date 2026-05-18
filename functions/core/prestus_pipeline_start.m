@@ -6,7 +6,9 @@ function job_id = prestus_pipeline_start(parameters, options)
 % prestus_pipeline directly. On HPC, serialises parameters to a temp .mat
 % file, generates a bootstrap .m script, and submits via hpc_submit_job.
 % When parameters.simulation.uncertainty is true, delegates to
-% uncertainty_pipeline instead of direct submission.
+% uncertainty_pipeline. When parameters.simulation.transducer_coupling is
+% 'async' and multiple transducers are present, delegates to
+% async_transducer_pipeline instead of direct submission.
 %
 % Use as:
 %   prestus_pipeline_start(parameters)
@@ -58,7 +60,9 @@ function job_id = prestus_pipeline_start(parameters, options)
     switch parameters.platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
-            if is_multi_isppa_mode(parameters)
+            if is_async_mode(parameters)
+                async_transducer_pipeline(parameters, options);
+            elseif is_multi_isppa_mode(parameters)
                 multi_isppa_pipeline(parameters, options);
             else
                 prestus_pipeline(parameters, options);
@@ -71,6 +75,15 @@ function job_id = prestus_pipeline_start(parameters, options)
             % uncertainty_pipeline manages its own multi-stage job graph.
             if isfield(parameters.simulation, 'uncertainty') && parameters.simulation.uncertainty
                 uncertainty_pipeline(parameters, options);
+                job_id = [];
+                return;
+            end
+
+            % Intercept async multi-transducer mode: each transducer gets its
+            % own acoustic job; combine and thermal stages follow with
+            % scheduler dependencies.
+            if is_async_mode(parameters)
+                async_transducer_pipeline(parameters, options);
                 job_id = [];
                 return;
             end

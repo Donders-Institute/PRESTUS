@@ -82,6 +82,25 @@ function [parameters] = prestus_pipeline(parameters, options)
         return;
     end
 
+    % ====================================================================
+    %% DUAL-ASYNC COMBINE STAGE
+    % Lightweight intercept for stage 2 of dual_async_pipeline when
+    % dispatched via prestus_pipeline_start on HPC. Calls
+    % combine_async_intensity and returns immediately — no k-Wave involved.
+    % ====================================================================
+    if isfield(parameters, 'modules') && isfield(parameters.modules, 'combine_async') && ...
+            parameters.modules.combine_async
+        targets = [];
+        if isfield(parameters.async_combine, 'targets_wcm2')
+            targets = parameters.async_combine.targets_wcm2;
+        end
+        combine_async_intensity( ...
+            parameters.async_combine.files_in, ...
+            parameters.async_combine.file_out, ...
+            targets);
+        return;
+    end
+
     fprintf('Starting processing for subject %i %s\n',...
         parameters.subject_id, parameters.io.output_affix)
     
@@ -317,6 +336,36 @@ function [parameters] = prestus_pipeline(parameters, options)
         disp('Skipping acoustic simulation, loading existing output file.')
         load(filename_sensor_data);
         parameters.state.acoustics_available = 1;
+        % When the cached data was produced by an axisymmetric simulation,
+        % acoustic_wrapper already applied convert_axisymmetric_to_2d/3d to the
+        % arrays before saving them.  The current parameters still hold the
+        % pre-conversion (axisymmetric) grid dims and transducer positions because
+        % we bypassed acoustic_wrapper.  Detect this mismatch from the loaded data
+        % size and re-apply the same coordinate transformation to the current
+        % (freshly computed) positions so they match the stored arrays.
+        if numel(parameters.grid.dims) == 2 && ...
+                isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
+            expand_to_3d = strcmp(parameters.simulation.medium, 'phantom') || ...
+                           (isfield(parameters.modules, 'run_heating_sims') && ...
+                            parameters.modules.run_heating_sims == 1);
+            if ~expand_to_3d
+                % convert_axisymmetric_to_2d transposes [Nz x Nr] → [2*Nr x Nz];
+                % detect by comparing loaded array first-dim against 2*Nr.
+                Nr_orig = parameters.grid.dims(2);
+                Nz_orig = parameters.grid.dims(1);
+                if size(sensor_data.p_max_all, 1) == Nr_orig * 2
+                    for ti_load = 1:numel(parameters.transducer)
+                        tp = parameters.transducer(ti_load).trans_pos;
+                        fp = parameters.transducer(ti_load).focus_pos;
+                        tp(2) = tp(2) + Nr_orig;
+                        fp(2) = fp(2) + Nr_orig;
+                        parameters.transducer(ti_load).trans_pos = fliplr(tp);
+                        parameters.transducer(ti_load).focus_pos = fliplr(fp);
+                    end
+                    parameters.grid.dims = [Nr_orig * 2, Nz_orig];
+                end
+            end
+        end
         sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
     else
         disp('No acoustic simulation available or requested ... skipping analysis')

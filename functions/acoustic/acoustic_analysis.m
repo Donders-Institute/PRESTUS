@@ -47,12 +47,19 @@ end
     tr = parameters.transducer(1);
     trans_pos = tr.trans_pos;
     focus_pos = tr.focus_pos;
-    
+
     % intialize output structure
     results = struct();
 
-    % Temporal peak pressure at every gridpoint (p_max_all = peak over last steady-state cycles)
-    acoustic_pressure = gather(sensor_data.p_max_all); % gather is used since it could be a GPU array
+    % For async-combined caches, p_max_async holds the per-voxel pressure
+    % maximum across transducers (instantaneous peak when one fires at a time).
+    % p_max_all holds the thermal-equivalent field (intensity sum) and must
+    % not be used for acoustic safety metrics.
+    if isfield(sensor_data, 'p_max_async')
+        acoustic_pressure = gather(sensor_data.p_max_async);
+    else
+        acoustic_pressure = gather(sensor_data.p_max_all);
+    end
     results.Psptp = max(acoustic_pressure(:)); % spatial peak temporal peak pressure
 
     % Calculates the Isppa for every gridpoint
@@ -213,6 +220,9 @@ end
 		trans_suffix = '';
 		if n_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
         
+        tpos_plot = tpos_sim;
+        fpos_plot = fpos_sim;
+
         if numel(parameters.grid.dims)==3
             slices = struct( ...
                 'dim', {'x', 'y', 'z'}, ...
@@ -254,8 +264,8 @@ end
                 segmentation, ...
                 source_labels, ...
                 after_exit_plane_mask, ...
-                tpos_sim, ...
-                fpos_sim, ...
+                tpos_plot, ...
+                fpos_plot, ...
                 highlighted_pos);
 
             output_plot = fullfile(parameters.io.dir_img, ...
