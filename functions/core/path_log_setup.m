@@ -146,11 +146,11 @@ end
 
     % Resolve the subject-specific pCT output directory into parameters.io.dir_pct.
     % path.pct is a user-configured base directory (preserved as-is).
-    %   empty    → io.dir_pct = {path.seg}/m2m_sub-NNN/  (uses existing SimNIBS m2m folder)
-    %   non-empty → io.dir_pct = {path.pct}/sub-NNN/     (dedicated dir, PRESTUS naming)
+    %   empty    → io.dir_pct = {parent of path.seg}/pct/sub-NNN/  (parallel to seg folder)
+    %   non-empty → io.dir_pct = {path.pct}/sub-NNN/               (dedicated dir, PRESTUS naming)
     if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
         if ~isfield(parameters.path, 'pct') || isempty(parameters.path.pct)
-            parameters.io.dir_pct = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', subject_id));
+            parameters.io.dir_pct = fullfile(fileparts(parameters.path.seg), 'pct', sprintf('sub-%03d', subject_id));
         else
             parameters.io.dir_pct = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
         end

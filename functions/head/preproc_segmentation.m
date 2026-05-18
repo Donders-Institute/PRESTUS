@@ -46,7 +46,6 @@ end
 
     % Define output folder for segmentation results
     segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
-
     filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
 
     % Run segmentation (if necessary)
@@ -71,11 +70,13 @@ end
 
     parameters = simnibs_version(segmentation_folder, parameters);
 
+    pct_folder = fullfile(parameters.path.pct, sprintf('m2m_sub-%03d', parameters.subject_id));
+    filename_pseudoCT = fullfile(pct_folder, 'pseudoCT.nii.gz');
+
     if parameters.pct.enabled == 1
         if isempty(filename_t2)
             error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
         end
-        filename_pseudoCT = fullfile(segmentation_folder, 'pseudoCT.nii.gz');
         if exist(filename_pseudoCT, 'file')
             disp('pseudoCT available...');
         else

@@ -59,7 +59,7 @@ if any(pad_pre_post > 0)
     medium_masks    = padarray(medium_masks,    pad_pre_post, 0, 'both');
     bone_mask_img   = padarray(bone_mask_img,   pad_pre_post, 0, 'both');
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img,   pad_pre_post, 0, 'both');
+        pseudoCT_img = padarray(pseudoCT_img,   pad_pre_post, NaN, 'both');
     end
     total_pre_offset = total_pre_offset + pad_pre_post;  % User padding contribution
     % Positions shift by PRE-padding amount ('both' adds pre first)
@@ -91,7 +91,7 @@ if any(min_dims < 1)
     medium_masks  = padarray(medium_masks,  pad_amount, i_water, 'pre');
     bone_mask_img = padarray(bone_mask_img, pad_amount, 0,       'pre');
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img, pad_amount, 0, 'pre');
+        pseudoCT_img = padarray(pseudoCT_img, pad_amount, NaN, 'pre');
     end
     total_pre_offset = total_pre_offset + pad_amount;  % Add conditional padding
     min_dims = max(min_dims, [1 1 1]);
@@ -114,7 +114,7 @@ if any(max_dims > size(medium_masks))
     medium_masks  = padarray(medium_masks,  pad_post_amount, i_water, 'post');
     bone_mask_img = padarray(bone_mask_img, pad_post_amount, 0,       'post');
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img, pad_post_amount, 0, 'post');
+        pseudoCT_img = padarray(pseudoCT_img, pad_post_amount, NaN, 'post');
     end
     fprintf('Post-padding applied: [%d %d %d] voxels\n', pad_post_amount);
 end
