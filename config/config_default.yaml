@@ -69,19 +69,12 @@ io:
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
 
-#------------ ISPPA targeting (free-water pressure scaling)
-#
-# Set target_isppa_wcm2 to a scalar to scale the acoustic output to a specific
-# free-water ISPPA before thermal analysis. Set it to a vector to automatically
-# run one thermal job per target (multi-ISPPA mode); see doc_multi_isppa.md.
-#
-# The acoustic simulation always runs at the elem_amp specified in the transducer
-# config. A fast water baseline sim is run alongside it (modules.run_water_baseline)
-# to record the free-water ISPPA at that drive level. Post-hoc pressure scaling is
-# then applied when loading cached results for thermal analysis.
+#------------ Calibration (equipment-level metadata, not ISPPA targeting)
 
 calibration:
-  target_isppa_wcm2: []  # Target free-water ISPPA [W/cm²]; scalar or vector
+  # target_isppa_wcm2 has moved to transducer.target_isppa_wcm2 (per-transducer).
+  # Setting calibration.target_isppa_wcm2 here still works but is deprecated and
+  # will be removed in a future release.
 
 #------------ Module execution
 
@@ -131,11 +124,21 @@ analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
 
 #------------ Transducer specification  (no defaults)
+#
+# target_isppa_wcm2: target free-water ISPPA for this transducer [W/cm²].
+#   Scalar  → scale to that intensity before thermal analysis.
+#   Vector  → run one thermal job per value (multi-ISPPA sweep mode).
+#   Empty   → no scaling; use elem_amp drive level as-is.
+#
+# The acoustic simulation always runs at the elem_amp specified below.
+# modules.run_water_baseline must be enabled to record the free-water baseline
+# ISPPA so that post-hoc pressure scaling can be applied.
 
 transducer:
   name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
+  target_isppa_wcm2: [] # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
 
   trans_pos: []              # Transducer position [T1 grid space]
   focus_pos: []              # Stimulation target position [T1 grid space]

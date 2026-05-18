@@ -99,6 +99,7 @@ function parameters = load_parameters(varargin)
         extra_config_location = varargin{2};
         extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
         parameters = MergeStruct(parameters, extra_parameters);
+        parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargin > 2
         % Check that extra inputs come in pairs (filename, location)
         if mod(numel(varargin), 2) ~= 0
@@ -110,7 +111,34 @@ function parameters = load_parameters(varargin)
             extra_config_location = varargin{i+1};
             extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
             parameters = MergeStruct(parameters, extra_parameters);
+            parameters = restore_struct_arrays(parameters, extra_parameters);
         end
+    end
+
+    %% Backwards compatibility: migrate calibration.target_isppa_wcm2 → transducer(i).target_isppa_wcm2
+    %
+    % The global calibration.target_isppa_wcm2 field is deprecated. Each transducer
+    % now carries its own target_isppa_wcm2. If the old field is present and a
+    % per-transducer value has not already been set, copy the global value to every
+    % transducer entry and remove the old field.
+    if isfield(parameters, 'calibration') && ...
+            isfield(parameters.calibration, 'target_isppa_wcm2') && ...
+            ~isempty(parameters.calibration.target_isppa_wcm2) && ...
+            any(isfinite(parameters.calibration.target_isppa_wcm2))
+        warning('prestus:deprecatedField', ...
+            ['calibration.target_isppa_wcm2 is deprecated. ' ...
+             'Set transducer.target_isppa_wcm2 instead (per-transducer). ' ...
+             'The value has been migrated automatically this run.']);
+        if isfield(parameters, 'transducer')
+            for ti = 1:numel(parameters.transducer)
+                if ~isfield(parameters.transducer(ti), 'target_isppa_wcm2') || ...
+                        isempty(parameters.transducer(ti).target_isppa_wcm2)
+                    parameters.transducer(ti).target_isppa_wcm2 = ...
+                        parameters.calibration.target_isppa_wcm2;
+                end
+            end
+        end
+        parameters.calibration = rmfield(parameters.calibration, 'target_isppa_wcm2');
     end
 
     %% Check interactive mode requirements
@@ -204,4 +232,29 @@ function parameters = load_parameters(varargin)
         print_parameter_summary(parameters)
     end
 
+end
+
+function merged = restore_struct_arrays(merged, extra)
+% After MergeStruct, top-level struct-array fields (e.g. transducer) may have
+% been collapsed to a scalar because getfield on a struct array returns only
+% the first element.  Restore any field that the extra config defined as a
+% larger array than what survived the merge.
+%
+% Strategy: element(1) of merged is already the correct merge of defaults +
+% extra element(1).  For elements 2..N we merge that same default-merged
+% base with each extra element so every element retains all default fields.
+    if ~isstruct(extra); return; end
+    fn = fieldnames(extra);
+    for i = 1:numel(fn)
+        f = fn{i};
+        if isfield(merged, f) && isstruct(extra.(f)) && ...
+                numel(extra.(f)) > numel(merged.(f))
+            base = merged.(f);   % 1×1: correctly merged defaults + extra element(1)
+            result = base;
+            for k = 2:numel(extra.(f))
+                result(k) = MergeStruct(base, extra.(f)(k));
+            end
+            merged.(f) = result;
+        end
+    end
 end
