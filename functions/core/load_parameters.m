@@ -206,12 +206,14 @@ function parameters = load_parameters(varargin)
     %% Convert additional paths into cell arrays for processing
 
     % Convert `paths_to_add` into cell array format (split by semicolon)
-    if isfield(parameters.startup, 'paths_to_add') && ~isempty(parameters.startup.paths_to_add)
+    if isfield(parameters.startup, 'paths_to_add') && ~isempty(parameters.startup.paths_to_add) ...
+            && ~iscell(parameters.startup.paths_to_add)
         parameters.startup.paths_to_add = cellstr(strsplit(parameters.startup.paths_to_add, ';'));
     end
 
     % Convert `subpaths_to_add` into cell array format (split by semicolon)
-    if isfield(parameters.startup, 'subpaths_to_add') && ~isempty(parameters.startup.subpaths_to_add)
+    if isfield(parameters.startup, 'subpaths_to_add') && ~isempty(parameters.startup.subpaths_to_add) ...
+            && ~iscell(parameters.startup.subpaths_to_add)
         parameters.startup.subpaths_to_add = cellstr(strsplit(parameters.startup.subpaths_to_add, ';'));
     end
 
