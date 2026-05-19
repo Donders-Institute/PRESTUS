@@ -32,9 +32,23 @@ function hash = prestus_version(prestus_path)
             hash = strtrim(git_info);
         end
 
+        [tag_status, tag_str] = system(sprintf('git -C "%s" describe --tags --always 2>/dev/null', prestus_path));
+        if tag_status == 0 && ~isempty(strtrim(tag_str))
+            version_str = strtrim(tag_str);
+        else
+            version_file = fullfile(prestus_path, 'VERSION');
+            if isfile(version_file)
+                fid = fopen(version_file, 'r');
+                version_str = strtrim(fgetl(fid));
+                fclose(fid);
+            else
+                version_str = 'unknown';
+            end
+        end
+
         if nargout == 0
             fprintf('============================================================ \n');
-            fprintf('PRESTUS 0.4.0 + \n');
+            fprintf('PRESTUS %s \n', version_str);
             fprintf('Commit: %s (branch: %s)  \n', hash, strtrim(branch));
             fprintf('Commit date: %s \n', strtrim(date));
             fprintf('============================================================ \n');
