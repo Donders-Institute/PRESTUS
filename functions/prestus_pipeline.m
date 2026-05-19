@@ -61,8 +61,8 @@ function [parameters] = prestus_pipeline(parameters, options)
     %% TELEMETRY (opt-in, anonymous)
     % ====================================================================
     telemetry_setup();                    % no-op after first run
-    track_usage('run_start', parameters);
-    telemetry_t0 = tic;
+    telemetry_t0  = tic;
+    telemetry_rid = generate_run_id();
     try
 
     % ====================================================================
@@ -603,12 +603,13 @@ function [parameters] = prestus_pipeline(parameters, options)
         prestus_pipeline_start(sequential_parameters, options)
     end
 
-    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success'));
+    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid));
 
     catch me_
         track_usage('run_error', parameters, struct( ...
             'duration_s', toc(telemetry_t0), ...
             'status',     'error', ...
+            'run_id',     telemetry_rid, ...
             'error_id',   me_.identifier));
         rethrow(me_);
     end

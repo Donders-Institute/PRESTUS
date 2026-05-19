@@ -6,14 +6,15 @@ function track_usage(event, parameters, options)
 % the pipeline. No personal data is transmitted; see docs/telemetry.md.
 %
 % Use as:
-%   track_usage('run_start', parameters)
-%   track_usage('run_end',   parameters, struct('duration_s', t, 'status', 'success'))
-%   track_usage('run_error', parameters, struct('duration_s', t, 'error_id', me.identifier))
+%   track_usage('run_end',   parameters, struct('run_id', rid, 'duration_s', t, 'status', 'success'))
+%   track_usage('run_error', parameters, struct('run_id', rid, 'duration_s', t, 'error_id', me.identifier))
 %
 % Events:
-%   run_start  - emitted after path/log setup, before any module runs
 %   run_end    - emitted on clean pipeline exit
 %   run_error  - emitted from the pipeline catch block
+%
+% A per-run UUID is generated in prestus_pipeline via generate_run_id() and
+% passed as options.run_id so individual runs are identifiable on the backend.
 %
 % See also: TELEMETRY_SETUP, TELEMETRY_SETUP_RESET, PRESTUS_VERSION
 
@@ -103,6 +104,7 @@ function payload = build_payload(event, parameters, options)
     payload.modules_enabled = modules_on;
 
     % --- outcome fields (populated on run_end / run_error) ---
+    if isfield(options, 'run_id'),      payload.run_id      = options.run_id;       end
     if isfield(options, 'duration_s'),  payload.duration_s  = options.duration_s;  end
     if isfield(options, 'status'),      payload.status      = options.status;       end
     if isfield(options, 'error_id'),    payload.error_id    = options.error_id;     end
@@ -162,6 +164,14 @@ function mode = detect_pipeline_mode(parameters)
     else
         mode = 'single';
     end
+end
+
+% -------------------------------------------------------------------------
+function rid = generate_run_id()
+    bytes = uint8(floor(rand(1,16) * 256));
+    bytes(7) = bitor(bitand(bytes(7), uint8(15)), uint8(64));
+    bytes(9) = bitor(bitand(bytes(9), uint8(63)), uint8(128));
+    rid = sprintf('%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x', bytes);
 end
 
 % -------------------------------------------------------------------------
