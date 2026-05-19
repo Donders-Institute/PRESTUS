@@ -9,6 +9,21 @@ if ~exist(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
 end
 
+% Coerce list-of-list fields to cell-of-cell if yaml ConvertToArray
+% flattened them into numeric matrices.
+for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
+    f = coerce_field{1};
+    if ~iscell(parameters.calibration.(f))
+        parameters.calibration.(f) = ...
+            cellfun(@num2cell, num2cell(parameters.calibration.(f), 2), ...
+                    'UniformOutput', false);
+    elseif ~iscell(parameters.calibration.(f){1})
+        parameters.calibration.(f) = ...
+            cellfun(@num2cell, parameters.calibration.(f), ...
+                    'UniformOutput', false);
+    end
+end
+
 % Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
 for i = 1:N_i
