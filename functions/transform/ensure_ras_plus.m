@@ -107,7 +107,7 @@ end
     new_T(4, 1:3)  = origin_ras';
 
     hdr_out = hdr_in;
-    hdr_out.Transform        = affineTransform3d(new_T);
+    hdr_out.Transform        = affine3d(new_T);
     hdr_out.ImageSize        = sz(1:3);
     hdr_out.PixelDimensions  = new_pixdims;
 

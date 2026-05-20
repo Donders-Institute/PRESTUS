@@ -64,14 +64,14 @@ else
     % In case simulations are not run in a skull of layered tissue, 
     % alternative grid dimensions are set up
     if strcmp(parameters.simulation.medium, 'phantom')
-        % read in phantoms directly as medium masks 
+        % read in phantoms directly as medium masks
         segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
         segmented_img = squeeze(niftiread(filename_segmented));
-        if size(segmented_img) == parameters.grid.default_dims
+        if isequal(size(segmented_img), parameters.grid.default_dims)
             parameters.grid.dims = parameters.grid.default_dims;
             disp('Check passed: phantom dimensions fit requested grid...');
-        elseif length(size(segmented_img))==2 && all(size(segmented_img') == parameters.grid.default_dims)
+        elseif length(size(segmented_img))==2 && isequal(size(segmented_img'), parameters.grid.default_dims)
             parameters.grid.dims = parameters.grid.default_dims;
             segmented_img = segmented_img';
             disp('Check passed: phantom dimensions fit requested grid after rotating phantom...');
