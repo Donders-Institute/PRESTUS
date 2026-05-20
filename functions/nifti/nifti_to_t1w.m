@@ -89,7 +89,7 @@ else
     T = diag([res res res 1]);
     T(1:3, 4) = origin;
     niftiwrite(cast(data, opts.Datatype), orig_file, 'Compressed', true);
-    hdr = niftiinfo([orig_file '.gz']);
+    hdr = niftiinfo([orig_file '.nii.gz']);
     hdr.PixelDimensions = repmat(res, 1, numel(hdr.PixelDimensions));
     hdr.Datatype        = opts.Datatype;
     if ~isempty(opts.BitsPerPixel)
