@@ -38,7 +38,10 @@ end
     focus_wrt_mid_bowl = desired_focal_distance_ep + dist_to_mid_bowl;
 
     % Compute the target point in relation to the natural focus [mm]
-    aim_wrt_natural_focus = tran.transducer.annular.curv_radius_mm - focus_wrt_mid_bowl;
+    % Positive z = beyond natural focus; negative z = between bowl and natural focus.
+    % Bowl apex sits at z = -curv_radius in this frame, so a point at
+    % focus_wrt_mid_bowl mm from the apex is at z = focus_wrt_mid_bowl - curv_radius.
+    aim_wrt_natural_focus = focus_wrt_mid_bowl - tran.transducer.annular.curv_radius_mm;
     point_mm = [0, 0, aim_wrt_natural_focus]; % Target point coordinates [x, y, z] in mm
 
     % Target point in meters

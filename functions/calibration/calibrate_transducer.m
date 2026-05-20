@@ -133,7 +133,10 @@ ref_col = find(abs(available_depths_ep - ref_depth) < 0.5, 1);
         params_ref.transducer.annular.elem_phase_deg = geo_phases_ref_deg;
         params_ref.transducer.annular.elem_phase_rad = geo_phases_ref_deg * pi / 180;
 
-        % Global search at reference depth
+        % Global search at reference depth — seed from geometric phases so
+        % the recovered delta is a small hardware-specific correction, not
+        % an arbitrary alternative solution far from the geometric prediction.
+        params_ref.calibration.opt_use_initial_phases = true;
         fprintf('Running global search at reference depth %.1f mm...\n', ref_depth);
         [opt_phases_rad, opt_velocity, min_err] = perform_global_search(...
             params_ref, profile_ref, ...

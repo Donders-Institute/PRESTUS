@@ -121,12 +121,14 @@ end
         case 'monotonic'
             if use_initial_phases
                 p = mod(parameters.transducer.annular.elem_phase_rad(:)', 2*pi);
+                phase_start0 = p(1);
                 deltas0 = max(diff(p), 0);
             else
+                phase_start0 = rand() * 2*pi;
                 deltas0 = rand(1, n_elem-1) * 2*pi/(n_elem-1);
             end
             % [phase_start, delta_1, ..., delta_{N-1}, velocity]
-            initial_guess = [mod(p(1), 2*pi), deltas0, velocity];
+            initial_guess = [phase_start0, deltas0, velocity];
             lower_bounds  = [0,    zeros(1, n_elem-1), 0.001];
             upper_bounds  = [2*pi, 2*pi * ones(1, n_elem-1), parameters.calibration.opt_upper_velocity];
         otherwise

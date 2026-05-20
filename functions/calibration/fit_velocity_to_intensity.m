@@ -74,7 +74,7 @@ end
     % Exclude near-field if requested
     I_filtered = I_axial;
     axial_pos_filtered = axial_position;
-    if parameters.calibration.skip_front_peak_mm ~= 0
+    if isfield(parameters.calibration, 'skip_front_peak_mm') && parameters.calibration.skip_front_peak_mm ~= 0
         i_remove = axial_pos_filtered <= parameters.calibration.skip_front_peak_mm;
         axial_pos_filtered(i_remove) = [];
         I_filtered(i_remove) = [];

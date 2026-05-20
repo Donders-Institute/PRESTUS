@@ -89,6 +89,11 @@ for i = 1:N_i
     dist_from_exit_plane = charac_data(3:end, 1);
     intens_data = charac_data(3:end, 2:end);
 
+    % readmatrix pads ragged CSVs with NaN — drop those columns
+    valid_cols                    = isfinite(available_foci_wrt_exit_plane);
+    available_foci_wrt_exit_plane = available_foci_wrt_exit_plane(valid_cols);
+    intens_data                   = intens_data(:, valid_cols);
+
     % Ensure focal depths are specified. 
     % If no focal depths, perform the simulations for all available focal depths
     if isempty(parameters.calibration.focal_depths_wrt_exit_plane{i})
