@@ -40,6 +40,12 @@ end
     is_layered = strcmp(parameters.simulation.medium, 'layered');
     m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 
+    % thermal_simulation expands temp_0 via radialExpand2DTo3D for axisymmetric grids
+    % but MATLAB pass-by-value means the caller's copy stays 2D; re-expand here.
+    if ~isequal(size(kwave_medium.temp_0), size(results_heating.maxT))
+        kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0);
+    end
+
     data_types = ["heating", "heating_end", "heatrise", "heatrise_end", ...
                   "CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"];
     n = numel(data_types);
