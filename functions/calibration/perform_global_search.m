@@ -97,21 +97,51 @@ end
         parameters.calibration.opt_upper_velocity = 0.2; % set default for upper velocity to 20 mm/s;
     end
 
+    use_initial_phases = isfield(parameters.calibration, 'opt_use_initial_phases') && ...
+        parameters.calibration.opt_use_initial_phases && ...
+        isfield(parameters.transducer.annular, 'elem_phase_rad') && ...
+        ~isempty(parameters.transducer.annular.elem_phase_rad);
+
     switch precession_mode
         case 'linear'
+            if use_initial_phases
+                p = mod(parameters.transducer.annular.elem_phase_rad(:)', 2*pi);
+                x = (0:n_elem-1)';
+                coeffs = [ones(n_elem,1), x] \ p(:);
+                phase_start0 = mod(coeffs(1), 2*pi);
+                phase_step0  = coeffs(2);
+            else
+                phase_start0 = rand() * 2*pi;
+                phase_step0  = (rand()-0.5) * 2*pi;
+            end
             % [phase_start (rad), phase_step (rad/elem), velocity (m/s)]
-            initial_guess = [rand() * 2*pi, (rand()-0.5) * 2*pi, velocity];
+            initial_guess = [phase_start0, phase_step0, velocity];
             lower_bounds  = [0,    -2*pi, 0.001];
             upper_bounds  = [2*pi,  2*pi, parameters.calibration.opt_upper_velocity];
         case 'monotonic'
+            if use_initial_phases
+                p = mod(parameters.transducer.annular.elem_phase_rad(:)', 2*pi);
+                deltas0 = max(diff(p), 0);
+            else
+                deltas0 = rand(1, n_elem-1) * 2*pi/(n_elem-1);
+            end
             % [phase_start, delta_1, ..., delta_{N-1}, velocity]
-            initial_guess = [rand() * 2*pi, rand(1, n_elem-1) * 2*pi/(n_elem-1), velocity];
+            initial_guess = [mod(p(1), 2*pi), deltas0, velocity];
             lower_bounds  = [0,    zeros(1, n_elem-1), 0.001];
             upper_bounds  = [2*pi, 2*pi * ones(1, n_elem-1), parameters.calibration.opt_upper_velocity];
         otherwise
-            initial_guess = [randi(360, [1, n_elem]) / 180 * pi, velocity];
+            if use_initial_phases
+                initial_phases = mod(parameters.transducer.annular.elem_phase_rad(:)', 2*pi);
+            else
+                initial_phases = randi(360, [1, n_elem]) / 180 * pi;
+            end
+            initial_guess = [initial_phases, velocity];
             lower_bounds  = [zeros(1, n_elem), 0.001];
             upper_bounds  = [2*pi * ones(1, n_elem), parameters.calibration.opt_upper_velocity];
+    end
+
+    if use_initial_phases
+        disp('perform_global_search: using manufacturer/config phases as initial guess.');
     end
 
     if ~isfield(parameters.calibration, 'opt_method') || strcmp(parameters.calibration.opt_method, 'FEXminimize')

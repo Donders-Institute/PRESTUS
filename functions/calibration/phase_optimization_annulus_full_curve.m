@@ -54,16 +54,16 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
     end
 
     if strcmp(forward_model, 'rayleigh')
-        i_axial_oneil = rayleigh_axial_intensity(phase, velocity, parameters, axial_position);
+        i_axial = rayleigh_axial_intensity(phase, velocity, parameters, axial_position);
     elseif strcmp(forward_model, 'oneil')
-        p_axial_oneil = focusedAnnulusONeil(parameters.transducer.annular.curv_radius_mm / 1e3, ...
+        p_axial = focusedAnnulusONeil(parameters.transducer.annular.curv_radius_mm / 1e3, ...
             [parameters.transducer.annular.elem_id_mm; parameters.transducer.annular.elem_od_mm] / 1e3, ...
             repmat(velocity, 1, parameters.transducer.annular.elem_n), ...
             [phase], parameters.transducer.freq_hz, ...
             parameters.medium_properties.water.sound_speed, ...
             parameters.medium_properties.water.density, ...
             (axial_position - 0.5) * 1e-3);
-        i_axial_oneil = p_axial_oneil.^2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
+        i_axial = p_axial.^2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
     else
         error('phase_optimization_annulus_full_curve: unknown forward_model ''%s''; expected ''oneil'' or ''rayleigh''.', forward_model);
     end
@@ -85,7 +85,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
 
     %% Calculate error metric
     % Compute weighted squared error between computed and desired profiles
-    error_v = (i_axial_oneil - desired_intensity_curve).^2 .* weights;
+    error_v = (i_axial - desired_intensity_curve).^2 .* weights;
     error_v = error_v(limit_ind); % Restrict error calculation to optimization limits
     error = mean(error_v); % Mean squared error
 
@@ -96,7 +96,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         % Plot computed and desired profiles along with weights
         ax1 = subplot(1, 2, 1);
         hold on;
-        plot(axial_position, i_axial_oneil, 'Color', [0 0 0]);
+        plot(axial_position, i_axial, 'Color', [0 0 0]);
         plot(axial_position, desired_intensity_curve, 'Color', [1 0 0]);
         yyaxis right;
         plot(axial_position, weights);
