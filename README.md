@@ -27,7 +27,7 @@ Please see the [PRESTUS documentation](https://donders-institute.github.io/PREST
 # Reference
 
 If you use this tool for publications, please cite:
-Kosciessa, J. Q.\*, Chetverikov, A.\*, Cornelissen, M., van der Zee, K., Carpino, E., Wimmers, M., Adelhöfer, N., Meijer, S., & Verhagen, L. (2026). PRESTUS (0.5.0). Zenodo. https://doi.org/10.5281/zenodo.15095860
+Kosciessa, J. Q., Chetverikov, A., Cornelissen, M., van der Zee, K., Carpino, E., Wimmers, M., Adelhöfer, N., Meijer, S., & Verhagen, L. (2026). PRESTUS (0.6.0). Zenodo. https://doi.org/10.5281/zenodo.15095860
 
 # Contributors
 
