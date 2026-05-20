@@ -15,6 +15,10 @@ function nifti_thermal(parameters, planimg, results_heating, kwave_medium)
 %                     CEM43_iso, CEM43_iso_end
 %   kwave_medium    - struct with field: temp_0
 %
+% The T1w back-transform (tformarray) is batched by fill-value group, and the
+% MNI transform is issued as a single parallel call to
+% convert_final_to_MNI_simnibs.
+%
 % See also: NIFTI_MEDIUM, NIFTI_ACOUSTIC, CONVERT_FINAL_TO_MNI_SIMNIBS
 
 arguments
@@ -39,65 +43,126 @@ end
 
     data_types = ["heating", "heating_end", "heatrise", "heatrise_end", ...
                   "CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"];
+    n = numel(data_types);
 
-    for data_type = data_types
-        orig_file    = fullfile(parameters.io.dir_nii_T1w, sprintf('sub-%03d_%s_T1w%s_%s', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
-        orig_file_gz = strcat(orig_file, '.nii.gz');
-        mni_file     = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_MNI%s_%s.nii.gz', ...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, data_type));
+    % Build all file paths up front
+    orig_files    = cell(1, n);
+    orig_files_gz = cell(1, n);
+    mni_files     = cell(1, n);
+    for k = 1:n
+        dt = data_types(k);
+        orig_files{k}    = fullfile(parameters.io.dir_nii_T1w, sprintf('sub-%03d_%s_T1w%s_%s', ...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, dt));
+        orig_files_gz{k} = strcat(orig_files{k}, '.nii.gz');
+        mni_files{k}     = fullfile(parameters.io.dir_nii_MNI, sprintf('sub-%03d_%s_MNI%s_%s.nii.gz', ...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix, dt));
+    end
 
-        switch data_type
-            case "heating",      data = single(results_heating.maxT);
-            case "heating_end",  data = single(results_heating.heating_endT);
-            case "heatrise",     data = single(results_heating.maxT - kwave_medium.temp_0);
-            case "heatrise_end", data = single(results_heating.heating_endT - kwave_medium.temp_0);
-            case "CEM43",        data = single(results_heating.CEM43);
-            case "CEM43_end",    data = single(results_heating.CEM43_end);
-            case "CEM43_iso",    data = single(results_heating.CEM43_iso);
-            case "CEM43_iso_end",data = single(results_heating.CEM43_iso_end);
-        end
+    needs_t1w = false(1, n);
+    for k = 1:n
+        needs_t1w(k) = logical(confirm_overwriting(orig_files_gz{k}, parameters));
+    end
 
-        if confirm_overwriting(orig_file_gz, parameters)
-            if is_layered
-                orig_hdr = planimg.t1_header;
-                orig_hdr.Datatype = 'single';
-                data_backtransf = tformarray(data, planimg.inv_transf, ...
-                    makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], ...
-                    size(planimg.t1_image_orig), [], 0);
+    % -------------------------------------------------------------------------
+    % T1w back-transform — batched by fill-value group (2 tformarray calls
+    % instead of 8).
+    %
+    % Group A (fill = water baseline):  heating, heating_end        → indices 1–2
+    % Group B (fill = 0):               heatrise*, CEM43*           → indices 3–8
+    % -------------------------------------------------------------------------
+    if is_layered
+        orig_hdr          = planimg.t1_header;
+        orig_hdr.Datatype = 'single';
+        t1_size           = size(planimg.t1_image_orig);
+        fill_water        = double(parameters.thermal.temp_0.water);
 
-                if strcmp(data_type, "heating")
-                    % Remove back-transform edge artefacts: replace the outer
-                    % shell of the heated region with the median boundary value.
-                    heatmap_mask = data_backtransf > 0;
-                    heatmap_mask_eroded = imerode(heatmap_mask, strel('sphere', 3));
-                    heatmap_mask_eroded_edge = imdilate(heatmap_mask_eroded, strel('sphere', 1)) & heatmap_mask & ~heatmap_mask_eroded;
-                    heatmap_band_values = data_backtransf(heatmap_mask_eroded_edge);
-                    if ~isempty(heatmap_band_values)
-                        heatmap_band_value = median(heatmap_band_values);
-                    else
-                        heatmap_band_value = parameters.thermal.temp_0.water;
-                    end
-                    data_backtransf(~heatmap_mask_eroded) = heatmap_band_value;
-                    data_backtransf(1:2,:,:)       = parameters.thermal.temp_0.water;
-                    data_backtransf(end-1:end,:,:) = parameters.thermal.temp_0.water;
-                    data_backtransf(:,1:2,:)       = parameters.thermal.temp_0.water;
-                    data_backtransf(:,end-1:end,:) = parameters.thermal.temp_0.water;
-                    data_backtransf(:,:,1:2)       = parameters.thermal.temp_0.water;
-                    data_backtransf(:,:,end-1:end) = parameters.thermal.temp_0.water;
-
-                elseif any(strcmp(data_type, ["CEM43", "CEM43_end", "CEM43_iso", "CEM43_iso_end"]))
-                    data_backtransf(data_backtransf <= 0) = 0.0000001;
+        grp_a = [1 2];
+        if any(needs_t1w(grp_a))
+            stack_a = cat(4, single(results_heating.maxT), single(results_heating.heating_endT));
+            backtransf_a = tformarray(stack_a, planimg.inv_transf, ...
+                makeresampler('linear', 'fill'), [1 2 3], [1 2 3], t1_size, [], fill_water);
+            for ki = 1:numel(grp_a)
+                k = grp_a(ki);
+                if needs_t1w(k)
+                    niftiwrite(backtransf_a(:,:,:,ki), orig_files{k}, orig_hdr, 'Compressed', true);
                 end
-
-                niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
-            else
-                niftiwrite(data, orig_file, 'Compressed', true);
             end
         end
 
-        nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder);
+        grp_b = 3:8;
+        if any(needs_t1w(grp_b))
+            stack_b = cat(4, ...
+                single(results_heating.maxT         - kwave_medium.temp_0), ...
+                single(results_heating.heating_endT - kwave_medium.temp_0), ...
+                single(results_heating.CEM43), ...
+                single(results_heating.CEM43_end), ...
+                single(results_heating.CEM43_iso), ...
+                single(results_heating.CEM43_iso_end));
+            backtransf_b = tformarray(stack_b, planimg.inv_transf, ...
+                makeresampler('linear', 'fill'), [1 2 3], [1 2 3], t1_size, [], 0);
+            cem_local = [3 4 5 6]; % local positions within grp_b that are CEM43 types
+            for ki = 1:numel(grp_b)
+                k = grp_b(ki);
+                if ~needs_t1w(k); continue; end
+                v = backtransf_b(:,:,:,ki);
+                if ismember(ki, cem_local)
+                    v(v <= 0) = 0.0000001;
+                end
+                niftiwrite(v, orig_files{k}, orig_hdr, 'Compressed', true);
+            end
+        end
 
-        clear data;
+    else
+        for k = 1:n
+            if ~needs_t1w(k); continue; end
+            switch data_types(k)
+                case "heating",      data = single(results_heating.maxT);
+                case "heating_end",  data = single(results_heating.heating_endT);
+                case "heatrise",     data = single(results_heating.maxT - kwave_medium.temp_0);
+                case "heatrise_end", data = single(results_heating.heating_endT - kwave_medium.temp_0);
+                case "CEM43",        data = single(results_heating.CEM43);
+                case "CEM43_end",    data = single(results_heating.CEM43_end);
+                case "CEM43_iso",    data = single(results_heating.CEM43_iso);
+                case "CEM43_iso_end",data = single(results_heating.CEM43_iso_end);
+            end
+            niftiwrite(data, orig_files{k}, 'Compressed', true);
+        end
+    end
+
+    % -------------------------------------------------------------------------
+    % MNI transform — single batched call; fill corrections applied afterwards
+    % -------------------------------------------------------------------------
+    if ~is_layered || ~should_save_output(parameters.io, 'save_MNI')
+        return
+    end
+
+    mni_in    = {};
+    mni_out   = {};
+    fill_vals = [];
+    for k = 1:n
+        if ~confirm_overwriting(mni_files{k}, parameters); continue; end
+        if ~isfile(orig_files_gz{k}); continue; end
+        mni_in{end+1}    = orig_files_gz{k}; %#ok<AGROW>
+        mni_out{end+1}   = mni_files{k};     %#ok<AGROW>
+        fill_vals(end+1) = double(k <= 2) * fill_water; %#ok<AGROW>
+    end
+
+    if isempty(mni_in); return; end
+
+    convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters, ...
+        'interpolation_order', 0);
+
+    % Apply per-volume fill corrections (replace out-of-FOV zeros)
+    for j = 1:numel(mni_out)
+        if ~isfile(mni_out{j}); continue; end
+        fill_val = fill_vals(j);
+        if fill_val == 0; continue; end
+        hdr = niftiinfo(mni_out{j});
+        vol = niftiread(hdr);
+        bg  = (vol == 0);
+        if any(bg, 'all')
+            vol(bg) = cast(fill_val, class(vol));
+            niftiwrite(vol, strrep(mni_out{j}, '.nii.gz', ''), hdr, 'Compressed', true);
+        end
     end
 end

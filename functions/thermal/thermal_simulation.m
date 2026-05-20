@@ -1,5 +1,4 @@
-function [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, CEM43_max, CEM43_focal, CEM43_cur, timeseries, CEM43_iso_max, CEM43_iso_focal, CEM43_iso_cur] = ...
-    thermal_simulation(...
+function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulation(...
     parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
 % THERMAL_SIMULATION  Simulate thermal effects of transcranial ultrasound using k-Wave
 %
@@ -13,10 +12,12 @@ function [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, CEM43_max, C
 % simulation.code_type is 'matlab_gpu' or 'cpp_gpu'.
 %
 % Use as:
-%   [thermal_diff_obj, time_status_seq, T_max, T_focal, T_cur, ...
-%    CEM43_max, CEM43_focal, CEM43_cur, timeseries, ...
-%    CEM43_iso_max, CEM43_iso_focal, CEM43_iso_cur] = ...
+%   [thermal_diff_obj, time_status_seq, results_heating] = ...
 %       thermal_simulation(parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
+%
+% results_heating fields: maxT, focal_planeT, heating_endT,
+%   CEM43, focal_planeCEM43, CEM43_end, timeseries,
+%   CEM43_iso, focal_planeCEM43_iso, CEM43_iso_end
 %
 % Input:
 %   parameters   - PRESTUS config; must contain thermal, timing, grid.dims,
@@ -127,7 +128,7 @@ if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_h
     heatmap_image = niftiread(parameters.io.adopted_heatmap);
     fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
     kwave_medium.temp_0 = double(tformarray(heatmap_image, maketform("affine", transf), ...
-        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+        makeresampler('linear', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], parameters.thermal.temp_0.water));
 end
 
 % convert attenuation into absorption coefficients
@@ -238,7 +239,15 @@ end
 CEM43_max = thermal_diff_obj.cem43;
 
 % initialize field for cem43 (iso variant)
-tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
+if isfield(parameters.io, 'adopted_cem43_iso') && ~isempty(parameters.io.adopted_cem43_iso) && isfile(parameters.io.adopted_cem43_iso)
+    cem43_iso_image = niftiread(parameters.io.adopted_cem43_iso);
+    fprintf('\nAdopting ISO CEM43 heatmap %s from previous simulation\n', parameters.io.adopted_cem43_iso)
+    tmp_obj.cem43_iso = double(tformarray(cem43_iso_image, ...
+        maketform("affine", transf), ...
+        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+else
+    tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
+end
 CEM43_iso_max = tmp_obj.cem43_iso;
 
 % Convert the thermal parameters for the simulation
@@ -477,16 +486,17 @@ T_focal         = T_focal(:,:,1:cur_timepoint);
 CEM43_focal     = CEM43_focal(:,:,1:cur_timepoint);
 CEM43_iso_focal = CEM43_iso_focal(:,:,1:cur_timepoint);
 
-% Apply gather (if variables are GPU arrays)
-T_max         = gather(T_max);
-T_focal       = gather(T_focal);
-T_cur         = gather(T_cur);
-CEM43_max     = gather(CEM43_max);
-CEM43_focal   = gather(CEM43_focal);
-CEM43_cur     = gather(CEM43_cur);
-CEM43_iso_max   = gather(CEM43_iso_max);
-CEM43_iso_focal = gather(CEM43_iso_focal);
-CEM43_iso_cur   = gather(CEM43_iso_cur);
+% Gather results into output struct (gathering from GPU if needed)
+results_heating.maxT                 = gather(T_max);
+results_heating.focal_planeT         = gather(T_focal);
+results_heating.heating_endT         = gather(T_cur);
+results_heating.CEM43                = gather(CEM43_max);
+results_heating.focal_planeCEM43     = gather(CEM43_focal);
+results_heating.CEM43_end            = gather(CEM43_cur);
+results_heating.timeseries           = timeseries;
+results_heating.CEM43_iso            = gather(CEM43_iso_max);
+results_heating.focal_planeCEM43_iso = gather(CEM43_iso_focal);
+results_heating.CEM43_iso_end        = gather(CEM43_iso_cur);
 
 fprintf('Thermal simulation complete. Recorded %d timepoints.\n', cur_timepoint);
 

@@ -75,19 +75,27 @@ if opts.IsLayered
 
     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
 else
+    % Build a diagonal RAS sform so all phantom outputs share a
+    % consistent world-space definition.  origin_ras_mm defaults to
+    % [0 0 0] when not provided, which places voxel (1,1,1) at
+    % world (res, res, res) mm — matching the convention used by
+    % createPhantom's write_phantom so overlays align in ITK-SNAP.
+    res = parameters.grid.resolution_mm;
     if isfield(planimg, 'origin_ras_mm') && ~isempty(planimg.origin_ras_mm)
-        % build a diagonal RAS affine from grid resolution and declared origin
-        res = parameters.grid.resolution_mm;
-        hdr = niftiinfo();
-        hdr.ImageSize    = size(data);
-        hdr.PixelDimensions = repmat(res, 1, ndims(data));
-        hdr.Datatype     = opts.Datatype;
-        T = diag([res res res 1]);
-        T(1:3, 4) = planimg.origin_ras_mm(:);
-        hdr.Transform    = affineTransform3d(T');
-        niftiwrite(cast(data, opts.Datatype), orig_file, hdr, 'Compressed', true);
+        origin = planimg.origin_ras_mm(:);
     else
-        niftiwrite(data, orig_file, 'Compressed', true);
+        origin = zeros(3, 1);
     end
+    T = diag([res res res 1]);
+    T(1:3, 4) = origin;
+    niftiwrite(cast(data, opts.Datatype), orig_file, 'Compressed', true);
+    hdr = niftiinfo([orig_file '.gz']);
+    hdr.PixelDimensions = repmat(res, 1, numel(hdr.PixelDimensions));
+    hdr.Datatype        = opts.Datatype;
+    if ~isempty(opts.BitsPerPixel)
+        hdr.BitsPerPixel = opts.BitsPerPixel;
+    end
+    hdr.Transform = affine3d(T');
+    niftiwrite(cast(data, opts.Datatype), orig_file, hdr, 'Compressed', true);
 end
 end
