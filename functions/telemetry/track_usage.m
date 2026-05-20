@@ -71,6 +71,12 @@ function payload = build_payload(event, parameters, options, pipe_options)
     catch
         payload.kwave_ver = 'unknown';
     end
+    payload.os_version    = get_os_version();
+    payload.cpu_model     = get_cpu_model();
+    payload.n_cpu_cores   = feature('numcores');
+    payload.ram_gb        = get_ram_gb();
+    payload.gpu_model     = get_gpu_model();
+    payload.toolboxes     = get_toolbox_names();
 
     % --- execution environment ---
     payload.sim_platform  = safe_get(parameters, {'platform'}, 'unknown');
@@ -201,6 +207,87 @@ function n = get_elem_n(parameters)
             if ~isnan(nr) && ~isnan(nc), n = nr * nc; end
         otherwise
             n = NaN;
+    end
+end
+
+% -------------------------------------------------------------------------
+function v = get_os_version()
+    try
+        arch = computer('arch');
+        if contains(arch, 'mac')
+            [~, v] = system('sw_vers -productVersion');
+        elseif isunix
+            [~, v] = system('uname -r');
+        else
+            [~, v] = system('ver');
+        end
+        v = strtrim(v);
+    catch
+        v = 'unknown';
+    end
+end
+
+% -------------------------------------------------------------------------
+function m = get_cpu_model()
+    try
+        arch = computer('arch');
+        if contains(arch, 'mac')
+            [~, m] = system('sysctl -n machdep.cpu.brand_string');
+        elseif isunix
+            [~, m] = system('grep -m1 "model name" /proc/cpuinfo | cut -d: -f2');
+        else
+            [~, m] = system('wmic cpu get name /value');
+            m = regexprep(m, 'Name=', '');
+        end
+        m = strtrim(m);
+    catch
+        m = 'unknown';
+    end
+end
+
+% -------------------------------------------------------------------------
+function gb = get_ram_gb()
+    try
+        arch = computer('arch');
+        if contains(arch, 'mac')
+            [~, r] = system('sysctl -n hw.memsize');
+            gb = round(str2double(strtrim(r)) / 1024^3);
+        elseif isunix
+            [~, r] = system('grep MemTotal /proc/meminfo');
+            kb = str2double(regexp(r, '\d+', 'match', 'once'));
+            gb = round(kb / 1024^2);
+        else
+            [~, r] = system('wmic computersystem get TotalPhysicalMemory /value');
+            bytes = str2double(regexp(r, '\d+', 'match', 'once'));
+            gb = round(bytes / 1024^3);
+        end
+    catch
+        gb = NaN;
+    end
+end
+
+% -------------------------------------------------------------------------
+function name = get_gpu_model()
+    try
+        if ~license('test', 'Distrib_Computing_Toolbox')
+            name = 'no_pct';
+            return
+        end
+        g = gpuDevice();
+        name = g.Name;
+    catch
+        name = 'none';
+    end
+end
+
+% -------------------------------------------------------------------------
+function names = get_toolbox_names()
+    try
+        info = ver;
+        names = {info.Name};
+        names = names(~strcmp(names, 'MATLAB'));
+    catch
+        names = {};
     end
 end
 
