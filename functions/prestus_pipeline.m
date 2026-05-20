@@ -684,14 +684,14 @@ function [parameters] = prestus_pipeline(parameters, options)
           acoustic_provenance results_acoustic ...
           acoustic_Ipa acoustic_MI acoustic_pressure highlighted_pos
 
-    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid));
+    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid), options);
 
     catch me_
         track_usage('run_error', parameters, struct( ...
             'duration_s', toc(telemetry_t0), ...
             'status',     'error', ...
             'run_id',     telemetry_rid, ...
-            'error_id',   me_.identifier));
+            'error_id',   me_.identifier), options);
         rethrow(me_);
     end
 

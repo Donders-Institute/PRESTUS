@@ -1,4 +1,4 @@
-function track_usage(event, parameters, options)
+function track_usage(event, parameters, options, pipe_options)
 % TRACK_USAGE  Send anonymous usage statistics to the PRESTUS telemetry endpoint.
 %
 % Does nothing unless the user has explicitly opted in via telemetry_setup.
@@ -16,12 +16,16 @@ function track_usage(event, parameters, options)
 % A per-run UUID is generated in prestus_pipeline via generate_run_id() and
 % passed as options.run_id so individual runs are identifiable on the backend.
 %
+% pipe_options is the pipeline options struct (e.g. with sequential_configs)
+% used for pipeline mode detection; it is optional and never transmitted.
+%
 % See also: TELEMETRY_SETUP, TELEMETRY_SETUP_RESET, PRESTUS_VERSION
 
     arguments
-        event      (1,:) char
-        parameters (1,1) struct
-        options    (1,1) struct = struct()
+        event        (1,:) char
+        parameters   (1,1) struct
+        options      (1,1) struct = struct()
+        pipe_options (1,1) struct = struct()
     end
 
     if ~telemetry_opted_in()
@@ -29,7 +33,7 @@ function track_usage(event, parameters, options)
     end
 
     try
-        payload = build_payload(event, parameters, options);
+        payload = build_payload(event, parameters, options, pipe_options);
         send_payload(payload);
     catch
         % silently drop – telemetry must never interrupt the pipeline
@@ -52,7 +56,7 @@ function opted = telemetry_opted_in()
 end
 
 % -------------------------------------------------------------------------
-function payload = build_payload(event, parameters, options)
+function payload = build_payload(event, parameters, options, pipe_options)
 
     % --- identity (all anonymous) ---
     payload.event         = event;
@@ -84,7 +88,7 @@ function payload = build_payload(event, parameters, options)
     payload.layers        = get_layer_names(parameters);
 
     % --- pipeline mode ---
-    payload.pipeline_mode = detect_pipeline_mode(parameters);
+    payload.pipeline_mode = detect_pipeline_mode(parameters, pipe_options);
 
     % --- transducer (model/type only, no geometry) ---
     payload.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
@@ -156,11 +160,14 @@ function val = safe_get(s, keys, default)
 end
 
 % -------------------------------------------------------------------------
-function mode = detect_pipeline_mode(parameters)
+function mode = detect_pipeline_mode(parameters, pipe_options)
+    if nargin < 2, pipe_options = struct(); end
     if is_async_mode(parameters)
         mode = 'async';
     elseif is_multi_isppa_mode(parameters)
         mode = 'multi_isppa';
+    elseif isfield(pipe_options, 'sequential_configs')
+        mode = 'sequential';
     else
         mode = 'single';
     end
