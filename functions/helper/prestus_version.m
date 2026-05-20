@@ -1,19 +1,21 @@
-function hash = prestus_version(prestus_path)
+function [hash, version_str] = prestus_version(prestus_path)
 % PRESTUS_VERSION  Print PRESTUS version info and optionally return the git hash.
 %
 % Resolves the PRESTUS root (via get_prestus_path if not supplied), then uses
 % git to retrieve the short commit hash, branch name, and commit date.
 %
 % Use as:
-%   prestus_version()           % print only
-%   hash = prestus_version()    % print and return short commit hash
+%   prestus_version()                    % print only
+%   hash = prestus_version()             % print and return short commit hash
+%   [hash, ver] = prestus_version()      % also return version string (tag/VERSION)
 %   hash = prestus_version(prestus_path)
 %
 % Input:
 %   prestus_path - path to the PRESTUS root directory (optional)
 %
 % Output:
-%   hash - short git commit hash string, or 'unknown' if git is unavailable
+%   hash        - short git commit hash string, or 'unknown' if git is unavailable
+%   version_str - version tag string (from git describe or VERSION file), or 'unknown'
 %
 % See also: KWAVE_VERSION, SIMNIBS_VERSION, PATH_LOG_SETUP
 
@@ -21,7 +23,8 @@ function hash = prestus_version(prestus_path)
         prestus_path = get_prestus_path;
     end
 
-    hash = 'unknown';
+    hash        = 'unknown';
+    version_str = 'unknown';
 
     try
         [status, git_info] = system(sprintf('git -C "%s" rev-parse --short HEAD 2>/dev/null', prestus_path));
@@ -41,8 +44,6 @@ function hash = prestus_version(prestus_path)
                 fid = fopen(version_file, 'r');
                 version_str = strtrim(fgetl(fid));
                 fclose(fid);
-            else
-                version_str = 'unknown';
             end
         end
 

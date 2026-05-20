@@ -58,7 +58,7 @@ function payload = build_payload(event, parameters, options)
     payload.event         = event;
     payload.timestamp_utc = posixtime(datetime('now', 'TimeZone', 'UTC'));
     payload.uuid          = get_or_create_uuid();
-    payload.prestus_ver   = prestus_version();   % returns short git hash
+    [payload.prestus_hash, payload.prestus_ver] = prestus_version();
     payload.matlab_ver    = version('-release');
     payload.platform      = computer('arch');
     try
