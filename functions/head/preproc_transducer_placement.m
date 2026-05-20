@@ -185,6 +185,9 @@ function parameters = run_heuristic_placement(parameters)
                    'Check transducer_positioning output.'], tpos_file);
         end
         parameters = read_tpos_file(tpos_file, parameters);
+        plot_placement_t1_overlay(parameters, ...
+            parameters.transducer(1).trans_pos, ...
+            parameters.transducer(1).focus_pos, 'heuristic');
 
     else
         % Submit HPC job — positions not yet available; exit and let user re-run
@@ -254,4 +257,7 @@ function parameters = run_plantus_placement(parameters)
         parameters.transducer(ti).focus_pos_ras = focus_pos_ras;
     end
     parameters.placement.plantus.target_ras = target_ras;
+    plot_placement_t1_overlay(parameters, ...
+        parameters.transducer(1).trans_pos, ...
+        parameters.transducer(1).focus_pos, 'plantus');
 end
