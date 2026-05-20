@@ -13,7 +13,7 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 %   fwhm_mm        - smoothing kernel FWHM [mm]; scalar or [1xNdim] (default: 1.0)
 %   voxel_size_mm  - voxel spacing [mm]; scalar or [1xNdim] (default: 0.5)
 %   threshold      - binarisation threshold 0–1; 0 returns continuous output (default: 0.5)
-%   method         - 'gaussian' or 'box' (default: 'gaussian')
+%   method         - 'gaussian', 'box', or 'off' to skip smoothing (default: 'gaussian')
 %
 % Output:
 %   thresholded_img - smoothed image, binary when threshold > 0
@@ -25,10 +25,16 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
         fwhm_mm (1,:) double {mustBeNonnegative} = 1.0
         voxel_size_mm (1,:) double {mustBePositive} = 0.5
         threshold (1,1) double {mustBeInRange(threshold, 0, 1)} = 0.5
-        method string {mustBeMember(method, ["gaussian", "box"])} = "gaussian"
+        method string {mustBeMember(method, ["gaussian", "box", "off"])} = "gaussian"
     end
 
     img = double(unsmoothed_img);
+
+    if method == "off"
+        thresholded_img = img;
+        return;
+    end
+
     ndims_img = ndims(img);
 
     % Normalize fwhm_mm and voxel_size_mm to length ndims_img

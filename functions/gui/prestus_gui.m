@@ -639,7 +639,7 @@ end
         nedt(gl, 7, 2, 'headmodel.csf_expansion', 40); lbl(gl, 7, 3, 'voxels');
 
         lbl(gl, 8, 1, 'Smoothing method');
-        drp(gl, 8, 2, 'headmodel.smooth_method', {'gaussian','box'}, 'gaussian');
+        drp(gl, 8, 2, 'headmodel.smooth_method', {'gaussian','box','off'}, 'gaussian');
 
         lbl(gl, 9, 1, 'Smoothing FWHM');
         nedt(gl, 9, 2, 'headmodel.smooth_fwhm_mm', 1); lbl(gl, 9, 3, 'mm');
