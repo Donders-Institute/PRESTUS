@@ -172,6 +172,6 @@ end
 
     if ~isempty(mni_in)
         convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters, ...
-            'interpolation_order', 0);
+            'interpolation_order', 0, 'FillValues', mni_fills);
     end
 end

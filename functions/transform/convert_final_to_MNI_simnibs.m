@@ -16,6 +16,7 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %   convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters)
 %   convert_final_to_MNI_simnibs({in1,in2,...}, m2m_folder, {out1,out2,...}, parameters)
 %   convert_final_to_MNI_simnibs(..., 'interpolation_order', 0)
+%   convert_final_to_MNI_simnibs(..., 'FillValues', vals)
 %
 % Input:
 %   path_to_input_img  - path or cell array of paths to input NIfTI(s) in subject space
@@ -24,6 +25,11 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %   parameters         - PRESTUS config; uses startup.simnibs_bin_path and hpc.ld_library_path
 %   options.interpolation_order - resampling order passed to subject2mni
 %                                 (0=nearest, 1=linear; default: 1)
+%   options.FillValues - scalar or vector (one per input) fill value applied post-hoc to
+%                        out-of-FOV voxels (identified as exactly 0 after warping).
+%                        SimNIBS does not expose a cval parameter, so filling is done
+%                        after the transform by replacing 0-valued voxels. Only
+%                        meaningful for non-zero fill values (default: [] = no fill).
 %
 % See also: SIMULATION_NIFTI, CONVERT_FINAL_TO_MNI_MATLAB, SUBJECT2MNI_COORDS_LDFIX
 
@@ -33,6 +39,7 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
         path_to_output_img
         parameters struct
         options.interpolation_order = 1
+        options.FillValues          = []
     end
 
     % Normalise scalar inputs to cell arrays so the rest of the code is uniform
@@ -94,6 +101,25 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
     for k = 1:n
         if ~strcmp(simnibs_names{k}, output_list{k}) && isfile(simnibs_names{k})
             movefile(simnibs_names{k}, output_list{k});
+        end
+    end
+
+    % Post-hoc fill: SimNIBS has no cval parameter, so out-of-FOV voxels are
+    % always written as 0. Replace them with the requested fill value.
+    if ~isempty(options.FillValues)
+        fills = options.FillValues;
+        if isscalar(fills)
+            fills = repmat(fills, 1, n);
+        end
+        for k = 1:n
+            fv = fills(k);
+            if fv == 0 || ~isfile(output_list{k})
+                continue
+            end
+            info = niftiinfo(output_list{k});
+            vol  = niftiread(info);
+            vol(vol == 0) = cast(fv, class(vol));
+            niftiwrite(vol, output_list{k}, info, 'Compressed', true);
         end
     end
 end
