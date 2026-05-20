@@ -47,13 +47,15 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
     limit_ind = (axial_position >= opt_limits(1) & axial_position <= opt_limits(2));
 
     %% Compute acoustic intensity profile
-    use_rayleigh = isfield(parameters, 'calibration') && ...
-                   isfield(parameters.calibration, 'forward_model') && ...
-                   strcmp(parameters.calibration.forward_model, 'rayleigh');
-
-    if use_rayleigh
-        i_axial_oneil = rayleigh_axial_intensity(phase, velocity, parameters, axial_position);
+    if isfield(parameters.calibration, 'forward_model')
+        forward_model = parameters.calibration.forward_model;
     else
+        forward_model = 'oneil';
+    end
+
+    if strcmp(forward_model, 'rayleigh')
+        i_axial_oneil = rayleigh_axial_intensity(phase, velocity, parameters, axial_position);
+    elseif strcmp(forward_model, 'oneil')
         p_axial_oneil = focusedAnnulusONeil(parameters.transducer.annular.curv_radius_mm / 1e3, ...
             [parameters.transducer.annular.elem_id_mm; parameters.transducer.annular.elem_od_mm] / 1e3, ...
             repmat(velocity, 1, parameters.transducer.annular.elem_n), ...
@@ -62,6 +64,8 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
             parameters.medium_properties.water.density, ...
             (axial_position - 0.5) * 1e-3);
         i_axial_oneil = p_axial_oneil.^2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
+    else
+        error('phase_optimization_annulus_full_curve: unknown forward_model ''%s''; expected ''oneil'' or ''rayleigh''.', forward_model);
     end
 
     %% Generate weights if not provided

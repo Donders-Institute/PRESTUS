@@ -19,8 +19,11 @@ The following documents the functions provided in PRESTUS.
 | `calibration_transducer`                | Run water simulations to optimize transducer source amplitude and element phases matching a target intensity profile via O’Neil analytical solution, global search, and re-simulation. |
 | `compute_oneil_solution`                | Compute analytical O’Neil pressure along the beam axis for focused annular transducers in water, derives particle velocity and grid adjustment factor, and plots comparisons with simulated/desired intensities. |
 | `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
+| `export_babelbrain_weights`             | Pack PRESTUS per-element phases and particle velocity into a BabelBrain OptimizedWeightsFile (HDF5 complex64 phasors). |
+| `extract_analytical_profile`           | Compute an axial intensity profile analytically (O'Neil or Rayleigh forward model) without running a k-Wave simulation; returns the same struct layout as `extract_simulated_profile`. |
 | `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
 | `extract_simulated_profile`             | Extract and visualize simulated acoustic pressure data.                                         |
+| `import_babelbrain_weights`             | Read per-element phase weights from a BabelBrain OptimizedWeightsFile (.h5), derive hardware correction relative to geometric phases, and write the correction into the transducer equipment YAML. |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |
 | `phase_optimization_annulus`            | Optimizes the phase profile by calculating focal distance error for an annular transducer.      |
@@ -78,9 +81,9 @@ The following documents the functions provided in PRESTUS.
 | `get_xyz_mesh`                          | Generates a mesh of 3D coordinates for a given image.                                           |
 | `getidx`                                | Retrieves indices for requested tissues from a parameter structure.                             |
 | `kwave_version`                         | Display k-Wave version number and (if available) git hash.                                      |
+| `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
 | `log_timer`                             | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region.                                       |
-| `mergeStructure`                        | Merges multiple scalar structures into one.                                                     |
 | `read_ini_file`                         | Read an INI file into MATLAB                                                                    |
 | `round_if_integer`                      | Rounds values if they are sufficiently close to integers; otherwise raises an error.            |
 | `simnibs_version`                       | Get SimNIBS version of segmentation from HTML, print, allocate to `parameters`.                 |

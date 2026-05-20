@@ -1,59 +1,75 @@
 function [corrected_velocity, I_peak_before, I_peak_after] = fit_velocity_to_intensity(...
-    parameters, profile_oneil, opt_phases, opt_velocity, desired_intensity)
+    parameters, profile_analytical, opt_phases, opt_velocity, desired_intensity)
 % FIT_VELOCITY_TO_INTENSITY  Analytically correct particle velocity to match desired peak intensity
 %
 % After global search optimises profile shape (phases and velocity), the
-% peak intensity may not perectly match the desired_intensity. 
-% 
+% peak intensity may not perfectly match the desired_intensity.
+%
 % If only amplitude needs to be calibrated, this also does not require a
 % recalibration of phases.
 %
-% Since I ∝ v², velocity for a target amplitude can be computed analytically: 
+% Since I ∝ v², velocity for a target amplitude can be computed analytically:
 % v_new = v_old * sqrt(I_desired / I_peak).
+%
+% The forward model is selected by parameters.calibration.forward_model:
+%   'oneil'    (default) — O'Neil closed-form via focusedAnnulusONeil
+%   'rayleigh'           — Rayleigh–Sommerfeld via rayleigh_axial_intensity
 %
 % Use as:
 %   [corrected_velocity, I_peak_before, I_peak_after] = ...
-%       fit_velocity_to_intensity(parameters, profile_oneil, opt_phases, ...
+%       fit_velocity_to_intensity(parameters, profile_analytical, opt_phases, ...
 %                                 opt_velocity, desired_intensity)
 %
 % Input:
-%   parameters                   - PRESTUS config with transducer.annular geometry and
-%                                  medium_properties.water, calibration.skip_front_peak_mm [mm]
-%   profile_oneil                - struct with axial_distance_bowl [mm]
-%   opt_phases                   - optimised phases per element [rad]
-%   opt_velocity                 - optimised particle velocity from global search [m/s]
-%   desired_intensity            - target peak intensity [W/cm²]
+%   parameters          - PRESTUS config with transducer.annular geometry,
+%                         medium_properties.water, calibration.skip_front_peak_mm [mm],
+%                         calibration.forward_model ('oneil'|'rayleigh', optional)
+%   profile_analytical  - struct with axial_distance_bowl [mm]
+%   opt_phases          - optimised phases per element [rad]
+%   opt_velocity        - optimised particle velocity from global search [m/s]
+%   desired_intensity   - target peak intensity [W/cm²]
 %
 % Output:
 %   corrected_velocity - velocity adjusted to yield desired peak intensity [m/s]
 %   I_peak_before      - peak intensity before correction [W/cm²]
 %   I_peak_after       - peak intensity after correction [W/cm²]
 %
-% See also: PERFORM_GLOBAL_SEARCH, COMPUTE_ONEIL_SOLUTION, CALIBRATION_TRANSDUCER
+% See also: PERFORM_GLOBAL_SEARCH, COMPUTE_ANALYTICAL_SOLUTION, CALIBRATION_TRANSDUCER,
+%           RAYLEIGH_AXIAL_INTENSITY
 
 arguments
-    parameters                   (1,1) struct
-    profile_oneil                (1,1) struct
-    opt_phases                   (1,:) {mustBeNumeric}
-    opt_velocity                 (1,1) {mustBeNumeric}
-    desired_intensity            (1,1) {mustBeNumeric}
+    parameters          (1,1) struct
+    profile_analytical  (1,1) struct
+    opt_phases          (1,:) {mustBeNumeric}
+    opt_velocity        (1,1) {mustBeNumeric}
+    desired_intensity   (1,1) {mustBeNumeric}
 end
 
-    axial_position = profile_oneil.axial_distance_bowl;
+    if isfield(parameters.calibration, 'forward_model')
+        forward_model = parameters.calibration.forward_model;
+    else
+        forward_model = 'oneil';
+    end
 
-    % Compute analytical pressure profile with current optimized parameters
-    p_axial = focusedAnnulusONeil(...
-        parameters.transducer.annular.curv_radius_mm / 1e3, ...
-        [parameters.transducer.annular.elem_id_mm; parameters.transducer.annular.elem_od_mm] / 1e3, ...
-        repmat(opt_velocity, 1, parameters.transducer.annular.elem_n), ...
-        [opt_phases], ...
-        parameters.transducer.freq_hz, ...
-        parameters.medium_properties.water.sound_speed, ...
-        parameters.medium_properties.water.density, ...
-        (axial_position - 0.5) * 1e-3);
+    axial_position = profile_analytical.axial_distance_bowl;
 
-    % Convert pressure to intensity [W/cm^2]
-    I_axial = p_axial .^ 2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
+    % Evaluate forward model with current optimised parameters
+    if strcmp(forward_model, 'rayleigh')
+        I_axial = rayleigh_axial_intensity(opt_phases, opt_velocity, parameters, axial_position);
+    elseif strcmp(forward_model, 'oneil')
+        p_axial = focusedAnnulusONeil( ...
+            parameters.transducer.annular.curv_radius_mm / 1e3, ...
+            [parameters.transducer.annular.elem_id_mm; parameters.transducer.annular.elem_od_mm] / 1e3, ...
+            repmat(opt_velocity, 1, parameters.transducer.annular.elem_n), ...
+            [opt_phases], ...
+            parameters.transducer.freq_hz, ...
+            parameters.medium_properties.water.sound_speed, ...
+            parameters.medium_properties.water.density, ...
+            (axial_position - 0.5) * 1e-3);
+        I_axial = p_axial .^ 2 / (2 * parameters.medium_properties.water.sound_speed * parameters.medium_properties.water.density) * 1e-4;
+    else
+        error('fit_velocity_to_intensity: unknown forward_model ''%s''; expected ''oneil'' or ''rayleigh''.', forward_model);
+    end
 
     % Exclude near-field if requested
     I_filtered = I_axial;

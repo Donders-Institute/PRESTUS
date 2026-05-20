@@ -1,4 +1,4 @@
-function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile_oneil_opt, profile_sim, profile_sim_opt, min_err)
+function plot_opt_sim_results(parameters, profile_target, profile_analytical, profile_analytical_opt, profile_sim, profile_sim_opt, min_err)
 % PLOT_OPT_SIM_RESULTS  Plot and save comparison of calibration optimisation profiles
 %
 % Generates a figure comparing the target, original analytical, optimised
@@ -6,41 +6,41 @@ function plot_opt_sim_results(parameters, profile_target, profile_oneil, profile
 % profiles. Saves the figure to calibration.path_output.
 %
 % Use as:
-%   plot_opt_sim_results(parameters, profile_target, profile_oneil, profile_oneil_opt, ...
+%   plot_opt_sim_results(parameters, profile_target, profile_analytical, profile_analytical_opt, ...
 %                        profile_sim, profile_sim_opt, min_err)
 %
 % Input:
-%   parameters       - PRESTUS config; uses calibration.path_output,
-%                      calibration.desired_focal_distance_ep [mm],
-%                      calibration.desired_intensity [W/cm²], calibration.equipment_name
-%   profile_target   - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
-%   profile_oneil    - struct with axial_intensity from original O'Neil solution [W/cm²]
-%   profile_oneil_opt- struct with axial_intensity from optimised O'Neil solution [W/cm²]
-%   profile_sim      - struct with axial_intensity from original simulation [W/cm²]
-%   profile_sim_opt  - struct with axial_intensity from optimised simulation [W/cm²]
-%   min_err          - minimum optimisation error
+%   parameters            - PRESTUS config; uses calibration.path_output,
+%                           calibration.desired_focal_distance_ep [mm],
+%                           calibration.desired_intensity [W/cm²], calibration.equipment_name
+%   profile_target        - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
+%   profile_analytical    - struct with axial_intensity from original analytical solution [W/cm²]
+%   profile_analytical_opt- struct with axial_intensity from optimised analytical solution [W/cm²]
+%   profile_sim           - struct with axial_intensity from original simulation [W/cm²]
+%   profile_sim_opt       - struct with axial_intensity from optimised simulation [W/cm²]
+%   min_err               - minimum optimisation error
 %
-% See also: CALIBRATION_TRANSDUCER, PERFORM_GLOBAL_SEARCH, RECOMPUTE_ONEIL_SOLUTION
+% See also: CALIBRATION_TRANSDUCER, PERFORM_GLOBAL_SEARCH, RECOMPUTE_ANALYTICAL_SOLUTION
 
 arguments
-    parameters        (1,1) struct
-    profile_target    (1,1) struct
-    profile_oneil     (1,1) struct
-    profile_oneil_opt (1,1) struct
-    profile_sim       (1,1) struct
-    profile_sim_opt   (1,1) struct
-    min_err           (1,1) {mustBeNumeric}
+    parameters             (1,1) struct
+    profile_target         (1,1) struct
+    profile_analytical     (1,1) struct
+    profile_analytical_opt (1,1) struct
+    profile_sim            (1,1) struct
+    profile_sim_opt        (1,1) struct
+    min_err                (1,1) {mustBeNumeric}
 end
-    
+
     %% Plot comparison of profiles
 
     figure('Position', [10, 10, 900, 500]);
     hold on;
     plot(profile_target.axial_distance_bowl, profile_target.axial_intensity, ...
         'LineWidth', 2, 'Color', 'r', 'DisplayName', 'Target Profile');
-    plot(profile_oneil.axial_distance_bowl, profile_oneil.axial_intensity, ...
+    plot(profile_analytical.axial_distance_bowl, profile_analytical.axial_intensity, ...
         'LineWidth', 1, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Original (Analytical)');
-    plot(profile_oneil_opt.axial_distance_bowl, profile_oneil_opt.axial_intensity, ...
+    plot(profile_analytical_opt.axial_distance_bowl, profile_analytical_opt.axial_intensity, ...
         'LineWidth', 1, 'Color', [0 0 0], 'LineStyle', ':', 'DisplayName', 'Optimized (Analytical)');
     plot(profile_sim.axial_distance_bowl, profile_sim.axial_intensity, ...
         'LineWidth', 1, 'Color', [0.75 0.75 0.75], 'DisplayName', 'Original (Simulated)');
