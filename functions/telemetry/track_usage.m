@@ -94,7 +94,7 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
     payload.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
     payload.transducer_name       = safe_get(parameters, {'transducer', 'name'}, '');
-    payload.n_transducer_elements = safe_get(parameters, {'transducer', 'elem_n'}, NaN);
+    payload.n_transducer_elements = get_elem_n(parameters);
 
     % --- modules enabled ---
     mods = safe_get(parameters, {'modules'}, struct());
@@ -179,6 +179,29 @@ function rid = generate_run_id()
     bytes(7) = bitor(bitand(bytes(7), uint8(15)), uint8(64));
     bytes(9) = bitor(bitand(bytes(9), uint8(63)), uint8(128));
     rid = sprintf('%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x', bytes);
+end
+
+% -------------------------------------------------------------------------
+function n = get_elem_n(parameters)
+    tr_type = safe_get(parameters, {'transducer', 'type'}, '');
+    switch tr_type
+        case 'annular'
+            n = safe_get(parameters, {'transducer', 'annular', 'elem_n'}, NaN);
+        case 'matrix'
+            % matrix element count lives under the chosen arrangement sub-struct
+            arrangements = {'fibonacci', 'fermat', 'file'};
+            n = NaN;
+            for k = 1:numel(arrangements)
+                v = safe_get(parameters, {'transducer', 'matrix', 'elements', arrangements{k}, 'elem_n'}, NaN);
+                if ~isnan(v), n = v; return; end
+            end
+            % rectangular stores row × col
+            nr = safe_get(parameters, {'transducer', 'matrix', 'elements', 'rectangular', 'elem_n_row'}, NaN);
+            nc = safe_get(parameters, {'transducer', 'matrix', 'elements', 'rectangular', 'elem_n_col'}, NaN);
+            if ~isnan(nr) && ~isnan(nc), n = nr * nc; end
+        otherwise
+            n = NaN;
+    end
 end
 
 % -------------------------------------------------------------------------
