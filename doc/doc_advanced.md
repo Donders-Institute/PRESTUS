@@ -27,7 +27,7 @@ But now, you will also feed it the configs for each subsequent simulation:
 `options.sequential_configs = sequential_configs` 
 `prestus_pipeline_start(config_1, options)`
 
-Please note that you have to use the names `config_x` in the sequential_configs, and that you have to use integers. So names like `config_-5`, `config_0`, `config_1234` and `config_007`.
+Please note that field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`, `config_1234`). The dispatcher picks the field with the lowest numeric value first, so the absolute values and gaps don't matter — only their relative order does. Non-numeric suffixes (e.g. `config_abc`) will be silently ignored or cause an error.
 
 ##### Cache reuse in sequential simulations
 
@@ -47,14 +47,16 @@ To reuse the base run's acoustic results in the follow-up (e.g. same target, dif
 options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output_affix;
 ```
 
-```
-io.adopted_heatmap           | path to NIfTI file (set automatically by the dispatcher)
-io.adopted_cem43             | path to NIfTI file (set automatically by the dispatcher)
-io.preproc_affix             | affix for grid/medium cache lookup
-io.acoustic_cache_affix      | affix for acoustic cache lookup
-io.thermal_cache_affix       | affix for thermal cache file
-options.sequential_configs
-```
+| Parameter | Description |
+|---|---|
+| `io.adopted_heatmap` | Path to a temperature heatmap NIfTI (`heating_end.nii.gz`) used as the thermal starting point. Set automatically from the previous run's output; override to supply a custom starting temperature. |
+| `io.adopted_cem43` | Path to a CEM43 NIfTI (`CEM43_end.nii.gz`) carried forward for cumulative thermal dose. Set automatically; can be overridden. |
+| `io.adopted_cem43_iso` | Path to the ISO-variant CEM43 NIfTI (`CEM43_iso_end.nii.gz`). Set automatically alongside `adopted_cem43`. |
+| `io.preproc_affix` | Affix for grid/medium cache lookup (defaults to the base run's `output_affix`). |
+| `io.acoustic_cache_affix` | Affix for acoustic cache lookup. Not set by default — acoustics are re-run unless you set this explicitly. |
+| `io.thermal_cache_affix` | Affix for the thermal cache file (defaults to `<base_affix>_seq<N>`). |
+| `options.sequential_configs` | Struct of follow-up configs to dispatch in order (see example above). |
+| `options.sequential_cleanup_intermediate` | If `true`, per-run NIfTI and image files are deleted after the final summary report is successfully generated. Default: `false`. |
 
 #### Multi-Transducer Modeling
 
@@ -87,10 +89,14 @@ This is the default mode and requires no additional configuration.
 
 If the transducers fire in separate, non-overlapping time windows (asynchronous duty cycles), their pressure fields never coexist. Because only one transducer is active at any instant, two distinct combination rules apply:
 
-- **Acoustic safety metrics (ISPPA, MI, peak pressure):** the relevant quantity is the per-voxel maximum across transducers — the peak pressure at any voxel is set by whichever transducer produces the higher instantaneous pressure there.
-- **Thermal heat deposition:** time-averaged heating accumulates from all transducers; the combined heat source entering the bioheat equation is the intensity sum across all transducers weighted by their respective duty cycles.
+- **Acoustic safety metrics (ISPPA, MI, peak pressure):** the relevant quantity is the per-voxel maximum across transducers. The peak pressure at any voxel is determined by whichever transducer produces the higher instantaneous pressure there.
+- **Thermal heat deposition:** time-averaged heating accumulates from all transducers; the combined heat source entering the bioheat equation is the incoherent intensity sum across all transducers (currently assuming identical duty cycles).
 
 PRESTUS provides a dedicated `transducer_coupling: async` mode that handles both combination rules automatically. See [doc_async_transducer.md](doc_async_transducer.md) for configuration details, pipeline stages, and output files.
+
+**Staggered / time-offset firing**
+
+If the transducers fire in sequence (one after another, or with partial temporal overlap), the closest approximation within the current framework is to use the [Sequential Simulations](#sequential-simulations) mechanism. Run one transducer's heating simulation, carry over the resulting temperature and CEM43 maps via `adopted_heatmap` / `adopted_cem43`, then run the next transducer's heating simulation starting from that thermal state. This correctly captures the cumulative thermal history but assumes the acoustic fields do not overlap in time.
 
 ##### Complex Pressure Field
 

@@ -66,8 +66,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | 0 |
 | `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
-| `adopted_heatmap` | Path to an existing intensity heatmap NIfTI to reuse instead of re-running acoustics. | — | Optional. Used for sequential multi-target runs. |
-| `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_heatmap` | Path to an existing **temperature** heatmap NIfTI (`heating_end.nii.gz`) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. Set automatically by the sequential dispatcher. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_cem43_iso` | Path to an existing ISO-variant CEM43 heatmap NIfTI (`CEM43_iso_end.nii.gz`) to accumulate across runs. Set automatically alongside `adopted_cem43` by the sequential dispatcher. | — | Optional. Used for sequential multi-target runs. |
 
 **Runtime-derived (set by `path_log_setup`):**
 
@@ -277,7 +278,7 @@ See [doc_preproc.md](doc_preproc.md).
 |---|---|---|---|
 | `head_pad_mm` | Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]. | `0` | |
 | `csf_expansion` | Dilation of the CSF brain mask into surrounding head regions [grid voxels]. | `40` | |
-| `smooth_method` | Mask smoothing filter type. | `'gaussian'` | `gaussian` / `box` |
+| `smooth_method` | Mask smoothing filter type. | `'gaussian'` | `gaussian` / `box` / `off` |
 | `smooth_threshold_skull` | Binarisation threshold for skull mask; higher = thinner mask. | `0.5` | |
 | `smooth_threshold_other` | Binarisation threshold for other masks; higher = thinner mask. | `0.5` | |
 | `smooth_fwhm_mm` | FWHM of smoothing kernel [mm]. | `1` | |
@@ -422,6 +423,7 @@ A separate `config_calibration.yaml` applies for calibration workflows and is lo
 | `opt_limits` | Distance limits for optimisation [mm]. | |
 | `opt_weights` | Weighting of original profile during fitting. | `1` = equal; `>1` = Gaussian (narrower with larger values) |
 | `opt_seed` | Random seed for optimisation. | |
+| `opt_use_initial_phases` | Use phases from `transducer.annular.elem_phase_rad` as the initial guess instead of random initialization. | `false` (default); set to `true` when manufacturer-provided or previously calibrated phases are available. |
 | `opt_upper_velocity` | Upper velocity in global search | |
 | `opt_phase_precession` | Constrain element phases during optimisation. | `false` (default) = independent; `'linear'` = strict ramp (`phase_start + i * phase_step`, 2 free params); `'monotonic'` = ordered phases via cumulative non-negative increments (N params, monotonically constrained). |
 | `opt_amp_validation` | Run free-water simulation to validate phases and amplitudes?| 'always' (default) / 'never' / 'initial' (only for the first target intensity) / 'final' (only for the final target intensity) | |

@@ -48,7 +48,8 @@ an unhandled exception). The table below lists every field that may be sent.
 | `event` | Event type: `run_start`, `run_end`, or `run_error` |
 | `timestamp_utc` | POSIX timestamp (seconds since epoch, UTC) |
 | `uuid` | Random UUID generated locally on first run; stored in `~/.prestus/uuid.txt`. Not linked to your identity or machine. |
-| `prestus_ver` | Short git commit hash of the running PRESTUS checkout |
+| `prestus_ver` | Version string of the running PRESTUS checkout (from `git describe` or the `VERSION` file, e.g. `v0.5.1`) |
+| `prestus_hash` | Short git commit hash of the running PRESTUS checkout (e.g. `628edd0`) |
 | `matlab_ver` | MATLAB release string (e.g. `R2024a`) |
 | `kwave_ver` | k-Wave toolbox version string as reported by `getComputerInfo` |
 | `platform` | CPU architecture string from `computer('arch')` (e.g. `maci64`, `glnxa64`) |
@@ -148,7 +149,7 @@ The charts below are populated live from the anonymised telemetry database.
     const client = supabase.createClient(URL, KEY);
     const { data, error } = await client
       .from('events')
-      .select('received_at,status,prestus_ver,duration_s,uuid,code_type')
+      .select('received_at,status,prestus_ver,prestus_hash,duration_s,uuid,code_type')
       .order('received_at', { ascending: false })
       .limit(5000);
 

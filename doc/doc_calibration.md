@@ -89,44 +89,26 @@ $$p = \sqrt{2 \cdot I_\mathrm{desired} \cdot 10^4 \cdot \rho \cdot c}$$
 
 The profile is then truncated or NaN-padded to match the simulation axis length (derived from `grid.default_dims(end)`).
 
-##### Step 2 — Run initial free-water simulation
+##### Step 2 — Compute analytical bootstrap profile
 
-How simulations are run is determined by the main `parameters` (e.g., `simulation.code_type`). Additional settings in `parameters.calibration` can override default behaviour:
+`extract_analytical_profile` evaluates the configured forward model using the nominal transducer parameters from the config (no k-Wave simulation is needed at this stage). This provides an initial velocity estimate and an intensity shape that phase optimisation can work with.
 
-- `axisymmetric2D`  
-  Override default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no, default `0`).
-- `force_kwavearray`  
-  Force free-water simulations to use kWaveArray (`1`). If `0`, uses the setting in the default or study-specific config.
-- `save_in_calibration_folder`  
-  If `true` (default), all simulation outputs are redirected to `calibration.path_output` rather than the subject output folder.
+The forward model is selected by `calibration.forward_model`:
 
-##### Step 3 — Extract simulated intensity along the focal axis
-
-`extract_simulated_profile` retrieves `p_max_all` from the simulation results and:
-- In 3D, takes the lateral slice at the transducer's lateral centre (`trans_pos(1:2)`)
-- Extracts the 1D axial pressure profile from the transducer position onward
-- Converts pressure to intensity: $I = p^2 / (2 \rho c) \times 10^{-4}$ [W/cm²]
-- Back-computes particle velocity from `elem_amp` via the acoustic impedance relation: $v = \mathrm{elem\_amp} / (\rho \cdot c)$
-
-The axial distance axis is expressed in mm from the transducer bowl.
-
-##### Step 4 — Compute the analytical O'Neil solution
-
-`compute_oneil_solution` calls `focusedAnnulusONeil` with the initial simulation velocity and phases to produce an analytical pressure profile, converted to intensity. This establishes a baseline for the optimization.
-
-It also computes `simulated_analytical_scaling`:
-
-$$\mathrm{simulated\_analytical\_scaling} = \frac{\max(I_\mathrm{simulated})}{\max(I_\mathrm{O'Neil})}$$
-
-This ratio captures the systematic offset between the k-Wave simulation and the analytical model and is propagated through the amplitude calculation in Step 7.
+| Value | Description |
+|---|---|
+| `'oneil'` (default) | O'Neil closed-form solution via `focusedAnnulusONeil` |
+| `'rayleigh'` | Rayleigh–Sommerfeld integral via `rayleigh_axial_intensity` |
 
 > **Coordinate note:** `focusedAnnulusONeil` receives axial positions as `(axial_position - 0.5) × 10^{-3}` metres. The `−0.5` half-voxel shift converts from voxel-centre to voxel-edge coordinates.
 
-##### Step 5 — Optimize element phases and velocity (global search)
+##### Step 3 — Determine element phases
 
-`perform_global_search` minimises the weighted mean-squared error between the analytical O'Neil profile and the scaled empirical target profile over element phases [0, 2π] and particle velocity [0.001, `opt_upper_velocity`].
+Two modes are available, selected by whether `calibration.elem_phase_correction_deg` is set:
 
-The initial phase guess is **random** (uniform over [0°, 360°]), not the manufacturer-provided phases. This means results can vary across runs unless a seed is fixed via `opt_seed`.
+**Global search (default):** `perform_global_search` minimises the weighted mean-squared error between the analytical forward model and the scaled empirical target profile over element phases [0, 2π] and particle velocity [0.001, `opt_upper_velocity`]. This runs purely analytically using the bootstrap profile from Step 2 — no k-Wave simulation is needed.
+
+By default the initial phase guess is **random** (uniform over [0°, 360°]). Set `calibration.opt_use_initial_phases = true` to use the phases already in `transducer.annular.elem_phase_rad` (e.g. manufacturer-provided steering phases) as the starting point instead. This can improve convergence when good prior phases are available. Results can still vary across runs unless a seed is fixed via `opt_seed`.
 
 Parameters that configure the search:
 
@@ -135,21 +117,46 @@ Parameters that configure the search:
 | `opt_method` | `FEXminimize` | Optimization backend: `FEXminimize` (open-source, bundled) or `GlobalSearch` (MATLAB Global Optimization Toolbox) |
 | `opt_weights` | `0` | Profile weighting: `0` = uniform across the full profile; `≥1` = Gaussian centred on the focal maximum with FWHM narrowing as weight increases (σ = focus_pos / weight) |
 | `opt_limits` | full profile range | Distance range [mm] over which the error is evaluated; defaults to the non-NaN extent of the target profile |
+| `opt_use_initial_phases` | `false` | Use phases from `transducer.annular.elem_phase_rad` as the starting point instead of random initialization. Useful when manufacturer-provided or previously calibrated phases are available. |
 | `opt_seed` | *(none)* | Integer random seed for reproducibility; if unset, results may vary across runs |
 | `opt_upper_velocity` | `0.2` m/s | Upper bound on particle velocity during search |
-| `skip_front_peak_mm` | `0` | Excludes the first N mm from peak detection to avoid near-field artifacts. Applied in both the global search objective and the amplitude correction (Step 5b). Does not restrict the fitting range — use `opt_limits` for that. |
+| `skip_front_peak_mm` | `0` | Excludes the first N mm from peak detection to avoid near-field artifacts. Applied in both the global search objective and the amplitude correction (Step 5). Does not restrict the fitting range — use `opt_limits` for that. |
 
 The `FEXminimize` backend uses fixed internal settings: `popsize = 5000`, `FinDiffType = 'central'`, `TolCon = 1e-8`.
+
+**Geometric correction mode:** If `calibration.elem_phase_correction_deg` is non-empty, the global search is skipped. The provided per-element offsets are added to the geometric steering phases from the config to form the combined element phases. This encodes systematic hardware delays (e.g. cable length mismatches) measured at a reference depth. Set `calibration.save_elem_correction = true` to persist global-search results as hardware corrections for reuse at other focal depths.
 
 ![calibration_fitting](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_fitting.png)
 Example profile fit with uniform `opt_weights`.
 
-#### Desired intensity loop
+##### Step 4 — Run free-water correction simulation (optional)
 
+A k-Wave simulation is run in free water using the nominal source parameters. The simulated peak intensity is compared to the analytical prediction to compute `simulated_analytical_scaling` — the ratio by which the analytical model under- or over-estimates the simulation. This factor corrects the source amplitude in Step 6.
+
+How simulations are run is determined by the main `parameters` (e.g., `simulation.code_type`). Additional settings in `parameters.calibration` can override default behaviour:
+
+- `run_free_water_sim`  
+  Run a free-water k-Wave simulation to compute the analytical-to-simulation scaling factor (`true`, default). Set to `false` for a fully simulation-free calibration — appropriate when the analytical model alone is considered sufficient (e.g. single-element transducers with no inter-element phase steering). The scaling factor defaults to 1 when skipped.
+- `axisymmetric2D`  
+  Override default 3D simulation to perform axisymmetric 2D water simulations (`1` = yes, `0` = no, default `0`).
+- `force_kwavearray`  
+  Force free-water simulations to use kWaveArray (`1`). If `0`, uses the setting in the default or study-specific config.
+- `save_in_calibration_folder`  
+  If `true` (default), all simulation outputs are redirected to `calibration.path_output` rather than the subject output folder.
+
+##### Step 5 — Compute analytical reference profile with optimized phases
+
+`compute_analytical_solution` evaluates the configured forward model with the final optimized phases to produce a reference analytical intensity profile and computes `simulated_analytical_scaling`:
+
+$$\mathrm{simulated\_analytical\_scaling} = \frac{\max(I_\mathrm{simulated})}{\max(I_\mathrm{analytical})}$$
+
+This ratio captures the systematic offset between the k-Wave simulation and the analytical model and is propagated through the amplitude calculation in Step 6. When `run_free_water_sim = false`, this scaling factor is 1 by construction.
+
+#### Desired intensity loop
 
 ##### Step 5b — Amplitude correction to match target ISPPA
 
-After the global search optimises profile **shape**, the peak intensity of the analytical profile may not exactly equal `desired_intensity` because the search jointly optimises phases and velocity without a hard intensity constraint.
+After phase determination optimises profile **shape**, the peak intensity of the analytical profile may not exactly equal `desired_intensity` because the search jointly optimises phases and velocity without a hard intensity constraint.
 
 If only amplitude needs to be calibrated, this also does not require phase recalibration.
 
@@ -161,19 +168,19 @@ $$v_\mathrm{target} = v_\mathrm{opt} \cdot \sqrt{\frac{I_\mathrm{target}}{I_\mat
 
 A warning is issued if `corrected_velocity` exceeds `opt_upper_velocity`.
 
-##### Step 6 — Recalculate analytical O'Neil solution with optimized parameters
-
-`recompute_oneil_solution` calls `focusedAnnulusONeil` with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to calculate an optimized analytical profile. This profile is plotted against the target and the original O'Neil solution for visual inspection.
-
-##### Step 7 — Calculate the optimized source amplitude
+##### Step 6 — Calculate the optimized source amplitude
 
 The amplitude that yields the corrected velocity for use in the k-Wave simulation is:
 
 $$
-\mathrm{amp}_\text{optimized} = \mathrm{round}\!\left( \frac{v_\text{corrected}}{v_\text{original}} \cdot \sqrt{\frac{I_\text{O'Neil}}{I_\text{sim}}} \cdot \mathrm{amp}_\text{original} \right)
+\mathrm{amp}_\text{optimized} = \mathrm{round}\!\left( \frac{v_\text{corrected}}{v_\text{original}} \cdot \sqrt{\frac{I_\text{analytical}}{I_\text{sim}}} \cdot \mathrm{amp}_\text{original} \right)
 $$
 
-where `v_original` and `amp_original` come from the initial simulation (Steps 2–3), `v_corrected` is the velocity that yields an analytic match. To correct for minor mismatches between analytical and simulated intensities, the velocity scaling is corercted via the square root of analytical/simulated intensity ratio (i.e., the sqrt of 1/`simulated_analytical_scaling` from Step 4).
+where `v_original` and `amp_original` come from the initial simulation (Steps 4–5), `v_corrected` is the velocity that yields an analytic match. To correct for minor mismatches between analytical and simulated intensities, the velocity scaling is corrected via the square root of analytical/simulated intensity ratio (i.e., the sqrt of 1/`simulated_analytical_scaling` from Step 5).
+
+##### Step 7 — Recalculate analytical solution with optimized parameters
+
+`recompute_analytical_solution` evaluates the configured forward model with `opt_phases` and the corrected `opt_velocity` (from Step 5b) to produce an optimized analytical profile. This profile is plotted against the target and the reference analytical solution for visual inspection.
 
 ##### Step 8 — Rerun water simulation with optimized settings (Optional)
 
@@ -184,7 +191,7 @@ By default, this is set to always, but it can also be set to 'never', 'initial' 
 
 ##### Step 9 — Extract simulated optimized intensity along the focal axis
 
-Same procedure as Step 3, applied to the optimized simulation results.
+Same procedure as Step 4, applied to the optimized simulation results.
 
 | Initial simulation | Optimized simulation |
 |--------------------|----------------------|
@@ -203,6 +210,10 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 2. **YAML** (`<equipment_name>-F<focal_depth>mm-I<intensity>wpercm2.yaml`) — the full `transducer` parameter struct with optimized phases and amplitude, ready to be merged into a PRESTUS study config.
 
 ![calibration_optimized_analytical](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/calibration_optimized_analytical.png)
+
+##### Step 11 — Cache cleanup
+
+After all simulations complete, k-Wave `.mat` result files written to the cache folder during calibration are removed to free disk space. Set `parameters.io.save_acoustic_matrices = 1` or `parameters.io.save_matrices = 1` to retain them for debugging.
 
 ---
 
