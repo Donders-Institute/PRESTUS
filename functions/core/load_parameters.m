@@ -93,12 +93,12 @@ function parameters = load_parameters(varargin)
         else
             extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true);
         end
-        parameters = MergeStruct(parameters, extra_parameters);
+        parameters = mergestruct(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
         extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
-        parameters = MergeStruct(parameters, extra_parameters);
+        parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargin > 2
         % Check that extra inputs come in pairs (filename, location)
@@ -110,7 +110,7 @@ function parameters = load_parameters(varargin)
             extra_config_file = varargin{i};
             extra_config_location = varargin{i+1};
             extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
-            parameters = MergeStruct(parameters, extra_parameters);
+            parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
         end
     end
@@ -254,7 +254,7 @@ function merged = restore_struct_arrays(merged, extra)
             base = merged.(f);   % 1×1: correctly merged defaults + extra element(1)
             result = base;
             for k = 2:numel(extra.(f))
-                result(k) = MergeStruct(base, extra.(f)(k));
+                result(k) = mergestruct(base, extra.(f)(k));
             end
             merged.(f) = result;
         end

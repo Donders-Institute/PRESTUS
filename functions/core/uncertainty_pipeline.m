@@ -414,7 +414,7 @@ function p = make_sim_params(base, affix, medium_config)
                 'Medium config file not found: %s', medium_config);
         end
         extra = yaml.loadFile(char(medium_config), 'ConvertToArray', true);
-        p     = MergeStruct(p, extra);
+        p     = mergestruct(p, extra);
     end
 
     p.modules.run_source_setup         = 1;
