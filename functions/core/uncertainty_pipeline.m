@@ -192,7 +192,7 @@ output_dir = get_output_dir(parameters);
 subj       = sprintf('sub-%03d', parameters.subject_id);
 medium     = parameters.simulation.medium;
 
-logs_dir = fullfile(output_dir, 'logs');
+logs_dir = fullfile(output_dir, 'log');
 if ~isfolder(logs_dir); mkdir(logs_dir); end
 log_files.stage1      = fullfile(logs_dir, sprintf('%s_%s_stage1_%s.txt',               subj, medium, run_ts));
 log_files.default     = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.default,      run_ts));
@@ -454,7 +454,7 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
     medium     = base_parameters.simulation.medium;
     nii_dir    = fullfile(get_output_dir(base_parameters), 'nii');
     run_ts     = string(datetime('now'), 'yyMMdd_HHmm');
-    logs_dir   = fullfile(get_output_dir(base_parameters), 'logs');
+    logs_dir   = fullfile(get_output_dir(base_parameters), 'log');
 
     [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
 
@@ -527,7 +527,7 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
     medium     = base_parameters.simulation.medium;
     nii_dir    = fullfile(get_output_dir(base_parameters), 'nii');
     run_ts     = string(datetime('now'), 'yyMMdd_HHmm');
-    logs_dir   = fullfile(get_output_dir(base_parameters), 'logs');
+    logs_dir   = fullfile(get_output_dir(base_parameters), 'log');
     output_dir = get_output_dir(base_parameters);
 
     [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
