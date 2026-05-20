@@ -61,8 +61,8 @@ conda run -n "${ENV_NAME}" pip install "${SIMNIBS_WHL_URL}"
 
 # ── 4. Install PlanTUS Python dependencies (optional) ────────────────────────
 if [ "${INSTALL_PLANTUS}" = true ]; then
-    echo "[4/5] Installing PlanTUS dependencies (nilearn, vtk, h5py)..."
-    conda run -n "${ENV_NAME}" pip install nilearn vtk h5py
+    echo "[4/5] Installing PlanTUS dependencies (nilearn, vtk, h5py, pynput)..."
+    conda run -n "${ENV_NAME}" pip install nilearn vtk h5py pynput
 else
     echo "[4/5] Skipping PlanTUS dependencies (--no-plantus)."
 fi

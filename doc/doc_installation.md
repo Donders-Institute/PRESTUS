@@ -168,13 +168,13 @@ Activate the SimNIBS environment and install the missing packages:
 
 ```bash
 source activate simnibs_v4.6.0
-pip install nilearn vtk h5py
+pip install nilearn vtk h5py pynput
 ```
 
 Verify the installation:
 
 ```bash
-python -c "import nilearn; import vtk; import h5py; print('PlanTUS dependencies OK')"
+python -c "import nilearn; import vtk; import h5py; import pynput; print('PlanTUS dependencies OK')"
 ```
 
 > **Note on `wb_command`**  

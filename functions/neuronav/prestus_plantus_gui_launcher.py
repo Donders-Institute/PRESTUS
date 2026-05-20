@@ -47,6 +47,9 @@ def parse_args():
     p.add_argument("--plantus_root", default="",
                    help="Path to PlanTUS installation directory "
                         "(must contain code/PlanTUS.py and resources/).")
+    p.add_argument("--output_dir", default="",
+                   help="Output directory (accepted for interface compatibility; "
+                        "GUI launcher uses PlanTUS default output location).")
     return p.parse_args()
 
 
