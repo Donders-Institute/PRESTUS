@@ -60,30 +60,62 @@ try
         p = run_params_list{ri};
         d = struct();
 
-        % CSV table (acoustic + thermal scalars)
-        if isfield(p.io, 'filename_table') && isfile(p.io.filename_table)
+        % CSV table (acoustic + thermal scalars).
+        % filename_table is set by path_log_setup at runtime; sequential-run
+        % parameter snapshots stored before pipeline execution may lack it, so
+        % reconstruct the path from known fields as a fallback.
+        csv_path = '';
+        if isfield(p.io, 'filename_table') && ~isempty(p.io.filename_table)
+            csv_path = p.io.filename_table;
+        elseif isfield(p.io, 'output_affix')
+            % dir_tabular == dir_output in PRESTUS (see path_log_setup)
+            dir_tab = '';
+            if isfield(p.io, 'dir_output') && ~isempty(p.io.dir_output)
+                dir_tab = p.io.dir_output;
+            elseif isfield(base_p.io, 'dir_output') && ~isempty(base_p.io.dir_output)
+                dir_tab = base_p.io.dir_output;
+            end
+            if ~isempty(dir_tab)
+                csv_path = fullfile(dir_tab, sprintf('sub-%03d_%s%s.csv', ...
+                    p.subject_id, medium, p.io.output_affix));
+            end
+        end
+        d.csv = [];
+        if ~isempty(csv_path) && isfile(csv_path)
             try
-                d.csv = readtable(p.io.filename_table, 'VariableNamingRule', 'preserve');
+                d.csv = readtable(csv_path, 'VariableNamingRule', 'preserve');
             catch
                 d.csv = [];
             end
-        else
-            d.csv = [];
         end
 
-        % Resolve dirs (may be absent if path_log_setup hasn't run yet)
+        % Resolve dirs (may be absent if path_log_setup hasn't run yet for
+        % sequential runs stored before their pipeline execution).
         if isfield(p.io, 'dir_cache')
             dir_cache = p.io.dir_cache;
         elseif isfield(p.io, 'dir_output')
             dir_cache = fullfile(p.io.dir_output, 'cache');
+        elseif isfield(base_p.io, 'dir_cache')
+            dir_cache = base_p.io.dir_cache;
         else
             dir_cache = '';
         end
         if ~isfield(p.io, 'dir_nii_T1w')
             if isfield(p.io, 'dir_output')
                 p.io.dir_nii_T1w = fullfile(p.io.dir_output, 'nii');
+            elseif isfield(base_p.io, 'dir_nii_T1w')
+                p.io.dir_nii_T1w = base_p.io.dir_nii_T1w;
             else
                 p.io.dir_nii_T1w = '';
+            end
+        end
+        if ~isfield(p.io, 'dir_img')
+            if isfield(p.io, 'dir_output')
+                p.io.dir_img = fullfile(p.io.dir_output, 'img');
+            elseif isfield(base_p.io, 'dir_img')
+                p.io.dir_img = base_p.io.dir_img;
+            else
+                p.io.dir_img = '';
             end
         end
 
@@ -96,12 +128,16 @@ try
         heating_mat = fullfile(dir_cache, ...
             sprintf('sub-%03d_%s_heating_res%s.mat', p.subject_id, medium, t_affix));
         d.timeseries = [];
+        d.time_status_seq = [];
         if isfile(heating_mat)
             try
-                tmp = load(heating_mat, 'results_heating');
+                tmp = load(heating_mat, 'results_heating', 'time_status_seq');
                 if isfield(tmp, 'results_heating') && ...
                    isfield(tmp.results_heating, 'timeseries')
                     d.timeseries = tmp.results_heating.timeseries;
+                end
+                if isfield(tmp, 'time_status_seq')
+                    d.time_status_seq = tmp.time_status_seq;
                 end
             catch
             end
@@ -359,19 +395,36 @@ function html = build_thermal_timeseries(run_data, run_labels, is_layered, subje
         return
     end
 
-    % Concatenate per-layer vectors; record run boundary indices
+    % Build real-time x-axis from time_status_seq, concatenating runs.
+    % Each run's timeseries has one entry per RECORDED step (skipping step 0).
+    % time_status_seq entries with recorded==1 give the real time for each entry.
     T_layers      = struct();
     CEM43_layers  = struct();
     CEM43_iso_layers = struct();
+    time_axis     = [];
     for li = 1:numel(layer_names)
         T_layers.(layer_names{li})         = [];
         CEM43_layers.(layer_names{li})     = [];
         CEM43_iso_layers.(layer_names{li}) = [];
     end
-    run_boundaries = [0];  % step index where each new run starts
+    run_boundaries = [];  % real-time values where each new run starts (after run 1)
+    t_offset = 0;         % cumulative time offset across runs
 
     for ri = 1:numel(run_data)
-        ts = run_data{ri}.timeseries;
+        ts  = run_data{ri}.timeseries;
+        tss = run_data{ri}.time_status_seq;
+
+        % Build per-run real-time vector from time_status_seq (recorded steps only,
+        % skipping the initial t=0 entry that precedes any timeseries data)
+        t_this = [];
+        if ~isempty(tss) && isstruct(tss) && isfield(tss, 'recorded') && isfield(tss, 'time')
+            recorded_mask = [tss.recorded] == 1;
+            t_recorded = [tss(recorded_mask).time];
+            if numel(t_recorded) > 1
+                t_this = t_recorded(2:end);  % drop t=0 initial entry
+            end
+        end
+
         n_this = 0;
         for li = 1:numel(layer_names)
             lname = layer_names{li};
@@ -387,16 +440,28 @@ function html = build_thermal_timeseries(run_data, run_labels, is_layered, subje
                 CEM43_iso_layers.(lname) = [CEM43_iso_layers.(lname), ts.CEM43_iso.(lname)(:)'];
             end
         end
-        run_boundaries(end+1) = run_boundaries(end) + n_this;
+
+        % Build time axis for this run; fall back to uniform step indices if missing
+        if numel(t_this) == n_this && n_this > 0
+            time_axis = [time_axis, t_this + t_offset];
+            t_offset  = t_offset + t_this(end);
+        else
+            % fallback: evenly-spaced step indices (avoids crashing when tss absent)
+            time_axis = [time_axis, (numel(time_axis) + (1:n_this))];
+            t_offset  = numel(time_axis);
+        end
+
+        if ri < numel(run_data)
+            run_boundaries(end+1) = t_offset;
+        end
     end
-    run_boundaries = run_boundaries(2:end-1);  % exclude 0 and final end
 
     html = [html '<h3>Temperature (max per layer)</h3>'];
-    html = [html build_ts_svg(T_layers, layer_names, run_boundaries, run_labels, ...
+    html = [html build_ts_svg(T_layers, layer_names, time_axis, run_boundaries, run_labels, ...
         'Temp (&#176;C)', 37, @(x) x)];
 
     html = [html '<h3>CEM43 (k-Wave, max per layer)</h3>'];
-    html = [html build_ts_svg(CEM43_layers, layer_names, run_boundaries, run_labels, ...
+    html = [html build_ts_svg(CEM43_layers, layer_names, time_axis, run_boundaries, run_labels, ...
         'CEM43 (min)', 0, @(x) x)];
 
     % ISO CEM43 (only if any data)
@@ -408,7 +473,7 @@ function html = build_thermal_timeseries(run_data, run_labels, is_layered, subje
     end
     if has_iso
         html = [html '<h3>CEM43<sub>ISO</sub> (max per layer)</h3>'];
-        html = [html build_ts_svg(CEM43_iso_layers, layer_names, run_boundaries, run_labels, ...
+        html = [html build_ts_svg(CEM43_iso_layers, layer_names, time_axis, run_boundaries, run_labels, ...
             'CEM43<sub>ISO</sub> (min)', 0, @(x) x)];
     end
 end
@@ -443,20 +508,21 @@ end
 %  SVG TIMESERIES
 %% ========================================================================
 
-function svg_html = build_ts_svg(layers, layer_names, run_boundaries, run_labels, y_label, y_floor, transform_fn)
+function svg_html = build_ts_svg(layers, layer_names, time_axis, run_boundaries, run_labels, y_label, y_floor, transform_fn)
 % Build an inline SVG of per-layer timeseries with run-boundary markers.
+% time_axis: real-time values (seconds) for each data point across all runs.
+% run_boundaries: real-time values at which each subsequent run starts.
 
     % Palette: brain=blue, skull=amber, skin=green, others=gray shades
     palette = {'#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#64748b'};
 
     % Determine total length and y range
-    n_pts   = 0;
+    n_pts   = numel(time_axis);
     y_max_v = y_floor;
     for li = 1:numel(layer_names)
         vec = layers.(layer_names{li});
         if ~isempty(vec)
-            n_pts   = max(n_pts, numel(vec));
-            finite  = vec(isfinite(vec));
+            finite = vec(isfinite(vec));
             if ~isempty(finite)
                 y_max_v = max(y_max_v, max(finite));
             end
@@ -473,9 +539,11 @@ function svg_html = build_ts_svg(layers, layer_names, run_boundaries, run_labels
     plot_w = W - pad_l - pad_r;
     plot_h = H - pad_t - pad_b;
 
+    t_min   = time_axis(1);
+    t_max   = time_axis(end);
+    t_range = max(t_max - t_min, 1);
     y_min   = y_floor;
     y_range = max(y_max_v * 1.05, y_min + 0.01) - y_min;
-    x_scale = plot_w / max(n_pts - 1, 1);
     y_scale = plot_h / y_range;
 
     svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
@@ -495,15 +563,12 @@ function svg_html = build_ts_svg(layers, layer_names, run_boundaries, run_labels
 
     % Run-boundary vertical lines
     for bi = 1:numel(run_boundaries)
-        bx = pad_l + (run_boundaries(bi) - 0.5) * x_scale;
+        bx = pad_l + (run_boundaries(bi) - t_min) / t_range * plot_w;
         svg = [svg sprintf(['<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" ' ...
             'stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>'], ...
             bx, pad_t, bx, pad_t+plot_h)];
-        if bi <= numel(run_labels) + 1
-            lbl = '';
-            if bi < numel(run_labels)
-                lbl = run_labels{bi+1};
-            end
+        if bi+1 <= numel(run_labels)
+            lbl = run_labels{bi+1};
             if ~isempty(lbl)
                 svg = [svg sprintf(['<text x="%.1f" y="%d" text-anchor="middle" ' ...
                     'font-size="9" fill="#94a3b8">%s</text>'], ...
@@ -519,7 +584,7 @@ function svg_html = build_ts_svg(layers, layer_names, run_boundaries, run_labels
         pad_l, pad_t+plot_h, pad_l+plot_w, pad_t+plot_h)];
 
     % Axis labels
-    svg = [svg sprintf('<text x="%.1f" y="%d" text-anchor="middle" font-size="11" fill="#64748b">Time step</text>', ...
+    svg = [svg sprintf('<text x="%.1f" y="%d" text-anchor="middle" font-size="11" fill="#64748b">Time (s)</text>', ...
         pad_l + plot_w/2, H-4)];
     svg = [svg sprintf('<text x="%d" y="%.1f" text-anchor="middle" font-size="11" fill="#64748b" ', ...
         12, pad_t + plot_h/2) ...
@@ -534,10 +599,10 @@ function svg_html = build_ts_svg(layers, layer_names, run_boundaries, run_labels
         color = palette{mod(li-1, numel(palette))+1};
 
         pts = '';
-        for i = 1:numel(vec)
+        for i = 1:min(numel(vec), numel(time_axis))
             val = vec(i);
             if ~isfinite(val), continue; end
-            xp = pad_l + (i-1) * x_scale;
+            xp = pad_l + (time_axis(i) - t_min) / t_range * plot_w;
             yp = pad_t + plot_h - (val - y_min) * y_scale;
             pts = [pts sprintf('%.1f,%.1f ', xp, yp)];
         end
