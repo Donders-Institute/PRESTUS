@@ -59,7 +59,11 @@ if ~is_layered || ~should_save_output(parameters.io, 'save_MNI') || ...
         ~confirm_overwriting(mni_file, parameters)
     return
 end
-convert_final_to_MNI_simnibs(orig_file_gz, m2m_folder, mni_file, parameters, 'interpolation_order', 0);
+mni_warp_method = 'simnibs';
+if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+    mni_warp_method = parameters.analysis.mni_warp_method;
+end
+convert_final_to_MNI_simnibs(orig_file_gz, m2m_folder, mni_file, parameters, 'interpolation_order', 0, 'method', mni_warp_method);
 
 if ~isfile(mni_file)
     return
@@ -94,8 +98,10 @@ switch options.FillMethod
         vol = niftiread(hdr);
         bg  = ~options.FovMask;
         if any(bg, 'all')
-            [~, idx]    = bwdist(options.FovMask);
-            vol(bg)     = vol(idx(bg));
+            vol_tmp = vol;
+            vol_tmp(bg) = NaN;
+            vol_tmp = nearest_fill_nan(vol_tmp);
+            vol(bg) = vol_tmp(bg);
             niftiwrite(vol, strrep(mni_file, '.nii.gz', ''), hdr, 'Compressed', true);
         end
 end

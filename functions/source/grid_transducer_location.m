@@ -42,7 +42,7 @@ end
                    'trans_pos and focus_pos must be defined for each transducer');
 
             pts_t1 = [tr.trans_pos(:).'; tr.focus_pos(:).'];  % 2×3
-            pts_sim = round(tformfwd(pts_t1, maketform('affine', planimg.transf))); % 2×3
+            pts_sim = round(affine_apply_pts(pts_t1, planimg.transf)); % 2×3
 
             parameters.transducer(ti).trans_pos  = pts_sim(1,:);
             parameters.transducer(ti).focus_pos  = pts_sim(2,:);

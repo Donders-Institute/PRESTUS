@@ -36,11 +36,10 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 %   2. theta_y = atan2(d(1), d(3)); R_y(-theta_y) via makehgtform.
 %   3. d' = R_y * d; theta_x = atan2(d'(2), d'(3)); R_x(theta_x).
 %   4. R = R_x * R_y; S = scale; T_rs = R * S.
-%   5. Bounds from tformfwd on corners; newdims = ceil(max-min).
+%   5. Bounds from affine_bounds on corners; newdims = ceil(max-min).
 %   6. Center c = (sz+1)/2; forward = translate(-c); backward = translate((newdims+1)/2).
-%   7. T = forward' * T_rs' * backward'; rotated_img = tformarray(nii_image, T).
+%   7. T = forward' * T_rs' * backward'; rotated_img = affine_resample_3d(nii_image, T).
 %   Assumes right-handed coordinates; angles ensure positive rotation.
-%   Requires Image Processing Toolbox (makehgtform, tformarray).
 %
 % See also: PREPROC_HEAD, PREPROC_CROP_GRID
 
@@ -111,14 +110,14 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     % forward: translates input center to origin
     % rotation_and_scale_matrix: rotates/scales around origin
     T_centered = forward' * rotation_and_scale_matrix';
-    TF_centered = maketform('affine', T_centered);
-    
+    TF_centered = T_centered;
+
     % Get bounds of the transformed image corners
-    img_bounds = findbounds(TF_centered, [0 0 0; size(nii_image)]);
-    
+    img_bounds = affine_bounds(TF_centered, [0 0 0; size(nii_image)]);
+
     % Get transformed positions of transducer and focus
-    tp_trans = tformfwd(trans_pos_grid, TF_centered);
-    fp_trans = tformfwd(focus_pos_grid, TF_centered);
+    tp_trans = affine_apply_pts(trans_pos_grid, TF_centered);
+    fp_trans = affine_apply_pts(focus_pos_grid, TF_centered);
     
     % Combine all points to find the maximum extent from the center
     all_points = [img_bounds; tp_trans; fp_trans];
@@ -147,13 +146,11 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         parameters.interpolation = 'linear';
     end
 
-    rotated_img = tformarray(nii_image, maketform('affine', transformation_matrix), ...
-        makeresampler(parameters.interpolation, 'fill'), [1 2 3], [1 2 3], newdims, [], 0);
+    rotated_img = affine_resample_3d(nii_image, transformation_matrix, newdims, parameters.interpolation, 0);
 
     %% Step 8: Update positions of transducer and focus
     % Transform transducer and focus positions using the affine transformation matrix
-    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], ...
-        maketform('affine', transformation_matrix)));
+    out_mat = round(affine_apply_pts([trans_pos_grid; focus_pos_grid], transformation_matrix));
     
     trans_pos_new = out_mat(1,:); % New transducer position
     focus_pos_new = out_mat(2,:); % New focus position

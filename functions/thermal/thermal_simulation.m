@@ -127,8 +127,8 @@ end
 if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_heatmap) && isfile(parameters.io.adopted_heatmap)
     heatmap_image = niftiread(parameters.io.adopted_heatmap);
     fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
-    kwave_medium.temp_0 = double(tformarray(heatmap_image, maketform("affine", transf), ...
-        makeresampler('linear', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], parameters.thermal.temp_0.water));
+    kwave_medium.temp_0 = double(affine_resample_3d(heatmap_image, transf, ...
+        size(medium_masks), 'linear', parameters.thermal.temp_0.water));
 end
 
 % convert attenuation into absorption coefficients
@@ -227,9 +227,8 @@ T_max = thermal_diff_obj.T;
 if isfield(parameters.io, 'adopted_cem43') && ~isempty(parameters.io.adopted_cem43) && isfile(parameters.io.adopted_cem43)
     cumulative_heat_image = niftiread(parameters.io.adopted_cem43);
     fprintf('\nAdopting CEM43 heatmap %s from previous simulation\n', parameters.io.adopted_cem43)
-    thermal_diff_obj.cem43 = double(tformarray(cumulative_heat_image, ...
-        maketform("affine", transf), ...
-        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+    thermal_diff_obj.cem43 = double(affine_resample_3d(cumulative_heat_image, transf, ...
+        size(medium_masks), 'nearest', 0));
 else
     thermal_diff_obj.cem43 = zeros(size(thermal_diff_obj.T));
 end
@@ -242,9 +241,8 @@ CEM43_max = thermal_diff_obj.cem43;
 if isfield(parameters.io, 'adopted_cem43_iso') && ~isempty(parameters.io.adopted_cem43_iso) && isfile(parameters.io.adopted_cem43_iso)
     cem43_iso_image = niftiread(parameters.io.adopted_cem43_iso);
     fprintf('\nAdopting ISO CEM43 heatmap %s from previous simulation\n', parameters.io.adopted_cem43_iso)
-    tmp_obj.cem43_iso = double(tformarray(cem43_iso_image, ...
-        maketform("affine", transf), ...
-        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], size(medium_masks), [], 0));
+    tmp_obj.cem43_iso = double(affine_resample_3d(cem43_iso_image, transf, ...
+        size(medium_masks), 'nearest', 0));
 else
     tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
 end

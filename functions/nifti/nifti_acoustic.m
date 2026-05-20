@@ -5,7 +5,7 @@ function nifti_acoustic(parameters, planimg, results_acoustic, acoustic_Ipa, aco
 % to T1 space. For the intensity map, also generates an overlay plot over the T1
 % image. Optionally converts all outputs to MNI space.
 %
-% The T1w back-transform (tformarray) is batched across all three volumes, and
+% The T1w back-transform (affine_resample_3d) is batched across all three volumes, and
 % the MNI transform (subject2mni) is run in parallel.
 %
 % Use as:
@@ -65,20 +65,26 @@ end
     end
 
     % -------------------------------------------------------------------------
-    % T1w back-transform — single batched tformarray call across all 3 volumes
+    % T1w back-transform — single batched affine_resample_3d call across all 3 volumes
     % -------------------------------------------------------------------------
+    % Check overwrite flags before the expensive affine_resample_3d call
+    needs_t1w = false(1, n);
+    for k = 1:n
+        needs_t1w(k) = logical(confirm_overwriting(orig_files_gz{k}, parameters));
+    end
+
     if is_layered
         orig_hdr          = planimg.t1_header;
         orig_hdr.Datatype = 'single';
 
-        stack = cat(4, single(acoustic_Ipa), single(acoustic_MI), single(acoustic_pressure));
-        backtransf = tformarray(stack, planimg.inv_transf, ...
-            makeresampler('cubic', 'fill'), [1 2 3], [1 2 3], ...
-            size(planimg.t1_image_orig), [], 0);
+        if any(needs_t1w)
+            stack = cat(4, single(acoustic_Ipa), single(acoustic_MI), single(acoustic_pressure));
+            backtransf = affine_resample_3d(stack, planimg.inv_transf, ...
+                size(planimg.t1_image_orig), 'linear', 0);
+        end
 
         for k = 1:n
-            orig_file_gz = orig_files_gz{k};
-            if ~confirm_overwriting(orig_file_gz, parameters); continue; end
+            if ~needs_t1w(k); continue; end
             niftiwrite(backtransf(:,:,:,k), orig_files{k}, orig_hdr, 'Compressed', true);
         end
     else
@@ -112,6 +118,10 @@ end
     end
 
     if ~isempty(mni_in)
-        convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters);
+        mni_warp_method = 'simnibs';
+        if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+            mni_warp_method = parameters.analysis.mni_warp_method;
+        end
+        convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters, 'method', mni_warp_method);
     end
 end

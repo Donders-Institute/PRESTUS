@@ -41,13 +41,13 @@ try
 
     affix = parameters.io.output_affix;
 
+    % Write all T1w property maps
     for i = 1:numel(properties)
         prop = properties{i};
         if ~isfield(kwave_medium, prop)
             continue
         end
         t1w_file = fullfile(out_dir, sprintf('%s_T1w%s', prop, affix));
-        mni_file = fullfile(out_dir, sprintf('%s_MNI%s.nii.gz', prop, affix));
 
         prop_data = single(kwave_medium.(prop));
         if isscalar(prop_data)
@@ -57,8 +57,35 @@ try
         nifti_to_t1w(prop_data, t1w_file, parameters, planimg, ...
             'Resampler', 'nearest', ...
             'FillValue', water_fill.(prop));
-        nifti_to_mni(strcat(t1w_file, '.nii.gz'), mni_file, parameters, true, m2m_folder, ...
-            'FillValue', water_fill.(prop));
+    end
+
+    % Batch all MNI conversions into a single parallel subject2mni call
+    if should_save_output(parameters.io, 'save_MNI')
+        mni_in    = {};
+        mni_out   = {};
+        mni_fills = [];
+        for i = 1:numel(properties)
+            prop = properties{i};
+            if ~isfield(kwave_medium, prop)
+                continue
+            end
+            t1w_gz = fullfile(out_dir, sprintf('%s_T1w%s.nii.gz', prop, affix));
+            mni_gz = fullfile(out_dir, sprintf('%s_MNI%s.nii.gz', prop, affix));
+            if ~confirm_overwriting(mni_gz, parameters) || ~isfile(t1w_gz)
+                continue
+            end
+            mni_in{end+1}    = t1w_gz;              %#ok<AGROW>
+            mni_out{end+1}   = mni_gz;              %#ok<AGROW>
+            mni_fills(end+1) = water_fill.(prop);   %#ok<AGROW>
+        end
+        if ~isempty(mni_in)
+            mni_warp_method = 'simnibs';
+            if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+                mni_warp_method = parameters.analysis.mni_warp_method;
+            end
+            convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters, ...
+                'interpolation_order', 0, 'FillValues', mni_fills, 'method', mni_warp_method);
+        end
     end
 catch ME
     prev = warning('off', 'backtrace');

@@ -1,7 +1,7 @@
 function nifti_to_t1w(data, orig_file, parameters, planimg, opts)
 % NIFTI_TO_T1W  Back-transform one volume to T1 space and write NIfTI
 %
-% Confirms overwriting, applies tformarray to bring data from simulation-grid
+% Confirms overwriting, applies affine_resample_3d to bring data from simulation-grid
 % space to T1 space, and writes a compressed NIfTI. MNI conversion is the
 % caller's responsibility (see NIFTI_TO_MNI).
 %
@@ -22,7 +22,7 @@ function nifti_to_t1w(data, orig_file, parameters, planimg, opts)
 %   FillMethod   - 'constant' (default) or 'nearest'.
 %                  'constant': out-of-grid voxels get FillValue.
 %                  'nearest':  out-of-grid voxels are filled with the value
-%                              of the nearest in-grid voxel (bwdist). Use when
+%                              of the nearest in-grid voxel (nearest_fill_nan). Use when
 %                              FillValue is ambiguous (e.g. pCT where 0 HU is
 %                              a valid tissue value).
 %   FillValue    - scalar fill value for FillMethod='constant' (default: 0)
@@ -58,19 +58,13 @@ if opts.IsLayered
     if strcmp(opts.FillMethod, 'nearest')
         % Fill with NaN as sentinel so out-of-grid voxels can be detected
         % after the transform, then replace each with its nearest in-grid value.
-        data_backtransf = single(tformarray(single(data), planimg.inv_transf, ...
-            makeresampler(opts.Resampler, 'fill'), [1 2 3], [1 2 3], ...
-            size(planimg.t1_image_orig), [], NaN));
-        bg = isnan(data_backtransf);
-        if any(bg, 'all')
-            [~, idx]             = bwdist(~bg);
-            data_backtransf(bg)  = data_backtransf(idx(bg));
-        end
+        data_backtransf = single(affine_resample_3d(single(data), planimg.inv_transf, ...
+            size(planimg.t1_image_orig), opts.Resampler, NaN));
+        data_backtransf = nearest_fill_nan(data_backtransf);
         data_backtransf = cast(data_backtransf, opts.Datatype);
     else
-        data_backtransf = cast(tformarray(single(data), planimg.inv_transf, ...
-            makeresampler(opts.Resampler, 'fill'), [1 2 3], [1 2 3], ...
-            size(planimg.t1_image_orig), [], double(opts.FillValue)), opts.Datatype);
+        data_backtransf = cast(affine_resample_3d(single(data), planimg.inv_transf, ...
+            size(planimg.t1_image_orig), opts.Resampler, double(opts.FillValue)), opts.Datatype);
     end
 
     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);

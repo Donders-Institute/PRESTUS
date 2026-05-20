@@ -5,7 +5,7 @@ function nifti_thermal(parameters, planimg, results_heating, kwave_medium)
 % space, with edge-artefact correction applied to the temperature map.
 % Optionally converts all outputs to MNI space.
 %
-% The T1w back-transform (tformarray) is batched by fill-value group, and the
+% The T1w back-transform (affine_resample_3d) is batched by fill-value group, and the
 % MNI transform (subject2mni) is run in parallel across all volumes.
 %
 % Use as:
@@ -66,7 +66,7 @@ end
     end
 
     % -------------------------------------------------------------------------
-    % T1w back-transform — batch by fill-value group to call tformarray once
+    % T1w back-transform — batch by fill-value group to call affine_resample_3d once
     % per group instead of once per volume.
     %
     % Group A (fill = water baseline): heating, heating_end  → indices 1–2
@@ -82,8 +82,8 @@ end
         grp_a = [1 2];
         if any(needs_t1w(grp_a))
             stack_a = cat(4, single(results_heating.maxT), single(results_heating.heating_endT));
-            backtransf_a = tformarray(stack_a, planimg.inv_transf, ...
-                makeresampler('linear', 'fill'), [1 2 3], [1 2 3], t1_size, [], fill_water);
+            backtransf_a = affine_resample_3d(stack_a, planimg.inv_transf, ...
+                t1_size, 'linear', fill_water);
         end
 
         % Group B — temperature rises use linear interpolation; CEM43 volumes use
@@ -96,16 +96,16 @@ end
             stack_hrise = cat(4, ...
                 single(results_heating.maxT - kwave_medium.temp_0), ...
                 single(results_heating.heating_endT - kwave_medium.temp_0));
-            backtransf_hrise = tformarray(stack_hrise, planimg.inv_transf, ...
-                makeresampler('linear', 'fill'), [1 2 3], [1 2 3], t1_size, [], 0);
+            backtransf_hrise = affine_resample_3d(stack_hrise, planimg.inv_transf, ...
+                t1_size, 'linear', 0);
 
             stack_cem = cat(4, ...
                 single(results_heating.CEM43), ...
                 single(results_heating.CEM43_end), ...
                 single(results_heating.CEM43_iso), ...
                 single(results_heating.CEM43_iso_end));
-            backtransf_cem = tformarray(stack_cem, planimg.inv_transf, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], t1_size, [], 0);
+            backtransf_cem = affine_resample_3d(stack_cem, planimg.inv_transf, ...
+                t1_size, 'nearest', 0);
         end
 
         % Write Group A volumes
@@ -171,7 +171,11 @@ end
     end
 
     if ~isempty(mni_in)
+        mni_warp_method = 'simnibs';
+        if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+            mni_warp_method = parameters.analysis.mni_warp_method;
+        end
         convert_final_to_MNI_simnibs(mni_in, m2m_folder, mni_out, parameters, ...
-            'interpolation_order', 0, 'FillValues', mni_fills);
+            'interpolation_order', 0, 'FillValues', mni_fills, 'method', mni_warp_method);
     end
 end

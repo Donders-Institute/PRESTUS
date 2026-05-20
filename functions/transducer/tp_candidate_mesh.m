@@ -35,16 +35,18 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
 
     %--- Tissue masks and boundaries -------------------------------------
     all_masks     = img > 0;  % Brain+skull+skin
-    outer_boundary = imdilate(all_masks, strel('sphere',1)) - all_masks;  % Outer surface
+    [kx1,ky1,kz1] = ndgrid(-1:1,-1:1,-1:1);
+    se1 = (kx1.^2+ky1.^2+kz1.^2) <= 1;
+    outer_boundary = (convn(logical(all_masks), se1, 'same') > 0) - logical(all_masks);
 
-    skin_boundary = all_masks - imerode(all_masks, strel('sphere',1));
+    skin_boundary = logical(all_masks) - (convn(logical(all_masks), se1, 'same') == nnz(se1));
     skin_coords   = gpuArray(coord_mesh.xyz(find(skin_boundary), :));
 
     img_cp = img;
     img_cp(img_cp == 7 | img_cp == 8) = 4;  % Merge trabecular/CSF → compact bone
     skull      = img_cp == 4;
-    skull_fill = imfill(img_cp > 0 & img_cp <= 4, 'holes');
-    skull_fill = imerode(skull_fill, strel('sphere',1));
+    skull_fill = imfill_holes_3d(img_cp > 0 & img_cp <= 4);
+    skull_fill = convn(logical(skull_fill), se1, 'same') == nnz(se1);
     skull_boundary = skull & ~skull_fill;
     skull_coords   = gpuArray(coord_mesh.xyz(find(skull_boundary), :));
 

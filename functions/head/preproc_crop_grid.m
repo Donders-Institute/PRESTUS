@@ -55,11 +55,11 @@ total_pre_offset = zeros(1,3);
 
 % Apply symmetric padding BEFORE transducer_setup
 if any(pad_pre_post > 0)
-    segmentation    = padarray(segmentation,    pad_pre_post, 0, 'both');
-    medium_masks    = padarray(medium_masks,    pad_pre_post, 0, 'both');
-    bone_mask_img   = padarray(bone_mask_img,   pad_pre_post, 0, 'both');
+    segmentation    = pad3_both(segmentation,  pad_pre_post, 0);
+    medium_masks    = pad3_both(medium_masks,  pad_pre_post, 0);
+    bone_mask_img   = pad3_both(bone_mask_img, pad_pre_post, 0);
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img,   pad_pre_post, NaN, 'both');
+        pseudoCT_img = pad3_both(pseudoCT_img, pad_pre_post, NaN);
     end
     total_pre_offset = total_pre_offset + pad_pre_post;  % User padding contribution
     % Positions shift by PRE-padding amount ('both' adds pre first)
@@ -87,11 +87,11 @@ clear combinedmask;
 % === CONDITIONAL PRE-PADDING if min_dims < 1 ===
 if any(min_dims < 1)
     pad_amount = abs(min(min_dims, [1 1 1]));
-    segmentation  = padarray(segmentation,  pad_amount, 0,       'pre');
-    medium_masks  = padarray(medium_masks,  pad_amount, i_water, 'pre');
-    bone_mask_img = padarray(bone_mask_img, pad_amount, 0,       'pre');
+    segmentation  = pad3_pre(segmentation,  pad_amount, 0);
+    medium_masks  = pad3_pre(medium_masks,  pad_amount, i_water);
+    bone_mask_img = pad3_pre(bone_mask_img, pad_amount, 0);
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img, pad_amount, NaN, 'pre');
+        pseudoCT_img = pad3_pre(pseudoCT_img, pad_amount, NaN);
     end
     total_pre_offset = total_pre_offset + pad_amount;  % Add conditional padding
     min_dims = max(min_dims, [1 1 1]);
@@ -110,11 +110,11 @@ max_dims = min_dims + new_grid_dims - 1;
 % === CONDITIONAL POST-PADDING if FFT expansion exceeds padding ===
 if any(max_dims > size(medium_masks))
     pad_post_amount = max(0, max_dims - size(medium_masks));
-    segmentation  = padarray(segmentation,  pad_post_amount, 0,       'post');
-    medium_masks  = padarray(medium_masks,  pad_post_amount, i_water, 'post');
-    bone_mask_img = padarray(bone_mask_img, pad_post_amount, 0,       'post');
+    segmentation  = pad3_post(segmentation,  pad_post_amount, 0);
+    medium_masks  = pad3_post(medium_masks,  pad_post_amount, i_water);
+    bone_mask_img = pad3_post(bone_mask_img, pad_post_amount, 0);
     if ~isempty(pseudoCT_img)
-        pseudoCT_img = padarray(pseudoCT_img, pad_post_amount, NaN, 'post');
+        pseudoCT_img = pad3_post(pseudoCT_img, pad_post_amount, NaN);
     end
     fprintf('Post-padding applied: [%d %d %d] voxels\n', pad_post_amount);
 end
@@ -148,4 +148,30 @@ fprintf('  User padding: %.1fmm = [%d %d %d] voxels\n', ...
 fprintf('  Total pre-offset: [%d %d %d] voxels\n', total_pre_offset);
 fprintf('  Crop bounds: min=[%d %d %d], max=[%d %d %d]\n', min_dims, max_dims);
 
+end
+
+function B = pad3_both(A, p, val)
+new_sz = size(A) + 2*p;
+B = fill_val(new_sz, val, class(A));
+B(p(1)+1:end-p(1), p(2)+1:end-p(2), p(3)+1:end-p(3)) = A;
+end
+
+function B = pad3_pre(A, p, val)
+new_sz = size(A) + p;
+B = fill_val(new_sz, val, class(A));
+B(p(1)+1:end, p(2)+1:end, p(3)+1:end) = A;
+end
+
+function B = pad3_post(A, p, val)
+new_sz = size(A) + p;
+B = fill_val(new_sz, val, class(A));
+B(1:end-p(1), 1:end-p(2), 1:end-p(3)) = A;
+end
+
+function B = fill_val(sz, val, cls)
+if isnan(val)
+    B = NaN(sz, cls);
+else
+    B = repmat(cast(val, cls), sz);
+end
 end

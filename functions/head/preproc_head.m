@@ -425,7 +425,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
         % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
-        inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
+        inv_final_transformation_matrix = inv(final_transformation_matrix);
 
         % Diagnostic NIfTIs: medium_masks, segmentation, and skull_mask
         % back-projected to T1 space. Written to debug_dir/preproc/ only
@@ -436,8 +436,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'single';
             segmented_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
-            plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+            plotdata = single(affine_resample_3d(uint8(medium_masks), inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(segmented_file)
                 try
                     niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
@@ -452,8 +452,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'single';
             segmentation_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_segmentation_final', parameters.subject_id));
-            plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+            plotdata = single(affine_resample_3d(uint8(segmentation_crop), inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(segmentation_file)
                 try
                     niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
@@ -468,8 +468,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'double';
             skull_mask_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
-            plotdata = double(tformarray(bone_mask_crop, inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
+            plotdata = double(affine_resample_3d(bone_mask_crop, inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(skull_mask_file)
                 try
                     niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
@@ -484,8 +484,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 orig_hdr.Datatype = 'single';
                 pseudoCT_file = fullfile(parameters.io.dir_debug_preproc,...
                     sprintf('sub-%03d_pseudoCT_final', parameters.subject_id));
-                plotdata = single(tformarray(pseudoCT_crop, inv_final_transformation_matrix, ...
-                    makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
+                plotdata = single(affine_resample_3d(pseudoCT_crop, inv_final_transformation_matrix, ...
+                    orig_hdr.ImageSize, 'nearest', 0));
                 if ~isfile(pseudoCT_file)
                     try
                         niftiwrite(plotdata, pseudoCT_file, orig_hdr, 'Compressed',true);
@@ -534,7 +534,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     % If the transformation cannot be correctly inverted, this will be displayed
     % If the inverse transformation is off by > 1 voxel, the script exits
 
-    backtransf_coordinates = round(tformfwd([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
+    backtransf_coordinates = round(affine_apply_pts([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
     diff_voxels = abs(backtransf_coordinates - [trans_pos_grid; focus_pos_grid]);
     
     if any(diff_voxels(:) > 1)
@@ -572,7 +572,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             fpos_t1 = tr.focus_pos(:).';
     
             % map to simulation grid using the same global transform
-            pts_sim = round(tformfwd([tpos_t1; fpos_t1], maketform('affine', final_transformation_matrix))); % 2×3
+            pts_sim = round(affine_apply_pts([tpos_t1; fpos_t1], final_transformation_matrix)); % 2×3
             tpos_sim = pts_sim(1,:);
             fpos_sim = pts_sim(2,:);
         end

@@ -58,11 +58,11 @@ function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rot
     forward  = makehgtform('translate', -rotation_center);
 
     T_centered = forward' * scale_matrix';
-    TF_centered = maketform('affine', T_centered);
+    TF_centered = T_centered;
 
-    img_bounds = findbounds(TF_centered, [0 0 0; size(nii_image)]);
-    tp_trans   = tformfwd(trans_pos_grid, TF_centered);
-    fp_trans   = tformfwd(focus_pos_grid, TF_centered);
+    img_bounds = affine_bounds(TF_centered, [0 0 0; size(nii_image)]);
+    tp_trans   = affine_apply_pts(trans_pos_grid, TF_centered);
+    fp_trans   = affine_apply_pts(focus_pos_grid, TF_centered);
 
     all_points = [img_bounds; tp_trans; fp_trans];
     max_abs    = max(abs(all_points), [], 1);
@@ -82,13 +82,11 @@ function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rot
         parameters.interpolation = 'linear';
     end
 
-    rescaled_img = tformarray(nii_image, maketform('affine', transformation_matrix), ...
-        makeresampler(parameters.interpolation, 'fill'), [1 2 3], [1 2 3], newdims, [], 0);
+    rescaled_img = affine_resample_3d(nii_image, transformation_matrix, newdims, parameters.interpolation, 0);
 
     %% Update transducer and focus positions
 
-    out_mat = round(tformfwd([trans_pos_grid; focus_pos_grid], ...
-        maketform('affine', transformation_matrix)));
+    out_mat = round(affine_apply_pts([trans_pos_grid; focus_pos_grid], transformation_matrix));
     trans_pos_new = out_mat(1,:);
     focus_pos_new = out_mat(2,:);
 

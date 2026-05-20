@@ -2,7 +2,7 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 % SMOOTH_IMG  Smooth an image with a Gaussian or box kernel defined by FWHM
 %
 % Converts FWHM in mm to voxel units and applies either a Gaussian
-% (imgaussfilt) or box-average filter. Optionally binarises the output
+% or box-average filter. Optionally binarises the output
 % with a user-specified threshold.
 %
 % Use as:
@@ -63,8 +63,13 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 
             switch method
                 case "gaussian"
-                    % imgaussfilt expects sigma in pixels/voxels [web:1][web:2]
-                    smoothed_img = imgaussfilt(img, sig);
+                    hw = ceil(3 * max(sig));
+                    [gx,gy] = ndgrid(-hw:hw, -hw:hw);
+                    g = exp(-0.5*(gx.^2/sig(1)^2 + gy.^2/sig(2)^2));
+                    g = g / sum(g(:));
+                    pad = hw;
+                    ip = padarray_replicate(img, [pad pad]);
+                    smoothed_img = conv2(ip, g, 'valid');
 
                 case "box"
                     % Kernel size = round(FWHM voxels), no minimum
@@ -76,7 +81,9 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     % Force odd kernel size
                     ksz = ksz + mod(ksz+1,2);
                     kernel = ones(ksz) / prod(ksz);
-                    smoothed_img = imfilter(img, kernel, 'replicate');  % Works for ksz=1 [web:24]
+                    pad = floor(ksz(1)/2);
+                    ip = padarray_replicate(img, [pad pad]);
+                    smoothed_img = conv2(ip, kernel, 'valid');
             end
 
         elseif ndims_img == 3
@@ -84,8 +91,11 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 
             switch method
                 case "gaussian"
-                    % imgaussfilt3 sigma also in voxels [web:4]
-                    smoothed_img = imgaussfilt3(img, sig);
+                    hw = ceil(3 * max(sig));
+                    [gx,gy,gz] = ndgrid(-hw:hw, -hw:hw, -hw:hw);
+                    g = exp(-0.5*(gx.^2/sig(1)^2 + gy.^2/sig(2)^2 + gz.^2/sig(3)^2));
+                    g = g / sum(g(:));
+                    smoothed_img = convn(img, g, 'same');
 
                 case "box"
                     ksz = round(fwhm_voxels(1:3));
@@ -110,4 +120,13 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
     else
         thresholded_img = smoothed_img;
     end
+end
+
+function out = padarray_replicate(img, pad)
+% Replicate-pad a 2-D array by pad(1) rows and pad(2) cols
+pr = pad(1); pc = pad(2);
+out = [repmat(img(1,:),    pr, 1);
+       img;
+       repmat(img(end,:),  pr, 1)];
+out = [repmat(out(:,1),   1, pc), out, repmat(out(:,end), 1, pc)];
 end

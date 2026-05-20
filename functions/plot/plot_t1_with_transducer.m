@@ -41,7 +41,9 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
     if any(min_coords < 1)
         pad_amount = ceil(1 - min_coords); % Amount to shift to make min 1
         % Pad at the beginning (pre)
-        t1_image = padarray(t1_image, pad_amount, 0, 'pre');
+        t1_image = cat(1, zeros([pad_amount(1), size(t1_image,2), size(t1_image,3)], class(t1_image)), t1_image);
+        t1_image = cat(2, zeros([size(t1_image,1), pad_amount(2), size(t1_image,3)], class(t1_image)), t1_image);
+        t1_image = cat(3, zeros([size(t1_image,1), size(t1_image,2), pad_amount(3)], class(t1_image)), t1_image);
         
         % Shift coordinates
         trans_pos_grid = trans_pos_grid + pad_amount;
@@ -61,7 +63,10 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
     %% Pad T1 image to ensure it includes transducer position (Positive/Post-padding)
     im_size = max([size(t1_image); trans_pos_grid; focus_pos_grid]);
     if ~isequal(im_size, size(t1_image))
-        t1_image = padarray(t1_image, im_size - size(t1_image), 'post'); % Pad image to include transducer position
+        pad_post = im_size - size(t1_image);
+        t1_image = cat(1, t1_image, zeros([pad_post(1), size(t1_image,2), size(t1_image,3)], class(t1_image)));
+        t1_image = cat(2, t1_image, zeros([size(t1_image,1), pad_post(2), size(t1_image,3)], class(t1_image)));
+        t1_image = cat(3, t1_image, zeros([size(t1_image,1), size(t1_image,2), pad_post(3)], class(t1_image)));
     end
 
     %% Create transducer mask and setup parameters

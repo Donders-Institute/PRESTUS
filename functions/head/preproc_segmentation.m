@@ -91,7 +91,11 @@ end
         path_to_input_img  = fullfile(segmentation_folder, 'T1.nii.gz');
         path_to_output_img = fullfile(segmentation_folder, 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
         if ~exist(path_to_output_img, 'file')
-            convert_final_to_MNI_simnibs(path_to_input_img, segmentation_folder, path_to_output_img, parameters);
+            mni_warp_method = 'simnibs';
+            if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+                mni_warp_method = parameters.analysis.mni_warp_method;
+            end
+            convert_final_to_MNI_simnibs(path_to_input_img, segmentation_folder, path_to_output_img, parameters, 'method', mni_warp_method);
         end
     end
 

@@ -98,7 +98,8 @@ end
             any(ismember(fieldnames(parameters.layers), {'skull'}))
         % Extract the skull edge ...
         mask = tissuemask_binary(parameters, medium_masks);
-        skull_edge = edge3(mask.skull, 'approxcanny', 0.1);
+        skull_log  = logical(mask.skull);
+        skull_edge = skull_log & (convn(single(~skull_log), ones(3,3,3,'single'), 'same') > 0);
         % ... to set as display mask
         kwave_input_args.DisplayMask = skull_edge;
     end

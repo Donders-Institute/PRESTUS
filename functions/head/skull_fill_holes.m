@@ -40,8 +40,10 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
         skull_continuous = skull_rubber_wrap(parameters, skull, medium_masks, segmented_img);
     else
         % Isotropic dilation
-        se = strel('sphere', 3);  % 3D ball for isotropic smoothing
-        skull_continuous = imclose(skull, se);  % Dilate then erode
+        [kx,ky,kz] = ndgrid(-3:3, -3:3, -3:3);
+        se = (kx.^2 + ky.^2 + kz.^2) <= 9;     % sphere r=3
+        skull_continuous = convn(logical(skull), se, 'same') > 0;            % dilate
+        skull_continuous = convn(skull_continuous, se, 'same') == nnz(se);   % erode
     end
     skull_new = skull_continuous & ~skull; % Identify voxels that were not part of the original skull mask
     medium_masks(skull_new) = skull_i(1);  % Only add new voxels as cortical bone (if differentiated)
