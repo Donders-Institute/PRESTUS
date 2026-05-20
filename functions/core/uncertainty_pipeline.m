@@ -48,6 +48,12 @@ function uncertainty_pipeline(parameters, options)
 %                .report_partition    — partition for stage 5 (default: scheduler default)
 %                .sim_memorylimit     — RAM in GB for stages 2-4 (default: inherit)
 %                .report_memorylimit  — RAM in GB for stage 5 (default: inherit)
+%                .sequential_configs  — struct of follow-up run parameter structs
+%                                       (config_2, config_3, …) for sequential
+%                                       thermal continuation with matched uncertainty
+%                                       variants (default/liberal/conservative thermal
+%                                       outputs are passed to the corresponding variant
+%                                       of the next run)
 %
 % See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE, GENERATE_UNCERTAINTY_REPORT
 
@@ -202,6 +208,18 @@ p_conservative.io.log_file = log_files.conservative;
 p_report       = make_report_params(parameters, options.affixes, log_files);
 
 % =========================================================================
+%% Sequential config pre-processing
+% =========================================================================
+
+has_sequential = isfield(options, 'sequential_configs') && ...
+                 isstruct(options.sequential_configs) && ...
+                 ~isempty(fieldnames(options.sequential_configs));
+
+% run_index_start: the run number assigned to the FIRST sequential follow-up.
+% Run 1 is the base uncertainty run, so sequential runs start at 2.
+run_index_start = 2;
+
+% =========================================================================
 %% Execute
 % =========================================================================
 
@@ -226,6 +244,23 @@ switch platform
             cleanup_uncertainty_intermediates(parameters, options.affixes);
         end
 
+        % Sequential runs: each follow-up run repeats the three uncertainty
+        % variants, with each variant inheriting the thermal end-state from
+        % the matched variant of the prior run.
+        if has_sequential
+            seq_run_params = run_sequential_matlab(parameters, options, run_index_start);
+            % Generate combined sequential uncertainty report
+            try
+                generate_sequential_report( ...
+                    seq_run_params.default, {}, ...
+                    struct('liberal_params_list', {seq_run_params.liberal}, ...
+                           'conservative_params_list', {seq_run_params.conservative}));
+            catch ME_seq_rep
+                warning('uncertainty_pipeline:seqReport', ...
+                    'Sequential uncertainty report failed: %s', ME_seq_rep.message);
+            end
+        end
+
     % ---------------------------------------------------------------------
     case {'slurm', 'qsub'}
     % Jobs are submitted immediately with scheduler afterok dependencies.
@@ -237,6 +272,18 @@ switch platform
         subject_id = parameters.subject_id;
         medium     = parameters.simulation.medium;
 
+        % Run prefix: 'r1-' when sequential configs are present, '' otherwise.
+        % This keeps job names unambiguous when multiple runs are chained
+        % (r1-u2-default, r2-u2-default, …) while staying backwards-compatible
+        % with single-run submissions (u1-preproc, u2-default, …).
+        has_sequential = isfield(options, 'sequential_configs') && ...
+                         ~isempty(fieldnames(options.sequential_configs));
+        if has_sequential
+            run_prefix = 'r1-';
+        else
+            run_prefix = '';
+        end
+
         % ── Stage 1 ──────────────────────────────────────────────────────
         % Skip if the head preprocessing cache already exists.
         % Sentinel: cache/sub-NNN_<medium>_cropped_smoothed.mat
@@ -246,7 +293,7 @@ switch platform
         preproc_sentinel = fullfile(output_dir, 'cache', ...
             sprintf('sub-%03d_%s_cropped_smoothed.mat', subject_id, medium));
         p_stage1.hpc.timelimit = options.stage1_timelimit;
-        p_stage1.hpc.job_name  = sprintf('PRESTUS-u1-preproc_%s', subj);
+        p_stage1.hpc.job_name  = sprintf('PRESTUS-%su1-preproc_%s', run_prefix, subj);
         p_stage1               = apply_memorylimit(p_stage1, options.stage1_memorylimit);
         p_stage1               = strip_gpu_requirements(p_stage1, options.stage1_partition);
         if isfile(preproc_sentinel)
@@ -269,9 +316,9 @@ switch platform
             'Stage 4', 'conservative', p_conservative, options.affixes.conservative   ...
         };
         job_names = { ...
-            sprintf('PRESTUS-u2-sim-default_%s',      subj); ...
-            sprintf('PRESTUS-u3-sim-liberal_%s',       subj); ...
-            sprintf('PRESTUS-u4-sim-conservative_%s',  subj)  ...
+            sprintf('PRESTUS-%su2-sim-default_%s',      run_prefix, subj); ...
+            sprintf('PRESTUS-%su3-sim-liberal_%s',       run_prefix, subj); ...
+            sprintf('PRESTUS-%su4-sim-conservative_%s',  run_prefix, subj)  ...
         };
         job_ids_sim = zeros(1, 3);
         sim_submitted = false(1, 3);
@@ -314,7 +361,7 @@ switch platform
             job_id_report = [];
         else
             p_report.hpc.timelimit  = options.report_timelimit;
-            p_report.hpc.job_name   = sprintf('PRESTUS-u5-report_%s', subj);
+            p_report.hpc.job_name   = sprintf('PRESTUS-%su5-report_%s', run_prefix, subj);
             p_report                = apply_memorylimit(p_report, options.report_memorylimit);
             p_report                = strip_gpu_requirements(p_report, options.report_partition);
             pending_sim_ids = job_ids_sim(sim_submitted);
@@ -326,10 +373,19 @@ switch platform
         end
         fprintf('\n');
 
+        % ── Sequential runs (HPC) ────────────────────────────────────────
+        % Each sequential run submits its three variants with afterok on the
+        % prior run's report job, then submits its own report job.
+        all_submitted_ids = [job_id_stage1, job_ids_sim(sim_submitted), job_id_report];
+        if has_sequential
+            [seq_submitted_ids, ~] = submit_sequential_hpc( ...
+                parameters, options, job_id_report, subj, run_index_start);
+            all_submitted_ids = [all_submitted_ids, seq_submitted_ids];
+        end
+
         % ── Summary ──────────────────────────────────────────────────────
         fprintf('All jobs submitted. Monitor: squeue -u $USER\n');
-        submitted_ids = [job_id_stage1, job_ids_sim(sim_submitted), job_id_report];
-        submitted_ids = submitted_ids(submitted_ids > 0);
+        submitted_ids = all_submitted_ids(all_submitted_ids > 0);
         if ~isempty(submitted_ids)
             fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));
             fprintf('To cancel         : scancel %s\n', num2str(submitted_ids));
@@ -343,6 +399,226 @@ switch platform
 end
 
 end % uncertainty_pipeline
+
+% =========================================================================
+%% Sequential helpers
+% =========================================================================
+
+function seq_affixes = make_seq_affixes(seq_number, base_affixes)
+% Derive variant affixes for sequential run <seq_number>.
+% The default variant gets the seq suffix alone; liberal and conservative
+% append their descriptor on top of that.
+    seq_suffix = sprintf('_seq%d', seq_number);
+    seq_affixes = struct( ...
+        'default',      [base_affixes.default      seq_suffix], ...
+        'liberal',      [base_affixes.liberal       seq_suffix], ...
+        'conservative', [base_affixes.conservative  seq_suffix]);
+end
+
+function p = wire_thermal_handoff(p, nii_dir, prior_affix, subject_id, medium)
+% Set adopted_heatmap / adopted_cem43 / adopted_cem43_iso from prior variant.
+    p.io.adopted_heatmap    = fullfile(nii_dir, ...
+        sprintf('sub-%03d_%s_T1w%s_heating_end.nii.gz',  subject_id, medium, prior_affix));
+    p.io.adopted_cem43      = fullfile(nii_dir, ...
+        sprintf('sub-%03d_%s_T1w%s_CEM43_end.nii.gz',    subject_id, medium, prior_affix));
+    p.io.adopted_cem43_iso  = fullfile(nii_dir, ...
+        sprintf('sub-%03d_%s_T1w%s_CEM43_iso_end.nii.gz',subject_id, medium, prior_affix));
+end
+
+function [sorted_fields, sorted_numbers] = sort_seq_configs(seq_configs)
+% Return sequential config field names and their numeric indices in sorted order.
+    fields   = fieldnames(seq_configs);
+    numbers  = cellfun(@(x) sscanf(x, 'config_%d'), fields);
+    [sorted_numbers, idx] = sort(numbers);
+    sorted_fields = fields(idx);
+end
+
+function medium_config = get_variant_medium_config(variant_name, options)
+% Return the YAML override path for a given variant name.
+    switch variant_name
+        case 'liberal';      medium_config = options.liberal_config;
+        case 'conservative'; medium_config = options.conservative_config;
+        otherwise;           medium_config = [];
+    end
+end
+
+% -------------------------------------------------------------------------
+
+function seq_run_params = run_sequential_matlab(base_parameters, options, run_index_start)
+% Execute sequential uncertainty runs on the MATLAB platform.
+% Returns a struct with fields .default, .liberal, .conservative — each a
+% cell array of parameter structs (one per sequential run), for passing to
+% generate_sequential_report.
+
+    subject_id = base_parameters.subject_id;
+    medium     = base_parameters.simulation.medium;
+    nii_dir    = fullfile(get_output_dir(base_parameters), 'nii');
+    run_ts     = string(datetime('now'), 'yyMMdd_HHmm');
+    logs_dir   = fullfile(get_output_dir(base_parameters), 'logs');
+
+    [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
+
+    seq_run_params = struct('default', {{}}, 'liberal', {{}}, 'conservative', {{}});
+    prior_affixes  = options.affixes;
+
+    for si = 1:numel(sorted_fields)
+        run_idx    = run_index_start + si - 1;
+        seq_p_base = options.sequential_configs.(sorted_fields{si});
+        seq_num    = sorted_numbers(si);
+        seq_aff    = make_seq_affixes(seq_num, options.affixes);
+
+        variant_names = {'default', 'liberal', 'conservative'};
+        stage_nums    = [2, 3, 4];
+        p_variants    = cell(1, 3);
+
+        for vi = 1:3
+            vname       = variant_names{vi};
+            cur_affix   = seq_aff.(vname);
+            prior_affix = prior_affixes.(vname);
+            med_cfg     = get_variant_medium_config(vname, options);
+
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg);
+            p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+
+            % Assign log file
+            p_v.io.log_file = fullfile(logs_dir, ...
+                sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, cur_affix, run_idx, run_ts));
+
+            p_variants{vi} = p_v;
+        end
+
+        % Build report params for this sequential run
+        seq_log_files.stage1       = '';
+        seq_log_files.default      = p_variants{1}.io.log_file;
+        seq_log_files.liberal      = p_variants{2}.io.log_file;
+        seq_log_files.conservative = p_variants{3}.io.log_file;
+        seq_log_files.report       = fullfile(logs_dir, ...
+            sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files);
+
+        % Run
+        run_stage(2, sprintf('Default simulation (r%d)', run_idx), ...
+            @() prestus_pipeline(p_variants{1}));
+        run_stage(3, sprintf('Liberal simulation (r%d)', run_idx), ...
+            @() prestus_pipeline(p_variants{2}));
+        run_stage(4, sprintf('Conservative simulation (r%d)', run_idx), ...
+            @() prestus_pipeline(p_variants{3}));
+        assert_variant_outputs_exist(seq_p_base, seq_aff);
+        run_stage(5, sprintf('Uncertainty report (r%d)', run_idx), ...
+            @() prestus_pipeline(p_rep));
+
+        seq_run_params.default{end+1}      = p_variants{1};
+        seq_run_params.liberal{end+1}      = p_variants{2};
+        seq_run_params.conservative{end+1} = p_variants{3};
+
+        prior_affixes = seq_aff;
+    end
+end
+
+% -------------------------------------------------------------------------
+
+function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
+        base_parameters, options, initial_report_job_id, subj, run_index_start)
+% Submit sequential uncertainty runs to the HPC scheduler.
+% Each run's three variants depend on the prior run's report job.
+% Returns all submitted job IDs and the final report job ID.
+
+    subject_id = base_parameters.subject_id;
+    medium     = base_parameters.simulation.medium;
+    nii_dir    = fullfile(get_output_dir(base_parameters), 'nii');
+    run_ts     = string(datetime('now'), 'yyMMdd_HHmm');
+    logs_dir   = fullfile(get_output_dir(base_parameters), 'logs');
+    output_dir = get_output_dir(base_parameters);
+
+    [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
+
+    all_ids            = [];
+    prior_job_id_report = initial_report_job_id;
+    prior_affixes      = options.affixes;
+
+    variant_names = {'default', 'liberal', 'conservative'};
+    stage_nums    = [2, 3, 4];
+
+    for si = 1:numel(sorted_fields)
+        run_idx    = run_index_start + si - 1;
+        run_prefix = sprintf('r%d-', run_idx);
+        seq_p_base = options.sequential_configs.(sorted_fields{si});
+        seq_num    = sorted_numbers(si);
+        seq_aff    = make_seq_affixes(seq_num, options.affixes);
+
+        job_ids_sim  = zeros(1, 3);
+        sim_submitted = false(1, 3);
+
+        for vi = 1:3
+            vname       = variant_names{vi};
+            cur_affix   = seq_aff.(vname);
+            prior_affix = prior_affixes.(vname);
+            med_cfg     = get_variant_medium_config(vname, options);
+
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg);
+            p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+            p_v.io.log_file = fullfile(logs_dir, ...
+                sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, cur_affix, run_idx, run_ts));
+
+            csv_file = fullfile(output_dir, ...
+                sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, cur_affix));
+
+            stage_label = sprintf('[r%d-u%d]', run_idx, stage_nums(vi));
+            fprintf('%s Submitting %s simulation    ', stage_label, vname);
+            if isfile(csv_file)
+                fprintf('— output exists, skipping.\n');
+            else
+                p_v.hpc.timelimit = options.sim_timelimit;
+                p_v.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', ...
+                    run_prefix, stage_nums(vi), vname, subj);
+                p_v = apply_memorylimit(p_v, options.sim_memorylimit);
+                if ~isempty(prior_job_id_report)
+                    p_v.hpc.depend_job_id = prior_job_id_report;
+                end
+                job_ids_sim(vi)   = prestus_pipeline_start(p_v);
+                sim_submitted(vi) = true;
+                fprintf('→ job %s  (mem %iG)\n', num2str(job_ids_sim(vi)), p_v.hpc.memorylimit);
+            end
+        end
+        fprintf('\n');
+
+        % Report job for this sequential run
+        seq_log_files.stage1       = '';
+        seq_log_files.default      = fullfile(logs_dir, ...
+            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.default,      run_idx, run_ts));
+        seq_log_files.liberal      = fullfile(logs_dir, ...
+            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.liberal,      run_idx, run_ts));
+        seq_log_files.conservative = fullfile(logs_dir, ...
+            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.conservative, run_idx, run_ts));
+        seq_log_files.report       = fullfile(logs_dir, ...
+            sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
+
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files);
+        report_file = fullfile(output_dir, ...
+            sprintf('sub-%03d_%s%s_uncertainty_report.html', subject_id, medium, seq_aff.default));
+
+        fprintf('[r%d-u5] Submitting uncertainty report    ', run_idx);
+        if isfile(report_file)
+            fprintf('— report exists, skipping.\n');
+            prior_job_id_report = [];
+        else
+            p_rep.hpc.timelimit = options.report_timelimit;
+            p_rep.hpc.job_name  = sprintf('PRESTUS-%su5-report_%s', run_prefix, subj);
+            p_rep = apply_memorylimit(p_rep, options.report_memorylimit);
+            p_rep = strip_gpu_requirements(p_rep, options.report_partition);
+            pending = job_ids_sim(sim_submitted);
+            if ~isempty(pending)
+                p_rep.hpc.depend_job_ids = pending;
+            end
+            prior_job_id_report = prestus_pipeline_start(p_rep);
+            fprintf('→ job %s  (mem %iG)\n', num2str(prior_job_id_report), p_rep.hpc.memorylimit);
+        end
+        fprintf('\n');
+
+        all_ids = [all_ids, job_ids_sim(sim_submitted), prior_job_id_report];
+        prior_affixes = seq_aff;
+    end
+end
 
 % =========================================================================
 %% Stage runner (MATLAB platform only)

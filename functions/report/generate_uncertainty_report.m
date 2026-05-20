@@ -418,6 +418,59 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
         html = regexprep(html, '<h3[^>]*>Temperature vs\. Time[^<]*</h3>', '');
     end
     html = [html '</div>'];
+
+    % Uncertainty band timeseries plots (separate plots, generated from .mat data)
+    has_ts = any(~cellfun(@isempty, heating));
+    if has_ts
+        caption = ['<p style="font-size:0.85em;color:#64748b;margin:4px 0 12px;">' ...
+            'Shaded area: liberal&#8211;conservative range. ' ...
+            'Solid line: default variant. Dashed lines: liberal (red) / conservative (gray).</p>'];
+
+        html = [html '<h3 style="margin-top:28px;">Temperature Timeseries — Global Maximum (Uncertainty)</h3>'];
+        html = [html caption];
+        html = [html build_metric_uncertainty_svg(heating, 'T', 37, 'Temp (&#176;C)', false)];
+
+        html = [html '<h3 style="margin-top:20px;">CEM43 Timeseries — Global Maximum (Uncertainty)</h3>'];
+        html = [html caption];
+        html = [html build_metric_uncertainty_svg(heating, 'CEM43', 0, 'CEM43 (min)', false)];
+
+        % Per-layer plots when layered data is present
+        layer_names = get_ts_layer_names(heating, 'T');
+        if ~isempty(layer_names)
+            html = [html '<h3 style="margin-top:20px;">Per-Layer Temperature Timeseries (Uncertainty)</h3>'];
+            html = [html caption];
+            for li = 1:numel(layer_names)
+                lname = layer_names{li};
+                html = [html sprintf('<h4 style="margin:12px 0 4px;color:#475569;">%s</h4>', ...
+                    html_utils.escape(strrep(lname, '_', ' ')))];
+                html = [html build_metric_uncertainty_svg(heating, 'T', 37, 'Temp (&#176;C)', lname)];
+            end
+
+            layer_names_cem = get_ts_layer_names(heating, 'CEM43');
+            if ~isempty(layer_names_cem)
+                html = [html '<h3 style="margin-top:20px;">Per-Layer CEM43 Timeseries (Uncertainty)</h3>'];
+                html = [html caption];
+                for li = 1:numel(layer_names_cem)
+                    lname = layer_names_cem{li};
+                    html = [html sprintf('<h4 style="margin:12px 0 4px;color:#475569;">%s</h4>', ...
+                        html_utils.escape(strrep(lname, '_', ' ')))];
+                    html = [html build_metric_uncertainty_svg(heating, 'CEM43', 0, 'CEM43 (min)', lname)];
+                end
+            end
+        end
+    end
+end
+
+function layer_names = get_ts_layer_names(heating, metric)
+% Return layer names found in heating{v}.timeseries.<metric> for any variant v.
+    layer_names = {};
+    for v = 1:numel(heating)
+        if ~isempty(heating{v}) && isfield(heating{v}, 'timeseries') && ...
+                isstruct(heating{v}.timeseries) && isfield(heating{v}.timeseries, metric)
+            layer_names = fieldnames(heating{v}.timeseries.(metric));
+            return
+        end
+    end
 end
 
 function html = build_images_section(variant_affixes, variant_labels, parameters, subject_id, medium, is_layered)
@@ -550,51 +603,60 @@ function tf = is_layered_limits(metric_names)
 end
 
 %% ========================================================================
-%  TIMESERIES SVG PLOT
+%  UNCERTAINTY TIMESERIES SVG PLOT
 %% ========================================================================
 
-function html = build_timeseries_svg(heating, variant_labels)
-% Build an inline SVG showing max temperature timeseries with uncertainty band.
-% heating{v}.timeseries is a struct with fields T, Tdiff, CEM43, each containing
-% per-layer vectors (e.g. timeseries.T.brain). We take the max across all layers
-% to show the global maximum temperature over time.
+function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, layer)
+% Build an inline SVG showing a timeseries metric with uncertainty band across
+% the three variants (liberal=1, default=2, conservative=3).
+%
+% metric  - field name in heating{v}.timeseries, e.g. 'T' or 'CEM43'
+% y_floor - lower y-axis bound (37 for temperature, 0 for CEM43)
+% y_label - y-axis label string (may include HTML entities)
+% layer   - char layer name to plot (e.g. 'brain'), or false for global max
 
     html = '';
-
-    % Extract max-temperature timeseries per variant
     ts_data = cell(1, 3);
     n_pts = 0;
-    max_temp_all = 0;
+    y_max_all = y_floor;
 
     for v = 1:3
         ts_line = [];
         if ~isempty(heating{v}) && isfield(heating{v}, 'timeseries')
             ts = heating{v}.timeseries;
-            if isstruct(ts) && isfield(ts, 'T')
-                % timeseries.T is a struct of per-layer vectors; take pointwise max
-                layer_names = fieldnames(ts.T);
-                for li = 1:numel(layer_names)
-                    ldata = ts.T.(layer_names{li})(:);
-                    if isempty(ts_line)
-                        ts_line = ldata;
-                    else
-                        n_common = min(numel(ts_line), numel(ldata));
-                        ts_line(1:n_common) = max(ts_line(1:n_common), ldata(1:n_common));
+            if isstruct(ts) && isfield(ts, metric)
+                m = ts.(metric);
+                if ischar(layer) || isstring(layer)
+                    % Single named layer
+                    if isfield(m, layer)
+                        ts_line = m.(layer)(:);
                     end
-                end
-            elseif isnumeric(ts)
-                % fallback: numeric matrix, take max across columns
-                if size(ts, 2) > 1
-                    ts_line = max(ts, [], 2);
                 else
-                    ts_line = ts(:);
+                    % Global maximum across all layers (layer == false)
+                    if isstruct(m)
+                        fns = fieldnames(m);
+                        for li = 1:numel(fns)
+                            ldata = m.(fns{li})(:);
+                            if isempty(ts_line)
+                                ts_line = ldata;
+                            else
+                                n_c = min(numel(ts_line), numel(ldata));
+                                ts_line(1:n_c) = max(ts_line(1:n_c), ldata(1:n_c));
+                            end
+                        end
+                    elseif isnumeric(m)
+                        ts_line = max(m, [], 2);
+                    end
                 end
             end
         end
         if ~isempty(ts_line)
+            finite_vals = ts_line(isfinite(ts_line));
+            if ~isempty(finite_vals)
+                y_max_all = max(y_max_all, max(finite_vals));
+            end
             ts_data{v} = ts_line;
             n_pts = max(n_pts, numel(ts_line));
-            max_temp_all = max(max_temp_all, max(ts_line(~isnan(ts_line))));
         end
     end
 
@@ -603,7 +665,6 @@ function html = build_timeseries_svg(heating, variant_labels)
         return;
     end
 
-    % Pad shorter timeseries with NaN
     for v = 1:3
         if isempty(ts_data{v})
             ts_data{v} = NaN(n_pts, 1);
@@ -612,125 +673,111 @@ function html = build_timeseries_svg(heating, variant_labels)
         end
     end
 
-    % SVG dimensions
     W = 700; H = 300;
-    pad_l = 60; pad_r = 20; pad_t = 20; pad_b = 50;
+    pad_l = 62; pad_r = 20; pad_t = 20; pad_b = 50;
     plot_w = W - pad_l - pad_r;
     plot_h = H - pad_t - pad_b;
 
-    y_min = 37;   % body temperature baseline
-    y_max = max(max_temp_all * 1.02, y_min + 0.1);
-    y_range = y_max - y_min;
+    y_min   = y_floor;
+    y_range = max(y_max_all * 1.05, y_min + 0.01) - y_min;
     x_scale = plot_w / max(n_pts - 1, 1);
     y_scale = plot_h / y_range;
 
-    % Build band polygon: liberal (upper, index 1) forward, conservative (lower, index 3) backward
+    % Band polygon: liberal (index 1) forward then conservative (index 3) backward
     band_pts = '';
     for i = 1:n_pts
-        x = pad_l + (i-1) * x_scale;
-        val = ts_data{1}(i);   % liberal
-        if isnan(val); val = 0; end
-        y = pad_t + plot_h - (val - y_min) * y_scale;
+        x   = pad_l + (i-1) * x_scale;
+        val = ts_data{1}(i);
+        if isnan(val); val = y_min; end
+        y   = pad_t + plot_h - (val - y_min) * y_scale;
         band_pts = [band_pts sprintf('%.1f,%.1f ', x, y)];
     end
     for i = n_pts:-1:1
-        x = pad_l + (i-1) * x_scale;
-        val = ts_data{3}(i);   % conservative
-        if isnan(val); val = 0; end
-        y = pad_t + plot_h - (val - y_min) * y_scale;
+        x   = pad_l + (i-1) * x_scale;
+        val = ts_data{3}(i);
+        if isnan(val); val = y_min; end
+        y   = pad_t + plot_h - (val - y_min) * y_scale;
         band_pts = [band_pts sprintf('%.1f,%.1f ', x, y)];
     end
 
-    % Build default line
-    default_pts = '';
-    for i = 1:n_pts
-        x = pad_l + (i-1) * x_scale;
-        val = ts_data{2}(i);
-        if isnan(val); continue; end
-        y = pad_t + plot_h - (val - y_min) * y_scale;
-        default_pts = [default_pts sprintf('%.1f,%.1f ', x, y)];
+    % Helper: build polyline point string for one variant
+    function pts = variant_pts(v_idx)
+        pts = '';
+        for ii = 1:n_pts
+            xx  = pad_l + (ii-1) * x_scale;
+            vv  = ts_data{v_idx}(ii);
+            if isnan(vv); continue; end
+            yy  = pad_t + plot_h - (vv - y_min) * y_scale;
+            pts = [pts sprintf('%.1f,%.1f ', xx, yy)];
+        end
     end
 
     % Y-axis ticks
-    n_ticks = 5;
-    tick_html = '';
+    n_ticks  = 5;
+    tick_svg = '';
     for k = 0:n_ticks
         val = y_min + y_range * k / n_ticks;
-        y = pad_t + plot_h - (val - y_min) * y_scale;
-        tick_html = [tick_html ...
+        yp  = pad_t + plot_h - (val - y_min) * y_scale;
+        tick_svg = [tick_svg ...
             sprintf('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="#e2e8f0" stroke-width="1"/>', ...
-                pad_l, y, W-pad_r, y) ...
+                pad_l, yp, W-pad_r, yp) ...
             sprintf('<text x="%d" y="%.1f" text-anchor="end" font-size="10" fill="#94a3b8">%.3g</text>', ...
-                pad_l-4, y+4, val)];
+                pad_l-4, yp+4, val)];
     end
 
-    % X-axis ticks (5 evenly spaced)
-    x_tick_html = '';
+    % X-axis ticks
+    xtick_svg = '';
     for k = 0:4
         idx = round(k * (n_pts-1) / 4) + 1;
-        x = pad_l + (idx-1) * x_scale;
-        x_tick_html = [x_tick_html ...
+        xp  = pad_l + (idx-1) * x_scale;
+        xtick_svg = [xtick_svg ...
             sprintf('<text x="%.1f" y="%d" text-anchor="middle" font-size="10" fill="#94a3b8">%d</text>', ...
-                x, H-pad_b+14, idx)];
+                xp, H-pad_b+14, idx)];
     end
 
     svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
-           'style="width:100%;max-width:' num2str(W) 'px;height:auto;display:block;margin:0 auto 16px;">'];
-    % Background
+           'style="width:100%;max-width:' num2str(W) 'px;height:auto;display:block;margin:0 auto 12px;">'];
     svg = [svg sprintf('<rect width="%d" height="%d" fill="white" rx="4" ry="4"/>', W, H)];
-    % Axes
-    svg = [svg tick_html x_tick_html];
+    svg = [svg tick_svg xtick_svg];
     svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#cbd5e1" stroke-width="1.5"/>', ...
         pad_l, pad_t, pad_l, pad_t+plot_h)];
     svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#cbd5e1" stroke-width="1.5"/>', ...
         pad_l, pad_t+plot_h, pad_l+plot_w, pad_t+plot_h)];
-    % Axis labels
     svg = [svg sprintf('<text x="%.1f" y="%d" text-anchor="middle" font-size="11" fill="#64748b">Time step</text>', ...
         pad_l + plot_w/2, H-4)];
     svg = [svg sprintf('<text x="%d" y="%.1f" text-anchor="middle" font-size="11" fill="#64748b" ', ...
         12, pad_t + plot_h/2) ...
-        'transform="rotate(-90,' num2str(12) ',' num2str(pad_t+plot_h/2) ')">Temp (&#176;C)</text>'];
+        'transform="rotate(-90,' num2str(12) ',' num2str(pad_t+plot_h/2) ')">' y_label '</text>'];
+
     % Uncertainty band
     if ~isempty(strtrim(band_pts))
         svg = [svg sprintf('<polygon points="%s" fill="#3b82f6" fill-opacity="0.15" stroke="none"/>', band_pts)];
     end
-    % Default line
-    if ~isempty(strtrim(default_pts))
-        svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>', ...
-            default_pts)];
-    end
-    % Liberal line (index 1)
-    lib_pts = '';
-    for i = 1:n_pts
-        x = pad_l + (i-1) * x_scale;
-        val = ts_data{1}(i);
-        if isnan(val); continue; end
-        y = pad_t + plot_h - (val - y_min) * y_scale;
-        lib_pts = [lib_pts sprintf('%.1f,%.1f ', x, y)];
-    end
+    % Liberal (dashed red)
+    lib_pts = variant_pts(1);
     if ~isempty(strtrim(lib_pts))
         svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>', lib_pts)];
     end
-    % Conservative line (index 3)
-    cons_pts = '';
-    for i = 1:n_pts
-        x = pad_l + (i-1) * x_scale;
-        val = ts_data{3}(i);
-        if isnan(val); continue; end
-        y = pad_t + plot_h - (val - y_min) * y_scale;
-        cons_pts = [cons_pts sprintf('%.1f,%.1f ', x, y)];
-    end
+    % Conservative (dashed gray)
+    cons_pts = variant_pts(3);
     if ~isempty(strtrim(cons_pts))
         svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>', cons_pts)];
     end
+    % Default (solid blue, drawn last so it sits on top)
+    def_pts = variant_pts(2);
+    if ~isempty(strtrim(def_pts))
+        svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>', ...
+            def_pts)];
+    end
+
     % Legend
     lx = pad_l + plot_w - 150; ly = pad_t + 10;
     svg = [svg sprintf('<rect x="%d" y="%d" width="150" height="64" rx="3" fill="white" fill-opacity="0.85" stroke="#e2e8f0"/>', lx, ly)];
     svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#1d4ed8" stroke-width="2"/><text x="%d" y="%d" font-size="10" fill="#475569">Default</text>', ...
         lx+6, ly+16, lx+26, ly+16, lx+30, ly+20)];
-    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Conservative</text>', ...
-        lx+6, ly+32, lx+26, ly+32, lx+30, ly+36)];
     svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Liberal</text>', ...
+        lx+6, ly+32, lx+26, ly+32, lx+30, ly+36)];
+    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Conservative</text>', ...
         lx+6, ly+48, lx+26, ly+48, lx+30, ly+52)];
     svg = [svg '</svg>'];
 
