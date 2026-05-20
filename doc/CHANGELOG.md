@@ -10,30 +10,41 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 
 #### Added
 
-- [**calibration**] Unified `calibrate_transducer` entry point with Rayleigh forward model
-- [**calibration**] Transducer library with parametric model store
 - [**calibration**] HPC dispatch, multi-intensity mode, and parametric calibration pipeline
 - [**calibration**] Geometric steering mode with per-element hardware correction
-- [**feature**] Async multi-transducer pipeline with incoherent intensity summation (see [doc_async_transducer.md](doc_async_transducer.md))
+- [**calibration**] Multiple analytical forward models — O'Neil & Rayleigh model
+- [**calibration**] Transducer library draft
+- [**feature**] Async multi-transducer pipeline (see [doc_async_transducer.md](doc_async_transducer.md))
+- [**feature**] Sequential simulation dispatcher with multi-run report and thermal chaining (see [doc_advanced.md](doc_advanced.md))
 - [**feature**] PlanTUS placement mode — wraps external PlanTUS optimiser for automated transducer targeting (see [doc_placement_plantus.md](doc_placement_plantus.md))
-- [**head**] RAS+ orientation enforced at NIfTI load time; `ras_plus` grid mode rescales without rotation
-- [**acoustic**] Save complex pressure field; `save_p_complex` flag guards time-series recording
-- [**feature**] Browser-based real-time transducer alignment viewer
-- [**config**] Optional `transducer.name` field
+- [**feature**] [Draft] Browser-based real-time transducer alignment viewer
 
 #### Changed
 
+- [**calibration**] Variable names generalised in `perform_global_search` and `phase_optimization_annulus_full_curve`; `opt_use_initial_phases` flag introduced
 - [**coord**] RAS established as canonical entry-point coordinate space; phantom and water pipelines use a RAS anchor
 - [**core**] `transducer.target_isppa_wcm2` migrated from calibration struct to transducer struct
+- [**telemetry**] Sequential pipeline mode detected and reported; version string (tag/VERSION) reported separately from git hash
+- [**core**] `MergeStruct` renamed to `mergestruct`; external copy removed
+- [**calibration**] Free-water validation can now be deactivated or run only for the first/last target ISPPA
+- [**head**] `tissuemask_binary` now exposes a `water` mask field
+- [**head**] `smooth_img` gains an `off` method (no smoothing); exposed in GUI
+- [**head**] RAS+ orientation enforced at NIfTI load time; `ras_plus` grid mode rescales without rotation
+- [**core**] Image Processing Toolbox calls replaced with base-MATLAB helpers throughout (no toolbox required for morphological ops, resampling)
+- [**config**] Optional `transducer.name` field
+- [**nifti**] Batched `tformarray` with optional parallel workers for MNI transforms
+- [**acoustic**] Save complex pressure field; `save_p_complex` flag guards time-series recording
 
 #### Fixed
 
 - [**calibration**] Amplitude scaling bug present since early PRESTUS versions: correction factor must be the square root of intensity ratios, not the ratio itself
-- [**calibration**] Free-water validation can now be deactivated or run only for the first/last target ISPPA
 - [**pCT**] pseudoCT path layout corrected; NaN padding used instead of zero fill
-- [**nifti**] Zero-sentinel fill replaced with explicit FOV mask in MNI outputs
+- [**nifti**] Zero fill replaced with explicit FOV mask in MNI outputs; `FillValues` option added to `convert_final_to_MNI_simnibs`
 - [**calibration**] Cache folder removed after calibration when `save_matrices` is disabled
 - [**telemetry**] Telemetry check added for standalone calibration runs
+- [**thermal**] `thermal_plot_sim` legend guarded against empty tissue masks
+- [**report**] Sequential report: fallback paths and real-time time axis corrected
+- [**transform**] `isequal` used for size comparison; `affine3d` replaces deprecated `affineTransform3d`
 
 ---
 
@@ -64,7 +75,7 @@ Introduces matrix transducer support, an uncertainty quantification pipeline, an
 
 #### Added
 
-- [**feature**] Uncertainty quantification pipeline by @jkosciessa (see [doc_uncertainty.md](doc_uncertainty.md))
+- [**feature**] Uncertainty quantification pipeline (see [doc_uncertainty.md](doc_uncertainty.md))
     - Three-variant simulation workflow (default / liberal / conservative medium properties) producing a unified HTML report with per-metric safety cards colour-coded against ITRUSST non-significant risk limits, acoustic and thermal range tables, side-by-side intensity and temperature maps, and an SVG temperature timeseries with uncertainty band
     - Supports MATLAB (sequential) and HPC (parallel, scheduler-dependent) execution with automatic resumption from partial runs
 - [**feature**] Matrix transducer support (see [doc_transducer.md](doc_transducer.md), [PR #117](https://github.com/Donders-Institute/PRESTUS/pull/117))
