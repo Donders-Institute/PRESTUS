@@ -14,10 +14,10 @@ function plot_opt_sim_results(parameters, profile_target, profile_analytical, pr
 %                           calibration.desired_focal_distance_ep [mm],
 %                           calibration.desired_intensity [W/cm²], calibration.equipment_name
 %   profile_target        - struct with axial_distance_bowl [mm] and axial_intensity [W/cm²]
-%   profile_analytical    - struct with axial_intensity from original analytical solution [W/cm²]
-%   profile_analytical_opt- struct with axial_intensity from optimised analytical solution [W/cm²]
-%   profile_sim           - struct with axial_intensity from original simulation [W/cm²]
-%   profile_sim_opt       - struct with axial_intensity from optimised simulation [W/cm²]
+%   profile_analytical    - struct with axial_intensity from phase-optimised analytical solution [W/cm²]
+%   profile_analytical_opt- struct with axial_intensity from amplitude-calibrated analytical solution [W/cm²]
+%   profile_sim           - struct with axial_intensity from correction simulation [W/cm²]
+%   profile_sim_opt       - struct with axial_intensity from validation simulation [W/cm²]
 %   min_err               - minimum optimisation error
 %
 % See also: CALIBRATION_TRANSDUCER, PERFORM_GLOBAL_SEARCH, RECOMPUTE_ANALYTICAL_SOLUTION
@@ -39,11 +39,11 @@ end
     plot(profile_target.axial_distance_bowl, profile_target.axial_intensity, ...
         'LineWidth', 2, 'Color', 'r', 'DisplayName', 'Target Profile');
     plot(profile_analytical.axial_distance_bowl, profile_analytical.axial_intensity, ...
-        'LineWidth', 1, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Original (Analytical)');
+        'LineWidth', 1, 'Color', [0.5 0.5 0.5], 'DisplayName', 'Phase-optimised (Analytical)');
     plot(profile_analytical_opt.axial_distance_bowl, profile_analytical_opt.axial_intensity, ...
-        'LineWidth', 1, 'Color', [0 0 0], 'LineStyle', ':', 'DisplayName', 'Optimized (Analytical)');
+        'LineWidth', 1, 'Color', [0 0 0], 'LineStyle', ':', 'DisplayName', 'Amplitude-calibrated (Analytical)');
     plot(profile_sim.axial_distance_bowl, profile_sim.axial_intensity, ...
-        'LineWidth', 1, 'Color', [0.75 0.75 0.75], 'DisplayName', 'Original (Simulated)');
+        'LineWidth', 1, 'Color', [0.75 0.75 0.75], 'DisplayName', 'Correction sim (Simulated)');
     plot(profile_sim_opt.axial_distance_bowl, profile_sim_opt.axial_intensity, ...
         'LineWidth', 2, 'Color', [0 0 0], 'DisplayName', 'Optimized (Simulated)');
     hold off;

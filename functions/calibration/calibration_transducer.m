@@ -157,11 +157,22 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % =========================================================================
     % STAGE 4 — Free-water correction simulation (optional)
     %
-    % Runs a k-Wave simulation in free water using the nominal (pre-optimised)
-    % source parameters.  The simulated peak intensity is compared to the
-    % analytical prediction to compute simulated_analytical_scaling — the ratio
-    % by which the analytical model under- or over-estimates the simulation.
+    % Runs a k-Wave simulation in free water to compute
+    % simulated_analytical_scaling — the ratio by which the analytical model
+    % under- or over-estimates the simulation at the same source conditions.
     % This factor corrects the source amplitude in Stage 5.
+    %
+    % Phase injection strategy:
+    %   Global search mode  — the optimised phases from Stage 3 are injected
+    %     into sim_param so that the correction simulation and the Stage 5
+    %     analytical profile are evaluated at matching conditions, making
+    %     simulated_analytical_scaling a clean model-vs-simulation ratio.
+    %   Geo correction mode — combined phases (geo + hardware offset) are not
+    %     yet known before the simulation runs; the simulation must use the
+    %     geometric steering phases to resolve them.  simulated_analytical_scaling
+    %     is therefore computed as peak_sim_geo / peak_analytical_combined.
+    %     This slight mismatch is acceptable because the correction offsets are
+    %     typically small relative to the steering phases.
     %
     % Set calibration.run_free_water_sim = false to skip this stage.  The
     % scaling factor then defaults to 1 (pure analytical amplitude prediction),
@@ -192,6 +203,15 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param.simulation.interactive = 0;
     sim_param.subject_id             = sim_id;
     sim_param.hpc.wait_for_job       = true;
+
+    % Inject optimised phases for global search mode so the correction
+    % simulation matches the analytical comparison in Stage 5.
+    % Geo correction mode cannot do this — combined phases are unknown until
+    % after the simulation resolves the steering geometry.
+    if ~use_geo_correction
+        sim_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
+        sim_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
+    end
 
     run_free_water_sim = ~isfield(parameters.calibration, 'run_free_water_sim') || ...
         parameters.calibration.run_free_water_sim;
@@ -225,6 +245,14 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     else
         % No simulation run; resolved_params is identical to bootstrap_params.
         resolved_params = bootstrap_params;
+        % Re-evaluate the analytical profile with the optimised phases so that
+        % Stage 5's compute_analytical_solution sees matching conditions in
+        % profile_sim and params_for_analytical, giving simulated_analytical_scaling = 1
+        % as documented in extract_analytical_profile.
+        profile_sim_params = bootstrap_params;
+        profile_sim_params.transducer.annular.elem_phase_rad = opt_source_phase_rad;
+        profile_sim_params.transducer.annular.elem_phase_deg = opt_source_phase_deg;
+        profile_sim = extract_analytical_profile(profile_sim_params);
     end
 
     % =========================================================================
