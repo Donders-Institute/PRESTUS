@@ -72,9 +72,9 @@ end
         else
             points_per_wavelength = parameters.grid.source_ppw;
         end
-        % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; k-Wave default.
+        % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; matches config_default.yaml.
         if ~isfield(parameters.grid, 'source_cfl') || isempty(parameters.grid.source_cfl)
-            cfl = 0.3;
+            cfl = 0.15;
         else
             cfl = parameters.grid.source_cfl;
         end
