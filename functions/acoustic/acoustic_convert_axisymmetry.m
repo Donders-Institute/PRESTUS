@@ -26,8 +26,9 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %   source_labels- transducer element label map [Nz x Nr]
 %
 % Output:
-%   All inputs returned with spatial fields expanded to 3D [2*Nr x 2*Nr x Nz]
-%   (heating requested) or mirrored to 2D [2*Nr x Nz] (no heating).
+%   All inputs returned with spatial fields expanded to [Nlateral x Nlateral x Naxial]
+%   (heating requested) or mirrored to [Nlateral x Naxial] (no heating).
+%   Original bilateral dims restored from axisym_bilateral_dims snapshot.
 %   parameters.grid.dims and kgrid updated to match.
 %
 % See also: CONVERT_AXISYMMETRIC_TO_3D, CONVERT_AXISYMMETRIC_TO_2D, ACOUSTIC_WRAPPER
