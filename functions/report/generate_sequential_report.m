@@ -80,25 +80,23 @@ try
         p = run_params_list{ri};
         d = struct();
 
+        % Ensure all io dirs are populated.  Params built by make_sim_params
+        % lack runtime fields set by path_log_setup; resolve_io_dirs fills
+        % them from path.sim without creating directories or logging.
+        p = resolve_io_dirs(p);
+
         % CSV table (acoustic + thermal scalars).
-        % filename_table is set by path_log_setup at runtime; sequential-run
-        % parameter snapshots stored before pipeline execution may lack it, so
-        % reconstruct the path from known fields as a fallback.
+        % Derive csv_path from dir_output + output_affix rather than trusting
+        % filename_table, which may carry a stale value when sequential_parameters
+        % was built as a copy of a prior run's runtime struct.
         csv_path = '';
-        if isfield(p.io, 'filename_table') && ~isempty(p.io.filename_table)
+        if isfield(p.io, 'dir_output') && ~isempty(p.io.dir_output) && ...
+                isfield(p.io, 'output_affix') && ...
+                isfield(p, 'subject_id') && isfield(p, 'simulation') && isfield(p.simulation, 'medium')
+            csv_path = fullfile(p.io.dir_output, sprintf('sub-%03d_%s%s.csv', ...
+                p.subject_id, p.simulation.medium, p.io.output_affix));
+        elseif isfield(p.io, 'filename_table') && ~isempty(p.io.filename_table)
             csv_path = p.io.filename_table;
-        elseif isfield(p.io, 'output_affix')
-            % dir_tabular == dir_output in PRESTUS (see path_log_setup)
-            dir_tab = '';
-            if isfield(p.io, 'dir_output') && ~isempty(p.io.dir_output)
-                dir_tab = p.io.dir_output;
-            elseif isfield(base_p.io, 'dir_output') && ~isempty(base_p.io.dir_output)
-                dir_tab = base_p.io.dir_output;
-            end
-            if ~isempty(dir_tab)
-                csv_path = fullfile(dir_tab, sprintf('sub-%03d_%s%s.csv', ...
-                    p.subject_id, medium, p.io.output_affix));
-            end
         end
         d.csv = [];
         if ~isempty(csv_path) && isfile(csv_path)
@@ -109,34 +107,11 @@ try
             end
         end
 
-        % Resolve dirs (may be absent if path_log_setup hasn't run yet for
-        % sequential runs stored before their pipeline execution).
-        if isfield(p.io, 'dir_cache')
+        % Derive dir_cache for thermal .mat lookup.
+        if isfield(p.io, 'dir_cache') && ~isempty(p.io.dir_cache)
             dir_cache = p.io.dir_cache;
-        elseif isfield(p.io, 'dir_output')
-            dir_cache = fullfile(p.io.dir_output, 'cache');
-        elseif isfield(base_p.io, 'dir_cache')
-            dir_cache = base_p.io.dir_cache;
         else
             dir_cache = '';
-        end
-        if ~isfield(p.io, 'dir_nii_T1w')
-            if isfield(p.io, 'dir_output')
-                p.io.dir_nii_T1w = fullfile(p.io.dir_output, 'nii');
-            elseif isfield(base_p.io, 'dir_nii_T1w')
-                p.io.dir_nii_T1w = base_p.io.dir_nii_T1w;
-            else
-                p.io.dir_nii_T1w = '';
-            end
-        end
-        if ~isfield(p.io, 'dir_img')
-            if isfield(p.io, 'dir_output')
-                p.io.dir_img = fullfile(p.io.dir_output, 'img');
-            elseif isfield(base_p.io, 'dir_img')
-                p.io.dir_img = base_p.io.dir_img;
-            else
-                p.io.dir_img = '';
-            end
         end
 
         % Thermal .mat file — use thermal_cache_affix when available

@@ -28,6 +28,8 @@ end
 report_path = '';
 
 try
+    parameters = resolve_io_dirs(parameters);
+
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
     output_dir = parameters.io.dir_output;
