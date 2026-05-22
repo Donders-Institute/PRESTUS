@@ -54,6 +54,9 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 #### Telemetry
 - System resources reported at run start: OS, CPU model/cores, RAM, GPU, CUDA version
 
+#### Reporting
+- Public usage statistics (see [doc_usage_statistics.md](doc_usage_statistics.md))
+
 ---
 
 ## v0.6.0 
