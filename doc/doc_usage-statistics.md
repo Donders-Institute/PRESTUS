@@ -26,6 +26,7 @@ The charts below are populated live from the anonymised telemetry database. Data
   <div class="telem-chart"><h4>Execution backend</h4><canvas id="tc-codetype"></canvas></div>
   <div class="telem-chart"><h4>Simulation medium</h4><canvas id="tc-medium"></canvas></div>
   <div class="telem-chart"><h4>Mean run duration by medium</h4><canvas id="tc-duration"></canvas></div>
+  <div class="telem-chart"><h4>Success rate by medium</h4><canvas id="tc-success-rate"></canvas></div>
 </div>
 
 <script>
@@ -110,8 +111,9 @@ The charts below are populated live from the anonymised telemetry database. Data
 
     // ── Stat cards ─────────────────────────────────────────────────
     const total     = data.length;
-    const successes = data.filter(r => r.status === 'success');
-    const successPct = total ? Math.round(successes.length / total * 100) + '%' : '—';
+    const layeredRuns = data.filter(r => classifyMedium(r).startsWith('layered'));
+    const layeredSucc = layeredRuns.filter(r => r.status === 'success');
+    const successPct  = layeredRuns.length ? Math.round(layeredSucc.length / layeredRuns.length * 100) + '%' : '—';
     const users     = new Set(data.map(r => r.uuid).filter(Boolean)).size;
     const versions  = new Set(data.map(resolveVersion).filter(v => v !== 'unknown')).size;
 
@@ -119,7 +121,7 @@ The charts below are populated live from the anonymised telemetry database. Data
     statsEl.style.display = 'grid';
     [
       ['Completed runs', total],
-      ['Success rate',   successPct],
+      ['Success rate (layered)', successPct],
       ['Versions',       versions],
       ['Unique users',   users],
     ].forEach(([label, val]) => {
@@ -208,6 +210,37 @@ The charts below are populated live from the anonymised telemetry database. Data
         scales: {
           x: { ticks: { color: fgL(), font: { size: 11 } }, grid: { display: false } },
           y: { ticks: { color: fgL(), callback: v => v + ' min' }, grid: { color: gridC() }, beginAtZero: true }
+        }
+      }
+    });
+    // ── Success rate by medium ─────────────────────────────────────
+    const srByMedium = {};
+    data.forEach(r => {
+      const med = classifyMedium(r);
+      if (!srByMedium[med]) srByMedium[med] = { ok: 0, total: 0 };
+      srByMedium[med].total++;
+      if (r.status === 'success') srByMedium[med].ok++;
+    });
+    const srOrder  = ['water', 'phantom', 'layered', 'layered + pCT'];
+    const srLabels = [...srOrder.filter(m => srByMedium[m]),
+                      ...Object.keys(srByMedium).filter(m => !srOrder.includes(m))];
+    const srValues = srLabels.map(m => +(srByMedium[m].ok / srByMedium[m].total * 100).toFixed(1));
+    new Chart(document.getElementById('tc-success-rate'), {
+      type: 'bar',
+      data: {
+        labels: srLabels,
+        datasets: [{
+          data: srValues,
+          backgroundColor: srLabels.map((_, i) => PAL[i % PAL.length]),
+          borderRadius: 4,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: fgL(), font: { size: 11 } }, grid: { display: false } },
+          y: { min: 0, max: 100, ticks: { color: fgL(), callback: v => v + '%' }, grid: { color: gridC() } }
         }
       }
     });
