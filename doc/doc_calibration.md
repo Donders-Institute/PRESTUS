@@ -108,7 +108,7 @@ Two modes are available, selected by whether `calibration.elem_phase_correction_
 
 **Global search (default):** `perform_global_search` minimises the weighted mean-squared error between the analytical forward model and the scaled empirical target profile over element phases [0, 2π] and particle velocity [0.001, `opt_upper_velocity`]. This runs purely analytically using the bootstrap profile from Step 2 — no k-Wave simulation is needed.
 
-By default the initial phase guess is **random** (uniform over [0°, 360°]). Set `calibration.opt_use_initial_phases = true` to use the phases already in `transducer.annular.elem_phase_rad` (e.g. manufacturer-provided steering phases) as the starting point instead. This can improve convergence when good prior phases are available. Results can still vary across runs unless a seed is fixed via `opt_seed`.
+By default the global search is seeded from the **geometric steering phases** (computed analytically from the transducer geometry and target depth). Set `calibration.opt_use_initial_phases = true` to instead use the phases already in `transducer.annular.elem_phase_rad` (e.g. manufacturer-provided phases) as the starting point. Results can still vary across runs unless a seed is fixed via `opt_seed`.
 
 Parameters that configure the search:
 
@@ -117,7 +117,7 @@ Parameters that configure the search:
 | `opt_method` | `FEXminimize` | Optimization backend: `FEXminimize` (open-source, bundled) or `GlobalSearch` (MATLAB Global Optimization Toolbox) |
 | `opt_weights` | `0` | Profile weighting: `0` = uniform across the full profile; `≥1` = Gaussian centred on the focal maximum with FWHM narrowing as weight increases (σ = focus_pos / weight) |
 | `opt_limits` | full profile range | Distance range [mm] over which the error is evaluated; defaults to the non-NaN extent of the target profile |
-| `opt_use_initial_phases` | `false` | Use phases from `transducer.annular.elem_phase_rad` as the starting point instead of random initialization. Useful when manufacturer-provided or previously calibrated phases are available. |
+| `opt_use_initial_phases` | `false` | Use phases from `transducer.annular.elem_phase_rad` as the starting point. Default (`false`) seeds from geometric steering phases. Set to `true` to use manufacturer-provided or previously calibrated phases instead. |
 | `opt_seed` | *(none)* | Integer random seed for reproducibility; if unset, results may vary across runs |
 | `opt_upper_velocity` | `0.2` m/s | Upper bound on particle velocity during search |
 | `skip_front_peak_mm` | `0` | Excludes the first N mm from peak detection to avoid near-field artifacts. Applied in both the global search objective and the amplitude correction (Step 5). Does not restrict the fitting range — use `opt_limits` for that. |
@@ -201,7 +201,7 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 
 ##### Step 10 — Plot and save results
 
-`plot_opt_sim_results` produces a comparison figure of the initial and optimized analytical and simulated profiles.
+`plot_opt_sim_results` produces a comparison figure with the following legend entries: **Phase-optimised (Analytical)**, **Amplitude-calibrated (Analytical)**, and **Correction sim (Simulated)**. These labels reflect the role of each profile in the pipeline: the phase-optimised curve shows the analytical result after the global search; the amplitude-calibrated curve shows it after velocity scaling; the correction sim curve is the k-Wave free-water result used to compute `simulated_analytical_scaling`.
 
 `save_optimized_values` writes two output files to `calibration.path_output_profiles`:
 

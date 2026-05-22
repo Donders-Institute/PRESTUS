@@ -58,6 +58,23 @@ options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output
 | `options.sequential_configs` | Struct of follow-up configs to dispatch in order (see example above). |
 | `options.sequential_cleanup_intermediate` | If `true`, per-run NIfTI and image files are deleted after the final summary report is successfully generated. Default: `false`. |
 
+##### Sequential simulations with uncertainty mode
+
+`options.sequential_configs` can be combined with `parameters.simulation.uncertainty = true`. In that case, each follow-up run is executed three times — once per uncertainty variant (default / liberal / conservative) — and each variant inherits the thermal end-state from the matched variant of the prior run:
+
+```matlab
+parameters.simulation.uncertainty = true;
+
+options.sequential_configs.config_2 = config_2;
+options.sequential_configs.config_3 = config_3;
+
+prestus_pipeline(parameters, options);
+```
+
+After all sequential runs complete, `generate_sequential_report` is called with the full list of default/liberal/conservative parameter structs. The base run appears as **run 1** in the combined report; each follow-up adds a further run entry. The resulting report shows temperature and CEM43 timeseries with liberal/conservative shaded uncertainty bands overlaid on the default trajectory.
+
+On HPC, job names are prefixed with `r1-` when sequential configs are present (e.g. `PRESTUS-r1-u2-sim-default_sub-001`) to keep scheduler job names unambiguous across chained submissions. See [doc_uncertainty.md](doc_uncertainty.md) for the full description of the uncertainty pipeline.
+
 #### Multi-Transducer Modeling
 
 Status: *experimental support*

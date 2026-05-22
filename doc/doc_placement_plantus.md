@@ -1,5 +1,7 @@
 # PlanTUS placement pipeline – step-by-step
 
+> ⚠️ **Experimental.** PlanTUS placement is under active development. Results should be verified manually before use in a study.
+
 This document describes the sequence of operations performed when
 `placement.mode = 'plantus'` is set in a PRESTUS configuration.
 
@@ -207,6 +209,8 @@ For the best vertex *v*:
 under `<mesh_dir>/PlanTUS/<target_name>/`, loads `position_matrix`, and passes
 it to `localite_matrix_to_positions` to convert the 4×4 RAS matrix into
 `trans_pos` and `focus_pos` in voxel coordinates.
+
+After the placement coordinates are resolved, a T1 overlay plot (`plot_placement_t1_overlay`) is generated automatically and written to the subject output folder. It shows the final transducer position and target overlaid on orthogonal T1 slices.
 
 ---
 

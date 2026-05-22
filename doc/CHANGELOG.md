@@ -4,47 +4,55 @@ Notable changes to this project are documented here.
 
 ---
 
-## v0.6.0-development
+## v0.6.1
+*(2026-05-22)*
 
-Extends the calibration pipeline with a unified entry point, parametric model store, and HPC dispatch. Introduces async multi-transducer simulations, PlanTUS-based automated placement, and RAS as the canonical coordinate space.
+Extends the calibration pipeline with a unified entry point, parametric model store, and HPC dispatch. Introduces async multi-transducer simulations, a sequential simulation dispatcher, PlanTUS-based automated placement, and RAS as the canonical coordinate space. Drops the Image Processing Toolbox requirement.
 
-#### Added
+#### Core / Config
+- MATLAB Image Processing Toolbox no longer required — morphological ops and resampling use base-MATLAB equivalents
+- `transducer.target_isppa_wcm2` migrated from calibration struct to transducer struct
+- Optional `transducer.name` field added to transducer config
 
-- [**calibration**] HPC dispatch, multi-intensity mode, and parametric calibration pipeline
-- [**calibration**] Geometric steering mode with per-element hardware correction
-- [**calibration**] Multiple analytical forward models — O'Neil & Rayleigh model
-- [**calibration**] Transducer library draft
-- [**feature**] Async multi-transducer pipeline (see [doc_async_transducer.md](doc_async_transducer.md))
-- [**feature**] Sequential simulation dispatcher with multi-run report and thermal chaining (see [doc_advanced.md](doc_advanced.md))
-- [**feature**] PlanTUS placement mode — wraps external PlanTUS optimiser for automated transducer targeting (see [doc_placement_plantus.md](doc_placement_plantus.md))
-- [**feature**] [Draft] Browser-based real-time transducer alignment viewer
+#### Calibration
+- Unified `calibrate_transducer` entry point with HPC dispatch, multi-intensity mode, and parametric model store
+- Geometric steering mode with per-element hardware correction
+- Multiple analytical forward models — O'Neil and Rayleigh
+- Transducer library (draft)
+- Free-water correction moved post-analytical to make optional
+- Free-water validation can be deactivated or limited to first/last target ISPPA
+- Pluggable analytical forward model interface
+- Option to use manufacturer phases to initiate global search (`opt_use_initial_phases`)
+- ⚠️ **Fixed:** amplitude scaling bug present since early PRESTUS versions — correction factor is the square root of intensity ratios, not the ratio itself
 
-#### Changed
+#### Placement
+- PlanTUS placement mode wraps the external PlanTUS optimiser for automated transducer targeting — **experimental** (see [doc_placement_plantus.md](doc_placement_plantus.md))
+- T1 overlay plot auto-generated after heuristic and PlanTUS placement
+- Browser-based transducer alignment viewer (*experimental*)
 
-- [**calibration**] Variable names generalised in `perform_global_search` and `phase_optimization_annulus_full_curve`; `opt_use_initial_phases` flag introduced
-- [**coord**] RAS established as canonical entry-point coordinate space; phantom and water pipelines use a RAS anchor
-- [**core**] `transducer.target_isppa_wcm2` migrated from calibration struct to transducer struct
-- [**telemetry**] Sequential pipeline mode detected and reported; version string (tag/VERSION) reported separately from git hash
-- [**core**] `MergeStruct` renamed to `mergestruct`; external copy removed
-- [**calibration**] Free-water validation can now be deactivated or run only for the first/last target ISPPA
-- [**head**] `tissuemask_binary` now exposes a `water` mask field
-- [**head**] `smooth_img` gains an `off` method (no smoothing); exposed in GUI
-- [**head**] RAS+ orientation enforced at NIfTI load time; `ras_plus` grid mode rescales without rotation
-- [**core**] Image Processing Toolbox calls replaced with base-MATLAB helpers throughout (no toolbox required for morphological ops, resampling)
-- [**config**] Optional `transducer.name` field
-- [**nifti**] Batched `tformarray` with optional parallel workers for MNI transforms
-- [**acoustic**] Save complex pressure field; `save_p_complex` flag guards time-series recording
+#### Acoustic/Thermal
+- Async multi-transducer pipeline (see [doc_async_transducer.md](doc_async_transducer.md))
+- Sequential simulation dispatcher: runs multiple parameter configurations in series, chains thermal simulations, and produces a consolidated multi-run report (see [doc_advanced.md](doc_advanced.md))
+- ⚠️ **Fixed:** sequential simulation produced incorrect outputs prior to this release 
+- Uncertainty pipeline produces uncertainty bands across sequential multi-run parameter sweeps
+- Complex pressure field optionally saved (`save_p_complex`) (*experimental*)
 
-#### Fixed
+#### Head pipeline
+- RAS established as canonical entry-point coordinate space; RAS+ orientation enforced at NIfTI load time; `ras_plus` grid mode rescales without rotation
+- `tissuemask_binary` exposes a `water` mask field
+- `smooth_img` gains an `off` method (no smoothing); exposed in GUI
 
-- [**calibration**] Amplitude scaling bug present since early PRESTUS versions: correction factor must be the square root of intensity ratios, not the ratio itself
-- [**pCT**] pseudoCT path layout corrected; NaN padding used instead of zero fill
-- [**nifti**] Zero fill replaced with explicit FOV mask in MNI outputs; `FillValues` option added to `convert_final_to_MNI_simnibs`
-- [**calibration**] Cache folder removed after calibration when `save_matrices` is disabled
-- [**telemetry**] Telemetry check added for standalone calibration runs
-- [**thermal**] `thermal_plot_sim` legend guarded against empty tissue masks
-- [**report**] Sequential report: fallback paths and real-time time axis corrected
-- [**transform**] `isequal` used for size comparison; `affine3d` replaces deprecated `affineTransform3d`
+#### Phantom
+- `trans_pos_mm` / `focus_pos_mm` config fields allow resolution-independent transducer and focus position specification
+- ⚠️ **Fixed:** phantom NIfTI outputs used incorrect voxel dimensions and inconsistent world-space orientation across pipeline stages
+
+#### NIfTI / Transform
+- Batched `tformarray` with optional parallel workers for MNI transforms
+- Explicit FOV mask used in MNI outputs instead of zero sentinel (unreliable for pCT Hounsfield values)
+- ⚠️ **Fixed:** pCT path layout corrected; NaN padding used instead of zero fill
+
+#### Telemetry
+- System resources reported at run start: OS, CPU model/cores, RAM, GPU, CUDA version
 
 ---
 

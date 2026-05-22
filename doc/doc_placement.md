@@ -35,3 +35,14 @@ Results are exported to a CSV file in the Localite data folder, ready for PRESTU
 | `transducer_from_localite`        | Load transducer position from Localite files?.                                                                       |
 | `reference_transducer_distance_mm` | Distance from tracker to transducer exit plane (in mm).                                                              |
 
+## Phantom / water simulations
+
+For phantom and water simulations the transducer and focus positions can be specified in millimetres rather than voxel indices using two optional config fields:
+
+| Field | Description |
+|---|---|
+| `trans_pos_mm` | Transducer position in mm from the grid origin (`[x, y, z]`). Converted to voxel indices at runtime using `grid.resolution_mm`. |
+| `focus_pos_mm` | Focus position in mm from the grid origin (`[x, y, z]`). Same conversion applies. |
+
+These fields are resolution-independent: the same config works unchanged when `grid.resolution_mm` is changed. When both voxel-index and mm fields are present, the mm fields take precedence. Phantom NIfTI outputs reuse the input header so that world-space orientation and voxel dimensions are consistent across all pipeline stages.
+

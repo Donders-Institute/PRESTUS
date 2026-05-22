@@ -41,6 +41,19 @@ Each pipeline run emits up to two events: `run_start` (before any module
 runs) and `run_end` (on clean exit) or `run_error` (if the pipeline throws
 an unhandled exception). The table below lists every field that may be sent.
 
+### System resources
+
+| Field | Description |
+|---|---|
+| `os_version` | OS version string (macOS: `sw_vers -productVersion`; Linux: kernel release; Windows: `ver` output). Returns `'unknown'` on error. |
+| `cpu_model` | CPU model name (e.g. `Apple M2 Pro`). Returns `'unknown'` on error. |
+| `n_cpu_cores` | Number of logical CPU cores via `feature('numcores')`. |
+| `ram_gb` | Total physical RAM in GB (rounded). Returns `NaN` on error. |
+| `gpu_model` | GPU device name from `gpuDevice()`. Returns `'no_pct'` when the Parallel Computing Toolbox is not licensed; `'none'` when no GPU is found; otherwise the device name string. |
+| `toolboxes` | Cell array of installed MATLAB toolbox names (MATLAB itself excluded). |
+
+All system resource fields are collected inside `try/catch` blocks and fall back to `'unknown'` or `NaN` on any error, so they never cause the telemetry payload to fail.
+
 ### Identity
 
 | Field | Description |
