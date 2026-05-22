@@ -26,6 +26,15 @@ end
 
 % Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
+
+% If a list-of-list field has only one entry, replicate it for all combinations
+for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
+    f = coerce_field{1};
+    if isfield(parameters.calibration, f) && iscell(parameters.calibration.(f)) && ...
+            length(parameters.calibration.(f)) == 1 && N_i > 1
+        parameters.calibration.(f) = repmat(parameters.calibration.(f), 1, N_i);
+    end
+end
 for i = 1:N_i
     combo_name = parameters.calibration.combinations{i};
     combo = equip_param.combos.(combo_name);

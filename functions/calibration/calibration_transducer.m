@@ -121,6 +121,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     end
     disp(['Saving free-water calibration in ', parameters.path.sim]);
     parameters.io.outputs_folder = fullfile(parameters.path.sim, sprintf('sub-%03d', sim_id));
+    bootstrap_params.io.outputs_folder = parameters.io.outputs_folder;
 
     use_geo_correction = isfield(parameters.calibration, 'elem_phase_correction_deg') && ...
         ~isempty(parameters.calibration.elem_phase_correction_deg);
