@@ -249,12 +249,16 @@ switch platform
         % the matched variant of the prior run.
         if has_sequential
             seq_run_params = run_sequential_matlab(parameters, options, run_index_start);
-            % Generate combined sequential uncertainty report
+            % Generate combined sequential uncertainty report.
+            % Prepend run-1 params so the base run appears as the first entry.
+            all_default = [{p_default},      seq_run_params.default];
+            all_liberal = [{p_liberal},      seq_run_params.liberal];
+            all_cons    = [{p_conservative}, seq_run_params.conservative];
             try
                 generate_sequential_report( ...
-                    seq_run_params.default, {}, ...
-                    struct('liberal_params_list', {seq_run_params.liberal}, ...
-                           'conservative_params_list', {seq_run_params.conservative}));
+                    all_default, {}, ...
+                    struct('liberal_params_list', {all_liberal}, ...
+                           'conservative_params_list', {all_cons}));
             catch ME_seq_rep
                 warning('uncertainty_pipeline:seqReport', ...
                     'Sequential uncertainty report failed: %s', ME_seq_rep.message);
