@@ -43,7 +43,15 @@ end
     % thermal_simulation expands temp_0 via radialExpand2DTo3D for axisymmetric grids
     % but MATLAB pass-by-value means the caller's copy stays 2D; re-expand here.
     if ~isequal(size(kwave_medium.temp_0), size(results_heating.maxT))
-        kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0);
+        if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
+            % Use the same Nlateral/ax_center as thermal_simulation to match the bilateral grid exactly.
+            Nlateral  = parameters.grid.axisym_bilateral_dims(2);
+            ax_center = parameters.transducer(1).trans_pos_bilateral(2);
+            kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0, 'linear', Nlateral, ax_center);
+        elseif ~isfield(parameters.grid, 'axisymmetric') || parameters.grid.axisymmetric == 0
+            % Non-axisymmetric grid: expand with default output size (2*Nr x 2*Nr).
+            kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0);
+        end
     end
 
     data_types = ["heating", "heating_end", "heatrise", "heatrise_end", ...
@@ -135,7 +143,9 @@ end
         end
 
     else
-        % Phantom medium: no back-transform needed
+        % Phantom medium: route through nifti_to_t1w so outputs share the
+        % phantom's world-space transform (orientation + z-flip) and the
+        % axisymmetric 3D→2D slice extraction is applied consistently.
         for k = 1:n
             if ~needs_t1w(k); continue; end
             switch data_types(k)
@@ -148,7 +158,7 @@ end
                 case "CEM43_iso",    data = single(results_heating.CEM43_iso);
                 case "CEM43_iso_end",data = single(results_heating.CEM43_iso_end);
             end
-            niftiwrite(data, orig_files{k}, 'Compressed', true);
+            nifti_to_t1w(data, orig_files{k}, parameters, planimg, 'IsLayered', false);
         end
     end
 

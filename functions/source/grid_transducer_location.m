@@ -66,6 +66,17 @@ end
             end
         end
 
+        % Convert mm positions to voxel indices if specified via *_mm fields.
+        % This allows configs to store resolution-independent coordinates in mm
+        % (e.g. trans_pos_mm: [35, 1]) rather than voxel counts that change
+        % with grid resolution.
+        if isfield(parameters.transducer, 'trans_pos_mm') && ~isempty(parameters.transducer.trans_pos_mm)
+            parameters.transducer.trans_pos = round(parameters.transducer.trans_pos_mm(:)' / parameters.grid.resolution_mm);
+        end
+        if isfield(parameters.transducer, 'focus_pos_mm') && ~isempty(parameters.transducer.focus_pos_mm)
+            parameters.transducer.focus_pos = round(parameters.transducer.focus_pos_mm(:)' / parameters.grid.resolution_mm);
+        end
+
         if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...
                 || (~isfield(parameters.transducer, 'focus_pos')|| isempty(parameters.transducer.focus_pos))
             disp('Either grid or focus position is not set, positioning them arbitrarily based on the focal distance')
@@ -85,6 +96,10 @@ end
             if size(trans_pos,1)>size(trans_pos, 2)
                 warn('Specified transducer position appears transposed...adjusting');
                 trans_pos = trans_pos';
+            end
+            if numel(trans_pos) ~= numel(parameters.grid.dims)
+                error('trans_pos has %d elements but grid has %d dimensions. Check your transducer position configuration.', ...
+                    numel(trans_pos), numel(parameters.grid.dims));
             end
         end
         % set focus position in grid

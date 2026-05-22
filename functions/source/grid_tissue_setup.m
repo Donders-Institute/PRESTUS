@@ -67,7 +67,19 @@ else
         % read in phantoms directly as medium masks
         segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
         filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
+        nii_info      = niftiinfo(filename_segmented);
         segmented_img = squeeze(niftiread(filename_segmented));
+        planimg.phantom_header = nii_info;
+
+        % Read voxel size from NIfTI header (first spatial dim; phantoms are isotropic)
+        nii_res_mm = nii_info.PixelDimensions(1);
+        if abs(nii_res_mm - parameters.grid.resolution_mm) > 1e-6
+            warning(['Phantom NIfTI voxel size (%.4f mm) differs from parameters.grid.resolution_mm (%.4f mm). ' ...
+                     'Overriding parameters.grid.resolution_mm with NIfTI value.'], ...
+                    nii_res_mm, parameters.grid.resolution_mm);
+            parameters.grid.resolution_mm = nii_res_mm;
+        end
+
         if isequal(size(segmented_img), parameters.grid.default_dims)
             parameters.grid.dims = parameters.grid.default_dims;
             disp('Check passed: phantom dimensions fit requested grid...');
@@ -104,10 +116,13 @@ else
     end
 
     % no planning image transform for non-layered grids
-    planimg.t1_image_orig = [];
-    planimg.t1_header     = [];
-    planimg.transf        = [];
-    planimg.inv_transf    = [];
+    planimg.t1_image_orig  = [];
+    planimg.t1_header      = [];
+    planimg.transf         = [];
+    planimg.inv_transf     = [];
+    if ~isfield(planimg, 'phantom_header')
+        planimg.phantom_header = [];
+    end
     % optional RAS world-space anchor (set via parameters.grid.origin_ras_mm)
     if isfield(parameters, 'grid') && isfield(parameters.grid, 'origin_ras_mm')
         planimg.origin_ras_mm = parameters.grid.origin_ras_mm(:)';

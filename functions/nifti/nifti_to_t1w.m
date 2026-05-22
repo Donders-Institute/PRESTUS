@@ -69,19 +69,17 @@ if opts.IsLayered
 
     niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
 else
-    % Build a diagonal RAS sform so all phantom outputs share a
-    % consistent world-space definition.  origin_ras_mm defaults to
-    % [0 0 0] when not provided, which places voxel (1,1,1) at
-    % world (res, res, res) mm — matching the convention used by
-    % createPhantom's write_phantom so overlays align in ITK-SNAP.
     res = parameters.grid.resolution_mm;
-    if isfield(planimg, 'origin_ras_mm') && ~isempty(planimg.origin_ras_mm)
-        origin = planimg.origin_ras_mm(:);
-    else
-        origin = zeros(3, 1);
+
+    % For axisymmetric phantom runs the acoustic/thermal outputs are radially
+    % expanded to 3D [2*Nr x 2*Nr x Nz]. Extract the central xz-slice so the
+    % saved NIfTI matches the 2D phantom input dimensions [Nr_full x Nz].
+    if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1 && ndims(data) == 3
+        data = squeeze(data(round(size(data,1)/2), :, :));
     end
-    T = diag([res res res 1]);
-    T(1:3, 4) = origin;
+
+    % Write without header first so niftiinfo can parse the file dimensions,
+    % then rewrite with the full spatial header.
     niftiwrite(cast(data, opts.Datatype), orig_file, 'Compressed', true);
     hdr = niftiinfo([orig_file '.nii.gz']);
     hdr.PixelDimensions = repmat(res, 1, numel(hdr.PixelDimensions));
@@ -89,7 +87,23 @@ else
     if ~isempty(opts.BitsPerPixel)
         hdr.BitsPerPixel = opts.BitsPerPixel;
     end
-    hdr.Transform = affine3d(T');
+
+    % Reuse the phantom input NIfTI transform when available so output NIfTIs
+    % share the same world-space orientation (including any z-flip) and can be
+    % overlaid directly on the phantom in a viewer.
+    if isfield(planimg, 'phantom_header') && ~isempty(planimg.phantom_header)
+        hdr.Transform = planimg.phantom_header.Transform;
+    else
+        if isfield(planimg, 'origin_ras_mm') && ~isempty(planimg.origin_ras_mm)
+            origin = planimg.origin_ras_mm(:);
+        else
+            origin = zeros(3, 1);
+        end
+        T = diag([res res res 1]);
+        T(1:3, 4) = origin;
+        hdr.Transform = affine3d(T');
+    end
+
     niftiwrite(cast(data, opts.Datatype), orig_file, hdr, 'Compressed', true);
 end
 end
