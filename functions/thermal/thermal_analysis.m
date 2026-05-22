@@ -1,0 +1,199 @@
+function [results_thermal] = thermal_analysis(parameters, results_heating, ...
+    time_status_seq, medium_masks, highlighted_pos, segmentation)
+% THERMAL_ANALYSIS  Summarise and visualise results of a thermal ultrasound simulation
+%
+% Reads the existing output table, appends scalar thermal metrics (maxT,
+% endT, maxCEM43, ISO CEM43), and for layered / phantom simulations adds
+% per-tissue-layer breakdowns (brain, skull, skin). Calls thermal_plot_sim
+% to generate time-course and CEM43 plots along the focal axis, and
+% plot_overlay / plot_overlay_2d to render max-temperature overlays on the
+% segmentation for each cardinal slice (3-D) or the sagittal plane (2-D).
+%
+% Use as:
+%   [results_thermal] = thermal_analysis(parameters, results_heating, ...
+%       time_status_seq, medium_masks, highlighted_pos, segmentation)
+%
+% Input:
+%   parameters      - PRESTUS config; must contain io.filename_table,
+%                     io.dir_output, io.output_affix, transducer(1).trans_pos,
+%                     transducer(1).focus_pos, simulation.medium, thermal.temp_0
+%   results_heating - struct from THERMAL_SIMULATION; must contain
+%                     maxT, heating_endT, CEM43, CEM43_end,
+%                     CEM43_iso, CEM43_iso_end, focal_planeT,
+%                     focal_planeCEM43, focal_planeCEM43_iso, timeseries
+%   time_status_seq - struct array with fields time, status, recorded
+%   medium_masks    - layer label map (may be empty)
+%   highlighted_pos - position to highlight in overlay plots
+%   segmentation    - tissue label map for overlay background
+%
+% Output:
+%   results_thermal - extended output table with scalar and per-tissue thermal metrics
+%
+% See also: THERMAL_SIMULATION, THERMAL_PLOT_SIM, TISSUEMASK_BINARY
+
+arguments
+    parameters      (1,1) struct
+    results_heating (1,1) struct
+    time_status_seq (1,:) struct
+    medium_masks    {mustBeNumericOrLogical}
+    highlighted_pos
+    segmentation    {mustBeNumericOrLogical}
+end
+
+    disp('Processing the results of thermal simulations...')
+
+    if numel(parameters.transducer) > 1
+        warn(['***************************************************\n' ...
+            '*  MULTI-TRANSDUCER HEATING RESULTS — READ CAREFULLY\n' ...
+            '*\n' ...
+            '*  Thermal diffusion is simulated for the COMBINED field,\n' ...
+            '*  but ALL focal-plane / time-course heating plots reflect\n' ...
+            '*  ONLY first transducer and MAY MISS HOTSPOTS near other beams\n' ...
+            '*\n' ...
+            '*  DO NOT use these 1D/2D plots as a complete safety check\n' ...
+            '*\n' ...
+            '*  ALWAYS inspect 3D maxT and CEM43 volumes (NIfTIs)\n' ...
+            '***************************************************'])
+    end
+
+    % Sets up an empty medium mask if none is specified
+    if isempty(medium_masks)
+        medium_masks = zeros(parameters.grid.dims);
+    end
+
+    % Get tissue-specific masks
+    mask = tissuemask_binary(parameters, medium_masks);
+
+    % Creates an output table for temperature readings
+    results_thermal = readtable(parameters.io.filename_table);
+
+    results_thermal.maxT = max(results_heating.maxT, [], 'all');
+    results_thermal.endT = max(results_heating.heating_endT, [], 'all');
+    results_thermal.maxCEM43 = max(results_heating.CEM43, [], 'all');
+    results_thermal.maxCEM43end = max(results_heating.CEM43_end, [], 'all');
+    results_thermal.maxCEM43iso = max(results_heating.CEM43_iso, [], 'all');
+    results_thermal.maxCEM43isoend = max(results_heating.CEM43_iso_end, [], 'all');
+
+    % Encode layer-specific estimates
+    if contains(parameters.simulation.medium, {'layered'; 'phantom'})
+        % temperature maximum
+        results_thermal.maxT_brain = masked_max_3d(results_heating.maxT, mask.brain);
+        results_thermal.maxT_skull = masked_max_3d(results_heating.maxT, mask.skull); 
+        results_thermal.maxT_skin = masked_max_3d(results_heating.maxT, mask.skin);
+        % temperature (at simulation offset)
+        results_thermal.endT_brain = masked_max_3d(results_heating.heating_endT, mask.brain);
+        results_thermal.endT_skull = masked_max_3d(results_heating.heating_endT, mask.skull); 
+        results_thermal.endT_skin = masked_max_3d(results_heating.heating_endT, mask.skin);
+        % temperature rise
+        results_thermal.riseT_brain = masked_max_3d(results_heating.maxT, mask.brain)-parameters.thermal.temp_0.brain;
+        results_thermal.riseT_skull = masked_max_3d(results_heating.maxT, mask.skull)-parameters.thermal.temp_0.skull; 
+        results_thermal.riseT_skin = masked_max_3d(results_heating.maxT, mask.skin)-parameters.thermal.temp_0.skin;
+        % temperature rise (at simulation offset)
+        results_thermal.rise_endT_brain = results_thermal.endT_brain-parameters.thermal.temp_0.brain;
+        results_thermal.rise_endT_skull = results_thermal.endT_skull-parameters.thermal.temp_0.skull; 
+        results_thermal.rise_endT_skin = results_thermal.endT_skin-parameters.thermal.temp_0.skin;
+        % CEM43 (kWave)
+        results_thermal.CEM43_brain = masked_max_3d(results_heating.CEM43, mask.brain);
+        results_thermal.CEM43_skull = masked_max_3d(results_heating.CEM43, mask.skull);
+        results_thermal.CEM43_skin  = masked_max_3d(results_heating.CEM43, mask.skin);
+        % CEM43 kWave (at simulation offset)
+        results_thermal.CEM43_end_brain = masked_max_3d(results_heating.CEM43_end, mask.brain);
+        results_thermal.CEM43_end_skull = masked_max_3d(results_heating.CEM43_end, mask.skull);
+        results_thermal.CEM43_end_skin  = masked_max_3d(results_heating.CEM43_end, mask.skin);
+        % CEM43 (ISO)
+        results_thermal.CEM43iso_brain = masked_max_3d(results_heating.CEM43_iso, mask.brain);
+        results_thermal.CEM43iso_skull = masked_max_3d(results_heating.CEM43_iso, mask.skull);
+        results_thermal.CEM43iso_skin  = masked_max_3d(results_heating.CEM43_iso, mask.skin);
+        % CEM43 ISO (at simulation offset)
+        results_thermal.CEM43iso_end_brain = masked_max_3d(results_heating.CEM43_iso_end, mask.brain);
+        results_thermal.CEM43iso_end_skull = masked_max_3d(results_heating.CEM43_iso_end, mask.skull);
+        results_thermal.CEM43iso_end_skin  = masked_max_3d(results_heating.CEM43_iso_end, mask.skin);
+    end
+    
+    % Save overview table
+    writetable(results_thermal, parameters.io.filename_table);
+
+    % Creates a visual overlay of the transducer (if 3D T1 image is available)
+    if exist('planimg') && isfield(planimg, 't1_header')
+        grid.resolution_mm = planimg.t1_header.PixelDimensions(1);
+        [~, source_labels] = transducer_setup(...
+            parameters.transducer(1), ...
+            parameters.transducer(1).trans_pos, ...
+            parameters.transducer(1).focus_pos, ...
+            size(segmentation), ...
+            grid.resolution_mm, parameters);
+    else
+        source_labels = zeros(size(segmentation));
+    end
+
+    % Creates a line graph of heating in the focal plane and (OPTIONAL) video of the heat propagation
+    thermal_plot_sim(...
+        results_heating.focal_planeT, ...
+        time_status_seq, ...
+        parameters, ...
+        parameters.transducer(1).trans_pos, ...
+        medium_masks, ...
+        results_heating.focal_planeCEM43, ...
+        results_heating.timeseries, ...
+        results_heating.focal_planeCEM43_iso);
+            
+    % Plots the maximum temperature in the segmented brain
+    if results_thermal.maxT < 38
+        temp_color_range = [37, 38];
+    else
+        temp_color_range = [37, results_thermal.maxT];
+    end
+
+    % plot heating superimposed on segmentation
+    if ndims(results_heating.maxT) == 3
+
+        slices = struct( ...
+            'dim', {'x', 'y', 'z'}, ...
+            'pos', {parameters.transducer(1).focus_pos(1), ...
+            parameters.transducer(1).focus_pos(2), ...
+            parameters.transducer(1).focus_pos(3)});
+
+        for i = 1:numel(slices)
+            slice = slices(i);
+            [~,~,~,~,~,~,~,h]=plot_overlay(...
+                results_heating.maxT, ...
+                segmentation, ...
+                source_labels, ...
+                parameters, ...
+                {slice.dim, slice.pos}, ...
+                parameters.transducer(1).trans_pos, ...
+                parameters.transducer(1).focus_pos, ...
+                highlighted_pos, ...
+                'overlay_color_range', temp_color_range);
+
+            % Construct output filename
+            output_plot_filename = fullfile(parameters.io.dir_img,...
+                sprintf('sub-%03d_%s_maxT_%s%s.png',...
+                parameters.subject_id, ...
+                parameters.simulation.medium, ...
+                slice.dim, ...
+                parameters.io.output_affix));
+
+            saveas(h, output_plot_filename, 'png')
+            close(h);
+        end
+    elseif ndims(results_heating.maxT) == 2
+        [h]=plot_overlay_2d(...
+                results_heating.maxT, ...
+                medium_masks, ...
+                source_labels, ...
+                after_exit_plane_mask, ...
+                parameters.transducer(1).trans_pos, ...
+                parameters.transducer(1).focus_pos, ...
+                highlighted_pos, ...
+                'overlay_color_range', temp_color_range, ...
+                'bg_bw_range', [0, numel(fieldnames(parameters.layers))]);
+
+        output_plot_filename = fullfile(parameters.io.dir_img,...
+            sprintf('sub-%03d_%s_maxT%s.png',...
+            parameters.subject_id, ...
+            parameters.simulation.medium, ...
+            parameters.io.output_affix));
+        saveas(h, output_plot_filename, 'png')
+        close(h);
+    end

@@ -1,0 +1,98 @@
+site_name: PRESTUS - Ultrasound Simulation Toolbox
+docs_dir: doc
+site_description: 'PREprocessing & Simulations Toolbox for transcranial Ultrasound neuromodulation'
+site_url: https://donders-institute.github.io/PRESTUS
+site_author: Donders Institute for Brain, Cognition and Behaviour
+
+repo_url: https://github.com/Donders-Institute/PRESTUS
+repo_name: Donders-Institute/PRESTUS
+
+theme:
+  name: material
+  icon:
+    logo: material/waves
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+  palette:
+    # Light mode toggle
+    - scheme: default
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+        
+    # Dark mode toggle  
+    - scheme: slate
+      primary: black
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  fonts:
+    text: Roboto
+    code: Roboto Mono
+
+nav:
+  - 🏠 Home: README.md
+  - 🚀 Getting Started:
+    - Installation: doc_installation.md
+    - Getting started: doc_getting-started.md
+    - GUI: doc_gui.md
+    - Usage Statistics: doc_usage-statistics.md
+  - 📖 Documentation:
+    - Transducer Setup: doc_transducer.md
+    - Transducer Calibration: doc_calibration.md
+    - Transducer Placement: doc_placement.md
+    - Transducer Placement (Heuristic): doc_placement_heuristic.md
+    - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
+    - Transducer Placement (PLANTUS): doc_placement_plantus.md
+    - Coordinate Systems: doc_coordinate_systems.md
+    - Head Processing: doc_preproc.md
+    - Medium Setup: doc_medium.md
+    - Outputs: doc_outputs.md
+  - 🔬 Simulations:
+    - Acoustic: doc_simulations-acoustic.md
+    - Thermal: doc_simulations-thermal.md
+    - (pseudo)CT: doc_pseudoCT.md
+    - Uncertainty: doc_uncertainty.md
+  - 📚 References: 
+    - Parameters: doc_parameters.md
+    - Functions: doc_functions.md
+    - Modules: doc_modules.md
+  - 🖥️ Advanced:
+    - Advanced Workflows: doc_advanced.md
+    - Backend: doc_backend.md
+    - HPC: doc_hpc.md
+    - Multi-ISPPA: doc_multi_isppa.md
+    - Async Multi-Transducer: doc_async_transducer.md
+    - Group: doc_group.md
+    - Testing: doc_testing.md
+    - Telemetry: doc_telemetry.md
+  - 🆘 Troubleshooting: doc_troubleshooting.md
+  - 📋 Community:
+    - Code of Conduct: CODE_OF_CONDUCT.md
+    - Contributing: CONTRIBUTING.md
+    - Changelog: CHANGELOG.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr                    # Abbreviations
+  - admonition              # !!! note, !!! warning boxes
+  - toc:                    # Table of contents
+      permalink: true
+  - tables                  # | tables |
+  - pymdownx.highlight      # Code highlighting
+  - pymdownx.superfences    # ``` fences with highlighting
+  - pymdownx.arithmatex:
+      generic: true         # Enables $...$ and $$...$$
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  - https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2
+  - https://cdn.jsdelivr.net/npm/chart.js@4

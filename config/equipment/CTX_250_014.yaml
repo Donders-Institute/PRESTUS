@@ -1,0 +1,32 @@
+type: transducer
+serial: CTX_250_014
+name: NeuroFUS 2 ch. CTX_250_014
+manufact: Sonic Concepts
+n_elem: 2
+min_foc: 12.6
+max_foc: 44.1
+transducer:
+  annular:
+    elem_n: 10
+    elem_id_mm: [0.0, 6.5764, 13.1529, 19.7293, 26.3058, 32.6136, 35.2535, 37.8935, 40.5334, 43.1734]
+    elem_od_mm: [5.7744, 12.3509, 18.9273, 25.5038, 32.0802, 34.9316, 37.5716, 40.2115, 42.8515, 45.4914]
+    curv_radius_mm: 63.2
+    dist_geom_ep_mm: 56.87
+  freq_hz: 250000.0
+combos:
+  SC_203_035:
+    ds:
+      serial: SC_203_035
+      name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO junior SC_203_035
+      manufact: Sonic Concepts
+      available_ch: 4
+    char_data_path: Axial_profiles_CTX-250-014~TPO-203-035.csv
+    phase_table: CTX-250-014 - TPO-203-035 - Steer Table.csv
+  SC_105_010:
+    ds:
+      serial: SC_105_010
+      name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO senior SC_105_010
+      manufact: Sonic Concepts
+      available_ch: 4
+    char_data_path: Axial_profiles_CTX-250-014~TPO-105-010.csv
+    phase_table: CTX-250-014 - TPO-105-010 - Steer Table.csv

@@ -36,16 +36,14 @@ end
 
 % This benchmark models a water / soft tissue interface.
 
-pml = 20; % include a pml layer (on the axial dimension only)
-
 % Initialize the matrix with global value 0
-data = zeros(120+pml, 70);
+data = zeros(120, 70);
 % Generate coordinate grids for each pixel
-[X, Y] = meshgrid(1:70, 1:120+pml);
+[X, Y] = meshgrid(1:70, 1:120);
 % Fill region with white matter (soft tissue) labels
-data([30:120]+pml,:) = 1;
+data(30:120,:) = 1;
 % Reshape data to 3D for NIfTI compatibility
-data_3d = reshape(data, [120+pml, 70, 1]);
+data_3d = reshape(data, [120, 70, 1]);
 % Invert image to match what we would like
 % data_3d = data_3d(end:-1:1,:,:);
 % Write the data to a NIfTI file with 1x1x1 mm voxel size
@@ -63,14 +61,14 @@ movefile(fullfile(pn.benchmark1, 'benchmark1.nii.gz'), ...
 % This benchmark models a water / skull / soft tissue interface.
 
 % Step 1: Initialize the matrix with global value 0 (dimensions: 120 rows (y), 70 columns (x))
-data = zeros(120+pml, 70);
+data = zeros(120, 70);
 
 % Step 2: Generate coordinate grids for each pixel (assuming 1 mm per pixel)
-[X, Y] = meshgrid(1:70, 1:120+pml);
+[X, Y] = meshgrid(1:70, 1:120);
 
 % Step 3: Compute the center of curvature
 center_x = 35;                  % x-coordinate (column)
-center_y = 90 - 75;      % y-coordinate (row) => pml + 15
+center_y = 15;            % y-coordinate (row)
 
 % Step 4: Calculate the Euclidean distance from the center
 distance = sqrt((X - center_x).^2 + (Y - center_y).^2);
@@ -84,7 +82,7 @@ data(annulus_mask) = 4;    % Annular layer
 data(inner_mask)   = 1;    % Inner region
 
 % Step 6: Reshape data to 3D for NIfTI compatibility (singleton z-dimension)
-data_3d = reshape(data, [pml + 120, 70, 1]);
+data_3d = reshape(data, [120, 70, 1]);
 
 % Invert image to match what we would like
 data_3d = data_3d(end:-1:1,:,:);

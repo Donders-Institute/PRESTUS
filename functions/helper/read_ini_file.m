@@ -1,0 +1,74 @@
+function iniData = read_ini_file(filename)
+% READ_INI_FILE  Parse an INI file into a MATLAB struct
+%
+% Reads section headers ([section]) and key=value pairs, grouping fields
+% under a struct named after each section. Skips blank lines and comments
+% (lines beginning with ; or #).
+%
+% Use as:
+%   iniData = read_ini_file(filename)
+%
+% Input:
+%   filename - path to the INI file
+%
+% Output:
+%   iniData - struct with one field per section, each containing key-value pairs
+%
+% See also: SET_REAL_PHASES
+
+arguments
+    filename (1,:) char
+end
+
+    % Open the file
+    fid = fopen(filename, 'r');
+    if fid == -1
+        error('Could not open the file: %s', filename);
+    end
+
+    iniData = struct();
+    currentSection = '';
+    
+    % Read the file line by line
+    while ~feof(fid)
+        line = strtrim(fgetl(fid));
+        
+        % Skip empty lines or comments
+        if isempty(line) || startsWith(line, ';') || startsWith(line, '#')
+            continue;
+        end
+        
+        % Check if the line is a section header
+        if startsWith(line, '[') && endsWith(line, ']')
+            currentSection = matlab.lang.makeValidName(line(2:end-1)); % Remove [ and ]
+            iniData.(currentSection) = struct(); % Create a new section
+            continue;
+        end
+        
+        % Parse key-value pairs
+        if contains(line, '=')
+            tokens = strsplit(line, '=');
+            key = strtrim(tokens{1});
+            value = strtrim(tokens{2});
+            
+            % Convert numeric values if possible
+            numericValue = str2double(value);
+            if ~isnan(numericValue)
+                value = numericValue;
+            end
+            
+            % Assign the key-value pair to the current section
+            % Convert key to a valid field name
+            validKey = matlab.lang.makeValidName(key);
+            if isempty(currentSection)
+                iniData.(validKey) = value;
+            else
+                iniData.(currentSection).(validKey) = value;
+            end
+        end
+    end
+    
+    % Close the file
+    fclose(fid);
+    
+end

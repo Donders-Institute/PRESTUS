@@ -1,0 +1,64 @@
+function display_info = hpc_job_info(platform, job_id, job_name, ...
+    memory_gb, timelimit, log_dir, visualize)
+% HPC_JOB_INFO  Build a formatted job-info struct and optionally print it
+%
+% Constructs display_info from submission metadata and, when visualize=true,
+% prints a formatted summary to the console with job ID, check commands,
+% memory, time limit, and log path.
+%
+% Use as:
+%   display_info = hpc_job_info(platform, job_id, job_name, ...
+%       memory_gb, timelimit, log_dir, visualize)
+%
+% Input:
+%   platform   - scheduler type: 'slurm' or 'qsub'
+%   job_id     - raw job ID returned by the scheduler (numeric for SLURM)
+%   job_name   - job name string (typically encodes subject ID and affix)
+%   memory_gb  - memory allocation in GB
+%   timelimit  - wall-time limit string (e.g. '06:00:00')
+%   log_dir    - path to the log_hpc directory
+%   visualize  - logical; if true, print job summary to console
+%
+% Output:
+%   display_info - struct with fields:
+%                    .id          — formatted job ID string
+%                    .name        — job name
+%                    .check_cmd   — shell command to check job status
+%                    .detail_cmd  — shell command for detailed job info
+%                    .memory_gb   — memory allocation (GB)
+%                    .timelimit   — wall-time limit string
+%                    .log_dir     — log directory path
+%
+% See also: HPC_SUBMIT_JOB, HPC_JOB_NAME
+
+    % Format job ID
+    if strcmp(platform, 'slurm') && isnumeric(job_id)
+        display_info.id = sprintf('%d', job_id);
+        display_info.check_cmd = sprintf('squeue -u $USER | grep %s', job_name);
+        display_info.detail_cmd = sprintf('sacct -j %s', display_info.id);
+    else
+        display_info.id = string(job_id);
+        display_info.check_cmd = sprintf('qstat %s', display_info.id);
+        display_info.detail_cmd = display_info.check_cmd;
+    end
+    
+    % Common fields
+    display_info.name = job_name;
+    display_info.memory_gb = memory_gb;
+    display_info.timelimit = timelimit;
+    display_info.log_dir = log_dir;
+
+    if visualize == true
+        fprintf('\n⚙️ JOB INFO\n');
+        fprintf('═════════════════════════════\n');
+        fprintf('Job ID:       %s\n', display_info.id);
+        fprintf('Job name:     %s\n', display_info.name);
+        fprintf('Subject:      %s\n', job_name);
+        fprintf('Memory:       %.0f GB\n', display_info.memory_gb);
+        fprintf('Time limit:   %s\n', display_info.timelimit);
+        fprintf('Log dir:      %s\n', display_info.log_dir);
+        fprintf('Check:        %s\n', display_info.check_cmd);
+        fprintf('Details:      %s\n', display_info.detail_cmd);
+        fprintf('\n');
+    end
+end

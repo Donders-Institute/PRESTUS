@@ -1,0 +1,24 @@
+type: transducer
+serial: IS_PCD15473_01001_OPM
+name: Imasonic 10 ch. IS_PCD15473_01001_OPM
+manufact: Imasonic
+n_elem: 10
+min_foc: 7.3
+max_foc: 92.0
+transducer:
+  annular:
+    elem_n: 10
+    elem_id_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+    elem_od_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+    curv_radius_mm: 100.0
+    dist_geom_ep_mm: 92.7
+  freq_hz: 300000.0
+combos:
+  IGT_32_ch_comb_10_ch:
+    ds:
+      serial: IGT_32_ch_comb_10_ch
+      name: IGT 32 ch. - 10 ch.
+      manufact: IGT
+      available_ch: 32
+    char_data_path: Axial_profiles_IS_PCD15473_01001_OPM~IGT_32_ch_comb_10_ch.csv
+    phase_table: transducer_15473_10_300kHz.ini

@@ -1,0 +1,52 @@
+# Conservative medium properties for uncertainty quantification.
+#
+# This parameter set is designed to produce the LOWER bound of plausible
+# acoustic intensity and heating at the brain target. It represents a dense,
+# highly attenuating skull (less energy transmitted) combined with brain
+# tissue properties that reduce absorption and heating.
+#
+# Use this config to document the lower end of the plausible exposure range.
+#
+# Sources: Aubry et al. (2025) ITRUSST consensus; Marsac et al. (2017);
+#          Pinton et al. (2012); Deffieux & Konofagou (2010).
+
+medium_properties:
+  brain:
+    sound_speed: 1520             # m/s   — lower bound
+    density: 1046                 # kg/m³ — nominal
+    alpha_coeff: 0.94             # dB/(cm·MHz) — upper bound (more attenuation → less intensity)
+    alpha_power: 1.0
+    thermal_conductivity: 0.48    # W/(m·K) — lower bound
+    specific_heat_capacity: 3583  # J/(kg·K) — lower bound
+    perfusion: 196                # mL/min/kg — lower bound (less cooling → more heating)
+    absorption_fraction: 0.80     # fraction of attenuation converted to heat
+
+  skull:
+    sound_speed: 2822             # m/s   — upper bound (more impedance mismatch → less transmission)
+    density: 1908                 # kg/m³ — upper bound (more impedance mismatch)
+    alpha_coeff: 24.4             # dB/(cm·MHz) — upper bound (more skull attenuation)
+    alpha_power: 1.0
+    thermal_conductivity: 0.31    # W/(m·K) — nominal
+    specific_heat_capacity: 1313  # J/(kg·K) — lower bound
+    perfusion: 10                 # mL/min/kg — lower bound
+    absorption_fraction: 1.00     # fraction of attenuation converted to heat (k-Plan default)
+
+  skull_trabecular:
+    sound_speed: 2822             # m/s   — upper bound (more impedance mismatch → less transmission)
+    density: 1908                 # kg/m³ — upper bound (more impedance mismatch)
+    alpha_coeff: 24.4             # dB/(cm·MHz) — upper bound (more skull attenuation)
+    alpha_power: 1.0
+    thermal_conductivity: 0.31    # W/(m·K) — nominal
+    specific_heat_capacity: 1313  # J/(kg·K) — lower bound
+    perfusion: 10                 # mL/min/kg — lower bound
+    absorption_fraction: 1.00     # fraction of attenuation converted to heat (k-Plan default)
+
+  skull_cortical:
+    sound_speed: 2822             # m/s   — upper bound (more impedance mismatch → less transmission)
+    density: 1908                 # kg/m³ — upper bound (more impedance mismatch)
+    alpha_coeff: 24.4             # dB/(cm·MHz) — upper bound (more skull attenuation)
+    alpha_power: 1.0
+    thermal_conductivity: 0.31    # W/(m·K) — nominal
+    specific_heat_capacity: 1313  # J/(kg·K) — lower bound
+    perfusion: 10                 # mL/min/kg — lower bound
+    absorption_fraction: 1.00     # fraction of attenuation converted to heat (k-Plan default)

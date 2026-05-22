@@ -1,0 +1,455 @@
+# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
+
+# !!! Important !!! Do not edit this document. Instead, copy (at least) the first segment into your own config file.
+
+#------------------------------------------------
+#------------ Setup-specific specfication (Defaults)
+# The following information is study-specific.
+# Defaults should be overwritten (where sensible or necessary) in a separate <simulation-X>config.yaml file.
+#------------------------------------------------
+
+#------------ General
+
+subject_id: 0    # Participant ID (integer, used for path substitution in path.t1_pattern and path.t2_pattern) 
+platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matlab (recommended for debugging)
+
+#------------ Simulation type & execution
+
+simulation:
+  medium: layered     # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+  code_type: matlab_gpu # Select which k-Wave code to run:
+                        #   MATLAB CPU code 'matlab_cpu'
+                        #   MATLAB GPU code 'matlab_gpu'
+                        #   C++ CPU code 'cpp_cpu'
+                        #   C++ GPU code 'cpp_gpu'
+  precision: 'single' # Computational precision for both acoustic and thermal simulations
+  interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
+  debug: 0            # Activate debug mode with additional intermediate outputs?
+  transducer_coupling: coherent # How multiple transducers interact acoustically:
+                                #   'coherent'  — pressure fields are superposed in a single k-Wave run
+                                #                 (models interference; current default behaviour)
+                                #   'async'     — each transducer is simulated independently and
+                                #                 intensities are summed incoherently before thermal
+                                #                 simulation (models asynchronous / non-overlapping firing)
+
+#------------ Paths
+
+path:
+  anat: ''              # Location of the structural input data [full path]
+  sim: ''               # Location of the simulation outputs [full path or folder name in path.anat]
+  seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
+  t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
+  t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
+  localite: ''          # Path to Localite neuronavigation output folder
+  pct: ''               # Base output directory for pseudoCT files. Leave empty to write pseudoCT
+                        # outputs into the SimNIBS m2m folder (path.seg/m2m_sub-NNN/). When set,
+                        # outputs go to path.pct/sub-NNN/ using the PRESTUS subject naming.
+
+#------------ Startup (environment & toolbox paths)
+
+startup:
+  simnibs_bin_path: ''  # Path to the SimNIBS environment (please use full paths)
+  matlab_bin_path: ''   # Path to MATLAB binary, required for pseudoCT generation on HPC (e.g. /opt/matlab/R2024a/bin/matlab)
+  fsl_bin_path: ''      # Path to FSL bin directory, required for pseudoCT generation (e.g. /opt/fsl/bin); used to set PATH
+  ants_bin_path: ''     # Path to ANTs bin directory, required for pseudoCT generation (e.g. /opt/ants/bin); used to set PATH
+  ants_simg_path: ''    # Path to ANTs Singularity image (.simg/.sif); if set, ANTs tools are run via singularity exec
+  modules_to_load: []   # HPC environment modules to load before pCT generation (e.g. ['matlab/R2023b','fsl/6.0.7','ants/2.5.3'])
+  paths_to_add: []      # Additional paths to add with addpath()
+  subpaths_to_add: []   # Paths to add recursively with addpath(genpath()); relative to config file location
+
+#------------ I/O management
+
+io:
+  output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
+  overwrite_files: always   # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+  overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
+  # Intermediate matrix saving
+  # save_matrices is the global fallback: set to 0 to suppress all saves,
+  # set to 1 to enable all saves. Individual flags below take precedence
+  # when explicitly set, allowing fine-grained control per output type.
+  save_matrices: 0          # Global fallback for all intermediate matrix saves (0 = skip all)
+  save_source_matrices: 1   # kwave_source.mat — transducer source array; shared across variants
+  save_acoustic_matrices: 0 # Acoustic sensor_data + kgrid + kwave_medium + source (can be very large)
+  save_thermal_matrices: 1  # heating_res.mat — temperature timeseries and field maps
+  save_heatingvideo: 0      # Save a video of incremental heating?
+  save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
+  save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
+
+#------------ Calibration (equipment-level metadata, not ISPPA targeting)
+
+calibration:
+  # target_isppa_wcm2 has moved to transducer.target_isppa_wcm2 (per-transducer).
+  # Setting calibration.target_isppa_wcm2 here still works but is deprecated and
+  # will be removed in a future release.
+
+#------------ Module execution
+
+modules:
+  run_transducer_placement: 1 # Resolve trans_pos/focus_pos via placement.mode (manual/localite/heuristic)?
+  run_grid_setup: 1           # Setup grid and run head processing? Mandatory for simulations.
+  run_medium_setup: 1         # Map medium acoustic properties? Mandatory for simulations.
+  run_source_setup: 1         # Set up acoustic source? Mandatory for simulations.
+  run_water_baseline: 0       # Run fast water sim to record free-water ISPPA provenance alongside acoustic cache?
+  run_acoustic_sims: 1        # Run acoustic simulations?
+  run_acoustic_analysis: 1    # Run acoustic analysis?
+  run_heating_sims: 0         # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
+  run_thermal_analysis: 1     # Run thermal analysis?
+  run_nifti_creation: 1       # Run nifti creation?
+  run_posthoc_water_sims: 1   # Run simulations in free water with identical setup?
+  generate_report: 1          # Generate a self-contained HTML simulation report at the end of the pipeline?
+  segmentation_only: 0        # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
+
+#------------ High-performance computing
+hpc:
+  name: 'default'   # 'default' or 'snellius'
+  gpu: ''
+  partition: ''
+  reservation: ''
+  wait_for_job: false
+  timelimit: '04:00:00'
+  memorylimit: 20
+  ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+  job_prefix: 'PS' # Prefix for HPC job names (keep short; total name capped at 20 chars)
+  max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
+
+# Smallest possible allocation (https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660209/Snellius+partitions+and+accounting)
+snellius:
+  gpu_a100:
+    cores: 18
+    memorylimit: 120
+    timelimit: "120:00:00" # max wall time of 120 h
+    n_gpu: 1
+  gpu_h100:
+    cores: 16
+    memorylimit: 180
+    timelimit: "120:00:00" # max wall time of 120 h
+    n_gpu: 1
+
+#------------ Target analysis
+analysis:
+  focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+
+#------------ Transducer specification  (no defaults)
+#
+# target_isppa_wcm2: target free-water ISPPA for this transducer [W/cm²].
+#   Scalar  → scale to that intensity before thermal analysis.
+#   Vector  → run one thermal job per value (multi-ISPPA sweep mode).
+#   Empty   → no scaling; use elem_amp drive level as-is.
+#
+# The acoustic simulation always runs at the elem_amp specified below.
+# modules.run_water_baseline must be enabled to record the free-water baseline
+# ISPPA so that post-hoc pressure scaling can be applied.
+
+transducer:
+  name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')
+  type: []              # 'annular' for Annular array or 'matrix' for Matrix array
+  freq_hz: []           # Fundamental frequency [Hz]
+  target_isppa_wcm2: [] # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
+
+  trans_pos: []              # Transducer position [T1 grid space]
+  focus_pos: []              # Stimulation target position [T1 grid space]
+  focal_distance_ep: []      # Expected focal distance from transducer exit plane [mm]
+  focal_distance_bowl: []    # Expected focal distance from transducer bowl [mm]
+  focal_distance_offset: []  # Offset between bowl and exit plane [mm] [DERIVED]
+  
+  # --------------------------
+  # Annular transducer parameters
+  # --------------------------
+  annular:
+    elem_n: []            # Number of elements in the transducer [#]
+    elem_id_mm: []        # Inner diameter of each element [mm]
+    elem_od_mm: []        # Outer diameter of each element [mm]
+    elem_amp: []          # Pressure amplitude [Pa]
+    elem_phase_deg: []    # Source phase of each element [deg] (0-360)
+    curv_radius_mm: []    # Radius of curvature of the bowl [mm]
+    dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
+    depth_mm: []          # Depth of transducer used for visualization purposes [mm]
+
+  # --------------------------
+  # Matrix transducer parameters
+  # --------------------------
+  matrix:
+    elem_amp: []          # Pressure amplitude [Pa]
+    steering: []          # '1D' (Axial steering) or '3D' (Volumetric steering)
+    elem_shape: []        # 'rect', 'disc', or 'bowl' - physical shape of each element
+    elem_height_mm: []    # Element height [mm]
+    elem_width_mm: []     # Element width [mm]
+    outer_diameter_mm: [] # Outer diameter of the transducer [mm]
+    depth_mm: []          # Depth of transducer used for visualization purposes [mm]
+    is_curved: []         # true if transducer has a curved (spherical) surface, false if flat
+    curv_radius_mm: []    # Radius of curvature of the bowl [mm]
+    dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
+
+    # Optional Clover multi-aperture configuration
+    is_clover_setup: []  # true to enable Clover replication
+    clover:
+      n_leaves: []       # Number of leaves (1–3)
+      ROC_parent: []     # Radius of curvature of parent setup [mm]
+
+    # --------------------------
+    # Grid definition
+    # --------------------------
+    matrix_shape:
+      type: []           # 'define_here' (define grid manually) or 'extract_from_file' (load positions from file)
+
+      # If define_here is used:
+      define_here:
+        grid_shape:
+          type: []       # 'rect', 'fibonacci', 'fermat' - type of grid layout
+
+          rect:
+            elem_n_row: []          # Number of rows in rectangular grid
+            elem_n_col: []          # Number of columns in rectangular grid
+            elem_spacing_height_mm: [] # Edge-to-edge spacing between rows [mm]
+            elem_spacing_width_mm: []  # Edge-to-edge spacing between columns [mm]
+            sparsity_factor: []     # Fraction of elements used (0 < value <= 1)
+
+          fibonacci:
+            elem_n: []             # Total number of elements for Fibonacci grid
+            kerf_mm: []            # Minimum spacing between elements [mm]
+
+          fermat:
+            elem_n: []             # Total number of elements for Fermat spiral grid
+
+      # If extract_from_file is used:
+      extract_from_file:
+        file_path: []              # Path to file with element positions (x, y, z) [string]
+        start_row: []              # Row in file where element data starts
+        start_col: []              # Column in file where element data starts
+        elem_n: []                 # Total number of elements to extract
+        select_random_subset: []   # true to randomly pick a subset
+        subset:
+          random_seed: []          # true to use a new seed each run, false to fix seed
+          subset_n_elements: []    # Number of elements in the subset
+        project_on_new_ROC: []     # true to project elements onto new ROC
+        ROC_projection:
+          new_ROC_mm: []           # New desired radius of curvature [mm]
+
+#------------ Transducer Placement
+
+placement:
+  mode: 'manual'    # Placement mode: 'manual' (use trans_pos/focus_pos as provided) |
+                    #   'localite' (derive from Localite XML; set placement.localite.file or path.localite) |
+                    #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
+                    #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
+  localite:
+    enabled: 0        # Use Localite neuronavigation to position the transducer?
+    # --- Simple mode: provide a direct path to a single Localite XML file ---
+    file: ''          # Path to a single Localite XML file (TriggerMarkers or GUMMarkers)
+    # --- Full neuronav mode: automatic file selection from path.localite folder ---
+    # Used when placement.localite.file is empty and path.localite is set.
+    session: 1        # Session identifier for file selection (integer or 'ses-XX')
+    markertype: 'TriggerMarkers'  # 'TriggerMarkers' or 'GUMMarkers'
+    position: 1       # Series index to use when multiple positions are in the file
+    # --- Shared ---
+    reference_distance_mm: 15 # Fallback offset (mm) from Localite matrix origin to bowl rear centre (used by k-Wave makeBowl).
+                              # Negative = bowl rear centre is on the housing side relative to the matrix origin.
+                              # Only used when transducer geometry fields are absent and tracker_to_bowl_mm is not set.
+    tracker_to_bowl_mm: []  # Explicit measured offset (mm) from the Localite 4×4 matrix origin to the bowl rear centre
+                            # (the geometric axis point at the back of the housing; bowl_pos in k-Wave makeBowl).
+                            # Negative = bowl rear centre is on the housing/tracker side (away from head).
+                            # When set, overrides both the geometry-derived value and reference_distance_mm.
+                            # See doc_placement_neuronav.md §"Localite matrix origin" for how to determine this value.
+  heuristic:
+    mni_target_mm: []    # [x y z] MNI coordinate of the sonication target (required for mode='heuristic')
+    target_name: ''      # Label string for the target, used in output filenames (required for mode='heuristic')
+    dist_close: []
+    ear_radius: 35
+    save_localite_t1: false # Save Localite-aligned T1 output for header correction?
+    left_ear_center: []
+    right_ear_center: []
+    criterion_intersection: 0.05
+    criterion_skin_mean: []
+    criterion_skull_mean: []
+    criterion_skin_var: []
+    criterion_skull_var: []
+    expand_step: 0.01
+
+  plantus:
+    # --- Paths (required) ---
+    script_path: ''           # Path to PlanTUS installation directory (must contain PlanTUS_wrapper.py).
+                              # Install from: https://github.com/MScheltienne/PlanTUS
+    env_path: ''      # Path to SimNIBS installation (must contain simnibs_env/bin/python).
+                              # Typically the top-level SimNIBS directory, e.g. /opt/SimNIBS-4.1
+    # --- Target (one of the two must be set) ---
+    target_name: ''           # Label string for the target; used in output filenames (required)
+    mni_target_mm: []         # [x y z] MNI coordinate of the sonication target [mm].
+                              # If empty, transducer.focus_pos (voxel) is used instead.
+    # --- Transducer characterisation (required) ---
+    focal_distance_list: []   # [1×N] focal distances [mm] from calibration report.
+                              # PlanTUS evaluates each distance as a candidate placement configuration.
+    flhm_list: []             # [1×N] full-width at half-maximum focal length [mm] for each entry
+                              # in focal_distance_list (same calibration report).
+    # --- Geometry (optional; defaults derived from transducer equipment config) ---
+    additional_offset_mm: 0   # Extra stand-off between skin and transducer exit plane [mm]
+                              # (e.g., coupling gel pad or water-filled cone).
+    max_angle_deg: 10         # Maximum allowed transducer tilt angle [degrees].
+    mask_radius_mm: 2         # Radius of the spherical target mask [mm].
+    # --- Optimisation weights (must sum to 1.0) ---
+    weight_skin_target_distances: 0.2     # Penalise transducer-to-target distance
+    weight_skin_target_angles: 0.2        # Penalise beam angle at skin
+    weight_skin_target_intersections: 0.2 # Reward beam-target volume overlap
+    weight_skin_skull_angles: 0.2         # Penalise skin-skull surface angle
+    weight_skull_thickness: 0.2           # Penalise skull thickness at entry
+    # --- Surface visualisation (optional) ---
+    connectome_wb_path: ''    # Path to Connectome Workbench bin/ directory.
+                              # Leave empty to skip (--skip_wb_view is always passed).
+
+#------------ Simulation grid
+
+grid:
+  resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
+  default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
+  pml_size: 'auto'    # Perfectly Matched Layer (PML) thickness [grid points] or 'auto'.
+                      # 'auto': calls getOptimalPMLSize(kgrid) which searches the range [10, 40]
+                      #   and picks the size that minimises the largest prime factor of
+                      #   grid_N + 2*pml_size (independently per dimension), maximising FFT speed.
+                      #   For axisymmetric mode the radial dimension uses the WSWA variant.
+                      # Integer (e.g. 20): fixed thickness; may slow FFT if grid_N + 2*pml_size
+                      #   has large prime factors.
+  source_ppw: []      # Points Per Wavelength [default: calculated internally]
+  min_ppw: 6          # Minimum acceptable PPW at the fundamental frequency; triggers a warning if violated
+  source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction
+  source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
+  max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
+  use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
+  axisymmetric: 0     # Use 2D axisymmetric simulation mode?
+  mode: 'transducer_axis'  # Grid orientation mode:
+                           #   'transducer_axis' (default) — rotate volume so focal axis aligns
+                           #     with z before simulation; compact grid, z-aligned beam.
+                           #   'ras_plus' — keep volume in RAS+ orientation; no rotation applied,
+                           #     only isotropic rescaling. Preserves world-space geometry and
+                           #     aligns with k-Plan / BabelBrain conventions. Requires that
+                           #     transducer_setup can place a bowl at an arbitrary angle, which
+                           #     k-Wave supports via makeBowl(grid, trans_pos, r, d, focus_pos).
+
+#------------ Segmentation
+
+segmentation:
+  use_qform: 0      # Force qform reorientation before charm segmentation? Set to 1 if charm reports qform/sform mismatch.
+  debug: 0          # Pass --debug flag to charm segmentation for verbose output?
+
+#------------ Head model processing
+
+headmodel:
+  head_pad_mm: 0      # Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]
+  csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [grid voxels]
+  # Thresholds for smoothing masks (and acoustic properties)
+  smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
+  smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
+  smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
+  smooth_fwhm_mm: 1   # Smoothing FWHM [mm]
+  smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
+  # Settings for skull hole-filling
+  skull_fill_method: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
+  skull_wrap_radius: 10 # Rubber-wrap radius [grid voxels]; larger = tighter rubber ignoring bigger dents (recommendation: 2–10)
+  skull_wrap_visualize: 0 # Visualize rubber-wrap result? (Currently causes issues on HPC)
+
+#------------ (pseudo-)CT skull property mapping
+
+pct:
+  enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
+  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/carpino/wiesinger/treeby/kosciessa
+  debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
+  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
+  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
+  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
+
+#------------ Simulation layers
+# Assign tissue compartments to model, with their SimNIBS segmentation label indices.
+# You can remove or add layers. If you want a skull-only simulation, remove brain and skin for example.
+
+layers:
+  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
+  brain: [1, 2]
+  skin: [5]
+  skull: [4]
+  skull_cortical: [7]
+  skull_trabecular: [8]
+
+#------------ Sonication timing protocol (no defaults - must be specified for thermal simulations)
+
+timing:
+  pd: 0            # Pulse Duration (PD) [s]
+  pri: 0           # Pulse Repetition Interval (PRI) [s]; PRF = 1/pri
+  ptd: 0           # Pulse Train Duration (PTD) [s]
+  pt_timestep: 0.02   # Modelling time step within a pulse train [s]
+  ptri: 0          # Pulse Train Repetition Interval (PTRI) [s]
+  ptrd: 0          # Pulse Train Repetition Duration (PTRD) [s]
+  post_ptri_dur: 0 # Post-PTRI steady-state duration [s]
+  post_pt_timestep: 1 # Modelling time step following PT & PTRI [s]
+  equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
+
+#------------ Thermal parameters
+
+thermal:
+  cem43_iso: 0
+  temp_0: #[deg C] initial temperature
+    water: 37
+    skull: 37
+    brain: 37
+    skin: 37
+    skull_trabecular: 37
+    skull_cortical: 37
+  sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
+  record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
+  log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
+
+#------------  Medium properties
+# References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
+# Note: skull attenuation and absorption values remain uncertain, use defaults with caution!
+medium_properties:
+  water:
+    sound_speed: 1500
+    density: 994
+    alpha_coeff: 2.17e-3
+    alpha_power: 2
+    thermal_conductivity: 0.60 # [W/m/°C]
+    specific_heat_capacity: 4178 # [J/kg/°C]
+    perfusion: 0
+    absorption_fraction: 1
+  brain:
+    sound_speed: 1546 # [m/s]
+    density: 1046 # [kg/m^3]
+    alpha_coeff: 0.59
+    alpha_power: 1.2
+    thermal_conductivity: 0.51 # [W/m/°C]
+    specific_heat_capacity: 3630 # [J/kg/°C]
+    perfusion: 559
+    absorption_fraction: 1
+  skin:
+    sound_speed: 1610 # [m/s]
+    density: 1090 # [kg/m^3]
+    alpha_coeff: 0.4
+    alpha_power: 1
+    thermal_conductivity: 0.37 # [W/m/°C]
+    specific_heat_capacity: 3391 # [J/kg/°C]
+    perfusion: 106
+    absorption_fraction: 1
+  skull: # (single skull layer only; mostly following cortical bone)
+    sound_speed: 2800 # [m/s]
+    density: 1850 # [kg/m^3]
+    alpha_coeff: 13.3
+    alpha_power: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 1793 # [J/kg/°C]
+    perfusion: 20
+    absorption_fraction: 0.28
+  skull_trabecular: # trabecular bone
+    sound_speed: 2300 # [m/s]
+    density: 1700 # [kg/m^3]
+    alpha_coeff: 13.3
+    alpha_power: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 2274 # [J/kg/°C]
+    perfusion: 30
+    absorption_fraction: 0.28
+  skull_cortical: # cortical bone
+    sound_speed: 2800 # [m/s]
+    density: 1850 # [kg/m^3]
+    alpha_coeff: 13.3
+    alpha_power: 1
+    thermal_conductivity: 0.32 # [W/m/°C]
+    specific_heat_capacity: 1313 # [J/kg/°C]
+    perfusion: 10
+    absorption_fraction: 0.28

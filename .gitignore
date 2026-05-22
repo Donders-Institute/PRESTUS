@@ -9,6 +9,12 @@
 *.o[0-9][0-9][0-9][0-9]*
 
 
+######################
+# Ignore mkdocs site #
+######################
+
+site/
+
 ###################
 # Matlab specific #
 ###################
@@ -81,3 +87,4 @@ $RECYCLE.BIN/
 .Trash-*
 core.*
 .Rhistory
+.claude

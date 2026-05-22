@@ -1,0 +1,191 @@
+function elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)
+% CREATE_CLOVER_ARRAY  Replicate a single matrix sub-array into a multi-leaf clover configuration
+%
+% Each of the N leaves (default 3, 120° apart) is placed on a parent spherical
+% bowl of radius ROC_parent, rotated azimuthally around Z, then tilted in
+% elevation toward the parent bowl center so that all leaves converge on a
+% common natural focus. A least-squares sphere fit is performed per leaf to
+% locate its apex and validate its distance to the intended focus. Optional
+% debug figures show the 3-D leaf arrangement.
+%
+% Use as:
+%   elem_pos_m = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)
+%
+% Input:
+%   parameters  - PRESTUS config; parameters.simulation.debug controls figure generation
+%   tr_matrix   - matrix + clover geometry fields: tr_matrix.clover.n_leaves,
+%                 tr_matrix.clover.ROC_parent [mm], tr_matrix.outer_diameter_mm [mm],
+%                 tr_matrix.curv_radius_mm [mm], tr_matrix.elem_shape
+%   elem_pos_m  - [3xN] element positions of one sub-array [m]
+%   trans_pos_m - [3x1] transducer origin in the simulation grid [m]
+%   focus_pos_m - [3x1] acoustic focus position in the simulation grid [m]
+%
+% Output:
+%   elem_pos_m  - [3xN] full clover element positions for all leaves [m]
+%
+% See also: CREATE_MATRIX_KARRAY, SOURCE_CREATE
+
+arguments
+    parameters  (1,1) struct
+    tr_matrix   (1,1) struct
+    elem_pos_m  (3,:) {mustBeNumeric}
+    trans_pos_m (3,1) {mustBeNumeric}
+    focus_pos_m (3,1) {mustBeNumeric}
+end
+
+    % --------------------------------------------------------------------
+    % Clover geometry parameters
+    % --------------------------------------------------------------------
+    n_leaves = tr_matrix.clover.n_leaves;
+    ROC_parent_mm = tr_matrix.clover.ROC_parent;
+
+    theta_az = 2*pi / 3;  % 120° spacing (fixed geometry)
+
+    % Estimate elevation angle to ensure sub-apertures do not overlap on
+    % the parent sphere
+    aperture_diam = tr_matrix.outer_diameter_mm;
+    radius_circle = aperture_diam / (2 * ROC_parent_mm * sin(theta_az / 2));
+    elevation_angle = asin(radius_circle);
+
+    % --------------------------------------------------------------------
+    % Extract base geometry (convert to mm for geometric operations)
+    % --------------------------------------------------------------------
+    base_pos_mm = elem_pos_m' * 1e3;   % [N x 3]
+
+    % Parent bowl center (global reference)
+    parent_center_m = trans_pos_m;
+    parent_center_m(3) = trans_pos_m(3) + ROC_parent_mm * 1e-3;
+    parent_center_mm = parent_center_m * 1e3;
+
+    % --------------------------------------------------------------------
+    % Define reference (first leaf center)
+    % Place first transducer at desired elevation on ROC sphere 
+    % (along X-axis azimuthally)
+    % --------------------------------------------------------------------
+    center0 = parent_center_mm + [ ...
+        ROC_parent_mm * cos(elevation_angle);
+        0;
+        ROC_parent_mm * sin(elevation_angle)
+    ];
+
+    % Express base positions relative to first center
+    positions_local = base_pos_mm - center0';
+
+    % --------------------------------------------------------------------
+    % Allocate storage
+    % --------------------------------------------------------------------
+    elem_all = [];
+    h_leaves = gobjects(1, tr_matrix.clover.n_leaves);  % handles for each leaf
+
+
+    % [DEBUG] visualize leaf orientation
+    if parameters.simulation.debug == 1
+        h = figure;
+        hold on;
+        axis equal;
+        colors = lines(n_leaves);
+        legend_entries = strings(1, n_leaves);
+    end
+
+    % --------------------------------------------------------------------
+    % Generate each clover leaf
+    % --------------------------------------------------------------------
+    for i = 1:n_leaves
+
+        % --- Rotation matrices --- 
+        angle_z = (i-1) * theta_az;
+
+        % Rotate around Z to spread evenly
+        Rz = [cos(angle_z), -sin(angle_z), 0;
+              sin(angle_z),  cos(angle_z), 0;
+              0,             0,            1];
+
+        % Rotate around Y to tilt downward (toward focus)
+        Ry = [cos(elevation_angle), 0, sin(elevation_angle);
+              0,                    1, 0;
+             -sin(elevation_angle), 0, cos(elevation_angle)];
+
+        R = Rz * Ry;
+
+        % --- Rotate center ---
+        center_rot = (R * (center0 - parent_center_mm)) + parent_center_mm;
+
+        % --- Rotate elements ---
+        elems_rot = (R * positions_local')' + center_rot';
+
+        % --- Fit sphere to find apex (validation) ---
+        ROC_leaf = tr_matrix.curv_radius_mm;
+
+        residuals = @(c) vecnorm(elems_rot - c, 2, 2) - ROC_leaf;
+
+        % Least squares optimization
+        center_fit = lsqnonlin(residuals, mean(elems_rot)); 
+
+        % Compute apex (bowl center point)
+        dir_vec = mean(elems_rot) - center_fit;
+        dir_vec = dir_vec / norm(dir_vec);
+        apex = center_fit + ROC_leaf * dir_vec;
+
+        % Distance to parent center (sanity check)
+        dist_focus = norm(parent_center_mm' - apex);
+
+        % [DEBUG] visualize leaf orientation
+        if parameters.simulation.debug == 1
+            legend_entries(i) = sprintf('Leaf %d (dist: %.2f mm)', i, dist_focus);
+
+            scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
+                15, colors(i,:), 'filled');
+
+            h_leaves(i) = plot3([apex(1), parent_center_mm(1)], ...
+                [apex(2), parent_center_mm(2)], ...
+                [apex(3), parent_center_mm(3)], 'k--');
+        end
+
+        % --- Store ---
+        elem_all = [elem_all; elems_rot];
+    end
+    
+    % --------------------------------------------------------------------
+    % Finalize outputs
+    % --------------------------------------------------------------------
+    elem_pos_m = elem_all' / 1e3;  % back to meters
+
+    % --------------------------------------------------------------------
+    % Debug plot
+    % --------------------------------------------------------------------
+    % [DEBUG] visualize leaf orientation
+    if parameters.simulation.debug == 1
+        h_parent = scatter3(parent_center_mm(1), parent_center_mm(2), ...
+            parent_center_mm(3), 100, 'r', 'filled');
+        h_focus  = scatter3(focus_pos_m(1)*1e3, focus_pos_m(2)*1e3, focus_pos_m(3)*1e3, 100, 'b', 'filled');
+        h_center = scatter3(trans_pos_m(1)*1e3, trans_pos_m(2)*1e3, trans_pos_m(3)*1e3, 100, 'g', 'filled');
+
+        % Combine handles for legend
+        legend_handles = [h_leaves, h_parent, h_focus, h_center];
+
+        % Labels
+        par_bowl_label = "Middle of parent bowl, ROC " + sprintf('%.2f', ...
+            ROC_parent_mm) + " mm";
+        legend_labels = [legend_entries, ...
+            par_bowl_label, "Focus", "Transducer center"];
+
+        legend(legend_handles, legend_labels);
+
+        xlabel('X [mm]');
+        ylabel('Y [mm]');
+        zlabel('Z [mm]');
+        title(sprintf('Clover Array (%d leaves) ROC sub-arrray %.1f mm', n_leaves, ROC_leaf));
+
+        grid on;
+        view([20 25 30]);
+
+        output_file = fullfile(parameters.io.dir_debug_source, ...
+            sprintf('sub-%03d_%s_clover%s.png',...
+            parameters.subject_id, parameters.simulation.medium, ...
+            parameters.io.output_affix));
+
+        saveas(h, output_file);
+        close(h);
+    end
+
+end
