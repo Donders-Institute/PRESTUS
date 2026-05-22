@@ -392,38 +392,9 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     elseif exist(filename_sensor_data, 'file')
         disp('Skipping acoustic simulation, loading existing output file.')
-        load(filename_sensor_data);
+        [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
+            cache_acoustic('load', filename_sensor_data, parameters);
         parameters.state.acoustics_available = 1;
-
-        % acoustic_wrapper saves the sensor data after expanding the
-        % axisymmetric result to 2-D / 3-D, but the current parameters
-        % struct still holds the pre-expansion axisymmetric grid dims and
-        % transducer positions (because we bypassed acoustic_wrapper).
-        % Detect the mismatch from the loaded array size and re-apply the
-        % same [Nz x Nr] → [2*Nr x Nz] coordinate transformation so that
-        % all downstream code sees consistent positions.
-        if numel(parameters.grid.dims) == 2 && ...
-                isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
-            expand_to_3d = strcmp(parameters.simulation.medium, 'phantom') || ...
-                           (isfield(parameters.modules, 'run_heating_sims') && ...
-                            parameters.modules.run_heating_sims == 1);
-            if ~expand_to_3d
-                Nr_orig = parameters.grid.dims(2);
-                Nz_orig = parameters.grid.dims(1);
-                if size(sensor_data.p_max_all, 1) == Nr_orig * 2
-                    for ti_load = 1:numel(parameters.transducer)
-                        tp = parameters.transducer(ti_load).trans_pos;
-                        fp = parameters.transducer(ti_load).focus_pos;
-                        tp(2) = tp(2) + Nr_orig;
-                        fp(2) = fp(2) + Nr_orig;
-                        parameters.transducer(ti_load).trans_pos = fliplr(tp);
-                        parameters.transducer(ti_load).focus_pos = fliplr(fp);
-                    end
-                    parameters.grid.dims = [Nr_orig * 2, Nz_orig];
-                end
-            end
-        end
-        sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
     else
         disp('No acoustic simulation available or requested ... skipping analysis')
         parameters.state.acoustics_available = 0;
