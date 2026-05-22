@@ -118,8 +118,10 @@ end
 % etc.); temp_0 and absorption_fraction were stored separately in medium_plus
 % and were not expanded at that point.
 if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
-    kwave_medium.temp_0              = radialExpand2DTo3D(kwave_medium.temp_0);
-    kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction);
+    Nlateral  = parameters.grid.axisym_bilateral_dims(2);
+    ax_center = parameters.transducer(1).trans_pos_bilateral(2);
+    kwave_medium.temp_0              = radialExpand2DTo3D(kwave_medium.temp_0,              'linear',  Nlateral, ax_center);
+    kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction, 'linear',  Nlateral, ax_center);
 end
 
 % Override initial temperature from a previous simulation's heatmap.
