@@ -26,8 +26,8 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %   source_labels- [Nz x Nr] numeric, transducer element label map
 %
 % Output:
-%   All inputs returned with spatial fields expanded to [2*Nr x 2*Nr x Nz].
-%   parameters.grid.dims updated to [2*Nr, 2*Nr, Nz].
+%   All inputs returned with spatial fields expanded to [Nlateral x Nlateral x Naxial].
+%   parameters.grid.dims updated to [Nlateral, Nlateral, Naxial] (original bilateral dims restored).
 %   kgrid replaced with a 3D kWaveGrid.
 %
 % See also: RADIALEXPAND2DTO3D, GRID_AXISYMMETRY, CONVERT_AXISYMMETRIC_TO_2D
@@ -43,50 +43,53 @@ arguments
     source_labels(:,:) {mustBeNumericOrLogical}
 end
 
-%% convert 2d axisymmetry images to 3d
+%% Resolve original bilateral dimensions
+% grid_axisymmetry saved the bilateral state (post-axis-flip, pre-halve).
+% Restore to those dimensions so the 3D output looks identical to what a
+% full bilateral simulation would have produced.
+assert(isfield(parameters.grid, 'axisym_bilateral_dims'), ...
+    'convert_axisymmetric_to_3d: parameters.grid.axisym_bilateral_dims missing. Was grid_axisymmetry called?');
 
-% Continuous fields: linear interpolation preserves smooth spatial variation
-sensor_data.p_final   = radialExpand2DTo3D(sensor_data.p_final);
-sensor_data.p_max_all = radialExpand2DTo3D(sensor_data.p_max_all);
+bilateral_dims  = parameters.grid.axisym_bilateral_dims;   % [Naxial, Nlateral]
+bilateral_tp    = parameters.transducer(1).trans_pos_bilateral;   % [axial, lateral_center]
+bilateral_fp    = parameters.transducer(1).focus_pos_bilateral;
+
+Naxial   = bilateral_dims(1);
+Nlateral = bilateral_dims(2);          % original full bilateral width
+ax_center = bilateral_tp(2);           % axis column index in the bilateral grid
+
+%% convert 2d axisymmetry images to 3d
+% Expand to the original Nlateral × Nlateral cross-section so the output
+% dimensions match a non-axisymmetric run exactly.
+expand = @(A, m) radialExpand2DTo3D(A, m, Nlateral, ax_center);
+
+% Continuous fields: linear interpolation
+sensor_data.p_final   = expand(sensor_data.p_final,   'linear');
+sensor_data.p_max_all = expand(sensor_data.p_max_all, 'linear');
 if isfield(sensor_data, 'p_complex')
-    sensor_data.p_complex = radialExpand2DTo3D(real(sensor_data.p_complex)) + ...
-                        1i .* radialExpand2DTo3D(imag(sensor_data.p_complex));
+    sensor_data.p_complex = expand(real(sensor_data.p_complex), 'linear') + ...
+                        1i .* expand(imag(sensor_data.p_complex), 'linear');
 end
 fields = fieldnames(kwave_medium);
 for i = 1:numel(fields)
     if size(kwave_medium.(fields{i}), 2) > 1
-        kwave_medium.(fields{i}) = radialExpand2DTo3D(kwave_medium.(fields{i}));
+        kwave_medium.(fields{i}) = expand(kwave_medium.(fields{i}), 'linear');
     end
 end
 
-% Discrete label/mask fields: nearest-neighbour interpolation prevents
-% fractional blended values at tissue boundaries
-segmentation  = radialExpand2DTo3D(segmentation,           'nearest');
-medium_masks  = radialExpand2DTo3D(medium_masks,           'nearest');
-source.p_mask = radialExpand2DTo3D(double(source.p_mask),  'nearest');
-source_labels = radialExpand2DTo3D(double(source_labels),  'nearest');
+% Discrete label/mask fields: nearest-neighbour to preserve integer values
+segmentation  = expand(segmentation,           'nearest');
+medium_masks  = expand(medium_masks,           'nearest');
+source.p_mask = expand(double(source.p_mask),  'nearest');
+source_labels = expand(double(source_labels),  'nearest');
 
-%% convert positions from 2d radial to 3d 
+%% Restore original dims and positions
+% Output is [Nlateral x Nlateral x Naxial], axis at (ax_center, ax_center).
+parameters.grid.dims = [Nlateral, Nlateral, Naxial];
 
-% shift positions to diameter location
-trans_pos_final = parameters.transducer(1).trans_pos;
-focus_pos_final = parameters.transducer(1).focus_pos;
+trans_pos_final = [ax_center, ax_center, bilateral_tp(1)];
+focus_pos_final = [ax_center, ax_center, bilateral_fp(1)];
 
-trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
-focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
-
-% convert: radial x axial -> diameter x diameter x axial
-Nr_full = parameters.grid.dims(2) * 2;
-Nz      = parameters.grid.dims(1);
-parameters.grid.dims = [Nr_full, Nr_full, Nz];
-
-% convert: transducer and focus positions
-trans_pos_final = fliplr(trans_pos_final);
-trans_pos_final = [trans_pos_final(1), trans_pos_final(1), trans_pos_final(2)];
-focus_pos_final = fliplr(focus_pos_final);
-focus_pos_final = [focus_pos_final(1), focus_pos_final(1), focus_pos_final(2)];
-
-% encode in the transducer position
 parameters.transducer(1).trans_pos = trans_pos_final;
 parameters.transducer(1).focus_pos = focus_pos_final;
 

@@ -6,8 +6,22 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 %     annular element is placed with makeBowl / makeArc. CW signals are
 %     built with createCWSignals and assigned row-by-row to source.p.
 %   Branch 2 (use_kWaveArray ~= 0): Single transducer only. kWaveArray
-%     handles element geometry; grid weights distribute signals. For 2-D
-%     axisymmetric annular arrays a mirrored grid approach is used.
+%     handles element geometry; grid weights distribute signals.
+%
+%   Axisymmetric mode (Branch 2, annular type, grid.axisymmetric == 1):
+%     kWaveArray does not offer native axisymmetric source weighting, so a
+%     mirrored-grid approximation is used:
+%       1. A bilateral grid with 2*kgrid.Ny-1 columns is created (odd size,
+%          so the centre column is exactly at y=0).
+%       2. Each element is placed on the bilateral grid according to its
+%          radial position: central disks (inner_diam == 0) are placed at
+%          y=0 with diameter = outer_diam; annular rings (inner_diam > 0)
+%          are placed at y = (r_inner + r_outer)/2 with diameter = r_outer - r_inner.
+%          The focus direction sets arc orientation; focal depth is set by
+%          curv_radius_mm.
+%       3. Element weights are computed on the full bilateral grid, then
+%          cropped to columns kgrid.Ny:end → [Nx x Ny] where column 1 = r=0.
+%
 % Element diameters are converted from mm to odd-integer grid points before
 % geometry creation.
 %
@@ -200,6 +214,15 @@ end
                 isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
             axisymmetric = true;
             disp("Using axisymmetric setup for 2D input...");
+            % Only single-element annular transducers are supported.
+            % Matrix arrays have arbitrary 2D element layouts that cannot
+            % be represented on the radial half-grid.
+            if ~strcmp(tr.type, 'annular')
+                error('PRESTUS:sourceCreate:axisymTypeNotSupported', ...
+                    ['Axisymmetric mode only supports annular transducers. ' ...
+                     'Transducer type ''%s'' requires a full 2D or 3D grid. ' ...
+                     'Disable grid.axisymmetric or use a non-axisymmetric setup.'], tr.type);
+            end
         else
             axisymmetric = false;
         end
@@ -296,19 +319,50 @@ end
             tr.(tr.type).elem_phase_rad);   % [elem_n x Nt]
 
         if axisymmetric == true && strcmp(tr.type, 'annular')
+            % Mirrored-grid approach for axisymmetric annular arrays
+            %
+            % k-Wave's axisymmetric solver (kspaceFirstOrderAS) normalises the
+            % radial grid internally: y_vec = kgrid.y_vec - kgrid.y_vec(1), so
+            % column 1 of source.p_mask is ALWAYS treated as r=0.  kWaveArray
+            % does not support 'Axisymmetric' source weighting directly, so we
+            % approximate by:
+            %   1. Building a full bilateral grid with 2*Ny-1 columns (odd, so
+            %      the centre column sits exactly at y=0).
+            %   2. Computing element grid weights on that full grid.
+            %   3. Cropping columns kgrid.Ny:end to obtain the right half-plane
+            %      [Nx x Ny]; column 1 of the crop = centre column = r=0.
+            %
+            % Element placement on the bilateral grid:
+            %   Central disk  (elem_id == 0): arc centred at y = 0 with
+            %     diameter = outer_diameter.  Spans [-r_o, +r_o] bilaterally;
+            %     after crop to right half the arc covers r in [0, r_o].
+            %   Annular ring  (elem_id > 0): arc centred at y = (r_i + r_o)/2
+            %     with diameter = r_o - r_i.  After crop the arc covers r
+            %     in [r_i, r_o], matching the physical ring aperture exactly.
+            %   focus_pos_full sets only the forward orientation (+x direction);
+            %   the acoustic focal depth is governed by curv_radius_mm.
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
 
-            position_base = [kgrid.x_vec(trans_pos_1(1)), 0+eps];
-            focus_pos_full = [0, 0+eps];
-            
-            for el_i = 1:tr.annular.elem_n
-                el_OD_m = tr.annular.elem_od_mm(el_i) * 1e-3;
-                y_shift = (el_i - (tr.annular.elem_n+1)/2) * el_OD_m;
-                element_pos = position_base + [0, y_shift];
+            x_trans_m = kgrid.x_vec(trans_pos_1(1));
+            % focus_pos_full: only direction matters; use true focal x-coord.
+            focus_pos_full = [kgrid.x_vec(focus_pos_1(1)), 0+eps];
 
-                karray_full.addArcElement(element_pos, tr.annular.curv_radius_mm * 1e-3, el_OD_m, focus_pos_full);
+            for el_i = 1:tr.annular.elem_n
+                inner_r_m = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;   % inner radius [m]
+                outer_r_m = tr.annular.elem_od_mm(el_i) / 2 * 1e-3;   % outer radius [m]
+                if inner_r_m == 0
+                    % Central disk: bilateral arc centred on axis (r=0)
+                    element_pos  = [x_trans_m, 0+eps];
+                    el_diameter_m = 2 * outer_r_m;      % full bilateral aperture
+                else
+                    % Annular ring: off-axis arc at the ring's radial centre
+                    center_r_m   = (inner_r_m + outer_r_m) / 2;
+                    element_pos  = [x_trans_m, center_r_m];
+                    el_diameter_m = outer_r_m - inner_r_m;
+                end
+                karray_full.addArcElement(element_pos, tr.annular.curv_radius_mm * 1e-3, el_diameter_m, focus_pos_full);
             end
 
             source_mask_full = false(kgrid_mirrored.Nx, kgrid_mirrored.Ny);
