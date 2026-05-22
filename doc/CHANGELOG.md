@@ -31,9 +31,9 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 - Browser-based transducer alignment viewer (*experimental*)
 
 #### Acoustic/Thermal
-- Async multi-transducer pipeline (see [doc_async_transducer.md](doc_async_transducer.md))
+- Async multi-transducer pipeline — **experimental** (see [doc_async_transducer.md](doc_async_transducer.md))
 - Sequential simulation dispatcher: runs multiple parameter configurations in series, chains thermal simulations, and produces a consolidated multi-run report (see [doc_advanced.md](doc_advanced.md))
-- ⚠️ **Fixed:** sequential simulation produced incorrect outputs prior to this release 
+- ⚠️ **Fixed:** sequential simulation produced incorrect outputs prior to this release due to mismatching grid->T1w transforms and back of the adopted heatmaps; the heatmaps were not interpolated with the baseline free-water value leading to interpolation artefacts
 - Uncertainty pipeline produces uncertainty bands across sequential multi-run parameter sweeps
 - Complex pressure field optionally saved (`save_p_complex`) (*experimental*)
 

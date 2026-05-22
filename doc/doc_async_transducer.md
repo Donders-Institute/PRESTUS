@@ -1,6 +1,6 @@
 # Async multi-transducer mode
 
-> **Advanced feature.** This mode is intended for setups where two or more
+> **Experimental** This mode is intended for setups where two or more
 > transducers fire asynchronously — i.e., with non-overlapping duty cycles
 > or alternating pulses — so that their pressure fields never superpose
 > coherently. Configuring this mode requires a clear understanding of the
