@@ -2,14 +2,37 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 % SOURCE_SENSOR_SETUP  Create kWaveGrid, CW source, and full-grid sensor for a TUS simulation
 %
 % Builds the k-Wave computational grid (kWaveGrid) in 2-D or 3-D from
-% parameters.grid.dims and resolution_mm. The time axis is chosen from
-% the first transducer frequency: dt is derived from points-per-wavelength
-% (PPW) and the CFL number (grid.source_cfl, default 0.3) so that the
-% temporal sampling is an integer divisor of the wave period. A PPW
-% check against grid.min_ppw (default 6) warns when the grid is too
-% coarse. If grid_time_step is supplied (non-empty), that value is used
-% directly (retry after instability). The sensor records p_max_all and
-% p_final over the last 3 wave periods to capture steady state.
+% parameters.grid.dims and resolution_mm.
+%
+% --- Time axis ---
+%
+% dt  is derived from two quantities:
+%   PPW  = max_sound_speed / (freq_hz * dx)   [spatial samples per wavelength]
+%   CFL  = grid.source_cfl  (default 0.15)    [Courant-Friedrichs-Lewy number]
+%   PPP  = ceil(PPW / CFL)                    [temporal samples per period]
+%   dt   = wave_period / PPP                   [time step, s]
+%
+% max_sound_speed sets PPW (and therefore dt): using the fastest medium
+% gives the smallest dt, which is numerically stable everywhere.
+% Override dt by passing a non-empty grid_time_step (used on a stability
+% retry after checkStability flags instability).
+%
+% A PPW check is run against grid.min_ppw (default 6) using min_sound_speed
+% (shortest wavelength, worst-case spatial sampling). A warning is issued
+% when the grid is too coarse.
+%
+% t_end is the simulation duration:
+%   t_end = grid_diagonal / min_sound_speed
+%
+% min_sound_speed (the slowest medium, typically water at ~1500 m/s) is
+% used here — NOT max_sound_speed. Using max_sound_speed would shorten the
+% simulation when bone is present (e.g. skull at 2800 m/s cuts t_end by
+% ~1.9×), causing the wavefront traveling through slow tissue to not reach
+% steady state at and beyond the focal peak, producing an artefactual
+% post-peak pressure drop.
+%
+% The sensor records p_max_all and p_final over the last 3 wave periods
+% to capture steady state.
 %
 % Use as:
 %   [kgrid, source, sensor, source_labels] = ...
@@ -27,7 +50,9 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %   trans_pos_final - transducer position in grid indices
 %   focus_pos_final - focus position in grid indices
 %   grid_time_step  - override dt [s] (optional, default: auto)
-%   min_sound_speed - minimum sound speed for PPW check [m/s] (optional, default: max_sound_speed)
+%   min_sound_speed - minimum sound speed across all media [m/s] (optional, default: max_sound_speed).
+%                     Used for (1) the PPW spatial-sampling check and (2) computing t_end so
+%                     the simulation runs long enough for waves in slow media to reach steady state.
 %
 % Output:
 %   kgrid         - kWaveGrid with time axis set
@@ -115,8 +140,18 @@ end
             grid_time_step);
     end
 
-    % Calculate the number of time steps to reach steady state
-    t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / max_sound_speed;    % [s]
+    % Calculate the number of time steps to reach steady state.
+    % Use min_sound_speed so that the simulation runs long enough for the
+    % wave to traverse the full grid through the slowest medium (e.g. water
+    % at 1500 m/s).  Using max_sound_speed underestimates t_end when bone is
+    % present, cutting the simulation short before the steady-state field
+    % develops beyond the focal peak.
+    if nargin >= 6 && ~isempty(min_sound_speed)
+        t_end_speed = min_sound_speed;
+    else
+        t_end_speed = max_sound_speed;
+    end
+    t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / t_end_speed;    % [s]
     simulation_time_points = round(t_end / grid_time_step);
 
     % Create the time array
