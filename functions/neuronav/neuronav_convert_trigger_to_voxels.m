@@ -1,5 +1,5 @@
 function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ...
-    neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters, pn)
+    neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters)
 % NEURONAV_CONVERT_TRIGGER_TO_VOXELS  Convert Localite trigger positions to voxel coordinates
 %
 % Extracts the mean 4×4 matrix from each requested series, derives
@@ -9,14 +9,14 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 %
 % Use as:
 %   [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ...
-%       neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters, pn)
+%       neuronav_convert_trigger_to_voxels(sub_id, positions, outputStruct, parameters)
 %
 % Input:
 %   sub_id       - subject identifier string (e.g. 'sub-001')
 %   positions    - array of series indices to process
 %   outputStruct - cell array of series structs from NEURONAV_COMPUTE_SERIES_STATISTICS
-%   parameters   - (1,1) simulation config struct with transducer geometry
-%   pn           - (1,1) path names struct with data_prelocalite field
+%   parameters   - PRESTUS config struct with transducer geometry and
+%                  parameters.path.localite_raw for the T1 MRI location
 %
 % Output:
 %   transducer_ras - [Nx3] transducer positions in native RAS space [mm]
@@ -28,7 +28,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 % See also: NEURONAV_COMPUTE_SERIES_STATISTICS, LOCALITE_MATRIX_TO_POSITIONS
 
     % --- Load T1 MRI ---
-    t1_file   = dir(fullfile(pn.data_prelocalite, sprintf('%s_*T1*.nii*', sub_id)));
+    t1_file   = dir(fullfile(parameters.path.localite_raw, sprintf('%s_*T1*.nii*', sub_id)));
     t1_header = niftiinfo(fullfile(t1_file(1).folder, t1_file(1).name));
     t1_image  = niftiread(fullfile(t1_file(1).folder, t1_file(1).name));
 
