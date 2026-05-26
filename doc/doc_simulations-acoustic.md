@@ -50,6 +50,24 @@ Acoustic simulation accuracy depends on resolving the shortest wavelength in the
 
 **Default CFL of 0.15 is intentionally conservative.** k-Wave's own default CFL is 0.3; PRESTUS uses 0.15 to provide additional temporal stability margin in heterogeneous skull simulations, where the theoretical stability limit is only an approximation (see [`checkStability`](http://www.k-wave.org/documentation/checkStability.php)). This roughly doubles the number of time steps — and acoustic simulation runtime — compared to k-Wave's default. If runtime is a concern and simulations are stable, `source_cfl` can be increased toward 0.3, but this should be validated against `checkStability` output for the specific medium.
 
+### Simulation duration (`t_end`)
+
+The total simulation duration is set long enough for the wave to reach every point in the domain and for the steady-state pressure field to establish everywhere:
+
+```
+t_end = grid_diagonal / c_min
+```
+
+where `grid_diagonal = sqrt(x_size² + y_size² + z_size²)` and `c_min` is the **minimum** sound speed across all media (typically water or brain, ~1500 m/s).
+
+The number of time steps follows from `t_end` and `dt`:
+
+```
+N_steps = round(t_end / dt)
+```
+
+The sensor then records `p_max_all` and `p_final` over the last three wave periods of this interval to capture the steady-state field.
+
 ---
 
 ## Axisymmetric simulations

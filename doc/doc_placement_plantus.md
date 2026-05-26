@@ -229,7 +229,7 @@ After the placement coordinates are resolved, a T1 overlay plot (`plot_placement
 
 | Tool | Headless | Interactive | Used in step |
 |------|:--------:|:-----------:|-------------|
-| SimNIBS Python (nibabel, scipy, nilearn) | ✓ | ✓ | All steps |
+| SimNIBS Python (nibabel, scipy, nilearn) — see [installation guide](doc_installation.md#simnibs-installation) | ✓ | ✓ | All steps |
 | PlanTUS Python library (`PlanTUS.py`) | ✓ | ✓ | All steps |
 | PyYAML (or built-in fallback) | ✓ | ✓ | YAML config loading |
 | FSL `fslmaths` | ✓ | ✓ | Avoidance mask – tissue binarisation |

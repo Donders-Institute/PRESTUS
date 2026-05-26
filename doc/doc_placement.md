@@ -10,30 +10,32 @@ Suitable coordinates (x/y/z) may be identified in preferred imaging software bas
 
 ## Heuristic coordinate selection
 
-PRESTUS can identify heuristic locations for transducer placement (see [Heuristic Tranducer Placement](doc_placement_heuristic.md)). This benefits iterative approaches without manual intervention. 
+PRESTUS can identify heuristic locations for transducer placement (see [Heuristic Transducer Placement](doc_placement_heuristic.md)). This benefits iterative approaches without manual intervention.
 
-Outside of PRESTUS, alternative tools such as [PlanTUS](https://github.com/mlueckel/PlanTUS) can be used to manually identify candidate transducer locations based on a broader range of criteria.
+PRESTUS also integrates [PlanTUS](doc_placement_plantus.md) (Lueckel et al., Mainz) as a native placement mode. The two automated modes differ in their inputs and optimisation strategy:
+
+| | `heuristic` | `plantus` |
+|---|---|---|
+| **Input** | `final_tissues.nii.gz` (label volume) | Full SimNIBS mesh (`sub-XXX.msh`) + SimNIBS Python env |
+| **Strategy** | Single-objective sphere-expansion on skull surface | Multi-objective optimisation (beam overlap, skin/skull angles, skull thickness, target distance) |
+| **Focal distance sweep** | No | Yes |
+| **External dependency** | None | PlanTUS + SimNIBS installation |
+
+Use `heuristic` when only a tissue-label segmentation is available or when running batch jobs on an HPC cluster. Use `plantus` when the full SimNIBS mesh is available and multi-objective placement optimisation or transducer selection across focal distances is needed.
 
 ## Neuronavigation coordinate selection
 
-PRESTUS provides helper functions to read-in coordinates acquired with  neuronavigation systems. Currently, PRESTUS supports read-in of localite positions.
+PRESTUS provides helper functions to read coordinates acquired with neuronavigation systems. Currently, Localite is supported.
 
-An example file (`examples/demo_localite.m`) is provided. 
+See [Neuronavigation read-in](doc_placement_neuronav.md) for full details. In brief:
 
-The example script `demo_localite.m` highlights a workflow for extracting localite transducer positions. 
+1. Localite writes transducer position as a 4×4 transformation matrix (RAS mm) in one of several XML file formats (TriggerMarkers, GUMMarkers, InstrumentMarker).
+2. `neuronav_compute_series_statistics` parses any of these formats and returns a mean 4×4 matrix per position series.
+3. `localite_matrix_to_positions` converts the matrix to transducer bowl and focus positions in both RAS mm and T1 voxel space.
 
-- Based on the study design, localite may encode the positions from multiple stimulations in the same output file. For a requested session, `neuronav_select_and_average_localite` selects the latest available Localite trigger XML file. 
-- In a localite session, triggers may be repeatedly acquired during the full pulse train repetition duration. `neuronav_compute_series_statistics` computes statistics across stimulus series (using a user-defined voxel size and user-defined trigger trains). 
-- From these extracted metrics, `neuronav_create_marker_averags` generates averaged marker positions for transducer and target locations. 
-- These are converted from Localite tracker space to native voxel indices and RAS coordinates aligned with the planning T1 image (`neuronav_convert_trigger_to_voxels`).
-- Optionally, coordinates can be transformed to MNI space via SIMNIBS registration matrices (`neuronav_convert_native_to_MNI`). 
+The recommended preprocessing output is a small JSON file with `trans_pos_ras` and `focus_pos_ras` (RAS mm), generated once per session and fed back into PRESTUS via `ras_to_grid`. See [Neuronavigation read-in § Recommended simple output format](doc_placement_neuronav.md#recommended-simple-output-format).
 
-Results are exported to a CSV file in the Localite data folder, ready for PRESTUS simulation input.
-
-> **Alternative localite read-in.**
-> PRESTUS currently allows an alternative Localite read-in using the following parameters. This is not yet documented.
-| `transducer_from_localite`        | Load transducer position from Localite files?.                                                                       |
-| `reference_transducer_distance_mm` | Distance from tracker to transducer exit plane (in mm).                                                              |
+An example workflow (`examples/demo_localite.m`) and a multi-format debugging script (`code/debug_localite_inputs.m`) are provided.
 
 ## Phantom / water simulations
 
