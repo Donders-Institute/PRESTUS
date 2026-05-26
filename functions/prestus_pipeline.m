@@ -370,7 +370,28 @@ function [parameters] = prestus_pipeline(parameters, options)
         parameters.subject_id, parameters.simulation.medium, acoustic_file_affix));
 
     parameters.state.acoustics_available = 0;
-    if isfield(parameters.modules, 'run_acoustic_sims') && parameters.modules.run_acoustic_sims && ...
+
+    % --- External acoustic NIfTI (e.g. from BabelBrain or a previous PRESTUS run) ---
+    % When io.external_acoustic_nifti is set, the acoustic simulation stages are
+    % skipped and the NIfTI (p_max_all [Pa] in T1 space) is passed directly to
+    % thermal_simulation, which resamples it into the (thermal) grid.
+    % Acoustic analysis (ISPPA, MI) is not available in this path.
+    has_external_acoustic = isfield(parameters.io, 'external_acoustic_nifti') && ...
+        ~isempty(parameters.io.external_acoustic_nifti);
+
+    if has_external_acoustic
+        ext_nii = parameters.io.external_acoustic_nifti;
+        if ~isfile(ext_nii)
+            error('prestus_pipeline:externalAcousticNotFound', ...
+                'io.external_acoustic_nifti not found: %s', ext_nii);
+        end
+        fprintf('[pipeline] Using external acoustic NIfTI: %s\n', ext_nii);
+        sensor_data = ext_nii;   % char path; thermal_simulation handles NIfTI loading
+        parameters.state.acoustics_available = 1;
+        parameters.modules.run_acoustic_analysis = 0;
+        % source/sensor/kgrid placeholders are built in Stage 8 via thermal_grid_setup.
+
+    elseif isfield(parameters.modules, 'run_acoustic_sims') && parameters.modules.run_acoustic_sims && ...
         confirm_overwriting(filename_sensor_data, parameters) && ...
         (parameters.simulation.interactive == 0 || ...
         confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
@@ -481,9 +502,42 @@ function [parameters] = prestus_pipeline(parameters, options)
             kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
             clear medium_plus;
 
+            % --- Independent thermal grid setup ---
+            % Use thermal_grid_setup when:
+            %   (a) A coarser thermal resolution is requested, OR
+            %   (b) An independent thermal FOV is specified, OR
+            %   (c) An external acoustic NIfTI was provided (no acoustic kgrid exists).
+            % In all other cases the acoustic kgrid, medium, and masks are used as-is.
+            use_thermal_grid = has_external_acoustic || ...
+                (isfield(parameters.grid, 'thermal_resolution_mm') && ...
+                 ~isempty(parameters.grid.thermal_resolution_mm) && ...
+                 parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...
+                (isfield(parameters.grid, 'thermal_fov_mm') && ...
+                 ~isempty(parameters.grid.thermal_fov_mm));
+
+            if use_thermal_grid
+                [kgrid_th, kwave_medium_th, medium_masks_th, parameters_th, transf_th] = ...
+                    thermal_grid_setup(parameters, planimg, kwave_medium, medium_masks, ...
+                                       trans_pos, focus_pos);
+                % Build placeholder sensor and source sized to thermal grid
+                sensor_th        = struct();
+                sensor_th.mask   = ones(parameters_th.grid.dims);
+                source_th        = struct();
+                source_th.Q      = zeros(parameters_th.grid.dims);
+            else
+                kgrid_th        = kgrid;
+                kwave_medium_th = kwave_medium;
+                medium_masks_th = medium_masks;
+                parameters_th   = parameters;
+                transf_th       = planimg.transf;
+                sensor_th       = sensor;
+                source_th       = source;
+            end
+
             [kwaveDiffusion, time_status_seq, results_heating] = ...
                 thermal_simulation(...
-                parameters, sensor_data, kgrid, kwave_medium, sensor, source, planimg.transf, medium_masks);
+                parameters_th, sensor_data, kgrid_th, kwave_medium_th, ...
+                sensor_th, source_th, transf_th, medium_masks_th);
 
             if ~should_save_output(parameters.io, 'save_thermal_matrices')
                 disp('Not saving thermal simulation output matrices ...')
@@ -491,13 +545,14 @@ function [parameters] = prestus_pipeline(parameters, options)
                 save(filename_heating_data, ...
                     'kwaveDiffusion',...
                     'time_status_seq',...
-                    'sensor',...
+                    'sensor_th',...
                     'results_heating',...
-                    'kwave_medium', ...
+                    'kwave_medium_th', ...
                     '-v7.3');
             end
 
-            clear sensor_data source sensor kgrid kwaveDiffusion
+            clear sensor_data source source_th sensor sensor_th kgrid kgrid_th kwaveDiffusion
+            clear kwave_medium_th medium_masks_th parameters_th transf_th
 
             parameters.state.heating_available = 1;
         elseif exist(filename_heating_data, 'file')

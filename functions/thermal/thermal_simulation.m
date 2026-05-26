@@ -23,20 +23,48 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 %   parameters   - PRESTUS config; must contain thermal, timing, grid.dims,
 %                  transducer(1).trans_pos, transducer(1).freq_hz [Hz],
 %                  pct.enabled, simulation.code_type, simulation.precision,
-%                  simulation.interactive, io.adopted_cem43 (optional)
-%   sensor_data  - struct from acoustic simulation; must contain p_max_all [Pa]
-%   kgrid        - kWaveGrid object
+%                  simulation.interactive, io.adopted_cem43 (optional).
+%                  When calling with an independent thermal grid (via
+%                  thermal_grid_setup), pass the parameters_th copy that
+%                  has grid.dims and transducer(1).trans_pos updated to
+%                  thermal grid coordinates.
+%   sensor_data  - EITHER a struct from acoustic simulation containing
+%                  p_max_all [Pa] (standard path), OR a char/string path
+%                  to a NIfTI file (.nii or .nii.gz) whose volume will be
+%                  read as p_max_all [Pa] and resampled to kgrid size via
+%                  affine_resample_3d with transf.  The NIfTI must be in
+%                  the same coordinate space as the T1 image (i.e. the space
+%                  from which transf maps into the simulation grid).
+%                  BabelBrain outputs pressure as p_amp [Pa] in a NIfTI that
+%                  can be passed directly here.
+%
+%                  NOTE on units: the NIfTI must store peak positive pressure
+%                  in Pascals (Pa), matching what PRESTUS writes to
+%                  *_pressure.nii.gz.  BabelBrain also uses Pa.  If the file
+%                  stores MPa, multiply after loading (not done automatically).
+%   kgrid        - kWaveGrid object (may be from thermal_grid_setup for an
+%                  independent thermal resolution/FOV)
 %   kwave_medium - struct with fields: alpha_coeff, alpha_power,
 %                  density [kg/m^3], sound_speed [m/s],
 %                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
 %                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C];
 %                  temp_0 and absorption_fraction are the medium_plus fields
-%                  reintegrated by the caller before this function is invoked
-%   sensor       - struct with sensor.mask (used to define focal axis recording window)
+%                  reintegrated by the caller before this function is invoked.
+%                  When using an independent thermal grid, pass the
+%                  kwave_medium_th returned by thermal_grid_setup.
+%   sensor       - struct with sensor.mask (used to define focal axis recording
+%                  window); mask must be sized to kgrid dimensions.  When
+%                  using an independent thermal grid, pass a placeholder struct
+%                  with mask = ones(parameters_th.grid.dims).
 %   source       - struct; Q is overwritten internally from p_max_all
-%   transf       - affine forward transform from T1 to simulation grid
-%                  (used only when io.adopted_cem43 is specified)
-%   medium_masks - layer label map for per-tissue timeseries
+%   transf       - affine forward transform (T1 → simulation grid, 4×4).
+%                  Used (a) to resample NIfTI sensor_data into the grid, and
+%                  (b) to resample adopted_cem43/heatmap NIfTIs.  Pass
+%                  transf_th from thermal_grid_setup when using an independent
+%                  thermal grid.
+%   medium_masks - layer label map for per-tissue timeseries; must be sized
+%                  to kgrid dimensions (use medium_masks_th from
+%                  thermal_grid_setup when applicable)
 %
 % Output:
 %   thermal_diff_obj  - kWaveDiffusion object after simulation
@@ -57,7 +85,7 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 
 arguments
     parameters   (1,1) struct
-    sensor_data  (1,1) struct
+    sensor_data                    % struct with p_max_all [Pa], OR char/string NIfTI path
     kgrid        (1,1)
     kwave_medium (1,1) struct
     sensor       (1,1) struct
@@ -158,7 +186,21 @@ if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.
 end
 
 % Get the maximum pressure (in Pa) and calculate Q, the volume rate of heat deposition
-p = gather(abs(sensor_data.p_max_all));
+% sensor_data may be a struct (standard path) or a NIfTI file path (external acoustic)
+if ischar(sensor_data) || isstring(sensor_data)
+    nii_path = char(sensor_data);
+    if ~isfile(nii_path)
+        error('thermal_simulation:niftiNotFound', ...
+            'sensor_data NIfTI not found: %s', nii_path);
+    end
+    fprintf('[thermal_simulation] Loading p_max_all from NIfTI: %s\n', nii_path);
+    nii_vol  = single(niftiread(nii_path));   % [Pa], T1 space
+    th_dims  = parameters.grid.dims;
+    p = gather(abs(single(affine_resample_3d(nii_vol, transf, th_dims, 'linear', 0))));
+    clear nii_vol
+else
+    p = gather(abs(sensor_data.p_max_all));
+end
 source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system (W/m3)
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
 clear alpha_np p;
