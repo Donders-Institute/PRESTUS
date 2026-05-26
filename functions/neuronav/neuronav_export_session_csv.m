@@ -35,6 +35,14 @@ function neuronav_export_session_csv( ...
 
 N = size(trans_vox, 1);
 
+% Allow MNI args to be empty (e.g. when MNI conversion is disabled)
+if isempty(trans_mni_vox),  trans_mni_vox  = nan(N,3); end
+if isempty(target_mni_vox), target_mni_vox = nan(N,3); end
+if isempty(trans_mni_mm),   trans_mni_mm   = nan(N,3); end
+if isempty(target_mni_mm),  target_mni_mm  = nan(N,3); end
+if isempty(trans_mm),       trans_mm       = nan(N,3); end
+if isempty(target_mm),      target_mm      = nan(N,3); end
+
 variableTypes = [repmat({'string'},1,3), repmat({'double'},1,25)];
 T = table('Size', [0 28], ...
           'VariableTypes', variableTypes, ...
