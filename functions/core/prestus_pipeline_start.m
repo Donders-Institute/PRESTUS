@@ -41,6 +41,10 @@ function job_id = prestus_pipeline_start(parameters, options)
     if ~contains(path, helpers_path)
         addpath(helpers_path);
     end
+    telemetry_path = fullfile(helpers_path, '..', 'telemetry');
+    if ~contains(path, telemetry_path)
+        addpath(telemetry_path);
+    end
 
     % Prompt for telemetry consent before any dispatch (interactive context).
     % prestus_pipeline retains the call as a fallback for direct invocations.
