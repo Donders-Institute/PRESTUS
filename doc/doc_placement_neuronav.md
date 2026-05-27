@@ -7,6 +7,9 @@ To get started, see an example demo (without provided data) in `/examples/demo_l
 
 Three Localite XML file types are supported. All are parsed via the same pipeline (`neuronav_compute_series_statistics`), which handles single markers, repeated trigger trains, and multi-position recordings uniformly.
 
+<details markdown>
+<summary>Localite XML file formats — TriggerMarkers, GUMMarkers, InstrumentMarker</summary>
+
 ### `TriggerMarkers`
 
 Multiple triggers can be sent during stimulation to acquire updates to the transducer location over time. Files are named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations are averaged within each position series (identified by time-gap segmentation). Multiple positions per recording session are supported.
@@ -24,6 +27,8 @@ Static instrument positions stored as full 4×4 matrices in an `InstrumentMarker
 ### Unsupported: `EntryTarget`
 
 Some Localite versions export an `EntryTargetList` XML containing flat `Target/Marker/ColVec3D` and `Rotation/RotationReference/ColVec3D` entries at the top level (not wrapped in `GUMMarkerList/Element`). This format is not currently handled by `neuronav_compute_series_statistics`. To use it, manually read the target position and rotation reference vector, construct a synthetic 4×4 matrix (as in the GUMMarkers branch of `neuronav_compute_series_statistics`), and pass it to `localite_matrix_to_positions`.
+
+</details>
 
 ### Pipeline entry point
 
@@ -117,7 +122,8 @@ SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.
 
 ---
 
-## Localite matrix origin: physical interpretation and calibration
+<details markdown>
+<summary>Localite matrix origin: physical interpretation and calibration</summary>
 
 ### Background
 
@@ -169,3 +175,5 @@ placement:
 ```
 
 `tracker_to_bowl_mm` takes priority over the geometry-derived distance and over `reference_distance_mm`. The geometry-derived fallback (`-(curv_radius_mm − dist_geom_ep_mm)`) remains available when transducer geometry is fully specified and the matrix origin is known to be at the exit plane.
+
+</details>

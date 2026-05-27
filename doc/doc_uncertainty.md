@@ -28,6 +28,9 @@ The liberal/conservative distinction follows the logic that different parameter 
 
 The following table summarises the default, liberal, and conservative medium acoustic properties currently implemented in PRESTUS.
 
+<details markdown>
+<summary>Brain and Skull property tables</summary>
+
 ### Brain
 
 | Property | Conservative | Default | Liberal | Unit |
@@ -58,6 +61,8 @@ The following table summarises the default, liberal, and conservative medium aco
 
 > **Multi-compartment skull models.** When a segmentation includes separate skull sub-compartments (e.g., `skull_cortical` and `skull_trabecular`), the same liberal and conservative values are currently applied identically to all skull compartments. This is a known simplification — in reality, cortical and trabecular bone have distinct acoustic properties. Users modelling detailed skull microstructure should consider customising the uncertainty configs (see [Customising medium property ranges](#customising-medium-property-ranges)) to assign compartment-specific ranges.
 
+</details>
+
 ---
 
 ## Workflow
@@ -74,7 +79,7 @@ Stage 4: Conservative simulation        ┘
 Stage 5: Uncertainty report generation  (serial; runs once all three output files are present)
 ```
 
-Uncertainty mode can be combined with sequential simulations — see [Sequential simulations with uncertainty mode](doc_advanced.md#sequential-simulations-with-uncertainty-mode) for details.
+Uncertainty mode can be combined with sequential simulations — see [Sequential simulations with uncertainty mode](doc_sequential.md#sequential-simulations-with-uncertainty-mode) for details.
 
 All five stages are managed automatically when `parameters.simulation.uncertainty = true` is set before calling `prestus_pipeline`. This is the same entry point used for standard simulations — no separate function call is required.
 

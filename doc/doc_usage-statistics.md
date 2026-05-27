@@ -24,6 +24,7 @@ The charts below are populated live from the anonymised telemetry database. Data
   <div class="telem-chart" style="grid-column:1/-1"><h4>Completed simulations per month</h4><canvas id="tc-timeline"></canvas></div>
   <div class="telem-chart"><h4>Execution platform</h4><canvas id="tc-platform"></canvas></div>
   <div class="telem-chart"><h4>Execution backend</h4><canvas id="tc-codetype"></canvas></div>
+  <div class="telem-chart"><h4>Pipeline mode</h4><canvas id="tc-pipemode"></canvas></div>
   <div class="telem-chart"><h4>Simulation medium</h4><canvas id="tc-medium"></canvas></div>
   <div class="telem-chart"><h4>Mean run duration by medium</h4><canvas id="tc-duration"></canvas></div>
   <div class="telem-chart"><h4>Success rate by medium</h4><canvas id="tc-success-rate"></canvas></div>
@@ -50,6 +51,8 @@ The charts below are populated live from the anonymised telemetry database. Data
     'a9305dc': { tag: 'v0.6.0', n: 0   },
     '75badde': { tag: 'v0.6.0', n: 15  },
     'ad10be4': { tag: 'v0.6.0', n: 16  },
+    'e6bd1b2': { tag: 'v0.6.1', n: 0   },
+    'f5d6243': { tag: 'v0.6.1', n: 5   },
   };
 
   function resolveVersion(row) {
@@ -95,7 +98,7 @@ The charts below are populated live from the anonymised telemetry database. Data
 
     const { data, error } = await client
       .from('events')
-      .select('received_at,event,status,duration_s,uuid,sim_platform,code_type,medium,pct_enabled,prestus_ver,prestus_hash')
+      .select('received_at,event,status,duration_s,uuid,sim_platform,code_type,pipeline_mode,medium,pct_enabled,prestus_ver,prestus_hash')
       .in('event', ['run_end', 'run_error'])
       .order('received_at', { ascending: false })
       .limit(5000);
@@ -175,6 +178,10 @@ The charts below are populated live from the anonymised telemetry database. Data
       [...ck, ...unknownCC],
       [...ck.map(k => cc[k]), ...unknownCC.map(k => cc[k])]
     );
+
+    // ── Pipeline mode ──────────────────────────────────────────────
+    const pmc = countBy(data, r => r.pipeline_mode ?? '(unknown)');
+    doughnutChart('tc-pipemode', Object.keys(pmc), Object.values(pmc));
 
     // ── Simulation medium (layered+pCT as its own category) ────────
     const mc = countBy(data, classifyMedium);

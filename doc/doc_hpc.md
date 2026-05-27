@@ -8,76 +8,64 @@ The following sections describe workflows at the Donders to start (interactive) 
 
 For more extensive documentation, see the [HPC wiki](https://hpc.dccn.nl/) (*intranet required*).
 
-### PBS
+<details markdown>
+<summary>Donders HPC — PBS workflow</summary>
 
-1. Select an access node:
+1. Select an access node: `mentat001`, `mentat002`, `mentat003`, `mentat004`
 
-- `mentat001`
-- `mentat002`
-- `mentat003`
-- `mentat004`
+2. Login: `ssh abcxyz@mentat004.dccn.nl`
 
-2. Login on access node:
-`ssh abcxyz@mentat004.dccn.nl`
+3. Start VNC manager: `vncmanager - 2`
 
-3. Start the VNC manager to connect GUI via VNC:
-`vncmanager - 2`
+4. Connect via VNC (see [here](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC)) — TigerVNC: enter ip [e.g., `mentat004.dccn.nl:12`]
 
-4. Connect via VNC (see [here](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC))
-    TigerVNC: enter ip [e.g., mentat004.dccn.nl:12]
-
-5. Load QSUB:
-`module load qsub`
+5. Load QSUB: `module load qsub`
 
 6. Start interactive job:
-`qsub -I -l 'nodes=1:gpus=1,feature=cuda,walltime=05:00:00,mem=24gb,reqattr=cudacap>=5.0'`
+```
+qsub -I -l 'nodes=1:gpus=1,feature=cuda,walltime=05:00:00,mem=24gb,reqattr=cudacap>=5.0'
+```
 
-7. Start MATLAB: 
-`module load matlab/R2022b`
-`matlab`
+7. Start MATLAB:
+```
+module load matlab/R2022b
+matlab
+```
+*Note*: PBS only supports CUDA 11.2, which is dropped starting in R2023 — see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50).
 
-    *Note*: PBS only supports CUDA 11.2, which is dropped starting in R2023, see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50)
+8. Use PRESTUS scripts ending in `*_qsub*`.
+9. Check job status in terminal: `qstat`
 
-8. PRESTUS scripts: use `**_qsub*`
-9. in `terminal` check `qstat`
+</details>
 
-### SLURM
+<details markdown>
+<summary>Donders HPC — SLURM workflow</summary>
 
-1. Select an access node:
+1. Select an access node: `mentat005`, `mentat006`, `mentat007` (previously `mentat001s`)
 
-- `mentat005`
-- `mentat006`
-- `mentat007` (previously `mentat001s`)
+2. Login: `ssh abcxyz@mentat001.dccn.nl`
 
-2. Login on access node:
-`ssh abcxyz@mentat001.dccn.nl`
+3. Start VNC manager: `vncmanager - 2`
 
-3. Start the VNC manager to connect GUI via VNC:
-vncmanager - 2
+4. Connect via VNC (see [here](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC)) — TigerVNC: enter ip [e.g., `mentat007.dccn.nl:12`]
 
-4. Connect via VNC (see [here](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC))
-    TigerVNC: enter ip [e.g., mentat007.dccn.nl:12]
+5. Load SLURM: `module load slurm`
 
-5. Load slurm:
-`module load slurm`
+6. Start interactive job:
+    - Without MATLAB GUI: `srun --mem=8gb --time=01:00:00 --x11 -p interactive --pty bash -i`
+    - With MATLAB GUI: `srun --partition=gpu --gres=gpu:1 --mem=8G --time=01:00:00 --x11 --pty /bin/bash -i`
 
-6. Start interactive job: 
-    - 6a. If you do *not* need a MATLAB GUI:
-    `srun --mem=8gb --time=01:00:00 --x11 -p interactive --pty bash -i`
-    - 6b. **If you need a MATLAB GUI:**
-    `srun --partition=gpu --gres=gpu:1 --mem=8G --time=01:00:00 --x11 --pty /bin/bash -i`
+7. Start MATLAB:
+```
+module load matlab/R2024a
+matlab
+```
+*Note*: SLURM supports CUDA 12.2 — recent MATLAB versions (up to R2024) should be supported; see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50).
 
-7. Start MATLAB: 
-`module load matlab/R2024a`
-`matlab`
+8. Use PRESTUS scripts ending in `*_slurm*`.
+9. Check job status: `squeue`. For PBS→SLURM command migration see [this documentation](https://hpc.dccn.nl/docs/cluster_howto/compute_slurm.html#migrating-from-torque-pbs-to-slurm).
 
-    *Note*: SLURM supports CUDA 12.2, which is why recent MATLAB versions (at least up to R2024) should be supported, see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50)
-
-7. Start MATLAB: `matlab`
-
-8. PRESTUS scripts: use `**_slurm*`
-
-9. in `terminal` check `squeue`; for migrating other commands see [this documentation](https://hpc.dccn.nl/docs/cluster_howto/compute_slurm.html#migrating-from-torque-pbs-to-slurm)
+</details>
 
 ### GPU support
 
@@ -93,29 +81,30 @@ The following settings can be used to specify the HPC GPU setup.
 | parameters.hpc_partition                   | "gpu"       | The Donders HPC offers a ```gpu40g``` partition that should be used for the majority of thermal simulations.  It consists of nodes with GPU with vRAM > 40 GB.|
 | parameters.hpc_reservation                   | ""       | By default do not use a reserved cue.|
 
-#### Benchmark data Nvidia GPUs
+<details markdown>
+<summary>Benchmark data — Nvidia GPUs</summary>
 
-Below are (potentially unrepresentative) benchmark data for different Nvidia GPUs. These simulations were run on a 256 by 216 by 192mm grid, with minor varitions depending on transducer placement. 
+These are potentially unrepresentative benchmarks run on a 256 × 216 × 192 mm grid, with minor variations depending on transducer placement.
 
 **Acoustic Simulations**
 
-| GPU                           | Memory Used | Duration                  | Notes                          |
-|-------------------------------|-------------|-----------------------------|--------------------------------|
-| A100 80 GB                   | 12 GB       | 14 mins                     | Slightly smaller grid size     |
-| A100 80 GB (partitioned in 2x40GB) | 12 GB       | 25 mins                     |                                |
-| A100 40 GB                   | 12 GB       | 19 mins                     |                                |
-| A16 16 GB                    | 12 GB       | 145 mins                    |                                |
-| P100 16 GB                   | 12 GB       | 43 mins                     | Compiled, ~ L40s              |
-| L40S 47 GB                   | 14 GB       | 28 mins                     | Compiled                      |
-
----
+| GPU | Memory Used | Duration | Notes |
+|---|---|---|---|
+| A100 80 GB | 12 GB | 14 mins | Slightly smaller grid size |
+| A100 80 GB (partitioned 2×40 GB) | 12 GB | 25 mins | |
+| A100 40 GB | 12 GB | 19 mins | |
+| A16 16 GB | 12 GB | 145 mins | |
+| P100 16 GB | 12 GB | 43 mins | Compiled, ~L40s |
+| L40S 47 GB | 14 GB | 28 mins | Compiled |
 
 **Heating Simulations**
 
-| GPU                           | Memory Used    | Duration                 | Notes                          |
-|-------------------------------|----------------|-----------------------------|--------------------------------|
-| A100 80 GB                   | ?? GB          | ~12s/trial (400 trials: ~90 mins) | Slightly smaller grid size     |
-| A100 40 GB                   | ?? GB          | ~17s/trial (400 trials: ~115 mins) |                                |
-| A16 16 GB                    | Out of RAM     | ???                         |                                |
-| P100 16 GB                   | Out of RAM     | ???                         |                                |
-| L40S 47 GB                   | ?? GB          | ~4s/trial (400 trials: ~45 mins)   |                                |
+| GPU | Memory Used | Duration | Notes |
+|---|---|---|---|
+| A100 80 GB | ?? GB | ~12 s/trial (400 trials: ~90 mins) | Slightly smaller grid size |
+| A100 40 GB | ?? GB | ~17 s/trial (400 trials: ~115 mins) | |
+| A16 16 GB | Out of RAM | ??? | |
+| P100 16 GB | Out of RAM | ??? | |
+| L40S 47 GB | ?? GB | ~4 s/trial (400 trials: ~45 mins) | |
+
+</details>

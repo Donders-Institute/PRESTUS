@@ -42,36 +42,38 @@ nav:
     - Getting started: doc_getting-started.md
     - GUI: doc_gui.md
     - Usage Statistics: doc_usage-statistics.md
-  - 📖 Documentation:
-    - Transducer Setup: doc_transducer.md
-    - Transducer Calibration: doc_calibration.md
-    - Transducer Placement: doc_placement.md
+  - 🔧 Equipment Modeling:
+    - Transducer Configuration: doc_transducer.md
+    - Calibration: doc_calibration.md
+    - Transducer Placement Overview: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
     - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
     - Transducer Placement (PLANTUS): doc_placement_plantus.md
     - Coordinate Systems: doc_coordinate_systems.md
-    - Head Processing: doc_preproc.md
+  - 🧠 Tissue Modeling:
+    - Head Preprocessing: doc_preproc.md
     - Medium Setup: doc_medium.md
-    - Outputs: doc_outputs.md
-  - 🔬 Simulations:
+    - (pseudo)CT: doc_pseudoCT.md
+  - 🖥️ Simulations:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
-    - (pseudo)CT: doc_pseudoCT.md
-    - Uncertainty: doc_uncertainty.md
-  - 📚 References: 
+    - Outputs: doc_outputs.md
+    - Backend: doc_backend.md
+    - HPC: doc_hpc.md
+  - 📊 Advanced Pipelines:
+    - Overview: doc_advanced.md
+    - Uncertainty Analysis: doc_uncertainty.md
+    - Multi-Intensity: doc_multiintensity.md
+    - Multi-Transducer: doc_multitransducer.md
+    - Sequential: doc_sequential.md
+    - Group Analysis: doc_group.md
+  - 📚 Reference:
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
     - Modules: doc_modules.md
-  - 🖥️ Advanced:
-    - Advanced Workflows: doc_advanced.md
-    - Backend: doc_backend.md
-    - HPC: doc_hpc.md
-    - Multi-ISPPA: doc_multi_isppa.md
-    - Async Multi-Transducer: doc_async_transducer.md
-    - Group: doc_group.md
     - Testing: doc_testing.md
     - Telemetry: doc_telemetry.md
-  - 🆘 Troubleshooting: doc_troubleshooting.md
+    - Troubleshooting: doc_troubleshooting.md
   - 📋 Community:
     - Code of Conduct: CODE_OF_CONDUCT.md
     - Contributing: CONTRIBUTING.md
@@ -88,6 +90,7 @@ markdown_extensions:
   - tables                  # | tables |
   - pymdownx.highlight      # Code highlighting
   - pymdownx.superfences    # ``` fences with highlighting
+  - md_in_html                # Markdown inside <details> blocks
   - pymdownx.arithmatex:
       generic: true         # Enables $...$ and $$...$$
 
