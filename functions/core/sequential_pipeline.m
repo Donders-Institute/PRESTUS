@@ -10,7 +10,13 @@ function sequential_pipeline(parameters, options)
 %   output_affix        — base output_affix + '_seq<N>' (drives all output filenames)
 %   preproc_affix       — reused from base run (head geometry unchanged)
 %   acoustic_cache_affix — NOT defaulted; fresh run unless user sets it
-%   thermal_cache_affix — base output_affix + '_seq<N>' to avoid "already done"
+%   thermal_cache_affix — same as output_affix by default
+%
+% Affix tracking:
+%   options.sequential_run_affixes — cell array of structs, one per run,
+%   each with fields output_affix and thermal_cache_affix.  Built here as
+%   runs are registered and passed explicitly to generate_sequential_report,
+%   which uses it for all file lookups instead of inferring from params structs.
 %
 % A multi-run summary HTML report is generated automatically after the last
 % sequential run completes (requires generate_sequential_report on the path).
@@ -72,27 +78,46 @@ end
     % acoustic_cache_affix intentionally NOT defaulted: fresh run by default.
     % Set it explicitly in the sequential config to reuse prior acoustics.
     if ~isfield(sequential_parameters.io, 'thermal_cache_affix')
-        sequential_parameters.io.thermal_cache_affix = ...
-            [parameters.io.output_affix, seq_suffix];
+        sequential_parameters.io.thermal_cache_affix = sequential_parameters.io.output_affix;
     end
 
-    % ---- accumulate run configs for the sequential report ----
+    % ---- accumulate run configs and affix registry for the sequential report ----
+    seq_affix_entry = struct( ...
+        'output_affix',       sequential_parameters.io.output_affix, ...
+        'thermal_cache_affix', sequential_parameters.io.thermal_cache_affix);
+
     if ~isfield(options, 'sequential_report_runs')
-        all_run_params = [{parameters}, {sequential_parameters}];
+        % First sequential call: register the base run, then this run.
+        base_t_affix = parameters.io.output_affix;
+        if isfield(parameters.io, 'thermal_cache_affix') && ...
+                ~isempty(parameters.io.thermal_cache_affix)
+            base_t_affix = parameters.io.thermal_cache_affix;
+        end
+        base_affix_entry = struct( ...
+            'output_affix',       parameters.io.output_affix, ...
+            'thermal_cache_affix', base_t_affix);
+        all_run_params  = [{parameters}, {sequential_parameters}];
+        run_affixes     = {base_affix_entry, seq_affix_entry};
     else
-        all_run_params = [options.sequential_report_runs, {sequential_parameters}];
+        all_run_params  = [options.sequential_report_runs,  {sequential_parameters}];
+        run_affixes     = [options.sequential_run_affixes,  {seq_affix_entry}];
     end
 
     fprintf('Running subsequent heating simulation on %s\n', lowestField);
 
     is_last_sequential = isempty(fieldnames(sequential_configs));
+    options.is_sequential_run = true;
     if ~is_last_sequential
-        options.sequential_configs     = sequential_configs;
-        options.sequential_report_runs = all_run_params;
+        options.sequential_configs      = sequential_configs;
+        options.sequential_report_runs  = all_run_params;
+        options.sequential_run_affixes  = run_affixes;
     else
         options = rmfield(options, 'sequential_configs');
         if isfield(options, 'sequential_report_runs')
             options = rmfield(options, 'sequential_report_runs');
+        end
+        if isfield(options, 'sequential_run_affixes')
+            options = rmfield(options, 'sequential_run_affixes');
         end
     end
 
@@ -102,7 +127,7 @@ end
     if is_last_sequential && numel(all_run_params) > 1
         report_ok = false;
         try
-            generate_sequential_report(all_run_params);
+            generate_sequential_report(all_run_params, {}, run_affixes);
             report_ok = true;
         catch ME_rep
             warning('prestus_pipeline:sequentialReport', ...
