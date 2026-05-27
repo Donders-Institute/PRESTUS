@@ -52,6 +52,7 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     expected_segment_length= get_nested(parameters, {'placement','localite','expected_segment_length'},80);
     overwrite_flag         = get_nested(parameters, {'io','overwrite_files'},                          'always');
     overwrite              = ~strcmpi(overwrite_flag, 'never');
+    coil_map               = get_nested(parameters, {'neuronav','coil_map'},                           []);
 
     % ------------------------------------------------------------------
     % Harmonise session string
@@ -87,33 +88,57 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     if ~exist(out_dir, 'dir'), mkdir(out_dir); end
 
     % ------------------------------------------------------------------
-    % Select raw marker file (TriggerMarkers primary, GUMMarkers fallback)
+    % Select raw marker file(s) and compute per-series statistics
     % ------------------------------------------------------------------
     raw_root = fullfile(parameters.path.localite_raw, sub_id, session, loc_folder);
 
-    [localite, markertype, source_file] = select_raw_file(raw_root, sub_id, session, ...
-        session_prev, parameters.path.localite_raw, loc_folder, session_folder_pattern);
+    if ~isempty(coil_map)
+        % --- Multi-coil path: one file per coil in coil_map --------------
+        results    = {};
+        markertype = 'TriggerMarkers';
+        source_file = {};
+        for c = 1:numel(coil_map)
+            coil_idx = coil_map(c).coil;
+            [localite_c, src_c] = select_coil_file(raw_root, coil_idx, sub_id, session);
+            if isempty(localite_c)
+                warning('neuronav_ingest_markers: no usable file for coil %d (%s %s)', ...
+                    coil_idx, sub_id, session);
+                results{end+1} = []; %#ok<AGROW>
+                source_file{end+1} = ''; %#ok<AGROW>
+                continue;
+            end
+            stats_c = neuronav_compute_series_statistics(localite_c, voxel_size, ...
+                expected_segment_length, markertype);
+            if isempty(stats_c)
+                warning('neuronav_ingest_markers: no valid series for coil %d (%s %s)', ...
+                    coil_idx, sub_id, session);
+                results{end+1} = []; %#ok<AGROW>
+            else
+                results{end+1} = stats_c{1}; %#ok<AGROW>
+            end
+            source_file{end+1} = src_c; %#ok<AGROW>
+        end
+        if all(cellfun(@isempty, results))
+            warning('neuronav_ingest_markers: all coils empty for %s %s', sub_id, session);
+            xml_path = ''; json_path = ''; results = {}; return;
+        end
+    else
+        % --- Legacy single-coil path (Coil0) -----------------------------
+        [localite, markertype, source_file] = select_raw_file(raw_root, sub_id, session, ...
+            session_prev, parameters.path.localite_raw, loc_folder, session_folder_pattern);
 
-    if isempty(localite)
-        warning('neuronav_ingest_markers: no usable marker file for %s %s', sub_id, session);
-        xml_path  = '';
-        json_path = '';
-        results   = {};
-        return;
-    end
+        if isempty(localite)
+            warning('neuronav_ingest_markers: no usable marker file for %s %s', sub_id, session);
+            xml_path = ''; json_path = ''; results = {}; return;
+        end
 
-    % ------------------------------------------------------------------
-    % Compute per-series statistics
-    % ------------------------------------------------------------------
-    results = neuronav_compute_series_statistics(localite, voxel_size, ...
-        expected_segment_length, markertype);
+        results = neuronav_compute_series_statistics(localite, voxel_size, ...
+            expected_segment_length, markertype);
 
-    if isempty(results)
-        warning('neuronav_ingest_markers: no valid series for %s %s', sub_id, session);
-        xml_path  = '';
-        json_path = '';
-        results   = {};
-        return;
+        if isempty(results)
+            warning('neuronav_ingest_markers: no valid series for %s %s', sub_id, session);
+            xml_path = ''; json_path = ''; results = {}; return;
+        end
     end
 
     % ------------------------------------------------------------------
@@ -122,10 +147,30 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     n_targets = numel(target_map);
     n_series  = numel(results);
     for t = 1:n_targets
-        if target_map(t).series_index > n_series
+        si = target_map(t).series_index;
+        if si > n_series
             error('neuronav_ingest_markers: target_map(%d).series_index=%d but only %d series found for %s %s', ...
-                t, target_map(t).series_index, n_series, sub_id, session);
+                t, si, n_series, sub_id, session);
         end
+        if isempty(results{si})
+            warning('neuronav_ingest_markers: series %d is empty (coil dropout?) for %s %s — skipping target "%s"', ...
+                si, sub_id, session, target_map(t).target_name);
+        end
+    end
+
+    % Remove targets whose series is empty
+    valid_targets = arrayfun(@(tm) ~isempty(results{tm.series_index}), target_map);
+    target_map = target_map(valid_targets);
+    if isempty(target_map)
+        warning('neuronav_ingest_markers: no valid targets remain for %s %s', sub_id, session);
+        xml_path = ''; json_path = ''; return;
+    end
+
+    % Resolve source_file to a single string for JSON sidecar
+    if iscell(source_file)
+        src_str = strjoin(source_file(~cellfun(@isempty, source_file)), '; ');
+    else
+        src_str = source_file;
     end
 
     % ------------------------------------------------------------------
@@ -136,7 +181,7 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     % ------------------------------------------------------------------
     % Write JSON sidecar
     % ------------------------------------------------------------------
-    write_json_sidecar(json_path, target_map, results, markertype, source_file);
+    write_json_sidecar(json_path, target_map, results, markertype, src_str);
 
     fprintf('  [ingest] %s %s → %s\n', sub_id, session, xml_path);
     fprintf('  [ingest] %s %s → %s\n', sub_id, session, json_path);
@@ -313,6 +358,75 @@ function write_json_sidecar(json_path, target_map, results, markertype, source_f
     end
     fprintf(fid, '%s\n', json_str);
     fclose(fid);
+end
+
+
+% ======================================================================
+%  LOCAL HELPER: select file for a specific coil index
+% ======================================================================
+function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, session)
+% Returns the localite struct for a given coil index, checking for
+% all-zero positions and falling back to other timestamps if needed.
+
+    localite    = [];
+    source_name = '';
+
+    pattern = sprintf('TriggerMarkers_Coil%d_*.xml', coil_idx);
+    files   = dir(fullfile(raw_root, '**', 'TMSTrigger', pattern));
+    files   = files([files.bytes] > 10000);
+
+    if isempty(files)
+        warning('neuronav_ingest_markers: no TriggerMarkers files found for Coil%d (%s %s)', ...
+            coil_idx, sub_id, session);
+        return;
+    end
+
+    % Sort newest first
+    for i = 1:numel(files)
+        tok = regexp(files(i).name, '_(\d{17})', 'tokens', 'once');
+        if ~isempty(tok)
+            try, files(i).dt = datetime(tok{1}, 'InputFormat', 'yyyyMMddHHmmssSSS');
+            catch, files(i).dt = NaT; end
+        else
+            files(i).dt = NaT;
+        end
+    end
+    valid = ~arrayfun(@(f) isnat(f.dt), files);
+    files = files(valid);
+    if isempty(files), return; end
+    [~, sidx] = sort([files.dt], 'descend');
+    files = files(sidx);
+
+    for k = 1:numel(files)
+        fpath = fullfile(files(k).folder, files(k).name);
+        try
+            loc = readstruct(fpath);
+        catch
+            warning('neuronav_ingest_markers: failed to read %s', fpath);
+            continue;
+        end
+
+        % Check for all-zero positions
+        if isfield(loc, 'TriggerMarker')
+            markers = loc.TriggerMarker;
+            xs = arrayfun(@(m) m.Matrix4D.data03Attribute, markers);
+            ys = arrayfun(@(m) m.Matrix4D.data13Attribute, markers);
+            zs = arrayfun(@(m) m.Matrix4D.data23Attribute, markers);
+            if all(xs == 0) && all(ys == 0) && all(zs == 0)
+                warning(['neuronav_ingest_markers: Coil%d positions are all-zero in %s ' ...
+                    '(%s %s) — trying next timestamp'], ...
+                    coil_idx, files(k).name, sub_id, session);
+                continue;
+            end
+        end
+
+        localite    = loc;
+        source_name = files(k).name;
+        return;
+    end
+
+    warning('neuronav_ingest_markers: no non-zero file found for Coil%d (%s %s)', ...
+        coil_idx, sub_id, session);
 end
 
 
