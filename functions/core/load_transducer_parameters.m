@@ -37,8 +37,47 @@ end
         % the entire validation block when no type has been set.
         has_type = arrayfun(@(t) isfield(t, 'type') && (ischar(t.type) || isstring(t.type)) && ~isempty(t.type), ...
                             parameters.transducer);
-        if ~any(has_type)
+        has_serial = arrayfun(@(t) isfield(t, 'serial') && (ischar(t.serial) || isstring(t.serial)) && ~isempty(t.serial), ...
+                              parameters.transducer);
+        if ~any(has_type) && ~any(has_serial)
             return;
+        end
+
+        % ── Serial-based auto-resolution ─────────────────────────────────────
+        % When a transducer entry carries a 'serial' field, load geometry from
+        % the equipment library and, if phases/amplitude are absent, resolve
+        % them from the calibration library.  Inline fields always take
+        % precedence over library values.
+        if any(has_serial)
+            equip_param = load_equipment_config();
+            library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            % Resolve each serial-bearing transducer.  Because resolution may
+            % add fields (e.g. type, freq_hz) that were absent from the
+            % original struct array element, we rebuild the array from scratch
+            % to avoid MATLAB's heterogeneous-struct-array assignment error.
+            resolved = cell(1, numel(parameters.transducer));
+            for t_i = 1:numel(parameters.transducer)
+                resolved{t_i} = parameters.transducer(t_i);
+            end
+            for t_i = find(has_serial)
+                resolved{t_i} = resolve_transducer_from_serial( ...
+                    resolved{t_i}, equip_param, library_path, t_i);
+            end
+            % Collect all field names across all elements, then rebuild.
+            all_fields = cellfun(@fieldnames, resolved, 'UniformOutput', false);
+            all_fields = unique(vertcat(all_fields{:}));
+            rebuilt    = struct();
+            for t_i = 1:numel(resolved)
+                for fi = 1:numel(all_fields)
+                    f = all_fields{fi};
+                    if isfield(resolved{t_i}, f)
+                        rebuilt(t_i).(f) = resolved{t_i}.(f);
+                    else
+                        rebuilt(t_i).(f) = [];
+                    end
+                end
+            end
+            parameters.transducer = rebuilt;
         end
 
         new_transducers = struct([]);
