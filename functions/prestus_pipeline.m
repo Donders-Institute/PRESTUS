@@ -558,6 +558,9 @@ function [parameters] = prestus_pipeline(parameters, options)
         elseif exist(filename_heating_data, 'file')
             disp('Skipping thermal simulation, loading existing output file.')
             load(filename_heating_data);
+            if exist('kwave_medium_th', 'var') && isfield(kwave_medium_th, 'temp_0')
+                kwave_medium.temp_0 = kwave_medium_th.temp_0;
+            end
             parameters.state.heating_available = 1;
         else
             warning('prestus_pipeline:thermalNoAcoustics', ...
