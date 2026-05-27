@@ -127,7 +127,9 @@ end
     if is_last_sequential && numel(all_run_params) > 1
         report_ok = false;
         try
-            generate_sequential_report(all_run_params, {}, run_affixes);
+            seq_labels = cellfun(@(a) label_from_affix(a.output_affix), run_affixes, ...
+                'UniformOutput', false);
+            generate_sequential_report(all_run_params, seq_labels, run_affixes);
             report_ok = true;
         catch ME_rep
             warning('prestus_pipeline:sequentialReport', ...
@@ -157,5 +159,14 @@ end
                 end
             end
         end
+    end
+end
+
+function lbl = label_from_affix(affix)
+    if isempty(affix)
+        lbl = 'Base';
+    else
+        lbl = strtrim(regexprep(affix, '^_', ''));
+        if isempty(lbl); lbl = affix; end
     end
 end

@@ -300,8 +300,9 @@ function html = build_header_section(subject_id, medium, n_runs, run_labels, bas
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
     html = [html sprintf('<tr><th>Medium</th><td>%s</td></tr>', html_utils.escape(medium))];
     html = [html sprintf('<tr><th>Runs</th><td>%d</td></tr>', n_runs)];
+    escaped_labels = cellfun(@html_utils.escape, run_labels, 'UniformOutput', false);
     html = [html sprintf('<tr><th>Run labels</th><td>%s</td></tr>', ...
-        html_utils.escape(strjoin(run_labels, ' &rarr; ')))];
+        strjoin(escaped_labels, ' &rarr; '))];
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     if isfield(base_p, 'io') && isfield(base_p.io, 'dir_output')
         html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(base_p.io.dir_output))];
