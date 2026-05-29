@@ -1,77 +1,218 @@
 # Changelog
 
-Notable changes to this project will be documented here.
+Notable changes to this project are documented here. 
 
-## `development` v0.5.0 [*unreleased*]
+---
 
-Note: Parameters, naming, and default values have changed. Please consult the [documentation](https://donders-institute.github.io/PRESTUS/) for the current parameter specification.
+## v0.6.1
+*(2026-05-22)*
+
+Extends the calibration pipeline with a unified entry point, parametric model store, and HPC dispatch. Introduces async multi-transducer simulations, a sequential simulation dispatcher, PlanTUS-based automated placement, and RAS as the canonical coordinate space. Drops the Image Processing Toolbox requirement.
+
+#### Core / Config
+- MATLAB Image Processing Toolbox no longer required — morphological ops and resampling use base-MATLAB equivalents
+- `transducer.target_isppa_wcm2` migrated from calibration struct to transducer struct
+- Optional `transducer.name` field added to transducer config
+
+#### Calibration
+- Unified `calibrate_transducer` entry point with HPC dispatch, multi-intensity mode, and parametric model store
+- Geometric steering mode with per-element hardware correction
+- Multiple analytical forward models — O'Neil and Rayleigh
+- Transducer library (draft)
+- Free-water correction moved post-analytical to make optional
+- Free-water validation can be deactivated or limited to first/last target ISPPA
+- Pluggable analytical forward model interface
+- Option to use manufacturer phases to initiate global search (`opt_use_initial_phases`)
+- ⚠️ **Fixed:** amplitude scaling bug present since early PRESTUS versions — correction factor is the square root of intensity ratios, not the ratio itself
+
+#### Placement
+- PlanTUS placement mode wraps the external PlanTUS optimiser for automated transducer targeting — **experimental** (see [doc_placement_plantus.md](doc_placement_plantus.md))
+- T1 overlay plot auto-generated after heuristic and PlanTUS placement
+- Browser-based transducer alignment viewer (*experimental*)
+
+#### Acoustic/Thermal
+- Async multi-transducer pipeline — **experimental** (see [doc_async_transducer.md](doc_async_transducer.md))
+- Sequential simulation dispatcher: runs multiple parameter configurations in series, chains thermal simulations, and produces a consolidated multi-run report (see [doc_advanced.md](doc_advanced.md))
+- ⚠️ **Fixed:** sequential simulation produced incorrect outputs prior to this release due to mismatching grid->T1w transforms and back of the adopted heatmaps; the heatmaps were not interpolated with the baseline free-water value leading to interpolation artefacts
+- Uncertainty pipeline produces uncertainty bands across sequential multi-run parameter sweeps
+- Complex pressure field optionally saved (`save_p_complex`) (*experimental*)
+
+#### Head pipeline
+- RAS established as canonical entry-point coordinate space; RAS+ orientation enforced at NIfTI load time; `ras_plus` grid mode rescales without rotation
+- `tissuemask_binary` exposes a `water` mask field
+- `smooth_img` gains an `off` method (no smoothing); exposed in GUI
+
+#### Phantom
+- `trans_pos_mm` / `focus_pos_mm` config fields allow resolution-independent transducer and focus position specification
+- ⚠️ **Fixed:** phantom NIfTI outputs used incorrect voxel dimensions and inconsistent world-space orientation across pipeline stages
+
+#### NIfTI / Transform
+- Batched `tformarray` with optional parallel workers for MNI transforms
+- Explicit FOV mask used in MNI outputs instead of zero sentinel (unreliable for pCT Hounsfield values)
+- ⚠️ **Fixed:** pCT path layout corrected; NaN padding used instead of zero fill
+
+#### Telemetry
+- System resources reported at run start: OS, CPU model/cores, RAM, GPU, CUDA version
+
+#### Reporting
+- Public usage statistics (see [doc_usage_statistics.md](doc_usage_statistics.md))
+- Group HTML report — `prestus_group_report_start` / `generate_group_report` aggregate per-subject CSVs and PNGs (across all subjects sharing a `medium` + `output_affix`) into a self-contained HTML with a mean ± SD exposure dashboard, subject roster, split acoustic (Intensity, MI) and thermal (maxT, riseT, CEM43) box plots, per-subject cards, and a client-side subject filter. Subjects are auto-discovered via `discover_group_subjects`; generated iteratively after each subject finishes when `modules.generate_group_report = 1`, or on demand. See [doc_group.md](doc_group.md#group-html-report).
+
+---
+
+## v0.6.0 
+*(2026-04-30)*
+
+Introduces matrix transducer support, an uncertainty quantification pipeline, and a rudimentary GUI. The pipeline is further integrated with automated pCT generation, placement dispatch, multi-ISPPA targeting, and a BIDS-inspired output structure. Parameter names and output paths have changed throughout.
+
+> ⚠️ **Migration note:** Several parameter names and all output paths have changed in this release. Existing configs and post-processing scripts will need updating.
+>
+> **Parameters:**
+> - `parameters.submit_medium` renamed to `parameters.platform`
+> - Segmentation smoothing now specified in FWHM mm (parameter name changed)
+> - Transducer field suffixes renamed consistently — check transducer config fields
+> - Further parameter renames throughout — consult `config_default.yaml` for current names
+>
+> **Output paths:**
+> - `parameters.io` fields renamed: `*_dir` → `dir_*`, `*_filename` → `filename_*`
+> - Preprocessing cache files follow a consistent `res_N_descriptor` naming scheme
+> - `space-` prefix removed from all NIfTI output filenames
+> - `output_affix` now appended at the end of all output filenames
+> - HPC log directory renamed: `hpc_log/` → `log_hpc/`
+> - Outputs reorganised into BIDS-inspired typed subdirectories (`acoustic/`, `thermal/`, `cache/`, `debug/`, etc.)
+>
+> **Directory and config naming:**
+> - `toolboxes/` directory renamed to `external/`
+> - Config files consistently prefixed with `config_`
 
 #### Added
 
-- [**feature**] Uncertainty quantification pipeline by @jkosciessa
-    - Three-variant simulation workflow (default / liberal / conservative medium properties) producing a unified HTML report with safety dashboard, acoustic and thermal range tables, timing summary, and side-by-side maps
+- [**feature**] Uncertainty quantification pipeline (see [doc_uncertainty.md](doc_uncertainty.md))
+    - Three-variant simulation workflow (default / liberal / conservative medium properties) producing a unified HTML report with per-metric safety cards colour-coded against ITRUSST non-significant risk limits, acoustic and thermal range tables, side-by-side intensity and temperature maps, and an SVG temperature timeseries with uncertainty band
     - Supports MATLAB (sequential) and HPC (parallel, scheduler-dependent) execution with automatic resumption from partial runs
-- [**feature**] Matrix transducer support (see [PR #117](https://github.com/Donders-Institute/PRESTUS/pull/117))
-    - Flexible element layout options (rectangular grid, Fibonacci, Fermat spiral) and Clover multi-array configuration
+- [**feature**] Matrix transducer support (see [doc_transducer.md](doc_transducer.md), [PR #117](https://github.com/Donders-Institute/PRESTUS/pull/117))
+    - Flexible element layout options: rectangular grid, Fibonacci, Fermat spiral, and Clover multi-array configuration
     - Element positions can be defined inline or loaded from file
-- [**feature**] Heuristic transducer placement
-    - Automated skull-surface search with configurable positioning criteria and ear exclusion
+- [**pCT**] pCT generation fully automated inside the pipeline; a T1w image, UTE image, and mapping algorithm are sufficient — pre-generation remains possible for debugging; pCT section included in HTML report when used
+- [**calibration**] In-pipeline amplitude calibration to target ISPPA
+- [**feature**] Multi-ISPPA targeting — run acoustics once, scale to N independent thermal targets via post-hoc pressure scaling (see [doc_multi_isppa.md](doc_multi_isppa.md))
+- [**thermal**] Dual CEM43 output: both kWave and ISO formulations propagated through pipeline, CSV, NIfTIs, and report
+- [**report**] ISO CEM43 shown in Exposure Dashboard and methods section when enabled
+- [**feature**] Placement dispatch — unified entry point for manual, Localite, and heuristic transducer positioning (see [doc_placement.md](doc_placement.md))
+- [**feature**] `prestus_config_init` — bootstraps a project-specific config directory and `config_default.yaml`; `load_parameters` now resolves the project config automatically so PRESTUS can be called from any working directory
+- [**neuronav**] Unified Localite pipeline via `localite_matrix_to_positions`; `InstrumentMarker` support added; `tracker_to_bowl_mm` parameter
+- [**feature**] PRESTUS GUI — tabbed parameter editor and simulation launcher (see [doc_gui.md](doc_gui.md))
+- [**feature**] `prestus_group_start` — new entry point for group-level MNI-space analysis
+- [**feature**] `segmentation_only` pipeline mode
+- [**report**] MItc (mechanical index transcranial) reported across all intracranial tissues
+- [**thermal**] `simulation.log_thermal_updates` — suppress verbose per-step k-Wave progress output (default: off)
+- [**refactor**] `simulation_nifti` split into per-pipeline-stage calls; bone mask separated from pseudoCT NIfTIs
+- [**telemetry**] Opt-in anonymous usage telemetry (disabled by default; see [doc_telemetry.md](doc_telemetry.md))
+
+#### Changed
+
+- [**I/O**] Subject-specific output subfolders enforced
+- [**output**] Intensity output naming cleaned up: redundant `max` labels removed; naming aligned with standardised pressure and intensity metric conventions
+- [**grid**] `pml_size` defaults to `'auto'`; effective PML size resolved and tracked in log
+- [**config**] `simulation.debug` defaults to `0`; property-map and MNI NIfTI export flags added to `config_default.yaml`
+- [**validation**] Function inputs consistently validated via MATLAB `arguments` blocks; `help <function>` exposes header information inline
+- [**report**] Safety Dashboard renamed to **Exposure Dashboard**; water-medium limits now populated; pressure units corrected; dynamic pressure display added; CEM and temperature removed from water-medium report
+
+#### Fixed
+
+- [**paths**] `load_parameters` resolves `config_default.yaml` via an absolute path, preventing stray output folders
+- [**paths**] Cross-platform SimNIBS path compatibility
+- [**transducer**] Annular array element format and default thickness corrected
+- [**nifti**] Property map export: corrected datatype mismatch, scalar `alpha_power` handling, and `FillValue` assignment
+- [**hpc**] Transducer index suffix omitted from positioning filenames for single-transducer runs
+- [**plots**] T1 intensity overlay orientation corrected using NIfTI sform; deprecated `LineSmoothing` property removed
+- [**logging**] Post-hoc water simulation writes to its own independent log file; PPW warning no longer emits a backtrace
+- [**debug**] Debug directory creation and plots skipped when `simulation.debug = 0`
+
+---
+
+## v0.5.0
+*(2026-02-27)*
+
+Major restructuring of the pipeline into discrete processing stages. Adds parallel multi-transducer support, an HTML simulation report, C++ backend, skull rubber-wrap, and heuristic transducer placement. Parameter names have changed and existing configs will need updating.
+
+> ⚠️ **Migration note** — configs from v0.4.x will need updating:
+> - `layer_labels` renamed to `layers`
+> - Transducer and focus position fields renamed to `trans_pos` / `focus_pos` consistently
+> - `grid_step_m` and `default_grid_size` removed
+> - Grid expansion parameter renamed
+> - Attenuation parameters renamed — consult `config_default.yaml`
+> - Layer indexing field migrated from `layers` to `medium` throughout
+> - Pipeline refactored into discrete processing stages — consult the documentation for current function entry points
+
+#### Added
+
 - [**feature**] C++ backend CPU & GPU support by @jkosciessa
-- [**feature**] HTML simulation report by @sirmrmarty
-    - Self-contained per-subject summary of acoustic and thermal outputs
 - [**feature**] Parallel multi-transducer support for layered simulations by @dreamstimlab (see [PR #100](https://github.com/Donders-Institute/PRESTUS/pull/100))
+- [**feature**] HTML simulation report — self-contained per-subject summary of acoustic and thermal outputs by @sirmrmarty
+- [**feature**] Heuristic transducer placement — automated skull-surface search with configurable positioning criteria and ear exclusion (see [PR #109](https://github.com/Donders-Institute/PRESTUS/pull/109))
+- [**skull**] Rubber-wrap skull mask inflation by @meijer-s (see [PR #103](https://github.com/Donders-Institute/PRESTUS/pull/103))
+- [**thermal**] Flexible and standardised protocol timing specification aligned with TUSCalculator; protocol plot output
+- [**thermal**] Additional thermal timeseries outputs (max per tissue, heating at focus)
 - [**feature**] Per-step pipeline benchmarking: wall time, peak RAM, and disk usage logged at each stage
 - [**grid**] Minimum PPW validation at source setup (`grid.min_ppw`, default 6); warns with the maximum `resolution_mm` that would satisfy the requirement
-- [**skull**] Rubber-wrap skull mask inflation by @meijer-s (see [PR #103](https://github.com/Donders-Institute/PRESTUS/pull/103))
-- [**thermal**] More flexible and standardised protocol timing specification with output plot
-- [**thermal**] Additional thermal timeseries outputs (max per tissue, heating at focus)
-- [**doc**] GitHub Pages [documentation](https://donders-institute.github.io/PRESTUS/) covering parameters, functions, installation, quick start, and processing steps
-- [**feature**] `prestus_config_init` — bootstraps a project-specific config directory and `config_default.yaml`; `load_parameters` now resolves the project config automatically so PRESTUS can be called from any working directory; `prestus_gui` accepts an optional parameter struct and shows the active config path
-- [**feature**] `prestus_group_start` — new entry point for group-level MNI-space analysis
-- [**feature**] Group HTML report — `prestus_group_report_start` / `generate_group_report` aggregate per-subject CSVs and PNGs (across all subjects sharing a `medium` + `output_affix`) into a self-contained HTML with a mean ± SD exposure dashboard, subject roster, split acoustic (Intensity, MI) and thermal (maxT, riseT, CEM43) box plots, per-subject cards, and a client-side subject filter. Subjects are auto-discovered via `discover_group_subjects`; the report runs manually or automatically at the end of each per-subject pipeline when `modules.generate_group_report = 1`. See [doc_group.md](doc_group.md#group-html-report).
 - [**calibration**] `calibration.opt_phase_precession` — optional constraint on element phases during amplitude/phase optimisation
-- [**thermal**] `simulation.log_thermal_updates` — suppress verbose per-step k-Wave progress output (default: off)
-- [**telemetry**] Opt-in anonymous usage telemetry (disabled by default; see documentation)
+- [**neuronav**] Updated Localite GUMMarkers parsing
+- [**doc**] GitHub Pages [documentation](https://donders-institute.github.io/PRESTUS/) — parameters, functions, installation, quick start, and processing steps
 
 #### Changed
 
 - [**refactor**] Pipeline and core processing steps refactored; functions organised by processing stage
-- [**validation**] Function inputs are now consistently validated via MATLAB `arguments` blocks; `help <function>` calls expose header information inline. Some checks may surface new errors — please report unexpected failures
-- [**calibration**] Dedicated config and unified pipeline for transducer calibration [@MaCuinea, @jkosciessa]
-- [**hpc**] HPC submission refactored; platform selection unified under `parameters.platform`
-- [**preproc**] Segmentation smoothing now specified in FWHM mm; grid interpolation updated for continuous data
-- [**pCT**] Updated to new folder structure; skull density and sound speed regularised to water minimum
-- [**pCT**] pCT generation is now fully integrated into the pipeline; pre-generating pCTs beforehand remains possible (e.g. for debugging) but is no longer required — a T1w image, a UTE image, and a mapping algorithm are sufficient
-- [**refactor**] PML (Perfectly Matched Layer) is now added only at the acoustic wave simulation stage, rather than carried through from preprocessing or phantom generation; the default `"auto"` setting optimises PML size automatically
-- [**I/O**] Subject-specific output subfolders are now enforced to simplify the I/O landscape
 - [**axisymmetric**] Axisymmetric acoustic simulations now default to 3D thermal output
-- [**I/O**] Outputs reorganised into BIDS-inspired typed subdirectories (`acoustic/`, `thermal/`, `cache/`, `debug/`, etc.)
-- [**I/O**] `simulation_nifti` split into per-pipeline-stage calls; bone mask separated from pseudoCT NIfTIs; `space-` prefix removed from output filenames
-- [**I/O**] `parameters.io` dir/filename fields renamed to `dir_*/filename_*` convention; preprocessing cache files follow a consistent `res_N_descriptor` naming scheme
-- [**I/O**] C++ backend HDF5 intermediates now routed to `cache/`; thermal sensor data cleared by default to reduce memory footprint (`save_thermal_matrices` retains it)
-- [**config**] `simulation.debug` defaults to `0`; property-map and MNI NIfTI export flags added to `config_default.yaml`; duplicate `output_mni` key removed
-- [**report**] Safety Dashboard renamed to **Exposure Dashboard**; water-medium limits now populated
-- [**parameter**] Various parameters renamed or restructured; consult `config_default.yaml` and the documentation for current names
 
 #### Fixed
 
-Not all (hot-)fixes are reported here.
-
-- [**source**] Each uncertainty variant now recomputes its own k-Wave source with its own time axis; shared caching across variants with different medium sound speeds could produce incorrect pressure maps
-- [**paths**] `load_parameters` resolves `config_default.yaml` via an absolute path, preventing stray output folders when called from an unexpected working directory
-- [**calibration**] Potential bugs with transducer distance calculation
+- [**pCT**] kPlan skull density and sound speed regularised to water minimum
+- [**acoustic**] GPU array correctly moved to CPU before NIfTI export
+- [**calibration**] Unoptimized parameters no longer passed to Oneil recomputation
 - [**savemat**] k-Wave source matrix saving can now be correctly deactivated; water simulations force-save matrix outputs
-- [**nifti**] Property map export: corrected datatype mismatch, scalar `alpha_power` handling, and `FillValue` assignment
-- [**plots**] T1 intensity overlay orientation corrected using NIfTI sform; deprecated `LineSmoothing` property removed from transducer overlay and box plots
-- [**debug**] Debug directory creation and debug plots are now skipped when `simulation.debug = 0`
-- [**logging**] Post-hoc water simulation writes to its own independent log file; PPW warning no longer emits a backtrace
-- [**hpc**] Transducer index suffix omitted from positioning filenames for single-transducer runs
 
 #### Deprecated/Removed
 
-- [**feature**] Removed explicit ‘skull’-only simulations; equivalent behaviour is achieved by removing layers in the simulation setup
+- [**feature**] Explicit `skull`-only simulation mode removed; equivalent behaviour is achieved by removing layers from the simulation setup
 
-## v0.4.0
+---
+
+## v0.4.2 
+*(2025-12-04)*
+
+Refactors the calibration and acoustic profiling pipeline and introduces multi-element axisymmetry support.
+
+#### Added
+
+- [**calibration**] Acoustic profiling refactor with documented standalone calibration pipeline (see [doc_calibration.md](doc_calibration.md))
+- [**calibration**] Multi-element axisymmetry support (experimental)
+
+#### Changed
+
+- [**default**] kWaveArray used by default
+
+---
+
+## v0.4.1 
+*(2025-08-26)*
+
+Post-release additions to v0.4.0: heat trace outputs, Localite neuronavigation integration, and 3D thermal as the default for axisymmetric runs.
+
+#### Added
+
+- [**thermal**] Heat trace saving
+- [**logging**] MATLAB log written to output directory
+- [**neuronav**] Localite coordinate processing
+
+#### Changed
+
+- [**axisymmetric**] 3D thermal simulation is now the default for axisymmetric acoustic runs
+
+---
+
+## v0.4.0 
+*(2025-06-04)*
 
 This release features major updates. Please consult the documentation for current parameter choices. Some features remain unstable and new bugs may pop up. Let's remain vigilant and try to quickly introduce hotfixes in those cases.
 
@@ -96,6 +237,8 @@ This release features major updates. Please consult the documentation for curren
 - Documentation, pCT, HCP updates & more, see above by @jkosciessa in #59
 - The last one summarizes more than half a year of updates to code and documentation.
 
+---
+
 ## v0.3.0
 
 - PseudoCT feature by @eleonoracarpino and @jkosciessa
@@ -106,6 +249,8 @@ This release features major updates. Please consult the documentation for curren
 - Check simulation stability and adjust time step accordingly by @MaCuinea and @jkosciessa
 - Enable tissue-specific temp_0 specification by @jkosciessa
 - Fix heating plot bug by @jkosciessa
+
+---
 
 ## v0.2.0
 
@@ -120,6 +265,8 @@ This release features major updates. Please consult the documentation for curren
 - Group plots fixes and improvements by @KTZ228 in #26
 - FIX: revert to working version by @mekman in #35
 - DOC: reworked installation instructions by @mekman in #36
+
+---
 
 ## v0.1.0
 

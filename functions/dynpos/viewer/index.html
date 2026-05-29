@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRESTUS — Transducer Alignment</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Left panel: controls ─────────────────────────────────────── -->
+    <aside id="sidebar">
+      <h1>Transducer Alignment</h1>
+      <p class="hint">
+        Click anywhere in the viewer to move the <strong>active marker</strong>
+        to that RAS+ coordinate, or edit the fields below directly.
+      </p>
+
+      <!-- Active marker toggle -->
+      <fieldset id="marker-toggle">
+        <legend>Active marker</legend>
+        <label>
+          <input type="radio" name="active_marker" value="trans" checked />
+          <span class="dot trans-dot"></span> Transducer (entry)
+        </label>
+        <label>
+          <input type="radio" name="active_marker" value="focus" />
+          <span class="dot focus-dot"></span> Focus (target)
+        </label>
+      </fieldset>
+
+      <!-- Transducer position -->
+      <fieldset>
+        <legend><span class="dot trans-dot"></span> Transducer — RAS+ mm</legend>
+        <div class="coord-row">
+          <label>R <input type="number" id="tx" step="0.5" /></label>
+          <label>A <input type="number" id="ty" step="0.5" /></label>
+          <label>S <input type="number" id="tz" step="0.5" /></label>
+        </div>
+      </fieldset>
+
+      <!-- Focus position -->
+      <fieldset>
+        <legend><span class="dot focus-dot"></span> Focus — RAS+ mm</legend>
+        <div class="coord-row">
+          <label>R <input type="number" id="fx" step="0.5" /></label>
+          <label>A <input type="number" id="fy" step="0.5" /></label>
+          <label>S <input type="number" id="fz" step="0.5" /></label>
+        </div>
+      </fieldset>
+
+      <!-- Geometry summary -->
+      <fieldset id="geometry">
+        <legend>Beam geometry</legend>
+        <table>
+          <tr><td>Transducer diameter</td><td id="g-diam">—</td></tr>
+          <tr><td>Radius of curvature</td><td id="g-roc">—</td></tr>
+          <tr><td>Trans→Focus distance</td><td id="g-dist">—</td></tr>
+        </table>
+      </fieldset>
+
+      <div id="actions">
+        <button id="btn-reset" class="secondary">Reset to initial</button>
+        <button id="btn-cancel" class="secondary">Cancel</button>
+        <button id="btn-save" class="primary">Save &amp; close</button>
+      </div>
+
+      <div id="status"></div>
+    </aside>
+
+    <!-- ── Right panel: NiiVue viewer ───────────────────────────────── -->
+    <main id="viewer-container">
+      <canvas id="gl1"></canvas>
+    </main>
+
+  </div>
+
+  <!-- NiiVue from CDN (pinned minor version) -->
+  <script src="https://cdn.jsdelivr.net/npm/@niivue/niivue@0.46/dist/niivue.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

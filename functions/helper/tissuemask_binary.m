@@ -38,3 +38,6 @@ end
 
     skin_i = find(strcmp(labels, 'skin'));
     mask.skin = ismember(medium_masks,skin_i);
+
+    water_i = find(strcmp(labels, 'water'));
+    mask.water = ismember(medium_masks,water_i);

@@ -2,7 +2,7 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 % SMOOTH_IMG  Smooth an image with a Gaussian or box kernel defined by FWHM
 %
 % Converts FWHM in mm to voxel units and applies either a Gaussian
-% (imgaussfilt) or box-average filter. Optionally binarises the output
+% or box-average filter. Optionally binarises the output
 % with a user-specified threshold.
 %
 % Use as:
@@ -13,7 +13,7 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 %   fwhm_mm        - smoothing kernel FWHM [mm]; scalar or [1xNdim] (default: 1.0)
 %   voxel_size_mm  - voxel spacing [mm]; scalar or [1xNdim] (default: 0.5)
 %   threshold      - binarisation threshold 0–1; 0 returns continuous output (default: 0.5)
-%   method         - 'gaussian' or 'box' (default: 'gaussian')
+%   method         - 'gaussian', 'box', or 'off' to skip smoothing (default: 'gaussian')
 %
 % Output:
 %   thresholded_img - smoothed image, binary when threshold > 0
@@ -25,10 +25,16 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
         fwhm_mm (1,:) double {mustBeNonnegative} = 1.0
         voxel_size_mm (1,:) double {mustBePositive} = 0.5
         threshold (1,1) double {mustBeInRange(threshold, 0, 1)} = 0.5
-        method string {mustBeMember(method, ["gaussian", "box"])} = "gaussian"
+        method string {mustBeMember(method, ["gaussian", "box", "off"])} = "gaussian"
     end
 
     img = double(unsmoothed_img);
+
+    if method == "off"
+        thresholded_img = img;
+        return;
+    end
+
     ndims_img = ndims(img);
 
     % Normalize fwhm_mm and voxel_size_mm to length ndims_img
@@ -57,8 +63,13 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 
             switch method
                 case "gaussian"
-                    % imgaussfilt expects sigma in pixels/voxels [web:1][web:2]
-                    smoothed_img = imgaussfilt(img, sig);
+                    hw = ceil(3 * max(sig));
+                    [gx,gy] = ndgrid(-hw:hw, -hw:hw);
+                    g = exp(-0.5*(gx.^2/sig(1)^2 + gy.^2/sig(2)^2));
+                    g = g / sum(g(:));
+                    pad = hw;
+                    ip = padarray_replicate(img, [pad pad]);
+                    smoothed_img = conv2(ip, g, 'valid');
 
                 case "box"
                     % Kernel size = round(FWHM voxels), no minimum
@@ -70,7 +81,9 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     % Force odd kernel size
                     ksz = ksz + mod(ksz+1,2);
                     kernel = ones(ksz) / prod(ksz);
-                    smoothed_img = imfilter(img, kernel, 'replicate');  % Works for ksz=1 [web:24]
+                    pad = floor(ksz(1)/2);
+                    ip = padarray_replicate(img, [pad pad]);
+                    smoothed_img = conv2(ip, kernel, 'valid');
             end
 
         elseif ndims_img == 3
@@ -78,8 +91,11 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 
             switch method
                 case "gaussian"
-                    % imgaussfilt3 sigma also in voxels [web:4]
-                    smoothed_img = imgaussfilt3(img, sig);
+                    hw = ceil(3 * max(sig));
+                    [gx,gy,gz] = ndgrid(-hw:hw, -hw:hw, -hw:hw);
+                    g = exp(-0.5*(gx.^2/sig(1)^2 + gy.^2/sig(2)^2 + gz.^2/sig(3)^2));
+                    g = g / sum(g(:));
+                    smoothed_img = convn(img, g, 'same');
 
                 case "box"
                     ksz = round(fwhm_voxels(1:3));
@@ -104,4 +120,13 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
     else
         thresholded_img = smoothed_img;
     end
+end
+
+function out = padarray_replicate(img, pad)
+% Replicate-pad a 2-D array by pad(1) rows and pad(2) cols
+pr = pad(1); pc = pad(2);
+out = [repmat(img(1,:),    pr, 1);
+       img;
+       repmat(img(end,:),  pr, 1)];
+out = [repmat(out(:,1),   1, pc), out, repmat(out(:,end), 1, pc)];
 end

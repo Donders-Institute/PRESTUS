@@ -2,16 +2,28 @@
 %
 %   Usage (from repo root or tests/ folder):
 %
-%     run_all_tests            % unit tests only (default)
-%     run_all_tests('unit')    % same as above
-%     run_all_tests('water')   % unit + water pipeline (no MRI/SimNIBS needed)
-%     run_all_tests('head')    % water + smoke_config + smoke_head
-%     run_all_tests('acoustic')% head + smoke_acoustic
-%     run_all_tests('all')     % full suite including thermal
+%     run_all_tests              % unit tests only (default)
+%     run_all_tests('unit')      % same as above
+%     run_all_tests('water')     % unit + water pipeline (no MRI/SimNIBS needed)
+%     run_all_tests('head')      % water + smoke_config + smoke_head
+%     run_all_tests('acoustic')  % head + smoke_acoustic
+%     run_all_tests('all')       % full suite including thermal
+%
+%   Demo-data levels (require PRESTUS_DEMO_DATA to point to prestus_testdata/):
+%     run_all_tests('demo_inputs')   % verify all demo input files exist
+%     run_all_tests('demo_config')   % load all three placement-mode configs
+%     run_all_tests('demo_localite') % parse Localite XML -> voxel positions
+%     run_all_tests('demo_pct')      % verify pCT data is present/readable
+%     run_all_tests('demo_head')     % head preprocessing on real sub-009 data
+%     run_all_tests('demo_acoustic') % full acoustic pipeline on sub-009
+%     run_all_tests('demo_thermal')  % thermal pipeline on cached sub-009 acoustics
 %
 %   Environment variables (for integration levels >= 'head'):
 %     PRESTUS_TEST_DATA   — path to folder with demo subject data & m2m_* output
 %     PRESTUS_DEMO_CONFIG — path to study config YAML  (default: config_tutorial.yaml)
+%
+%   Environment variables (for demo levels):
+%     PRESTUS_DEMO_DATA   — path to prestus_testdata root folder
 %
 %   The script exits with a non-zero status on any failure, making it
 %   suitable for CI:
@@ -23,6 +35,10 @@ function run_all_tests(level)
         level = 'unit';
     end
 
+    % Flush MATLAB's function cache so tests always run against the files
+    % currently on disk, not a version loaded earlier in the session.
+    clear functions %#ok<CLFUNC>
+
     % ---- Resolve paths ------------------------------------------------
     here      = fileparts(mfilename('fullpath'));
     repo_root = fileparts(here);
@@ -32,37 +48,37 @@ function run_all_tests(level)
     addpath(fullfile(here, 'fixtures'));
 
     % ---- Select test files and tags by level --------------------------
-    unit_files = {
-        fullfile(here, 'test_helper.m')
-        fullfile(here, 'test_thermal_parameters.m')
-        fullfile(here, 'test_transform.m')
-        fullfile(here, 'test_load_parameters.m')
-        fullfile(here, 'test_head_preprocessing.m')
-    };
+    unit_suites = [ ...
+        testsuite(fullfile(here, 'test_helper.m')), ...
+        testsuite(fullfile(here, 'test_thermal_parameters.m')), ...
+        testsuite(fullfile(here, 'test_transform.m')), ...
+        testsuite(fullfile(here, 'test_load_parameters.m')), ...
+        testsuite(fullfile(here, 'test_head_preprocessing.m'))];
 
     integration_file  = fullfile(here, 'test_integration_pipeline.m');
     water_test_file   = fullfile(here, 'test_integration_water.m');
     isppa_test_file   = fullfile(here, 'test_isppa_rescaling.m');
     placement_test_file = fullfile(here, 'test_transducer_placement.m');
+    demo_test_file    = fullfile(here, 'test_integration_demo.m');
 
     switch lower(level)
         case 'unit'
-            suites = [testsuite(unit_files), ...
+            suites = [unit_suites, ...
                       testsuite(placement_test_file, 'Tag', 'manual')];
         case 'water'
-            suites = [testsuite(unit_files), ...
+            suites = [unit_suites, ...
                       testsuite(placement_test_file, 'Tag', 'manual'), ...
                       testsuite(water_test_file), ...
                       testsuite(isppa_test_file)];
         case 'head'
-            suites = [testsuite(unit_files), ...
+            suites = [unit_suites, ...
                       testsuite(placement_test_file), ...
                       testsuite(water_test_file), ...
                       testsuite(isppa_test_file), ...
                       testsuite(integration_file, 'Tag', 'smoke_config'), ...
                       testsuite(integration_file, 'Tag', 'smoke_head')];
         case 'acoustic'
-            suites = [testsuite(unit_files), ...
+            suites = [unit_suites, ...
                       testsuite(placement_test_file), ...
                       testsuite(water_test_file), ...
                       testsuite(isppa_test_file), ...
@@ -70,13 +86,43 @@ function run_all_tests(level)
                       testsuite(integration_file, 'Tag', 'smoke_head'), ...
                       testsuite(integration_file, 'Tag', 'smoke_acoustic')];
         case 'all'
-            suites = [testsuite(unit_files), ...
+            suites = [unit_suites, ...
                       testsuite(placement_test_file), ...
                       testsuite(water_test_file), ...
                       testsuite(isppa_test_file), ...
                       testsuite(integration_file)];
+        case 'demo_inputs'
+            suites = testsuite(demo_test_file, 'Tag', 'demo_inputs');
+        case 'demo_config'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_config')];
+        case 'demo_localite'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_localite')];
+        case 'demo_pct'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_pct')];
+        case 'demo_head'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_localite'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_pct'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_head')];
+        case 'demo_acoustic'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_localite'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_pct'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_head'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_acoustic')];
+        case 'demo_thermal'
+            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_acoustic'), ...
+                      testsuite(demo_test_file, 'Tag', 'demo_thermal')];
         otherwise
-            error('Unknown level ''%s''. Use: unit | head | acoustic | all', level);
+            error('Unknown level ''%s''. Use: unit | head | acoustic | all | demo_inputs | demo_config | demo_localite | demo_pct | demo_head | demo_acoustic | demo_thermal', level);
     end
 
     % ---- Run ----------------------------------------------------------
@@ -212,6 +258,36 @@ function m = build_descriptions()
         'test_each_output_isppa_positive',          'multi_isppa_pipeline: focal Isppa is positive for each target'
         'test_acoustic_cache_reused',               'multi_isppa_pipeline: acoustic cache .mat is written by Stage 1'
         'test_single_target_passthrough',           'multi_isppa_pipeline: scalar target_isppa raises an error'
+        % --- test_integration_demo (demo_inputs) ---
+        'test_t1_exists',                           'demo inputs: sub-009 T1w NIfTI is present in BIDS folder'
+        'test_ute_exists',                          'demo inputs: sub-009 UTE NIfTI is present in BIDS folder'
+        'test_segmentation_exists',                 'demo inputs: sub-009 final_tissues.nii.gz is present in m2m folder'
+        'test_localite_xml_exists',                 'demo inputs: TriggerMarkers XML exists under localite/sub-009/ses-02'
+        'test_heuristic_coord_file_exists',         'demo inputs: heuristic coord JSON is present for sub-009'
+        'test_heuristic_coord_file_valid',          'demo inputs: coord JSON has required fields mni_target_mm (3-element) and target_name'
+        'test_pct_pseudoCT_exists',                 'demo inputs: pseudoCT.nii.gz is present in m2m folder'
+        'test_pct_ute_reg_exists',                  'demo inputs: UTE_reg.nii.gz is present in m2m folder'
+        'test_mni_transforms_exist',                'demo inputs: toMNI/ folder with Conform2MNI_nonl.nii.gz is present'
+        % --- test_integration_demo (demo_config) ---
+        'test_manual_config_loads',                 'demo config (manual): loads without error; placement.mode=manual; 10 elements'
+        'test_localite_config_loads',               'demo config (localite): loads without error; placement.mode=localite; enabled=1'
+        'test_heuristic_config_loads',              'demo config (heuristic): loads without error; 3-element mni_target_mm injected from JSON'
+        'test_t1_pattern_resolves',                 'demo config: t1_pattern resolves to an existing file for sub-009'
+        % --- test_integration_demo (demo_localite) ---
+        'test_localite_xml_parses',                 'demo localite: TriggerMarkers XML parses to finite trans/focus voxel positions'
+        'test_neuronav_select_finds_session',        'demo localite: neuronav_select_localite finds ses-02 data for sub-009'
+        % --- test_integration_demo (demo_pct) ---
+        'test_pct_enabled_config_loads',            'demo pct: config with pct.enabled=1 loads correctly'
+        'test_pseudoCT_nifti_readable',             'demo pct: pseudoCT.nii.gz is a readable 3-D NIfTI volume'
+        'test_ute_reg_nifti_readable',              'demo pct: UTE_reg.nii.gz is a readable 3-D NIfTI volume'
+        % --- test_integration_demo (demo_head) ---
+        'test_preproc_head_manual',                 'demo head (manual): preproc_head completes; medium_masks and grid.dims present'
+        'test_medium_masks_label_range_manual',     'demo head (manual): medium_mask labels fall within [0, n_layers]'
+        'test_preproc_head_pct',                    'demo head (pct): preproc_head with pct.enabled=1 returns non-empty pseudoCT crop'
+        % --- test_integration_demo (demo_acoustic) ---
+        'test_acoustic_output_created_manual',      'demo acoustic (manual): intensity_orig_coord NIfTI created after full pipeline'
+        % --- test_integration_demo (demo_thermal) ---
+        'test_thermal_output_created_manual',       'demo thermal (manual): cem43_orig_coord NIfTI created after thermal pipeline'
     };
 
     m = containers.Map(keys(:,1), keys(:,2));

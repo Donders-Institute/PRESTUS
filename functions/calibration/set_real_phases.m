@@ -17,7 +17,7 @@ function elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, 
 % Output:
 %   elem_phase_deg - [1xN] element phases [°]
 %
-% See also: COMPUTE_PHASES, SAVE_OPTIMIZED_VALUES, CALIBRATION_TRANSDUCER
+% See also: COMPUTE_PHASES, GENERATE_TRAN_INI_FROM_GEOMETRY, SAVE_OPTIMIZED_VALUES, CALIBRATION_TRANSDUCER
 
 arguments
     phase_table
@@ -31,14 +31,18 @@ end
         % Extract phase values directly from the table
         distance = phase_table.Distance;
         phases = phase_table(:, 2:end-1); % Remove non-phase columns
-        
+
         foc_index = find(distance == focal_distance_ep, 1);
         init_phases = table2array(phases(foc_index, :));
     elseif isequal(tran.manufact, "Imasonic")
         % Compute phases based on the focal depth
         init_phases = compute_phases(parameters.medium_properties.water.sound_speed, tran, focal_distance_ep, phase_table);
     else
-        error('Unsupported transducer manufacturer: %s', tran.manufact);
+        % Generic or other manufacturer: derive element positions analytically
+        % from ring geometry (elem_id_mm, elem_od_mm, curv_radius_mm) in the
+        % transducer YAML.  No external phase table file is required.
+        tran_ini_data = generate_tran_ini_from_geometry(tran);
+        init_phases = compute_phases(parameters.medium_properties.water.sound_speed, tran, focal_distance_ep, tran_ini_data);
     end
 
     % Adjust phases for virtual elements if necessary

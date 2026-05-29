@@ -23,16 +23,57 @@ If you want the heatmaps to not carry over, you would run your pipeline like thi
 
 But now, you will also feed it the configs for each subsequent simulation:
 `sequential_configs.config_2 = config_2`  
-`sequential_configs.config_3 = config_3`  
-`prestus_pipeline_start(subject_id, config_1, 'sequential_configs', sequential_configs)`   
+`sequential_configs.config_3 = config_3` 
+`options.sequential_configs = sequential_configs` 
+`prestus_pipeline_start(config_1, options)`
 
-Please note that you have to use the names `config_x` in the sequential_configs, and that you have to use integers. So names like `config_-5`, `config_0`, `config_1234` and `config_007`.
+Please note that field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`, `config_1234`). The dispatcher picks the field with the lowest numeric value first, so the absolute values and gaps don't matter — only their relative order does. Non-numeric suffixes (e.g. `config_abc`) will be silently ignored or cause an error.
 
+##### Cache reuse in sequential simulations
+
+When a follow-up simulation is dispatched, PRESTUS automatically manages which results are reused and which are recomputed:
+
+| Stage | Default behaviour | How to override |
+|---|---|---|
+| Grid & medium setup | **Reused** from base run | Set `io.preproc_affix` in the sequential config |
+| Acoustic simulation | **Re-run** with the follow-up config | Set `io.acoustic_cache_affix` to an existing affix to reuse prior acoustics |
+| Thermal simulation | **Re-run** (cache file gets a `_seq<N>` suffix automatically) | Set `io.thermal_cache_affix` explicitly to control the cache filename |
+
+The rationale is that the head geometry does not change between sequential targets, so preproc can always be shared. Acoustics default to a fresh run because the follow-up may target a different location or use different transducer settings. The thermal cache is always given a unique name to avoid the "already done" check silently loading the base run's thermal results.
+
+To reuse the base run's acoustic results in the follow-up (e.g. same target, different timing protocol):
+
+```matlab
+options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output_affix;
 ```
-parameters.adopted_heatmap | path to nifti file
-parameters.adopted_cumulative_heat | path to nifti file
-options.sequential_configs
+
+| Parameter | Description |
+|---|---|
+| `io.adopted_heatmap` | Path to a temperature heatmap NIfTI (`heating_end.nii.gz`) used as the thermal starting point. Set automatically from the previous run's output; override to supply a custom starting temperature. |
+| `io.adopted_cem43` | Path to a CEM43 NIfTI (`CEM43_end.nii.gz`) carried forward for cumulative thermal dose. Set automatically; can be overridden. |
+| `io.adopted_cem43_iso` | Path to the ISO-variant CEM43 NIfTI (`CEM43_iso_end.nii.gz`). Set automatically alongside `adopted_cem43`. |
+| `io.preproc_affix` | Affix for grid/medium cache lookup (defaults to the base run's `output_affix`). |
+| `io.acoustic_cache_affix` | Affix for acoustic cache lookup. Not set by default — acoustics are re-run unless you set this explicitly. |
+| `io.thermal_cache_affix` | Affix for the thermal cache file (defaults to `<base_affix>_seq<N>`). |
+| `options.sequential_configs` | Struct of follow-up configs to dispatch in order (see example above). |
+| `options.sequential_cleanup_intermediate` | If `true`, per-run NIfTI and image files are deleted after the final summary report is successfully generated. Default: `false`. |
+
+##### Sequential simulations with uncertainty mode
+
+`options.sequential_configs` can be combined with `parameters.simulation.uncertainty = true`. In that case, each follow-up run is executed three times — once per uncertainty variant (default / liberal / conservative) — and each variant inherits the thermal end-state from the matched variant of the prior run:
+
+```matlab
+parameters.simulation.uncertainty = true;
+
+options.sequential_configs.config_2 = config_2;
+options.sequential_configs.config_3 = config_3;
+
+prestus_pipeline(parameters, options);
 ```
+
+After all sequential runs complete, `generate_sequential_report` is called with the full list of default/liberal/conservative parameter structs. The base run appears as **run 1** in the combined report; each follow-up adds a further run entry. The resulting report shows temperature and CEM43 timeseries with liberal/conservative shaded uncertainty bands overlaid on the default trajectory.
+
+On HPC, job names are prefixed with `r1-` when sequential configs are present (e.g. `PRESTUS-r1-u2-sim-default_sub-001`) to keep scheduler job names unambiguous across chained submissions. See [doc_uncertainty.md](doc_uncertainty.md) for the full description of the uncertainty pipeline.
 
 #### Multi-Transducer Modeling
 
@@ -61,15 +102,14 @@ When multiple transducers are listed in the configuration, PRESTUS combines them
 
 This is the default mode and requires no additional configuration.
 
-**Independent / incoherent firing**
+**Asynchronous / temporally non-overlapping firing**
 
-If the transducers fire independently (no fixed phase relationship), their pressures do not coherently interfere. In this case the correct quantity to sum is intensity, not pressure:
+If the transducers fire in separate, non-overlapping time windows (asynchronous duty cycles), their pressure fields never coexist. Because only one transducer is active at any instant, two distinct combination rules apply:
 
-$$I_\text{total} = \frac{|p_1|^2}{2 \rho c} + \frac{|p_2|^2}{2 \rho c}$$
+- **Acoustic safety metrics (ISPPA, MI, peak pressure):** the relevant quantity is the per-voxel maximum across transducers. The peak pressure at any voxel is determined by whichever transducer produces the higher instantaneous pressure there.
+- **Thermal heat deposition:** time-averaged heating accumulates from all transducers; the combined heat source entering the bioheat equation is the incoherent intensity sum across all transducers (currently assuming identical duty cycles).
 
-To simulate this scenario, run a separate PRESTUS simulation for each transducer individually (each config contains only that transducer). The resulting `Isppa` volumes can then be summed voxelwise in post-processing to obtain the combined intensity field.
-
-The combined intensity field can then serve as input to a single thermal simulation. Note that running independent thermal simulations and summing the resulting temperature maps is **not** valid: thermal diffusion is a global coupled process, not the sum of two independently computed fields.
+PRESTUS provides a dedicated `transducer_coupling: async` mode that handles both combination rules automatically. See [doc_async_transducer.md](doc_async_transducer.md) for configuration details, pipeline stages, and output files.
 
 **Staggered / time-offset firing**
 

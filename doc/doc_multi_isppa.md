@@ -1,6 +1,6 @@
 # Multi-ISPPA mode
 
-When `calibration.target_isppa_wcm2` is a vector with more than one value, PRESTUS automatically enters **multi-ISPPA mode**. A single acoustic simulation is run and cached; thermal analysis is then performed in parallel at each requested free-water intensity, with each job producing its own output files and HTML report.
+When `transducer.target_isppa_wcm2` is a vector with more than one value, PRESTUS automatically enters **multi-ISPPA mode**. A single acoustic simulation is run and cached; thermal analysis is then performed in parallel at each requested free-water intensity, with each job producing its own output files and HTML report.
 
 ---
 
@@ -35,9 +35,13 @@ On HPC (SLURM/qsub), stages 2…N are submitted in parallel with an `afterok` de
 
 ## Configuration
 
+`target_isppa_wcm2` is set in the transducer block:
+
 ```yaml
-calibration:
+transducer:
   target_isppa_wcm2: [10, 20, 30, 50]   # W/cm² — triggers multi-ISPPA mode
+  elem_amp: ...
+  # ... other transducer fields
 ```
 
 **Important:** `modules.run_water_baseline` defaults to `0` — you must explicitly enable it so that the provenance required for scaling is recorded:
@@ -46,6 +50,8 @@ calibration:
 modules:
   run_water_baseline: 1
 ```
+
+> **Backwards compatibility:** The older form `calibration.target_isppa_wcm2` is still accepted and is automatically migrated to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning.
 
 ---
 
@@ -98,7 +104,7 @@ Each stage checks for its sentinel output file before submitting (HPC) or runnin
 
 ## Relationship to uncertainty mode
 
-Multi-ISPPA mode and uncertainty mode are composable. When both `simulation.uncertainty = true` and `calibration.target_isppa_wcm2` is a vector, the two modes nest automatically:
+Multi-ISPPA mode and uncertainty mode are composable. When both `simulation.uncertainty = true` and `transducer.target_isppa_wcm2` is a vector, the two modes nest automatically:
 
 ```
 Stage 1   preproc / source setup         (shared)
@@ -112,5 +118,13 @@ Final     report
 This works because `uncertainty_pipeline` passes the full `parameters` struct (including the vector `target_isppa_wcm2`) into each variant's `prestus_pipeline` call, which then dispatches to `multi_isppa_pipeline`. Affixes compose naturally: the uncertainty variant affix (`_liberal`) is already set in `io.output_affix` when `multi_isppa_pipeline` builds its per-target affixes, yielding `_liberal_isppa030` etc.
 
 For each target intensity, an uncertainty report is generated aggregating the three variants at that intensity (e.g. `sub-001_layered_uncertainty_report_isppa030.html`). No report aggregating across intensities is produced.
+
+---
+
+## Relationship to async multi-transducer mode
+
+When `simulation.transducer_coupling = 'async'` and multiple transducers are defined, each transducer carries its own `target_isppa_wcm2`. The async pipeline scales each transducer's pressure field independently before summing intensities incoherently. Multi-ISPPA sweeps are supported: if any transducer has a vector target, one combine+thermal pair is run per sweep point.
+
+See [doc_async_transducer.md](doc_async_transducer.md) for full details.
 
 See also: [doc_calibration.md](doc_calibration.md), [doc_uncertainty.md](doc_uncertainty.md), [doc_modules.md](doc_modules.md)

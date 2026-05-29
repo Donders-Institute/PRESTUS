@@ -9,8 +9,32 @@ if ~exist(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
 end
 
+% Coerce list-of-list fields to cell-of-cell if yaml ConvertToArray
+% flattened them into numeric matrices.
+for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
+    f = coerce_field{1};
+    if ~iscell(parameters.calibration.(f))
+        parameters.calibration.(f) = ...
+            cellfun(@num2cell, num2cell(parameters.calibration.(f), 2), ...
+                    'UniformOutput', false);
+    elseif ~iscell(parameters.calibration.(f){1})
+        parameters.calibration.(f) = ...
+            cellfun(@num2cell, parameters.calibration.(f), ...
+                    'UniformOutput', false);
+    end
+end
+
 % Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
+
+% If a list-of-list field has only one entry, replicate it for all combinations
+for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
+    f = coerce_field{1};
+    if isfield(parameters.calibration, f) && iscell(parameters.calibration.(f)) && ...
+            length(parameters.calibration.(f)) == 1 && N_i > 1
+        parameters.calibration.(f) = repmat(parameters.calibration.(f), 1, N_i);
+    end
+end
 for i = 1:N_i
     combo_name = parameters.calibration.combinations{i};
     combo = equip_param.combos.(combo_name);
@@ -18,6 +42,7 @@ for i = 1:N_i
     % Extract equipment details
     tran_serial = combo.tran_serial; % - Transducer serial number or identifier
     tran = equip_param.trans.(tran_serial);
+    parameters.calibration.equipment_yaml_path = fullfile(equip_param.path, [char(tran_serial), '.yaml']);
     ds = combo.ds;                   % - Driving System metadata (inlined in combo)
 
     % Configure transducer parameters
@@ -39,14 +64,31 @@ for i = 1:N_i
     parameters.calibration.filename_calibrated_CSV = ...
         strcat(equip_param.gen.prestus_virt_name, equipment_name, '.csv');
 
-    % Load manufacturer-provided phase data (only possible if phase tables are available)
-    combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
-    if isequal(tran.manufact, "Sonic Concepts")
+    % Load manufacturer-provided phase data.
+    % Sonic Concepts and Imasonic require an external phase-table file.
+    % For any other manufacturer ('generic' or custom), phases are computed
+    % geometrically from the ring dimensions in the YAML — no file needed.
+    if isequal(tran.manufact, 'Sonic Concepts')
+        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
         phase_table = readtable(combo.phase_table);
-    elseif isequal(tran.manufact, "Imasonic")
+    elseif isequal(tran.manufact, 'Imasonic')
+        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
         phase_table = read_ini_file(combo.phase_table);
     else
-        error('Unsupported transducer manufacturer: %s | Please reach out to the developers.', tran.manufact);
+        phase_table = struct();   % unused; set_real_phases calls generate_tran_ini_from_geometry
+    end
+
+    % Load pre-calibrated per-element correction from the transducer equipment YAML.
+    % Written there by save_elem_correction after a reference-depth calibration.
+    % When present, activates geometric steering mode for all depths in this combo:
+    %   phases(depth) = compute_phases(depth) + elem_phase_correction
+    % Leave absent to use the default global-search path.
+    parameters.calibration.elem_phase_correction_deg = [];
+    if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
+        parameters.calibration.elem_phase_correction_deg = tran.elem_phase_correction.deg(:)';
+        fprintf('Loaded element correction (%d elements, ref depth %.2f mm) from transducer YAML.\n', ...
+            numel(parameters.calibration.elem_phase_correction_deg), ...
+            tran.elem_phase_correction.ref_depth_ep_mm);
     end
 
     % Load characterization data
@@ -55,6 +97,11 @@ for i = 1:N_i
     available_foci_wrt_exit_plane = round(charac_data(2, 2:end), 2);
     dist_from_exit_plane = charac_data(3:end, 1);
     intens_data = charac_data(3:end, 2:end);
+
+    % readmatrix pads ragged CSVs with NaN — drop those columns
+    valid_cols                    = isfinite(available_foci_wrt_exit_plane);
+    available_foci_wrt_exit_plane = available_foci_wrt_exit_plane(valid_cols);
+    intens_data                   = intens_data(:, valid_cols);
 
     % Ensure focal depths are specified. 
     % If no focal depths, perform the simulations for all available focal depths

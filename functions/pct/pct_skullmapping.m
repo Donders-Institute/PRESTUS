@@ -219,7 +219,7 @@ end
     saveas(h, fullfile(path_pct, figureName), 'png');
 
     %% Export values to text
-    fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(b)]);
+    fprintf(['Mapping formula: y = ', num2str(m), ' * x + ', num2str(b), '\n']);
 
     txt_file = fopen(fullfile(path_pct, 'pCT_skull_mapping.txt'), 'w');
     fprintf(txt_file, '%.2f\n %.2f\n', round(m), round(b));

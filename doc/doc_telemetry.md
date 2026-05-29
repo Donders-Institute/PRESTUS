@@ -41,6 +41,19 @@ Each pipeline run emits up to two events: `run_start` (before any module
 runs) and `run_end` (on clean exit) or `run_error` (if the pipeline throws
 an unhandled exception). The table below lists every field that may be sent.
 
+### System resources
+
+| Field | Description |
+|---|---|
+| `os_version` | OS version string (macOS: `sw_vers -productVersion`; Linux: kernel release; Windows: `ver` output). Returns `'unknown'` on error. |
+| `cpu_model` | CPU model name (e.g. `Apple M2 Pro`). Returns `'unknown'` on error. |
+| `n_cpu_cores` | Number of logical CPU cores via `feature('numcores')`. |
+| `ram_gb` | Total physical RAM in GB (rounded). Returns `NaN` on error. |
+| `gpu_model` | GPU device name from `gpuDevice()`. Returns `'no_pct'` when the Parallel Computing Toolbox is not licensed; `'none'` when no GPU is found; otherwise the device name string. |
+| `toolboxes` | Cell array of installed MATLAB toolbox names (MATLAB itself excluded). |
+
+All system resource fields are collected inside `try/catch` blocks and fall back to `'unknown'` or `NaN` on any error, so they never cause the telemetry payload to fail.
+
 ### Identity
 
 | Field | Description |
@@ -48,7 +61,8 @@ an unhandled exception). The table below lists every field that may be sent.
 | `event` | Event type: `run_start`, `run_end`, or `run_error` |
 | `timestamp_utc` | POSIX timestamp (seconds since epoch, UTC) |
 | `uuid` | Random UUID generated locally on first run; stored in `~/.prestus/uuid.txt`. Not linked to your identity or machine. |
-| `prestus_ver` | Short git commit hash of the running PRESTUS checkout |
+| `prestus_ver` | Version string of the running PRESTUS checkout (from `git describe` or the `VERSION` file, e.g. `v0.5.1`) |
+| `prestus_hash` | Short git commit hash of the running PRESTUS checkout (e.g. `628edd0`) |
 | `matlab_ver` | MATLAB release string (e.g. `R2024a`) |
 | `kwave_ver` | k-Wave toolbox version string as reported by `getComputerInfo` |
 | `platform` | CPU architecture string from `computer('arch')` (e.g. `maci64`, `glnxa64`) |
@@ -92,4 +106,8 @@ an unhandled exception). The table below lists every field that may be sent.
 | `status` | `"success"` or `"error"` |
 | `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`) — **no message text** is transmitted |
 
-Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected. 
+Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected.
+
+## Usage statistics
+
+See the [Usage Statistics](doc_usage-statistics.md) page for live charts populated from the anonymised telemetry database.

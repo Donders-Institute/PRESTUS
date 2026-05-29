@@ -28,14 +28,20 @@ for ti = 1:numel(parameters.transducer)
     has_ep   = isfield(tr, 'focal_distance_ep')   && ~isempty(tr.focal_distance_ep);
     has_bowl = isfield(tr, 'focal_distance_bowl') && ~isempty(tr.focal_distance_bowl);
 
-    % Compute the geometry offset (bowl → exit plane) from type sub-struct
-    type_tr = tr.(tr.type);
-    if isfield(type_tr, 'curv_radius_mm') && isfield(type_tr, 'dist_geom_ep_mm') && ...
-            ~isempty(type_tr.curv_radius_mm) && ~isempty(type_tr.dist_geom_ep_mm) && ...
-            isfinite(type_tr.curv_radius_mm)
-        focal_distance_offset = type_tr.curv_radius_mm - type_tr.dist_geom_ep_mm;
-    else
-        focal_distance_offset = 0;
+    % Compute the geometry offset (bowl → exit plane) from type sub-struct.
+    % Skip transducers that have no valid type or no matching sub-struct.
+    tr_type = '';
+    if isfield(tr, 'type') && (ischar(tr.type) || isstring(tr.type)) && ~isempty(tr.type)
+        tr_type = char(tr.type);
+    end
+    focal_distance_offset = 0;
+    if ~isempty(tr_type) && isfield(tr, tr_type)
+        type_tr = tr.(tr_type);
+        if isfield(type_tr, 'curv_radius_mm') && isfield(type_tr, 'dist_geom_ep_mm') && ...
+                ~isempty(type_tr.curv_radius_mm) && ~isempty(type_tr.dist_geom_ep_mm) && ...
+                isfinite(type_tr.curv_radius_mm)
+            focal_distance_offset = type_tr.curv_radius_mm - type_tr.dist_geom_ep_mm;
+        end
     end
     tr.focal_distance_offset = focal_distance_offset;
 

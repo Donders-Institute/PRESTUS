@@ -44,7 +44,14 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
         % Read the image and ensure it matches the original image size by padding if necessary
         orig_imsize = size(imread(old_name)); % Get original image size
         I = imread(old_name); % Read image file
-        I = padarray(I, max([0 0 0; orig_imsize - size(I)], [], 1), I(1), 'pre'); % Pad image if needed
+        pad_amt = max([0 0 0; orig_imsize - size(I)], [], 1);
+        if any(pad_amt)
+            fill_px = I(1);
+            new_sz  = size(I) + pad_amt;
+            I_new   = repmat(fill_px, new_sz);
+            I_new(pad_amt(1)+1:end, pad_amt(2)+1:end, pad_amt(3)+1:end) = I;
+            I = I_new;
+        end
 
         % Add a text label to the top-left corner of the image with subject ID
         I = insertText(I, [0 5], sprintf('P%02i', subject_list(subject_i)), ...

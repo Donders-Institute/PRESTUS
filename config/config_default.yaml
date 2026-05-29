@@ -25,6 +25,12 @@ simulation:
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
   debug: 0            # Activate debug mode with additional intermediate outputs?
+  transducer_coupling: coherent # How multiple transducers interact acoustically:
+                                #   'coherent'  — pressure fields are superposed in a single k-Wave run
+                                #                 (models interference; current default behaviour)
+                                #   'async'     — each transducer is simulated independently and
+                                #                 intensities are summed incoherently before thermal
+                                #                 simulation (models asynchronous / non-overlapping firing)
 
 #------------ Paths
 
@@ -69,19 +75,12 @@ io:
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
 
-#------------ ISPPA targeting (free-water pressure scaling)
-#
-# Set target_isppa_wcm2 to a scalar to scale the acoustic output to a specific
-# free-water ISPPA before thermal analysis. Set it to a vector to automatically
-# run one thermal job per target (multi-ISPPA mode); see doc_multi_isppa.md.
-#
-# The acoustic simulation always runs at the elem_amp specified in the transducer
-# config. A fast water baseline sim is run alongside it (modules.run_water_baseline)
-# to record the free-water ISPPA at that drive level. Post-hoc pressure scaling is
-# then applied when loading cached results for thermal analysis.
+#------------ Calibration (equipment-level metadata, not ISPPA targeting)
 
 calibration:
-  target_isppa_wcm2: []  # Target free-water ISPPA [W/cm²]; scalar or vector
+  # target_isppa_wcm2 has moved to transducer.target_isppa_wcm2 (per-transducer).
+  # Setting calibration.target_isppa_wcm2 here still works but is deprecated and
+  # will be removed in a future release.
 
 #------------ Module execution
 
@@ -132,11 +131,21 @@ analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
 
 #------------ Transducer specification  (no defaults)
+#
+# target_isppa_wcm2: target free-water ISPPA for this transducer [W/cm²].
+#   Scalar  → scale to that intensity before thermal analysis.
+#   Vector  → run one thermal job per value (multi-ISPPA sweep mode).
+#   Empty   → no scaling; use elem_amp drive level as-is.
+#
+# The acoustic simulation always runs at the elem_amp specified below.
+# modules.run_water_baseline must be enabled to record the free-water baseline
+# ISPPA so that post-hoc pressure scaling can be applied.
 
 transducer:
   name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
+  target_isppa_wcm2: [] # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
 
   trans_pos: []              # Transducer position [T1 grid space]
   focus_pos: []              # Stimulation target position [T1 grid space]
@@ -222,7 +231,8 @@ transducer:
 placement:
   mode: 'manual'    # Placement mode: 'manual' (use trans_pos/focus_pos as provided) |
                     #   'localite' (derive from Localite XML; set placement.localite.file or path.localite) |
-                    #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name)
+                    #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
+                    #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer?
     # --- Simple mode: provide a direct path to a single Localite XML file ---
@@ -256,6 +266,36 @@ placement:
     criterion_skull_var: []
     expand_step: 0.01
 
+  plantus:
+    # --- Paths (required) ---
+    script_path: ''           # Path to PlanTUS installation directory (must contain PlanTUS_wrapper.py).
+                              # Install from: https://github.com/MScheltienne/PlanTUS
+    env_path: ''      # Path to SimNIBS installation (must contain simnibs_env/bin/python).
+                              # Typically the top-level SimNIBS directory, e.g. /opt/SimNIBS-4.1
+    # --- Target (one of the two must be set) ---
+    target_name: ''           # Label string for the target; used in output filenames (required)
+    mni_target_mm: []         # [x y z] MNI coordinate of the sonication target [mm].
+                              # If empty, transducer.focus_pos (voxel) is used instead.
+    # --- Transducer characterisation (required) ---
+    focal_distance_list: []   # [1×N] focal distances [mm] from calibration report.
+                              # PlanTUS evaluates each distance as a candidate placement configuration.
+    flhm_list: []             # [1×N] full-width at half-maximum focal length [mm] for each entry
+                              # in focal_distance_list (same calibration report).
+    # --- Geometry (optional; defaults derived from transducer equipment config) ---
+    additional_offset_mm: 0   # Extra stand-off between skin and transducer exit plane [mm]
+                              # (e.g., coupling gel pad or water-filled cone).
+    max_angle_deg: 10         # Maximum allowed transducer tilt angle [degrees].
+    mask_radius_mm: 2         # Radius of the spherical target mask [mm].
+    # --- Optimisation weights (must sum to 1.0) ---
+    weight_skin_target_distances: 0.2     # Penalise transducer-to-target distance
+    weight_skin_target_angles: 0.2        # Penalise beam angle at skin
+    weight_skin_target_intersections: 0.2 # Reward beam-target volume overlap
+    weight_skin_skull_angles: 0.2         # Penalise skin-skull surface angle
+    weight_skull_thickness: 0.2           # Penalise skull thickness at entry
+    # --- Surface visualisation (optional) ---
+    connectome_wb_path: ''    # Path to Connectome Workbench bin/ directory.
+                              # Leave empty to skip (--skip_wb_view is always passed).
+
 #------------ Simulation grid
 
 grid:
@@ -275,6 +315,14 @@ grid:
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
+  mode: 'transducer_axis'  # Grid orientation mode:
+                           #   'transducer_axis' (default) — rotate volume so focal axis aligns
+                           #     with z before simulation; compact grid, z-aligned beam.
+                           #   'ras_plus' — keep volume in RAS+ orientation; no rotation applied,
+                           #     only isotropic rescaling. Preserves world-space geometry and
+                           #     aligns with k-Plan / BabelBrain conventions. Requires that
+                           #     transducer_setup can place a bowl at an arbitrary angle, which
+                           #     k-Wave supports via makeBowl(grid, trans_pos, r, d, focus_pos).
 
 #------------ Segmentation
 

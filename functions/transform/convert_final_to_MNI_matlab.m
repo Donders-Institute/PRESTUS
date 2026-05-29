@@ -78,9 +78,6 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
     % Compute affine transformation matrix from final space to MNI space
     final_to_mni_affine = inv(mni_header.Transform.T') * subj2mni * t1_orig_hdr.Transform.T' * inv_final_transformation_matrix.tdata.T';
 
-    % Create affine transformation object for MATLAB's `tformarray`
-    final_to_mni_tform = maketform('affine', final_to_mni_affine');
-
     % Check if output NIfTI file exists and handle accordingly
     if options.check_nifti_on_disk
         img_mni_hdr = mni_header; % Use MNI header as template for output image
@@ -90,8 +87,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
         % Confirm overwriting or load existing file
         if confirm_overwriting(options.nifti_filename, parameters)
             % Transform input image to MNI space and save as NIfTI file
-            img_mni = tformarray(final_img, final_to_mni_tform, ...
-                        makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], mni_template_size, [], options.fill_value);
+            img_mni = affine_resample_3d(final_img, final_to_mni_affine', mni_template_size, 'nearest', options.fill_value);
 
             niftiwrite(img_mni, regexprep(options.nifti_filename, '.nii.gz$', ''), 'Compressed', true);
         else

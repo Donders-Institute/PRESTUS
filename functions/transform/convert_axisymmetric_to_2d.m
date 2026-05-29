@@ -24,8 +24,8 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %   source_labels- [Nz x Nr] numeric, transducer element label map
 %
 % Output:
-%   All inputs returned with spatial fields mirrored and transposed to [2*Nr x Nz].
-%   parameters.grid.dims updated to [2*Nr, Nz].
+%   All inputs returned with spatial fields mirrored and transposed to [Nlateral x Naxial].
+%   parameters.grid.dims updated to [Nlateral, Naxial] (original bilateral dims restored).
 %   kgrid replaced with a 2D kWaveGrid.
 %
 % See also: CONVERT_AXISYMMETRIC_TO_3D, GRID_AXISYMMETRY
@@ -39,41 +39,68 @@ arguments
     source       (1,1) struct
     source_labels(:,:) {mustBeNumericOrLogical}
 end
-sensor_data.p_final = cat(2, fliplr(sensor_data.p_final), sensor_data.p_final);
-sensor_data.p_max_all = cat(2, fliplr(sensor_data.p_max_all), sensor_data.p_max_all);
+%% Resolve original bilateral dimensions
+assert(isfield(parameters.grid, 'axisym_bilateral_dims'), ...
+    'convert_axisymmetric_to_2d: parameters.grid.axisym_bilateral_dims missing. Was grid_axisymmetry called?');
+
+bilateral_dims = parameters.grid.axisym_bilateral_dims;   % [Naxial, Nlateral]
+bilateral_tp   = parameters.transducer(1).trans_pos_bilateral;
+bilateral_fp   = parameters.transducer(1).focus_pos_bilateral;
+
+Nlateral  = bilateral_dims(2);   % target bilateral width (e.g. 280)
+ax_center = bilateral_tp(2);     % axis column in the bilateral grid (e.g. 140)
+
+% Mirror the half-plane about the axis to reconstruct exactly Nlateral
+% columns, with the axis landing at column ax_center.
+%
+% Half-grid layout (Nr columns):
+%   col 1         = r = 0  (axis)
+%   col 2..Nr     = r = dy .. (Nr-1)*dy
+%
+% Target bilateral layout (Nlateral columns):
+%   col 1..(ax_center-1)   = reflected cols ax_center..2  (left of axis)
+%   col ax_center          = axis (col 1 of half-grid)
+%   col (ax_center+1)..Nlateral = cols 2..(Nlateral-ax_center+1)  (right)
+%
+% The right half takes exactly Nlateral-ax_center columns from the
+% half-grid (cols 2..(Nlateral-ax_center+1)), so the half-grid must have
+% at least Nlateral-ax_center+1 columns.  grid_axisymmetry guarantees this
+% because Nr = dims(2) - ax_center + 1 and dims(2) = Nlateral.
+right_len = Nlateral - ax_center;               % columns right of axis
+
+mirror = @(A) cat(2, ...
+    fliplr(A(:, 2:ax_center)), ...              % reflected left:  ax_center-1 cols
+    A(:, 1), ...                                % axis:            1 col
+    A(:, 2:right_len+1));                       % right half:      right_len cols
+
+sensor_data.p_final   = mirror(sensor_data.p_final);
+sensor_data.p_max_all = mirror(sensor_data.p_max_all);
 if isfield(sensor_data, 'p_complex')
-    sensor_data.p_complex = cat(2, fliplr(real(sensor_data.p_complex)), real(sensor_data.p_complex)) + ...
-                        1i .* cat(2, fliplr(imag(sensor_data.p_complex)), imag(sensor_data.p_complex));
+    sensor_data.p_complex = mirror(real(sensor_data.p_complex)) + ...
+                        1i .* mirror(imag(sensor_data.p_complex));
 end
-segmentation = cat(2, fliplr(segmentation), segmentation);
-medium_masks = cat(2, fliplr(medium_masks), medium_masks);
-source.p_mask = cat(2, fliplr(source.p_mask), source.p_mask);
-source_labels = cat(2, fliplr(source_labels), source_labels);
+segmentation  = mirror(segmentation);
+medium_masks  = mirror(medium_masks);
+source.p_mask = mirror(source.p_mask);
+source_labels = mirror(source_labels);
 fields = fieldnames(kwave_medium);
 for i = 1:numel(fields)
     if size(kwave_medium.(fields{i}),2)>1
-        kwave_medium.(fields{i}) = cat(2, fliplr(kwave_medium.(fields{i})), kwave_medium.(fields{i}));
+        kwave_medium.(fields{i}) = mirror(kwave_medium.(fields{i}));
     end
 end
 
-% shift positions to diameter location
-trans_pos_final = parameters.transducer(1).trans_pos;
-focus_pos_final = parameters.transducer(1).focus_pos;
+%% Restore original bilateral dims and positions
+% The data is currently [Naxial x Nlateral].  Transpose back to
+% [Nlateral x Naxial] to match the original bilateral orientation, then
+% restore the stored dims and positions so downstream code sees the same
+% grid it would from a non-axisymmetric run.
+parameters.grid.dims = fliplr(bilateral_dims);   % [Nlateral, Naxial]
 
-trans_pos_final(2) = trans_pos_final(2)+parameters.grid.dims(2);
-focus_pos_final(2) = focus_pos_final(2)+parameters.grid.dims(2);
-
-% convert radial dimension size into diameter
-parameters.grid.dims(2) = parameters.grid.dims(2)*2;
-
-% shift radial to x dim
-parameters.grid.dims = fliplr(parameters.grid.dims);
-trans_pos_final = fliplr(trans_pos_final);
-focus_pos_final = fliplr(focus_pos_final);
 segmentation = segmentation';
 medium_masks = medium_masks';
 sensor_data.p_max_all = sensor_data.p_max_all';
-sensor_data.p_final = sensor_data.p_final';
+sensor_data.p_final   = sensor_data.p_final';
 if isfield(sensor_data, 'p_complex')
     sensor_data.p_complex = sensor_data.p_complex.';
 end
@@ -86,9 +113,9 @@ for i = 1:numel(fields)
     end
 end
 
-% Retain transducer and focus positions after all grid manipulations
-parameters.transducer(1).trans_pos = trans_pos_final;
-parameters.transducer(1).focus_pos = focus_pos_final;
+% Restore positions from the bilateral snapshot: [lateral, axial]
+parameters.transducer(1).trans_pos = fliplr(bilateral_tp);
+parameters.transducer(1).focus_pos = fliplr(bilateral_fp);
 
 % set up kgrid again for eventual heating sim
 kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ...

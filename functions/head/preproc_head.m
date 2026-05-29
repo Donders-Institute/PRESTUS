@@ -66,6 +66,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         t1_image = niftiread(filename_t1_simnibs);
         t1_header = niftiinfo(filename_t1_simnibs);
     end
+    [t1_image, t1_header] = ensure_ras_plus(t1_image, t1_header);
 
     if parameters.pct.enabled == 1
         % Load pseudoCT from the resolved pCT directory (parameters.io.dir_pct).
@@ -75,15 +76,18 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
         pseudoCT_header = niftiinfo(filename_pseudoCT);
+        [pseudoCT_image, pseudoCT_header] = ensure_ras_plus(pseudoCT_image, pseudoCT_header);
 
         % Load pseudoCT tissues mask
         filename_tissues_mask = fullfile(pct_dir, 'tissues_mask.nii.gz');
         tissues_mask_image = niftiread(filename_tissues_mask);
         tissues_mask_header = niftiinfo(filename_tissues_mask);
+        [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
     else
         % Load traditional SimNIBS segmentation
         tissues_mask_image = niftiread(filename_segmented);
         tissues_mask_header = niftiinfo(filename_segmented);
+        [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
     end
 
     %% Determine transducer position in T1 grid
@@ -160,9 +164,20 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         focus_pos_grid = focus_pos_grid';
     end
 
-    %% Rotate and scale images to match the stimulation trajectory
+    %% Rotate/rescale images to match the stimulation trajectory
+    % grid.mode='transducer_axis' (default): rotate so focal axis aligns with z.
+    % grid.mode='ras_plus': rescale only; volume stays in RAS+ orientation.
 
-    disp('Rotating images to focal axis and rescaling to grid resolution ...')
+    use_ras_plus = isfield(parameters, 'grid') && isfield(parameters.grid, 'mode') && ...
+                   strcmp(parameters.grid.mode, 'ras_plus');
+
+    if use_ras_plus
+        disp('Rescaling images to grid resolution (RAS+ mode — no rotation) ...')
+        preproc_fn = @preproc_rescale_only;
+    else
+        disp('Rotating images to focal axis and rescaling to grid resolution ...')
+        preproc_fn = @preproc_align_to_focal_axis;
+    end
 
     % If the segmentation process was not successful, it will stop preprocessing
     assert(exist(filename_segmented,'file') > 0, ...
@@ -193,7 +208,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             scale_factor_t1 = t1_header.PixelDimensions(1)/parameters.grid.resolution_mm;
             [t1_img_rr, trans_pos_rescaled, focus_pos_rescaled, ...
             scale_rotate_recenter_matrix, rotation_matrix, ~, ~, t1_rr_img_montage] = ...
-                preproc_align_to_focal_axis(...
+                preproc_fn(...
                 t1_image, ...
                 t1_header, ...
                 trans_pos_grid, ...
@@ -222,7 +237,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         scale_factor_seg = tissues_mask_header.PixelDimensions(1)/parameters.grid.resolution_mm;
         [segmented_img_rr, ~, ~, ...
             ~, ~, ~, ~, segm_img_montage] = ...
-            preproc_align_to_focal_axis(...
+            preproc_fn(...
             tissues_mask_image, ...
             tissues_mask_header, ...
             trans_pos_grid, ...
@@ -247,7 +262,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         % Binary skull mask is always derived from the segmentation labels.
         bone_img = ismember(tissues_mask_image, charm_seg_labels().bonemask);
         [bone_mask_img_rr, ~, ~, ~, ~, ~, ~, bone_mask_montage] = ...
-            preproc_align_to_focal_axis(...
+            preproc_fn(...
             bone_img, ...
             tissues_mask_header, ...
             trans_pos_grid, ...
@@ -259,7 +274,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         % pseudoCT (HU values) is only available in the pCT pipeline variant.
         if parameters.pct.enabled == 1
             [pseudoCT_img_rr, ~, ~, ~, ~, ~, ~, pseudoCT_montage] = ...
-                preproc_align_to_focal_axis(...
+                preproc_fn(...
                 pseudoCT_image, ...
                 pseudoCT_header, ...
                 trans_pos_grid, ...
@@ -292,8 +307,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             end
         end; clear bone_mask_montage pseudoCT_montage;
 
-        assert(isequal(size(trans_pos_rescaled(1:2)),size(focus_pos_rescaled(1:2))),...
-            "After reorientation, the first two coordinates of the focus and the transducer should be the same")
+        % x/y equality check omitted: holds only in transducer_axis mode where
+        % the focal axis is aligned with z. In ras_plus mode trans and focus
+        % differ in all three coordinates.
 
         % Save rotated and rescaled data.
         % The transformation matrices are always saved — they are small and
@@ -409,7 +425,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
         % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
-        inv_final_transformation_matrix = maketform('affine', inv(final_transformation_matrix')');
+        inv_final_transformation_matrix = inv(final_transformation_matrix);
 
         % Diagnostic NIfTIs: medium_masks, segmentation, and skull_mask
         % back-projected to T1 space. Written to debug_dir/preproc/ only
@@ -420,8 +436,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'single';
             segmented_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_medium_masks_final', parameters.subject_id));
-            plotdata = single(tformarray(uint8(medium_masks), inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+            plotdata = single(affine_resample_3d(uint8(medium_masks), inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(segmented_file)
                 try
                     niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
@@ -436,8 +452,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'single';
             segmentation_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_segmentation_final', parameters.subject_id));
-            plotdata = single(tformarray(uint8(segmentation_crop), inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0)) ;
+            plotdata = single(affine_resample_3d(uint8(segmentation_crop), inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(segmentation_file)
                 try
                     niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
@@ -452,8 +468,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             orig_hdr.Datatype = 'double';
             skull_mask_file = fullfile(parameters.io.dir_debug_preproc,...
                 sprintf('sub-%03d_skull_mask_final', parameters.subject_id));
-            plotdata = double(tformarray(bone_mask_crop, inv_final_transformation_matrix, ...
-                makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
+            plotdata = double(affine_resample_3d(bone_mask_crop, inv_final_transformation_matrix, ...
+                orig_hdr.ImageSize, 'nearest', 0));
             if ~isfile(skull_mask_file)
                 try
                     niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
@@ -468,8 +484,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 orig_hdr.Datatype = 'single';
                 pseudoCT_file = fullfile(parameters.io.dir_debug_preproc,...
                     sprintf('sub-%03d_pseudoCT_final', parameters.subject_id));
-                plotdata = single(tformarray(pseudoCT_crop, inv_final_transformation_matrix, ...
-                    makeresampler('nearest', 'fill'), [1 2 3], [1 2 3], orig_hdr.ImageSize, [], 0));
+                plotdata = single(affine_resample_3d(pseudoCT_crop, inv_final_transformation_matrix, ...
+                    orig_hdr.ImageSize, 'nearest', 0));
                 if ~isfile(pseudoCT_file)
                     try
                         niftiwrite(plotdata, pseudoCT_file, orig_hdr, 'Compressed',true);
@@ -518,7 +534,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     % If the transformation cannot be correctly inverted, this will be displayed
     % If the inverse transformation is off by > 1 voxel, the script exits
 
-    backtransf_coordinates = round(tformfwd([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
+    backtransf_coordinates = round(affine_apply_pts([trans_pos_final; focus_pos_final], inv_final_transformation_matrix));
     diff_voxels = abs(backtransf_coordinates - [trans_pos_grid; focus_pos_grid]);
     
     if any(diff_voxels(:) > 1)
@@ -556,7 +572,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             fpos_t1 = tr.focus_pos(:).';
     
             % map to simulation grid using the same global transform
-            pts_sim = round(tformfwd([tpos_t1; fpos_t1], maketform('affine', final_transformation_matrix))); % 2×3
+            pts_sim = round(affine_apply_pts([tpos_t1; fpos_t1], final_transformation_matrix)); % 2×3
             tpos_sim = pts_sim(1,:);
             fpos_sim = pts_sim(2,:);
         end

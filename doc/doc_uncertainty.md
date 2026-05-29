@@ -74,6 +74,8 @@ Stage 4: Conservative simulation        ┘
 Stage 5: Uncertainty report generation  (serial; runs once all three output files are present)
 ```
 
+Uncertainty mode can be combined with sequential simulations — see [Sequential simulations with uncertainty mode](doc_advanced.md#sequential-simulations-with-uncertainty-mode) for details.
+
 All five stages are managed automatically when `parameters.simulation.uncertainty = true` is set before calling `prestus_pipeline`. This is the same entry point used for standard simulations — no separate function call is required.
 
 ### Basic usage
@@ -180,7 +182,7 @@ The uncertainty report (`generate_uncertainty_report.m`) is a self-contained HTM
 
 - **Safety dashboard** — Color-coded cards for all ITRUSST consensus safety metrics (MI, CEM43, temperature rise, absolute temperature). Each card shows the **default** value with the liberal–conservative range annotated. The bar spans a metric-specific minimum (37 °C for absolute temperatures, 0 elsewhere) to `max(max_sim, limit)`. The colored fill extends to `min(max_sim, limit)`; three ticks mark the liberal (blue), default (black), and conservative (brown) values. Color is determined by the conservative value.
 - **Acoustic results** — Range table showing liberal / default / conservative values for key acoustic metrics (ISPPA, focal distance, MI, half-maximum volume).
-- **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Side-by-side temperature-vs-time images (`thermal_max`) across liberal, default, and conservative variants.
+- **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Side-by-side temperature-vs-time images (`thermal_max`) across liberal, default, and conservative variants. Per-layer and global uncertainty-band timeseries plots show temperature and CEM43 over time with liberal/conservative shaded envelopes around the default trajectory.
 - **Additional maps** — Side-by-side maximum temperature maps across variants.
 - **Raw data tables** — Full CSV output tables for each variant.
 

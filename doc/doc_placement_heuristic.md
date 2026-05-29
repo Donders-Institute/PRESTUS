@@ -97,6 +97,8 @@ PRESTUS generates an overview of the selected transducer placement:
 
 If `parameters.localite_path` is specified, it will also deposit a copy of the plot there.
 
+A T1 overlay plot (`plot_placement_t1_overlay`) is generated automatically after the heuristic position is selected. It shows the transducer position and target overlaid on orthogonal T1 slices and is written to the subject output folder alongside the standard placement figure.
+
 ### Save Localite planning image
 
 **[Optional]**  

@@ -39,6 +39,11 @@ end
         return
     end
 
+    if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
+        disp('Axisymmetric mode: skipping medium NIfTI export.')
+        return
+    end
+
     is_layered = strcmp(parameters.simulation.medium, 'layered');
     m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
 

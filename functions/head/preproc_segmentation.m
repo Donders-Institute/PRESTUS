@@ -46,7 +46,6 @@ end
 
     % Define output folder for segmentation results
     segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
-
     filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
 
     % Run segmentation (if necessary)
@@ -71,11 +70,13 @@ end
 
     parameters = simnibs_version(segmentation_folder, parameters);
 
+    pct_folder = fullfile(parameters.path.pct, sprintf('m2m_sub-%03d', parameters.subject_id));
+    filename_pseudoCT = fullfile(pct_folder, 'pseudoCT.nii.gz');
+
     if parameters.pct.enabled == 1
         if isempty(filename_t2)
             error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
         end
-        filename_pseudoCT = fullfile(segmentation_folder, 'pseudoCT.nii.gz');
         if exist(filename_pseudoCT, 'file')
             disp('pseudoCT available...');
         else
@@ -90,7 +91,11 @@ end
         path_to_input_img  = fullfile(segmentation_folder, 'T1.nii.gz');
         path_to_output_img = fullfile(segmentation_folder, 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
         if ~exist(path_to_output_img, 'file')
-            convert_final_to_MNI_simnibs(path_to_input_img, segmentation_folder, path_to_output_img, parameters);
+            mni_warp_method = 'simnibs';
+            if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
+                mni_warp_method = parameters.analysis.mni_warp_method;
+            end
+            convert_final_to_MNI_simnibs(path_to_input_img, segmentation_folder, path_to_output_img, parameters, 'method', mni_warp_method);
         end
     end
 

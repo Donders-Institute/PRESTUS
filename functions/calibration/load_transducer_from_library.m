@@ -91,6 +91,19 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
                 entry.precession_mode);
     end
 
+    % Apply per-element hardware correction if present in the transducer YAML
+    if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
+        correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
+        if numel(correction_rad) ~= n_elem
+            warning(['load_transducer_from_library: elem_phase_correction has %d elements ' ...
+                'but transducer has %d — correction skipped.'], numel(correction_rad), n_elem);
+        else
+            elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
+            fprintf('Applied per-element hardware correction (ref depth %.2f mm).\n', ...
+                tran.elem_phase_correction.ref_depth_ep_mm);
+        end
+    end
+
     parameters.transducer.annular.elem_phase_rad = elem_phase_rad;
     parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
 

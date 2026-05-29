@@ -1,0 +1,29 @@
+% Example Sonic Concepts phase table
+%
+% FORMAT expected by set_real_phases (manufact = 'Sonic Concepts'):
+%   readtable() reads this file.
+%   Column 1  : Distance  — focal depth relative to the exit plane [mm].
+%               Must match the values requested in calibration_setup exactly
+%               (no interpolation is performed for Sonic Concepts tables).
+%   Columns 2…N: one column per physical element, phases in degrees [0–360).
+%               The column headers are arbitrary (not parsed by code).
+%   Column N+1: trailing column (e.g. gain or notes) — ignored by code via
+%               phases = phase_table(:, 2:end-1), which strips first and last.
+%
+% For a 4-element transducer this file has 6 columns:
+%   Distance | Phase_El1 | Phase_El2 | Phase_El3 | Phase_El4 | Gain
+%
+% Phases are manufacturer-specified and represent the hardware-driving phase
+% for each element at that steering depth.  They will be used as starting
+% phases in calibration_transducer and may be refined by perform_global_search.
+%
+% To add a new focal depth: insert a new row with the depth and the matching
+% element phases.  Rows may appear in any order — the code searches by value.
+Distance,Phase_El1,Phase_El2,Phase_El3,Phase_El4,Gain
+40.0,0.0,330.0,300.0,275.0,1.0
+45.0,0.0,335.0,308.0,286.0,1.0
+50.0,0.0,340.0,315.0,297.0,1.0
+55.0,0.0,345.0,323.0,308.0,1.0
+60.0,0.0,350.0,331.0,319.0,1.0
+65.0,0.0,355.0,345.0,338.0,1.0
+70.0,0.0,0.0,0.0,0.0,1.0

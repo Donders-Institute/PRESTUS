@@ -35,7 +35,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % Keep the largest connected skull component
     
     sz = size(BW);
-    CC = bwconncomp(BW, 26);
+    CC = bwconncomp_3d(BW, 26);
     if CC.NumObjects == 0, error("Skull mask is empty."); end
     sizes = cellfun(@numel, CC.PixelIdxList);
     [~, iBig] = max(sizes);
@@ -54,17 +54,20 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         wrapRadius = 10; % skull rubber wrap radius [grid voxels];
     end
 
-    se = strel("sphere", wrapRadius);
+    r_int = ceil(wrapRadius);
+    [kx,ky,kz] = ndgrid(-r_int:r_int, -r_int:r_int, -r_int:r_int);
+    se = (kx.^2 + ky.^2 + kz.^2) <= wrapRadius^2;
 
     % "Shrink-wrap" / morphological hull:
     % Bridge concavities that are smaller than wrapRadius (-> rubber won't go in).
-    BWwrap = imclose(BW1, se);
+    BWwrap = convn(logical(BW1), se, 'same') > 0;           % dilate
+    BWwrap = convn(BWwrap, se, 'same') == nnz(se);           % erode  → imclose
 
     % Ensure that the wrap is a continuous, filled region
-    BWwrap = imfill(BWwrap, "holes");
+    BWwrap = imfill_holes_3d(BWwrap);
 
     % Optional: remove any stray bits and keep largest component again
-    CCw = bwconncomp(BWwrap, 26);
+    CCw = bwconncomp_3d(BWwrap, 26);
     sizesw = cellfun(@numel, CCw.PixelIdxList);
     [~, iw] = max(sizesw);
     BWwrap2 = false(sz);
@@ -79,18 +82,7 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask%s.nii', parameters.io.output_affix));
 
-        infoOut = info;
-        infoOut.ImageSize = size(BW);
-        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(BW)));
-        infoOut.Datatype = 'uint8';
-        infoOut.BitsPerPixel = 8;
-        infoOut.Filename = outNii;
-        infoOut.Filemoddate = char(datetime("now"));
-
-        niftiwrite(BW, outNii, infoOut, 'Compressed', false);
-
-        gzip(outNii);
-        delete(outNii);   % remove uncompressed .nii
+        niftiwrite(BW, outNii, 'Compressed', true);
     end
 
     %% Manage layered head tissues
@@ -125,10 +117,12 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     touchRadius = 1;   % voxels: 1 = immediate neighbors (26-neighborhood)
 
-    se = strel("sphere", touchRadius);
+    r_int = ceil(touchRadius);
+    [kx,ky,kz] = ndgrid(-r_int:r_int, -r_int:r_int, -r_int:r_int);
+    se = (kx.^2 + ky.^2 + kz.^2) <= touchRadius^2;
 
-    GM_touch_region   = imdilate(BRAIN,   se);
-    SKIN_touch_region = imdilate(SKIN, se);
+    GM_touch_region   = convn(logical(BRAIN), se, 'same') > 0;
+    SKIN_touch_region = convn(logical(SKIN),  se, 'same') > 0;
 
     % Keep balloon voxels that touch BOTH
     B_touch_both =  BW & GM_touch_region & SKIN_touch_region;
@@ -157,8 +151,10 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     % --- Restrict to CSF voxels near existing balloon mask ---
     nearRadius = 2;                 % 1–2 suggested
-    seNear = strel("sphere", nearRadius);
-    nearBalloon = imdilate(B_out, seNear);
+    r_int = ceil(nearRadius);
+    [kx,ky,kz] = ndgrid(-r_int:r_int, -r_int:r_int, -r_int:r_int);
+    seNear = (kx.^2 + ky.^2 + kz.^2) <= nearRadius^2;
+    nearBalloon = convn(logical(B_out), seNear, 'same') > 0;
 
     CSF_touch_SKIN_6_near = CSF_touch_SKIN_6 & nearBalloon;
 
@@ -197,19 +193,9 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
         outNii = fullfile(parameters.io.dir_debug_preproc,...
             sprintf('balloon_mask_final%s.nii', parameters.io.output_affix));
 
-        infoOut = info;
-        infoOut.ImageSize = size(SKULL_BALLON);
-        infoOut.PixelDimensions = repmat(parameters.grid.resolution_mm,1,numel(size(SKULL_BALLON)));
-        infoOut.Datatype = 'uint8';
-        infoOut.BitsPerPixel = 8;
-        infoOut.Filename = outNii;
-        infoOut.Filemoddate = char(datetime("now"));
+        niftiwrite(uint8(SKULL_BALLON), outNii, 'Compressed', true);
 
-        niftiwrite(uint8(SKULL_BALLON), outNii, infoOut, 'Compressed', false);
-        gzip(outNii);
-        delete(outNii);
-
-        % fprintf("Saved: %s.gz\n", outNii);
+        % fprintf("Saved: %s\n", outNii);
     end
 
     %% [DEBUG] Visualize the expanded skull

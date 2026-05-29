@@ -83,28 +83,31 @@ end
 
     h = figure;
     hold on;
-    % create dummy values to avoid crashes when mask is empty
+    leg_handles = []; leg_labels = {};
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask.skull))
+    if any(mask.skull)
         data2plot = max(focal_axis_temperature(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.temp.Skull, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.skin))
+    if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.skin)
         data2plot = max(focal_axis_temperature(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.temp.Skin, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.brain))
+    if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.brain)
         data2plot = max(focal_axis_temperature(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.temp.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.temp.Brain, 'LineWidth', 2);
-    % add target
+    if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
     HEAT.temp.TARGET = focal_axis_temperature(target_pos_focal, 1:size(time_status_seq,2));
     p4 = plot(HEAT.recordedtime, HEAT.temp.TARGET, 'LineWidth', 2);
+    leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -120,7 +123,7 @@ end
     end
     xlim([0, HEAT.recordedtime(end)]);
     hold off
-    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'});
+    legend(leg_handles, leg_labels);
     legend('boxoff');
     title('Temperature in focal plane (NOT overall tissue max.)');
     saveas(h, output_plot, 'png');
@@ -130,31 +133,31 @@ end
 
     h = figure;
     hold on;
-%     p1 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.skull, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p2 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.skin, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-%     p3 = plot(HEAT.recordedtime, nanmean(focal_axis_trise(mask.brain, 1:size(time_status_seq,2)),1), 'LineWidth', 2);
-    % create dummy values to avoid crashes when mask is empty
+    leg_handles = []; leg_labels = {};
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask.skull))
+    if any(mask.skull)
         data2plot = max(focal_axis_trise(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.tempRise.Skull, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.skin))
+    if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.skin)
         data2plot = max(focal_axis_trise(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.tempRise.Skin, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.brain))
+    if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.brain)
         data2plot = max(focal_axis_trise(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.tempRise.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.tempRise.Brain, 'LineWidth', 2);
-    % add target
+    if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
     HEAT.tempRise.TARGET = focal_axis_trise(target_pos_focal, 1:size(time_status_seq,2));
     p4 = plot(HEAT.recordedtime, HEAT.tempRise.TARGET, 'LineWidth', 2);
+    leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
     ylabel('Temperature [°C]');
@@ -170,7 +173,7 @@ end
     end
     xlim([0, HEAT.recordedtime(end)]);
     hold off
-    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
+    legend(leg_handles, leg_labels, 'location', 'NorthWest');
     legend('boxoff');
     title('Temperature rise in focal plane (NOT overall tissue max.)');
     saveas(h, output_plot_rise, 'png');
@@ -180,31 +183,34 @@ end
 
     g = figure;
     hold on;
-    % create dummy values to avoid crashes when mask is empty
+    leg_handles = []; leg_labels = {};
     data2plot = NaN(numel(HEAT.recordedtime), 1);
-    if any(find(mask.skull))
+    if any(mask.skull)
         data2plot = max(focal_CEM(mask.skull, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Skull = data2plot;
     p1 = plot(HEAT.recordedtime, HEAT.CEM43.Skull, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.skin))
+    if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.skin)
         data2plot = max(focal_CEM(mask.skin, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Skin = data2plot;
     p2 = plot(HEAT.recordedtime, HEAT.CEM43.Skin, 'LineWidth', 2);
-    data2plot = NaN(numel(HEAT.recordedtime), 1); % create dummy values to avoid crashes
-    if any(find(mask.brain))
+    if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
+    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    if any(mask.brain)
         data2plot = max(focal_CEM(mask.brain, 1:size(time_status_seq,2)),[],1);
     end
     HEAT.CEM43.Brain = data2plot;
     p3 = plot(HEAT.recordedtime, HEAT.CEM43.Brain, 'LineWidth', 2);
-    % add target
+    if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
     HEAT.CEM43.TARGET = focal_CEM(target_pos_focal, 1:size(time_status_seq,2));
     p4 = plot(HEAT.recordedtime, HEAT.CEM43.TARGET, 'LineWidth', 2);
+    leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
-    ylabel(sprintf('CEM43'));
+    ylabel('CEM43');
     y_range = ylim();
     for i = 2:(length(time_status_seq)-1)
         if ~strcmp(time_status_seq(i).status,'on')
@@ -217,7 +223,7 @@ end
     end
     xlim([0, HEAT.recordedtime(end)]);
     hold off
-    legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
+    legend(leg_handles, leg_labels, 'location', 'NorthWest');
     legend('boxoff');
     title('CEM43 (kWave) in focal plane (NOT overall tissue max.)');
     saveas(g, output_plot_CEM, 'png');
@@ -229,22 +235,27 @@ end
         output_plot_CEM_iso = fullfile(td, sprintf('sub-%03d_%s_CEM_iso%s.png', sid, med, aff));
         focal_CEM_iso = squeeze(CEM43_iso(trans_pos(1),:,:));
         g = figure; hold on;
+        leg_handles = []; leg_labels = {};
         data2plot = NaN(numel(HEAT.recordedtime), 1);
-        if any(find(mask.skull))
+        if any(mask.skull)
             data2plot = max(focal_CEM_iso(mask.skull, 1:size(time_status_seq,2)),[],1);
         end
         p1 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
         data2plot = NaN(numel(HEAT.recordedtime), 1);
-        if any(find(mask.skin))
+        if any(mask.skin)
             data2plot = max(focal_CEM_iso(mask.skin, 1:size(time_status_seq,2)),[],1);
         end
         p2 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
         data2plot = NaN(numel(HEAT.recordedtime), 1);
-        if any(find(mask.brain))
+        if any(mask.brain)
             data2plot = max(focal_CEM_iso(mask.brain, 1:size(time_status_seq,2)),[],1);
         end
         p3 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
         p4 = plot(HEAT.recordedtime, focal_CEM_iso(target_pos_focal, 1:size(time_status_seq,2)), 'LineWidth', 2);
+        leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
         colormap('lines')
         xlabel('Time [s]'); ylabel('CEM43 (ISO)');
         y_range = ylim();
@@ -256,7 +267,7 @@ end
             a.FaceAlpha = 0.1;
         end
         xlim([0, HEAT.recordedtime(end)]); hold off
-        legend([p1, p2, p3, p4], {'skull'; 'skin'; 'brain'; 'target'}, 'location', 'NorthWest');
+        legend(leg_handles, leg_labels, 'location', 'NorthWest');
         legend('boxoff');
         title('CEM43 ISO in focal plane (NOT overall tissue max.)');
         saveas(g, output_plot_CEM_iso, 'png');
@@ -272,13 +283,26 @@ end
     % [layer-max] temperature over time
 
     HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
-    HEAT.recordedtime = HEAT.recordedtime(2:end);
     available_layers = fieldnames(timeseries.T);
+    n_ts = numel(timeseries.T.(available_layers{1}));
+    if numel(HEAT.recordedtime) == n_ts + 1
+        HEAT.recordedtime = HEAT.recordedtime(2:end);
+    elseif numel(HEAT.recordedtime) ~= n_ts
+        warning('thermal_plot_sim:timeseriesLengthMismatch', ...
+            'recordedtime length (%d) does not match timeseries length (%d); truncating to min.', ...
+            numel(HEAT.recordedtime), n_ts);
+        n_min = min(numel(HEAT.recordedtime), n_ts);
+        HEAT.recordedtime = HEAT.recordedtime(end-n_min+1:end);
+        for il = 1:numel(available_layers)
+            timeseries.T.(available_layers{il}) = timeseries.T.(available_layers{il})(end-n_min+1:end);
+        end
+    end
     available_layer_labels = strrep(available_layers, '_', ' ');
 
     h = figure; hold on;
+    layer_handles_T = gobjects(0);
     for i_layer = 1:numel(available_layers)
-        plot(HEAT.recordedtime, timeseries.T.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_T(end+1) = plot(HEAT.recordedtime, timeseries.T.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
@@ -295,8 +319,10 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layer_labels);
-    legend('boxoff');
+    if ~isempty(layer_handles_T)
+        legend(layer_handles_T, available_layer_labels);
+        legend('boxoff');
+    end
     title('Temperature (overall tissue max.)');
     saveas(h, [output_plot], 'png');
     close(h);
@@ -304,8 +330,9 @@ end
     % [layer-max] temperature change over time
 
     h = figure; hold on;
+    layer_handles_Tdiff = gobjects(0);
     for i_layer = 1:numel(available_layers)
-        plot(HEAT.recordedtime, timeseries.Tdiff.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_Tdiff(end+1) = plot(HEAT.recordedtime, timeseries.Tdiff.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
@@ -322,8 +349,10 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layer_labels);
-    legend('boxoff');
+    if ~isempty(layer_handles_Tdiff)
+        legend(layer_handles_Tdiff, available_layer_labels);
+        legend('boxoff');
+    end
     title('Temperature change (overall tissue max.)');
     saveas(h, [output_plot_rise], 'png');
     close(h);
@@ -331,8 +360,9 @@ end
     % [layer-max] thermal index over time
 
     h = figure; hold on;
+    layer_handles_CEM = gobjects(0);
     for i_layer = 1:numel(available_layers)
-        plot(HEAT.recordedtime, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_CEM(end+1) = plot(HEAT.recordedtime, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
@@ -349,8 +379,10 @@ end
     end
     xlim([1, HEAT.recordedtime(end)]);
     hold off
-    legend(available_layer_labels);
-    legend('boxoff');
+    if ~isempty(layer_handles_CEM)
+        legend(layer_handles_CEM, available_layer_labels);
+        legend('boxoff');
+    end
     title('Thermal Index CEM43 kWave (overall tissue max.)');
     saveas(h, [output_plot_CEM], 'png');
     close(h);
@@ -359,9 +391,12 @@ end
     if isfield(timeseries, 'CEM43_iso') && ~isempty(fieldnames(timeseries.CEM43_iso))
         output_plot_CEM_iso_max = fullfile(td, sprintf('sub-%03d_%s_CEM_iso_max%s.png', sid, med, aff));
         h = figure; hold on;
+        layer_handles_CEM_iso = gobjects(0);
+        layer_labels_CEM_iso = {};
         for i_layer = 1:numel(available_layers)
             if isfield(timeseries.CEM43_iso, available_layers{i_layer})
-                plot(HEAT.recordedtime, timeseries.CEM43_iso.(available_layers{i_layer}), 'LineWidth', 2);
+                layer_handles_CEM_iso(end+1) = plot(HEAT.recordedtime, timeseries.CEM43_iso.(available_layers{i_layer}), 'LineWidth', 2);
+                layer_labels_CEM_iso{end+1} = available_layer_labels{i_layer};
             end
         end
         colormap('lines')
@@ -375,7 +410,9 @@ end
             a.FaceAlpha = 0.1;
         end
         xlim([1, HEAT.recordedtime(end)]); hold off
-        legend(available_layer_labels); legend('boxoff');
+        if ~isempty(layer_handles_CEM_iso)
+            legend(layer_handles_CEM_iso, layer_labels_CEM_iso); legend('boxoff');
+        end
         title('Thermal Index CEM43 ISO (overall tissue max.)');
         saveas(h, output_plot_CEM_iso_max, 'png');
         close(h);

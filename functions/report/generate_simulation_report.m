@@ -23,6 +23,8 @@ end
 report_path = '';
 
 try
+    parameters = resolve_io_dirs(parameters);
+
     %% Determine output path
     subject_id = parameters.subject_id;
     medium = parameters.simulation.medium;

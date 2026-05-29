@@ -240,7 +240,7 @@ function pct_create_pseudoCT()
     pCT_skull="${path_pct}/pCT_skull.nii.gz"                            # UTE-calibrated skull → 200-1500 HU
     pCT_PVC="${path_pct}/pCT_PVC.nii.gz"                                # Sum of pure tissue fractions (no smoothing)
     pCT_PV_smooth="${path_pct}/pCT_PV_smooth.nii.gz"                    # Smoothed pCT
-    pCT="${path_pct}/pseudoCT.nii.gz"                                   # FINAL: bulk raw + boundaries smooth
+    pCT="${path_pct_root}/pseudoCT.nii.gz"                              # FINAL: bulk raw + boundaries smooth
 
     echo "========================================================================="
     echo "STEP 4.1: PARTIAL VOLUME CORRECTION - skull-air + skin-air interfaces"
@@ -334,10 +334,13 @@ function pct_create_pseudoCT()
         fslmaths "$ute_norm" -add -1 -mul -2000 -add 42 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     treeby)
         fslmaths "$ute_norm" -mul -2929.6 -add 3247.9 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
-    kosciessa|*)
+    kosciessa)
         m1=$(awk 'NR==1{print $1}' "${path_pct}/pCT_skull_mapping.txt")
         m2=$(awk 'NR==2{print $1}' "${path_pct}/pCT_skull_mapping.txt")
         fslmaths "$ute_norm" -mul "$m1" -add "$m2" -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    *)
+        echo "ERROR: Unknown skullmapping value '$skullmapping'. Valid options: miscouridou, carpino, wiesinger, treeby, kosciessa"
+        exit 1 ;;
     esac
 
     # Combine pure tissues (NO smoothing yet → sharp transitions at boundaries)

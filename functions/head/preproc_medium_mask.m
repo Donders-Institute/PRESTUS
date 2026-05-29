@@ -10,7 +10,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 %   medium_masks = preproc_medium_mask(segmented_img, parameters)
 %
 % Input:
-%   segmented_img - [Nx x Ny x Nz] SimNIBS tissue label volume
+%   segmented_img - [Nx x Ny x Nz] or [Nx x Nz] tissue label volume
 %   parameters    - (1,1) simulation configuration struct with .layers and .medium_properties
 %
 % Output:
@@ -19,7 +19,7 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 % See also: HEAD_SMOOTH_AND_CROP, PREPROC_HEAD
 
 arguments
-    segmented_img (:,:,:) {mustBeNumericOrLogical}
+    segmented_img {mustBeNumericOrLogical}
     parameters    (1,1) struct
 end
 

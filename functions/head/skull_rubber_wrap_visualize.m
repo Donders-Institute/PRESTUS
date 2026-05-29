@@ -33,16 +33,9 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
     %% Downsample (nearest neighbor for label/binary masks)
 
     if downsample_factor > 1
-        if exist('imresize3','file') == 2
-            s = 1 / downsample_factor;
-            SKULL_DS   = imresize3(SKULL,   s, 'nearest');
-            ZADDED_DS  = imresize3(ZADDED,  s, 'nearest');
-            BALLOON_DS = imresize3(BALLOON, s, 'nearest');
-        else
-            SKULL_DS   = SKULL(  1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
-            ZADDED_DS  = ZADDED( 1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
-            BALLOON_DS = BALLOON(1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
-        end
+        SKULL_DS   = SKULL(  1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
+        ZADDED_DS  = ZADDED( 1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
+        BALLOON_DS = BALLOON(1:downsample_factor:end, 1:downsample_factor:end, 1:downsample_factor:end);
     else
         SKULL_DS   = SKULL;
         ZADDED_DS  = ZADDED;

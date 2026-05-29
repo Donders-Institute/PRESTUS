@@ -14,3 +14,6 @@
 	path = external/FEX-minimize
 	url = https://github.com/rodyo/FEX-minimize.git
 	# 2f6ee87	v1.7
+[submodule "external/PlanTUS"]
+	path = external/PlanTUS
+	url = https://github.com/mlueckel/PlanTUS

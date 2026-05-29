@@ -360,8 +360,11 @@ for subject_i = 1:length(subject_list)
             end
             output_table.(sprintf('avg_intensity_within_fwhm_and_roi_overlap%s', options.outputs_suffix)) = avg_intensity_within_fwhm_and_roi_overlap;
             n_voxels_within_roi_above_thresh = sum(options.ROI_MNI_mask & (max_pressure_map_mni >= max_pressure/2),'all');
-            props = regionprops(true(size(options.ROI_MNI_mask)), options.ROI_MNI_mask, 'WeightedCentroid');
-            dist_between_intensity_and_center_of_ROI = norm(max_focus_MNI_grid - props.WeightedCentroid);
+            [cx,cy,cz] = ndgrid(1:size(options.ROI_MNI_mask,1), 1:size(options.ROI_MNI_mask,2), 1:size(options.ROI_MNI_mask,3));
+            w = double(options.ROI_MNI_mask);
+            w_sum = sum(w(:));
+            weighted_centroid = [sum(cx(:).*w(:)), sum(cy(:).*w(:)), sum(cz(:).*w(:))] / w_sum;
+            dist_between_intensity_and_center_of_ROI = norm(max_focus_MNI_grid - weighted_centroid);
             output_table.(sprintf('dist_between_intensity_and_center_of_ROI%s', options.outputs_suffix)) = dist_between_intensity_and_center_of_ROI;
             output_table.(sprintf('avg_intensity_within_roi%s', options.outputs_suffix)) = avg_intensity_within_roi;
             output_table.(sprintf('perc_voxels_within_roi%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/roi_size;

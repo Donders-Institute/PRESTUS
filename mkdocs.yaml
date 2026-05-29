@@ -41,12 +41,14 @@ nav:
     - Installation: doc_installation.md
     - Getting started: doc_getting-started.md
     - GUI: doc_gui.md
+    - Usage Statistics: doc_usage-statistics.md
   - 📖 Documentation:
     - Transducer Setup: doc_transducer.md
     - Transducer Calibration: doc_calibration.md
     - Transducer Placement: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
     - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
+    - Transducer Placement (PLANTUS): doc_placement_plantus.md
     - Coordinate Systems: doc_coordinate_systems.md
     - Head Processing: doc_preproc.md
     - Medium Setup: doc_medium.md
@@ -64,7 +66,8 @@ nav:
     - Advanced Workflows: doc_advanced.md
     - Backend: doc_backend.md
     - HPC: doc_hpc.md
-    - Multi-ISPPA: doc_multi_ISPPA.md
+    - Multi-ISPPA: doc_multi_isppa.md
+    - Async Multi-Transducer: doc_async_transducer.md
     - Group: doc_group.md
     - Testing: doc_testing.md
     - Telemetry: doc_telemetry.md
@@ -91,3 +94,5 @@ markdown_extensions:
 extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  - https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2
+  - https://cdn.jsdelivr.net/npm/chart.js@4

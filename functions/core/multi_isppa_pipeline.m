@@ -58,13 +58,17 @@ end
 %% Validate
 % =========================================================================
 
-if ~isfield(parameters, 'calibration') || ...
-        ~isfield(parameters.calibration, 'target_isppa_wcm2') || ...
-        numel(parameters.calibration.target_isppa_wcm2) < 2
-    error('multi_isppa_pipeline: calibration.target_isppa_wcm2 must contain at least two values.');
+% Targets are read from transducer(1).target_isppa_wcm2 (canonical location).
+% calibration.target_isppa_wcm2 is the deprecated fallback handled by load_parameters.
+if ~isfield(parameters, 'transducer') || isempty(parameters.transducer) || ...
+        ~isfield(parameters.transducer(1), 'target_isppa_wcm2') || ...
+        numel(parameters.transducer(1).target_isppa_wcm2) < 2 || ...
+        ~any(isfinite(parameters.transducer(1).target_isppa_wcm2))
+    error(['multi_isppa_pipeline: transducer(1).target_isppa_wcm2 must contain at least ' ...
+           'two finite values. Set it in the transducer config or YAML.']);
 end
 
-targets = parameters.calibration.target_isppa_wcm2(:)';
+targets = parameters.transducer(1).target_isppa_wcm2(:)';
 
 % =========================================================================
 %% Resolve options
@@ -269,11 +273,13 @@ end
 % =========================================================================
 
 function p = clear_multi_isppa_targets(p)
-% Replace the vector of targets with a scalar NaN so that:
+% Replace each transducer's target vector with NaN so that:
 %   (a) is_multi_isppa_mode returns false → no recursion on compute nodes
-%   (b) the target field is present so apply_isppa_scaling can check it
-    if isfield(p, 'calibration') && isfield(p.calibration, 'target_isppa_wcm2')
-        p.calibration.target_isppa_wcm2 = NaN;
+%   (b) the field is present so apply_isppa_scaling can detect it as unset
+    if isfield(p, 'transducer')
+        for ti = 1:numel(p.transducer)
+            p.transducer(ti).target_isppa_wcm2 = NaN;
+        end
     end
 end
 
@@ -300,7 +306,7 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix)
 % Stages 2…N: load cached acoustic results, apply pressure scaling to
 % target_isppa, run thermal simulation and analysis, generate HTML report.
     p = clear_multi_isppa_targets(base);
-    p.calibration.target_isppa_wcm2  = target_isppa;   % scalar for this job
+    p.transducer(1).target_isppa_wcm2 = target_isppa;  % scalar for this job
     p.io.acoustic_cache_affix        = base_affix;     % points at Stage-1 cache file
     p.modules.run_source_setup       = 0;   % kgrid/source/sensor come from acoustic cache
     p.modules.run_acoustic_sims      = 0;   % load from cache
