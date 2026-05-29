@@ -56,6 +56,9 @@ load_parameters
 [report]                modules.generate_report
       │                 Self-contained HTML report
       ▼
+[group report]          modules.generate_group_report
+      │                 Aggregate completed subjects into a group HTML report
+      ▼
 [free-water reference]  modules.run_posthoc_water_sims
                         Re-run acoustics in water for Isppa normalisation
 ```
@@ -74,6 +77,7 @@ load_parameters
 | Run thermal at a specific free-water ISPPA | `calibration.target_isppa_wcm2: 30` (water baseline runs automatically) |
 | Run thermal at multiple ISPPAs (parallel jobs) | `calibration.target_isppa_wcm2: [10, 20, 30, 50]` — triggers multi-ISPPA mode; see [doc_multi_isppa.md](doc_multi_isppa.md) |
 | Enable the water baseline measurement | `modules.run_water_baseline: 1` (required for ISPPA scaling) |
+| Generate a cross-subject group report | `modules.generate_group_report = 1` (or run `prestus_group_report_start` manually); see [doc_group.md](doc_group.md#group-html-report) |
 
 > **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`. If they do not exist, disabling an upstream module while enabling a downstream one will error.
 

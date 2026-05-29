@@ -473,6 +473,22 @@ function [parameters] = prestus_pipeline(parameters, options)
         generate_simulation_report(parameters);
     end
 
+    if isfield(parameters.modules, 'generate_group_report') && parameters.modules.generate_group_report
+        % Best-effort: aggregate all subjects completed so far into the group
+        % HTML report. Wrapped in try/catch because it reads other subjects'
+        % outputs (which may be mid-write during parallel runs) — a failure
+        % here must never abort this subject's own pipeline.
+        try
+            group_subjects = discover_group_subjects(parameters);
+            if ~isempty(group_subjects)
+                generate_group_report(parameters, group_subjects);
+            end
+        catch ME
+            warning('prestus_pipeline:groupReport', ...
+                'Group report generation failed: %s', ME.message);
+        end
+    end
+
     if isfield(parameters.modules, 'multi_isppa_report') && parameters.modules.multi_isppa_report
         if isfield(parameters, 'multi_isppa')
             generate_multi_isppa_report(parameters, parameters.multi_isppa);

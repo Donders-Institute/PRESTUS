@@ -213,3 +213,21 @@ A self-contained HTML report is written to the output directory (`sub-XXX_<mediu
 ![PRESTUS_html](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/html_report.png)
 
 A full example report on a phantom can be found here: [🔗 Download Example HTML](https://raw.githubusercontent.com/jkosciessa/PRESTUS_bin/main/examples/example_report.html)
+
+---
+
+## Group outputs
+
+When several subjects are simulated under the same `simulation.medium` and `io.output_affix`, the group report (`prestus_group_report_start`, or `modules.generate_group_report = 1`) aggregates them into a self-contained HTML file plus its box-plot images, written to `path.sim` (one level above the per-subject `sub-NNN/` folders):
+
+```
+group_<medium>_report<affix>.html         ← self-contained group HTML report
+group_plots/                              ← group-level box-plot images
+    group_<medium>_intensity<affix>.png     Isppa / Ipa_target across subjects
+    group_<medium>_mi<affix>.png            Mechanical Index per tissue
+    group_<medium>_maxT<affix>.png          maximum temperature  (heating runs)
+    group_<medium>_riseT<affix>.png         temperature rise     (heating runs)
+    group_<medium>_cem43<affix>.png         CEM43 thermal dose   (heating runs)
+```
+
+The thermal plots are produced only for layered media with heating simulations. The HTML aggregates each subject's existing CSV metrics and PNG overlays; it is regenerable at any time and runs no simulations. See [Group analysis](doc_group.md#group-html-report) for usage.

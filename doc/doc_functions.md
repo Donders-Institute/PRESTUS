@@ -45,6 +45,9 @@ The following documents the functions provided in PRESTUS.
 | `changem_vectorized`                    | Replace multiple old values in array A with corresponding new values.                           |
 | `combine_plots_by_suffix`               | Combines subject-specific plots into a single montage image.                                    |
 | `create_group_MNI_plots`                | Generate group-level plots in MNI space for multiple subjects.                                  |
+| `prestus_group_report_start`            | Entry point for the group HTML report; auto-discovers (or accepts) subjects and aggregates their per-subject outputs into one HTML file. |
+| `generate_group_report`                 | Assemble the self-contained group HTML report (exposure dashboard, subject roster, split acoustic/thermal box plots, per-subject cards). |
+| `discover_group_subjects`               | Auto-discover completed subjects by scanning `path.sim` for folders with a matching per-subject CSV. |
 
 #### HEAD
 
