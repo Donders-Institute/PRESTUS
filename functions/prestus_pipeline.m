@@ -274,6 +274,32 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('stop', 'nifti_medium');
 
     % ====================================================================
+    %% ACOUSTIC FOV CROP  (between medium and source setup)
+    %
+    % When grid.acoustic_fov_diameter_mm and grid.acoustic_fov_length_mm are
+    % set, the acoustic simulation runs on a beam-axis aligned sub-grid
+    % (lateral = diameter, axial = length, both centred on the focus).
+    % The crop offsets are stored in acoustic_provenance so that
+    % ASSEMBLE_LIMITED_FOV_FIELDS can back-project N independent limited-FOV
+    % results onto the full acoustic grid before thermal simulation.
+    % ====================================================================
+    has_acoustic_fov = isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_diameter_mm) && ...
+        isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_length_mm);
+
+    if has_acoustic_fov
+        full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
+        [parameters, kwave_medium, medium_masks, trans_pos, focus_pos, fov_offset_ac] = ...
+            acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos);
+        fprintf('[pipeline] Acoustic FOV crop active: offset [%s], new dims [%s]\n', ...
+            num2str(fov_offset_ac), num2str(parameters.grid.dims));
+    else
+        fov_offset_ac        = [];
+        full_ac_dims_saved   = [];
+    end
+
+    % ====================================================================
     %% STAGE 5 — SOURCE & SENSOR SETUP
     %
     % Constructs the k-Wave source matrix from the transducer geometry and
@@ -329,6 +355,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
 
     acoustic_provenance = struct();
+
+    % Record limited-FOV crop metadata in provenance so ASSEMBLE_LIMITED_FOV_FIELDS
+    % can back-project this result onto the full acoustic grid.
+    if has_acoustic_fov
+        acoustic_provenance.fov_offset_ac = fov_offset_ac;
+        acoustic_provenance.full_ac_dims  = full_ac_dims_saved;
+    end
+
     has_per_transducer_target = isfield(parameters, 'transducer') && ...
         any(arrayfun(@(t) isfield(t, 'target_isppa_wcm2') && ...
                           ~isempty(t.target_isppa_wcm2) && ...
