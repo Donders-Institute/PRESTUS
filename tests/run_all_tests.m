@@ -8,6 +8,8 @@
 %     run_all_tests('head')      % water + smoke_config + smoke_head
 %     run_all_tests('acoustic')  % head + smoke_acoustic
 %     run_all_tests('all')       % full suite including thermal
+%     run_all_tests('slurm_live') % submit a real SLURM job and check hpc_job_report output
+%                                 % (skipped automatically when sbatch is not on PATH)
 %
 %   Demo-data levels (require PRESTUS_DEMO_DATA to point to prestus_testdata/):
 %     run_all_tests('demo_inputs')   % verify all demo input files exist
@@ -53,7 +55,8 @@ function run_all_tests(level)
         testsuite(fullfile(here, 'test_thermal_parameters.m')), ...
         testsuite(fullfile(here, 'test_transform.m')), ...
         testsuite(fullfile(here, 'test_load_parameters.m')), ...
-        testsuite(fullfile(here, 'test_head_preprocessing.m'))];
+        testsuite(fullfile(here, 'test_head_preprocessing.m')), ...
+        testsuite(fullfile(here, 'test_hpc_job_report.m'))];
 
     integration_file  = fullfile(here, 'test_integration_pipeline.m');
     water_test_file   = fullfile(here, 'test_integration_water.m');
@@ -121,8 +124,10 @@ function run_all_tests(level)
                       testsuite(demo_test_file, 'Tag', 'demo_config'), ...
                       testsuite(demo_test_file, 'Tag', 'demo_acoustic'), ...
                       testsuite(demo_test_file, 'Tag', 'demo_thermal')];
+        case 'slurm_live'
+            suites = testsuite(fullfile(here, 'test_hpc_job_report.m'), 'Tag', 'slurm_live');
         otherwise
-            error('Unknown level ''%s''. Use: unit | head | acoustic | all | demo_inputs | demo_config | demo_localite | demo_pct | demo_head | demo_acoustic | demo_thermal', level);
+            error('Unknown level ''%s''. Use: unit | head | acoustic | all | slurm_live | demo_inputs | demo_config | demo_localite | demo_pct | demo_head | demo_acoustic | demo_thermal', level);
     end
 
     % ---- Run ----------------------------------------------------------
@@ -258,6 +263,19 @@ function m = build_descriptions()
         'test_each_output_isppa_positive',          'multi_isppa_pipeline: focal Isppa is positive for each target'
         'test_acoustic_cache_reused',               'multi_isppa_pipeline: acoustic cache .mat is written by Stage 1'
         'test_single_target_passthrough',           'multi_isppa_pipeline: scalar target_isppa raises an error'
+        % --- test_hpc_job_report ---
+        'test_report_has_expected_fields',          'hpc_job_report: struct has all required fields'
+        'test_carbon_calculation_cpu_only',         'hpc_job_report: CPU-only carbon estimate is positive and plausible'
+        'test_carbon_calculation_with_gpu',         'hpc_job_report: GPU jobs have non-zero energy_gpu_kwh > energy_cpu_kwh'
+        'test_custom_carbon_params',                'hpc_job_report: doubling carbon_intensity exactly doubles co2e_g'
+        'test_memory_efficiency_ratio',             'hpc_job_report: memory_efficiency = MaxRSS / requested_mem'
+        'test_time_efficiency_ratio',               'hpc_job_report: time_efficiency = elapsed / requested_timelimit'
+        'test_report_file_created',                 'hpc_job_report: writes <sub>_job<ID>_report.txt to log_dir'
+        'test_report_file_contains_key_fields',     'hpc_job_report: report file contains key metric field names'
+        'test_no_report_file_when_log_dir_empty',   'hpc_job_report: empty log_dir skips file write without error'
+        'test_failed_job_does_not_error',           'hpc_job_report: FAILED job state does not throw an error'
+        'test_qsub_produces_nan_metrics_with_warning','hpc_job_report: qsub path warns and returns NaN metrics'
+        'test_live_slurm_job_report',               'hpc_job_report (live): submits real sleep job, waits, checks sacct metrics and report file'
         % --- test_integration_demo (demo_inputs) ---
         'test_t1_exists',                           'demo inputs: sub-009 T1w NIfTI is present in BIDS folder'
         'test_ute_exists',                          'demo inputs: sub-009 UTE NIfTI is present in BIDS folder'
