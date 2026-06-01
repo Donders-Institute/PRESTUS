@@ -74,6 +74,29 @@ MNI space uses **LAS** orientation: the X axis increases toward the *left* hemis
 
 ---
 
+## Localite planning image: zero-origin affine and SimNIBS voxel grid
+
+Neuronavigation software (e.g. Localite TMS Navigator) writes a planning T1 with a **diagonal, zero-origin affine**:
+
+```
+affine = diag([voxel_size_mm, voxel_size_mm, voxel_size_mm, 1])
+```
+
+This means the "RAS mm" values stored in Localite XML trigger matrices are actually **planning-image space coordinates** (`world = voxel × voxel_size_mm`), not scanner-isocenter-relative RAS mm. When `ras_to_grid()` is called with the planning T1 header, it correctly inverts this back to voxel indices:
+
+```
+voxel = localite_mm / voxel_size_mm
+```
+
+**Do not re-project Localite coordinates using the SimNIBS m2m T1 header.**  
+The m2m T1 (`m2m_{sub_id}/T1.nii.gz`) has a full world-space affine (non-zero origin, possible small rotation). Calling `ras_to_grid(localite_mm, simnibs_t1_header)` applies the wrong inverse-affine and shifts positions by tens of millimetres.
+
+**When the same T1 was used for both neuronavigation and SimNIBS input**, the m2m T1 and the planning T1 share the same voxel grid — SimNIBS preserves the voxel dimensions and layout, updating only the affine to describe world-space position. In this case, voxel indices from the planning T1 (`ras_to_grid(localite_mm, planning_t1_header)`) are directly valid for PRESTUS simulations that load the m2m T1. No coordinate reprojection is needed.
+
+If the planning T1 and the SimNIBS input T1 differ (e.g. different acquisitions, different resolution), a registration step is required before the voxel indices can be used with the m2m T1.
+
+---
+
 ## Available transforms (SimNIBS)
 
 PRESTUS reuses nonlinear warp fields produced by SimNIBS/CHARM:

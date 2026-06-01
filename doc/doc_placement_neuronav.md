@@ -75,9 +75,13 @@ Average transducer and target locations can be provided in multiple coordinate s
 
 See the [coordinate system documentation](doc_coordinate_systems.md).
 
-Recorded localite coordinates are relative to a neuronavigation planning image [1] (e.g., `T1_forneuronav`) that was loaded in the neuronavigation software. 
+Recorded Localite coordinates are relative to a neuronavigation planning image (e.g., `T1_forneuronav`) that was loaded in the neuronavigation software. Neuronavigation software writes this planning image with a **zero-origin, diagonal affine** (`world = voxel × voxel_size_mm`) rather than a scanner-isocenter world-space affine. Localite trigger matrices are therefore in **planning-image space**, not scanner world-space RAS.
 
-SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.nii.gz` segmentation image however, so PRESTUS initially applies a transform from the planning to the segmentation image to the coordinates before they can be ported to MNI space.
+The `InstrumentMarker` XML written by `neuronav_ingest_markers` preserves these coordinates as-is and labels the coordinate space `"RAS"` — meaning the axes are RAS-oriented, but the origin remains at the image corner (zero-origin). To convert to voxels, use `ras_to_grid()` with the **planning T1 header**, not the SimNIBS m2m T1 header. The m2m T1 has a full world-space affine; applying its inverse to planning-image coordinates displaces positions by tens of millimetres.
+
+When SimNIBS is run on the planning T1, the resulting `m2m_{sub}/T1.nii.gz` shares the same voxel grid (SimNIBS preserves voxel dimensions and layout, updating only the affine). Voxel indices computed via `ras_to_grid(localite_mm, planning_t1_header)` are therefore directly valid for PRESTUS simulations that load the m2m T1 — no reprojection is needed. See [Coordinate Reference Systems](doc_coordinate_systems.md#localite-planning-image-zero-origin-affine-and-simnibs-voxel-grid).
+
+SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.nii.gz` segmentation image, so PRESTUS applies a transform from the planning to the segmentation image before porting coordinates to MNI space.
 
 1.	Trigger to Voxel (`neuronav_convert_trigger_to_voxels`): → subject voxel indices
 2.	Voxel → mm (`neuronav_grid_to_mm_batch`): → subject mm
@@ -92,7 +96,7 @@ SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.
 #### Coordinate Spaces in neuronav functions
 
 - `neuronav_convert_trigger_to_voxels`
-	- Localite/trigger data (RAS mm) → subject (native) voxel space
+	- Localite/trigger data (planning-image space mm, zero-origin RAS) → subject (native) voxel space via planning T1 header
 - `neuronav_grid_to_mm_batch`
 	- Input: Subject voxel indices (i,j,k)
 	- Operation: Uses subject’s T1 NIfTI affine transform

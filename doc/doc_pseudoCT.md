@@ -86,8 +86,7 @@ To inform skull properties by pCTs in simulations, set `parameters.use_pseudoCT 
 
 >[!warning] The most suitable mapping remains an active area of research. All mappings should therefore be treated as experimental. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will exclusively be applied within the uniform skull mask.
 
-<details markdown>
-<summary>Mapping skull density — algorithm details</summary>
+#### Mapping skull density
 
 Mapping algorithm is governed by `pct_mapping_density`.
 
@@ -161,10 +160,7 @@ Mapping algorithm is governed by `pct_mapping_density`.
     </span>
     <br>
 
-</details>
-
-<details markdown>
-<summary>Mapping skull sound speed — algorithm details</summary>
+#### Mapping skull sound speed
 
 Mapping algorithm is governed by `pct_mapping_soundspeed`.
 
@@ -208,10 +204,7 @@ Mapping algorithm is governed by `pct_mapping_soundspeed`.
     </span>
     <br>
 
-</details>
-
-<details markdown>
-<summary>Mapping skull attenuation — algorithm details</summary>
+#### Mapping skull attenuation
 
 Mapping algorithm is governed by `pct_mapping_attenuation`.
 
@@ -258,5 +251,3 @@ Mapping algorithm is governed by `pct_mapping_attenuation`.
     Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
     </span>
     <br>
-
-</details>
