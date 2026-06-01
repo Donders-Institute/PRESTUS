@@ -287,6 +287,11 @@ function write_instrument_marker_xml(xml_path, target_map, results)
     end
 
     fprintf(fid, '<?xml version="1.0" encoding="UTF-8"?>\n');
+    % coordinateSpace="RAS": axes are RAS-oriented, but the origin is at the
+    % corner of the neuronavigation planning image (zero-origin diagonal affine),
+    % NOT at the scanner isocenter. Coordinates satisfy world = voxel * voxel_size_mm.
+    % Do NOT interpret these as scanner-isocenter RAS mm or apply a SimNIBS m2m
+    % T1 inverse-affine to convert them to voxels — use the planning T1 header instead.
     fprintf(fid, '<InstrumentMarkerList coordinateSpace="RAS">\n');
     fprintf(fid, '    <!--All positions are saved in the coordinate system of the corresponding medical data.\n');
     fprintf(fid, 'NIfTI image data are recommended using RAS system (x-axis increases from the left hand side to the right hand side of the patient,\n');
@@ -297,7 +302,7 @@ function write_instrument_marker_xml(xml_path, target_map, results)
         res = results{tm.series_index};
 
         % Mean 4×4 matrix: results stores [1×4×4]; reshape to [4×4]
-        M = reshape(squeeze(res.matrix4d_mean), [4, 4])';
+        M = reshape(squeeze(res.matrix4d_mean), [4, 4]);
 
         if isfield(tm, 'color') && ~isempty(tm.color)
             color = tm.color;
