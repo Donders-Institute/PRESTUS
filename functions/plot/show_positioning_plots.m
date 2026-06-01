@@ -54,15 +54,17 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
     %% Create figure and generate subplots
     h = figure('Position', [200 200 1000 300]);
 
+    apply_deface = ~isfield(parameters.io, 'deface_plots') || parameters.io.deface_plots;
+
     % Subplot 1: Original segmentation with initial transducer and focus positions
     subplot(1, 3, 1);
     show_3d_head(segmented_img_orig, focus_pos_orig(1,:), trans_pos_orig(1,:), parameters, ...
-                 t1_pixel_size, coord_mesh_xyz, [0 0 0], view_pos, 0);
+                 t1_pixel_size, coord_mesh_xyz, [0 0 0], view_pos, 0, apply_deface);
 
     % Subplot 2: Original segmentation with slice cap applied
     subplot(1, 3, 2);
     show_3d_head(segmented_img_orig, focus_pos_orig(1,:), trans_pos_orig(1,:), parameters, ...
-                 t1_pixel_size, coord_mesh_xyz, slice_cap, view_pos, 0);
+                 t1_pixel_size, coord_mesh_xyz, slice_cap, view_pos, 0, apply_deface);
 
     % Subplot 3: Final segmentation with updated transducer and focus positions
     ax3 = subplot(1, 3, 3);

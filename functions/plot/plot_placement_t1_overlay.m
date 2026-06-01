@@ -31,6 +31,18 @@ function plot_placement_t1_overlay(parameters, trans_pos, focus_pos, label)
     hdr = niftiinfo(filename_t1);
     vox = hdr.PixelDimensions(1);  % assume isotropic; used for axis labels only
 
+    % Deface plots (default on); suppress with parameters.io.deface_plots = 0.
+    if ~isfield(parameters.io, 'deface_plots') || parameters.io.deface_plots
+        seg_file = fullfile(parameters.path.seg, ...
+            sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz');
+        if isfile(seg_file)
+            seg = double(niftiread(seg_file));
+            t1  = deface_volume(t1, seg, vox);
+        else
+            warning('plot_placement_t1_overlay: segmentation not found, defacing skipped:\n  %s', seg_file);
+        end
+    end
+
     tp = round(trans_pos(:)');
     fp = round(focus_pos(:)');
 
@@ -111,9 +123,13 @@ function plot_placement_t1_overlay(parameters, trans_pos, focus_pos, label)
 
             % --- Display ---
             if use_rgb
-                image(ax, rgb);
+                im = image(ax, rgb);
+                % Make defaced (NaN) pixels transparent so they show as background
+                im.AlphaData = double(~any(isnan(rgb), 3));
             else
-                imagesc(ax, sl); colormap(ax, gray);
+                him = imagesc(ax, sl); colormap(ax, gray);
+                % Make defaced (NaN) pixels transparent
+                him.AlphaData = double(~isnan(sl));
                 hold(ax,'on');
                 plot(ax, tp_rc(2), tp_rc(1), 's', 'MarkerSize', 10, ...
                      'Color', [0.2 0.4 1], 'LineWidth', 2);

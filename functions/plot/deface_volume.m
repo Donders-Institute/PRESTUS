@@ -50,17 +50,31 @@ function vol_out = deface_volume(vol, seg, voxel_size_mm, margin_mm)
         return;
     end
 
-    % Cut plane: posterior edge of eye socket + margin_mm, clamped to volume.
-    % This places the cut at roughly the ear-canal level for a standard head.
+    % Determine which Y direction is anterior by comparing the eye centroid
+    % to the brain centroid. Eyes are always anterior to the brain, so this
+    % is orientation-agnostic and works for both RAS and LAS/other NIfTIs.
     [~, y_eye, ~] = ind2sub(size(seg), find(eye_mask));
+    brain_mask = ismember(seg, [seg_labels.wm, seg_labels.gm]);
+    [~, y_brain, ~] = ind2sub(size(seg), find(brain_mask));
+    anterior_is_high_y = mean(y_eye) > mean(y_brain);
+
+    % Cut plane: posterior edge of eye socket shifted margin_mm into the head,
+    % placing the cut at roughly the ear-canal level.
     margin_vox = round(margin_mm / voxel_size_mm);
-    y_cutoff   = min(max(y_eye) + margin_vox, size(seg, 2));
+    if anterior_is_high_y
+        % Face at high Y — mask from cut plane upward
+        y_cutoff = max(min(y_eye) - margin_vox, 1);
+        face_mask = false(size(seg));
+        face_mask(:, y_cutoff:end, :) = true;
+    else
+        % Face at low Y — mask from cut plane downward
+        y_cutoff = min(max(y_eye) + margin_vox, size(seg, 2));
+        face_mask = false(size(seg));
+        face_mask(:, 1:y_cutoff, :) = true;
+    end
 
     % Tissues that should never be removed regardless of position
     inside_head = ismember(seg, [seg_labels.bonemask, seg_labels.csf]);
-
-    face_mask = false(size(seg));
-    face_mask(:, 1:y_cutoff, :) = true;
     face_mask = face_mask & ~inside_head;
 
     vol_out = vol;
