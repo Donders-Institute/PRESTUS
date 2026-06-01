@@ -77,7 +77,7 @@ end
             phases_from_params = @(p) p(1:end-1);
     end
 
-    optimize_phases = @(p) phase_optimization_annulus_full_curve(...
+    base_objective = @(p) phase_optimization_annulus_full_curve(...
         phases_from_params(p), ...
         parameters, ...
         p(end), ...
@@ -86,6 +86,25 @@ end
         0, ...
         opt_limits, ...
         weights);
+
+    % Optional L2 regularisation on deviation from initial (geometric) phases.
+    % Penalises large hardware corrections; only active when initial phases
+    % are provided (opt_use_initial_phases=true) and opt_regularization_lambda > 0.
+    reg_lambda = 0;
+    if isfield(parameters.calibration, 'opt_regularization_lambda') && ...
+            ~isempty(parameters.calibration.opt_regularization_lambda)
+        reg_lambda = parameters.calibration.opt_regularization_lambda;
+    end
+
+    if reg_lambda > 0 && isfield(parameters.transducer.annular, 'elem_phase_rad') && ...
+            ~isempty(parameters.transducer.annular.elem_phase_rad)
+        initial_phases_for_reg = parameters.transducer.annular.elem_phase_rad(:)';
+        optimize_phases = @(p) base_objective(p) + ...
+            reg_lambda * mean((phases_from_params(p) - initial_phases_for_reg).^2);
+        fprintf('perform_global_search: L2 regularisation active (lambda=%.4g).\n', reg_lambda);
+    else
+        optimize_phases = base_objective;
+    end
 
     % Set a random seed for reproducibility.
     if isfield(parameters.calibration, 'opt_seed')

@@ -11,6 +11,11 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % The difference is that BabelBrain trusts the manufacturer phase table
 % directly, while PRESTUS uses phases fitted by calibration_transducer.
 %
+% When the library YAML contains a global_model section (phases calibrated
+% across all depths simultaneously), phases are interpolated linearly at the
+% requested depth. Per-depth entries with is_refinement:true override the
+% global model when the requested depth is within 1 mm of that entry.
+%
 % Use as:
 %   parameters = load_transducer_from_library(combo_name, focal_distance_ep, ...
 %                    desired_intensity, equip_param)
@@ -52,6 +57,106 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     end
     tran = equip_param.trans.(tran_serial);
     parameters.transducer = tran.transducer;
+
+    %% Reconstruct phases — global model takes precedence when present
+    if isfield(lib, 'global_model') && ~isempty(lib.global_model) && ...
+            isfield(lib.global_model, 'depths_ep_mm') && ...
+            isfield(lib.global_model, 'elem_phase_deg')
+
+        gm     = lib.global_model;
+        depths = gm.depths_ep_mm(:)';
+
+        % elem_phase_deg is stored as a cell array of per-depth row vectors
+        phase_cell = gm.elem_phase_deg;
+        if ~iscell(phase_cell)
+            phase_cell = num2cell(phase_cell, 2);
+        end
+        phase_mat = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
+
+        % Check if a per-depth refinement overrides the global model
+        [dist, idx]    = min(abs(depths - focal_distance_ep));
+        used_depth_gm  = depths(idx);
+        use_refinement = false;
+
+        if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
+            fkey = sprintf('f%s', strrep(num2str(used_depth_gm), '.', 'p'));
+            if dist < 1 && isfield(lib.calibration.focal_depths, fkey) && ...
+                    isfield(lib.calibration.focal_depths.(fkey), 'is_refinement') && ...
+                    lib.calibration.focal_depths.(fkey).is_refinement
+                use_refinement = true;
+            end
+        end
+
+        if ~use_refinement
+            % Interpolate phases from global model
+            if numel(depths) == 1
+                interp_phases_deg = phase_mat(1, :);
+            else
+                interp_phases_deg = interp1(depths, phase_mat, focal_distance_ep, 'linear', 'extrap');
+            end
+            elem_phase_rad = interp_phases_deg / 180 * pi;
+
+            if dist > 5
+                warning(['load_transducer_from_library: closest global-model depth is %.1f mm ' ...
+                    '(requested %.1f mm). Consider running calibration at this depth.'], ...
+                    used_depth_gm, focal_distance_ep);
+            end
+
+            % Apply per-element hardware correction if present
+            n_elem = tran.transducer.annular.elem_n;
+            if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
+                correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
+                if numel(correction_rad) ~= n_elem
+                    warning(['load_transducer_from_library: elem_phase_correction has %d elements ' ...
+                        'but transducer has %d — correction skipped.'], numel(correction_rad), n_elem);
+                else
+                    elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
+                    fprintf('Applied per-element hardware correction (ref depth %.2f mm).\n', ...
+                        tran.elem_phase_correction.ref_depth_ep_mm);
+                end
+            end
+
+            parameters.transducer.annular.elem_phase_rad = elem_phase_rad;
+            parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
+
+            % Amplitude from global_model.amplitude_scaling
+            if isfield(gm, 'amplitude_scaling')
+                amp_map    = gm.amplitude_scaling;
+                int_keys   = fieldnames(amp_map);
+                int_values = cellfun(@(k) str2double(strrep(strrep(k, 'i', ''), 'p', '.')), int_keys);
+
+                [int_dist, amp_idx] = min(abs(int_values - desired_intensity));
+                int_used            = int_values(amp_idx);
+
+                if int_dist / desired_intensity > 0.05
+                    base_amp = amp_map.(int_keys{amp_idx});
+                    elem_amp = round(base_amp * sqrt(desired_intensity / int_used));
+                    warning(['load_transducer_from_library: scaling amplitude from %.1f to %.1f W/cm² ' ...
+                        '(%.0f -> %d). Run calibration at this intensity for an exact value.'], ...
+                        int_used, desired_intensity, base_amp, elem_amp);
+                else
+                    elem_amp = amp_map.(int_keys{amp_idx});
+                end
+                parameters.transducer.annular.elem_amp = repmat(elem_amp, 1, n_elem);
+            end
+
+            %% Focal distance bookkeeping
+            parameters.transducer.focal_distance_ep   = focal_distance_ep;
+            parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
+                (tran.transducer.annular.curv_radius_mm - ...
+                 tran.transducer.annular.dist_geom_ep_mm);
+            parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
+
+            %% Provenance
+            parameters.library_meta       = lib.meta;
+            parameters.library_focal_used = used_depth_gm;
+
+            fprintf('Library loaded (global model): %s | focal %.1f mm (interp from %.1f mm) | amp %d @ %.1f W/cm²\n', ...
+                combo_name, focal_distance_ep, used_depth_gm, elem_amp(1), desired_intensity);
+            return;
+        end
+        % fall through to per-depth if use_refinement == true
+    end
 
     %% Find closest calibrated focal depth
     cal = lib.calibration.focal_depths;
