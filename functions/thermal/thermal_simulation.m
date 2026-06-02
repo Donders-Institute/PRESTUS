@@ -245,7 +245,10 @@ if use_datacast == true
 end
 
 % Build final input args
-thermal_args = {'PlotSim', boolean(parameters.simulation.interactive)};
+% PlotSim is always disabled here; when interactive we manage a single persistent figure
+% ourselves via plotTemp after each takeTimeStep, because kWaveDiffusion.takeTimeStep
+% creates a new figure handle on every call when PlotSim=true.
+thermal_args = {'PlotSim', false};
 if use_datacast
     thermal_args = [thermal_args, {'DataCast', datacast}];
 end
@@ -260,6 +263,13 @@ thermal_diff_obj = kWaveDiffusion(...
     source, ...
     sensor, ...
     thermal_args{:});
+
+% In interactive mode, open a single figure that will be reused for all thermal updates
+if parameters.simulation.interactive
+    h_thermal_fig = figure('Name', 'kWave Thermal Simulation');
+    thermal_diff_obj.plotTemp;
+    drawnow;
+end
 
 % initialize field temperature
 if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
@@ -352,7 +362,10 @@ for rep_i = 1:n_ptri_reps
         else
             evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur)');
         end
-        
+        if parameters.simulation.interactive && ishandle(h_thermal_fig)
+            figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+        end
+
         % CEM43 iso update — R uses T_max so that any voxel that has previously
         % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
         % Irreversible damage (T>=57 ever reached) is recorded as Inf. See doc_simulations-thermal.md.
@@ -395,7 +408,10 @@ for rep_i = 1:n_ptri_reps
             else
                 evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur)');
             end
-            
+            if parameters.simulation.interactive && ishandle(h_thermal_fig)
+                figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+            end
+
             % CEM43 iso update — see ON-phase comment above for R=T_max rationale.
             tmp_obj.cem43_iso = tmp_obj.cem43_iso + params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur ./ 60 .* ...
                 (0 .* (thermal_diff_obj.T < 39 & T_max < 43) + ...
@@ -440,7 +456,10 @@ for rep_i = 1:n_ptri_reps
             else
                 evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur)');
             end
-            
+            if parameters.simulation.interactive && ishandle(h_thermal_fig)
+                figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+            end
+
             % CEM43 iso — see ON-phase comment for R=T_max rationale.
             tmp_obj.cem43_iso = tmp_obj.cem43_iso + 1*params_thermal.ptri_off_step_dur ./ 60 .* ...
                 (0 .* (thermal_diff_obj.T < 39 & T_max < 43) + ...
@@ -487,7 +506,10 @@ if params_thermal.post_ptri_steps_n > 0
         else
             evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur)');
         end
-        
+        if parameters.simulation.interactive && ishandle(h_thermal_fig)
+            figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+        end
+
         % CEM43 iso update — see ON-phase comment for R=T_max rationale.
         tmp_obj.cem43_iso = tmp_obj.cem43_iso + 1*params_thermal.post_ptri_step_dur ./ 60 .* ...
             (0 .* (thermal_diff_obj.T < 39 & T_max < 43) + ...
