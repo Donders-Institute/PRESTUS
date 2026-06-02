@@ -125,6 +125,6 @@ For each target intensity, an uncertainty report is generated aggregating the th
 
 When `simulation.transducer_coupling = 'async'` and multiple transducers are defined, each transducer carries its own `target_isppa_wcm2`. The async pipeline scales each transducer's pressure field independently before summing intensities incoherently. Multi-ISPPA sweeps are supported: if any transducer has a vector target, one combine+thermal pair is run per sweep point.
 
-See [doc_async_transducer.md](doc_async_transducer.md) for full details.
+See [doc_multitransducer.md](doc_multitransducer.md) for full details.
 
 See also: [doc_calibration.md](doc_calibration.md), [doc_uncertainty.md](doc_uncertainty.md), [doc_modules.md](doc_modules.md)

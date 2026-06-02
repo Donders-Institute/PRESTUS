@@ -1,4 +1,4 @@
-function report_path = generate_sequential_report(run_params_list, run_labels, uncertainty_variant_params)
+function report_path = generate_sequential_report(run_params_list, run_labels, run_affixes, uncertainty_variant_params)
 % GENERATE_SEQUENTIAL_REPORT  HTML summary report for a chain of sequential simulations
 %
 % Produces a self-contained HTML file with:
@@ -14,7 +14,8 @@ function report_path = generate_sequential_report(run_params_list, run_labels, u
 % Use as:
 %   report_path = generate_sequential_report(run_params_list)
 %   report_path = generate_sequential_report(run_params_list, run_labels)
-%   report_path = generate_sequential_report(run_params_list, run_labels, uncertainty_variant_params)
+%   report_path = generate_sequential_report(run_params_list, run_labels, run_affixes)
+%   report_path = generate_sequential_report(run_params_list, run_labels, run_affixes, uncertainty_variant_params)
 %
 % Input:
 %   run_params_list          - (1×N) cell array of PRESTUS parameters structs
@@ -25,6 +26,11 @@ function report_path = generate_sequential_report(run_params_list, run_labels, u
 %                              .conservative_params_list — (1×N) cell of params structs
 %                              When present, timeseries plots show shaded
 %                              liberal–conservative bands around the default line.
+%   run_affixes              - (optional) (1×N) cell array of structs, each with
+%                              fields .output_affix and .thermal_cache_affix.
+%                              Built by sequential_pipeline and used for all file
+%                              lookups.  When absent, affixes are inferred from
+%                              the params structs (backward-compatible fallback).
 %
 % Output:
 %   report_path - path to the generated HTML file
@@ -34,6 +40,7 @@ function report_path = generate_sequential_report(run_params_list, run_labels, u
 arguments
     run_params_list              (1,:) cell
     run_labels                   (1,:) cell   = {}
+    run_affixes                  (1,:) cell   = {}
     uncertainty_variant_params   (1,1) struct = struct()
 end
 
@@ -75,6 +82,8 @@ try
     % ------------------------------------------------------------------ %
     %% Load per-run data
     % ------------------------------------------------------------------ %
+    has_affix_registry = numel(run_affixes) == n_runs;
+
     run_data = cell(1, n_runs);
     for ri = 1:n_runs
         p = run_params_list{ri};
@@ -85,16 +94,25 @@ try
         % them from path.sim without creating directories or logging.
         p = resolve_io_dirs(p);
 
+        % Resolve affixes from the explicit registry when available; fall back
+        % to params struct fields for backward compatibility.
+        if has_affix_registry
+            o_affix = run_affixes{ri}.output_affix;
+            t_affix = run_affixes{ri}.thermal_cache_affix;
+        else
+            o_affix = p.io.output_affix;
+            if isfield(p.io, 'thermal_cache_affix') && ~isempty(p.io.thermal_cache_affix)
+                t_affix = p.io.thermal_cache_affix;
+            else
+                t_affix = o_affix;
+            end
+        end
+
         % CSV table (acoustic + thermal scalars).
-        % Derive csv_path from dir_output + output_affix rather than trusting
-        % filename_table, which may carry a stale value when sequential_parameters
-        % was built as a copy of a prior run's runtime struct.
         csv_path = '';
-        if isfield(p.io, 'dir_output') && ~isempty(p.io.dir_output) && ...
-                isfield(p.io, 'output_affix') && ...
-                isfield(p, 'subject_id') && isfield(p, 'simulation') && isfield(p.simulation, 'medium')
+        if isfield(p.io, 'dir_output') && ~isempty(p.io.dir_output)
             csv_path = fullfile(p.io.dir_output, sprintf('sub-%03d_%s%s.csv', ...
-                p.subject_id, p.simulation.medium, p.io.output_affix));
+                p.subject_id, p.simulation.medium, o_affix));
         elseif isfield(p.io, 'filename_table') && ~isempty(p.io.filename_table)
             csv_path = p.io.filename_table;
         end
@@ -114,12 +132,6 @@ try
             dir_cache = '';
         end
 
-        % Thermal .mat file — use thermal_cache_affix when available
-        if isfield(p.io, 'thermal_cache_affix')
-            t_affix = p.io.thermal_cache_affix;
-        else
-            t_affix = p.io.output_affix;
-        end
         heating_mat = fullfile(dir_cache, ...
             sprintf('sub-%03d_%s_heating_res%s.mat', p.subject_id, medium, t_affix));
         d.timeseries = [];
@@ -139,7 +151,7 @@ try
         end
 
         d.params    = p;
-        d.affix     = p.io.output_affix;
+        d.affix     = o_affix;
         d.t_affix   = t_affix;
         run_data{ri} = d;
     end
@@ -288,8 +300,9 @@ function html = build_header_section(subject_id, medium, n_runs, run_labels, bas
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
     html = [html sprintf('<tr><th>Medium</th><td>%s</td></tr>', html_utils.escape(medium))];
     html = [html sprintf('<tr><th>Runs</th><td>%d</td></tr>', n_runs)];
+    escaped_labels = cellfun(@html_utils.escape, run_labels, 'UniformOutput', false);
     html = [html sprintf('<tr><th>Run labels</th><td>%s</td></tr>', ...
-        html_utils.escape(strjoin(run_labels, ' &rarr; ')))];
+        strjoin(escaped_labels, ' &rarr; '))];
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     if isfield(base_p, 'io') && isfield(base_p.io, 'dir_output')
         html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(base_p.io.dir_output))];

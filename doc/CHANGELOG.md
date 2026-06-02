@@ -31,7 +31,7 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 - Browser-based transducer alignment viewer (*experimental*)
 
 #### Acoustic/Thermal
-- Async multi-transducer pipeline — **experimental** (see [doc_async_transducer.md](doc_async_transducer.md))
+- Async multi-transducer pipeline — **experimental** (see [doc_multitransducer.md](doc_multitransducer.md))
 - Sequential simulation dispatcher: runs multiple parameter configurations in series, chains thermal simulations, and produces a consolidated multi-run report (see [doc_advanced.md](doc_advanced.md))
 - ⚠️ **Fixed:** sequential simulation produced incorrect outputs prior to this release due to mismatching grid->T1w transforms and back of the adopted heatmaps; the heatmaps were not interpolated with the baseline free-water value leading to interpolation artefacts
 - Uncertainty pipeline produces uncertainty bands across sequential multi-run parameter sweeps
@@ -95,7 +95,7 @@ Introduces matrix transducer support, an uncertainty quantification pipeline, an
     - Element positions can be defined inline or loaded from file
 - [**pCT**] pCT generation fully automated inside the pipeline; a T1w image, UTE image, and mapping algorithm are sufficient — pre-generation remains possible for debugging; pCT section included in HTML report when used
 - [**calibration**] In-pipeline amplitude calibration to target ISPPA
-- [**feature**] Multi-ISPPA targeting — run acoustics once, scale to N independent thermal targets via post-hoc pressure scaling (see [doc_multi_isppa.md](doc_multi_isppa.md))
+- [**feature**] Multi-ISPPA targeting — run acoustics once, scale to N independent thermal targets via post-hoc pressure scaling (see [doc_multiintensity.md](doc_multiintensity.md))
 - [**thermal**] Dual CEM43 output: both kWave and ISO formulations propagated through pipeline, CSV, NIfTIs, and report
 - [**report**] ISO CEM43 shown in Exposure Dashboard and methods section when enabled
 - [**feature**] Placement dispatch — unified entry point for manual, Localite, and heuristic transducer positioning (see [doc_placement.md](doc_placement.md))

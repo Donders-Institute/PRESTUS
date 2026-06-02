@@ -282,7 +282,7 @@ transducer:
   target_isppa_wcm2: [10, 20, 30, 50]   # W/cm² — triggers multi-ISPPA mode
 ```
 
-See [doc_multi_isppa.md](doc_multi_isppa.md) for full details.
+See [doc_multiintensity.md](doc_multiintensity.md) for full details.
 
 ### Provenance fields
 

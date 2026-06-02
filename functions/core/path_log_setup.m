@@ -173,6 +173,18 @@ end
         save(filename_parameters, 'parameters');
         clear filename_parameters;
 
+        % Write human-readable resolved-parameters YAML to log folder so that
+        % results are reproducible even if the transducer library is updated.
+        try
+            filename_params_yaml = fullfile(parameters.io.dir_logs, ...
+                sprintf('sub-%03d_%s_parameters%s.yaml', ...
+                subject_id, parameters.simulation.medium, parameters.io.output_affix));
+            yaml.dumpFile(filename_params_yaml, parameters);
+        catch yaml_err
+            warning('prestus:yamlSnapshot', ...
+                'Could not write parameter snapshot YAML: %s', yaml_err.message);
+        end
+
         % Create a log.
         % Use a pre-assigned path if uncertainty_pipeline set one (so all
         % five stage logs have known, deterministic paths); otherwise fall

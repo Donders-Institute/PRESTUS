@@ -4,15 +4,9 @@ function telemetry_setup()
 % Called at the start of prestus_pipeline. Skipped if the user has already
 % made an explicit decision (i.e. ~/.prestus/telemetry.json exists).
 %
-% In interactive sessions the prompt is shown every run until the user
-% explicitly answers 'y' or 'n'. No decision is recorded and no data is
-% ever sent without an explicit answer.
-%
-% In non-interactive sessions (HPC batch jobs) the full notice is printed
-% to stdout on every run but no decision is recorded and no data is sent.
-% To opt in from an HPC environment, either:
-%   1. Run PRESTUS once interactively and answer 'y', or
-%   2. Create ~/.prestus/telemetry.json with {"opt_in":true} manually.
+% The prompt blocks until the user answers 'y' or 'n'. To avoid being
+% prompted at all (e.g. before an HPC job), call telemetry_set_consent()
+% once beforehand to record the decision.
 %
 % The consent record written to ~/.prestus/telemetry.json contains only:
 %   opt_in         - true/false
@@ -49,27 +43,16 @@ function telemetry_setup()
         '  - IP addresses or hostnames\n', ...
         '  - Acoustic pressure values, simulation results, or tissue property values\n\n', ...
         'Full details: https://github.com/Donders-Institute/PRESTUS/blob/main/documentation/doc_telemetry.md\n\n', ...
-        'To silence this message, answer below or edit:\n', ...
+        'Answer below. This prompt will loop until you choose.\n', ...
+        'To opt out later, set opt_in=false in:\n', ...
         '  %s\n\n'], cfg_file);
 
-    if ~feature('ShowFigureWindows')
-        % Non-interactive (HPC batch job): print notice but do not record a
-        % decision and do not send data. The message will reappear on every
-        % run until the user opts in or out interactively.
-        fprintf(['Non-interactive session: no data will be sent.\n', ...
-                 'To opt in, run PRESTUS once interactively, or create:\n', ...
-                 '  %s\n', ...
-                 'containing: {"opt_in":true,"decided_on":"YYYY-MM-DD","prestus_ver":""}\n\n'], ...
-                cfg_file);
-        return   % no decision recorded – prompt will reappear next run
-    end
-
-    reply = input('Allow anonymous usage statistics? [y/n]: ', 's');
-    reply = lower(strtrim(reply));
-
-    if ~ismember(reply, {'y', 'n'})
-        fprintf('No answer recorded – you will be asked again on the next run.\n\n');
-        return   % no decision recorded – prompt will reappear next run
+    reply = '';
+    while ~ismember(reply, {'y', 'n'})
+        reply = lower(strtrim(input('Allow anonymous usage statistics? [y/n]: ', 's')));
+        if ~ismember(reply, {'y', 'n'})
+            fprintf('Please answer y or n.\n');
+        end
     end
 
     opted = strcmp(reply, 'y');

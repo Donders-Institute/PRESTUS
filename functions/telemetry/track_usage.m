@@ -172,7 +172,8 @@ function mode = detect_pipeline_mode(parameters, pipe_options)
         mode = 'async';
     elseif is_multi_isppa_mode(parameters)
         mode = 'multi_isppa';
-    elseif isfield(pipe_options, 'sequential_configs')
+    elseif isfield(pipe_options, 'sequential_configs') || ...
+           (isfield(pipe_options, 'is_sequential_run') && pipe_options.is_sequential_run)
         mode = 'sequential';
     else
         mode = 'single';

@@ -1,5 +1,5 @@
 function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
-    neuronav_convert_MNI_to_native(sub_id, parameters, pn, trans_mm, targ_mm)
+    neuronav_convert_MNI_to_native(sub_id, parameters, trans_mm, targ_mm)
 
 % NEURONAV_CONVERT_MNI_TO_NATIVE  Transform coordinates from MNI space to native subject space
 %
@@ -9,12 +9,11 @@ function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
 %
 % Use as:
 %   [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
-%       neuronav_convert_MNI_to_native(sub_id, parameters, pn, trans_mm, targ_mm)
+%       neuronav_convert_MNI_to_native(sub_id, parameters, trans_mm, targ_mm)
 %
 % Input:
 %   sub_id     - subject identifier string (e.g. ‘sub-010’)
-%   parameters - (1,1) simulation parameters struct
-%   pn         - (1,1) path names struct with data_seg field
+%   parameters - PRESTUS config struct with parameters.seg_path field
 %   trans_mm   - [Nx3] transducer coordinates in MNI space [mm RAS]
 %   targ_mm    - [Nx3] target coordinates in MNI space [mm RAS]
 %
@@ -28,8 +27,8 @@ function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
 
     Npos = size(trans_mm,1); % Number of positions
 
-    t1seg_info = niftiinfo(fullfile(pn.data_seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
-    m2m_folder = fullfile(pn.data_seg, sprintf('m2m_%s', sub_id));
+    t1seg_info = niftiinfo(fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
+    m2m_folder = fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id));
     transformation_type = 'nonl';
 
     for i = 1:Npos

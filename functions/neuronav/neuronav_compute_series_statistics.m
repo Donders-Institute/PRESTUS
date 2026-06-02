@@ -123,8 +123,11 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 
     % Expand raw Matrix4D structs to Matrix4D_full + coord/rot fields
     % (needed for TriggerMarkers and InstrumentMarker; GUMMarkers are already expanded above)
+    % Note: do NOT guard on ~isfield(...,'Matrix4D_full') — setting that field on one
+    % element of a MATLAB struct array propagates it (as []) to all other elements,
+    % so isfield returns true for elements that were never actually populated.
     for i = 1:length(triggerMarkers)
-        if isfield(triggerMarkers(i), 'Matrix4D') && ~isfield(triggerMarkers(i), 'Matrix4D_full')
+        if isfield(triggerMarkers(i), 'Matrix4D')
             matrix4d = triggerMarkers(i).Matrix4D;
             matrix_data = zeros(4,4);
             all_fields = fieldnames(matrix4d);
@@ -154,7 +157,9 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
     [recordingTimes, sortIdx] = sort(recordingTimes);
     triggerMarkers = triggerMarkers(sortIdx);
 
-    % Detect segments (TriggerMarkers only — GUMMarkers and InstrumentMarker have no timing)
+    % Build segments: one cell per series.
+    % TriggerMarkers: detect series by timing gaps; each cell = cluster of triggers to average.
+    % GUMMarkers / InstrumentMarker: each element is its own series (no averaging across targets).
     if strcmp(markertype, 'TriggerMarkers') && length(recordingTimes) > 1
         timeDiffs = diff(recordingTimes);
         gap_threshold = median(timeDiffs) * 3;
@@ -162,30 +167,32 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
         segmentStarts = [1, jumpIdx + 1];
         segmentEnds = [jumpIdx, numel(recordingTimes)];
     else
-        segmentStarts = 1;
-        segmentEnds = length(triggerMarkers);
+        segmentStarts = 1:length(triggerMarkers);
+        segmentEnds   = 1:length(triggerMarkers);
     end
 
-    % Create segments
+    % Create segments — one cell per series
     segments = {};
     for i = 1:length(segmentStarts)
         range = segmentStarts(i):segmentEnds(i);
-        if isempty(expected_segment_length) || abs(length(range) - expected_segment_length) <= 20
-            segments{end+1} = triggerMarkers(range);
+        if strcmp(markertype, 'TriggerMarkers') && ...
+           ~isempty(expected_segment_length) && abs(length(range) - expected_segment_length) > 20
+            continue;
         end
+        segments{end+1} = triggerMarkers(range); %#ok<AGROW>
     end
 
     if isempty(segments)
-        warn("⚠ No valid %s segments found", markertype);
+        warning('neuronav_compute_series_statistics: no valid %s segments found', markertype);
         stats = {};
         return;
     end
 
     % ----------- ONE CELL PER SERIES WITH Matrix4D_full AT CELL LEVEL -----------
     stats = {};  % 1×N cell array
-    
-    for s = 1:length(segments{:})
-        stim_data = segments{1}(s);
+
+    for s = 1:numel(segments)
+        stim_data = segments{s};
         N = length(stim_data);
         
         % Extract all Matrix4D_full matrices for this series

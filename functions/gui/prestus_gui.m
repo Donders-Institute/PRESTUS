@@ -26,7 +26,8 @@ fig = uifigure( ...
     'Position',        [80 60 820 680], ...
     'Color',           st.bg_fig, ...
     'Resize',          'on', ...
-    'AutoResizeChildren', 'off');
+    'AutoResizeChildren', 'off', ...
+    'Visible',         'off');
 
 % App state stored in UserData
 app.dir_output  = '';
@@ -100,7 +101,10 @@ tabs.grid        = uitab(tg, 'Title', '  Grid          ');
 tabs.medium      = uitab(tg, 'Title', '  Medium        ');
 tabs.thermal     = uitab(tg, 'Title', '  Thermal       ');
 tabs.hpc         = uitab(tg, 'Title', '  HPC           ');
-tabs.advanced    = uitab(tg, 'Title', '  Advanced      ');
+tabs.advanced         = uitab(tg, 'Title', '  Advanced      ');
+tabs.placement        = uitab(tg, 'Title', '  Placement     ');
+tabs.multitransducer  = uitab(tg, 'Title', '  Multi-Transducer  ');
+tabs.calibration      = uitab(tg, 'Title', '  Calibration   ');
 tabs.run         = uitab(tg, 'Title', '  ▶  Run        ');
 tabs.results     = uitab(tg, 'Title', '  Results       ');
 
@@ -118,8 +122,17 @@ build_tab_medium(tabs.medium);
 build_tab_thermal(tabs.thermal);
 build_tab_hpc(tabs.hpc);
 build_tab_advanced(tabs.advanced);
+build_tab_placement(tabs.placement);
+build_tab_multitransducer(tabs.multitransducer);
+build_tab_calibration(tabs.calibration);
 build_tab_run(tabs.run);
 build_tab_results(tabs.results);
+
+%% ── Build widget tag → handle cache ──────────────────────────────────────
+
+% Collect all tagged descendants once so set_widget/findobj callers can use
+% the cache instead of walking the full component tree on each lookup.
+widget_cache = build_widget_cache();
 
 %% ── Wire cross-tab callbacks ──────────────────────────────────────────────
 
@@ -132,7 +145,10 @@ if ~isempty(h_heating)
     cb_toggle_thermal_timing(h_heating.Value);  % apply initial state
 end
 
-%% ── Load defaults ─────────────────────────────────────────────────────────
+%% ── Show window, then load defaults ───────────────────────────────────────
+
+fig.Visible = 'on';
+drawnow;
 
 load_defaults();
 
@@ -149,7 +165,7 @@ end
 
     %% ── Tab 1: I/O & Paths ────────────────────────────────────────────
     function build_tab_io(t)
-        gl = tab_grid(t, 36, {200, '1x', 55, 80});
+        gl = tab_grid(t, 39, {200, '1x', 55, 80});
 
         sec(gl, 1, 'Subject');
         lbl(gl, 2, 1, '* Subject ID');
@@ -223,11 +239,27 @@ end
 
         lbl(gl, 32, 1, 'Save heating video');
         chk(gl, 32, 2, 'io.save_heatingvideo', false, 'Save MP4 of incremental heating');
+        sp(gl, 33);
+
+        sec(gl, 34, 'Advanced I/O');
+        lbl(gl, 35, 1, 'External acoustic NIfTI');
+        edt(gl, 35, 2, 'io.external_acoustic_nifti', '', 0);
+        brw(gl, 35, 4, 'io.external_acoustic_nifti', 'file');
+        note_lbl(gl, 36, 'When set, skips acoustic simulation. NIfTI must contain p-max [Pa] in T1 space (e.g. from BabelBrain or a prior run).');
+
+        lbl(gl, 37, 1, 'Save complex pressure');
+        chk(gl, 37, 2, 'io.save_p_complex', false, 'Save magnitude + phase of steady-state pressure field');
+
+        lbl(gl, 38, 1, 'Save property maps');
+        chk(gl, 38, 2, 'io.save_property_maps', false, 'Save per-tissue acoustic/thermal property NIfTIs to nii/properties/');
+
+        lbl(gl, 39, 1, 'Save MNI outputs');
+        chk(gl, 39, 2, 'io.save_MNI', true, 'Save simulation outputs in MNI space in addition to native T1w');
     end
 
     %% ── Tab 2: Simulation ─────────────────────────────────────────────
     function build_tab_simulation(t)
-        gl = tab_grid(t, 28, {200, '1x', 55, 80});
+        gl = tab_grid(t, 52, {200, '1x', 55, 80});
 
         sec(gl, 1, 'Simulation Type');
         lbl(gl, 2, 1, '* Medium');
@@ -284,45 +316,106 @@ end
 
         chk(gl, 11+size(modules,1)+1, col_span, 'modules.segmentation_only', false, ...
             'Segmentation only — stop after SimNIBS (skip grid and simulations)');
+        sp(gl, 23);
+
+        sec(gl, 24, 'Multi-ISPPA Intensity Sweep');
+        lbl(gl, 25, 1, 'Target Isppa (W/cm²)');
+        edt(gl, 25, 2, 'transducer.target_isppa_wcm2', '', 0);
+        note_lbl(gl, 26, 'One value for a single run; comma-separated list triggers intensity sweep (separate thermal sim per value, shared acoustic sim).');
+        sp(gl, 27);
+
+        sec(gl, 28, 'Sequential Simulations');
+        chk(gl, 29, [1 2], 'options.sequential.enabled', false, ...
+            'Chain follow-up sonications (thermal state inherited between runs)');
+        note_lbl(gl, 30, 'Enter one YAML config path per line. Each follow-up inherits the temperature and CEM43 maps from the preceding run.');
+
+        lbl(gl, 31, 1, 'Follow-up configs');
+        seq_ta = uitextarea(gl, ...
+            'Value',       {''}, ...
+            'FontName',    st.font, 'FontSize', st.fs_sm, ...
+            'Placeholder', 'path/to/followup1.yaml', ...
+            'Tag',         'sequential_configs_textarea');
+        seq_ta.Layout.Row = [32 38]; seq_ta.Layout.Column = [1 3];
+
+        btn_seq_brw = uibutton(gl, 'Text', '+ Add', ...
+            'FontName', st.font, 'FontSize', st.fs_sm, ...
+            'BackgroundColor', [0.88 0.91 0.96], ...
+            'ButtonPushedFcn', @(~,~) cb_seq_browse_append());
+        btn_seq_brw.Layout.Row = 32; btn_seq_brw.Layout.Column = 4;
     end
 
     %% ── Tab 3: Transducer ─────────────────────────────────────────────
     function build_tab_transducer(t)
-        gl = tab_grid(t, 30, {200, '1x', 55, 80});
+        gl = tab_grid(t, 35, {200, '1x', 55, 80});
 
-        sec(gl, 1, 'General');
-        lbl(gl, 2, 1, '* Type');
-        h_type = drp(gl, 2, 2, 'transducer.type', {'annular','matrix'}, 'annular');
-        h_type.ValueChangedFcn = @(dd,~) cb_transducer_type(dd);
+        % ── Library-based selection (rows 1-4) ────────────────────────
+        sec(gl, 1, 'Transducer Library');
+        lbl(gl, 2, 1, 'Serial');
 
-        lbl(gl, 3, 1, '* Frequency');
-        nedt(gl, 3, 2, 'transducer.freq_hz', 500000);
-        lbl(gl, 3, 3, 'Hz');
+        % Populate serial list from equipment config; fall back to empty.
+        serial_items = {'(manual)'};
+        try
+            eq = load_equipment_config();
+            serial_items = [{'(manual)'}; fieldnames(eq.trans)];
+        catch
+        end
+        h_serial = uidropdown(gl, ...
+            'Items',    serial_items, ...
+            'Value',    serial_items{1}, ...
+            'Tag',      'transducer.serial', ...
+            'FontName', st.font, 'FontSize', st.fs);
+        h_serial.Layout.Row = 2; h_serial.Layout.Column = [2 3];
+        h_serial.ValueChangedFcn = @(dd,~) cb_serial_changed(dd);
 
-        lbl(gl, 4, 1, 'Focal distance (exit plane)');
-        nedt(gl, 4, 2, 'transducer.focal_distance_ep', NaN);
-        lbl(gl, 4, 3, 'mm');
+        lbl(gl, 3, 1, 'Driving system serial');
+        edt(gl, 3, 2, 'transducer.combo.ds_serial', '', 0);
+        note_lbl(gl, 4, 'Optional. Omit for a generic (DS-agnostic) calibration. Specify to use a driving-system-specific calibration.');
 
-        lbl(gl, 5, 1, 'Focal distance (bowl)');
-        nedt(gl, 5, 2, 'transducer.focal_distance_bowl', NaN);
-        lbl(gl, 5, 3, 'mm');
+        h_lib_cov = uilabel(gl, ...
+            'Text',      'Library: —', ...
+            'Tag',       'lbl_library_coverage', ...
+            'FontName',  st.font, ...
+            'FontSize',  st.fs_sm, ...
+            'FontColor', [0.5 0.5 0.5], ...
+            'WordWrap',  'on');
+        h_lib_cov.Layout.Row = 5; h_lib_cov.Layout.Column = [1 3];
+
         sp(gl, 6);
 
-        sec(gl, 7, 'Transducer Position (T1 voxels)');
-        lbl(gl, 8, 1, 'Transducer position');
-        xyz_panel(gl, 8, 'transducer.trans_pos', [NaN NaN NaN]);
+        % ── General (rows 7-12) ───────────────────────────────────────
+        sec(gl, 7, 'General');
+        lbl(gl, 8, 1, '* Type');
+        h_type = drp(gl, 8, 2, 'transducer.type', {'annular','matrix'}, 'annular');
+        h_type.ValueChangedFcn = @(dd,~) cb_transducer_type(dd);
 
-        lbl(gl, 9, 1, 'Focus position');
-        xyz_panel(gl, 9, 'transducer.focus_pos', [NaN NaN NaN]);
-        sp(gl, 10);
+        lbl(gl, 9, 1, '* Frequency');
+        nedt(gl, 9, 2, 'transducer.freq_hz', 500000);
+        lbl(gl, 9, 3, 'Hz');
 
-        % ── Annular panel ─────────────────────────────────────────────
+        lbl(gl, 10, 1, 'Focal distance (exit plane)');
+        nedt(gl, 10, 2, 'transducer.focal_distance_ep', NaN);
+        lbl(gl, 10, 3, 'mm');
+
+        lbl(gl, 11, 1, 'Focal distance (bowl)');
+        nedt(gl, 11, 2, 'transducer.focal_distance_bowl', NaN);
+        lbl(gl, 11, 3, 'mm');
+        sp(gl, 12);
+
+        sec(gl, 13, 'Transducer Position (T1 voxels)');
+        lbl(gl, 14, 1, 'Transducer position');
+        xyz_panel(gl, 14, 'transducer.trans_pos', [NaN NaN NaN]);
+
+        lbl(gl, 15, 1, 'Focus position');
+        xyz_panel(gl, 15, 'transducer.focus_pos', [NaN NaN NaN]);
+        sp(gl, 16);
+
+        % ── Annular panel (rows 17-30) ────────────────────────────────
         pnl_ann = uipanel(gl, ...
             'Title',           '', ...
             'BackgroundColor', st.bg_panel, ...
             'BorderType',      'none', ...
             'Tag',             'panel_annular');
-        pnl_ann.Layout.Row    = [11 24];
+        pnl_ann.Layout.Row    = [17 30];
         pnl_ann.Layout.Column = [1 4];
 
         gl_ann = uigridlayout(pnl_ann, ...
@@ -364,14 +457,14 @@ end
         nedt(gl_ann, 9, 2, 'transducer.annular.depth_mm', 16);
         lbl(gl_ann, 9, 3, 'mm');
 
-        % ── Matrix panel ───────────────────────────────────────────────
+        % ── Matrix panel (rows 17-30, hidden by default) ──────────────
         pnl_mat = uipanel(gl, ...
             'Title',           '', ...
             'BackgroundColor', st.bg_panel, ...
             'BorderType',      'none', ...
             'Tag',             'panel_matrix', ...
             'Visible',         'off');
-        pnl_mat.Layout.Row    = [11 24];
+        pnl_mat.Layout.Row    = [17 30];
         pnl_mat.Layout.Column = [1 4];
 
         gl_mat = uigridlayout(pnl_mat, ...
@@ -425,7 +518,7 @@ end
 
     %% ── Tab 4: Grid ───────────────────────────────────────────────────
     function build_tab_grid(t)
-        gl = tab_grid(t, 20, {200, '1x', 55, 80});
+        gl = tab_grid(t, 29, {200, '1x', 55, 80});
 
         sec(gl, 1, 'Spatial Resolution');
         lbl(gl, 2, 1, '* Grid resolution');
@@ -469,6 +562,22 @@ end
 
         lbl(gl, 19, 1, 'Use kWaveArray');
         chk(gl, 19, 2, 'grid.use_kWaveArray', true, 'Recommended for accurate transducer modelling');
+        sp(gl, 20);
+
+        sec(gl, 21, 'Grid Orientation & Thermal Grid');
+        lbl(gl, 22, 1, 'Grid orientation mode');
+        drp(gl, 22, 2, 'grid.mode', {'transducer_axis','ras_plus'}, 'transducer_axis');
+        note_lbl(gl, 23, 'transducer_axis: rotate volume so focal axis aligns with z (compact grid). ras_plus: keep scanner RAS+ orientation without rotation.');
+
+        lbl(gl, 24, 1, 'Thermal resolution');
+        nedt(gl, 24, 2, 'grid.thermal_resolution_mm', NaN);
+        lbl(gl, 24, 3, 'mm');
+        note_lbl(gl, 25, 'Leave NaN to use the acoustic grid resolution for thermal simulation.');
+
+        lbl(gl, 26, 1, 'Thermal FOV');
+        nedt(gl, 26, 2, 'grid.thermal_fov_mm', NaN);
+        lbl(gl, 26, 3, 'mm');
+        note_lbl(gl, 27, 'Leave NaN to match the acoustic simulation field-of-view.');
     end
 
     %% ── Tab 5: Medium Properties ──────────────────────────────────────
@@ -622,7 +731,7 @@ end
 
     %% ── Tab 8: Advanced ───────────────────────────────────────────────
     function build_tab_advanced(t)
-        gl = tab_grid(t, 58, {220, '1x', 55, 80});
+        gl = tab_grid(t, 55, {220, '1x', 55, 80});
 
         sec(gl, 1, 'Segmentation');
         lbl(gl, 2, 1, 'Force qform reorientation');
@@ -699,38 +808,384 @@ end
         note_lbl(gl, 28, 'Radius around focus for ISPPA averaging in output metrics.');
         sp(gl, 29);
 
-        sec(gl, 30, 'Transducer Placement');
-        lbl(gl, 31, 1, 'Localite placement');
-        chk(gl, 31, 2, 'placement.localite.enabled', false, ...
-            'Use position_transducer_localite for placement');
+        sp(gl, 30);
+        note_lbl(gl, 31, 'Transducer placement settings (manual / Localite / heuristic / PlanTUS) are in the Placement tab.');
+        sp(gl, 32);
 
-        lbl(gl, 32, 1, 'Localite reference dist.');
-        nedt(gl, 32, 2, 'placement.localite.reference_distance_mm', 15); lbl(gl, 32, 3, 'mm');
-        note_lbl(gl, 33, 'Correct for distance between IR trackers and transducer exit plane.');
+        sec(gl, 33, 'Neuronavigation Ingestion');
+        lbl(gl, 34, 1, 'Subject ID');
+        h_sub = uieditfield(gl, 'text', 'Tag', 'neuronav.sub_id', 'Value', '', ...
+            'FontName', st.font, 'FontSize', st.fs, 'Placeholder', 'sub-001');
+        h_sub.Layout.Row = 34; h_sub.Layout.Column = 2;
 
-        lbl(gl, 34, 1, 'Save Localite-aligned T1');
-        chk(gl, 34, 2, 'placement.heuristic.save_localite_t1', false, ...
-            'Save T1 aligned to Localite header for correction');
+        lbl(gl, 35, 1, 'Session ID');
+        h_ses = uieditfield(gl, 'text', 'Tag', 'neuronav.ses_id', 'Value', '', ...
+            'FontName', st.font, 'FontSize', st.fs, 'Placeholder', 'ses-01');
+        h_ses.Layout.Row = 35; h_ses.Layout.Column = 2;
 
-        lbl(gl, 35, 1, 'Heuristic dist. close');
-        nedt(gl, 35, 2, 'placement.heuristic.dist_close', NaN); lbl(gl, 35, 3, 'mm');
+        note_lbl(gl, 36, 'Marker type (TriggerMarkers / GUMMarkers) is auto-detected from the folder.');
 
-        lbl(gl, 36, 1, 'Ear radius');
-        nedt(gl, 36, 2, 'placement.heuristic.ear_radius', 35); lbl(gl, 36, 3, 'mm');
-        sp(gl, 37);
+        lbl(gl, 37, 1, 'Raw Localite path');
+        h_raw = uieditfield(gl, 'text', 'Tag', 'neuronav.raw_path', 'Value', '', ...
+            'FontName', st.font, 'FontSize', st.fs);
+        h_raw.Layout.Row = 37; h_raw.Layout.Column = 2;
+        brw(gl, 37, 4, 'neuronav.raw_path', 'dir');
 
-        sec(gl, 38, 'Simulation Layers');
-        note_lbl(gl, 39, 'Comma-separated SimNIBS label indices assigned to each tissue compartment.');
+        lbl(gl, 38, 1, 'Output path');
+        h_out = uieditfield(gl, 'text', 'Tag', 'neuronav.out_path', 'Value', '', ...
+            'FontName', st.font, 'FontSize', st.fs);
+        h_out.Layout.Row = 38; h_out.Layout.Column = 2;
+        brw(gl, 38, 4, 'neuronav.out_path', 'dir');
+
+        h_ingest_btn = uibutton(gl, 'Text', '▶  Run Ingestion', ...
+            'Tag', 'btn_ingest', ...
+            'FontName', st.font, 'FontSize', st.fs, 'FontWeight', 'bold', ...
+            'BackgroundColor', st.accent, 'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) cb_ingest());
+        h_ingest_btn.Layout.Row = 39; h_ingest_btn.Layout.Column = [1 2];
+
+        h_ingest_status = uilabel(gl, ...
+            'Text', '', 'Tag', 'lbl_ingest_status', ...
+            'FontName', st.font, 'FontSize', st.fs_sm, ...
+            'FontColor', st.text_sub, 'WordWrap', 'on', ...
+            'HorizontalAlignment', 'left');
+        h_ingest_status.Layout.Row = 40; h_ingest_status.Layout.Column = [1 4];
+        sp(gl, 41);
+
+        sec(gl, 42, 'Simulation Layers');
+        note_lbl(gl, 43, 'Comma-separated SimNIBS label indices assigned to each tissue compartment.');
 
         layer_names = {'water','brain','skin','skull','skull_cortical','skull_trabecular'};
         layer_defaults = {'0,3,6,9,10', '1,2', '5', '4', '7', '8'};
         for i = 1:numel(layer_names)
-            lbl(gl, 39+i, 1, layer_names{i});
-            edt(gl, 39+i, 2, ['layers.' layer_names{i}], layer_defaults{i}, 0);
+            lbl(gl, 43+i, 1, layer_names{i});
+            edt(gl, 43+i, 2, ['layers.' layer_names{i}], layer_defaults{i}, 0);
         end
     end
 
-    %% ── Tab 9: Run ────────────────────────────────────────────────────
+    %% ── Tab 9: Placement ─────────────────────────────────────────────
+    function build_tab_placement(t)
+        gl = tab_grid(t, 60, {220, '1x', 55, 80});
+
+        sec(gl, 1, 'Transducer Placement');
+        lbl(gl, 2, 1, 'Placement mode');
+        h_placement_mode = drp(gl, 2, 2, 'placement.mode', ...
+            {'manual','localite','heuristic','plantus'}, 'manual');
+        note_lbl(gl, 3, 'manual: use trans_pos/focus_pos as-is.  localite: read from XML.  heuristic: sphere-expansion search.  plantus: multi-objective optimisation.');
+        sp(gl, 4);
+
+        % ── Localite sub-panel ────────────────────────────────────────────
+        pnl_loc = uipanel(gl, 'Title', '', 'BackgroundColor', st.bg_panel, ...
+            'BorderType', 'none', 'Tag', 'panel_placement_localite', 'Visible', 'off');
+        pnl_loc.Layout.Row = [5 16]; pnl_loc.Layout.Column = [1 4];
+        gl_loc = uigridlayout(pnl_loc, 'RowHeight', repmat({26},1,12), ...
+            'ColumnWidth', {220,'1x',55,80}, 'Padding', [0 2 0 2], ...
+            'RowSpacing', 4, 'BackgroundColor', st.bg_panel);
+
+        sec(gl_loc, 1, 'Localite Config');
+        lbl(gl_loc, 2, 1, 'Localite XML file');
+        edt(gl_loc, 2, 2, 'placement.localite.file', '', 0);
+        brw(gl_loc, 2, 4, 'placement.localite.file', 'file');
+        lbl(gl_loc, 3, 1, 'Session index');
+        nedt(gl_loc, 3, 2, 'placement.localite.session', 1);
+        lbl(gl_loc, 4, 1, 'Marker type');
+        drp(gl_loc, 4, 2, 'placement.localite.markertype', ...
+            {'TriggerMarkers','NavigationMarkers'}, 'TriggerMarkers');
+        lbl(gl_loc, 5, 1, 'Marker position index');
+        nedt(gl_loc, 5, 2, 'placement.localite.position', 1);
+        lbl(gl_loc, 6, 1, 'Reference distance');
+        nedt(gl_loc, 6, 2, 'placement.localite.reference_distance_mm', 15);
+        lbl(gl_loc, 6, 3, 'mm');
+        note_lbl(gl_loc, 7, 'Distance between IR trackers and transducer exit plane.');
+        lbl(gl_loc, 8, 1, 'Save Localite-aligned T1');
+        chk(gl_loc, 8, 2, 'placement.localite.save_localite_t1', false, ...
+            'Save T1 aligned to Localite header for QC');
+
+        % ── Heuristic sub-panel ───────────────────────────────────────────
+        pnl_heu = uipanel(gl, 'Title', '', 'BackgroundColor', st.bg_panel, ...
+            'BorderType', 'none', 'Tag', 'panel_placement_heuristic', 'Visible', 'off');
+        pnl_heu.Layout.Row = [5 16]; pnl_heu.Layout.Column = [1 4];
+        gl_heu = uigridlayout(pnl_heu, 'RowHeight', repmat({26},1,12), ...
+            'ColumnWidth', {220,'1x',55,80}, 'Padding', [0 2 0 2], ...
+            'RowSpacing', 4, 'BackgroundColor', st.bg_panel);
+
+        sec(gl_heu, 1, 'Heuristic (Sphere-Expansion) Config');
+        lbl(gl_heu, 2, 1, 'MNI target (mm)');
+        xyz_panel(gl_heu, 2, 'placement.heuristic.mni_target_mm', [NaN NaN NaN]);
+        lbl(gl_heu, 3, 1, 'Target name');
+        edt(gl_heu, 3, 2, 'placement.heuristic.target_name', '', 0);
+        lbl(gl_heu, 4, 1, 'Dist. close');
+        nedt(gl_heu, 4, 2, 'placement.heuristic.dist_close', NaN);
+        lbl(gl_heu, 4, 3, 'mm');
+        lbl(gl_heu, 5, 1, 'Ear exclusion radius');
+        nedt(gl_heu, 5, 2, 'placement.heuristic.ear_radius', 35);
+        lbl(gl_heu, 5, 3, 'mm');
+        lbl(gl_heu, 6, 1, 'Save Localite-aligned T1');
+        chk(gl_heu, 6, 2, 'placement.heuristic.save_localite_t1', false, ...
+            'Save T1 aligned to heuristic result for QC');
+
+        % ── PlanTUS sub-panel ─────────────────────────────────────────────
+        pnl_ptu = uipanel(gl, 'Title', '', 'BackgroundColor', st.bg_panel, ...
+            'BorderType', 'none', 'Tag', 'panel_placement_plantus', 'Visible', 'off');
+        pnl_ptu.Layout.Row = [5 57]; pnl_ptu.Layout.Column = [1 4];
+        gl_ptu = uigridlayout(pnl_ptu, 'RowHeight', repmat({26},1,26), ...
+            'ColumnWidth', {220,'1x',55,80}, 'Padding', [0 2 0 2], ...
+            'RowSpacing', 4, 'BackgroundColor', st.bg_panel, 'Scrollable', 'on');
+
+        sec(gl_ptu, 1, 'PlanTUS Config');
+        lbl(gl_ptu, 2, 1, '* PlanTUS script path');
+        edt(gl_ptu, 2, 2, 'placement.plantus.script_path', '', 1);
+        brw(gl_ptu, 2, 4, 'placement.plantus.script_path', 'dir');
+        lbl(gl_ptu, 3, 1, '* SimNIBS env path');
+        edt(gl_ptu, 3, 2, 'placement.plantus.env_path', '', 1);
+        brw(gl_ptu, 3, 4, 'placement.plantus.env_path', 'dir');
+        lbl(gl_ptu, 4, 1, '* MNI target (mm)');
+        xyz_panel(gl_ptu, 4, 'placement.plantus.mni_target_mm', [NaN NaN NaN]);
+        lbl(gl_ptu, 5, 1, '* Target name');
+        edt(gl_ptu, 5, 2, 'placement.plantus.target_name', '', 1);
+        lbl(gl_ptu, 6, 1, '* Focal distance list');
+        edt(gl_ptu, 6, 2, 'placement.plantus.focal_distance_list', '', 1);
+        lbl(gl_ptu, 6, 3, 'mm');
+        note_lbl(gl_ptu, 7, 'Comma-separated calibration focal distances from the exit plane.');
+        lbl(gl_ptu, 8, 1, '* FLHM list');
+        edt(gl_ptu, 8, 2, 'placement.plantus.flhm_list', '', 1);
+        lbl(gl_ptu, 8, 3, 'mm');
+        note_lbl(gl_ptu, 9, 'Comma-separated full-width half-max focal lengths matching the focal distance list.');
+        lbl(gl_ptu, 10, 1, 'Max steering angle');
+        nedt(gl_ptu, 10, 2, 'placement.plantus.max_angle_deg', 10);
+        lbl(gl_ptu, 10, 3, 'deg');
+        lbl(gl_ptu, 11, 1, 'Additional offset');
+        nedt(gl_ptu, 11, 2, 'placement.plantus.additional_offset_mm', 0);
+        lbl(gl_ptu, 11, 3, 'mm');
+        lbl(gl_ptu, 12, 1, 'Mask radius');
+        nedt(gl_ptu, 12, 2, 'placement.plantus.mask_radius_mm', 2);
+        lbl(gl_ptu, 12, 3, 'mm');
+        lbl(gl_ptu, 13, 1, 'Connectome WB path');
+        edt(gl_ptu, 13, 2, 'placement.plantus.connectome_wb_path', '', 0);
+        brw(gl_ptu, 13, 4, 'placement.plantus.connectome_wb_path', 'dir');
+        note_lbl(gl_ptu, 14, 'Optional. Required for interactive GUI visualisation.');
+        sp(gl_ptu, 15);
+        sec(gl_ptu, 16, 'Optimisation Weights (must sum to 1.0)');
+        lbl(gl_ptu, 17, 1, 'Skin-target distance');
+        nedt(gl_ptu, 17, 2, 'placement.plantus.weights.skin_target_distances', 0.2);
+        lbl(gl_ptu, 18, 1, 'Skin-target angle');
+        nedt(gl_ptu, 18, 2, 'placement.plantus.weights.skin_target_angles', 0.2);
+        lbl(gl_ptu, 19, 1, 'Skin-target intersection');
+        nedt(gl_ptu, 19, 2, 'placement.plantus.weights.skin_target_intersections', 0.2);
+        lbl(gl_ptu, 20, 1, 'Skin-skull angle');
+        nedt(gl_ptu, 20, 2, 'placement.plantus.weights.skin_skull_angles', 0.2);
+        lbl(gl_ptu, 21, 1, 'Skull thickness');
+        nedt(gl_ptu, 21, 2, 'placement.plantus.weights.skull_thickness', 0.2);
+
+        % Wire placement mode dropdown to show/hide sub-panels
+        h_placement_mode.ValueChangedFcn = @(dd,~) cb_placement_mode(dd.Value);
+        cb_placement_mode('manual');  % apply initial state
+    end
+
+    %% ── Tab 10: Multi-Transducer ──────────────────────────────────────
+    function build_tab_multitransducer(t)
+        gl = tab_grid(t, 22, {220, '1x', 55, 80});
+
+        sec(gl, 1, 'Multi-Transducer Mode');
+        note_lbl(gl, 2, 'Primary transducer is defined in the Transducer tab. Secondary transducers are loaded from YAML config files listed below.');
+
+        lbl(gl, 3, 1, 'Coupling mode');
+        drp(gl, 3, 2, 'simulation.transducer_coupling', {'coherent','async'}, 'coherent');
+        note_lbl(gl, 4, 'coherent: all transducers simulated in one k-Wave run (interference modelled).  async: each simulated independently, intensities summed incoherently.');
+        sp(gl, 5);
+
+        sec(gl, 6, 'Secondary Transducer Configs');
+        note_lbl(gl, 7, 'Each YAML fully defines one additional transducer (type, frequency, position, focus, intensity). They are loaded and appended to parameters.transducer(2..N).');
+
+        lbl(gl, 8, 1, 'Config paths');
+        mt_ta = uitextarea(gl, ...
+            'Value',       {''}, ...
+            'FontName',    st.font, 'FontSize', st.fs_sm, ...
+            'Placeholder', 'path/to/transducer2.yaml', ...
+            'Tag',         'multitrans_configs_textarea');
+        mt_ta.Layout.Row = [9 16]; mt_ta.Layout.Column = [1 3];
+
+        btn_mt_brw = uibutton(gl, 'Text', '+ Add', ...
+            'FontName', st.font, 'FontSize', st.fs_sm, ...
+            'BackgroundColor', [0.88 0.91 0.96], ...
+            'ButtonPushedFcn', @(~,~) cb_multitrans_browse_append());
+        btn_mt_brw.Layout.Row = 9; btn_mt_brw.Layout.Column = 4;
+
+        note_lbl(gl, 17, 'One YAML path per line. Leave empty for single-transducer mode.');
+    end
+
+    %% ── Tab 10: Calibration ───────────────────────────────────────────
+    function build_tab_calibration(t)
+        gl = tab_grid(t, 52, {200, '1x', 55, 80});
+
+        sec(gl, 1, 'Input Data');
+        lbl(gl, 2, 1, 'Equipment name');
+        edt(gl, 2, 2, 'calibration.equipment_name', '', 0);
+        note_lbl(gl, 3, 'Identifier matched against characterisation CSV files (e.g. CTX500).');
+
+        lbl(gl, 4, 1, 'Axial profile folder');
+        edt(gl, 4, 2, 'calibration.path_input_axial', '', 0);
+        brw(gl, 4, 3, 'calibration.path_input_axial', 'dir');
+        note_lbl(gl, 5, 'Directory containing per-equipment axial hydrophone CSVs.');
+
+        lbl(gl, 6, 1, 'Phase table folder');
+        edt(gl, 6, 2, 'calibration.path_input_phase', '', 0);
+        brw(gl, 6, 3, 'calibration.path_input_phase', 'dir');
+        note_lbl(gl, 7, 'Directory with manufacturer phase tables (Sonic Concepts / Imasonic).');
+        sp(gl, 8);
+
+        sec(gl, 9, 'Calibration Targets');
+        lbl(gl, 10, 1, 'Focal depths (ep)');
+        edt(gl, 10, 2, 'calibration.focal_depths_wrt_exit_plane', '', 0);
+        lbl(gl, 10, 3, 'mm');
+        note_lbl(gl, 11, 'Comma-separated target focal distances from the exit plane.');
+
+        lbl(gl, 12, 1, 'Desired intensities');
+        edt(gl, 12, 2, 'calibration.desired_intensities', '', 0);
+        lbl(gl, 12, 3, 'W/cm²');
+        note_lbl(gl, 13, 'Comma-separated target Isppa values; one calibration run per value.');
+
+        lbl(gl, 14, 1, 'Add focal-distance offset');
+        chk(gl, 14, 2, 'calibration.add_FDO', false, 'Add bowl-offset to focal distance');
+        note_lbl(gl, 15, 'Shifts focal target by (curvature radius − exit-plane distance).');
+        sp(gl, 16);
+
+        sec(gl, 17, 'Optimisation Settings');
+        lbl(gl, 18, 1, 'Calibration mode');
+        drp(gl, 18, 2, 'calibration.Mode', {'single_ref','multi_depth'}, 'single_ref');
+        note_lbl(gl, 19, '"single_ref" optimises at one reference depth and extrapolates; "multi_depth" fits all depths jointly (BabelBrain-style, slower).');
+
+        lbl(gl, 20, 1, 'Forward model');
+        drp(gl, 20, 2, 'calibration.ForwardModel', {'oneil','rayleigh'}, 'oneil');
+        note_lbl(gl, 21, '"oneil" is faster; "rayleigh" matches BabelBrain and is more accurate for ring gaps. Default for multi_depth is rayleigh.');
+
+        lbl(gl, 22, 1, 'Reference depth');
+        nedt(gl, 22, 2, 'calibration.RefDepth', NaN);
+        lbl(gl, 22, 3, 'mm');
+        note_lbl(gl, 23, 'Reference depth for single_ref and for packaging output phases. Leave blank for median of available depths.');
+
+        lbl(gl, 24, 1, 'Initial velocity');
+        nedt(gl, 24, 2, 'calibration.initial_velocity', 0.05);
+        lbl(gl, 24, 3, 'm/s');
+        note_lbl(gl, 25, 'Starting guess for the element normal velocity during fitting.');
+
+        lbl(gl, 26, 1, 'Upper velocity');
+        nedt(gl, 26, 2, 'calibration.opt_upper_velocity', 0.2);
+        lbl(gl, 26, 3, 'm/s');
+        note_lbl(gl, 27, 'Upper bound on velocity during optimisation.');
+
+        lbl(gl, 28, 1, 'Phase precession');
+        drp(gl, 28, 2, 'calibration.opt_phase_precession', ...
+            {'none','linear','monotonic'}, 'none');
+        note_lbl(gl, 29, '"none" = unconstrained per-element phases (required for single_ref geo-correction); "linear"/"monotonic" add phase ramp constraints.');
+
+        lbl(gl, 30, 1, 'Regularisation λ');
+        nedt(gl, 30, 2, 'calibration.opt_regularization_lambda', 0);
+        note_lbl(gl, 31, 'L2 penalty weight on hardware correction. 0 = none. Recommended for both modes to keep optimised phases near geometric steering (typical: 1e-4–1e-2). Larger values reduce the correction magnitude.');
+
+        lbl(gl, 32, 1, 'Opt. limits');
+        edt(gl, 32, 2, 'calibration.opt_limits', '', 0);
+        lbl(gl, 32, 3, 'mm');
+        note_lbl(gl, 33, 'Two-element [min max] range (from bowl) for profile error computation. Leave blank to use full non-NaN range.');
+
+        lbl(gl, 34, 1, 'Profile weights');
+        nedt(gl, 34, 2, 'calibration.opt_weights', 0);
+        note_lbl(gl, 35, '0 = uniform weighting; ≥1 = Gaussian centred on FLHM (higher = narrower peak emphasis).');
+
+        lbl(gl, 36, 1, 'Opt. method');
+        drp(gl, 36, 2, 'calibration.opt_method', {'FEXminimize','GlobalSearch'}, 'FEXminimize');
+        note_lbl(gl, 37, '"FEXminimize" (default, no toolbox required); "GlobalSearch" requires the Global Optimisation Toolbox.');
+
+        lbl(gl, 38, 1, 'Random seed');
+        nedt(gl, 38, 2, 'calibration.opt_seed', NaN);
+        note_lbl(gl, 39, 'Integer seed for reproducible optimisation. Leave blank for a non-deterministic run.');
+        sp(gl, 40);
+
+        sec(gl, 41, 'Simulation Control');
+        lbl(gl, 42, 1, 'Run free-water sim');
+        chk(gl, 42, 2, 'calibration.run_free_water_sim', true, 'Simulate correction in free water');
+
+        lbl(gl, 43, 1, 'Force kWaveArray');
+        chk(gl, 43, 2, 'calibration.force_kwavearray', false, 'Use kWaveArray transducer backend');
+
+        lbl(gl, 44, 1, 'Axisymmetric 2D');
+        chk(gl, 44, 2, 'calibration.axisymmetric2D', false, 'Use 2-D axisymmetric grid (annular only)');
+
+        lbl(gl, 45, 1, 'Amplitude validation');
+        drp(gl, 45, 2, 'calibration.opt_amp_validation', ...
+            {'always','initial','final','none'}, 'final');
+        note_lbl(gl, 46, 'When to run a validation simulation after amplitude calibration.');
+        sp(gl, 47);
+
+        sec(gl, 48, 'Per-Element Phase Corrections');
+        lbl(gl, 49, 1, 'Correction offsets');
+        edt(gl, 49, 2, 'calibration.elem_phase_correction_deg', '', 0);
+        lbl(gl, 49, 3, 'deg');
+        note_lbl(gl, 50, 'Comma-separated hardware phase offsets per element (optional; loaded from transducer YAML if present).');
+
+        lbl(gl, 51, 1, 'Save recovered offsets');
+        chk(gl, 51, 2, 'calibration.save_elem_correction', false, 'Write recovered corrections back to transducer YAML');
+        sp(gl, 52);
+
+        sec(gl, 53, 'Output');
+        lbl(gl, 54, 1, 'Output folder');
+        edt(gl, 54, 2, 'calibration.path_output', '', 0);
+        brw(gl, 54, 3, 'calibration.path_output', 'dir');
+
+        lbl(gl, 55, 1, 'Profiles output folder');
+        edt(gl, 55, 2, 'calibration.path_output_profiles', '', 0);
+        brw(gl, 55, 3, 'calibration.path_output_profiles', 'dir');
+
+        lbl(gl, 56, 1, 'Calibrated CSV filename');
+        edt(gl, 56, 2, 'calibration.filename_calibrated_CSV', '', 0);
+        note_lbl(gl, 57, 'Output filename for the calibrated intensity profile CSV.');
+
+        lbl(gl, 58, 1, 'Save in calibration folder');
+        chk(gl, 58, 2, 'calibration.save_in_calibration_folder', false, 'Route all outputs to the calibration output folder');
+
+        lbl(gl, 59, 1, 'BabelBrain export path');
+        edt(gl, 59, 2, 'calibration.ExportBabelBrain', '', 0);
+        brw(gl, 59, 3, 'calibration.ExportBabelBrain', 'file');
+        note_lbl(gl, 60, 'Optional .h5 output path for BabelBrain element weights (delta-from-geo phasors).');
+        sp(gl, 61);
+
+        sec(gl, 62, 'Run Calibration');
+        btn_cal = uibutton(gl, ...
+            'Text',       '▶   Run Calibration', ...
+            'FontName',   st.font, 'FontSize', st.fs_lg, 'FontWeight', 'bold', ...
+            'BackgroundColor', [0.18 0.55 0.34], ...
+            'FontColor',  [1 1 1]);
+        btn_cal.Layout.Row    = 63;
+        btn_cal.Layout.Column = [1 4];
+        btn_cal.ButtonPushedFcn = @(~,~) cb_run_calibration();
+
+        lbl_cal_status = uilabel(gl, ...
+            'Text',       'Ready.', ...
+            'FontName',   st.font, 'FontSize', st.fs, ...
+            'FontColor',  st.text_sub, ...
+            'HorizontalAlignment', 'left');
+        lbl_cal_status.Layout.Row    = 64;
+        lbl_cal_status.Layout.Column = [1 4];
+        sp(gl, 65);
+    end
+
+    function cb_run_calibration()
+        % Gather calibration fields and call calibration_pipeline_start.
+        % Minimal stub — expand once the full config-to-struct mapping is wired.
+        params = struct();
+        fields = findobj(ancestor(gcf,'figure'), '-not', 'Type', 'figure', 'Tag', '-regexp', '^calibration\.');
+        for k = 1:numel(fields)
+            tag = fields(k).Tag;
+            parts = strsplit(tag, '.');
+            val   = fields(k).Value;
+            params.(parts{1}).(parts{2}) = val;
+        end
+        disp('calibration parameters collected:');
+        disp(params);
+        % TODO: call calibration_pipeline_start(params) once config path is wired.
+    end
+
+    %% ── Tab 10: Run ────────────────────────────────────────────────────
     function build_tab_run(t)
         gl = uigridlayout(t, ...
             'RowHeight',    {44, 28, '1x'}, ...
@@ -769,7 +1224,7 @@ end
         log_area.Layout.Row = 3; log_area.Layout.Column = 1;
     end
 
-    %% ── Tab 10: Results ───────────────────────────────────────────────
+    %% ── Tab 11: Results ───────────────────────────────────────────────
     function build_tab_results(t)
         gl = uigridlayout(t, ...
             'RowHeight',   {36, '1x'}, ...
@@ -917,7 +1372,7 @@ end
         % Resolve output dir and log path
         app = fig.UserData;
         out_dir = '';
-        if isfield(params, 'io') && isfield(params.io, 'output_dir')
+        if isfield(params, 'io') && isfield(params.io, 'dir_output')
             out_dir = params.io.dir_output;
         end
         app.dir_output = out_dir;
@@ -978,6 +1433,55 @@ end
         end
         h_run = findobj(fig, 'Tag', 'btn_run');
         if ~isempty(h_run), h_run.Enable = 'on'; end
+    end
+
+    function cb_ingest()
+        % Collect required fields from the Neuronavigation Ingestion widgets
+        sub_id_h   = findobj(fig, 'Tag', 'neuronav.sub_id');
+        ses_id_h   = findobj(fig, 'Tag', 'neuronav.ses_id');
+        raw_path_h = findobj(fig, 'Tag', 'neuronav.raw_path');
+        out_path_h = findobj(fig, 'Tag', 'neuronav.out_path');
+        status_h   = findobj(fig, 'Tag', 'lbl_ingest_status');
+
+        sub_id   = strtrim(sub_id_h.Value);
+        ses_id   = strtrim(ses_id_h.Value);
+        raw_path = strtrim(raw_path_h.Value);
+        out_path = strtrim(out_path_h.Value);
+
+        if isempty(sub_id) || isempty(ses_id) || isempty(raw_path) || isempty(out_path)
+            status_h.Text      = '✗ Subject ID, Session ID, Raw path and Output path are all required.';
+            status_h.FontColor = st.mandatory;
+            return;
+        end
+
+        % Build a minimal parameters struct sufficient for neuronav_ingest_markers
+        params_ingest = struct();
+        params_ingest.path.localite_raw  = raw_path;
+        params_ingest.path.localite_post = out_path;
+        params_ingest.io.overwrite_files = 'always';
+
+        % Build a minimal single-target map (series 1, transducer 1)
+        target_map.series_index  = 1;
+        target_map.transducer_id = 1;
+        target_map.target_name   = 'target';
+
+        btn_h = findobj(fig, 'Tag', 'btn_ingest');
+        if ~isempty(btn_h), btn_h.Enable = 'off'; end
+        status_h.Text      = '⟳ Running ingestion…';
+        status_h.FontColor = st.accent;
+        drawnow;
+
+        try
+            [xml_path, json_path] = neuronav_ingest_markers(params_ingest, sub_id, ses_id, target_map);
+            status_h.Text      = sprintf('✓ Done.  XML: %s', xml_path);
+            status_h.FontColor = st.success;
+        catch ME
+            status_h.Text      = sprintf('✗ %s', ME.message);
+            status_h.FontColor = st.mandatory;
+            fprintf('\n=== Neuronavigation Ingestion Error ===\n%s\n=======================================\n', ME.getReport('extended'));
+        end
+
+        if ~isempty(btn_h), btn_h.Enable = 'on'; end
     end
 
     function populate_log_from_file(diary_file)
@@ -1041,10 +1545,151 @@ end
         end
     end
 
+    function cb_serial_changed(dd)
+        serial = dd.Value;
+        if strcmp(serial, '(manual)'), return; end
+        try
+            eq   = load_equipment_config();
+            if ~isfield(eq.trans, serial), return; end
+            geom = eq.trans.(serial).transducer;
+
+            % Populate type
+            if isfield(geom, 'annular')
+                set_widget('transducer.type', 'annular');
+                cb_transducer_type(findobj(fig, 'Tag', 'transducer.type'));
+            elseif isfield(geom, 'matrix')
+                set_widget('transducer.type', 'matrix');
+                cb_transducer_type(findobj(fig, 'Tag', 'transducer.type'));
+            end
+
+            % Populate frequency
+            if isfield(geom, 'freq_hz')
+                set_widget('transducer.freq_hz', geom.freq_hz);
+            end
+
+            % Populate annular geometry fields
+            if isfield(geom, 'annular')
+                ann = geom.annular;
+                if isfield(ann, 'elem_n')
+                    set_widget('transducer.annular.elem_n', ann.elem_n);
+                end
+                if isfield(ann, 'elem_id_mm') && isnumeric(ann.elem_id_mm)
+                    h = findobj(fig, 'Tag', 'transducer.annular.elem_id_mm');
+                    if ~isempty(h)
+                        h.Value = strjoin(arrayfun(@num2str, ann.elem_id_mm(:)', 'UniformOutput', false), ',');
+                    end
+                end
+                if isfield(ann, 'elem_od_mm') && isnumeric(ann.elem_od_mm)
+                    h = findobj(fig, 'Tag', 'transducer.annular.elem_od_mm');
+                    if ~isempty(h)
+                        h.Value = strjoin(arrayfun(@num2str, ann.elem_od_mm(:)', 'UniformOutput', false), ',');
+                    end
+                end
+                if isfield(ann, 'curv_radius_mm')
+                    set_widget('transducer.annular.curv_radius_mm', ann.curv_radius_mm);
+                end
+                if isfield(ann, 'dist_geom_ep_mm')
+                    set_widget('transducer.annular.dist_geom_ep_mm', ann.dist_geom_ep_mm);
+                end
+            end
+        catch ME
+            append_log(sprintf('Could not load geometry for %s: %s', serial, ME.message));
+        end
+
+        % Update library coverage label
+        update_library_coverage_label(serial);
+    end
+
+    function update_library_coverage_label(serial_val)
+        lbl_cov = findobj(fig, 'Tag', 'lbl_library_coverage');
+        if isempty(lbl_cov), return; end
+        if strcmp(serial_val, '(manual)')
+            lbl_cov.Text = 'Library: —';
+            return;
+        end
+        try
+            lib_path  = fullfile(get_prestus_path(), 'config', 'transducer');
+            yaml_path = fullfile(lib_path, [serial_val '.yaml']);
+            if isfile(yaml_path)
+                lib = yaml.loadFile(yaml_path, 'ConvertToArray', true);
+                if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')
+                    depths = lib.global_model.depths_ep_mm(:)';
+                elseif isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
+                    dk     = fieldnames(lib.calibration.focal_depths);
+                    depths = sort(cellfun(@(k) str2double(strrep(strrep(k,'f',''),'p','.')), dk));
+                else
+                    depths = [];
+                end
+                if isempty(depths)
+                    lbl_cov.Text = 'Library: no calibrated depths';
+                else
+                    depth_strs   = arrayfun(@(d) sprintf('%.0f', d), depths(:)', 'UniformOutput', false);
+                    lbl_cov.Text = ['Library: ' strjoin(depth_strs, ', ') ' mm'];
+                end
+            else
+                lbl_cov.Text = 'Library: not found';
+            end
+        catch
+            lbl_cov.Text = 'Library: (error reading)';
+        end
+    end
+
+    function cb_placement_mode(mode)
+        % Show the sub-panel matching the selected placement mode; hide others.
+        tags   = {'panel_placement_localite','panel_placement_heuristic','panel_placement_plantus'};
+        modes  = {'localite','heuristic','plantus'};
+        for k = 1:numel(tags)
+            h = findobj(fig, 'Tag', tags{k});
+            if ~isempty(h)
+                if strcmp(mode, modes{k})
+                    h.Visible = 'on';
+                else
+                    h.Visible = 'off';
+                end
+            end
+        end
+    end
+
+    function cb_seq_browse_append()
+        [f, d] = uigetfile({'*.yaml;*.yml','YAML files';'*.*','All files'}, ...
+            'Select follow-up config YAML');
+        if isequal(f, 0), return; end
+        p = fullfile(d, f);
+        h = findobj(fig, 'Tag', 'sequential_configs_textarea');
+        if ~isempty(h)
+            lines = h.Value;
+            if numel(lines) == 1 && isempty(strtrim(lines{1}))
+                h.Value = {p};
+            else
+                h.Value = [lines; {p}];
+            end
+        end
+    end
+
+    function cb_multitrans_browse_append()
+        [f, d] = uigetfile({'*.yaml;*.yml','YAML files';'*.*','All files'}, ...
+            'Select secondary transducer config YAML');
+        if isequal(f, 0), return; end
+        p = fullfile(d, f);
+        h = findobj(fig, 'Tag', 'multitrans_configs_textarea');
+        if ~isempty(h)
+            lines = h.Value;
+            if numel(lines) == 1 && isempty(strtrim(lines{1}))
+                h.Value = {p};
+            else
+                h.Value = [lines; {p}];
+            end
+        end
+    end
+
     function cb_browse(target_tag, browse_type)
         if strcmp(browse_type, 'dir')
             p = uigetdir();
             if isequal(p, 0), return; end
+        elseif strcmp(browse_type, 'file')
+            [f, d] = uigetfile({'*.*','All files'});
+            if isequal(f, 0), return; end
+            p = fullfile(d, f);
         else
             [f, d] = uigetfile({'*.yaml;*.yml','YAML files';'*.*','All files'});
             if isequal(f, 0), return; end
@@ -1059,7 +1704,7 @@ end
         if isempty(app.dir_output) || ~isfolder(app.dir_output)
             try
                 params = collect_params();
-                if isfield(params, 'io') && isfield(params.io, 'output_dir') && ~isempty(params.io.dir_output)
+                if isfield(params, 'io') && isfield(params.io, 'dir_output') && ~isempty(params.io.dir_output)
                     app.dir_output = params.io.dir_output;
                     fig.UserData   = app;
                 end
@@ -1140,13 +1785,14 @@ end
             set_widget(tag, flat.(keys{i}));
         end
         % XYZ array fields stored as separate _1/_2/_3 widgets
-        xyz_tags = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims'};
+        xyz_tags = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims', ...
+                    'placement.heuristic.mni_target_mm', 'placement.plantus.mni_target_mm'};
         for i = 1:numel(xyz_tags)
             tag     = xyz_tags{i};
             safe    = strrep(tag, '.', '__');
             if isfield(flat, safe) && isnumeric(flat.(safe)) && numel(flat.(safe)) >= 3
                 for k = 1:3
-                    hw = findobj(fig, 'Tag', sprintf('%s_%d', tag, k));
+                    hw = cached_findobj(sprintf('%s_%d', tag, k));
                     if ~isempty(hw), hw.Value = double(flat.(safe)(k)); end
                 end
             end
@@ -1155,13 +1801,17 @@ end
         csv_array_tags = {'transducer.annular.elem_id_mm', ...
                           'transducer.annular.elem_od_mm', ...
                           'transducer.annular.elem_phase_deg', ...
+                          'transducer.target_isppa_wcm2', ...
+                          'placement.plantus.focal_distance_list', ...
+                          'placement.plantus.flhm_list', ...
+                          'calibration.elem_phase_correction_deg', ...
                           'layers.water', 'layers.brain', 'layers.skin', ...
                           'layers.skull', 'layers.skull_cortical', 'layers.skull_trabecular'};
         for i = 1:numel(csv_array_tags)
             tag  = csv_array_tags{i};
             safe = strrep(tag, '.', '__');
             if isfield(flat, safe) && isnumeric(flat.(safe)) && ~isempty(flat.(safe))
-                hw = findobj(fig, 'Tag', tag);
+                hw = cached_findobj(tag);
                 if ~isempty(hw) && isa(hw, 'matlab.ui.control.EditField')
                     hw.Value = strjoin(arrayfun(@num2str, flat.(safe)(:)', 'UniformOutput', false), ',');
                 end
@@ -1171,11 +1821,57 @@ end
         if isfield(params, 'medium_properties')
             set_medium_table(params.medium_properties);
         end
+
+        % Sequential configs textarea
+        seq_ta_h = cached_findobj('sequential_configs_textarea');
+        if ~isempty(seq_ta_h) && isfield(params, 'options') && isfield(params.options, 'sequential_configs')
+            sc = params.options.sequential_configs;
+            lines = {};
+            for k = 1:100
+                fname = sprintf('config_%d', k);
+                if isfield(sc, fname), lines{end+1} = sc.(fname); else, break; end %#ok<AGROW>
+            end
+            if ~isempty(lines), seq_ta_h.Value = lines; end
+        end
+
+        % Multi-transducer configs textarea
+        mt_ta_h = cached_findobj('multitrans_configs_textarea');
+        if ~isempty(mt_ta_h) && isfield(params, 'options') && isfield(params.options, 'additional_transducer_configs')
+            ac = params.options.additional_transducer_configs;
+            lines = {};
+            for k = 1:100
+                fname = sprintf('config_%d', k);
+                if isfield(ac, fname), lines{end+1} = ac.(fname); else, break; end %#ok<AGROW>
+            end
+            if ~isempty(lines), mt_ta_h.Value = lines; end
+        end
+
+        % Update placement sub-panel visibility to match loaded mode
+        h_pm = cached_findobj('placement.mode');
+        if ~isempty(h_pm)
+            cb_placement_mode(h_pm.Value);
+        end
+
+        % Sync transducer serial dropdown: add serial to items list if not
+        % present (e.g. config was written without launching GUI), then select it.
+        h_serial = cached_findobj('transducer.serial');
+        if ~isempty(h_serial) && isfield(params, 'transducer')
+            tr1 = params.transducer;
+            if isstruct(tr1) && numel(tr1) >= 1; tr1 = tr1(1); end
+            if isstruct(tr1) && isfield(tr1, 'serial') && ~isempty(tr1.serial)
+                serial_val = char(tr1.serial);
+                if ~any(strcmp(h_serial.Items, serial_val))
+                    h_serial.Items = [h_serial.Items, {serial_val}];
+                end
+                h_serial.Value = serial_val;
+                update_library_coverage_label(serial_val);
+            end
+        end
     end
 
     function params = collect_params()
         params = struct();
-        % Collect all tagged widgets
+        % Collect all tagged input widgets
         all_widgets = [findobj(fig, '-isa', 'matlab.ui.control.EditField'); ...
                        findobj(fig, '-isa', 'matlab.ui.control.NumericEditField'); ...
                        findobj(fig, '-isa', 'matlab.ui.control.DropDown');   ...
@@ -1188,15 +1884,19 @@ end
             % which breaks pipeline code that expects char. Empty fields
             % intentionally fall back to the config_default.yaml value.
             if ischar(val) && isempty(val), continue; end
+            % Skip the sentinel value for the serial dropdown — it means
+            % "not selected" so no serial should be written to the config.
+            if strcmp(tag, 'transducer.serial') && strcmp(val, '(manual)'), continue; end
             params = set_nested(params, tag, val);
         end
         % XYZ triplets stored as separate tagged fields
-        xyz_tags = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims'};
+        xyz_tags = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims', ...
+                    'placement.heuristic.mni_target_mm', 'placement.plantus.mni_target_mm'};
         for i = 1:numel(xyz_tags)
             tag = xyz_tags{i};
             vals = zeros(1,3);
             for ax_i = 1:3
-                hw = findobj(fig, 'Tag', sprintf('%s_%d', tag, ax_i));
+                hw = cached_findobj(sprintf('%s_%d', tag, ax_i));
                 if ~isempty(hw), vals(ax_i) = hw.Value; end
             end
             params = set_nested(params, tag, vals);
@@ -1205,11 +1905,15 @@ end
         csv_array_tags = {'transducer.annular.elem_id_mm', ...
                           'transducer.annular.elem_od_mm', ...
                           'transducer.annular.elem_phase_deg', ...
+                          'transducer.target_isppa_wcm2', ...
+                          'placement.plantus.focal_distance_list', ...
+                          'placement.plantus.flhm_list', ...
+                          'calibration.elem_phase_correction_deg', ...
                           'layers.water', 'layers.brain', 'layers.skin', ...
                           'layers.skull', 'layers.skull_cortical', 'layers.skull_trabecular'};
         for i = 1:numel(csv_array_tags)
             tag = csv_array_tags{i};
-            hw = findobj(fig, 'Tag', tag);
+            hw = cached_findobj(tag);
             if ~isempty(hw) && isa(hw, 'matlab.ui.control.EditField')
                 raw = strtrim(hw.Value);
                 if ~isempty(raw)
@@ -1222,10 +1926,39 @@ end
         end
 
         % Medium properties table
-        tbl = findobj(fig, 'Tag', 'medium_table');
+        tbl = cached_findobj('medium_table');
         if ~isempty(tbl)
             params = read_medium_table(params, tbl);
         end
+
+        % Sequential configs textarea (one YAML path per line)
+        seq_ta_h = cached_findobj('sequential_configs_textarea');
+        if ~isempty(seq_ta_h)
+            cfg_idx = 0;
+            for k = 1:numel(seq_ta_h.Value)
+                p = strtrim(seq_ta_h.Value{k});
+                if ~isempty(p)
+                    cfg_idx = cfg_idx + 1;
+                    params = set_nested(params, ...
+                        sprintf('options.sequential_configs.config_%d', cfg_idx), p);
+                end
+            end
+        end
+
+        % Multi-transducer configs textarea (one YAML path per line)
+        mt_ta_h = cached_findobj('multitrans_configs_textarea');
+        if ~isempty(mt_ta_h)
+            cfg_idx = 0;
+            for k = 1:numel(mt_ta_h.Value)
+                p = strtrim(mt_ta_h.Value{k});
+                if ~isempty(p)
+                    cfg_idx = cfg_idx + 1;
+                    params = set_nested(params, ...
+                        sprintf('options.additional_transducer_configs.config_%d', cfg_idx), p);
+                end
+            end
+        end
+
         % Derived: output_affix and output_dir
         if ~isfield(params, 'io') || ~isfield(params.io, 'output_affix')
             params.io.output_affix = '';
@@ -1485,8 +2218,29 @@ end
 %%  UTILITY: STRUCT ↔ WIDGET
 %% ════════════════════════════════════════════════════════════════════════
 
+    function cache = build_widget_cache()
+        % Returns a containers.Map: tag -> handle for all tagged descendants.
+        all_h = findobj(fig, '-not', 'Tag', '');
+        cache = containers.Map('KeyType', 'char', 'ValueType', 'any');
+        for ki = 1:numel(all_h)
+            t = all_h(ki).Tag;
+            if ~isempty(t) && ~isKey(cache, t)
+                cache(t) = all_h(ki);
+            end
+        end
+    end
+
+    function h = cached_findobj(tag)
+        if isKey(widget_cache, tag)
+            h = widget_cache(tag);
+        else
+            h = findobj(fig, 'Tag', tag);
+            if ~isempty(h), widget_cache(tag) = h(1); end
+        end
+    end
+
     function set_widget(tag, val)
-        h = findobj(fig, 'Tag', tag);
+        h = cached_findobj(tag);
         if isempty(h), return; end
         h = h(1);
         try

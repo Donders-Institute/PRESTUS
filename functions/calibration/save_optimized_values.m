@@ -100,8 +100,15 @@ end
     parameters.transducer.focal_distance_ep = parameters.calibration.desired_focal_distance_ep;
     parameters.transducer.set_intensity_w_per_cm2 = parameters.calibration.desired_intensity;
 
-    % Wrap transducer parameters in a parent structure for YAML
-    data = struct('transducer', parameters.transducer);
+    data = struct();
+    data.meta.tran_serial = parameters.calibration.equipment_name;
+    data.meta.created_at  = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    try
+        data.meta.prestus_version = prestus_version();
+    catch
+        data.meta.prestus_version = 'unknown';
+    end
+    data.transducer = parameters.transducer;
     yaml.dumpFile(yaml_path, data);
 
     fprintf('Transducer parameters with optimized values saved to YAML: %s \n', yaml_path);

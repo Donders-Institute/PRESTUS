@@ -42,7 +42,7 @@ end
 
     % thermal_simulation expands temp_0 via radialExpand2DTo3D for axisymmetric grids
     % but MATLAB pass-by-value means the caller's copy stays 2D; re-expand here.
-    if ~isequal(size(kwave_medium.temp_0), size(results_heating.maxT))
+    if isfield(kwave_medium, 'temp_0') && ~isequal(size(kwave_medium.temp_0), size(results_heating.maxT))
         if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
             % Use the same Nlateral/ax_center as thermal_simulation to match the bilateral grid exactly.
             Nlateral  = parameters.grid.axisym_bilateral_dims(2);
