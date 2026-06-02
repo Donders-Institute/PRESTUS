@@ -1852,6 +1852,12 @@ end
             cb_placement_mode(h_pm.Value);
         end
 
+        % Re-sync thermal timing enable state to match loaded run_heating_sims value.
+        h_heat = cached_findobj('modules.run_heating_sims');
+        if ~isempty(h_heat)
+            cb_toggle_thermal_timing(h_heat.Value);
+        end
+
         % Sync transducer serial dropdown: add serial to items list if not
         % present (e.g. config was written without launching GUI), then select it.
         h_serial = cached_findobj('transducer.serial');
