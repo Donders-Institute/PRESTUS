@@ -3,9 +3,10 @@ function vol_out = deface_volume(vol, seg, voxel_size_mm, margin_mm)
 %
 % Identifies the face as scalp/skin/muscle voxels anterior to a cut plane
 % that is MARGIN_MM posterior to the posterior edge of the eye labels.
-% The default margin (30 mm) places the cut plane at roughly the ear-canal
-% level, matching the aggressiveness of standard defacing tools. All skull,
-% brain, and CSF tissue is always preserved regardless of position.
+% The default margin (10 mm) places the cut plane just behind the eye socket,
+% removing the nose/mouth region while preserving the ears and most of the
+% lateral face. All skull, brain, and CSF tissue is always preserved
+% regardless of position.
 %
 % For floating-point volumes (T1 intensity) face voxels are set to NaN so
 % that plot functions can render them as transparent rather than black.
@@ -22,7 +23,7 @@ function vol_out = deface_volume(vol, seg, voxel_size_mm, margin_mm)
 %   seg            - [Nx x Ny x Nz] integer SimNIBS charm tissue label volume,
 %                    same size as VOL
 %   voxel_size_mm  - isotropic voxel size in mm (default: 1.0)
-%   margin_mm      - posterior margin past the back of the eye socket (default: 30)
+%   margin_mm      - posterior margin past the back of the eye socket (default: 10)
 %
 % Output:
 %   vol_out - copy of VOL with face voxels removed (NaN for float, 0 for integer)
@@ -33,7 +34,7 @@ function vol_out = deface_volume(vol, seg, voxel_size_mm, margin_mm)
         vol            (:,:,:)
         seg            (:,:,:)
         voxel_size_mm  (1,1) double = 1.0
-        margin_mm      (1,1) double = 30.0
+        margin_mm      (1,1) double = 10.0
     end
 
     if ~isequal(size(vol), size(seg))

@@ -103,38 +103,41 @@ else
 end
 
 % -------------------------------------------------------------------------
-% Build per-dimension FOV [mm]: diameter for lateral, length for axial
+% Build FOV extents [mm]
+%
+% Axial  (beam_dim):    starts at the transducer centre, extends fov_length_mm
+%                       forward along the beam axis.
+% Lateral (lateral_dims): centred on the focus, width = fov_diameter_mm.
 % -------------------------------------------------------------------------
-fov_mm = zeros(1, 3);
-fov_mm(lateral_dims) = fov_diameter_mm;
-fov_mm(beam_dim)     = fov_length_mm;
+ac_fov_mm   = full_ac_dims * dx_mm;   % full acoustic extent in mm
+trans_mm    = (trans_pos  - 1) * dx_mm;   % [1×3]
+focus_mm    = (focus_pos  - 1) * dx_mm;   % [1×3]
 
-ac_fov_mm = full_ac_dims * dx_mm;   % full acoustic FOV in mm
+fov_lo_mm = zeros(1, 3);
+fov_hi_mm = zeros(1, 3);
 
-% Clamp requested FOV to full acoustic extent
-fov_mm = min(fov_mm, ac_fov_mm);
+% Axial: transducer centre → transducer centre + fov_length_mm
+fov_lo_mm(beam_dim) = trans_mm(beam_dim);
+fov_hi_mm(beam_dim) = trans_mm(beam_dim) + fov_length_mm;
 
-% Centre FOV on focus_pos
-focus_mm  = (focus_pos - 1) * dx_mm;   % [1×3]
-fov_lo_mm = focus_mm - fov_mm / 2;
-fov_hi_mm = focus_mm + fov_mm / 2;
+% Lateral: centred on focus
+fov_lo_mm(lateral_dims) = focus_mm(lateral_dims) - fov_diameter_mm / 2;
+fov_hi_mm(lateral_dims) = focus_mm(lateral_dims) + fov_diameter_mm / 2;
 
-% Clamp lo/hi, then nudge lo if hi was clamped
+% Clamp to full acoustic grid
+fov_lo_mm = max(fov_lo_mm, 0);
 fov_hi_mm = min(fov_hi_mm, ac_fov_mm);
-fov_lo_mm = max(fov_lo_mm, 0);
-fov_lo_mm = min(fov_lo_mm, fov_hi_mm - fov_mm);
-fov_lo_mm = max(fov_lo_mm, 0);
 
 % Convert to 1-based voxel indices in the full grid
-fov_start_ac = max(ones(1,3),         round(fov_lo_mm / dx_mm) + 1);
-fov_end_ac   = min(full_ac_dims,      round(fov_hi_mm / dx_mm) + 1);
+fov_start_ac = max(ones(1,3),    round(fov_lo_mm / dx_mm) + 1);
+fov_end_ac   = min(full_ac_dims, round(fov_hi_mm / dx_mm) + 1);
 fov_dims     = fov_end_ac - fov_start_ac + 1;   % cropped dims
 
 fov_offset_ac = fov_start_ac;   % 1-based start index in full grid
 
-fprintf('[acoustic_grid_fov] Full acoustic grid: %.2f mm, [%s] vox\n', ...
-    dx_mm, num2str(full_ac_dims));
-fprintf('[acoustic_grid_fov] FOV box: lateral=%.1f mm, axial=%.1f mm  →  [%s] vox  (offset [%s])\n', ...
+fprintf('[acoustic_grid_fov] Full acoustic grid: [%s] vox @ %.2f mm\n', ...
+    num2str(full_ac_dims), dx_mm);
+fprintf('[acoustic_grid_fov] FOV box: lateral=%.1f mm, axial=%.1f mm  ->  [%s] vox  (offset [%s])\n', ...
     fov_diameter_mm, fov_length_mm, num2str(fov_dims), num2str(fov_start_ac));
 
 % -------------------------------------------------------------------------
@@ -171,9 +174,16 @@ fov_origin_mm = (fov_start_ac - 1) * dx_mm;   % physical offset of FOV origin
 trans_pos_fov = round(((trans_pos  - 1) * dx_mm - fov_origin_mm) / dx_mm + 1);
 focus_pos_fov = round(((focus_pos  - 1) * dx_mm - fov_origin_mm) / dx_mm + 1);
 
-% Clamp (transducer may sit outside the FOV)
+% Focus must be inside the FOV; warn if it was clamped (fov_length_mm too short).
+focus_pos_fov_unclamped = focus_pos_fov;
 trans_pos_fov = max(1, min(trans_pos_fov, fov_dims));
 focus_pos_fov = max(1, min(focus_pos_fov, fov_dims));
+if any(focus_pos_fov ~= focus_pos_fov_unclamped)
+    warning('acoustic_grid_fov:focusOutsideFOV', ...
+        ['Focus (full-grid vox [%s]) maps to FOV vox [%s], clamped from [%s]. ' ...
+         'Increase acoustic_fov_length_mm so the FOV reaches beyond the focus.'], ...
+        num2str(focus_pos), num2str(focus_pos_fov), num2str(focus_pos_fov_unclamped));
+end
 
 % -------------------------------------------------------------------------
 % Clone parameters and update for FOV grid

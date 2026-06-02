@@ -290,10 +290,25 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     if has_acoustic_fov
         full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
+        % Save full-grid state so thermal simulation can use the full domain.
+        kwave_medium_full  = kwave_medium;
+        medium_masks_full  = medium_masks;
+        segmentation_full  = segmentation;
+        trans_pos_full     = trans_pos;
+        focus_pos_full     = focus_pos;
+        grid_dims_full     = parameters.grid.dims;
         [parameters, kwave_medium, medium_masks, trans_pos, focus_pos, fov_offset_ac] = ...
             acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos);
         fprintf('[pipeline] Acoustic FOV crop active: offset [%s], new dims [%s]\n', ...
             num2str(fov_offset_ac), num2str(parameters.grid.dims));
+        % Crop segmentation to the same FOV so analysis masks match sensor_data size.
+        fov_end_ac = fov_offset_ac + parameters.grid.dims - 1;
+        if ~isempty(segmentation) && isequal(size(segmentation), double(full_ac_dims_saved))
+            segmentation = segmentation( ...
+                fov_offset_ac(1):fov_end_ac(1), ...
+                fov_offset_ac(2):fov_end_ac(2), ...
+                fov_offset_ac(3):fov_end_ac(3));
+        end
     else
         fov_offset_ac        = [];
         full_ac_dims_saved   = [];
@@ -532,6 +547,40 @@ function [parameters] = prestus_pipeline(parameters, options)
         if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
             confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
 
+            % Restore full-grid state for thermal — the acoustic FOV crop is
+            % scoped to the acoustic simulation only.
+            if has_acoustic_fov
+                % Back-project pressure field(s) from FOV sub-grid to full grid.
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_all')
+                    fov_sz    = size(sensor_data.p_max_all);
+                    fov_end_bp = fov_offset_ac + fov_sz - 1;
+                    p_bp = zeros(grid_dims_full, 'single');
+                    p_bp(fov_offset_ac(1):fov_end_bp(1), ...
+                         fov_offset_ac(2):fov_end_bp(2), ...
+                         fov_offset_ac(3):fov_end_bp(3)) = single(sensor_data.p_max_all);
+                    sensor_data.p_max_all = p_bp;
+                    clear p_bp;
+                end
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_async')
+                    fov_sz    = size(sensor_data.p_max_async);
+                    fov_end_bp = fov_offset_ac + fov_sz - 1;
+                    p_bp = zeros(grid_dims_full, 'single');
+                    p_bp(fov_offset_ac(1):fov_end_bp(1), ...
+                         fov_offset_ac(2):fov_end_bp(2), ...
+                         fov_offset_ac(3):fov_end_bp(3)) = single(sensor_data.p_max_async);
+                    sensor_data.p_max_async = p_bp;
+                    clear p_bp;
+                end
+                kwave_medium  = kwave_medium_full;
+                medium_masks  = medium_masks_full;
+                segmentation  = segmentation_full;
+                trans_pos     = trans_pos_full;
+                focus_pos     = focus_pos_full;
+                parameters.grid.dims = grid_dims_full;
+                clear kwave_medium_full medium_masks_full segmentation_full ...
+                      trans_pos_full focus_pos_full grid_dims_full;
+            end
+
             kwave_medium.temp_0              = medium_plus.temp_0;
             kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
             clear medium_plus;
@@ -542,7 +591,10 @@ function [parameters] = prestus_pipeline(parameters, options)
             %   (b) An independent thermal FOV is specified, OR
             %   (c) An external acoustic NIfTI was provided (no acoustic kgrid exists).
             % In all other cases the acoustic kgrid, medium, and masks are used as-is.
-            use_thermal_grid = has_external_acoustic || ...
+            % Also force thermal grid rebuild when acoustic FOV was active:
+            % kgrid was built on the cropped FOV grid and must be rebuilt for
+            % the restored full-grid medium/pressure.
+            use_thermal_grid = has_external_acoustic || has_acoustic_fov || ...
                 (isfield(parameters.grid, 'thermal_resolution_mm') && ...
                  ~isempty(parameters.grid.thermal_resolution_mm) && ...
                  parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...
