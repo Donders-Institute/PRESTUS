@@ -1790,10 +1790,20 @@ end
         for i = 1:numel(xyz_tags)
             tag     = xyz_tags{i};
             safe    = strrep(tag, '.', '__');
-            if isfield(flat, safe) && isnumeric(flat.(safe)) && numel(flat.(safe)) >= 3
-                for k = 1:3
-                    hw = cached_findobj(sprintf('%s_%d', tag, k));
-                    if ~isempty(hw), hw.Value = double(flat.(safe)(k)); end
+            if isfield(flat, safe) && isnumeric(flat.(safe))
+                v = double(flat.(safe));
+                if numel(v) >= 3
+                    % 3-D: load all three components directly
+                    for k = 1:3
+                        hw = cached_findobj(sprintf('%s_%d', tag, k));
+                        if ~isempty(hw), hw.Value = v(k); end
+                    end
+                elseif numel(v) == 2
+                    % 2-D (axisymmetric): map to X(_1) and Z(_3), leave Y(_2) as-is
+                    for k = [1 3]
+                        hw = cached_findobj(sprintf('%s_%d', tag, k));
+                        if ~isempty(hw), hw.Value = v(ceil(k/2)); end
+                    end
                 end
             end
         end
@@ -1906,6 +1916,18 @@ end
                 if ~isempty(hw), vals(ax_i) = hw.Value; end
             end
             params = set_nested(params, tag, vals);
+        end
+        % For 2D axisymmetric simulations drop the Y (2nd) component from
+        % position and dimension fields so they match the 2-element grid.dims.
+        ax_h = cached_findobj('grid.axisymmetric');
+        if ~isempty(ax_h) && ax_h.Value
+            for pos_tag = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims'}
+                t = pos_tag{1};
+                v = get_nested(params, t);
+                if isnumeric(v) && numel(v) == 3
+                    params = set_nested(params, t, v([1 3]));
+                end
+            end
         end
         % Parse comma-separated fields into numeric arrays
         csv_array_tags = {'transducer.annular.elem_id_mm', ...
