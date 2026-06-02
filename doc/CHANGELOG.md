@@ -12,6 +12,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
 - Multi-transducer incoherent field assembly for independent-element arrays
 - External acoustic NIfTI can now be passed directly as input to the thermal pipeline
+- ⚠️ **Fixed:** simulation end time (`t_end`) now derived from the minimum sound speed (soft tissue / water, ~1500 m/s) rather than the maximum (bone, ~2800 m/s); the previous behaviour truncated the simulation ~1.9× too early, causing an artefactual pressure drop before steady state was reached
 
 #### Thermal simulation
 - `thermal_grid_setup` exposed as a standalone utility
