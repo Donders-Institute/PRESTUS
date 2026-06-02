@@ -500,8 +500,24 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     if parameters.state.acoustics_available
         log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
-        nifti_acoustic(parameters, planimg, results_acoustic, ...
-            acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        % When the acoustic FOV crop is active, back-project the analysis
+        % volumes (Ipa, MI, pressure) from FOV coords to the full grid so
+        % that nifti_acoustic places them at the correct spatial location.
+        if has_acoustic_fov && ~isempty(fov_offset_ac)
+            % Back-project FOV-sized analysis volumes to the full grid so
+            % nifti_acoustic places them at the correct spatial location.
+            params_nii           = parameters;
+            params_nii.grid.dims = full_ac_dims_saved;
+            nifti_acoustic(params_nii, planimg, results_acoustic, ...
+                fov_backproject_volume(acoustic_Ipa,      fov_offset_ac, full_ac_dims_saved), ...
+                fov_backproject_volume(acoustic_MI,       fov_offset_ac, full_ac_dims_saved), ...
+                fov_backproject_volume(acoustic_pressure, fov_offset_ac, full_ac_dims_saved), ...
+                highlighted_pos + fov_offset_ac - 1);
+            clear params_nii;
+        else
+            nifti_acoustic(parameters, planimg, results_acoustic, ...
+                acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        end
         log_timer('stop', 'nifti_acoustic');
     end
     % acoustic pressure maps no longer needed after NIfTI export;
@@ -552,24 +568,12 @@ function [parameters] = prestus_pipeline(parameters, options)
             if has_acoustic_fov
                 % Back-project pressure field(s) from FOV sub-grid to full grid.
                 if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_all')
-                    fov_sz    = size(sensor_data.p_max_all);
-                    fov_end_bp = fov_offset_ac + fov_sz - 1;
-                    p_bp = zeros(grid_dims_full, 'single');
-                    p_bp(fov_offset_ac(1):fov_end_bp(1), ...
-                         fov_offset_ac(2):fov_end_bp(2), ...
-                         fov_offset_ac(3):fov_end_bp(3)) = single(sensor_data.p_max_all);
-                    sensor_data.p_max_all = p_bp;
-                    clear p_bp;
+                    sensor_data.p_max_all = fov_backproject_volume( ...
+                        single(sensor_data.p_max_all), fov_offset_ac, grid_dims_full);
                 end
                 if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_async')
-                    fov_sz    = size(sensor_data.p_max_async);
-                    fov_end_bp = fov_offset_ac + fov_sz - 1;
-                    p_bp = zeros(grid_dims_full, 'single');
-                    p_bp(fov_offset_ac(1):fov_end_bp(1), ...
-                         fov_offset_ac(2):fov_end_bp(2), ...
-                         fov_offset_ac(3):fov_end_bp(3)) = single(sensor_data.p_max_async);
-                    sensor_data.p_max_async = p_bp;
-                    clear p_bp;
+                    sensor_data.p_max_async = fov_backproject_volume( ...
+                        single(sensor_data.p_max_async), fov_offset_ac, grid_dims_full);
                 end
                 kwave_medium  = kwave_medium_full;
                 medium_masks  = medium_masks_full;
@@ -577,6 +581,14 @@ function [parameters] = prestus_pipeline(parameters, options)
                 trans_pos     = trans_pos_full;
                 focus_pos     = focus_pos_full;
                 parameters.grid.dims = grid_dims_full;
+                parameters.transducer(1).trans_pos = trans_pos_full;
+                if isfield(parameters.transducer(1), 'focus_pos')
+                    parameters.transducer(1).focus_pos = focus_pos_full;
+                end
+                % Translate highlighted_pos from FOV to full-grid voxels.
+                if ~isempty(highlighted_pos)
+                    highlighted_pos = highlighted_pos + fov_offset_ac - 1;
+                end
                 clear kwave_medium_full medium_masks_full segmentation_full ...
                       trans_pos_full focus_pos_full grid_dims_full;
             end
