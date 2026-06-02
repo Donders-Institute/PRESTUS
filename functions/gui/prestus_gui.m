@@ -1900,6 +1900,10 @@ end
             % which breaks pipeline code that expects char. Empty fields
             % intentionally fall back to the config_default.yaml value.
             if ischar(val) && isempty(val), continue; end
+            % Skip NaN-sentinel numerics (fields created with nedt(…, NaN)
+            % that the user left at their "not set" state).  These fall back
+            % to config_default.yaml / pipeline defaults.
+            if isnumeric(val) && isscalar(val) && isnan(val), continue; end
             % Skip the sentinel value for the serial dropdown — it means
             % "not selected" so no serial should be written to the config.
             if strcmp(tag, 'transducer.serial') && strcmp(val, '(manual)'), continue; end
@@ -2299,7 +2303,15 @@ end
         if isa(h, 'matlab.ui.control.CheckBox')
             val = h.Value;
         elseif isa(h, 'matlab.ui.control.NumericEditField')
-            val = h.Value;
+            % Fields created with nedt(…, NaN) use Value=0 as a sentinel
+            % for "not set" (NumericEditField cannot store NaN at creation
+            % time).  Return NaN so collect_params can skip them, keeping
+            % the downstream code's isempty() / isfield() guards intact.
+            if strcmp(h.Placeholder, 'NaN') && h.Value == 0
+                val = NaN;
+            else
+                val = h.Value;
+            end
         elseif isa(h, 'matlab.ui.control.DropDown')
             val = h.Value;
         else
