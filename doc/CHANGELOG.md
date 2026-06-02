@@ -4,6 +4,47 @@ Notable changes to this project are documented here.
 
 ---
 
+## v0.6.2-pre (development)
+
+Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an expanded transducer library, and GUI updates for Placement, Multi-Transducer, and Calibration tabs. Several fixes improve reliability of the thermal, sequential, and NeuroNav workflows.
+
+#### Acoustic simulation
+- Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
+- Multi-transducer incoherent field assembly for independent-element arrays
+- External acoustic NIfTI can now be passed directly as input to the thermal pipeline
+
+#### Thermal simulation
+- `thermal_grid_setup` exposed as a standalone utility
+- ⚠️ **Fixed:** initial temperature (`temp_0`) now correctly loaded from cached heating files
+
+#### Head pipeline
+- Automated defacing via pydeface, with optional integration into the segmentation pipeline
+- Defaced regions shown transparently in placement and 3D head views
+
+#### Calibration
+- Transducer library: scan equipment, store validated parametric models, plot and compare entries
+- Joint-depth phase/amplitude fit for more robust free-field characterisation
+- Transducers can now be resolved automatically from a serial-number-based equipment library
+
+#### NeuroNav
+- Multi-coil ingestion supported via `parameters.neuronav.coil_map`
+- ⚠️ **Fixed:** T1 NIfTI lookup now works reliably across all conversion functions
+
+#### Sequential / Reporting
+- Run labels derived automatically from output affixes in consolidated reports
+- Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
+- ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
+
+#### GUI
+- New Placement, Multi-Transducer, and Calibration tabs
+
+#### Infrastructure
+- `overwrite_files` setting now respected by `simnibs_t1_to_mni`
+- Compromised polyfill.io CDN replaced with Cloudflare drop-in
+- `pydeface` added to environment setup script
+
+---
+
 ## v0.6.1
 *(2026-05-22)*
 
