@@ -259,6 +259,10 @@ See [doc_placement_heuristic.md](doc_placement_heuristic.md).
 | `source_limit_fraction` | Fraction of the stability limit to use for time step. | `0.9` | After source setup, `checkStability` is called; if the CFL-derived `dt` exceeds the estimated limit, source setup reruns with `dt = source_limit_fraction × dt_stability_limit`. The final effective `dt` may therefore be smaller than `CFL × dx / c_max`. Set to `0` to disable. |
 | `max_expand` | Maximum grid expansion for prime-number FFT optimisation [voxels]. | `40` | |
 | `use_kWaveArray` | Use the kWaveArray class for transducer modelling? | `1` | `1 = yes`, `0 = no` |
+| `acoustic_fov_diameter_mm` | Lateral extent of the acoustic simulation FOV [mm], centred on the focus. When set together with `acoustic_fov_length_mm`, the k-Wave acoustic simulation runs on a cropped sub-grid rather than the full head grid. Thermal simulation is always performed on the full head grid. | `[]` | Optional. See [doc_limited_fov.md](doc_limited_fov.md). |
+| `acoustic_fov_length_mm` | Axial extent of the acoustic simulation FOV [mm], starting from the transducer centre and extending distally. Must be large enough to enclose the focus and any near-field region of interest. | `[]` | Optional. Requires `acoustic_fov_diameter_mm`. See [doc_limited_fov.md](doc_limited_fov.md). |
+| `thermal_resolution_mm` | Grid resolution for the thermal simulation [mm]. When set to a value larger than `resolution_mm`, the acoustic pressure field is resampled to a coarser grid before thermal simulation, reducing memory and runtime. | `[]` | Optional. Defaults to `resolution_mm` (same grid). |
+| `thermal_fov_mm` | Spatial extent of the thermal simulation domain [mm], as a `[1×3]` vector `[x y z]`. When set, the thermal grid is cropped to a box of this size centred on the focus. Unlike the acoustic FOV crop, the thermal FOV has no physical justification for excluding regions: heat diffuses well beyond the focal zone, and cropping can underestimate temperature rise in neighbouring tissue. Use only for rapid prototyping, not for safety-critical results. | `[]` | Optional. See [doc_limited_fov.md](doc_limited_fov.md). |
 
 ---
 
