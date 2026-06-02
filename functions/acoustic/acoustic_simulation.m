@@ -41,9 +41,23 @@ end
 %   3: C++ CPU code 'cpp_cpu'
 %   4: C++ GPU code 'cpp_gpu'
 
-% Only actively plot each timepoint of the simulations if it is interactive
-if ~parameters.simulation.interactive
-   input_args.PlotSim = false;
+% Disable k-Wave's PlotSim when not interactive, when using C++ backends
+% (which run out-of-process), or when the PRESTUS GUI is open.  The GUI is
+% a uifigure whose figure management conflicts with k-Wave's gcf-based
+% plotting: waitbar updates steal gcf from the simulation figure, causing
+% planeplot to draw into the wrong window.  Command-line interactive runs
+% (no GUI) are unaffected and still receive the real-time animation.
+gui_open   = ~isempty(findall(0, 'Tag', 'prestus_gui'));
+cpp_backend = ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu'});
+if ~parameters.simulation.interactive || gui_open || cpp_backend
+    input_args.PlotSim = false;
+    if parameters.simulation.interactive
+        if gui_open
+            disp('Interactive acoustic visualization is disabled when the PRESTUS GUI is open.');
+        elseif cpp_backend
+            disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu).');
+        end
+    end
 end
 
 % Remove fields that are not recognized for acoustic simulations
