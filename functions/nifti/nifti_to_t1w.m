@@ -67,7 +67,7 @@ if opts.IsLayered
             size(planimg.t1_image_orig), opts.Resampler, double(opts.FillValue)), opts.Datatype);
     end
 
-    niftiwrite(data_backtransf, orig_file, orig_hdr, 'Compressed', true);
+    niftiwrite_gz(data_backtransf, orig_file, orig_hdr);
 else
     res = parameters.grid.resolution_mm;
 
@@ -80,7 +80,7 @@ else
 
     % Write without header first so niftiinfo can parse the file dimensions,
     % then rewrite with the full spatial header.
-    niftiwrite(cast(data, opts.Datatype), orig_file, 'Compressed', true);
+    niftiwrite_gz(cast(data, opts.Datatype), orig_file);
     hdr = niftiinfo([orig_file '.nii.gz']);
     hdr.PixelDimensions = repmat(res, 1, numel(hdr.PixelDimensions));
     hdr.Datatype        = opts.Datatype;
@@ -104,6 +104,23 @@ else
         hdr.Transform = affine3d(T');
     end
 
-    niftiwrite(cast(data, opts.Datatype), orig_file, hdr, 'Compressed', true);
+    niftiwrite_gz(cast(data, opts.Datatype), orig_file, hdr);
+end
+end
+
+function niftiwrite_gz(data, filepath, hdr)
+% Write NIfTI then compress with system gzip to avoid MATLAB's Java-based
+% compressgz which fails under macOS Full Disk Access restrictions.
+nii_path = [filepath '.nii'];
+gz_path  = [filepath '.nii.gz'];
+if nargin < 3
+    niftiwrite(data, filepath);
+else
+    niftiwrite(data, filepath, hdr);
+end
+if exist(gz_path, 'file'), delete(gz_path); end
+[status, msg] = system(['gzip -f "' nii_path '"']);
+if status ~= 0
+    error('niftiwrite_gz:gzipFailed', 'gzip failed for %s: %s', nii_path, msg);
 end
 end

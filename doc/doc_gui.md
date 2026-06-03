@@ -30,6 +30,12 @@ To get a clean state before loading, click **↺ Defaults** first, then **⬆ Lo
 
 ---
 
+## macOS: Full Disk Access required
+
+On macOS, MATLAB launched from the Finder or Dock runs under stricter sandboxing than MATLAB launched from a terminal. If full disk access is required, open **System Settings → Privacy & Security → Full Disk Access** and add `MATLAB.app`. A restart of MATLAB is required for the change to take effect. This does not affect terminal-launched MATLAB, where the error does not occur.
+
+---
+
 ## Run
 
 Press **▶ Run Simulation** to execute the pipeline with the current settings. The log area captures all terminal output produced during the run.
