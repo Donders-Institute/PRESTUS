@@ -98,6 +98,7 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 
 #### Reporting
 - Public usage statistics (see [doc_usage_statistics.md](doc_usage_statistics.md))
+- Group HTML report — `prestus_group_report_start` / `generate_group_report` aggregate per-subject CSVs and PNGs (across all subjects sharing a `medium` + `output_affix`) into a self-contained HTML with a mean ± SD exposure dashboard, subject roster, split acoustic (Intensity, MI) and thermal (maxT, riseT, CEM43) box plots, per-subject cards, and a client-side subject filter. Subjects are auto-discovered via `discover_group_subjects`; generated iteratively after each subject finishes when `modules.generate_group_report = 1`, or on demand. See [doc_group.md](doc_group.md#group-html-report).
 
 ---
 

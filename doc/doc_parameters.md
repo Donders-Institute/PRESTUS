@@ -108,6 +108,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `run_nifti_creation` | Export results as NIfTI files. | `1` | |
 | `run_posthoc_water_sims` | Run free-water reference simulations after head simulations. | `1` | |
 | `generate_report` | Generate self-contained HTML simulation report. | `1` | |
+| `generate_group_report` | Aggregate completed subjects into a group HTML report at the end of the run. | `1` | Best-effort; auto-discovers subjects. Or run `prestus_group_report_start` manually. |
 | `segmentation_only` | Stop after segmentation; skip grid setup and all simulations. | `0` | Only has effect when `simulation.medium = 'layered'`. |
 
 All flags: `1 = yes`, `0 = no`.
