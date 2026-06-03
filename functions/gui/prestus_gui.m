@@ -23,6 +23,7 @@ st = sty();
 
 fig = uifigure( ...
     'Name',            'PRESTUS', ...
+    'Tag',             'prestus_gui', ...
     'Position',        [80 60 820 680], ...
     'Color',           st.bg_fig, ...
     'Resize',          'on', ...
@@ -32,6 +33,7 @@ fig = uifigure( ...
 % App state stored in UserData
 app.dir_output  = '';
 app.config_path = '';
+app.last_params = [];
 fig.UserData    = app;
 
 %% ── Header bar ────────────────────────────────────────────────────────────
@@ -106,51 +108,57 @@ tabs.placement        = uitab(tg, 'Title', '  Placement     ');
 tabs.multitransducer  = uitab(tg, 'Title', '  Multi-Transducer  ');
 tabs.calibration      = uitab(tg, 'Title', '  Calibration   ');
 tabs.run         = uitab(tg, 'Title', '  ▶  Run        ');
-tabs.results     = uitab(tg, 'Title', '  Results       ');
 
 for f = fieldnames(tabs)'
     tabs.(f{1}).BackgroundColor = st.bg_panel;
 end
 
 %% ── Build each tab ────────────────────────────────────────────────────────
+% Only the I/O and Run tabs are built immediately — they are the most
+% commonly visited at startup.  All other tabs are built lazily on first
+% selection to minimise startup time (the Results tab in particular
+% contains six uiaxes and a uihtml widget which are expensive to create).
+
+tab_built = struct( ...
+    'io',               true,  ...
+    'simulation',       false, ...
+    'transducer',       false, ...
+    'grid',             false, ...
+    'medium',           false, ...
+    'thermal',          false, ...
+    'hpc',              false, ...
+    'advanced',         false, ...
+    'placement',        false, ...
+    'multitransducer',  false, ...
+    'calibration',      false, ...
+    'run',              true,  ...
+    'results',          true);  % no tab, nothing to build
 
 build_tab_io(tabs.io);
-build_tab_simulation(tabs.simulation);
-build_tab_transducer(tabs.transducer);
-build_tab_grid(tabs.grid);
-build_tab_medium(tabs.medium);
-build_tab_thermal(tabs.thermal);
-build_tab_hpc(tabs.hpc);
-build_tab_advanced(tabs.advanced);
-build_tab_placement(tabs.placement);
-build_tab_multitransducer(tabs.multitransducer);
-build_tab_calibration(tabs.calibration);
 build_tab_run(tabs.run);
-build_tab_results(tabs.results);
+
+tg.SelectionChangedFcn = @cb_tab_selected;
 
 %% ── Build widget tag → handle cache ──────────────────────────────────────
 
-% Collect all tagged descendants once so set_widget/findobj callers can use
-% the cache instead of walking the full component tree on each lookup.
+% Collect tagged descendants of the already-built tabs.  The cache is
+% extended automatically by cached_findobj when lazy tabs are built.
 widget_cache = build_widget_cache();
 
 %% ── Wire cross-tab callbacks ──────────────────────────────────────────────
 
 % Thermal timing fields are only meaningful when thermal simulation is on.
-% Disable them initially (run_heating_sims defaults to false) and toggle
-% whenever the checkbox changes.
-h_heating = findobj(fig, 'Tag', 'modules.run_heating_sims');
-if ~isempty(h_heating)
-    h_heating.ValueChangedFcn = @(cb,~) cb_toggle_thermal_timing(cb.Value);
-    cb_toggle_thermal_timing(h_heating.Value);  % apply initial state
-end
+% The callback is wired after the thermal tab is built (see cb_tab_selected).
 
-%% ── Show window, then load defaults ───────────────────────────────────────
+%% ── Load defaults, then show window ───────────────────────────────────────
+% Defaults are applied while the window is still invisible so that widget
+% updates are not rendered individually, then the window is shown fully
+% populated.
+
+load_defaults();
 
 fig.Visible = 'on';
 drawnow;
-
-load_defaults();
 
 if ~isempty(init_params) && isstruct(init_params)
     apply_params_to_gui(init_params);
@@ -1314,6 +1322,49 @@ end
 %%  CALLBACKS
 %% ════════════════════════════════════════════════════════════════════════
 
+    function cb_tab_selected(~, evt)
+        % Build the newly selected tab on first visit, then populate it.
+        new_tab = evt.NewValue;
+        % Find which field in tabs matches the selected tab handle
+        field = '';
+        fn = fieldnames(tabs);
+        for i = 1:numel(fn)
+            if tabs.(fn{i}) == new_tab
+                field = fn{i};
+                break;
+            end
+        end
+        if isempty(field) || tab_built.(field)
+            return;
+        end
+        switch field
+            case 'simulation',      build_tab_simulation(tabs.simulation);
+            case 'transducer',      build_tab_transducer(tabs.transducer);
+            case 'grid',            build_tab_grid(tabs.grid);
+            case 'medium',          build_tab_medium(tabs.medium);
+            case 'thermal',         build_tab_thermal(tabs.thermal);
+            case 'hpc',             build_tab_hpc(tabs.hpc);
+            case 'advanced',        build_tab_advanced(tabs.advanced);
+            case 'placement',       build_tab_placement(tabs.placement);
+            case 'multitransducer', build_tab_multitransducer(tabs.multitransducer);
+            case 'calibration',     build_tab_calibration(tabs.calibration);
+        end
+        tab_built.(field) = true;
+        % Wire thermal timing toggle after thermal tab is built
+        if strcmp(field, 'thermal')
+            h_heating = findobj(fig, 'Tag', 'modules.run_heating_sims');
+            if ~isempty(h_heating)
+                h_heating.ValueChangedFcn = @(cb,~) cb_toggle_thermal_timing(cb.Value);
+                cb_toggle_thermal_timing(h_heating.Value);
+            end
+        end
+        % Populate newly built widgets with the current params
+        ud = fig.UserData;
+        if ~isempty(ud.last_params)
+            apply_params_to_gui(ud.last_params);
+        end
+    end
+
     function cb_pct_toggle(src, sub_controls)
         % Enable/disable pCT sub-controls based on the pct.enabled checkbox
         if src.Value
@@ -1777,6 +1828,10 @@ end
     end
 
     function apply_params_to_gui(params)
+        % Save for re-application when lazy tabs are built later
+        ud = fig.UserData;
+        ud.last_params = params;
+        fig.UserData = ud;
         % Flatten struct to tag->value map and set each widget
         flat = flatten_struct(params, '');
         keys = fieldnames(flat);
@@ -1790,10 +1845,20 @@ end
         for i = 1:numel(xyz_tags)
             tag     = xyz_tags{i};
             safe    = strrep(tag, '.', '__');
-            if isfield(flat, safe) && isnumeric(flat.(safe)) && numel(flat.(safe)) >= 3
-                for k = 1:3
-                    hw = cached_findobj(sprintf('%s_%d', tag, k));
-                    if ~isempty(hw), hw.Value = double(flat.(safe)(k)); end
+            if isfield(flat, safe) && isnumeric(flat.(safe))
+                v = double(flat.(safe));
+                if numel(v) >= 3
+                    % 3-D: load all three components directly
+                    for k = 1:3
+                        hw = cached_findobj(sprintf('%s_%d', tag, k));
+                        if ~isempty(hw), hw.Value = v(k); end
+                    end
+                elseif numel(v) == 2
+                    % 2-D (axisymmetric): map to X(_1) and Z(_3), leave Y(_2) as-is
+                    for k = [1 3]
+                        hw = cached_findobj(sprintf('%s_%d', tag, k));
+                        if ~isempty(hw), hw.Value = v(ceil(k/2)); end
+                    end
                 end
             end
         end
@@ -1852,6 +1917,12 @@ end
             cb_placement_mode(h_pm.Value);
         end
 
+        % Re-sync thermal timing enable state to match loaded run_heating_sims value.
+        h_heat = cached_findobj('modules.run_heating_sims');
+        if ~isempty(h_heat)
+            cb_toggle_thermal_timing(h_heat.Value);
+        end
+
         % Sync transducer serial dropdown: add serial to items list if not
         % present (e.g. config was written without launching GUI), then select it.
         h_serial = cached_findobj('transducer.serial');
@@ -1870,7 +1941,19 @@ end
     end
 
     function params = collect_params()
-        params = struct();
+        % Seed with the last loaded params so unbuilt lazy tabs contribute
+        % their values rather than falling back to config_default.yaml.
+        % Widget values from built tabs override these below.
+        % Exclude 'startup' and 'state' fields: these are set by
+        % load_parameters internally and must not be pre-seeded here
+        % (they may already be in processed form, e.g. cellstr, that
+        % load_parameters cannot re-parse from a YAML round-trip).
+        ud = fig.UserData;
+        if ~isempty(ud.last_params)
+            params = rmfield_if_exists(ud.last_params, {'startup', 'state'});
+        else
+            params = struct();
+        end
         % Collect all tagged input widgets
         all_widgets = [findobj(fig, '-isa', 'matlab.ui.control.EditField'); ...
                        findobj(fig, '-isa', 'matlab.ui.control.NumericEditField'); ...
@@ -1884,6 +1967,10 @@ end
             % which breaks pipeline code that expects char. Empty fields
             % intentionally fall back to the config_default.yaml value.
             if ischar(val) && isempty(val), continue; end
+            % Skip NaN-sentinel numerics (fields created with nedt(…, NaN)
+            % that the user left at their "not set" state).  These fall back
+            % to config_default.yaml / pipeline defaults.
+            if isnumeric(val) && isscalar(val) && isnan(val), continue; end
             % Skip the sentinel value for the serial dropdown — it means
             % "not selected" so no serial should be written to the config.
             if strcmp(tag, 'transducer.serial') && strcmp(val, '(manual)'), continue; end
@@ -1895,11 +1982,41 @@ end
         for i = 1:numel(xyz_tags)
             tag = xyz_tags{i};
             vals = zeros(1,3);
+            any_widget = false;
             for ax_i = 1:3
                 hw = cached_findobj(sprintf('%s_%d', tag, ax_i));
-                if ~isempty(hw), vals(ax_i) = hw.Value; end
+                if ~isempty(hw)
+                    vals(ax_i) = hw.Value;
+                    any_widget = true;
+                end
             end
-            params = set_nested(params, tag, vals);
+            % Only overwrite the seeded last_params value when the tab is
+            % built (at least one widget exists); otherwise keep the seeded
+            % value to avoid zeroing out unvisited-tab fields.
+            if any_widget
+                params = set_nested(params, tag, vals);
+            end
+        end
+        % For 2D axisymmetric simulations drop the Y (2nd) component from
+        % position and dimension fields so they match the 2-element grid.dims.
+        % Fall back to last_params when the grid tab hasn't been built yet.
+        ax_h = cached_findobj('grid.axisymmetric');
+        if ~isempty(ax_h)
+            is_axisym = ax_h.Value;
+        else
+            is_axisym = ~isempty(ud.last_params) && ...
+                        isfield(ud.last_params, 'grid') && ...
+                        isfield(ud.last_params.grid, 'axisymmetric') && ...
+                        ud.last_params.grid.axisymmetric;
+        end
+        if is_axisym
+            for pos_tag = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims'}
+                t = pos_tag{1};
+                v = get_nested(params, t);
+                if isnumeric(v) && numel(v) == 3
+                    params = set_nested(params, t, v([1 3]));
+                end
+            end
         end
         % Parse comma-separated fields into numeric arrays
         csv_array_tags = {'transducer.annular.elem_id_mm', ...
@@ -2271,7 +2388,15 @@ end
         if isa(h, 'matlab.ui.control.CheckBox')
             val = h.Value;
         elseif isa(h, 'matlab.ui.control.NumericEditField')
-            val = h.Value;
+            % Fields created with nedt(…, NaN) use Value=0 as a sentinel
+            % for "not set" (NumericEditField cannot store NaN at creation
+            % time).  Return NaN so collect_params can skip them, keeping
+            % the downstream code's isempty() / isfield() guards intact.
+            if strcmp(h.Placeholder, 'NaN') && h.Value == 0
+                val = NaN;
+            else
+                val = h.Value;
+            end
         elseif isa(h, 'matlab.ui.control.DropDown')
             val = h.Value;
         else
@@ -2391,3 +2516,11 @@ end
     end
 
 end % prestus_gui
+
+function s = rmfield_if_exists(s, fields)
+for i = 1:numel(fields)
+    if isfield(s, fields{i})
+        s = rmfield(s, fields{i});
+    end
+end
+end

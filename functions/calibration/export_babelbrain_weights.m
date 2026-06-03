@@ -1,4 +1,4 @@
-function export_babelbrain_weights(phases_rad, velocity, parameters, out_path)
+function export_babelbrain_weights(phases_rad, velocity, parameters, out_path, geo_phases_rad)
 % EXPORT_BABELBRAIN_WEIGHTS  Write calibration result to BabelBrain HDF5 format
 %
 % Packs PRESTUS per-element phases and particle velocity into the
@@ -8,36 +8,42 @@ function export_babelbrain_weights(phases_rad, velocity, parameters, out_path)
 % BabelBrain applies these weights as:
 %   u0 *= OptimizedWeights          (in AdjustWeightAmplitudes)
 %
-% The phasors are constructed as:
-%   w = amplitude_scale * exp(1i * phases_rad)
+% where u0 already carries geometric (Rayleigh-steered) phases per element
+% (BabelIntegrationANNULAR_ARRAY.py line 399). The weights must therefore
+% be delta corrections relative to those geometric phases:
+%   w[n] = exp(1i * (phases_rad[n] - geo_phases_rad[n]))
 %
-% where amplitude_scale = velocity / baseline_velocity normalises to
-% BabelBrain's SourceAmpPa convention. If baseline_velocity is omitted, the
-% phasors have unit amplitude (|w| = 1), i.e. phase-only calibration.
+% Provide geo_phases_rad (geometric phases at the calibration depth) so the
+% correct delta is written. Without it the absolute phases are written, which
+% doubles the geometric steering inside BabelBrain and produces wrong results.
 %
 % Use as:
-%   export_babelbrain_weights(phases_rad, velocity, parameters, out_path)
-%   export_babelbrain_weights(phases_rad, velocity, parameters, out_path, baseline_velocity)
+%   export_babelbrain_weights(phases_rad, velocity, parameters, out_path, geo_phases_rad)
 %
 % Input:
 %   phases_rad         - [1 x N_elem] optimised element phases [rad]
 %   velocity           - calibrated scalar particle velocity [m/s]
 %   parameters         - PRESTUS config (used for n_elem, freq, metadata)
 %   out_path           - output .h5 file path (created or overwritten)
+%   geo_phases_rad     - [1 x N_elem] geometric phases at the calibration
+%                        depth [rad], from set_real_phases * pi/180.
+%                        Required for correct BabelBrain interoperability.
 %
 % Output:
 %   HDF5 file at out_path with:
-%     /CALIBRATION   - [N_elem x 1] complex64 phasors
-%     /metadata/...  - provenance fields (freq, velocity, n_elem, timestamp)
+%     /CALIBRATION/real, /CALIBRATION/imag - [N_elem x 1] float32 phasors
+%                        encoding hardware-correction delta from geometric phases
+%     /metadata/...      - provenance fields (freq, velocity, n_elem, timestamp)
 %
-% See also: PERFORM_GLOBAL_SEARCH, PERFORM_JOINT_DEPTH_FIT,
+% See also: IMPORT_BABELBRAIN_WEIGHTS, PERFORM_GLOBAL_SEARCH,
 %           BabelBrain/TranscranialModeling/BabelIntegrationBASE.py
 
 arguments
-    phases_rad  (1,:) {mustBeNumeric}
-    velocity    (1,1) {mustBeNumeric}
-    parameters  (1,1) struct
-    out_path    (1,:) char
+    phases_rad      (1,:) {mustBeNumeric}
+    velocity        (1,1) {mustBeNumeric}
+    parameters      (1,1) struct
+    out_path        (1,:) char
+    geo_phases_rad  (1,:) {mustBeNumeric} = []
 end
 
 n_elem = parameters.transducer.annular.elem_n;
@@ -45,8 +51,22 @@ assert(numel(phases_rad) == n_elem, ...
     'phases_rad length (%d) must match transducer.annular.elem_n (%d)', ...
     numel(phases_rad), n_elem);
 
-% Build complex phasors (unit amplitude — phase-only)
-weights = complex(cos(phases_rad(:)), sin(phases_rad(:)));   % [N_elem x 1]
+% Compute delta phases relative to geometric steering.
+% BabelBrain applies weights on top of u0 that already has geometric phases,
+% so the weights must encode only the hardware correction.
+if isempty(geo_phases_rad)
+    warning(['export_babelbrain_weights: geo_phases_rad not provided. ' ...
+        'Writing absolute phases — BabelBrain will double the geometric steering. ' ...
+        'Pass geo_phases_rad to get correct interoperability.']);
+    delta_rad = phases_rad(:);
+else
+    assert(numel(geo_phases_rad) == n_elem, ...
+        'geo_phases_rad length (%d) must match n_elem (%d)', numel(geo_phases_rad), n_elem);
+    % angle(exp(i*(opt-geo))) wraps correctly to (-pi, pi]
+    delta_rad = angle(exp(1i * (phases_rad(:) - geo_phases_rad(:))));
+end
+
+weights = complex(cos(delta_rad), sin(delta_rad));   % [N_elem x 1], unit amplitude
 
 % Write HDF5 — overwrite if exists
 if exist(out_path, 'file')
@@ -54,10 +74,8 @@ if exist(out_path, 'file')
 end
 
 % CALIBRATION dataset: real and imaginary parts stored as separate float32
-% arrays interleaved in a struct to match NumPy complex64 on read.
-% MATLAB's h5create/h5write stores complex natively as compound type,
-% which Python's h5py reads as structured array. Write real/imag separately
-% and reconstruct in Python: weights = data['real'] + 1j*data['imag']
+% arrays to match NumPy complex64 on read.
+% Reconstruct in Python: weights = data['real'] + 1j*data['imag']
 h5create(out_path, '/CALIBRATION/real', [n_elem 1], 'Datatype', 'single');
 h5create(out_path, '/CALIBRATION/imag', [n_elem 1], 'Datatype', 'single');
 h5write(out_path,  '/CALIBRATION/real', single(real(weights)));

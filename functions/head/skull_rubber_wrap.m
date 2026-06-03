@@ -26,7 +26,12 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % ==============================================================================
     
     % Load the T1w input image as a reference
-    info = niftiinfo(fullfile(parameters.path.seg, parameters.path.t1_pattern));
+    t1_glob = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    t1_hits = dir(t1_glob);
+    if isempty(t1_hits)
+        error('skull_rubber_wrap:t1NotFound', 'T1 file not found matching: %s', t1_glob);
+    end
+    info = niftiinfo(fullfile(t1_hits(1).folder, t1_hits(1).name));
 
     % ==============================================================================
     % CLEAN SKULL MASK

@@ -1,4 +1,4 @@
-function hpc_wait_for_completion(job_id, hpc_type, max_checks)
+function hpc_wait_for_completion(job_id, hpc_type, max_checks, parameters, log_dir)
 % HPC_WAIT_FOR_COMPLETION  Poll an HPC job until it completes or times out
 %
 % Repeatedly checks job status via squeue/sacct (SLURM) or qstat (qsub)
@@ -9,23 +9,31 @@ function hpc_wait_for_completion(job_id, hpc_type, max_checks)
 % Use as:
 %   hpc_wait_for_completion(job_id, hpc_type)
 %   hpc_wait_for_completion(job_id, hpc_type, max_checks)
+%   hpc_wait_for_completion(job_id, hpc_type, max_checks, parameters, log_dir)
 %
 % Input:
 %   job_id     - scheduler job ID (numeric for SLURM, string for qsub)
 %   hpc_type   - 'slurm' or 'qsub'
 %   max_checks - (optional) maximum number of status polls before giving up;
 %                default 540 (~3 hours at one check per 20 s)
+%   parameters - (optional) PRESTUS config struct; when provided together with
+%                log_dir, a post-job resource and carbon report is generated
+%                via hpc_job_report after the job finishes
+%   log_dir    - (optional) path to the log directory for the report file;
+%                must be provided alongside parameters to enable reporting
 %
 % Note:
 %   This function blocks the MATLAB session. Only use when the caller
 %   explicitly wants to wait (e.g. single-stage pipeline on SLURM).
 %   For fire-and-forget submission use hpc_submit_job without calling this.
 %
-% See also: HPC_SUBMIT_JOB, HPC_DETECT_SYSTEM
+% See also: HPC_SUBMIT_JOB, HPC_DETECT_SYSTEM, HPC_JOB_REPORT
 
 if nargin < 3 || isempty(max_checks)
     max_checks = 540;  % default: ~3 hours at 1 check/20s
 end
+if nargin < 4, parameters = []; end
+if nargin < 5, log_dir    = []; end
 disp('User has chosen to wait until job is finished...');
 job_completed = false;
 checks = 0;
@@ -114,6 +122,14 @@ if ~job_completed
     warn('TIMEOUT job %s after %.1f min (%d checks)', job_id_str, elapsed/60, checks);
 else
     fprintf('✓ Job %s (%s) complete after %.1f min (%d checks)\n', job_id_str, hpc_type, elapsed/60, checks);
+end
+
+if ~isempty(parameters) && ~isempty(log_dir)
+    try
+        hpc_job_report(job_id, hpc_type, parameters, log_dir);
+    catch ME
+        warning('hpc_wait_for_completion: post-job report failed: %s', ME.message);
+    end
 end
 
 end

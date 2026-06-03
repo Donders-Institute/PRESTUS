@@ -99,4 +99,12 @@ end
         end
     end
 
+    %% DEFACED DERIVATIVE
+    % Produces m2m_sub-NNN_defaced/ for sharing; original folder is unchanged.
+    % Runs after MNI registration so toMNI/T1_to_MNI_post-hoc.nii.gz is included.
+    % Off by default — enable with parameters.io.deface_m2m = 1.
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'deface') && parameters.segmentation.deface
+        preproc_deface_m2m(segmentation_folder, parameters);
+    end
+
 end

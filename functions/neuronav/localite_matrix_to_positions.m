@@ -91,12 +91,13 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
         end
     end
 
-    % --- Focal distance (bowl rear centre → acoustic focus, along beam axis) ---
-    % focal_distance_bowl is consistent with the bowl rear centre convention.
+    % --- Focal distance (exit plane → acoustic focus, along beam axis) ---
     parameters = focal_distance_calculation(parameters);
-    focal_dist = parameters.transducer(1).focal_distance_bowl;
+    focal_dist = parameters.transducer(1).focal_distance_ep;
 
     % --- Compute positions in RAS space ---
+    % reference_dist (negative) shifts ref_pos back to the bowl rear centre.
+    % focal_dist (positive, ~85 mm) moves ref_pos to the acoustic focus.
     trans_pos_ras = (ref_pos + reference_dist * ref_vec)';   % [1×4] homogeneous
     focus_pos_ras = (ref_pos + focal_dist     * ref_vec)';
 

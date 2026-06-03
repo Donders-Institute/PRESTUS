@@ -15,6 +15,7 @@ Unit tests cover pure, deterministic functions — no external tools, no file I/
 | `test_transform.m` | `ras_to_grid`, axisymmetric round-trip size checks |
 | `test_load_parameters.m` | `load_parameters` — default keys, config merging, affix sanitisation |
 | `test_head_preprocessing.m` | `get_crop_dims`, `preproc_medium_mask`, `skull_fill_holes` on synthetic segmentation volumes |
+| `test_deface_m2m.m` | `preproc_deface_m2m` — folder creation, sentinel, idempotency, skip paths (uses a stub binary; no real pydeface required) |
 
 Run all unit tests from MATLAB:
 

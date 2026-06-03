@@ -274,6 +274,47 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('stop', 'nifti_medium');
 
     % ====================================================================
+    %% ACOUSTIC FOV CROP  (between medium and source setup)
+    %
+    % When grid.acoustic_fov_diameter_mm and grid.acoustic_fov_length_mm are
+    % set, the acoustic simulation runs on a beam-axis aligned sub-grid
+    % (lateral = diameter, axial = length, both centred on the focus).
+    % The crop offsets are stored in acoustic_provenance so that
+    % ASSEMBLE_LIMITED_FOV_FIELDS can back-project N independent limited-FOV
+    % results onto the full acoustic grid before thermal simulation.
+    % ====================================================================
+    has_acoustic_fov = isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_diameter_mm) && ...
+        isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_length_mm);
+
+    if has_acoustic_fov
+        full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
+        % Save full-grid state so thermal simulation can use the full domain.
+        kwave_medium_full  = kwave_medium;
+        medium_masks_full  = medium_masks;
+        segmentation_full  = segmentation;
+        trans_pos_full     = trans_pos;
+        focus_pos_full     = focus_pos;
+        grid_dims_full     = parameters.grid.dims;
+        [parameters, kwave_medium, medium_masks, trans_pos, focus_pos, fov_offset_ac] = ...
+            acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos);
+        fprintf('[pipeline] Acoustic FOV crop active: offset [%s], new dims [%s]\n', ...
+            num2str(fov_offset_ac), num2str(parameters.grid.dims));
+        % Crop segmentation to the same FOV so analysis masks match sensor_data size.
+        fov_end_ac = fov_offset_ac + parameters.grid.dims - 1;
+        if ~isempty(segmentation) && isequal(size(segmentation), double(full_ac_dims_saved))
+            segmentation = segmentation( ...
+                fov_offset_ac(1):fov_end_ac(1), ...
+                fov_offset_ac(2):fov_end_ac(2), ...
+                fov_offset_ac(3):fov_end_ac(3));
+        end
+    else
+        fov_offset_ac        = [];
+        full_ac_dims_saved   = [];
+    end
+
+    % ====================================================================
     %% STAGE 5 — SOURCE & SENSOR SETUP
     %
     % Constructs the k-Wave source matrix from the transducer geometry and
@@ -329,6 +370,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
 
     acoustic_provenance = struct();
+
+    % Record limited-FOV crop metadata in provenance so ASSEMBLE_LIMITED_FOV_FIELDS
+    % can back-project this result onto the full acoustic grid.
+    if has_acoustic_fov
+        acoustic_provenance.fov_offset_ac = fov_offset_ac;
+        acoustic_provenance.full_ac_dims  = full_ac_dims_saved;
+    end
+
     has_per_transducer_target = isfield(parameters, 'transducer') && ...
         any(arrayfun(@(t) isfield(t, 'target_isppa_wcm2') && ...
                           ~isempty(t.target_isppa_wcm2) && ...
@@ -451,8 +500,24 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     if parameters.state.acoustics_available
         log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
-        nifti_acoustic(parameters, planimg, results_acoustic, ...
-            acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        % When the acoustic FOV crop is active, back-project the analysis
+        % volumes (Ipa, MI, pressure) from FOV coords to the full grid so
+        % that nifti_acoustic places them at the correct spatial location.
+        if has_acoustic_fov && ~isempty(fov_offset_ac)
+            % Back-project FOV-sized analysis volumes to the full grid so
+            % nifti_acoustic places them at the correct spatial location.
+            params_nii           = parameters;
+            params_nii.grid.dims = full_ac_dims_saved;
+            nifti_acoustic(params_nii, planimg, results_acoustic, ...
+                fov_backproject_volume(acoustic_Ipa,      fov_offset_ac, full_ac_dims_saved), ...
+                fov_backproject_volume(acoustic_MI,       fov_offset_ac, full_ac_dims_saved), ...
+                fov_backproject_volume(acoustic_pressure, fov_offset_ac, full_ac_dims_saved), ...
+                highlighted_pos + fov_offset_ac - 1);
+            clear params_nii;
+        else
+            nifti_acoustic(parameters, planimg, results_acoustic, ...
+                acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+        end
         log_timer('stop', 'nifti_acoustic');
     end
     % acoustic pressure maps no longer needed after NIfTI export;
@@ -498,6 +563,36 @@ function [parameters] = prestus_pipeline(parameters, options)
         if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
             confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
 
+            % Restore full-grid state for thermal — the acoustic FOV crop is
+            % scoped to the acoustic simulation only.
+            if has_acoustic_fov
+                % Back-project pressure field(s) from FOV sub-grid to full grid.
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_all')
+                    sensor_data.p_max_all = fov_backproject_volume( ...
+                        single(sensor_data.p_max_all), fov_offset_ac, grid_dims_full);
+                end
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_async')
+                    sensor_data.p_max_async = fov_backproject_volume( ...
+                        single(sensor_data.p_max_async), fov_offset_ac, grid_dims_full);
+                end
+                kwave_medium  = kwave_medium_full;
+                medium_masks  = medium_masks_full;
+                segmentation  = segmentation_full;
+                trans_pos     = trans_pos_full;
+                focus_pos     = focus_pos_full;
+                parameters.grid.dims = grid_dims_full;
+                parameters.transducer(1).trans_pos = trans_pos_full;
+                if isfield(parameters.transducer(1), 'focus_pos')
+                    parameters.transducer(1).focus_pos = focus_pos_full;
+                end
+                % Translate highlighted_pos from FOV to full-grid voxels.
+                if ~isempty(highlighted_pos)
+                    highlighted_pos = highlighted_pos + fov_offset_ac - 1;
+                end
+                clear kwave_medium_full medium_masks_full segmentation_full ...
+                      trans_pos_full focus_pos_full grid_dims_full;
+            end
+
             kwave_medium.temp_0              = medium_plus.temp_0;
             kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
             clear medium_plus;
@@ -508,7 +603,10 @@ function [parameters] = prestus_pipeline(parameters, options)
             %   (b) An independent thermal FOV is specified, OR
             %   (c) An external acoustic NIfTI was provided (no acoustic kgrid exists).
             % In all other cases the acoustic kgrid, medium, and masks are used as-is.
-            use_thermal_grid = has_external_acoustic || ...
+            % Also force thermal grid rebuild when acoustic FOV was active:
+            % kgrid was built on the cropped FOV grid and must be rebuilt for
+            % the restored full-grid medium/pressure.
+            use_thermal_grid = has_external_acoustic || has_acoustic_fov || ...
                 (isfield(parameters.grid, 'thermal_resolution_mm') && ...
                  ~isempty(parameters.grid.thermal_resolution_mm) && ...
                  parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...

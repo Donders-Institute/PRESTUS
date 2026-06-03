@@ -177,6 +177,22 @@ Verify the installation:
 python -c "import nilearn; import vtk; import h5py; import pynput; print('PlanTUS dependencies OK')"
 ```
 
+#### [Optional: Defacing dependencies]
+
+If you intend to use MRI defacing (`modules.deface_m2m = 1`), `pydeface` must be installed in the SimNIBS environment:
+
+```bash
+source activate simnibs_v4.6.0
+pip install pydeface
+```
+
+Verify the installation:
+
+```bash
+python -c "import pydeface; print('pydeface OK')"
+pydeface --help
+```
+
 > **Note on `wb_command`**  
 > PlanTUS also requires `wb_command` (Connectome Workbench) for surface processing and volume operations (e.g. `volume-fill-holes`). Although PlanTUS only prints a warning when it is missing rather than aborting immediately, the absence of `wb_command` causes intermediate files to not be created and the pipeline will fail.
 >

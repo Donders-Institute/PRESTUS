@@ -58,7 +58,7 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 
     % --- Convert each position using shared math ---
     for i = positions
-        coord_matrix = reshape(squeeze(outputStruct{i}.matrix4d_mean), [4, 4])';
+        coord_matrix = reshape(squeeze(outputStruct{i}.matrix4d_mean), [4, 4]);
 
         [tp, fp, tr, fr] = localite_matrix_to_positions(coord_matrix, t1_header, parameters);
 

@@ -8,19 +8,22 @@ function correction_deg = import_babelbrain_weights(...
 % the transducer equipment YAML via SAVE_ELEM_CORRECTION so it is picked
 % up automatically by load_equipment_config / load_transducer_from_library.
 %
-% BabelBrain stores calibrated element weights as complex64 phasors:
-%   angle(w_i) = optimised phase for element i [rad]
-%   abs(w_i)   = amplitude scaling (ignored here — PRESTUS controls drive
-%                level via elem_amp, not per-element amplitude weights)
+% BabelBrain stores calibrated element weights as complex64 phasors where
+% angle(w_i) encodes a DELTA correction relative to geometric phases, not
+% an absolute phase. BabelBrain's TxCalibration builds a transfer matrix A
+% with geometric Rayleigh phases already applied as source excitation, and
+% optimises correction weights b starting from zero phases. Consequently:
+%   angle(w_i) = opt_phase_i - geo_phase_i    [hardware delta, rad]
+%   abs(w_i)   = amplitude scaling (ignored — PRESTUS uses elem_amp)
 %
-% The correction is:
-%   correction_deg = mod(unwrap(opt_deg) - unwrap(geo_deg), 360)
+% To derive the PRESTUS correction (also a delta from geo), the absolute
+% phases are first reconstructed:
+%   abs_opt_deg = mod(geo_deg + angle(w)*180/pi, 360)
+% then passed to SAVE_ELEM_CORRECTION which computes:
+%   correction_deg = mod(unwrap(abs_opt) - unwrap(geo), 360) = angle(w)*180/pi
 %
-% where geo_deg are the geometric phases computed by SET_REAL_PHASES at
-% ref_depth_ep. This is identical to the correction stored by
-% SAVE_ELEM_CORRECTION after a PRESTUS global-search calibration, so the
-% same geometric-steering path is used regardless of which tool produced
-% the calibration.
+% The two-step round-trip is equivalent to using angle(w) directly but
+% keeps the code path consistent with PRESTUS global-search calibrations.
 %
 % Use as:
 %   correction_deg = import_babelbrain_weights( ...
@@ -103,10 +106,16 @@ end
     end
 
     % ── Derive and save correction ────────────────────────────────────────
-    save_elem_correction(equipment_yaml_path, opt_phases_deg, geo_phases_deg, ref_depth_ep);
+    % BabelBrain stores weights as corrections relative to geometric phases:
+    % the transfer matrix A is built with geometric phases already applied,
+    % so angle(b) is a delta from geometric, not an absolute phase.
+    % Reconstruct absolute phases before calling save_elem_correction, which
+    % internally subtracts geo — otherwise geometric phases would be subtracted twice.
+    opt_phases_abs_deg = mod(geo_phases_deg + opt_phases_deg, 360);
+    save_elem_correction(equipment_yaml_path, opt_phases_abs_deg, geo_phases_deg, ref_depth_ep);
 
-    geo_unwrapped  = unwrap(geo_phases_deg * pi/180) * 180/pi;
-    opt_unwrapped  = unwrap(opt_phases_deg * pi/180) * 180/pi;
+    geo_unwrapped  = unwrap(geo_phases_deg       * pi/180) * 180/pi;
+    opt_unwrapped  = unwrap(opt_phases_abs_deg   * pi/180) * 180/pi;
     correction_deg = mod(opt_unwrapped - geo_unwrapped, 360);
 
 end

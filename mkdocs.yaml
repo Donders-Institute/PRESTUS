@@ -57,6 +57,7 @@ nav:
   - 🖥️ Simulations:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
+    - Limited Acoustic FOV: doc_limited_fov.md
     - Outputs: doc_outputs.md
     - Backend: doc_backend.md
     - HPC: doc_hpc.md

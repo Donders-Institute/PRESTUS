@@ -1,4 +1,4 @@
-function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz, crop_at_target, view_angle, open_figure)
+function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz, crop_at_target, view_angle, open_figure, apply_deface)
 % SHOW_3D_HEAD  Visualise a segmented 3D head with transducer and target positions
 %
 % Renders skin and tissue surfaces from a segmented volume and overlays
@@ -7,7 +7,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
 %
 % Use as:
 %   show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_size, coord_mesh_xyz)
-%   show_3d_head(..., crop_at_target, view_angle, open_figure)
+%   show_3d_head(..., crop_at_target, view_angle, open_figure, apply_deface)
 %
 % Input:
 %   segmented_img  - [Nx x Ny x Nz] tissue label volume
@@ -23,7 +23,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
 % See also: PLOT_CORONAL_SLICES, SHOW_POSITIONING_PLOTS
 
     arguments
-        segmented_img (:,:,:) 
+        segmented_img (:,:,:)
         target_xyz     (:,3)  double
         trans_xyz      (:,3)  double
         parameters     (1,1)  struct
@@ -32,6 +32,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
         crop_at_target (1,3)  double = [0,0,0]
         view_angle     (1,2)  double = [0,0]
         open_figure    (1,1)  double = 1
+        apply_deface   (1,1)  logical = true
     end
 
     % Ensure both target_xyz and trans_xyz are of same number of points
@@ -52,6 +53,11 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     %% Downsample anatomy for visualization
     ds_factor = 2;
     segmented_img_ds = segmented_img(1:ds_factor:end, 1:ds_factor:end, 1:ds_factor:end);
+
+    % Deface: zero anterior scalp/face voxels before surface extraction
+    if apply_deface
+        segmented_img_ds = deface_volume(segmented_img_ds, segmented_img_ds, pixel_size * ds_factor);
+    end
 
     % Crop if requested
     origin_shift = [0 0 0];
@@ -176,27 +182,29 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
 
         % Plot target sphere
         sphere_mask = zeros(size(segmented_img_ds));
-        % Downsampled target for rounded indexing
         for k = 1:nPairs
-            targ_ds = round((target_xyz(k,:) + (ds_factor-1))/ds_factor);
-            % Get valid points within mask
-            valid_mask = ...
-               coord_mesh_xyz(:,1) >= 1 & coord_mesh_xyz(:,1) <= size(sphere_mask,1) & ...
-               coord_mesh_xyz(:,2) >= 1 & coord_mesh_xyz(:,2) <= size(sphere_mask,2) & ...
-               coord_mesh_xyz(:,3) >= 1 & coord_mesh_xyz(:,3) <= size(sphere_mask,3);
-            mesh_valid = coord_mesh_xyz(valid_mask, :);
-        
-            dists = sqrt(sum((mesh_valid - targ_ds).^2, 2));
-            flag = dists < 3;
-            
-            if ~any(flag)
+            % Search in full-res coordinates (coord_mesh_xyz is full-res),
+            % then downsample found indices to fill sphere_mask.
+            dists = sqrt(sum((coord_mesh_xyz - target_xyz(k,:)).^2, 2));
+            flag_full = dists < 3 * ds_factor;
+
+            if ~any(flag_full)
                 warn('Target lies outside plotted volume – no sphere drawn. Check transform & cropping (preproc_smooth_and_crop.m)')
                 continue
             end
-        
-            idx_x = mesh_valid(flag,1);
-            idx_y = mesh_valid(flag,2);
-            idx_z = mesh_valid(flag,3);
+
+            full_idx = find(flag_full);
+            [x_full, y_full, z_full] = ind2sub(size(segmented_img), full_idx);
+            idx_x = round((x_full + (ds_factor-1))/ds_factor);
+            idx_y = round((y_full + (ds_factor-1))/ds_factor);
+            idx_z = round((z_full + (ds_factor-1))/ds_factor);
+
+            inside = idx_x >= 1 & idx_x <= size(sphere_mask,1) & ...
+                     idx_y >= 1 & idx_y <= size(sphere_mask,2) & ...
+                     idx_z >= 1 & idx_z <= size(sphere_mask,3);
+            idx_x = idx_x(inside); idx_y = idx_y(inside); idx_z = idx_z(inside);
+
+            targ_ds = round((target_xyz(k,:) + (ds_factor-1))/ds_factor);
         
             lin_idx = sub2ind(size(sphere_mask), idx_x, idx_y, idx_z);
             sphere_mask(lin_idx) = 1;

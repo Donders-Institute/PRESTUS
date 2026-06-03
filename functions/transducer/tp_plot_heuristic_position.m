@@ -60,6 +60,8 @@ subplot(1,3,1);
     get_transducer_box(...
         trans_xyz_rotated([1,3]), target_xyz_rotated([1,3]), [], pixel_size, parameters);
 
+apply_deface = ~isfield(parameters.io, 'deface_plots') || parameters.io.deface_plots;
+
 subplot(1,3,2);
 
     show_3d_head(img, ...
@@ -70,7 +72,7 @@ subplot(1,3,2);
         coord_mesh.xyz, ...
         [0 0 0],...
         [0,0],...
-        0)
+        0, apply_deface)
 
 subplot(1,3,3);
 
@@ -82,7 +84,7 @@ subplot(1,3,3);
         coord_mesh.xyz, ...
         [0 0 0],...
         [0,0],...
-        0)
+        0, apply_deface)
 
     view([-175,0])
 
