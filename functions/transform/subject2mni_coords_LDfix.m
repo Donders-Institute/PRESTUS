@@ -55,8 +55,12 @@ else
 end
 
 % Run mni2subject_coords
-[status,result] = system(sprintf('%s%s/subject2mni_coords -m %s -s %s -o %s -t %s;', ...
-    ld_command, parameters.startup.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
+simnibs_bin = parameters.startup.simnibs_bin_path;
+assert(~isempty(simnibs_bin) && ~strcmp(simnibs_bin, '/'), ...
+    'parameters.startup.simnibs_bin_path must be set to the SimNIBS bin directory (not empty or ''/'')')
+subject2mni_bin = fullfile(simnibs_bin, 'subject2mni_coords');
+[status,result] = system(sprintf('%s%s -m %s -s %s -o %s -t %s;', ...
+    ld_command, subject2mni_bin, subdir, fn_in, fn_out, transformation_type));
 
 % Check if call was successefull
 if status ~= 0
