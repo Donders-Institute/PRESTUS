@@ -306,17 +306,56 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
     %% ACOUSTIC FOV CROP  (between medium and source setup)
     %
-    % When grid.acoustic_fov_diameter_mm and grid.acoustic_fov_length_mm are
-    % set, the acoustic simulation runs on a beam-axis aligned sub-grid
+    % When grid.acoustic_fov_diameter_mm and/or grid.acoustic_fov_length_mm
+    % are set, the acoustic simulation runs on a beam-axis aligned sub-grid
     % (lateral = diameter, axial = length, both centred on the focus).
+    % Either field may be set to 'auto':
+    %   acoustic_fov_length_mm   'auto' -> focal_depth_mm + grid.z_beyond_focus_mm
+    %                                      (default 40 mm, matching BabelBrain)
+    %   acoustic_fov_diameter_mm 'auto' -> outermost element diameter of the
+    %                                      first transducer (max elem_od_mm)
     % The crop offsets are stored in acoustic_provenance so that
     % ASSEMBLE_LIMITED_FOV_FIELDS can back-project N independent limited-FOV
     % results onto the full acoustic grid before thermal simulation.
     % ====================================================================
+
+    % Resolve 'auto' settings before the has_acoustic_fov check.
+    if isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+            ischar(parameters.grid.acoustic_fov_length_mm) && ...
+            strcmpi(parameters.grid.acoustic_fov_length_mm, 'auto')
+        focal_depth_vox = norm(focus_pos - trans_pos);
+        focal_depth_mm  = focal_depth_vox * parameters.grid.resolution_mm;
+        z_beyond_mm     = 40.0;  % default matching BabelBrain
+        if isfield(parameters.grid, 'z_beyond_focus_mm') && ...
+                ~isempty(parameters.grid.z_beyond_focus_mm)
+            z_beyond_mm = parameters.grid.z_beyond_focus_mm;
+        end
+        parameters.grid.acoustic_fov_length_mm = focal_depth_mm + z_beyond_mm;
+        fprintf('[pipeline] acoustic_fov_length_mm auto -> %.1f mm (focal depth %.1f + z_beyond %.1f)\n', ...
+            parameters.grid.acoustic_fov_length_mm, focal_depth_mm, z_beyond_mm);
+    end
+
+    if isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
+            ischar(parameters.grid.acoustic_fov_diameter_mm) && ...
+            strcmpi(parameters.grid.acoustic_fov_diameter_mm, 'auto')
+        if isfield(parameters.transducer(1), 'elem_od_mm') && ...
+                ~isempty(parameters.transducer(1).elem_od_mm)
+            parameters.grid.acoustic_fov_diameter_mm = max(parameters.transducer(1).elem_od_mm);
+        else
+            error('pipeline:autoFovDiameter', ...
+                ['acoustic_fov_diameter_mm=''auto'' requires transducer(1).elem_od_mm. ' ...
+                 'Set acoustic_fov_diameter_mm explicitly instead.']);
+        end
+        fprintf('[pipeline] acoustic_fov_diameter_mm auto -> %.1f mm (transducer outer diameter)\n', ...
+            parameters.grid.acoustic_fov_diameter_mm);
+    end
+
     has_acoustic_fov = isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
         ~isempty(parameters.grid.acoustic_fov_diameter_mm) && ...
+        isnumeric(parameters.grid.acoustic_fov_diameter_mm) && ...
         isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
-        ~isempty(parameters.grid.acoustic_fov_length_mm);
+        ~isempty(parameters.grid.acoustic_fov_length_mm) && ...
+        isnumeric(parameters.grid.acoustic_fov_length_mm);
 
     if has_acoustic_fov
         full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
@@ -791,26 +830,31 @@ function [parameters] = prestus_pipeline(parameters, options)
             contains(parameters.simulation.medium, {'layered', 'phantom'})
 
         fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+        fprintf('\n');
+        fprintf('========================================\n\n');
 
-        if numel(parameters.transducer) > 1
-            warning('prestus_pipeline:posthocMultiTransducer', ...
-                ['Post-hoc water simulations are not implemented for multiple transducers. ' ...
-                 'Only the first transducer will be used. ' ...
-                 'Consider running separate single-transducer configs instead.']);
+        transducer_N_water = numel(parameters.transducer);
+        for it_water = 1:transducer_N_water
+            if transducer_N_water > 1
+                fprintf('[pipeline] Post-hoc water sim — transducer %d / %d\n', it_water, transducer_N_water);
+            end
+            water_parameters = parameters;
+            water_parameters.simulation.medium = 'water';
+            water_parameters.modules.run_heating_sims = 0;
+            water_parameters.modules.run_posthoc_water_sims = 0;
+            water_parameters.simulation.debug = 0;
+            water_parameters.grid.default_dims = water_parameters.grid.dims;
+            water_parameters.io.log_file = '';  % new log file so water run does not append to the layered diary
+            water_parameters.hpc.timelimit = '05:00:00';
+            water_parameters.hpc.memorylimit = 40;
+            water_parameters.hpc.wait_for_job = false;
+            if transducer_N_water > 1
+                % Isolate to single transducer; index range preserves [1×1] struct array type.
+                water_parameters.transducer = parameters.transducer(it_water:it_water);
+                water_parameters.io.output_affix = sprintf('%s_tx%d', parameters.io.output_affix, it_water);
+            end
+            prestus_pipeline_start(water_parameters);
         end
-        water_parameters = parameters;
-        water_parameters.simulation.medium = 'water';
-        water_parameters.modules.run_heating_sims = 0;
-        water_parameters.modules.run_posthoc_water_sims = 0;
-        water_parameters.simulation.debug = 0;
-        water_parameters.grid.default_dims = water_parameters.grid.dims;
-        water_parameters.io.log_file = '';  % new log file so water run does not append to the layered diary
-        water_parameters.hpc.timelimit = '05:00:00';
-        water_parameters.hpc.memorylimit = 40;
-        water_parameters.hpc.wait_for_job = false;
-        prestus_pipeline_start(water_parameters);
         clear water_parameters;
     end
 
