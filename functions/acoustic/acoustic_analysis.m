@@ -74,33 +74,39 @@ end
     freq_MHz = freq_Hz/10^6;
     acoustic_MI = (acoustic_pressure/10^6)/sqrt(freq_MHz);
 
-    % Creates the foundation for a mask before the exit plane to calculate max values outside of it
-    if numel(parameters.transducer) > 1
-        warn(['Multi-transducer: exit-plane related metrics (after_exit_plane_mask, ' ...
-                    'max_Isppa_after_exit_plane, real_focal_distance, etc.) are computed ' ...
-                    'only w.r.t. the canonical first transducer.']);
-    end
+    % Creates a mask for voxels beyond the exit plane of any transducer.
+    % For multi-transducer setups the mask is the union across transducers:
+    % a voxel is "after exit" if it clears at least one transducer's exit
+    % plane (the logical OR of per-transducer after-exit masks). AND would
+    % yield an empty mask for bilateral / opposing-beam setups.
     comp_grid_size = size(sensor_data.p_max_all);
-    after_exit_plane_mask = ones(comp_grid_size);
-    bowl_depth_grid = round((tr.(tr.type).curv_radius_mm-...
-        tr.(tr.type).dist_geom_ep_mm)/parameters.grid.resolution_mm);
-    % Places the exit plane mask in the grid, adjusted to the amount of dimensions
-    if numel(parameters.grid.dims) == 3
-        if trans_pos(3) > comp_grid_size(3)/2
-            after_exit_plane_mask(:,:,(trans_pos(numel(parameters.grid.dims))-...
-                bowl_depth_grid):end) = 0;
-        else
-            after_exit_plane_mask(:,:,1:(trans_pos(numel(parameters.grid.dims))+...
-                bowl_depth_grid)) = 0;
+    after_exit_plane_mask = false(comp_grid_size);  % OR accumulation: start at 0
+
+    for it = 1:numel(parameters.transducer)
+        tr_it        = parameters.transducer(it);
+        trans_pos_it = tr_it.trans_pos;
+        bowl_depth_grid_it = round((tr_it.(tr_it.type).curv_radius_mm - ...
+            tr_it.(tr_it.type).dist_geom_ep_mm) / parameters.grid.resolution_mm);
+
+        mask_it = ones(comp_grid_size);
+        if numel(parameters.grid.dims) == 3
+            beam_dim = numel(parameters.grid.dims);
+            if trans_pos_it(beam_dim) > comp_grid_size(beam_dim) / 2
+                mask_it(:,:,1:(trans_pos_it(beam_dim) - bowl_depth_grid_it)) = 0;
+            else
+                mask_it(:,:,(trans_pos_it(beam_dim) + bowl_depth_grid_it):end) = 0;
+            end
+        elseif numel(parameters.grid.dims) == 2
+            beam_dim = numel(parameters.grid.dims);
+            if trans_pos_it(beam_dim) > comp_grid_size(beam_dim) / 2
+                mask_it(:,1:(trans_pos_it(beam_dim) - bowl_depth_grid_it)) = 0;
+            else
+                mask_it(:,(trans_pos_it(beam_dim) + bowl_depth_grid_it):end) = 0;
+            end
         end
-    elseif numel(parameters.grid.dims) == 2
-        if trans_pos(2) > comp_grid_size(2)/2
-            after_exit_plane_mask(:,(trans_pos(numel(parameters.grid.dims))-...
-                bowl_depth_grid):end) = 0;
-        else
-            after_exit_plane_mask(:,1:(trans_pos(numel(parameters.grid.dims))+...
-                bowl_depth_grid)) = 0;
-        end
+        % Union: voxel is "after exit" if it clears at least one transducer's exit plane.
+        % AND would produce an empty mask for bilateral / opposing-beam setups.
+        after_exit_plane_mask = after_exit_plane_mask | mask_it;
     end
 
     % [1] average Isppa within a circle around the target
@@ -210,7 +216,7 @@ end
     % Plot intensity on the segmented image (up to 2 transducers)
     n_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > n_plots
-        warn('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
+        warning('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
     end
     for ti = 1:n_plots
 

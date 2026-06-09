@@ -16,8 +16,8 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
 % by ASSEMBLE_LIMITED_FOV_FIELDS.
 %
 % Required parameters.grid fields:
-%   acoustic_fov_diameter_mm  — lateral FOV half-width [mm]
-%   acoustic_fov_length_mm    — axial FOV depth [mm]
+%   acoustic_fov_diameter_mm  — lateral FOV diameter [mm] (numeric; resolve 'auto' in caller)
+%   acoustic_fov_length_mm    — axial FOV depth [mm]      (numeric; resolve 'auto' in caller)
 %
 % Optional parameters.grid fields:
 %   mode  — 'transducer_axis' (default) or 'ras_plus'.
