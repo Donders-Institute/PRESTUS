@@ -22,7 +22,7 @@ where `p` is the peak pressure amplitude, `ρ` is density, and `c` is sound spee
 
 The **spatial peak** of IPA is ISPPA. When IPA is reported at a specific location (target point, radius average) rather than at the spatial maximum, it is labelled IPA.
 
-The **mechanical index** at each voxel is defined as MI = p⁻ / √f, where p⁻ is the peak negative pressure in MPa and f is the centre frequency in MHz. Note: PRESTUS uses `p_max_all` (peak positive pressure) as a proxy for p⁻; a direct negative-pressure map would require additional sensor configuration.
+The **mechanical index** at each voxel is defined as MI = p⁻ / √f, where p⁻ is the peak rarefaction (negative) pressure in MPa and f is the centre frequency in MHz (IEC 62359 / FDA). PRESTUS records `p_min_all` from k-Wave and uses its absolute value for MI; for multi-transducer async combinations the per-voxel most-negative pressure across transducers (`p_min_async`) is used instead.
 
 An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical Neurophysiology)](https://doi.org/10.1016/j.clinph.2021.12.010).
 

@@ -685,6 +685,14 @@ function [parameters] = prestus_pipeline(parameters, options)
                     sensor_data.p_max_async = fov_backproject_volume( ...
                         single(sensor_data.p_max_async), fov_offset_ac, grid_dims_full);
                 end
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_min_async')
+                    sensor_data.p_min_async = fov_backproject_volume( ...
+                        single(sensor_data.p_min_async), fov_offset_ac, grid_dims_full);
+                end
+                if ~isempty(sensor_data) && isfield(sensor_data, 'p_min_all')
+                    sensor_data.p_min_all = fov_backproject_volume( ...
+                        single(sensor_data.p_min_all), fov_offset_ac, grid_dims_full);
+                end
                 kwave_medium  = kwave_medium_full;
                 medium_masks  = medium_masks_full;
                 segmentation  = segmentation_full;

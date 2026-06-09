@@ -103,13 +103,20 @@ c   = data_ref.kwave_medium.sound_speed;
 
 [p_ref_scaled, target_used, baseline_used] = scale_pressure( ...
     p_ref, data_ref.acoustic_provenance, data_ref.acoustic_info, targets_wcm2(1), 1);
+
+% Derive scale factor and apply to p_min_all (peak negative, ≤0).
+% p_min tracks the most-negative pressure across transducers (worst-case MI).
+scale_ref      = p_ref_scaled ./ max(p_ref, eps('double'));
 clear p_ref;
+p_min_ref      = double(data_ref.sensor_data.p_min_all) .* scale_ref;
+clear scale_ref;
 
 I_total        = p_ref_scaled.^2 ./ (2 .* rho .* c);
 p_max_safety   = p_ref_scaled;   % per-voxel pressure maximum across transducers
+p_min_safety   = p_min_ref;      % per-voxel peak negative across transducers
 targets_log    = target_used;
 baselines_log  = baseline_used;
-clear p_ref_scaled;
+clear p_ref_scaled p_min_ref;
 
 % =========================================================================
 %% Accumulate remaining transducers
@@ -129,13 +136,18 @@ for k = 2:N
 
     [p_k_scaled, target_used, baseline_used] = scale_pressure( ...
         p_k, data_k.acoustic_provenance, data_k.acoustic_info, targets_wcm2(k), k);
-    clear data_k p_k;
+
+    scale_k   = p_k_scaled ./ max(p_k, eps('double'));
+    clear p_k;
+    p_min_k   = double(data_k.sensor_data.p_min_all) .* scale_k;
+    clear data_k scale_k;
 
     I_total      = I_total + p_k_scaled.^2 ./ (2 .* rho .* c);
-    p_max_safety = max(p_max_safety, p_k_scaled);  % instantaneous peak
+    p_max_safety = max(p_max_safety, p_k_scaled);   % instantaneous peak positive
+    p_min_safety = min(p_min_safety, p_min_k);      % instantaneous peak negative
     targets_log   = [targets_log,  target_used];   %#ok<AGROW>
     baselines_log = [baselines_log, baseline_used]; %#ok<AGROW>
-    clear p_k_scaled;
+    clear p_k_scaled p_min_k;
 end
 
 % =========================================================================
@@ -151,13 +163,14 @@ clear I_total rho c;
 % =========================================================================
 
 sensor_data              = data_ref.sensor_data;
-sensor_data.p_max_all    = p_thermal;   % thermal heat source (intensity sum)
-sensor_data.p_max_async  = p_max_safety; % acoustic safety (instantaneous max)
-clear p_thermal p_max_safety;
+sensor_data.p_max_all    = p_thermal;    % thermal heat source (intensity sum)
+sensor_data.p_max_async  = p_max_safety; % acoustic safety: peak positive (instantaneous max)
+sensor_data.p_min_async  = p_min_safety; % acoustic safety: peak negative (for MI)
+clear p_thermal p_max_safety p_min_safety;
 
 acoustic_provenance                      = data_ref.acoustic_provenance;
 acoustic_provenance.combined_from        = files_in;
-acoustic_provenance.combination_mode     = 'async_dual_field';  % p_max_all=thermal sum; p_max_async=safety max
+acoustic_provenance.combination_mode     = 'async_dual_field';  % p_max_all=thermal sum; p_max_async=safety peak positive; p_min_async=safety peak negative
 acoustic_provenance.combination_targets  = targets_log;
 acoustic_provenance.combination_baselines = baselines_log;
 acoustic_provenance.combination_time     = datestr(now); %#ok<TNOW1,DATST>

@@ -17,7 +17,7 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 %   parameters   - PRESTUS config with transducer, grid, analysis, io fields
 %   kwave_medium - spatial medium property maps (sound_speed, density, etc.)
 %   medium_masks - voxel-wise tissue layer label map
-%   sensor_data  - k-Wave output; requires p_max_all [Pa]
+%   sensor_data  - k-Wave output; requires p_max_all [Pa] and p_min_all [Pa] (for MI)
 %   segmentation - CHARM tissue label map
 %   source_labels- transducer element label map (for overlay plots)
 %
@@ -69,11 +69,8 @@ end
     results.Isppa = max(acoustic_Ipa(:));
 
     % Calculates the Mechanical Index for every gridpoint.
-    % MI = p_neg / sqrt(f) is conservative at lower frequencies (larger MI for
-    % the same pressure). In a multi-frequency setup each voxel's true MI depends
-    % on which transducer dominates there, which cannot be determined from the
-    % combined pressure map alone. Using the lowest frequency present is therefore
-    % the conservative choice: it never underestimates MI at any voxel.
+    % MI = |p_neg| / sqrt(f) per IEC 62359 / FDA: peak rarefaction pressure.
+    % In a multi-frequency setup the lowest frequency is used (conservative).
     freqs_all  = [parameters.transducer.freq_hz];
     freq_Hz    = min(freqs_all);
     freq_MHz   = freq_Hz / 1e6;
@@ -81,7 +78,19 @@ end
         fprintf(['Multi-frequency setup: MI computed using lowest frequency %g Hz ' ...
                  '(conservative; transducer frequencies: %s Hz).\n'], freq_Hz, num2str(freqs_all));
     end
-    acoustic_MI = (acoustic_pressure/10^6)/sqrt(freq_MHz);
+
+    % Select peak negative pressure map (p_min_all / p_min_async are ≤ 0).
+    if isfield(sensor_data, 'p_min_async')
+        acoustic_p_neg = abs(gather(sensor_data.p_min_async));
+    elseif isfield(sensor_data, 'p_min_all')
+        acoustic_p_neg = abs(gather(sensor_data.p_min_all));
+    else
+        warning('acoustic_analysis:noPeakNeg', ...
+            'p_min_all not found in sensor_data; falling back to p_max for MI (may underestimate).');
+        acoustic_p_neg = acoustic_pressure;
+    end
+
+    acoustic_MI = (acoustic_p_neg/10^6)/sqrt(freq_MHz);
 
     % Creates a mask for voxels beyond the exit plane of any transducer.
     % For multi-transducer setups the mask is the union across transducers:

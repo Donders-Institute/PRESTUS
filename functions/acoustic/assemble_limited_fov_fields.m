@@ -123,16 +123,21 @@ p_fov_ref = double(abs(data_ref.sensor_data.p_max_all));
 
 [p_fov_ref_scaled, target_used, baseline_used] = ...
     scale_pressure(p_fov_ref, prov_ref, data_ref.acoustic_info, targets_wcm2(1), 1);
+
+scale_ref         = p_fov_ref_scaled ./ max(p_fov_ref, eps('double'));
 clear p_fov_ref;
+p_fov_ref_min_scaled = double(data_ref.sensor_data.p_min_all) .* scale_ref;
+clear scale_ref;
 
 % Back-project first field into full grid
 p_full_sq_sum  = backproject_squared(p_fov_ref_scaled, fov_offset_ref, full_ac_dims);
 p_full_max     = backproject(p_fov_ref_scaled, fov_offset_ref, full_ac_dims);
+p_full_min     = backproject(p_fov_ref_min_scaled, fov_offset_ref, full_ac_dims);
 
 fov_offsets_log = {fov_offset_ref};
 targets_log     = target_used;
 baselines_log   = baseline_used;
-clear p_fov_ref_scaled;
+clear p_fov_ref_scaled p_fov_ref_min_scaled;
 
 % =========================================================================
 %% Accumulate remaining files
@@ -156,10 +161,15 @@ for k = 2:N
 
     [p_fov_k_scaled, target_used, baseline_used] = ...
         scale_pressure(p_fov_k, prov_k, data_k.acoustic_info, targets_wcm2(k), k);
-    clear data_k p_fov_k;
+
+    scale_k           = p_fov_k_scaled ./ max(p_fov_k, eps('double'));
+    clear p_fov_k;
+    p_fov_k_min_scaled = double(data_k.sensor_data.p_min_all) .* scale_k;
+    clear data_k scale_k;
 
     p_full_sq_sum = p_full_sq_sum + backproject_squared(p_fov_k_scaled, fov_offset_k, full_ac_dims);
     p_full_max    = max(p_full_max,  backproject(p_fov_k_scaled, fov_offset_k, full_ac_dims));
+    p_full_min    = min(p_full_min,  backproject(p_fov_k_min_scaled, fov_offset_k, full_ac_dims));
 
     fov_offsets_log{k} = fov_offset_k;           %#ok<AGROW>
     targets_log         = [targets_log,  target_used];   %#ok<AGROW>
@@ -186,8 +196,9 @@ clear p_full_sq_sum;
 
 sensor_data             = data_ref.sensor_data;
 sensor_data.p_max_all   = single(p_thermal);   % thermal heat source
-sensor_data.p_max_async = single(p_full_max);  % instantaneous safety maximum
-clear p_thermal p_full_max;
+sensor_data.p_max_async = single(p_full_max);  % acoustic safety: peak positive (instantaneous max)
+sensor_data.p_min_async = single(p_full_min);  % acoustic safety: peak negative (for MI)
+clear p_thermal p_full_max p_full_min;
 
 acoustic_provenance                          = data_ref.acoustic_provenance;
 acoustic_provenance.combined_from            = files_in;
