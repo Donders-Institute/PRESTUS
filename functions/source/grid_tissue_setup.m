@@ -90,7 +90,7 @@ else
         else
             parameters.grid.dims = size(segmented_img);
             disp('Setting grid according to phantom dimensions...')
-            sprintf('%dD grid dimensions: [%d, %d, %d]', numel(parameters.grid.dims), parameters.grid.dims);
+            fprintf('%dD grid dimensions: [%s]\n', numel(parameters.grid.dims), num2str(parameters.grid.dims));
         end
         % create medium mask according to indices in parameters.layers (see preproc_smooth_and_crop.m)
         [medium_masks] = preproc_medium_mask(segmented_img, parameters);
@@ -105,7 +105,7 @@ else
         assert(isfield(parameters, 'grid') && isfield(parameters.grid, 'default_dims'), ...
             'parameters.grid.default_dims must be set for water simulations')
         parameters.grid.dims = squeeze(parameters.grid.default_dims);
-        sprintf('Using default %dD grid dimensions: [%d, %d, %d]', numel(parameters.grid.dims), parameters.grid.dims);
+        fprintf('Using default %dD grid dimensions: [%s]\n', numel(parameters.grid.dims), num2str(parameters.grid.dims));
         % set up empty medium masks and segmentations
         medium_masks = ones(parameters.grid.dims); % single water layer
         segmentation = zeros(parameters.grid.dims);

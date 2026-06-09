@@ -173,7 +173,7 @@ end
 
         % highlight this position in the future
         highlighted_pos = [Ix, Iy, Iz];
-        highlighted_pos = highlighted_pos(1:numel(trans_pos));
+        highlighted_pos = highlighted_pos(1:numel(parameters.grid.dims));
         
         % extract indices in brain medium
         [results.Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = ...

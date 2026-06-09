@@ -300,6 +300,9 @@ if isfield(parameters.io, 'adopted_cem43_iso') && ~isempty(parameters.io.adopted
 else
     tmp_obj.cem43_iso = zeros(size(thermal_diff_obj.T));
 end
+if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
+    tmp_obj.cem43_iso = gpuArray(tmp_obj.cem43_iso);
+end
 CEM43_iso_max = tmp_obj.cem43_iso;
 
 % Convert the thermal parameters for the simulation

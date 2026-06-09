@@ -118,11 +118,6 @@ if isempty(bb_root)
         'Or set parameters.babelbrain.root explicitly.']);
 end
 
-if isempty(bb_root)
-    % Runner found but BabelBrain source is elsewhere — pass empty root and
-    % let run_babelbrain_case.py auto-detect via its own search logic.
-    bb_root = '';
-end
 
 %% Select Python executable
 if ~isempty(bb.python_env)
@@ -211,7 +206,7 @@ nii_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, 
 %% Step 3 — Write OptimizedWeightsFile (calibrated phases)
 weights_path = fullfile(out_dir, subj_id, [target '_CalibWeights.h5']);
 
-if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad')
+if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_amp')
     phases_rad = tr.annular.elem_phase_rad;
     elem_amp   = tr.annular.elem_amp(1);
 
