@@ -74,19 +74,39 @@ BabelBrain is included as a git submodule at `external/BabelBrain`. Initialise i
 git submodule update --init external/BabelBrain
 ```
 
-BabelBrain requires Python 3.9+ with BabelViscoFDTD and GPU compute libraries. The recommended setup uses the conda environment file bundled with BabelBrain:
+BabelBrain requires a dedicated Python environment — its compiled extension `BabelViscoFDTD` cannot be installed into a generic system Python. Use the conda environment file bundled with BabelBrain:
 
 ```bash
-# Apple Silicon
-conda env create -f external/BabelBrain/environment_mac_arm64-311.yml
+# Apple Silicon (Metal)
+conda env create -f external/BabelBrain/environment_mac_arm64-314.yml
+conda activate BabelBrain
+
+# macOS Intel
+conda env create -f external/BabelBrain/environment_mac_x64-314.yml
 conda activate BabelBrain
 
 # Linux (CUDA)
 conda env create -f external/BabelBrain/environment_linux.yml
 conda activate BabelBrain
+
+# Windows
+conda env create -f external/BabelBrain/environment_win-314.yml
+conda activate BabelBrain
 ```
 
-Set `babelbrain.python_env` to the full path of the environment, or leave empty to use the active `python3`.
+After activation, find the environment path and set it in your config:
+
+```bash
+conda activate BabelBrain
+which python   # e.g. /opt/conda/envs/BabelBrain/bin/python
+```
+
+```yaml
+babelbrain:
+  python_env: /opt/conda/envs/BabelBrain   # directory containing bin/python
+```
+
+`babelbrain.python_env` **must** be set — leaving it empty falls back to system `python3`, which will not have `BabelViscoFDTD` and will fail with `No module named 'BabelViscoFDTD'`.
 
 ---
 

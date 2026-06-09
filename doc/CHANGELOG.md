@@ -97,7 +97,7 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 - System resources reported at run start: OS, CPU model/cores, RAM, GPU, CUDA version
 
 #### Reporting
-- Public usage statistics (see [doc_usage_statistics.md](doc_usage_statistics.md))
+- Public usage statistics (see [doc_usage-statistics.md](doc_usage-statistics.md))
 
 ---
 

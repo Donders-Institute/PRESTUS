@@ -59,10 +59,9 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `ask`. Does NOT apply to SimNIBS segmentations. |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
-| `save_source_matrices` | |
-| `save_acoustic_matrices` | |
-| `save_thermal_matrices` | |
-| `save_source_matrices` | |
+| `save_source_matrices` | Save the transducer source matrix to `.mat`? | `0` | `1 = yes`, `0 = no`. Needed by multi-stage pipelines (e.g. uncertainty). |
+| `save_acoustic_matrices` | Save the full acoustic simulation result (sensor data) to `.mat`? | `0` | `1 = yes`, `0 = no`. Large files; set to `1` only when caching is needed across pipeline stages. |
+| `save_thermal_matrices` | Save the full thermal simulation result to `.mat`? | `0` | `1 = yes`, `0 = no`. |
 | `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | 0 |
 | `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |

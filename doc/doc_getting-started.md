@@ -14,7 +14,7 @@ A (currently outdated) demo that focuses on transducer calibration can be found 
 
 ### Create virtual transducer settings
 
-See [Transducer] and [Calibration](doc_calibration.md).
+See [Transducer](doc_transducer.md) and [Calibration](doc_calibration.md).
 
 ### Create a study-specific config file
 

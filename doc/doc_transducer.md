@@ -71,7 +71,7 @@ Expected distance from the transducer bowl to the stimulation focus (mm). Will b
 An annular array consists of concentric ring-shaped elements arranged on a spherically curved surface. Because all elements share the same acoustic axis, focusing is inherently one-dimensional (axial). Lateral steering is not possible; the transducer must be physically repositioned to change the target location.
 
 **Modeling in PRESTUS:**  
-Element geometry is defined by inner/outer diameters (`Elements_ID_mm`, `Elements_OD_mm`) and bowl curvature (`curv_radius_mm`). Each element is assigned an independent pressure amplitude (`elem_amp`) and phase (`elem_phase_deg`), which must be calibrated empirically. PRESTUS includes a calibration pipeline for annular arrays to match simulated pressure to free-water measurements.
+Element geometry is defined by inner/outer diameters (`elem_id_mm`, `elem_od_mm`) and bowl curvature (`curv_radius_mm`). Each element is assigned an independent pressure amplitude (`elem_amp`) and phase (`elem_phase_deg`), which must be calibrated empirically. PRESTUS includes a calibration pipeline for annular arrays to match simulated pressure to free-water measurements.
 
 **When to use:**  
 Use annular arrays when your hardware is a single-focus or multi-ring bowl transducer  with pre-calibrated per-element amplitudes and phases. This is the simpler and better-validated configuration.
