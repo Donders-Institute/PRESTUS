@@ -1,6 +1,6 @@
 # Transducer Placement
 
-Simulations in free water will place the transducer in a homogeneous water medium without the need to specify a target. For head smulations, any transducer needs to be positioned close to the scalp (possibly at some distance to allow for coupling), and a target needs to be specified.
+Simulations in free water will place the transducer in a homogeneous water medium without the need to specify a target. For head simulations, any transducer needs to be positioned close to the scalp (possibly at some distance to allow for coupling), and a target needs to be specified.
 
 PRESTUS expects coordinates of both the transducer (`transducer.trans_pos`) and target (`transducer.focus_pos`) to be specified as voxels in the T1w grid. The transducer coordinate describes the bowl of the transducer (i.e., not the exit plane in the case of curved transducers). Both coordinates need to be reported in the space of the planning image.
 

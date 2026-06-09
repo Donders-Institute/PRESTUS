@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-### Install PRESTUS and depencencies 
+### Install PRESTUS and dependencies
 
 See [Installation](doc_installation.md).
 

@@ -44,6 +44,7 @@ nav:
     - Usage Statistics: doc_usage-statistics.md
   - 🔧 Equipment Modeling:
     - Transducer Configuration: doc_transducer.md
+    - Transducer Library: doc_transducer_library.md
     - Calibration: doc_calibration.md
     - Transducer Placement Overview: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
@@ -60,6 +61,7 @@ nav:
     - Limited Acoustic FOV: doc_limited_fov.md
     - Outputs: doc_outputs.md
     - Backend: doc_backend.md
+    - BabelBrain: doc_babelbrain.md
     - HPC: doc_hpc.md
   - 📊 Advanced Pipelines:
     - Overview: doc_advanced.md
