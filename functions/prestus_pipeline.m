@@ -195,6 +195,13 @@ function [parameters] = prestus_pipeline(parameters, options)
         sprintf('sub-%03d_%s_grid_cache%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
+    % Compact sidecar carrying planimg (transforms + header only, no image volumes).
+    % Written alongside the grid cache; allows downstream stages to resume
+    % without the full grid cache when only planimg is needed.
+    filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
+        sprintf('sub-%03d_%s_planimg%s.mat', ...
+        parameters.subject_id, parameters.simulation.medium, preproc_affix));
+
     if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup == 1
         if ~confirm_overwriting(filename_grid_cache, parameters)
             disp('Loading grid cache - skipping head preprocessing.')
@@ -228,6 +235,10 @@ function [parameters] = prestus_pipeline(parameters, options)
                     'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
                 clear grid_cache_info
             end
+            % Sidecar is always written when grid setup runs, independent of save_grid_cache,
+            % so downstream stages can recover planimg even if the full cache is deleted.
+            save(filename_planimg_sidecar, 'planimg', '-v7.3');
+            fprintf('[pipeline] planimg sidecar written: %s\n', filename_planimg_sidecar);
         end
     else
         disp('No grid setup requested...no simulations will be performed.')
@@ -257,11 +268,30 @@ function [parameters] = prestus_pipeline(parameters, options)
         if ~confirm_overwriting(filename_medium_cache, parameters)
             disp('Loading medium cache - skipping medium property mapping.')
             load(filename_medium_cache);
+            % If the grid cache was deleted but the medium cache exists, planimg
+            % and medium_masks may not be in workspace.  Recover planimg from the
+            % compact sidecar so NIfTI export and thermal stages work correctly.
+            if ~exist('planimg', 'var') || isempty(planimg)
+                if isfile(filename_planimg_sidecar)
+                    fprintf('[pipeline] Grid cache absent — loading planimg from sidecar: %s\n', ...
+                        filename_planimg_sidecar);
+                    load(filename_planimg_sidecar, 'planimg');
+                else
+                    warning('prestus_pipeline:missingPlanimg', ...
+                        ['planimg not found in workspace or sidecar (%s). ' ...
+                         'NIfTI exports and thermal transforms may fail. ' ...
+                         'Re-run with run_grid_setup=1 to regenerate.'], ...
+                        filename_planimg_sidecar);
+                    planimg = struct();
+                end
+            end
         else
             [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, pseudoCT);
 
             if should_save_output(parameters.io, 'save_medium_cache')
-                save(filename_medium_cache, 'kwave_medium', 'medium_plus', '-v7.3');
+                % medium_masks saved here so this cache is self-contained:
+                % thermal and NIfTI stages need it when the grid cache is absent.
+                save(filename_medium_cache, 'kwave_medium', 'medium_plus', 'medium_masks', '-v7.3');
             end
         end
     else
