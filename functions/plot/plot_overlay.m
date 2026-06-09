@@ -153,11 +153,9 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             bg_min = options.bg_range(1);
             bg_max = options.bg_range(2);
         elseif ~isempty(options.segmented_img)
-            %bg_slice(segmented_img_slice==0) = 0;
             bg_slice_brain = bg_slice(segmented_slice>0&segmented_slice<3);
             bg_min =  min(bg_slice_brain(:));
             bg_max =  max(bg_slice_brain(:));
-            %bg_slice(bg_slice>0) = rescale(bg_slice(bg_slice>0), 'InputMin', bg_min, 'InputMax', bg_max);
         else
             bg_min = min(bg_slice(:));
             bg_max = max(bg_slice(:));

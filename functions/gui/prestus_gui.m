@@ -1190,9 +1190,9 @@ end
             val   = fields(k).Value;
             params.(parts{1}).(parts{2}) = val;
         end
-        disp('calibration parameters collected:');
-        disp(params);
-        % TODO: call calibration_pipeline_start(params) once config path is wired.
+        % calibration_pipeline_start expects positional args (profile, equipment,
+        % intensity, focal_distance, parameters, sim_id) — wire those from the
+        % collected params struct and the loaded config before enabling this call.
     end
 
     %% ── Transducer Library tab ────────────────────────────────────────

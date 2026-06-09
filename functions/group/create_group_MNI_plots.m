@@ -370,7 +370,11 @@ for subject_i = 1:length(subject_list)
             output_table.(sprintf('perc_voxels_within_roi%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/roi_size;
             output_table.(sprintf('perc_voxels_within_fwhm%s', options.outputs_suffix)) = n_voxels_within_roi_above_thresh/fwhm_size;
             output_table.(sprintf('roi_size%s', options.outputs_suffix)) = roi_size;
-            %writetable(output_table, output_pressure_file_with_ROI_analysis); 
+            if ~isempty(output_pressure_file_with_ROI_analysis)
+                writetable(output_table, output_pressure_file_with_ROI_analysis);
+            else
+                writetable(output_table, output_pressure_file);
+            end
         end
 
         % -- Plot creation step --

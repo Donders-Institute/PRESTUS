@@ -443,18 +443,15 @@ end
             parameters.io.output_affix));
         v = VideoWriter(output_video_name,'Uncompressed AVI');
         v.FrameRate = 2; % frames per second
-        % Create a video writer object for the output video file and open the object for writing.
         open(v);
         g = figure('Position', [100 100 304 156]);
         tss_recorded = time_status_seq(find([time_status_seq.recorded]==1));
-        %Generate a set of frames, get the frame from the figure, and then write each frame to the file.
         gray_img_brain = repmat(mat2gray(brain_slice),[1 1 3]);
-        for k = 1:size(focal_planeT,3) 
+        for k = 1:size(focal_planeT,3)
             cur_temp = squeeze(focal_planeT(:, :,  k));
             rgbImage = ind2rgb(round((cur_temp-color_limits(1))/diff(color_limits)*256), viridis(256));
             rgbImage(cur_temp <=37.01) = NaN;
             imshowpair(gray_img_brain, rgbImage, 'blend'),
-            %set(h, 'AlphaData', 0.2)
             try
                 title(sprintf('sample: %i, time: %.2f s\nmax temp: %.2f C, status: %s', ...
                     k, tss_recorded(k).time, max(cur_temp(:)), tss_recorded(k).status), 'FontSize', 8);

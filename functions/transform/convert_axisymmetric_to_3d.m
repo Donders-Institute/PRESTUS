@@ -106,16 +106,4 @@ kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ..
           parameters.grid.dims(2), parameters.grid.resolution_mm/1e3, ...
           parameters.grid.dims(3), parameters.grid.resolution_mm/1e3);
 
-%% DEBUG: visually inspect
-
-% % plot center of transducer
-% figure; imagesc(squeeze(sensor_data.p_max_all(:,floor(parameters.grid.dims(1)/2),:)))
-% 
-% % plot each slice along the axial dimension
-% figure;
-% for index = 1:parameters.grid.dims(3)
-%     imagesc(squeeze(sensor_data.p_max_all(:,:,index)))
-%     pause(0.5)
-% end
-
 end
