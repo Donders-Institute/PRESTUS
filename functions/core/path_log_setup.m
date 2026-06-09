@@ -116,6 +116,7 @@ end
         parameters.io.dir_reports          = out;
         parameters.io.dir_logs             = fullfile(out, 'log');
         parameters.io.dir_cache            = fullfile(out, 'cache');
+        parameters.io.dir_babelbrain       = fullfile(out, 'babelbrain');
         parameters.io.dir_debug            = fullfile(out, 'debug');
         parameters.io.dir_debug_preproc    = fullfile(out, 'debug', 'preproc');
         parameters.io.dir_debug_medium     = fullfile(out, 'debug', 'medium');
