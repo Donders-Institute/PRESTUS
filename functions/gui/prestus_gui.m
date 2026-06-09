@@ -107,6 +107,7 @@ tabs.advanced         = uitab(tg, 'Title', '  Advanced      ');
 tabs.placement        = uitab(tg, 'Title', '  Placement     ');
 tabs.multitransducer  = uitab(tg, 'Title', '  Multi-Transducer  ');
 tabs.calibration      = uitab(tg, 'Title', '  Calibration   ');
+tabs.tx_library       = uitab(tg, 'Title', '  Tx Library    ');
 tabs.run         = uitab(tg, 'Title', '  ▶  Run        ');
 
 for f = fieldnames(tabs)'
@@ -131,6 +132,7 @@ tab_built = struct( ...
     'placement',        false, ...
     'multitransducer',  false, ...
     'calibration',      false, ...
+    'tx_library',       false, ...
     'run',              true,  ...
     'results',          true);  % no tab, nothing to build
 
@@ -1193,6 +1195,172 @@ end
         % TODO: call calibration_pipeline_start(params) once config path is wired.
     end
 
+    %% ── Transducer Library tab ────────────────────────────────────────
+    function build_tab_tx_library(t)
+        % Two-column layout: list on left, detail panel on right.
+        gl = uigridlayout(t, ...
+            'RowHeight',    {'1x'}, ...
+            'ColumnWidth',  {220, '1x'}, ...
+            'Padding',      [12 12 12 12], ...
+            'ColumnSpacing', 12, ...
+            'BackgroundColor', st.bg_panel);
+
+        % ── Left: list panel ──────────────────────────────────────────
+        left_gl = uigridlayout(gl, ...
+            'RowHeight',    {28, '1x', 36}, ...
+            'ColumnWidth',  {'1x'}, ...
+            'Padding',      [0 0 0 0], 'RowSpacing', 6, ...
+            'BackgroundColor', st.bg_panel);
+        left_gl.Layout.Row = 1; left_gl.Layout.Column = 1;
+
+        lbl_list_hdr = uilabel(left_gl, ...
+            'Text',      'Library entries', ...
+            'FontName',  st.font, 'FontSize', st.fs, 'FontWeight', 'bold', ...
+            'FontColor', st.text_main, ...
+            'HorizontalAlignment', 'left');
+        lbl_list_hdr.Layout.Row = 1;
+
+        lib_list = uilistbox(left_gl, ...
+            'Items',     {}, ...
+            'FontName',  st.font, 'FontSize', st.fs, ...
+            'BackgroundColor', st.bg_edit, ...
+            'FontColor', st.text_main, ...
+            'Tag',       'tx_lib_list');
+        lib_list.Layout.Row = 2;
+
+        btn_refresh_lib = uibutton(left_gl, ...
+            'Text',      '🔄  Refresh', ...
+            'FontName',  st.font, 'FontSize', st.fs);
+        btn_refresh_lib.Layout.Row = 3;
+        btn_refresh_lib.ButtonPushedFcn = @(~,~) refresh_tx_library();
+
+        % ── Right: detail panel ───────────────────────────────────────
+        right_gl = uigridlayout(gl, ...
+            'RowHeight',    {28, '1x', 36, 36}, ...
+            'ColumnWidth',  {'1x'}, ...
+            'Padding',      [0 0 0 0], 'RowSpacing', 6, ...
+            'BackgroundColor', st.bg_panel);
+        right_gl.Layout.Row = 1; right_gl.Layout.Column = 2;
+
+        lbl_entry_name = uilabel(right_gl, ...
+            'Text',      'Select an entry to inspect', ...
+            'FontName',  st.font, 'FontSize', st.fs, 'FontWeight', 'bold', ...
+            'FontColor', st.text_main, ...
+            'Tag',       'tx_lib_entry_name');
+        lbl_entry_name.Layout.Row = 1;
+
+        detail_area = uitextarea(right_gl, ...
+            'Value',      {''}, ...
+            'FontName',   'Courier New', 'FontSize', st.fs_sm + 1, ...
+            'FontColor',  st.text_main, ...
+            'BackgroundColor', st.bg_edit, ...
+            'Editable',   'off', ...
+            'Tag',        'tx_lib_detail');
+        detail_area.Layout.Row = 2;
+
+        btn_load_lib = uibutton(right_gl, ...
+            'Text',      '⬆  Load into active config', ...
+            'FontName',  st.font, 'FontSize', st.fs, ...
+            'BackgroundColor', st.accent, 'FontColor', [1 1 1], ...
+            'Enable',    'off', ...
+            'Tag',       'tx_lib_load_btn');
+        btn_load_lib.Layout.Row = 3;
+        btn_load_lib.ButtonPushedFcn = @(~,~) load_tx_from_library();
+
+        lbl_lib_status = uilabel(right_gl, ...
+            'Text',      '', ...
+            'FontName',  st.font, 'FontSize', st.fs, ...
+            'FontColor', st.text_sub, ...
+            'Tag',       'tx_lib_status');
+        lbl_lib_status.Layout.Row = 4;
+
+        % Wire list selection
+        lib_list.ValueChangedFcn = @(lb,~) show_tx_library_entry(lb.Value);
+
+        % Populate on first build
+        refresh_tx_library();
+
+        % ── Helpers ───────────────────────────────────────────────────
+        function refresh_tx_library()
+            lib_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            lb = findobj(fig, 'Tag', 'tx_lib_list');
+            if ~isfolder(lib_path)
+                lb.Items = {'(library folder not found)'};
+                set_lib_status('Library folder missing: config/transducer/');
+                return
+            end
+            d = dir(fullfile(lib_path, '*.yaml'));
+            if isempty(d)
+                lb.Items = {'(no entries yet)'};
+                set_lib_status('Run update_transducer_library() to populate.');
+            else
+                names = {d.name};
+                lb.Items = cellfun(@(n) strrep(n, '.yaml', ''), names, 'UniformOutput', false);
+                set_lib_status(sprintf('%d entr%s found.', numel(d), ternary(numel(d)==1,'y','ies')));
+            end
+        end
+
+        function show_tx_library_entry(combo_name)
+            detail = findobj(fig, 'Tag', 'tx_lib_detail');
+            name_lbl = findobj(fig, 'Tag', 'tx_lib_entry_name');
+            load_btn = findobj(fig, 'Tag', 'tx_lib_load_btn');
+            if isempty(combo_name) || startsWith(combo_name, '(')
+                detail.Value = {''};
+                name_lbl.Text = 'Select an entry to inspect';
+                load_btn.Enable = 'off';
+                return
+            end
+            lib_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            yaml_path = fullfile(lib_path, [combo_name, '.yaml']);
+            if ~isfile(yaml_path)
+                detail.Value = {'File not found.'};
+                load_btn.Enable = 'off';
+                return
+            end
+            name_lbl.Text = combo_name;
+            % Read raw YAML text for display
+            fid = fopen(yaml_path, 'r');
+            raw = fread(fid, '*char')';
+            fclose(fid);
+            detail.Value = strsplit(raw, newline);
+            load_btn.Enable = 'on';
+        end
+
+        function load_tx_from_library()
+            lb       = findobj(fig, 'Tag', 'tx_lib_list');
+            combo    = lb.Value;
+            if isempty(combo) || startsWith(combo, '('), return; end
+            ud = fig.UserData;
+            params = ud.last_params;
+            if isempty(params)
+                set_lib_status('Load a config first (I/O tab).');
+                return
+            end
+            try
+                equip_param = load_equipment_config();
+                focal_ep    = params.transducer(1).dist_to_exit_plane;
+                intensity   = [];
+                if isfield(params.calibration, 'desired_intensities')
+                    intensity = params.calibration.desired_intensities(1);
+                end
+                params = load_transducer_from_library(combo, focal_ep, intensity, equip_param);
+                apply_params_to_gui(params);
+                set_lib_status(sprintf('Loaded ''%s'' into active config.', combo));
+            catch ME
+                set_lib_status(['Error: ' ME.message]);
+            end
+        end
+
+        function set_lib_status(msg)
+            s = findobj(fig, 'Tag', 'tx_lib_status');
+            if ~isempty(s), s.Text = msg; end
+        end
+
+        function v = ternary(cond, a, b)
+            if cond, v = a; else, v = b; end
+        end
+    end
+
     %% ── Tab 10: Run ────────────────────────────────────────────────────
     function build_tab_run(t)
         gl = uigridlayout(t, ...
@@ -1348,6 +1516,7 @@ end
             case 'placement',       build_tab_placement(tabs.placement);
             case 'multitransducer', build_tab_multitransducer(tabs.multitransducer);
             case 'calibration',     build_tab_calibration(tabs.calibration);
+            case 'tx_library',      build_tab_tx_library(tabs.tx_library);
         end
         tab_built.(field) = true;
         % Wire thermal timing toggle after thermal tab is built
@@ -2322,6 +2491,8 @@ end
         s.mandatory = [0.663 0.114 0.145];   % deep red #a91d25
         s.success   = [0.180 0.631 0.239];   % keep green for success
         s.text      = [0.082 0.082 0.090];
+        s.text_main = [0.082 0.082 0.090];   % alias for text; used in tx_library tab
+        s.bg_edit   = [0.965 0.965 0.970];   % light grey for read-only text areas
         s.text_sub  = [0.400 0.400 0.420];
         s.border    = [0.820 0.820 0.831];
         s.font      = 'Helvetica Neue';
