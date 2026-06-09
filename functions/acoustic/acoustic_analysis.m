@@ -68,10 +68,19 @@ end
     % Calculates the ISPPA (spatial peak pulse-average intensity)
     results.Isppa = max(acoustic_Ipa(:));
 
-    % Calculates the Mechanical Index for every gridpoint
-
-    freq_Hz = tr.freq_hz;
-    freq_MHz = freq_Hz/10^6;
+    % Calculates the Mechanical Index for every gridpoint.
+    % MI = p_neg / sqrt(f) is conservative at lower frequencies (larger MI for
+    % the same pressure). In a multi-frequency setup each voxel's true MI depends
+    % on which transducer dominates there, which cannot be determined from the
+    % combined pressure map alone. Using the lowest frequency present is therefore
+    % the conservative choice: it never underestimates MI at any voxel.
+    freqs_all  = [parameters.transducer.freq_hz];
+    freq_Hz    = min(freqs_all);
+    freq_MHz   = freq_Hz / 1e6;
+    if numel(unique(freqs_all)) > 1
+        fprintf(['Multi-frequency setup: MI computed using lowest frequency %g Hz ' ...
+                 '(conservative; transducer frequencies: %s Hz).\n'], freq_Hz, num2str(freqs_all));
+    end
     acoustic_MI = (acoustic_pressure/10^6)/sqrt(freq_MHz);
 
     % Creates a mask for voxels beyond the exit plane of any transducer.

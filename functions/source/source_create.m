@@ -5,8 +5,10 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 %   Branch 1 (use_kWaveArray == 0): Supports multiple transducers. Each
 %     annular element is placed with makeBowl / makeArc. CW signals are
 %     built with createCWSignals and assigned row-by-row to source.p.
-%   Branch 2 (use_kWaveArray ~= 0): Single transducer only. kWaveArray
-%     handles element geometry; grid weights distribute signals.
+%   Branch 2 (use_kWaveArray ~= 0): kWaveArray handles element geometry;
+%     grid weights distribute signals. Multiple transducers supported in
+%     non-axisymmetric mode; all transducers are added to one kWaveArray
+%     with global element indexing. Axisymmetric mode is single-transducer only.
 %
 %   Axisymmetric mode (Branch 2, annular type, grid.axisymmetric == 1):
 %     kWaveArray does not offer native axisymmetric source weighting, so a
@@ -53,10 +55,6 @@ end
 
     transducer_N = numel(parameters.transducer);
 
-    if parameters.grid.use_kWaveArray ~= 0 && transducer_N > 1
-        error(['Multiple transducers with kWaveArray (use_kWaveArray ~= 0) ' ...
-               'are not implemented yet. Use use_kWaveArray == 0 or a single transducer.']);
-    end
 
     %% Validate / broadcast positions
 
@@ -106,10 +104,6 @@ end
         % --- per-transducer CW signals (per-element) ---
 
         freqs = [tr_arr.freq_hz];
-        if numel(unique(freqs)) > 1
-            warn('Multiple source frequencies not yet supported. Using %i Hz.', freqs(1));
-        end
-
         cw_signals_all    = cell(1, transducer_N);
         n_elements_per_T  = zeros(1, transducer_N);
 
@@ -119,7 +113,7 @@ end
             % elem_amp and elem_phase_rad are per-element vectors
             cw_signals_all{it} = createCWSignals( ...
                 kgrid.t_array, ...
-                freqs(1), ...               % use canonical frequency
+                freqs(it), ...              % per-transducer frequency
                 tr.(tr.type).elem_amp, ...
                 tr.(tr.type).elem_phase_rad);       % [elem_n x Nt]
 
@@ -196,170 +190,73 @@ end
 
         source.p_mask    = transducer_mask;
 
-    %% Branch 2: kWaveArray-based setup (single transducer)
+    %% Branch 2: kWaveArray-based setup (multi-transducer supported in non-axisymmetric mode)
 
     else
         disp('Setting up kWaveArray (might take a bit of time)');
 
-        % Note: Both `parameters` and `tr` are passed to this function to
-        % allow support for multiple transducers in future implementations.
-        tr = tr_arr(1);  % use first (and only) transducer here
-
-        % 3D/2D positions for kWaveArray are taken from the first transducer
-        trans_pos_1  = tr.trans_pos;
-        focus_pos_1  = tr.focus_pos;
-
-        % Determine if axisymmetric mode should be enabled
+        % Determine if axisymmetric mode is requested.
+        % Axisymmetric mode uses a mirrored-grid approximation and supports
+        % only a single annular transducer (bilateral grid cannot represent
+        % two physical transducers on the radial half-plane).
         if numel(parameters.grid.dims) == 2 && ...
                 isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
             axisymmetric = true;
             disp("Using axisymmetric setup for 2D input...");
-            % Only single-element annular transducers are supported.
-            % Matrix arrays have arbitrary 2D element layouts that cannot
-            % be represented on the radial half-grid.
-            if ~strcmp(tr.type, 'annular')
+            if transducer_N > 1
+                error('PRESTUS:sourceCreate:axisymMultiTxNotSupported', ...
+                    ['Axisymmetric kWaveArray mode supports only a single transducer. ' ...
+                     'Use use_kWaveArray == 0 or disable grid.axisymmetric for multiple transducers.']);
+            end
+            if ~strcmp(tr_arr(1).type, 'annular')
                 error('PRESTUS:sourceCreate:axisymTypeNotSupported', ...
                     ['Axisymmetric mode only supports annular transducers. ' ...
                      'Transducer type ''%s'' requires a full 2D or 3D grid. ' ...
-                     'Disable grid.axisymmetric or use a non-axisymmetric setup.'], tr.type);
+                     'Disable grid.axisymmetric or use a non-axisymmetric setup.'], tr_arr(1).type);
             end
         else
             axisymmetric = false;
         end
 
-        % Create kWaveArray object (always without axisymmetry)
+        % Create kWaveArray object (always without native axisymmetry)
         karray = kWaveArray('Axisymmetric', false, ...
                            'BLITolerance', 0.1, ...
                            'UpsamplingRate', 10, ...
                            'BLIType', 'sinc');
 
-        switch tr.type
-            case 'annular'
-                % Set focus position and transducer position vectors in physical coordinates
-                if numel(parameters.grid.dims) == 3
-                    % 3D annular array
-                    pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2)), kgrid.z_vec(trans_pos_1(3))];
-                    focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2)), kgrid.z_vec(focus_pos_1(3))];
+        if axisymmetric
 
-                    karray.addAnnularArray(pos_vec, ...
-                                           tr.annular.curv_radius_mm * 1e-3, ...
-                                           [tr.annular.elem_id_mm; tr.annular.elem_od_mm] * 1e-3, ...
-                                           focus_vec);
+            % ---- Axisymmetric single-transducer path ----
+            % Uses mirrored bilateral grid then crops to right half-plane.
+            % See Branch 2 docstring in source_create for derivation details.
 
-                elseif numel(parameters.grid.dims) == 2 && axisymmetric == false
+            tr          = tr_arr(1);
+            trans_pos_1 = trans_pos(1,:);
+            focus_pos_1 = focus_pos(1,:);
 
-                    % 2D arc-shaped element
-                    pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
-                    focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
+            % Add arc to main karray (not used below but keeps object consistent)
+            pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
+            focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
+            karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, tr.annular.elem_od_mm * 1e-3, focus_vec);
 
-                    karray.addArcElement(pos_vec, ...
-                                         tr.annular.curv_radius_mm * 1e-3, ...
-                                         tr.annular.elem_od_mm * 1e-3, ...
-                                         focus_vec);
-                end
-            case 'matrix'
-                trans_pos_m = [kgrid.x_vec(tr.trans_pos(1));
-                    kgrid.y_vec(tr.trans_pos(2));
-                    kgrid.z_vec(tr.trans_pos(3))];
-
-                focus_pos_m = [kgrid.x_vec(tr.focus_pos(1));
-                    kgrid.y_vec(tr.focus_pos(2));
-                    kgrid.z_vec(tr.focus_pos(3))];
-
-                switch tr.matrix.matrix_shape.type
-                    case 'define_here'
-                        [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m);
-                    case 'extract_from_file'               
-                        elem_pos_m = extract_element_pos(parameters, tr,  trans_pos_m);
-                    otherwise 
-                        error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
-                end
-
-                % [DEBUG] visualize element distribution
-                if parameters.simulation.debug == 1
-                    % Convert positions to mm for plotting
-                    elem_pos_mm = elem_pos_m' * 1e3;
-
-                    h = figure;
-                    scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
-                    axis equal
-                    xlabel('X [mm]')
-                    ylabel('Y [mm]')
-                    zlabel('Z [mm]')
-                    view([0 90])
-                    title('Transducer Element Distribution')
-                    grid on;
-
-                    % Build filenames
-                    fig_filename = fullfile(parameters.io.dir_debug_source, ...
-                        sprintf('sub-%03d_%s_transducer_element_distribution%s.fig', ...
-                        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-
-                    png_filename = fullfile(parameters.io.dir_debug_source, ...
-                        sprintf('sub-%03d_%s_transducer_element_distribution%s.png', ...
-                        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-
-                    % Save outputs
-                    saveas(h, fig_filename, 'fig')
-                    saveas(h, png_filename, 'png')
-                    close(h)
-                end
-                
-                [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos);
-
-            otherwise
-                error('Array shape %s is unknown or not implemented.', tr.type)
-        end
-
-        % CW per-element for this transducer
-        cw_signal = createCWSignals( ...
-            kgrid.t_array, ...
-            tr.freq_hz, ...
-            tr.(tr.type).elem_amp, ...
-            tr.(tr.type).elem_phase_rad);   % [elem_n x Nt]
-
-        if axisymmetric == true && strcmp(tr.type, 'annular')
-            % Mirrored-grid approach for axisymmetric annular arrays
-            %
-            % k-Wave's axisymmetric solver (kspaceFirstOrderAS) normalises the
-            % radial grid internally: y_vec = kgrid.y_vec - kgrid.y_vec(1), so
-            % column 1 of source.p_mask is ALWAYS treated as r=0.  kWaveArray
-            % does not support 'Axisymmetric' source weighting directly, so we
-            % approximate by:
-            %   1. Building a full bilateral grid with 2*Ny-1 columns (odd, so
-            %      the centre column sits exactly at y=0).
-            %   2. Computing element grid weights on that full grid.
-            %   3. Cropping columns kgrid.Ny:end to obtain the right half-plane
-            %      [Nx x Ny]; column 1 of the crop = centre column = r=0.
-            %
-            % Element placement on the bilateral grid:
-            %   Central disk  (elem_id == 0): arc centred at y = 0 with
-            %     diameter = outer_diameter.  Spans [-r_o, +r_o] bilaterally;
-            %     after crop to right half the arc covers r in [0, r_o].
-            %   Annular ring  (elem_id > 0): arc centred at y = (r_i + r_o)/2
-            %     with diameter = r_o - r_i.  After crop the arc covers r
-            %     in [r_i, r_o], matching the physical ring aperture exactly.
-            %   focus_pos_full sets only the forward orientation (+x direction);
-            %   the acoustic focal depth is governed by curv_radius_mm.
+            cw_signal = createCWSignals(kgrid.t_array, tr.freq_hz, ...
+                tr.(tr.type).elem_amp, tr.(tr.type).elem_phase_rad);
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
 
-            x_trans_m = kgrid.x_vec(trans_pos_1(1));
-            % focus_pos_full: only direction matters; use true focal x-coord.
+            x_trans_m      = kgrid.x_vec(trans_pos_1(1));
             focus_pos_full = [kgrid.x_vec(focus_pos_1(1)), 0+eps];
 
             for el_i = 1:tr.annular.elem_n
-                inner_r_m = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;   % inner radius [m]
-                outer_r_m = tr.annular.elem_od_mm(el_i) / 2 * 1e-3;   % outer radius [m]
+                inner_r_m = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;
+                outer_r_m = tr.annular.elem_od_mm(el_i) / 2 * 1e-3;
                 if inner_r_m == 0
-                    % Central disk: bilateral arc centred on axis (r=0)
-                    element_pos  = [x_trans_m, 0+eps];
-                    el_diameter_m = 2 * outer_r_m;      % full bilateral aperture
+                    element_pos   = [x_trans_m, 0+eps];
+                    el_diameter_m = 2 * outer_r_m;
                 else
-                    % Annular ring: off-axis arc at the ring's radial centre
-                    center_r_m   = (inner_r_m + outer_r_m) / 2;
-                    element_pos  = [x_trans_m, center_r_m];
+                    center_r_m    = (inner_r_m + outer_r_m) / 2;
+                    element_pos   = [x_trans_m, center_r_m];
                     el_diameter_m = outer_r_m - inner_r_m;
                 end
                 karray_full.addArcElement(element_pos, tr.annular.curv_radius_mm * 1e-3, el_diameter_m, focus_pos_full);
@@ -370,69 +267,142 @@ end
 
             for el_i = 1:tr.(tr.type).elem_n
                 grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
-                % Update the mask
                 source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0.25);
             end
 
-            source.p_mask = source_mask_full(:, kgrid.Ny:end);
+            source.p_mask        = source_mask_full(:, kgrid.Ny:end);
             grid_weights_cropped = grid_weights_3d(:, :, kgrid.Ny:end);
 
             source_idx = find(source.p_mask);
             num_points = numel(source_idx);
             nTime      = size(cw_signal, 2);
-
-            source.p = zeros(num_points, nTime);
+            source.p   = zeros(num_points, nTime);
 
             for el_i = 1:tr.(tr.type).elem_n
-                weights_el = squeeze(grid_weights_cropped(el_i, :, :));
+                weights_el  = squeeze(grid_weights_cropped(el_i, :, :));
                 weights_vec = weights_el(source_idx);
-                source.p = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
+                source.p    = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
             end
 
-            % label sources at 50% weights
             source_labels = sum(grid_weights_cropped > 0.5, 1) > 0;
             source_labels = squeeze(source_labels);
 
-        else
-            % Non-axisymmetric: compute weights and distribute signals manually
-            grid_weights_4d = zeros(tr.(tr.type).elem_n, kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            tr_arr(1) = tr;
 
-            for ind = 1:tr.(tr.type).elem_n
+        else
+
+            % ---- Non-axisymmetric path: supports N transducers ----
+            % Elements from all transducers are added to one karray; a global
+            % element index (offset per transducer) maps rows of the combined
+            % CW signal matrix to karray element slots.
+
+            elem_counts    = zeros(1, transducer_N);
+            cw_signals_all = cell(1, transducer_N);
+
+            for it = 1:transducer_N
+                tr           = tr_arr(it);
+                trans_pos_it = trans_pos(it,:);
+                focus_pos_it = focus_pos(it,:);
+
+                switch tr.type
+                    case 'annular'
+                        if numel(parameters.grid.dims) == 3
+                            pos_vec   = [kgrid.x_vec(trans_pos_it(1)), kgrid.y_vec(trans_pos_it(2)), kgrid.z_vec(trans_pos_it(3))];
+                            focus_vec = [kgrid.x_vec(focus_pos_it(1)), kgrid.y_vec(focus_pos_it(2)), kgrid.z_vec(focus_pos_it(3))];
+                            karray.addAnnularArray(pos_vec, ...
+                                                   tr.annular.curv_radius_mm * 1e-3, ...
+                                                   [tr.annular.elem_id_mm; tr.annular.elem_od_mm] * 1e-3, ...
+                                                   focus_vec);
+                        elseif numel(parameters.grid.dims) == 2
+                            pos_vec   = [kgrid.x_vec(trans_pos_it(1)), kgrid.y_vec(trans_pos_it(2))];
+                            focus_vec = [kgrid.x_vec(focus_pos_it(1)), kgrid.y_vec(focus_pos_it(2))];
+                            karray.addArcElement(pos_vec, ...
+                                                 tr.annular.curv_radius_mm * 1e-3, ...
+                                                 tr.annular.elem_od_mm * 1e-3, ...
+                                                 focus_vec);
+                        end
+
+                    case 'matrix'
+                        trans_pos_m = [kgrid.x_vec(trans_pos_it(1));
+                                       kgrid.y_vec(trans_pos_it(2));
+                                       kgrid.z_vec(trans_pos_it(3))];
+                        focus_pos_m = [kgrid.x_vec(focus_pos_it(1));
+                                       kgrid.y_vec(focus_pos_it(2));
+                                       kgrid.z_vec(focus_pos_it(3))];
+
+                        switch tr.matrix.matrix_shape.type
+                            case 'define_here'
+                                [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m);
+                            case 'extract_from_file'
+                                elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m);
+                            otherwise
+                                error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
+                        end
+
+                        if parameters.simulation.debug == 1
+                            elem_pos_mm = elem_pos_m' * 1e3;
+                            h = figure;
+                            scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
+                            axis equal; xlabel('X [mm]'); ylabel('Y [mm]'); zlabel('Z [mm]');
+                            view([0 90]); title('Transducer Element Distribution'); grid on;
+                            fig_filename = fullfile(parameters.io.dir_debug_source, ...
+                                sprintf('sub-%03d_%s_transducer_element_distribution_T%02d%s.fig', ...
+                                parameters.subject_id, parameters.simulation.medium, it, parameters.io.output_affix));
+                            png_filename = fullfile(parameters.io.dir_debug_source, ...
+                                sprintf('sub-%03d_%s_transducer_element_distribution_T%02d%s.png', ...
+                                parameters.subject_id, parameters.simulation.medium, it, parameters.io.output_affix));
+                            saveas(h, fig_filename, 'fig'); saveas(h, png_filename, 'png'); close(h);
+                        end
+
+                        [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos_it, focus_pos_it);
+
+                    otherwise
+                        error('Array shape %s is unknown or not implemented.', tr.type)
+                end
+
+                elem_counts(it)    = tr.(tr.type).elem_n;
+                cw_signals_all{it} = createCWSignals(kgrid.t_array, tr.freq_hz, ...
+                                                      tr.(tr.type).elem_amp, tr.(tr.type).elem_phase_rad);
+                tr_arr(it) = tr;
+            end
+
+            total_elements = sum(elem_counts);
+            offsets        = [0, cumsum(elem_counts(1:end-1))];
+
+            % Compute BLI grid weights for every element across all transducers
+            grid_weights_4d = zeros(total_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+            for ind = 1:total_elements
                 fprintf('Computing weights for element %i...', ind);
                 grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
                 fprintf(' done\n');
             end
 
             binary_mask = squeeze(sum(grid_weights_4d, 1)) ~= 0;
-
-            Nt        = size(cw_signal, 2);
-            mask_ind  = find(binary_mask);
-            num_src   = sum(binary_mask(:));
+            Nt          = size(cw_signals_all{1}, 2);
+            mask_ind    = find(binary_mask);
+            num_src     = sum(binary_mask(:));
 
             distributed_source_signal = zeros(num_src, Nt);
-            source_labels             = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz,1));
+            source_labels             = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
 
-            if canUseGPU
-                cw_signal                 = gpuArray(cw_signal);
-                distributed_source_signal = gpuArray(distributed_source_signal);
-            end
-
-            for ind = 1:tr.(tr.type).elem_n
-                source_weights = squeeze(grid_weights_4d(ind,:,:,:));
-                el_binary_mask = source_weights ~= 0;
-
+            for it = 1:transducer_N
+                cw_signal = cw_signals_all{it};
                 if canUseGPU
-                    source_weights = gpuArray(source_weights);
+                    cw_signal                 = gpuArray(cw_signal);
+                    distributed_source_signal = gpuArray(distributed_source_signal);
                 end
-
-                element_mask_ind = find(el_binary_mask);
-                local_ind        = ismember(mask_ind, element_mask_ind);
-
-                distributed_source_signal(local_ind,:) = ...
-                    distributed_source_signal(local_ind,:) + ...
-                    source_weights(element_mask_ind) * cw_signal(ind,:);
-
-                source_labels = source_labels + ind * el_binary_mask;
+                for el_i = 1:elem_counts(it)
+                    ind              = offsets(it) + el_i;
+                    source_weights   = squeeze(grid_weights_4d(ind,:,:,:));
+                    el_binary_mask   = source_weights ~= 0;
+                    if canUseGPU; source_weights = gpuArray(source_weights); end
+                    element_mask_ind = find(el_binary_mask);
+                    local_ind        = ismember(mask_ind, element_mask_ind);
+                    distributed_source_signal(local_ind,:) = ...
+                        distributed_source_signal(local_ind,:) + ...
+                        source_weights(element_mask_ind) * cw_signal(el_i,:);
+                    source_labels = source_labels + ind * el_binary_mask;
+                end
             end
 
             source.p_mask = binary_mask;
@@ -442,6 +412,5 @@ end
                 show_binary_mask_transducer(karray, kgrid, parameters);
             end
         end
-        tr_arr(1) = tr;
     end
 end

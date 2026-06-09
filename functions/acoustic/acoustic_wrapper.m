@@ -118,14 +118,28 @@ end
     % perform the acoustic simulation
     sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
 
-    % Extract complex pressure amplitude at the fundamental frequency from the
-    % recorded steady-state time series, then discard the raw time series.
+    % Extract complex pressure amplitude from the recorded steady-state time series.
     % p_complex = amp * exp(1i * phase) preserves interference information for
-    % coherent multi-transducer superposition in post-hoc analyses.
+    % coherent multi-transducer superposition. For multi-frequency setups, the DFT
+    % isolates each tone's component independently, so extractAmpPhase is run once
+    % per unique frequency. A single-frequency setup produces the original
+    % sensor_data.p_complex field; a multi-frequency setup produces one field per
+    % unique frequency, keyed as p_complex_<freq_Hz>Hz.
     if isfield(sensor_data, 'p')
-        freq_hz = parameters.transducer(1).freq_hz;
-        [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, freq_hz, 'Dim', ndims(sensor_data.p));
-        sensor_data.p_complex = amp .* exp(1i .* phase);
+        freqs_all    = [parameters.transducer.freq_hz];
+        unique_freqs = unique(freqs_all);
+        if numel(unique_freqs) == 1
+            [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(1), 'Dim', ndims(sensor_data.p));
+            sensor_data.p_complex = amp .* exp(1i .* phase);
+        else
+            fprintf('Multi-frequency setup: extracting p_complex at %d frequencies (%s Hz).\n', ...
+                numel(unique_freqs), num2str(unique_freqs));
+            for fi = 1:numel(unique_freqs)
+                [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(fi), 'Dim', ndims(sensor_data.p));
+                fkey = sprintf('p_complex_%gHz', unique_freqs(fi));
+                sensor_data.(fkey) = amp .* exp(1i .* phase);
+            end
+        end
         sensor_data = rmfield(sensor_data, 'p');
     end
 
@@ -151,17 +165,29 @@ end
     acoustic_info.parameters = parameters;
     acoustic_info.kwave_input_args = kwave_input_args;
 
-    % Save p_complex to a separate cache file when explicitly requested.
-    % Kept out of the main results file to avoid bloating it by default.
-    if isfield(sensor_data, 'p_complex')
-        if isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex
-            [fdir, fname, fext] = fileparts(filename_sensor_data);
-            filename_p_complex = fullfile(fdir, [strrep(fname, '_results', '_p_complex'), fext]);
-            p_complex = sensor_data.p_complex; %#ok<NASGU>
-            save(filename_p_complex, 'p_complex', '-v7.3');
-            fprintf('Saved complex pressure field to %s\n', filename_p_complex);
+    % Save p_complex field(s) to separate cache file(s) when explicitly requested.
+    % Single-frequency: saves p_complex as before.
+    % Multi-frequency: saves one file per unique frequency with a _<freq>Hz suffix.
+    p_complex_fields = fieldnames(sensor_data);
+    p_complex_fields = p_complex_fields(startsWith(p_complex_fields, 'p_complex'));
+    if ~isempty(p_complex_fields)
+        [fdir, fname, fext] = fileparts(filename_sensor_data);
+        for fi = 1:numel(p_complex_fields)
+            fld = p_complex_fields{fi};
+            if isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex
+                % For backward compatibility, the single-frequency file keeps the original name.
+                if strcmp(fld, 'p_complex')
+                    filename_p_complex = fullfile(fdir, [strrep(fname, '_results', '_p_complex'), fext]);
+                else
+                    freq_suffix = fld(length('p_complex')+1:end); % e.g. '_500Hz'
+                    filename_p_complex = fullfile(fdir, [strrep(fname, '_results', ['_p_complex' freq_suffix]), fext]);
+                end
+                p_complex = sensor_data.(fld); %#ok<NASGU>
+                save(filename_p_complex, 'p_complex', '-v7.3');
+                fprintf('Saved complex pressure field (%s) to %s\n', fld, filename_p_complex);
+            end
+            sensor_data = rmfield(sensor_data, fld);
         end
-        sensor_data = rmfield(sensor_data, 'p_complex');
     end
 
     if ~should_save_output(parameters.io, 'save_acoustic_matrices')

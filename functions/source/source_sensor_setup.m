@@ -81,9 +81,20 @@ end
                       parameters.grid.dims(2), parameters.grid.resolution_mm/1e3);
     end
 
-    % Backward-compatible access to (first) transducer
-    tx = parameters.transducer(1);
-    wave_period = 1 / tx.freq_hz;    % period [s]
+    % The time step (dt) is constrained by the highest frequency present: a shorter
+    % wave period requires finer temporal sampling to satisfy the CFL condition and
+    % avoid staircasing the waveform. Using the lowest frequency would under-sample
+    % higher-frequency transducers. The PPW check is also run against the highest
+    % frequency (shortest wavelength = worst-case spatial sampling).
+    freqs_all  = [parameters.transducer.freq_hz];
+    freq_hz_max = max(freqs_all);
+    tx = parameters.transducer(freqs_all == freq_hz_max);
+    tx = tx(1);   % pick first if multiple transducers share the max frequency
+    if numel(unique(freqs_all)) > 1
+        fprintf(['Multi-frequency setup: grid time step and PPW sized for highest frequency ' ...
+                 '%g Hz (transducer frequencies: %s Hz).\n'], freq_hz_max, num2str(freqs_all));
+    end
+    wave_period = 1 / tx.freq_hz;    % period [s] — based on highest frequency
     
     % Check the number of input arguments
     % As a default the time step is based on the CFL number (grid.source_cfl,

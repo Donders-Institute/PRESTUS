@@ -58,8 +58,11 @@ This writes `sub-XXX_<medium>_p_complex<affix>.mat` containing a single variable
 ## Known limitations
 
 - Simulations without a skull or layered setup (e.g. `medium: water`) only model the first transducer.
-- `kWaveArray` mode is incompatible with multiple transducers.
-- Different carrier frequencies across transducers are not supported.
+- `kWaveArray` mode supports multiple transducers in non-axisymmetric mode. Axisymmetric mode (`grid.axisymmetric = 1`) remains single-transducer only. Matrix-type transducers in `kWaveArray` mode assume a +Z beam axis; see [Transducer geometry](doc_transducer.md#beam-axis-constraint) for details.
+- **Different carrier frequencies** across transducers are handled as follows:
+  - **Grid time step and PPW** (`source_sensor_setup`): sized using the *highest* frequency present, ensuring all transducers are correctly sampled. A message is printed when frequencies differ.
+  - **Mechanical Index** (`acoustic_analysis`): computed using the *lowest* frequency present. This is the conservative choice — MI = p / √f is largest at low frequencies, so the resulting map never underestimates MI at any voxel. A message is printed when frequencies differ.
+  - **Complex pressure field** (`p_complex`, optional): when `io.save_p_complex: true`, the DFT-based extraction is run once per unique frequency; each produces a separate cache file named `*_p_complex_<freq>Hz.mat`. For a single shared frequency the original filename is preserved.
 - Exit-plane metrics (focal distance, `max_Isppa_after_exit_plane`, `real_focal_distance`) are computed only with respect to the first transducer.
 - Focal-plane time-course heating plots reflect only the focal plane of the first transducer and may miss hotspots near other beams. Always inspect the 3D `maxT` and `CEM43` NIfTI volumes for a complete safety assessment.
 - Post-hoc water-only simulations are not implemented for multiple transducers.

@@ -88,6 +88,9 @@ Element positions are either defined analytically (Fibonacci, Fermat spiral, or 
 **When to use:**  
 Use matrix arrays when your hardware supports electronic steering (e.g., a phased array system) or when you want to simulate volumetric targeting without repositioning the transducer. Note that amplitude calibration is not yet implemented for matrix arrays.
 
+**Beam axis constraint:**  
+Element orientation and phase delay computation (`create_matrix_karray`) assumes the transducer's natural beam axis is aligned with the grid +Z direction. This holds for the standard single-transducer placement (transducer at one face of the grid, firing toward the target). In multi-transducer configurations where a matrix transducer fires along a different axis (e.g. a second transducer opposing the first along −Z), element normals and phase delays will be computed incorrectly. Annular transducers are not affected by this constraint. If a matrix bilateral setup is required, the beam direction would need to be derived from `(focus_pos − trans_pos)` rather than hardcoded to `[0, 0, 1]` in `create_matrix_karray`.
+
 ---
 
 ## Transducer modeling: kWaveArray vs. simple elements

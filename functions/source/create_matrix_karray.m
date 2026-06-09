@@ -50,6 +50,10 @@ end
                    kgrid.y_vec(focus_pos(2)), ...
                    kgrid.z_vec(focus_pos(3))]';
 
+    % Assumes transducer beam axis is +Z. For transducers oriented along other
+    % axes (e.g. a second transducer firing in -Z in a bilateral setup) element
+    % orientations and phase delays will be wrong. Annular transducers are
+    % unaffected (this function is only called for matrix type).
     natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
     % Apply Clover setup if requested
@@ -150,7 +154,7 @@ end
         scatter3(natural_focus_pos_m(1,:), natural_focus_pos_m(2,:), natural_focus_pos_m(3,:), 'r.');
         plot3(focus_pos_m(1), focus_pos_m(2), focus_pos_m(3), 'go', 'MarkerFaceColor', 'g');
     
-        for ind = 1:tr.elem_n
+        for ind = 1:tr.matrix.elem_n
             el_pos = elem_pos_m(:, ind);
     
             % --- Ground truth direction (element -> focus)
