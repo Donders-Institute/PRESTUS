@@ -1,4 +1,4 @@
-function plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, max_data_pos, options, overlay_weight, overlay_color)
+function plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, max_data_pos, options, overlay_weight, overlay_color, tr_idx)
 % PLOT_TRANSDUCER_OVERLAY  Draw transducer geometry with labelled rectangles on the current axes
 %
 % Draws the transducer bowl, exit plane, and focus position on the current
@@ -17,6 +17,7 @@ function plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, 
 %   options        - struct with .grid_step, .show_rectangles, .rect_size
 %   overlay_weight - blend weight in [0, 1] for overlay_color
 %   overlay_color  - [1x3] RGB colour for blending
+%   tr_idx         - (optional) index into parameters.transducer (default 1)
 %
 % See also: PLOT_OVERLAY_2D, GET_TRANSDUCER_BOX
 
@@ -24,7 +25,11 @@ if isempty(trans_pos)
     return;
 end
 
-tr = parameters.transducer(1);
+if nargin < 9 || isempty(tr_idx)
+    tr_idx = 1;
+end
+tr_idx = min(tr_idx, numel(parameters.transducer));
+tr = parameters.transducer(tr_idx);
 
 %% 1. GEOMETRY CALCULATIONS (curved transducer details)
 %% Compute focal slope

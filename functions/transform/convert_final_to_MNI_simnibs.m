@@ -199,6 +199,7 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
 
     % --- Process each image ---
     for k = 1:n
+        restore = set_writable_tmpdir(input_list{k});
         in_info = niftiinfo(input_list{k});
         in_data = single(niftiread(in_info));
         in_A    = in_info.Transform.T';
@@ -229,6 +230,7 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
         out_info.Datatype    = src_dtype;
         out_info.BitsPerPixel = in_info.BitsPerPixel;
         niftiwrite(out_vol, strrep(output_list{k}, '.nii.gz', ''), out_info, 'Compressed', true);
+        restore();
     end
 
     apply_fill_values(output_list, n, options.FillValues);
@@ -248,9 +250,23 @@ function apply_fill_values(output_list, n, fill_values)
         if fv == 0 || ~isfile(output_list{k})
             continue
         end
+        restore = set_writable_tmpdir(output_list{k});
         info = niftiinfo(output_list{k});
         vol  = niftiread(info);
         vol(vol == 0) = cast(fv, class(vol));
         niftiwrite(vol, strrep(output_list{k}, '.nii.gz', ''), info, 'Compressed', true);
+        restore();
     end
+end
+
+% -------------------------------------------------------------------------
+function restore_fn = set_writable_tmpdir(ref_file)
+% Point TMPDIR at the directory containing ref_file so that niftiinfo can
+% unzip .nii.gz files even when the system tempdir is not writable (e.g. HPC).
+    prev = getenv('TMPDIR');
+    candidate = fileparts(ref_file);
+    if ~isempty(candidate) && isfolder(candidate)
+        setenv('TMPDIR', candidate);
+    end
+    restore_fn = @() setenv('TMPDIR', prev);
 end

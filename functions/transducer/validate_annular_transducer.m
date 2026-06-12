@@ -93,7 +93,10 @@ function tr = validate_annular_transducer(tr, t_i)
         annular_tr.elem_amp = repmat(annular_tr.elem_amp, [1, annular_tr.elem_n]);
     end
 
-    % Default depth_mm for visualization (if not set in config)
+    % Default depth_mm for visualization (if not set in config).
+    % 16 mm is a representative housing depth used only for 2-D overlay plots
+    % (how far behind the exit plane the transducer body extends); it has no
+    % effect on the simulation itself.  Override via annular.depth_mm in your config.
     if ~isfield(annular_tr, 'depth_mm') || isempty(annular_tr.depth_mm)
         annular_tr.depth_mm = 16;
     end

@@ -69,10 +69,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     end
 
     %% Validate input positions against image boundaries
-    if any(focus_pos > size(bg_image))
+    if any(focus_pos > size(bg_image), 'all')
         error('Focus point is outside of image boundaries');
     end
-    if ~isempty(trans_pos) && any(trans_pos > size(bg_image))
+    if ~isempty(trans_pos) && any(trans_pos > size(bg_image), 'all')
         error('Transducer point is outside of image boundaries');
     end
     if any(max_data_pos > size(bg_image))
@@ -94,48 +94,70 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     end
 
 
-    %% Extract transducer info
-
-    tr = parameters.transducer(1);
-
     %% Extract specified slice from images and masks
     % Determine slicing axis and adjust positions accordingly
     slice_x = 1:size(overlay_image,1);
     slice_y = 1:size(overlay_image,2);
     slice_z = 1:size(overlay_image,3);
-   
+
+    % Save full 3D positions before slicing (needed for per-transducer
+    % natural_focus computation via actual beam direction).
+    trans_pos_3d = trans_pos;
+    focus_pos_3d = focus_pos;
+
     if slice{1} == 'x'
         slice_x = slice{2};
+        col_idx = [2, 3];
         if ~isempty(focus_pos)
-            focus_pos = focus_pos(2:3);
+            focus_pos = focus_pos(:, 2:3);
         end
         if ~isempty(trans_pos)
-            trans_pos = trans_pos(2:3);
-            natural_focus = trans_pos + [0, tr.(tr.type).curv_radius_mm / parameters.grid.resolution_mm];
+            trans_pos = trans_pos(:, 2:3);
         end
         max_data_pos = max_data_pos(2:3);
     elseif slice{1} == 'y'
         slice_y = slice{2};
+        col_idx = [1, 3];
         if ~isempty(focus_pos)
-            focus_pos = focus_pos([1,3]);
+            focus_pos = focus_pos(:, [1,3]);
         end
         if ~isempty(trans_pos)
-            trans_pos = trans_pos([1,3]);
-            natural_focus = trans_pos + [0, tr.(tr.type).curv_radius_mm / parameters.grid.resolution_mm];
+            trans_pos = trans_pos(:, [1,3]);
         end
         max_data_pos = max_data_pos([1,3]);
     elseif slice{1} == 'z'
         slice_z = slice{2};
+        col_idx = [1, 2];
         if ~isempty(focus_pos)
-            focus_pos = focus_pos(1:2);
+            focus_pos = focus_pos(:, 1:2);
         end
         if ~isempty(trans_pos)
-            trans_pos = trans_pos([1,2]);
-            natural_focus = trans_pos + [0, 0];
+            trans_pos = trans_pos(:, 1:2);
         end
         max_data_pos = max_data_pos([1,2]);
     else
         error("slice must be a cell array with the first element of 'x','y', or 'z' and a second element a slice number")
+    end
+
+    % Compute natural_focus per transducer using the 3D beam direction so
+    % orientation follows the actual axis alignment of each transducer.
+    if ~isempty(trans_pos)
+        nT_ov = size(trans_pos, 1);
+        natural_focus = zeros(nT_ov, 2);
+        for ti_nf = 1:nT_ov
+            tr_i = parameters.transducer(min(ti_nf, numel(parameters.transducer)));
+            curv_vox = tr_i.(tr_i.type).curv_radius_mm / parameters.grid.resolution_mm;
+            tp3 = trans_pos_3d(ti_nf, :);
+            fp3 = focus_pos_3d(min(ti_nf, size(focus_pos_3d, 1)), :);
+            beam3 = fp3 - tp3;
+            blen = norm(beam3);
+            if blen > 0
+                nf3 = tp3 + curv_vox * beam3 / blen;
+                natural_focus(ti_nf, :) = nf3(col_idx);
+            else
+                natural_focus(ti_nf, :) = trans_pos(ti_nf, :);
+            end
+        end
     end
     
     bg_slice = squeeze(bg_image(slice_x, slice_y, slice_z));
@@ -164,7 +186,14 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         bg_slice = mat2gray(bg_slice, double([bg_min, bg_max]));
     end
     if ~isempty(trans_pos)
-        transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
+        if ~isequal(size(transducer_bowl), size(overlay_image))
+            warning('plot_overlay:transducerBowlSizeMismatch', ...
+                'transducer_bowl size %s does not match overlay_image size %s — skipping bowl overlay.', ...
+                mat2str(size(transducer_bowl)), mat2str(size(overlay_image)));
+            transducer_bowl = zeros(size(bg_slice));
+        else
+            transducer_bowl = mat2gray(squeeze(transducer_bowl(slice_x, slice_y, slice_z)));
+        end
     end
     overlay_image = gather(squeeze(overlay_image(slice_x, slice_y, slice_z)));
 
@@ -178,12 +207,12 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             overlay_image = overlay_image';
             if ~isempty(trans_pos), transducer_bowl = transducer_bowl'; end
             if options.overlay_segmented, segmented_slice = segmented_slice'; end
-            % swap the two position components
-            focus_pos    = focus_pos([2 1]);
+            % swap the two position components (works for both 1×2 and N×2)
+            focus_pos    = focus_pos(:, [2 1]);
             max_data_pos = max_data_pos([2 1]);
             if ~isempty(trans_pos)
-                trans_pos     = trans_pos([2 1]);
-                natural_focus = natural_focus([2 1]);
+                trans_pos     = trans_pos(:, [2 1]);
+                natural_focus = natural_focus(:, [2 1]);
             end
             [nr, nc] = deal(nc, nr);
         end
@@ -193,11 +222,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             overlay_image  = flipud(overlay_image);
             if ~isempty(trans_pos), transducer_bowl = flipud(transducer_bowl); end
             if options.overlay_segmented, segmented_slice = flipud(segmented_slice); end
-            focus_pos(1)    = nr + 1 - focus_pos(1);
+            focus_pos(:,1)    = nr + 1 - focus_pos(:,1);
             max_data_pos(1) = nr + 1 - max_data_pos(1);
             if ~isempty(trans_pos)
-                trans_pos(1)     = nr + 1 - trans_pos(1);
-                natural_focus(1) = nr + 1 - natural_focus(1);
+                trans_pos(:,1)     = nr + 1 - trans_pos(:,1);
+                natural_focus(:,1) = nr + 1 - natural_focus(:,1);
             end
         end
 
@@ -206,11 +235,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             overlay_image  = fliplr(overlay_image);
             if ~isempty(trans_pos), transducer_bowl = fliplr(transducer_bowl); end
             if options.overlay_segmented, segmented_slice = fliplr(segmented_slice); end
-            focus_pos(2)    = nc + 1 - focus_pos(2);
+            focus_pos(:,2)    = nc + 1 - focus_pos(:,2);
             max_data_pos(2) = nc + 1 - max_data_pos(2);
             if ~isempty(trans_pos)
-                trans_pos(2)     = nc + 1 - trans_pos(2);
-                natural_focus(2) = nc + 1 - natural_focus(2);
+                trans_pos(:,2)     = nc + 1 - trans_pos(:,2);
+                natural_focus(:,2) = nc + 1 - natural_focus(:,2);
             end
         end
     end
@@ -218,11 +247,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     if options.rotation
         R = [cosd(options.rotation) -sind(options.rotation); sind(options.rotation) cosd(options.rotation)];
         if ~isempty(focus_pos)
-            focus_pos = round(R*double(focus_pos'));
+            focus_pos = round((R * double(focus_pos'))');
         end
         if ~isempty(trans_pos)
-            trans_pos = round(R*double(trans_pos'));
-			natural_focus = round(R*double(natural_focus'));
+            trans_pos     = round((R * double(trans_pos'))');
+            natural_focus = round((R * double(natural_focus'))');
         end
         max_data_pos = round(R*double(max_data_pos'));
         overlay_image = imrotate(overlay_image, options.rotation);
@@ -247,10 +276,16 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     axis image;
     axis off;
     
-    % draw transducer (if grid was properly set up)
+    % draw all transducers (if grid was properly set up)
     if ~isempty(trans_pos) && parameters.modules.run_grid_setup == 1
         options.grid_step = parameters.grid.resolution_mm;
-        plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_focus, max_data_pos, options,  0.3, [0.2 0.6 1])
+        nT_draw = size(trans_pos, 1);
+        for ti_draw = 1:nT_draw
+            fp_draw = focus_pos(min(ti_draw, size(focus_pos,1)), :);
+            nf_draw = natural_focus(ti_draw, :);
+            plot_transducer_overlay(parameters, trans_pos(ti_draw,:), fp_draw, nf_draw, ...
+                max_data_pos, options, 0.3, [0.2 0.6 1], ti_draw);
+        end
     end
     
     if options.overlay_segmented
@@ -292,9 +327,11 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     axis image
     axis off;
     
-    if options.show_rectangles 
+    if options.show_rectangles
         rect_size = options.rect_size;
-        rectangle('Position', [focus_pos(2)-rect_size/2 focus_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
+        for ti_rect = 1:size(focus_pos, 1)
+            rectangle('Position', [focus_pos(ti_rect,2)-rect_size/2 focus_pos(ti_rect,1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
+        end
         rectangle('Position', [max_data_pos(2)-rect_size/2 max_data_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'b', 'LineWidth',1,'LineStyle','-')
         text(max_data_pos(2), max_data_pos(1)+10, [num2str(round(max_data_pos(2)*parameters.grid.resolution_mm)), 'mm'], 'Color', 'w')
     end

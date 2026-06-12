@@ -237,7 +237,7 @@ switch platform
         fprintf('\n');
 
         % ── Summary ──────────────────────────────────────────────────────
-        fprintf('All jobs submitted. Monitor: squeue -u $USER\n');
+        fprintf('All jobs submitted. Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
         all_ids = [job_id_acoustic, job_ids_thermal(thermal_submitted)];
         if options.generate_summary_report && exist('job_id_summary', 'var')
             all_ids = [all_ids, job_id_summary];

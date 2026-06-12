@@ -106,6 +106,13 @@ end
         bowl_depth_grid_it = round((tr_it.(tr_it.type).curv_radius_mm - ...
             tr_it.(tr_it.type).dist_geom_ep_mm) / parameters.grid.resolution_mm);
 
+        % Assumption: the beam travels along the last grid dimension (z / axial),
+        % and whether the transducer is on the "high-z" or "low-z" face is inferred
+        % from whether trans_pos(beam_dim) > grid_size(beam_dim)/2.
+        % This holds for all standard PRESTUS grid modes ('principal_axis',
+        % 'transducer_axis', 'ras_plus') because grid_tissue_setup always places
+        % the transducer along z.  It would NOT hold for a fully arbitrary rotation
+        % applied outside of PRESTUS.
         mask_it = ones(comp_grid_size);
         if numel(parameters.grid.dims) == 3
             beam_dim = numel(parameters.grid.dims);
@@ -231,21 +238,27 @@ end
         parameters.io.filename_table);
     end
 
-    % Plot intensity on the segmented image (up to 2 transducers)
+    % Plot intensity on the segmented image (up to 2 transducers).
+    % For multi-transducer setups all transducer geometries are drawn on
+    % every slice; slices are centred on each transducer's focus in turn.
     n_plots = min(2, numel(parameters.transducer));
     if numel(parameters.transducer) > n_plots
         warning('More than two transducers: intensity plots on segmentation will be created only for the first 2 transducers');
     end
+
+    % Build N×3 position matrices so plot_overlay can draw every transducer.
+    all_tpos = zeros(n_plots, 3);
+    all_fpos = zeros(n_plots, 3);
+    for ti = 1:n_plots
+        all_tpos(ti, :) = parameters.transducer(ti).trans_pos;
+        all_fpos(ti, :) = parameters.transducer(ti).focus_pos;
+    end
+
     for ti = 1:n_plots
 
-        tpos_sim = parameters.transducer(ti).trans_pos;
         fpos_sim = parameters.transducer(ti).focus_pos;
-		
-		trans_suffix = '';
-		if n_plots > 1; trans_suffix = sprintf('_T%02d', ti); end
-        
-        tpos_plot = tpos_sim;
-        fpos_plot = fpos_sim;
+
+        t_suffix = trans_suffix(ti, n_plots);
 
         if numel(parameters.grid.dims)==3
             slices = struct( ...
@@ -262,8 +275,8 @@ end
                     source_labels, ...
                     parameters, ...
                     {slice.dim, slice.pos}, ...
-                    tpos_sim, ...
-                    fpos_sim, ...
+                    all_tpos, ...
+                    all_fpos, ...
                     highlighted_pos);
 
                 % Construct output filename
@@ -273,7 +286,7 @@ end
                     parameters.subject_id, ...
                     parameters.simulation.medium, ...
                     slice.dim, ...
-                    trans_suffix, ...
+                    t_suffix, ...
                     parameters.io.output_affix) ...
                     );
 
@@ -288,19 +301,19 @@ end
                 segmentation, ...
                 source_labels, ...
                 after_exit_plane_mask, ...
-                tpos_plot, ...
-                fpos_plot, ...
+                all_tpos(ti,:), ...
+                all_fpos(ti,:), ...
                 highlighted_pos);
 
             output_plot = fullfile(parameters.io.dir_img, ...
                 sprintf('sub-%03d_%s_intensity%s%s.png', ...
                 parameters.subject_id, ...
                 parameters.simulation.medium, ...
-                trans_suffix, ...
+                t_suffix, ...
                 parameters.io.output_affix));
             set(h, 'InvertHardcopy', 'off'); % keep original colours
             saveas(h, output_plot, 'png')
             close(h);
         end
-	end
+    end
 end

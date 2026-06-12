@@ -388,7 +388,7 @@ switch platform
         end
 
         % ── Summary ──────────────────────────────────────────────────────
-        fprintf('All jobs submitted. Monitor: squeue -u $USER\n');
+        fprintf('All jobs submitted. Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
         submitted_ids = all_submitted_ids(all_submitted_ids > 0);
         if ~isempty(submitted_ids)
             fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));

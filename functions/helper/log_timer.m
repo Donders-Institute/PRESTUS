@@ -112,8 +112,16 @@ function ram_gb = log_process_memory() % fetch memory use of a process
     if ispc
         try m = memory; ram_gb = m.MemUsedMATLAB/1e9; catch, ram_gb = NaN; end
     else
-        [~, out] = system(sprintf('ps -o rss= -p %d', feature('getpid')));
-        ram_gb = str2double(strtrim(out)) / 1024^2;
+        try
+            [status, out] = system(sprintf('ps -o rss= -p %d', feature('getpid')));
+            if status ~= 0 || isempty(strtrim(out))
+                ram_gb = NaN;
+            else
+                ram_gb = str2double(strtrim(out)) / 1024^2;
+            end
+        catch
+            ram_gb = NaN;
+        end
     end
 end
 
@@ -129,7 +137,7 @@ function sample_peak_closure(label)
         end
         state = TIMER_STATES(label);
         current_ram = log_process_memory();
-        if current_ram > state.peak_ram_gb
+        if ~isnan(current_ram) && current_ram > state.peak_ram_gb
             state.peak_ram_gb = current_ram;
             TIMER_STATES(label) = state;
         end

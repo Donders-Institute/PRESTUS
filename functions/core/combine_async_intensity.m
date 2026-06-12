@@ -86,8 +86,7 @@ end
 % =========================================================================
 
 fprintf('Loading acoustic result 1/%d:\n  %s\n', N, files_in{1});
-data_ref = load(files_in{1}, 'sensor_data', 'kgrid', 'kwave_medium', 'source', ...
-                'sensor', 'segmentation', 'source_labels', 'medium_masks', ...
+data_ref = load(files_in{1}, 'sensor_data', 'kgrid', 'kwave_medium', ...
                 'acoustic_provenance', 'acoustic_info');
 
 p_ref = double(abs(data_ref.sensor_data.p_max_all));
@@ -98,6 +97,15 @@ if ndims(p_ref) < 3 %#ok<ISMAT>
          'Re-run acoustic simulations with a 3-D grid.']);
 end
 
+if ~isfield(data_ref, 'kwave_medium')
+    error('combine_async_intensity:noMedium', ...
+        ['kwave_medium not found in %s.\n' ...
+         'Per-transducer cache files must contain kwave_medium for the\n' ...
+         'incoherent intensity sum (I = p^2 / (2*rho*c) requires per-voxel\n' ...
+         'density and sound speed). Re-run the acoustic stage so that\n' ...
+         'parameters.io.save_kwave_medium = 1 is set for each transducer.'], ...
+        files_in{1});
+end
 rho = data_ref.kwave_medium.density;
 c   = data_ref.kwave_medium.sound_speed;
 
@@ -116,6 +124,10 @@ p_max_safety   = p_ref_scaled;   % per-voxel pressure maximum across transducers
 p_min_safety   = p_min_ref;      % per-voxel peak negative across transducers
 targets_log    = target_used;
 baselines_log  = baseline_used;
+
+% Track per-transducer ISPPA at the combined (target) scale for diagnostics.
+isppa_per_t    = zeros(1, N);
+isppa_per_t(1) = max((p_ref_scaled.^2 ./ (2 .* rho .* c)) .* 1e-4, [], 'all');
 clear p_ref_scaled p_min_ref;
 
 % =========================================================================
@@ -142,13 +154,34 @@ for k = 2:N
     p_min_k   = double(data_k.sensor_data.p_min_all) .* scale_k;
     clear data_k scale_k;
 
-    I_total      = I_total + p_k_scaled.^2 ./ (2 .* rho .* c);
-    p_max_safety = max(p_max_safety, p_k_scaled);   % instantaneous peak positive
-    p_min_safety = min(p_min_safety, p_min_k);      % instantaneous peak negative
-    targets_log   = [targets_log,  target_used];   %#ok<AGROW>
-    baselines_log = [baselines_log, baseline_used]; %#ok<AGROW>
+    I_total         = I_total + p_k_scaled.^2 ./ (2 .* rho .* c);
+    p_max_safety    = max(p_max_safety, p_k_scaled);   % instantaneous peak positive
+    p_min_safety    = min(p_min_safety, p_min_k);      % instantaneous peak negative
+    isppa_per_t(k)  = max((p_k_scaled.^2 ./ (2 .* rho .* c)) .* 1e-4, [], 'all');
+    targets_log      = [targets_log,  target_used];   %#ok<AGROW>
+    baselines_log    = [baselines_log, baseline_used]; %#ok<AGROW>
     clear p_k_scaled p_min_k;
 end
+
+% =========================================================================
+%% Per-transducer ISPPA summary at the combined (target) scale
+%
+% In async mode the joint ISPPA equals the per-voxel maximum of individual
+% transducer intensities.  Mathematically:
+%   joint_Isppa = max_v( max_k( p_k_scaled(v)² / (2·ρ·c) ) )
+%               = max_k( max_v( p_k_scaled(v)² / (2·ρ·c) ) )
+%               = max_k( Isppa_k )
+% so the joint ISPPA must equal the maximum single-transducer ISPPA at the
+% same (target) drive level.  The per-transducer acoustic runs are launched
+% with target_isppa_wcm2 = NaN and therefore report ISPPAs at the simulated
+% drive level — those values should NOT be compared directly against the
+% joint ISPPA reported here.
+% =========================================================================
+fprintf('Per-transducer ISPPAs at the combined (target) scale:\n');
+for ti = 1:N
+    fprintf('  Transducer %d: %.4f W/cm²\n', ti, isppa_per_t(ti));
+end
+fprintf('  Expected joint ISPPA (= max of above): %.4f W/cm²\n', max(isppa_per_t));
 
 % =========================================================================
 %% Back-convert to effective pressures
@@ -170,9 +203,10 @@ clear p_thermal p_max_safety p_min_safety;
 
 acoustic_provenance                      = data_ref.acoustic_provenance;
 acoustic_provenance.combined_from        = files_in;
-acoustic_provenance.combination_mode     = 'async_dual_field';  % p_max_all=thermal sum; p_max_async=safety peak positive; p_min_async=safety peak negative
-acoustic_provenance.combination_targets  = targets_log;
-acoustic_provenance.combination_baselines = baselines_log;
+acoustic_provenance.combination_mode                        = 'async_dual_field';  % p_max_all=thermal sum; p_max_async=safety peak positive; p_min_async=safety peak negative
+acoustic_provenance.combination_targets                     = targets_log;
+acoustic_provenance.combination_baselines                   = baselines_log;
+acoustic_provenance.combination_isppa_per_transducer_wcm2   = isppa_per_t;
 acoustic_provenance.combination_time     = datestr(now); %#ok<TNOW1,DATST>
 
 % =========================================================================
@@ -183,16 +217,10 @@ fprintf('Saving combined acoustic cache:\n  %s\n', file_out);
 
 kgrid         = data_ref.kgrid;         %#ok<NASGU>
 kwave_medium  = data_ref.kwave_medium;  %#ok<NASGU>
-source        = data_ref.source;        %#ok<NASGU>
-sensor        = data_ref.sensor;        %#ok<NASGU>
-segmentation  = data_ref.segmentation;  %#ok<NASGU>
-source_labels = data_ref.source_labels; %#ok<NASGU>
-medium_masks  = data_ref.medium_masks;  %#ok<NASGU>
 acoustic_info = data_ref.acoustic_info; %#ok<NASGU>
 
 save(file_out, ...
-    'sensor_data', 'kgrid', 'kwave_medium', 'source', 'sensor', ...
-    'segmentation', 'source_labels', 'medium_masks', 'acoustic_info', ...
+    'sensor_data', 'kgrid', 'kwave_medium', 'acoustic_info', ...
     'acoustic_provenance', '-v7.3');
 
 fprintf('Done — combined cache written from %d transducers.\n', N);
@@ -221,12 +249,24 @@ function [p_scaled, target_used, baseline_used] = scale_pressure( ...
         end
     end
 
-    % Resolve baseline
-    baseline = NaN;
+    % Resolve baseline: prefer measured free-water ISPPA (isppa_source =
+    % 'kwave_simulation'); fall back to library calibration value.  The two
+    % are equal when the simulation was run at the calibrated drive level.
+    baseline      = NaN;
+    baseline_src  = '';
     if isfield(acoustic_provenance, 'freefield_isppa_wcm2') && ...
             isscalar(acoustic_provenance.freefield_isppa_wcm2) && ...
             acoustic_provenance.freefield_isppa_wcm2 > 0
-        baseline = acoustic_provenance.freefield_isppa_wcm2;
+        baseline     = acoustic_provenance.freefield_isppa_wcm2;
+        baseline_src = 'kwave_simulation';
+    elseif isfield(acoustic_provenance, 'tx_calibration') && ...
+            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2') && ...
+            isscalar(acoustic_provenance.tx_calibration.isppa_wcm2) && ...
+            acoustic_provenance.tx_calibration.isppa_wcm2 > 0
+        baseline     = acoustic_provenance.tx_calibration.isppa_wcm2;
+        baseline_src = acoustic_provenance.tx_calibration.isppa_source;
+        fprintf('  Transducer %d: using tx_calibration.isppa_wcm2 (%.2f W/cm², source: %s) as baseline.\n', ...
+            transducer_idx, baseline, baseline_src);
     end
 
     target_used   = target;
@@ -234,15 +274,15 @@ function [p_scaled, target_used, baseline_used] = scale_pressure( ...
 
     if ~isfinite(target) || ~isfinite(baseline)
         if ~isfinite(target) && ~isfinite(baseline)
-            fprintf('  Transducer %d: no target or baseline — using simulated drive level.\n', ...
+            fprintf('  Intensity scaling (transducer %d): no target_isppa_wcm2 or baseline — using simulated drive level.\n', ...
                 transducer_idx);
         elseif ~isfinite(baseline)
-            warn('combine_async_intensity:noBaseline', ...
-                ['Transducer %d: freefield_isppa_wcm2 missing from provenance — ' ...
+            warning('combine_async_intensity:noBaseline', ...
+                ['Intensity scaling (transducer %d): freefield_isppa_wcm2 missing from provenance — ' ...
                  'pressure scaling skipped. Re-run the acoustic stage with ' ...
                  'modules.run_water_baseline = 1.'], transducer_idx);
         else
-            fprintf('  Transducer %d: no target specified — using simulated drive level.\n', ...
+            fprintf('  Intensity scaling (transducer %d): no target_isppa_wcm2 specified — using simulated drive level.\n', ...
                 transducer_idx);
         end
         p_scaled = p;
@@ -255,7 +295,7 @@ function [p_scaled, target_used, baseline_used] = scale_pressure( ...
         return;
     end
     if scale_p > 4 || scale_p < 0.25
-        warn('combine_async_intensity:largeScale', ...
+        warning('combine_async_intensity:largeScale', ...
             ['Transducer %d: large pressure scale factor (%.2fx) from %.1f to %.1f W/cm². ' ...
              'Verify linear acoustic regime.'], transducer_idx, scale_p, baseline, target);
     end

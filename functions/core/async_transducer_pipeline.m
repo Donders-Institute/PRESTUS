@@ -24,16 +24,16 @@ function async_transducer_pipeline(parameters, options)
 % Pipeline stages:
 %
 %   Stage 1…N      One acoustic simulation per transducer (parallel on HPC).
-%                  Affixes: _desc-t01, _desc-t02, …, _desc-tNN
+%                  Affixes: _trans-01, _trans-02, …, _trans-NN
 %
 %   Stage N+1…N+M  One COMBINE_ASYNC_INTENSITY call per sweep point j.
 %                  Passes the j-th target for each transducer; writes a
 %                  combined cache with affix _desc-asyncCombinedSjj (or
 %                  _desc-asyncCombined when M=1).
 %
-%   Stage N+M+1…   One thermal job per sweep point, reading the matching
-%   N+2M           combined cache.  Affixes: _desc-asyncThermalSjj (or
-%                  _desc-asyncThermal when M=1).
+%   Stage N+M+1…   One joint (thermal + intensity) job per sweep point,
+%   N+2M           reading the combined cache.  Affixes: _desc-asyncJointSjj
+%                  (or _desc-asyncJoint when M=1).
 %
 % Use as:
 %   async_transducer_pipeline(parameters)
@@ -111,14 +111,10 @@ for ti = 1:N
     end
 end
 
-% Build targets matrix [N × n_points]; scalars are broadcast.
+% Build targets matrix [N × n_points]; scalars broadcast across sweep points.
 targets_matrix = NaN(N, n_points);
 for ti = 1:N
-    if isscalar(target_vecs{ti})
-        targets_matrix(ti, :) = target_vecs{ti};
-    else
-        targets_matrix(ti, :) = target_vecs{ti};
-    end
+    targets_matrix(ti, :) = target_vecs{ti};
 end
 
 % =========================================================================
@@ -142,7 +138,7 @@ end
 
 affix_per_t = cell(1, N);
 for ti = 1:N
-    affix_per_t{ti} = sprintf('%s_desc-t%02d', base_affix, ti);
+    affix_per_t{ti} = [base_affix, trans_suffix(ti, N)];
 end
 
 % Combined and thermal affixes — include sweep index when M > 1.
@@ -151,10 +147,10 @@ affix_thermal  = cell(1, n_points);
 for j = 1:n_points
     if n_points == 1
         affix_combined{j} = [base_affix, '_desc-asyncCombined'];
-        affix_thermal{j}  = [base_affix, '_desc-asyncThermal'];
+        affix_thermal{j}  = [base_affix, '_desc-asyncJoint'];
     else
         affix_combined{j} = sprintf('%s_desc-asyncCombinedS%02d', base_affix, j);
-        affix_thermal{j}  = sprintf('%s_desc-asyncThermalS%02d',  base_affix, j);
+        affix_thermal{j}  = sprintf('%s_desc-asyncJointS%02d',    base_affix, j);
     end
 end
 
@@ -169,7 +165,7 @@ end
 
 p_thermal = cell(1, n_points);
 for j = 1:n_points
-    p_thermal{j} = make_thermal_params(parameters, affix_combined{j}, affix_thermal{j});
+    p_thermal{j} = make_thermal_params(parameters, affix_combined{j}, affix_thermal{j}, affix_per_t{1});
 end
 
 % =========================================================================
@@ -321,7 +317,7 @@ switch platform
                 pt = apply_memorylimit(pt, options.thermal_memorylimit);
                 pt = apply_partition(pt, options.thermal_partition);
                 if combine_submitted(j)
-                    pt.hpc.depend_job_id = job_ids_combine(j);
+                    pt.hpc.depend_job_ids = job_ids_combine(j);
                 end
                 job_id_th = prestus_pipeline_start(pt);
                 fprintf('           → job %s\n', num2str(job_id_th));
@@ -329,7 +325,7 @@ switch platform
         end
         fprintf('\n');
 
-        fprintf('All jobs submitted. Monitor: squeue -u $USER\n');
+        fprintf('All jobs submitted. Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
 
     % ---------------------------------------------------------------------
     otherwise
@@ -358,7 +354,11 @@ end
 function p = make_acoustic_params(base, transducer_idx, affix)
     p = base;
     p.transducer                     = base.transducer(transducer_idx);
-    % Clear target vector so the acoustic stage doesn't trigger multi-ISPPA.
+    % Clear target so the acoustic stage does not trigger multi-ISPPA mode.
+    % Scaling is done per-sweep-point inside combine_async_intensity.  As a
+    % consequence, ISPPA values from per-transducer acoustic runs are at the
+    % simulated drive level — compare against combine_async_intensity log output
+    % (combination_isppa_per_transducer_wcm2) for target-level per-transducer ISPPAs.
     p.transducer.target_isppa_wcm2   = NaN;
     p.modules.run_source_setup       = 1;
     p.modules.run_acoustic_sims      = 1;
@@ -371,6 +371,7 @@ function p = make_acoustic_params(base, transducer_idx, affix)
     p.io.overwrite_files             = 'never';
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 1;
+    p.io.save_kwave_medium           = 1;  % combine_async_intensity needs per-voxel rho/c
     p.io.save_thermal_matrices       = 0;
     p.simulation.interactive         = 0;
     p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
@@ -395,7 +396,7 @@ function p = make_combine_params(base, files_in, file_out, targets_wcm2)
     p.simulation.transducer_coupling = 'coherent';
 end
 
-function p = make_thermal_params(base, affix_combined, affix_thermal)
+function p = make_thermal_params(base, affix_combined, affix_thermal, affix_preproc)
     p = base;
     % Clear all per-transducer targets — scaling was already done in combine.
     for ti = 1:numel(p.transducer)
@@ -410,7 +411,7 @@ function p = make_thermal_params(base, affix_combined, affix_thermal)
     p.modules.generate_report        = 1;
     p.io.acoustic_cache_affix        = affix_combined;
     p.io.output_affix                = affix_thermal;
-    p.io.preproc_affix               = '';
+    p.io.preproc_affix               = affix_preproc;  % reuse trans-01 preproc cache
     p.io.overwrite_files             = 'never';
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 0;

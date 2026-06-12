@@ -66,7 +66,7 @@ function transducer_positioning_start(parameters, pn, target_name, mni_targets)
             if isfield(parameters.hpc, 'wait_for_job') && parameters.hpc.wait_for_job
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
-                hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks);
+                hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks, parameters, log_dir);
                 fprintf('✅ Job %s completed\n\n', job_id_display);
             end
             

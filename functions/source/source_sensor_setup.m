@@ -68,7 +68,7 @@ arguments
     trans_pos_final (1,:) {mustBeNumeric}
     focus_pos_final (1,:) {mustBeNumeric}
     grid_time_step  {mustBeNumeric} = []
-    min_sound_speed (1,1) {mustBeNumeric} = []
+    min_sound_speed {mustBeNumeric} = []
 end
 
     % Creates a simulation grid in 3 or 2 dimensions
