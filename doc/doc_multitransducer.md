@@ -15,6 +15,21 @@ transducer:
     # ...
 ```
 
+### Grid alignment
+
+The default `principal_axis` mode rotates the grid so that the first principal component of all transducer positions aligns with z. For bilateral setups this equals the inter-transducer axis, making the grid symmetric with respect to both bowls. No configuration is needed — this is the default:
+
+```yaml
+grid:
+  mode: 'principal_axis'   # default; omit to get the same behaviour
+```
+
+If you want the grid aligned to transducer(1)'s focal axis instead (e.g. transducer(1) is the primary beam), use `transducer_axis` explicitly. See [Preprocessing — Orientation](doc_preproc.md#orientation) for the full mode table.
+
+### Grid cropping
+
+The simulation grid is cropped to the bounding box that encloses the CSF-expanded head tissue **and the bowl geometry of every transducer**. See [Preprocessing — Cropping](doc_preproc.md#cropping) for details.
+
 ---
 
 ## Temporal relation of multi-transducer firing

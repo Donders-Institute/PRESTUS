@@ -1,6 +1,6 @@
 function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, ...
          focus_pos_final, translation_matrix] = preproc_crop_grid( ...
-         parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
+         parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img, all_trans_pos_grid, all_focus_pos_grid)
 % PREPROC_CROP_GRID  Crop 3-D head model to the simulation-relevant region
 %
 % Crops the full-head model to a CSF-guided, transducer-inclusive bounding
@@ -42,6 +42,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parame
 % See also: PREPROC_CROP_ECSF, HEAD_SMOOTH_AND_CROP
 
 if nargin < 7; pseudoCT_img = []; end
+if nargin < 8; all_trans_pos_grid = zeros(0,3); end
+if nargin < 9; all_focus_pos_grid = zeros(0,3); end
 
 % === USER SYMMETRIC PADDING (BOTH SIDES) ===
 if ~isfield(parameters.headmodel, 'head_pad_mm') || isempty(parameters.headmodel.head_pad_mm)
@@ -65,6 +67,10 @@ if any(pad_pre_post > 0)
     % Positions shift by PRE-padding amount ('both' adds pre first)
     trans_pos_grid = trans_pos_grid + pad_pre_post;
     focus_pos_grid = focus_pos_grid + pad_pre_post;
+    if ~isempty(all_trans_pos_grid)
+        all_trans_pos_grid = all_trans_pos_grid + pad_pre_post;
+        all_focus_pos_grid = all_focus_pos_grid + pad_pre_post;
+    end
 end
 
 % Expand CSF mask to crop the layered medium
@@ -73,14 +79,35 @@ end
 % Minimal fixed crop margin — PML is added outside the grid by k-Wave (PMLInside=false)
 crop_margin = 1;
 
-% Include transducer bowl geometry (safe with padding)
+% Include transducer bowl geometry for all transducers (safe with padding).
+% For multi-transducer setups, using only transducer(1) leaves the contralateral
+% side over-extended: the CSF-expanded head tissue reaches the far scalp + 40 mm,
+% while the opposite transducer bowl is never included in the crop mask.
 i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
-transducer_bowl = transducer_setup(parameters.transducer(1), trans_pos_grid, ...
-    focus_pos_grid, size(segmentation), parameters.grid.resolution_mm, parameters);
+
+% Use all_trans_pos_grid when provided (Nt×3), otherwise fall back to trans(1) only.
+if ~isempty(all_trans_pos_grid)
+    n_bowls = size(all_trans_pos_grid, 1);
+else
+    n_bowls = 1;
+end
+
+combinedmask = (medium_masks ~= i_water);
+for i_t = 1:n_bowls
+    if ~isempty(all_trans_pos_grid)
+        tp_i = all_trans_pos_grid(i_t,:);
+        fp_i = all_focus_pos_grid(i_t,:);
+    else
+        tp_i = trans_pos_grid;
+        fp_i = focus_pos_grid;
+    end
+    bowl_i = transducer_setup(parameters.transducer(i_t), tp_i, fp_i, ...
+        size(segmentation), parameters.grid.resolution_mm, parameters);
+    combinedmask = combinedmask | bowl_i;
+end
 
 % Compute crop bounds
 orig_dims = size(medium_masks);
-combinedmask = (medium_masks ~= i_water) | transducer_bowl;
 [min_dims, max_dims, new_grid_dims] = get_crop_dims(double(combinedmask), crop_margin);
 clear combinedmask;
 

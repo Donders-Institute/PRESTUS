@@ -17,6 +17,8 @@ platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matla
 
 simulation:
   medium: layered     # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+  # acoustic_backend: 'kwave'   # Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'
+  # thermal_backend:  'kwave'   # Thermal solver: 'kwave' (default) | 'babelbrain'
   code_type: matlab_gpu # Select which k-Wave code to run:
                         #   MATLAB CPU code 'matlab_cpu'
                         #   MATLAB GPU code 'matlab_gpu'
@@ -74,6 +76,13 @@ io:
   save_heatingvideo: 0      # Save a video of incremental heating?
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
+  save_p_complex: 0         # Save complex pressure field (p_complex) alongside p_max_all in the acoustic cache? (large)
+
+  # --- Advanced / optional fields (not set by default; uncomment to enable) ---
+  # external_acoustic_nifti: ''  # Full path to a pre-computed acoustic pressure NIfTI [Pa, T1 space].
+  #                              # When set, acoustic simulation stages are skipped and this file is
+  #                              # passed directly to the thermal simulation. Acoustic analysis is
+  #                              # not available in this path.  Requires run_heating_sims: 1.
 
 #------------ Calibration (equipment-level metadata, not ISPPA targeting)
 
@@ -144,7 +153,7 @@ transducer:
   name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
-  target_isppa_wcm2: [] # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
+  target_isppa_wcm2: 30 # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
 
   trans_pos: []              # Transducer position [T1 grid space]
   focus_pos: []              # Stimulation target position [T1 grid space]
@@ -300,6 +309,20 @@ placement:
 grid:
   resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
   default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
+  # z_beyond_focus_mm: 40   # Extra axial length beyond the focal depth when acoustic_fov_length_mm='auto' [mm].
+  #                          # Default 40 mm, matching BabelBrain conventions.  Override to extend or
+  #                          # shorten the acoustic-only sub-grid along the beam axis.
+  # acoustic_fov_diameter_mm: []  # Lateral diameter of the beam-axis-aligned acoustic sub-grid [mm].
+  #                               # 'auto' → outermost element diameter of transducer(1).
+  #                               # Set to a number to restrict the acoustic sim to a smaller lateral FOV.
+  # acoustic_fov_length_mm: []    # Axial length of the acoustic sub-grid [mm].
+  #                               # 'auto' → focal_depth + z_beyond_focus_mm.
+  # thermal_use_acoustic_fov: 0   # 1 = thermal simulation also runs within the acoustic FOV (faster,
+  #                               # less accurate cooling boundary). 0 = thermal uses the full grid (default).
+  # thermal_resolution_mm: []     # Override grid resolution for thermal simulation only [mm].
+  #                               # Leave empty to reuse the acoustic grid resolution.
+  # thermal_fov_mm: []            # Independent thermal FOV [mm]; defines a sub-grid around the focus
+  #                               # for the thermal solver, independent of the acoustic FOV.
   pml_size: 'auto'    # Perfectly Matched Layer (PML) thickness [grid points] or 'auto'.
                       # 'auto': calls getOptimalPMLSize(kgrid) which searches the range [10, 40]
                       #   and picks the size that minimises the largest prime factor of
@@ -314,9 +337,17 @@ grid:
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
-  mode: 'transducer_axis'  # Grid orientation mode:
-                           #   'transducer_axis' (default) — rotate volume so focal axis aligns
-                           #     with z before simulation; compact grid, z-aligned beam.
+  mode: 'principal_axis'   # Grid orientation mode:
+                           #   'principal_axis' (default) — rotate volume so the first principal
+                           #     component of all transducer positions aligns with z. For N=1
+                           #     this equals transducer_axis (focal axis of trans(1)); for N=2
+                           #     it equals the inter-transducer axis; for N≥3 it is the
+                           #     direction of maximum spread of the transducer position cloud.
+                           #     Gives a symmetric, compact grid for any transducer configuration.
+                           #   'transducer_axis' — rotate volume so the focal axis of
+                           #     transducer(1) aligns with z. Compact grid, z-aligned beam.
+                           #     Useful when transducer(1) is the primary beam and other
+                           #     transducers are secondary/passive.
                            #   'ras_plus' — keep volume in RAS+ orientation; no rotation applied,
                            #     only isotropic rescaling. Preserves world-space geometry and
                            #     aligns with k-Plan / BabelBrain conventions. Requires that

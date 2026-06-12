@@ -6,7 +6,15 @@ PRESTUS preprocesses `layered` segmentations to set up simulation grids.
 
 ### Orientation
 
-PRESTUS initially creates a grid by orienting the segmentation to the focal plane of the first transducer. In multi-transducer setups, alignment is done to the first specified transducer. Specifically, `preproc_align_to_focal_axis` performs a two-step rotation to align an arbitrary focal axis (defined by transducer and focus positions) with the z-axis of the coordinate system. This prepares subject-specific head models for ultrasound neuromodulation simulations by standardizing the acoustic propagation direction along z. 
+PRESTUS aligns the simulation grid before cropping. The alignment strategy is controlled by `grid.mode`:
+
+| Mode | Description |
+|---|---|
+| `principal_axis` (default) | Rotates the volume so the first principal component (PC1) of all transducer positions aligns with z. For N=1 this equals `transducer_axis`; for N=2 it equals the inter-transducer axis; for N≥3 it is the direction of maximum spread of the transducer position cloud. Gives a symmetric, compact grid for any transducer configuration. Implemented in `preproc_align_to_principal_axis`. |
+| `transducer_axis` | Rotates the volume so the focal axis of transducer(1) aligns with z. Useful when transducer(1) is the primary beam and other transducers are secondary. Implemented in `preproc_align_to_focal_axis`. |
+| `ras_plus` | No rotation; only isotropic rescaling to the requested grid resolution. Preserves world-space (RAS+) orientation. |
+
+In all modes the returned `scale_rotate_recenter_matrix` encodes the full T1-space → rotated/rescaled-grid transform, which is used downstream to map all transducer positions into the simulation space. 
 
 ### Scaling
 
@@ -29,7 +37,9 @@ PRESTUS attempts to enforce skull continuity (i.e., absence of holes) either by 
 
 ### Cropping
 
-To increase computational efficiency, the grid is tightly cropped around the head. The cropping factor is determined by the edges of the layered medium and the location of the transducer. [Prior to adding the transducer, the grid can optionally be expanded via `parameters.headmodel.head_pad_mm`, which applies symmetric padding and can avoid that the transducer ends out of grid bounds. This should not impact later computational efficiency of the simulation, as regions beyond the transducer + PML will afterwards be cropped]. To guide the bounds of the head area of interest in the simulation, the CSF segmentation (if available) will be expanded by `parameters.headmodel.csf_expansion` [in mm, converted to voxels at the current grid resolution] to guide bounds of the layered medium. Areas outside of the crop mask will be assigned to the water layer (and are eligible for cropping). Tight crop dimensions are then defined by enclosing the layered medium mask, the transducer geometry, plus a PML buffer. This is followed by FFT-optimized resizing via `find_min_factor`, which expands dimensions up to `parameters.grid.max_expand` voxels for faster FFT convolution. The medium is anchored at the original origin (transducer/target unchanged relative to head), with symmetric expansion/padding around the content to fit FFT requirements while maintaining anatomical alignment for k-Wave propagation.
+To increase computational efficiency, the grid is tightly cropped around the head. The cropping factor is determined by the edges of the layered medium and the location of the transducer(s). [Prior to adding the transducer, the grid can optionally be expanded via `parameters.headmodel.head_pad_mm`, which applies symmetric padding and can avoid that the transducer ends out of grid bounds. This should not impact later computational efficiency of the simulation, as regions beyond the transducer + PML will afterwards be cropped]. To guide the bounds of the head area of interest in the simulation, the CSF segmentation (if available) will be expanded by `parameters.headmodel.csf_expansion` [in mm, converted to voxels at the current grid resolution] to guide bounds of the layered medium. Areas outside of the crop mask will be assigned to the water layer (and are eligible for cropping). Tight crop dimensions are then defined by enclosing the layered medium mask, the transducer geometry, plus a PML buffer. This is followed by FFT-optimized resizing via `find_min_factor`, which expands dimensions up to `parameters.grid.max_expand` voxels for faster FFT convolution. The medium is anchored at the original origin (transducer/target unchanged relative to head), with symmetric expansion/padding around the content to fit FFT requirements while maintaining anatomical alignment for k-Wave propagation.
+
+**Multi-transducer cropping.** When multiple transducers are configured, the crop mask includes the bowl geometry of *every* transducer, not only the first. This is important for bilateral setups (e.g., two transducers on opposite temporal sides targeting the thalamus): without including the contralateral transducer bowl, the front of the grid would be bounded only by the CSF-expanded head tissue, which extends to the far scalp plus `csf_expansion` mm — leaving unnecessary space. With all bowls included, the crop is tight to the outermost water-bath region of each transducer. Grid alignment and rotation are still driven by the first transducer's focal axis; the positions of additional transducers are mapped into the same rotated/rescaled space before the crop bounds are computed.
 
 All image transformations are concatenated to update transducer and target positions. 
 

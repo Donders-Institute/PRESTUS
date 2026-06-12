@@ -149,9 +149,6 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                  'automatic file selection).']);
         end
     else
-        if numel(parameters.transducer) > 1
-            warn('Multiple transducers defined; alignment, cropping, and intermediate debug plots will be based only on the first transducer.');
-        end
         trans_pos_grid = parameters.transducer(1).trans_pos;
         focus_pos_grid = parameters.transducer(1).focus_pos;
     end
@@ -168,15 +165,24 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     % grid.mode='transducer_axis' (default): rotate so focal axis aligns with z.
     % grid.mode='ras_plus': rescale only; volume stays in RAS+ orientation.
 
-    use_ras_plus = isfield(parameters, 'grid') && isfield(parameters.grid, 'mode') && ...
-                   strcmp(parameters.grid.mode, 'ras_plus');
+    grid_mode = 'principal_axis';
+    if isfield(parameters, 'grid') && isfield(parameters.grid, 'mode')
+        grid_mode = parameters.grid.mode;
+    end
 
-    if use_ras_plus
-        disp('Rescaling images to grid resolution (RAS+ mode — no rotation) ...')
-        preproc_fn = @preproc_rescale_only;
-    else
-        disp('Rotating images to focal axis and rescaling to grid resolution ...')
-        preproc_fn = @preproc_align_to_focal_axis;
+    switch grid_mode
+        case 'ras_plus'
+            disp('Rescaling images to grid resolution (RAS+ mode — no rotation) ...')
+            preproc_fn = @preproc_rescale_only;
+        case 'principal_axis'
+            disp('Rotating images to inter-transducer (PCA) axis and rescaling to grid resolution ...')
+            preproc_fn = @preproc_align_to_principal_axis;
+        otherwise  % 'transducer_axis' and any unrecognised value
+            if ~strcmp(grid_mode, 'transducer_axis')
+                warn('Unrecognised grid.mode ''%s''; defaulting to transducer_axis.', grid_mode);
+            end
+            disp('Rotating images to focal axis and rescaling to grid resolution ...')
+            preproc_fn = @preproc_align_to_focal_axis;
     end
 
     % If the segmentation process was not successful, it will stop preprocessing
@@ -222,7 +228,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 imshow(t1_rr_img_montage)
                 title('Original (left) and rotated (right) planning image');
                 output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                    sprintf('sub-%03d_t1_rotated_scaled%s.png',...
+                    sprintf('sub-%03d_t1w_rotated_scaled%s.png',...
                     parameters.subject_id, parameters.io.output_affix));
                 saveas(h, output_plot_filename, 'png');
                 close(h);
@@ -399,7 +405,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             imfuse(mat2gray(t1_slice), skin_skull_img,'blend')) ,'size',[1 NaN]);
         title('T1 and SimNIBS skin (green) and skull (blue) masks');
         output_plot_filename = fullfile(parameters.io.dir_debug_preproc,...
-            sprintf('sub-%03d_t1_skin_skull%s.png',parameters.subject_id, parameters.io.output_affix));
+            sprintf('sub-%03d_t1w_skin_skull%s.png',parameters.subject_id, parameters.io.output_affix));
         saveas(h ,output_plot_filename ,'png')
         close(h);
 
@@ -418,10 +424,26 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     
    if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.io.dir_output);
+
+        % Transform all transducer positions to the rotated/rescaled grid space so
+        % preproc_crop_grid can include every transducer bowl in the crop mask.
+        n_trans = numel(parameters.transducer);
+        all_trans_pos_rescaled = zeros(n_trans, 3);
+        all_focus_pos_rescaled = zeros(n_trans, 3);
+        all_trans_pos_rescaled(1,:) = trans_pos_rescaled;
+        all_focus_pos_rescaled(1,:) = focus_pos_rescaled;
+        for ti = 2:n_trans
+            tp = parameters.transducer(ti).trans_pos(:)';
+            fp = parameters.transducer(ti).focus_pos(:)';
+            all_trans_pos_rescaled(ti,:) = round(affine_apply_pts(tp, scale_rotate_recenter_matrix));
+            all_focus_pos_rescaled(ti,:) = round(affine_apply_pts(fp, scale_rotate_recenter_matrix));
+        end
+
         % postprocess skull segmentation
         [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, focus_pos_final, crop_translation_matrix] = ...
             head_smooth_and_crop(...
-            parameters, segmented_img_rr, bone_mask_img_rr, trans_pos_rescaled, focus_pos_rescaled, pseudoCT_img_rr);
+            parameters, segmented_img_rr, bone_mask_img_rr, trans_pos_rescaled, focus_pos_rescaled, pseudoCT_img_rr, ...
+            all_trans_pos_rescaled, all_focus_pos_rescaled);
 
         % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
@@ -585,19 +607,16 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             h = figure;
             imshow(seg_with_trans_img);
             title('Segmentation with transducer');
+            seg_trans_suffix = trans_suffix(ti, max_plots);
             output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                sprintf('sub-%03d_%s_segmented_brain_final_T%02d%s.png',...
-                parameters.subject_id, parameters.simulation.medium, ti, parameters.io.output_affix));
+                sprintf('sub-%03d_%s_segmented_brain_final%s%s.png',...
+                parameters.subject_id, parameters.simulation.medium, seg_trans_suffix, parameters.io.output_affix));
             saveas(h, output_plot_filename, 'png')
             close(h);
         end
 
         % Plot positioning of transducer on segmentation
-        if numel(parameters.transducer) > 1
-            tnn_suffix = sprintf('_T%02d', ti);
-        else
-            tnn_suffix = '';
-        end
+        tnn_suffix = trans_suffix(ti, numel(parameters.transducer));
         output_plot_filename = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_positioning%s%s.png', ...
             parameters.subject_id, parameters.io.output_affix, tnn_suffix));

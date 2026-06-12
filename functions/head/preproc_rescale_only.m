@@ -1,4 +1,4 @@
-function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, montage_img] = ...
+function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     preproc_rescale_only(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
 
 % PREPROC_RESCALE_ONLY  Rescale a 3D image to grid resolution without rotation
@@ -32,6 +32,8 @@ function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rot
 %   focus_pos_new      - [1x3] focus position after rescaling
 %   transformation_matrix - [4x4] scale-and-recenter affine (no rotation)
 %   rotation_matrix    - [4x4] identity (returned for API compatibility)
+%   angle_x_rad        - 0 (no rotation; returned for API compatibility)
+%   angle_y_rad        - 0 (no rotation; returned for API compatibility)
 %   montage_img        - side-by-side comparison montage
 %
 % See also: PREPROC_ALIGN_TO_FOCAL_AXIS, PREPROC_HEAD
@@ -73,6 +75,8 @@ function [rescaled_img, trans_pos_new, focus_pos_new, transformation_matrix, rot
 
     % Identity rotation — no orientation change in ras_plus mode
     rotation_matrix = eye(4);
+    angle_x_rad     = 0;   % no rotation; returned for API compatibility with preproc_align_to_focal_axis
+    angle_y_rad     = 0;
 
     %% Resample image
 
