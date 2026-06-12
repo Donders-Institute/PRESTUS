@@ -79,17 +79,10 @@ bb = apply_default(bb, 'computing_backend',  3);
 bb = apply_default(bb, 'device_name',        'Apple');
 bb = apply_default(bb, 'python_env',         '');
 bb = apply_default(bb, 'root',               '');
-bb = apply_default(bb, 'isppa_w_per_cm2',    parameters.transducer(1).set_intensity_w_per_cm2);
+bb = apply_default(bb, 'isppa_w_per_cm2',    get_tx_isppa(parameters.transducer(1)));
 
 %% Locate Python binary
-if ~isempty(bb.python_env)
-    python_bin = fullfile(bb.python_env, 'bin', 'python');
-    if ~isfile(python_bin)
-        python_bin = fullfile(bb.python_env, 'python');
-    end
-else
-    python_bin = 'python3';
-end
+python_bin = resolve_python_env(bb.python_env, 'python');
 
 %% Locate runner script
 this_dir  = fileparts(mfilename('fullpath'));
@@ -108,6 +101,24 @@ end
 duty_cycle = t.pd / t.pri;
 prf_hz     = 1 / t.pri;
 duration_s = t.ptrd;   % pulse train repetition duration
+
+% Validate converted timing parameters before passing to BabelBrain
+if duty_cycle <= 0 || duty_cycle > 1
+    error(['babelbrain_thermal_wrapper: duty_cycle=%.4f is outside (0, 1].\n' ...
+        'Check parameters.timing.pd=%.4f s and .pri=%.4f s.'], duty_cycle, t.pd, t.pri);
+end
+if prf_hz <= 0 || ~isfinite(prf_hz)
+    error(['babelbrain_thermal_wrapper: PRF=%.2f Hz is invalid (<= 0 or non-finite).\n' ...
+        'Check parameters.timing.pri=%.4f s.'], prf_hz, t.pri);
+end
+if duration_s <= 0
+    error(['babelbrain_thermal_wrapper: duration=%.4f s is <= 0.\n' ...
+        'Check parameters.timing.ptrd.'], duration_s);
+end
+if bb.isppa_w_per_cm2 <= 0
+    error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is <= 0.\n' ...
+        'Check transducer(1).tx_calibration.isppa_wcm2.'], bb.isppa_w_per_cm2);
+end
 
 % Cooling interval between repetitions (BabelBrain DurationOff).
 % In PRESTUS, ptri is the period of one pulse-train block; the off-time is
@@ -142,6 +153,13 @@ if isfield(parameters, 'thermal') && isfield(parameters.thermal, 'temp_0') && ..
     baseline_temp = parameters.thermal.temp_0.brain;
 end
 
+%% Per-run log file
+log_dir = fullfile(fileparts(acoustic_h5), 'log');
+if ~isfolder(log_dir), mkdir(log_dir); end
+[~, acoustic_stem, ~] = fileparts(strrep(acoustic_h5, '.h5', ''));
+log_file = fullfile(log_dir, [acoustic_stem '_thermal.log']);
+fprintf('[babelbrain_thermal_wrapper] Log file: %s\n', log_file);
+
 %% Build Python command
 cmd = sprintf([ ...
     '"%s" "%s" '  ...
@@ -154,11 +172,13 @@ cmd = sprintf([ ...
     '--sel_p "%s" '  ...
     '--computing_backend %d '  ...
     '--device_name "%s" '  ...
+    '--log_file "%s" '  ...
     '%s '], ...
     python_bin, bb_runner, ...
     acoustic_h5, ...
     bb.isppa_w_per_cm2, duty_cycle, prf_hz, duration_s, duration_off_s, sel_p, ...
     bb.computing_backend, bb.device_name, ...
+    log_file, ...
     bb_root_flag(bb.root));
 
 if ~isempty(bb.root)
@@ -215,5 +235,17 @@ function flag = bb_root_flag(bb_root)
         flag = sprintf('--babelbrain_root "%s"', bb_root);
     else
         flag = '';
+    end
+end
+
+function isppa = get_tx_isppa(tr)
+% Read ISPPA from tx_calibration.isppa_wcm2 with fallback to legacy field.
+    if isfield(tr, 'tx_calibration') && isfield(tr.tx_calibration, 'isppa_wcm2') && ...
+            isscalar(tr.tx_calibration.isppa_wcm2) && isfinite(tr.tx_calibration.isppa_wcm2)
+        isppa = tr.tx_calibration.isppa_wcm2;
+    elseif isfield(tr, 'set_intensity_w_per_cm2') && isscalar(tr.set_intensity_w_per_cm2)
+        isppa = tr.set_intensity_w_per_cm2;
+    else
+        isppa = NaN;
     end
 end

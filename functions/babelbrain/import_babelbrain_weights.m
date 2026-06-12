@@ -97,8 +97,7 @@ end
     end
 
     % ── Compute geometric phases at the reference depth ───────────────────
-    tran_ini_data  = generate_tran_ini_from_geometry(tran);
-    geo_phases_deg = set_real_phases(tran_ini_data, tran, ref_depth_ep, parameters);
+    geo_phases_deg = set_real_phases([], tran, ref_depth_ep, parameters);
 
     if numel(geo_phases_deg) ~= n_elem_tran
         error(['import_babelbrain_weights: set_real_phases returned %d phases ' ...

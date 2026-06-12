@@ -32,6 +32,70 @@ import argparse
 import sys
 import os
 import yaml
+import numpy as np
+
+
+class _TeeStream:
+    """Write to multiple streams simultaneously (console + log file)."""
+    def __init__(self, *streams):
+        self.streams = streams
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+    def fileno(self):
+        return self.streams[0].fileno()
+
+
+def resolve_device_name(computing_backend, device_name):
+    """Return the first matching device name for the given backend.
+
+    When device_name is the sentinel default ('CPU' or 'auto') but the backend
+    is CUDA (1) or OpenCL (2), auto-detect the first available device so the
+    user does not need to know the exact hardware string.
+    """
+    _is_sentinel = device_name in ('CPU', 'auto')
+    if computing_backend == 1 and _is_sentinel:
+        # Use nvidia-smi for device detection — avoids CUDA library version mismatches
+        try:
+            import subprocess
+            out = subprocess.check_output(
+                ['nvidia-smi', '--query-gpu=name', '--format=csv,noheader'],
+                stderr=subprocess.STDOUT
+            ).decode().strip()
+            lines = [l.strip() for l in out.splitlines() if l.strip()]
+            if lines:
+                name = lines[0]
+                print(f'[run_babelbrain_case] Auto-detected CUDA device: {name}')
+                return name
+            else:
+                print('[run_babelbrain_case] ERROR: nvidia-smi found no GPUs. '
+                      'Ensure the SLURM job requests a GPU (--gres=gpu:1) or set device_name explicitly.',
+                      file=sys.stderr)
+                sys.exit(1)
+        except Exception as e:
+            print(f'[run_babelbrain_case] nvidia-smi device detection failed: {e}', file=sys.stderr)
+            sys.exit(1)
+    elif computing_backend == 2 and _is_sentinel:
+        try:
+            import pyopencl as cl
+            platforms = cl.get_platforms()
+            for pf in platforms:
+                devices = pf.get_devices(cl.device_type.GPU)
+                if devices:
+                    name = devices[0].name.strip()
+                    print(f'[run_babelbrain_case] Auto-detected OpenCL device: {name}')
+                    return name
+            print('[run_babelbrain_case] ERROR: no OpenCL GPU found. '
+                  'Set --device_name explicitly or use a different --computing_backend.',
+                  file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f'[run_babelbrain_case] OpenCL device detection failed: {e}', file=sys.stderr)
+            sys.exit(1)
+    return device_name
 
 
 def parse_args():
@@ -45,9 +109,11 @@ def parse_args():
     p.add_argument('--tx_system',           default='')
     p.add_argument('--freq',                default=500e3, type=float)
     p.add_argument('--ppw',                 default=6, type=int)
-    p.add_argument('--computing_backend',   default=3, type=int,
-                   help='1=CUDA 2=OpenCL 3=Metal 4=CPU')
-    p.add_argument('--device_name',         default='Apple')
+    p.add_argument('--computing_backend',   default=4, type=int,
+                   help='1=CUDA 2=OpenCL 3=Metal 4=CPU (default)')
+    p.add_argument('--device_name',         default='CPU',
+                   help='Hardware device string passed to BabelBrain. '
+                        'For CUDA/OpenCL, omit to auto-detect via nvidia-smi / pyopencl.')
     p.add_argument('--tx_mech_adjust_z',    default=0.0, type=float,
                    help='Transducer z offset into skin [m] (default 0: geometry already in NIfTI)')
     p.add_argument('--z_steering',          default=0.0, type=float,
@@ -64,6 +130,20 @@ def parse_args():
                    help='Enable BabelBrain skull refocusing back-propagation')
     p.add_argument('--dry_run',             action='store_true',
                    help='Pass bDryRun=True to RunCases — validates paths and imports without GPU')
+    p.add_argument('--use_ct',              action='store_true',
+                   help='Activate BabelBrain CT path (bUseCT=True). Requires a CT.nii.gz '
+                        'alongside the BabelViscoInput mask. Use when passing raw HU values '
+                        'from a UTE/PETRA scan for BabelBrain to map to acoustic properties.')
+    p.add_argument('--ct_mapping',          default='Webb-Marsac',
+                   help='HU-to-property mapping method (MappingMethod in __init__). '
+                        'Valid: Webb-Marsac (default), Aubry, Pichardo, McDannold, '
+                        'Marsac-Aubry, Pichardo-Marsac, McDannold-Marsac. '
+                        'Only used when --use_ct is set.')
+    p.add_argument('--use_petra',           action='store_true',
+                   help="Pass bPETRA=True to __init__ -- uses Bjorn's density formula for "
+                        'PETRA-sequence-derived pseudo-CT. Leave unset for ZTE/UTE pCT.')
+    p.add_argument('--log_file',            default='',
+                   help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     return p.parse_args()
 
 
@@ -123,7 +203,10 @@ def load_preset_config(babelbrain_root, tx_system):
         return {}
     yaml_path = os.path.join(babelbrain_root, 'BabelBrain', f'Babel_{folder}', 'default.yaml')
     if not os.path.isfile(yaml_path):
-        print(f'[run_babelbrain_case] Warning: preset config not found: {yaml_path}')
+        print(f'[run_babelbrain_case] WARNING: preset config not found: {yaml_path}', file=sys.stderr)
+        print(f'[run_babelbrain_case] WARNING: BabelBrain will use hardcoded geometry defaults '
+              f'for {tx_system}. Verify that transducer aperture, focal length, and ring '
+              f'diameters are correct for your hardware.', file=sys.stderr)
         return {}
     with open(yaml_path) as f:
         cfg = yaml.safe_load(f)
@@ -197,18 +280,31 @@ def convert_weights_if_needed(weights_path):
     if os.path.isfile(out_path):
         os.remove(out_path)
 
-    with h5py.File(out_path, 'w') as f:
-        f.create_dataset('CALIBRATION', data=weights_complex)
-        # Copy metadata datasets if present
-        try:
-            with h5py.File(weights_path, 'r') as fsrc:
-                for key in fsrc.keys():
-                    if key != 'CALIBRATION':
-                        fsrc.copy(key, f)
-        except Exception:
-            pass  # metadata is optional
+    # Use SaveToH5py so each dataset gets the 'type' attribute that ReadFromH5py requires.
+    from BabelViscoFDTD.H5pySimple import SaveToH5py
+    data_dict = {'CALIBRATION': weights_complex}
+    SaveToH5py(data_dict, out_path)
 
     print(f'[run_babelbrain_case] Converted PRESTUS weights → BabelBrain format: {out_path}')
+
+    # Read-back verification: confirm /CALIBRATION is a complex dataset that BabelBrain can open
+    with h5py.File(out_path, 'r') as _f:
+        _cal = _f.get('CALIBRATION')
+        if _cal is None:
+            raise ValueError(
+                f'Weights verification failed: /CALIBRATION missing from converted file {out_path}.'
+            )
+        if not isinstance(_cal, h5py.Dataset):
+            raise ValueError(
+                f'Weights verification failed: /CALIBRATION in {out_path} is a group, not a dataset.'
+            )
+        if not np.issubdtype(_cal.dtype, np.complexfloating):
+            raise ValueError(
+                f'Weights verification failed: /CALIBRATION dtype={_cal.dtype} in {out_path}; '
+                'expected complex64. BabelBrain ReadFromH5py will reject this file.'
+            )
+        _n = _cal.size
+    print(f'[run_babelbrain_case] Weights verified: {_n} elements, dtype=complex64')
     return out_path
 
 
@@ -242,8 +338,73 @@ def get_babelbrain_version(bb_root):
     }
 
 
+def _patch_annular_array_weights(RunSimClass):
+    """Monkey-patch AdjustWeightAmplitudes on the SimulationConditions class of
+    annular-array modules to handle per-ring calibration weights (N_rings values)
+    by expanding each ring weight to all its mesh subelements.  Per-subelement
+    weights (N_subelems values) pass through unchanged."""
+    import numpy as np
+    import inspect
+    import importlib
+
+    # Only patch for ANNULAR_ARRAY modules
+    if 'ANNULAR_ARRAY' not in inspect.getfile(RunSimClass):
+        return
+
+    # Resolve the SimulationConditions class from the same module
+    mod = inspect.getmodule(RunSimClass)
+    SimCond = getattr(mod, 'SimulationConditions', None)
+    if SimCond is None:
+        print('[run_babelbrain_case] Warning: could not find SimulationConditions — '
+              'per-ring weight expansion patch not applied.')
+        return
+
+    def _adjust_weight_amplitudes(self):
+        if self._OptimizedWeights is None:
+            return np.ones((self._TxRC['center'].shape[0], 1), np.complex64)
+
+        n_sub = self._TxRC['center'].shape[0]
+        n_rings = self._TxRC['NumberElems']
+
+        if self._OptimizedWeights.size == n_sub:
+            # Already per-subelement — use directly (normal base-class path)
+            return self._OptimizedWeights.reshape((n_sub, 1)).astype(np.complex64)
+
+        if self._OptimizedWeights.size == n_rings:
+            # Per-ring calibration weights — expand to per-subelement
+            print(f'[run_babelbrain_case] Expanding {n_rings} per-ring weights '
+                  f'to {n_sub} subelements.')
+            w_expanded = np.empty(n_sub, dtype=np.complex64)
+            base = 0
+            for n in range(n_rings):
+                count = self._TxRC['elemdims'][n][0]
+                w_expanded[base:base + count] = self._OptimizedWeights[n]
+                base += count
+            return w_expanded.reshape((n_sub, 1))
+
+        raise ValueError(
+            f"OptimizedWeightsFile {self._OptimizedWeightsFile} has "
+            f"{self._OptimizedWeights.size} subelements, but the Tx has "
+            f"{n_sub} elements ({n_rings} rings)."
+        )
+
+    SimCond.AdjustWeightAmplitudes = _adjust_weight_amplitudes
+    print(f'[run_babelbrain_case] Patched AdjustWeightAmplitudes on SimulationConditions '
+          f'for per-ring weight expansion.')
+
+
 def main():
     args = parse_args()
+
+    # Set up log file tee (stdout + stderr → console and file simultaneously)
+    _log_fh = None
+    if args.log_file:
+        os.makedirs(os.path.dirname(os.path.abspath(args.log_file)), exist_ok=True)
+        _log_fh = open(args.log_file, 'w', buffering=1)
+        sys.stdout = _TeeStream(sys.__stdout__, _log_fh)
+        sys.stderr = _TeeStream(sys.__stderr__, _log_fh)
+
+    args.device_name = resolve_device_name(args.computing_backend, args.device_name)
 
     try:
         bb_root = find_babelbrain_root(args.babelbrain_root)
@@ -276,9 +437,9 @@ def main():
         if 'FocalLength' in preset_cfg:
             geom_kw['FocalLength']  = float(preset_cfg['FocalLength'])
         if 'InDiameters' in preset_cfg:
-            geom_kw['InDiameters']  = [float(x) for x in preset_cfg['InDiameters']]
+            geom_kw['InDiameters']  = np.array([float(x) for x in preset_cfg['InDiameters']])
         if 'OutDiameters' in preset_cfg:
-            geom_kw['OutDiameters'] = [float(x) for x in preset_cfg['OutDiameters']]
+            geom_kw['OutDiameters'] = np.array([float(x) for x in preset_cfg['OutDiameters']])
 
     if geom_kw:
         print(f'[run_babelbrain_case] Preset geometry: '
@@ -311,9 +472,17 @@ def main():
         **geom_kw,
     )
 
+    if args.use_ct:
+        kw['bUseCT'] = True
+        kw['MappingMethod'] = args.ct_mapping
+        kw['bPETRA'] = args.use_petra
+        print(f'[run_babelbrain_case] CT path enabled: mapping={args.ct_mapping}'
+              f'{"  bPETRA=True" if args.use_petra else ""}')
+
     if args.weights_file and os.path.isfile(args.weights_file):
         kw['OptimizedWeightsFile'] = convert_weights_if_needed(args.weights_file)
         print(f'[run_babelbrain_case] Using weights: {kw["OptimizedWeightsFile"]}')
+        _patch_annular_array_weights(RunSimClass)
     else:
         print('[run_babelbrain_case] No weights file — using geometric focusing.')
 

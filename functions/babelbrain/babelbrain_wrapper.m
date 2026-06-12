@@ -1,5 +1,5 @@
 function sensor_data = babelbrain_wrapper( ...
-        parameters, medium_masks, kwave_medium, focus_pos, trans_pos, planimg, equip_param)
+        parameters, medium_masks, kwave_medium, focus_pos, trans_pos, planimg, equip_param, pseudoCT)
 % BABELBRAIN_WRAPPER  Run BabelBrain acoustic simulation as PRESTUS backend
 %
 % Drop-in replacement for ACOUSTIC_WRAPPER that uses BabelBrain's
@@ -21,7 +21,10 @@ function sensor_data = babelbrain_wrapper( ...
 %                         auto-detect. Set explicitly when using a custom
 %                         RUN_SIM subclass.
 %   .computing_backend  - 1=CUDA, 2=OpenCL, 3=Metal (Apple Silicon), 4=CPU
-%   .device_name        - device name string, e.g. 'Apple' or 'RTX3090'
+%                         'auto' (default): detect Metal on macOS, CUDA on Linux
+%                         with nvidia-smi, else CPU.
+%   .device_name        - device name string, e.g. 'Apple' or 'RTX3090'.
+%                         'auto' (default): derived from computing_backend.
 %   .ppw                - points-per-wavelength (default 6)
 %   .do_refocusing      - logical; use BabelBrain skull refocusing (default false)
 %   .z_beyond_focus_mm  - axial truncation past focus (default 40, mm)
@@ -32,6 +35,17 @@ function sensor_data = babelbrain_wrapper( ...
 %   .z_steering_m       - ZSteering [m]: axial offset of electronic focus from preset FocalLength.
 %                         Empty (default): auto-derived as focal_distance_mm - FocalLength when
 %                         no calibrated weights file is present; 0 when weights are provided.
+%   .ct_mapping         - BabelBrain HU→property mapping method. Non-empty activates the CT
+%                         path (bUseCT=True) and passes the pseudoCT HU volume to BabelBrain.
+%                         Valid values: 'Webb-Marsac' (default when non-empty), 'Aubry',
+%                         'Pichardo', 'McDannold', 'Marsac-Aubry', 'Pichardo-Marsac',
+%                         'McDannold-Marsac'. Empty (default): use label-based MatFreq path.
+%                         Note: only set this when passing raw HU values from a UTE/PETRA scan
+%                         for BabelBrain to map itself. If PRESTUS's pCT pipeline has already
+%                         converted HU to acoustic properties, use the default label path.
+%   .ct_use_petra       - logical; set true when the HU values in pseudoCT were derived from a
+%                         PETRA sequence (uses Björn's density formula in BabelBrain).
+%                         Default false (appropriate for ZTE/UTE-derived pCT).
 %
 % Use as:
 %   sensor_data = babelbrain_wrapper(parameters, medium_masks, kwave_medium, ...
@@ -47,6 +61,9 @@ function sensor_data = babelbrain_wrapper( ...
 %   trans_pos    - [1x3] transducer voxel in grid coordinates (for provenance)
 %   planimg      - planimg struct from grid_tissue_setup (affine info)
 %   equip_param  - (optional) equipment config struct for transducer lookup
+%   pseudoCT     - (optional) [Nx x Ny x Nz] Hounsfield-unit pseudo-CT in
+%                  grid space (from grid_tissue_setup). Required when
+%                  parameters.babelbrain.ct_mapping is non-empty.
 %
 % Output:
 %   sensor_data  - struct with p_max_all [Nx x Ny x Nz] [Pa], matching the
@@ -63,6 +80,7 @@ arguments
     trans_pos    (1,3) {mustBeNumeric}  %#ok<INUSA>
     planimg      (1,1) struct
     equip_param        struct  = struct()
+    pseudoCT           {mustBeNumeric} = []
 end
 
 %% Resolve BabelBrain config with defaults
@@ -72,8 +90,8 @@ if isfield(parameters, 'babelbrain')
 end
 
 bb = apply_default(bb, 'tx_system',         '');
-bb = apply_default(bb, 'computing_backend',  3);    % Metal
-bb = apply_default(bb, 'device_name',        'Apple');
+bb = apply_default(bb, 'computing_backend',  'auto');
+bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'ppw',                6);
 bb = apply_default(bb, 'do_refocusing',      false);
 bb = apply_default(bb, 'z_beyond_focus_mm',  40);
@@ -81,6 +99,8 @@ bb = apply_default(bb, 'python_env',         '');
 bb = apply_default(bb, 'tx_mech_adjust_z_m', 0.0);  % 0: geometry already in NIfTI
 bb = apply_default(bb, 'z_steering_m',       []);   % empty = auto-derived below
 bb = apply_default(bb, 'root',               '');
+bb = apply_default(bb, 'ct_mapping',         '');   % empty = label-based path
+bb = apply_default(bb, 'ct_use_petra',       false);
 
 %% Locate BabelBrain Python package and runner script
 % The runner script lives in functions/babelbrain/ alongside this file.
@@ -120,14 +140,10 @@ end
 
 
 %% Select Python executable
-if ~isempty(bb.python_env)
-    python_bin = fullfile(bb.python_env, 'bin', 'python');
-    if ~isfile(python_bin)
-        python_bin = fullfile(bb.python_env, 'python');  % Windows / conda root
-    end
-else
-    python_bin = 'python3';
-end
+python_bin = resolve_python_env(bb.python_env, 'python');
+
+%% Ensure HDF5 plugin path is valid (pass python_bin to locate blosc filter)
+ensure_hdf5_plugin_path(python_bin);
 
 %% Query BabelBrain version (before any simulation work)
 bb_version = query_babelbrain_version(python_bin, bb_runner, bb_root);
@@ -136,13 +152,87 @@ fprintf('[babelbrain_wrapper] BabelBrain %s  (%s)\n', ...
 
 %% I/O directories
 out_dir   = parameters.io.dir_cache;
+if out_dir(end) ~= filesep, out_dir(end+1) = filesep; end
 subj_id   = sprintf('sub-%03d', parameters.subject_id);
 target    = strrep(parameters.io.output_affix, '_', '');
 if isempty(target)
     target = 'target';
 end
 
+%% Multi-transducer coherent combination
+% When more than one transducer is present and async mode is not active,
+% simulate each transducer independently and sum the complex Fourier pressure
+% fields (coherent superposition). Each recursive call reduces to the
+% single-transducer path below.
+n_tx = numel(parameters.transducer);
+is_async = isfield(parameters, 'simulation') && ...
+           isfield(parameters.simulation, 'transducer_coupling') && ...
+           strcmp(parameters.simulation.transducer_coupling, 'async');
+
+if n_tx > 1 && ~is_async
+    fprintf('[babelbrain_wrapper] %d transducers — running coherent combination.\n', n_tx);
+    p_combined  = [];
+    last_sd     = struct();
+    for ti = 1:n_tx
+        fprintf('[babelbrain_wrapper] === Transducer %d / %d ===\n', ti, n_tx);
+        p_ti           = parameters;
+        p_ti.transducer = parameters.transducer(ti);
+        % Prevent re-entry on recursive call.
+        p_ti.simulation.transducer_coupling = 'coherent';
+        % Give each sub-run a unique affix so output files don't collide.
+        base_affix = parameters.io.output_affix;
+        p_ti.io.output_affix = [base_affix, trans_suffix(ti, n_tx)];
+        focus_ti = parameters.transducer(ti).focus_pos;
+        trans_ti = parameters.transducer(ti).trans_pos;
+        sd_ti = babelbrain_wrapper(p_ti, medium_masks, kwave_medium, ...
+            focus_ti, trans_ti, planimg, equip_param, pseudoCT);
+        if ~isfield(sd_ti, 'p_complex') || isempty(sd_ti.p_complex)
+            error(['babelbrain_wrapper: p_complex missing from transducer %d output.\n' ...
+                'Ensure the BabelBrain DataForSim.h5 contains /p_complex.'], ti);
+        end
+        % Shape consistency across transducers
+        if ~isempty(p_combined) && ~isequal(size(sd_ti.p_complex), size(p_combined))
+            error(['babelbrain_wrapper: p_complex size mismatch at transducer %d.\n' ...
+                'Got [%d %d %d], expected [%d %d %d].\n' ...
+                'All transducers must use the same simulation grid.'], ...
+                ti, size(sd_ti.p_complex,1), size(sd_ti.p_complex,2), size(sd_ti.p_complex,3), ...
+                size(p_combined,1), size(p_combined,2), size(p_combined,3));
+        end
+        % Finite-value check
+        n_bad = nnz(~isfinite(sd_ti.p_complex(:)));
+        if n_bad > 0
+            error('babelbrain_wrapper: p_complex from transducer %d contains %d NaN/Inf values.', ti, n_bad);
+        end
+        if isempty(p_combined)
+            p_combined = sd_ti.p_complex;
+        else
+            p_combined = p_combined + sd_ti.p_complex;
+        end
+        last_sd = sd_ti;
+    end
+    % Final combined field check
+    n_bad = nnz(~isfinite(p_combined(:)));
+    if n_bad > 0
+        error('babelbrain_wrapper: combined p_complex contains %d NaN/Inf values after summing %d transducers.', n_bad, n_tx);
+    end
+    sensor_data                    = last_sd;
+    sensor_data.p_complex          = p_combined;
+    sensor_data.p_max_all          = abs(p_combined);
+    sensor_data.coherent_n_tx      = n_tx;
+    return
+end
+
 tr = parameters.transducer(1);
+
+%% Resolve frequency and PPW (needed for NIfTI filenames in Steps 2–3b)
+freq_hz  = tr.freq_hz;
+res_mm   = parameters.grid.resolution_mm;
+c_min    = 1500;
+if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'brain')
+    c_min = parameters.medium_properties.brain.sound_speed;
+end
+ppw_auto = round(c_min / (freq_hz * res_mm * 1e-3));
+ppw_use  = max(bb.ppw, ppw_auto);
 
 %% Step 1 — Transducer preset
 if isempty(bb.tx_system)
@@ -201,7 +291,7 @@ end
 
 %% Step 2 — Write BabelViscoInput NIfTI
 fprintf('[babelbrain_wrapper] Writing input mask...\n');
-nii_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target);
+nii_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target, ppw_use);
 
 %% Step 3 — Write OptimizedWeightsFile (calibrated phases)
 weights_path = fullfile(out_dir, subj_id, [target '_CalibWeights.h5']);
@@ -223,17 +313,45 @@ else
     fprintf('[babelbrain_wrapper] No element phases found — BabelBrain will use geometric focusing.\n');
 end
 
-%% Step 4 — Invoke Python bridge
-fprintf('[babelbrain_wrapper] Launching BabelBrain simulation...\n');
-
-freq_hz  = tr.freq_hz;
-res_mm   = parameters.grid.resolution_mm;
-c_min    = 1500;
-if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'brain')
-    c_min = parameters.medium_properties.brain.sound_speed;
+%% Step 3b — Write pseudo-CT NIfTI for BabelBrain CT path (optional)
+ct_nii_path = '';
+if ~isempty(bb.ct_mapping)
+    if isempty(pseudoCT)
+        error(['babelbrain_wrapper: ct_mapping is set but no pseudoCT was supplied.\n' ...
+            'Pass the pseudoCT output of grid_tissue_setup as the 8th argument.']);
+    end
+    % BabelBrain expects CT.nii.gz alongside BabelViscoInput.nii.gz with the
+    % same frequency/PPW naming prefix.
+    ct_fname = sprintf('%s_%dkHz_%dPPW_CT.nii.gz', target, round(freq_hz/1e3), ppw_use);
+    ct_nii_path = fullfile(out_dir, subj_id, ct_fname);
+    if ~isfolder(fileparts(ct_nii_path))
+        mkdir(fileparts(ct_nii_path));
+    end
+    niftiwrite(single(pseudoCT), strrep(ct_nii_path, '.nii.gz', ''), 'Compressed', true);
+    fprintf('[babelbrain_wrapper] CT NIfTI written: %s\n', ct_nii_path);
 end
-ppw_auto = round(c_min / (freq_hz * res_mm * 1e-3));
-ppw_use  = max(bb.ppw, ppw_auto);  % never go below geometry-required PPW
+
+%% Step 4 — Invoke Python bridge
+[bb.computing_backend, bb.device_name] = resolve_bb_backend(bb.computing_backend, bb.device_name);
+
+% Checkpoint: verify input files are present and log their sizes
+d_nii = dir(nii_path);
+if isempty(d_nii)
+    error('babelbrain_wrapper: NIfTI input not found before launching simulation:\n  %s', nii_path);
+end
+fprintf('[babelbrain_wrapper] Input NIfTI:   %s  (%.1f MB)\n', nii_path, d_nii.bytes/1e6);
+if ~isempty(weights_path) && isfile(weights_path)
+    d_wt = dir(weights_path);
+    fprintf('[babelbrain_wrapper] Weights HDF5:  %s  (%.1f MB)\n', weights_path, d_wt.bytes/1e6);
+end
+
+% Per-run log file (Python stdout+stderr appended here for post-hoc debugging)
+log_dir = fullfile(out_dir, subj_id, 'log');
+if ~isfolder(log_dir), mkdir(log_dir); end
+log_file = fullfile(log_dir, sprintf('%s_%s_%dkHz_babelbrain_acoustic.log', subj_id, target, round(freq_hz/1e3)));
+fprintf('[babelbrain_wrapper] Log file: %s\n', log_file);
+
+fprintf('[babelbrain_wrapper] Launching BabelBrain simulation...\n');
 
 dry_run = isfield(bb, 'dry_run') && bb.dry_run;
 
@@ -250,18 +368,26 @@ cmd_args = sprintf([ ...
     '--tx_mech_adjust_z %.6f '  ...
     '--z_steering %.6f '  ...
     '--z_beyond_focus_mm %.1f '  ...
+    '--log_file "%s" '  ...
     '%s '  ...  % optional babelbrain_root flag
     '%s '  ...  % optional weights flag
     '%s '  ...  % optional refocusing flag
-    '%s '], ...  % optional dry_run flag
+    '%s '  ...  % optional dry_run flag
+    '%s '  ...  % optional use_ct flag
+    '%s '  ...  % optional ct_mapping flag
+    '%s '], ...  % optional use_petra flag
     python_bin, bb_runner, ...
     out_dir, subj_id, target, bb.tx_system, ...
     freq_hz, ppw_use, bb.computing_backend, bb.device_name, ...
     bb.tx_mech_adjust_z_m, z_steering_m, bb.z_beyond_focus_mm, ...
+    log_file, ...
     bb_root_flag(bb_root), ...
     bb_weights_flag(weights_path), ...
     bb_refocus_flag(bb.do_refocusing), ...
-    bb_dryrun_flag(dry_run));
+    bb_dryrun_flag(dry_run), ...
+    bb_usect_flag(~isempty(bb.ct_mapping)), ...
+    bb_ctmapping_flag(bb.ct_mapping), ...
+    bb_petra_flag(bb.ct_use_petra));
 
 fprintf('[babelbrain_wrapper] Command:\n  %s\n', cmd_args);
 
@@ -297,7 +423,9 @@ if ~isfile(h5_path)
     fprintf('[babelbrain_wrapper] Using output: %s\n', h5_path);
 end
 
-sensor_data = read_babelbrain_output(h5_path, bb.do_refocusing);
+rewrite_hdf5_no_blosc(h5_path, python_bin, this_dir);
+
+sensor_data = read_babelbrain_output(h5_path, bb.do_refocusing, parameters, planimg);
 sensor_data.babelbrain_version = bb_version;
 
 end
@@ -334,9 +462,78 @@ function flag = bb_refocus_flag(do_refocus)
     end
 end
 
+function [backend, device] = resolve_bb_backend(backend, device)
+% Resolve 'auto' computing_backend / device_name to concrete values.
+% Priority: Metal (macOS) > CUDA (nvidia-smi) > CPU.
+    if ~(ischar(backend) && strcmp(backend, 'auto'))
+        % Already a numeric backend — only resolve device if still 'auto'
+        if ischar(device) && strcmp(device, 'auto')
+            device = default_device_for_backend(backend);
+        end
+        return
+    end
+
+    if ismac
+        backend = 3;   % Metal
+        device  = 'Apple';
+        fprintf('[babelbrain_wrapper] Auto-detected backend: Metal (macOS)\n');
+        return
+    end
+
+    % Linux/Windows: probe for CUDA
+    [status, out] = system('nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null');
+    if status == 0
+        lines = strtrim(strsplit(strtrim(out), newline));
+        lines = lines(~cellfun(@isempty, lines));
+        if ~isempty(lines)
+            backend = 1;   % CUDA
+            device  = lines{1};
+            fprintf('[babelbrain_wrapper] Auto-detected backend: CUDA, device="%s"\n', device);
+            return
+        end
+    end
+
+    % Fallback: CPU
+    backend = 4;
+    device  = 'CPU';
+    fprintf('[babelbrain_wrapper] Auto-detected backend: CPU\n');
+end
+
+function device = default_device_for_backend(backend)
+% Return a safe default device string for a known numeric backend.
+    switch backend
+        case 3;  device = 'Apple';
+        otherwise; device = 'CPU';
+    end
+end
+
 function flag = bb_dryrun_flag(dry_run)
     if dry_run
         flag = '--dry_run';
+    else
+        flag = '';
+    end
+end
+
+function flag = bb_usect_flag(use_ct)
+    if use_ct
+        flag = '--use_ct';
+    else
+        flag = '';
+    end
+end
+
+function flag = bb_ctmapping_flag(ct_mapping)
+    if ~isempty(ct_mapping)
+        flag = sprintf('--ct_mapping "%s"', ct_mapping);
+    else
+        flag = '';
+    end
+end
+
+function flag = bb_petra_flag(use_petra)
+    if use_petra
+        flag = '--use_petra';
     else
         flag = '';
     end
@@ -373,4 +570,19 @@ function ver = query_babelbrain_version(python_bin, bb_runner, bb_root)
             end
         end
     end
+end
+
+function rewrite_hdf5_no_blosc(h5_path, python_bin, this_dir)
+% Rewrite h5_path in-place replacing blosc compression with gzip so MATLAB
+% can read it without a blosc filter plugin.
+rewriter = fullfile(this_dir, 'rewrite_hdf5_no_blosc.py');
+if ~isfile(rewriter)
+    warning('babelbrain_wrapper: rewrite_hdf5_no_blosc.py not found at %s — blosc read may fail.', rewriter);
+    return
+end
+cmd = sprintf('"%s" "%s" "%s"', python_bin, rewriter, h5_path);
+[status, out] = system(cmd);
+if status ~= 0
+    warning('babelbrain_wrapper: HDF5 rewrite failed (exit %d):\n%s\n  h5read may fail if blosc plugin is missing.', status, out);
+end
 end

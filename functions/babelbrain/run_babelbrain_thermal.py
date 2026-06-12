@@ -29,6 +29,20 @@ import sys
 import os
 
 
+class _TeeStream:
+    """Write to multiple streams simultaneously (console + log file)."""
+    def __init__(self, *streams):
+        self.streams = streams
+    def write(self, data):
+        for s in self.streams:
+            s.write(data)
+    def flush(self):
+        for s in self.streams:
+            s.flush()
+    def fileno(self):
+        return self.streams[0].fileno()
+
+
 def parse_args():
     p = argparse.ArgumentParser(description='PRESTUS–BabelBrain thermal bridge')
     p.add_argument('--acoustic_h5',        required=True,
@@ -55,6 +69,8 @@ def parse_args():
                    help='Off duration per cycle [s] (default 0)')
     p.add_argument('--repetitions',        default=1, type=int,
                    help='Number of sonication repetitions (default 1)')
+    p.add_argument('--log_file',            default='',
+                   help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     return p.parse_args()
 
 
@@ -77,6 +93,14 @@ def find_babelbrain_root(hint=''):
 
 def main():
     args = parse_args()
+
+    # Set up log file tee (stdout + stderr → console and file simultaneously)
+    _log_fh = None
+    if args.log_file:
+        os.makedirs(os.path.dirname(os.path.abspath(args.log_file)), exist_ok=True)
+        _log_fh = open(args.log_file, 'w', buffering=1)
+        sys.stdout = _TeeStream(sys.__stdout__, _log_fh)
+        sys.stderr = _TeeStream(sys.__stderr__, _log_fh)
 
     if not os.path.isfile(args.acoustic_h5):
         print(f'[run_babelbrain_thermal] Acoustic HDF5 not found: {args.acoustic_h5}',
@@ -136,6 +160,15 @@ def main():
         traceback.print_exc()
         sys.exit(1)
 
+    # Verify thermal output was written before returning success
+    import glob
+    acoustic_dir   = os.path.dirname(args.acoustic_h5)
+    thermal_files  = glob.glob(os.path.join(acoustic_dir, '*ThermalField*.h5'))
+    if not thermal_files:
+        print(f'[run_babelbrain_thermal] ERROR: No *ThermalField*.h5 found in {acoustic_dir} '
+              'after CalculateThermalProcess completed.', file=sys.stderr)
+        sys.exit(1)
+    print(f'[run_babelbrain_thermal] Thermal output: {thermal_files[-1]}')
     print('[run_babelbrain_thermal] Thermal simulation complete.')
     sys.exit(0)
 

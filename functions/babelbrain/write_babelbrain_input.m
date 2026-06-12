@@ -1,4 +1,4 @@
-function out_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target_name)
+function out_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target_name, ppw_override)
 % WRITE_BABELBRAIN_INPUT  Write BabelViscoInput NIfTI from PRESTUS medium masks
 %
 % Converts PRESTUS medium_masks (layer index volume in grid space) to a
@@ -52,6 +52,7 @@ arguments
     planimg       (1,1)   struct
     out_dir       (1,:)   char
     target_name   (1,:)   char
+    ppw_override  (1,1)   double = 0   % pass resolved PPW from wrapper; 0 = auto-compute
 end
 
 %% Derive PPW and build filename
@@ -59,13 +60,16 @@ freq_hz  = parameters.transducer(1).freq_hz;
 freq_kHz = round(freq_hz / 1e3);
 res_mm   = parameters.grid.resolution_mm;
 
-% BabelBrain convention: basePPW = c_min / (freq * resolution_mm)
-% Use minimum soft-tissue speed (brain, ~1540 m/s) as reference.
-c_min = 1500;  % conservative lower bound matching BabelBrain default
-if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'brain')
-    c_min = parameters.medium_properties.brain.sound_speed;
+if ppw_override > 0
+    ppw = ppw_override;
+else
+    % BabelBrain convention: basePPW = c_min / (freq * resolution_mm)
+    c_min = 1500;
+    if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'brain')
+        c_min = parameters.medium_properties.brain.sound_speed;
+    end
+    ppw = round(c_min / (freq_hz * res_mm * 1e-3));
 end
-ppw = round(c_min / (freq_hz * res_mm * 1e-3));
 
 subj_id  = sprintf('sub-%03d', parameters.subject_id);
 sub_dir  = fullfile(out_dir, subj_id);
@@ -148,15 +152,15 @@ if ~isempty(planimg) && isfield(planimg, 't1_header') && ~isempty(planimg.t1_hea
     % in the same orientation but may have different voxel size — rebuild
     % the sform with the correct pixel dimensions and origin.
     t1hdr = planimg.t1_header;
-    orig_origin = t1hdr.Transform.T(4, 1:3);  % [x y z] mm, row-major MATLAB affine3d
+    orig_origin = t1hdr.Transform.T(1:3, 4)';  % [x y z] mm; translation is in last column of affine3d.T
     T = diag([res_mm res_mm res_mm 1]);
     T(4, 1:3) = orig_origin;
-    hdr.Transform = affine3d(T');
+    hdr.Transform = affine3d(T);
 elseif ~isempty(planimg) && isfield(planimg, 'origin_ras_mm') && ~isempty(planimg.origin_ras_mm)
     origin = planimg.origin_ras_mm(:)';
     T = diag([res_mm res_mm res_mm 1]);
     T(4, 1:3) = origin;
-    hdr.Transform = affine3d(T');
+    hdr.Transform = affine3d(T);
 % else: leave MATLAB default identity affine; warn user
 else
     warning('write_babelbrain_input: planimg has no affine info. NIfTI will have identity transform.');
