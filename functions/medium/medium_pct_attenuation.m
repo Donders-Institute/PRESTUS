@@ -1,14 +1,24 @@
-function [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm)
+function [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm, density)
 % MEDIUM_PCT_ATTENUATION  Map pseudo-CT Hounsfield values to skull attenuation coefficients
 %
-% Applies one of four algorithms to fill alpha_coeff and alpha_power for
-% skull voxels indexed by skull_idx. Algorithm 'k-plan' uses a fixed
-% value; 'mueller' uses a square-root porosity model from Aubry et al.
-% 2022 / Fry 1978; 'aubry' uses the porosity model from Aubry et al.
-% 2003; 'none' uses the fixed scalar from parameters.medium_properties.skull.
+% Applies one of seven algorithms to fill alpha_coeff and alpha_power for
+% skull voxels indexed by skull_idx.
+%   'k-plan'    fixed value from config
+%   'mueller'   square-root porosity model (Aubry et al. 2022 / Fry 1978)
+%   'aubry'     porosity model (Aubry et al. 2003)
+%   'webb'      exponential HU model (Webb et al. 2020, scanner-specific; uses
+%               parameters.pct.webb_att_alpha0, .webb_att_beta, .webb_att_c or
+%               GE 120 kVp B-kernel defaults: Alpha_0=26, Beta=1.3, c=-0.0016)
+%   'pichardo'  2D ρ–freq interpolation from MapPichardo.h5
+%               (requires external/BabelBrain submodule and density argument)
+%   'mcdannold' polynomial ρ model (McDannold et al., linear in frequency)
+%   'none'      fixed scalar from parameters.medium_properties.skull
+% Webb, Pichardo, and McDannold results are converted to k-Wave alpha_coeff
+% (dB/cm/MHz^alpha_power) by normalising out the frequency dependence at 1 MHz.
 %
 % Use as:
 %   [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm)
+%   [alpha_coeff, alpha_power] = medium_pct_attenuation(..., density)  % required for pichardo/mcdannold
 %
 % Input:
 %   parameters  - PRESTUS config; must contain
@@ -31,7 +41,8 @@ arguments
     alpha_power {mustBeNumeric}
     pseudoCT    {mustBeNumeric}
     skull_idx   {mustBeNumericOrLogical}
-    algorithm   (1,:) char {mustBeMember(algorithm, {'k-plan','mueller','aubry','none'})}
+    algorithm   (1,:) char {mustBeMember(algorithm, {'k-plan','mueller','aubry','webb','pichardo','mcdannold','none'})}
+    density     {mustBeNumeric} = []
 end
 
 switch algorithm
@@ -75,6 +86,61 @@ switch algorithm
         alpha_coeff(skull_idx) = alpha_min + (alpha_max - alpha_min) * (phi(skull_idx).^0.5);
         % regularize sound speed to a minimum of water
         alpha_power(skull_idx) = parameters.medium_properties.skull.alpha_power;
+
+    case 'webb'
+        % Exponential HU-based attenuation from Webb et al. 2020 (Table IV).
+        % Formula: Att[Np/m] = (Alpha_0 * f_MHz^Beta * exp(HU*c)) * 100
+        % Converted to k-Wave format: alpha_coeff [dB/cm/MHz^Beta]
+        %   alpha_coeff(x) = Alpha_0 * exp(HU(x) * c) * 100 * 0.08686
+        %   alpha_power    = Beta
+        % Default parameters (GE 120 kVp, B kernel, 0.5×0.6 mm):
+        %   Alpha_0 = 26, Beta = 1.3, c = -0.0016
+        % Override via parameters.pct.webb_att_alpha0, .webb_att_beta, .webb_att_c.
+        % Reference: Webb et al. IEEE Trans Ultrason Ferroelectr Freq Control
+        %   68(5):1532–1545, 2020. DOI: 10.1109/TUFFC.2020.3039743
+        Alpha_0 = 26;
+        Beta    = 1.3;
+        c       = -0.0016;
+        if isfield(parameters, 'pct')
+            if isfield(parameters.pct, 'webb_att_alpha0'), Alpha_0 = parameters.pct.webb_att_alpha0; end
+            if isfield(parameters.pct, 'webb_att_beta'),   Beta    = parameters.pct.webb_att_beta;   end
+            if isfield(parameters.pct, 'webb_att_c'),      c       = parameters.pct.webb_att_c;      end
+        end
+        % 100 Np/m per (cm/m) × 0.08686 dB/Np = 8.686 dB/cm per unit of the formula
+        alpha_coeff(skull_idx) = Alpha_0 .* exp(pseudoCT(skull_idx) * c) * 8.686;
+        alpha_power(skull_idx) = Beta;
+
+    case 'pichardo'
+        % Frequency-dependent ρ→Att from Pichardo et al. 2D interpolation map.
+        % Requires external/BabelBrain submodule, density argument, and parameters.transducer(1).freq_hz.
+        % Map returns Att in Np/m; converted to k-Wave alpha_coeff normalised at 1 MHz
+        % assuming linear frequency scaling (alpha_power = 1).
+        if isempty(density)
+            error(['medium_pct_attenuation: pichardo requires density argument. ' ...
+                   'Call with 7 arguments: ..., algorithm, density']);
+        end
+        freq_hz  = parameters.transducer(1).freq_hz;
+        freq_MHz = freq_hz / 1e6;
+        [~, F_att] = medium_pct_pichardo_load(parameters);
+        att_Npm = F_att(density(skull_idx), freq_MHz);
+        att_dBcm = att_Npm * 0.08686;
+        alpha_coeff(skull_idx) = att_dBcm ./ freq_MHz;  % normalise to 1 MHz, alpha_power = 1
+        alpha_power(skull_idx) = 1;
+
+    case 'mcdannold'
+        % Polynomial ρ→Att from McDannold et al. with linear frequency scaling.
+        % Att[Np/m] = polyval(p, ρ) * freq_Hz / 660e3
+        % Converted to k-Wave alpha_coeff [dB/cm/MHz] (alpha_power = 1).
+        if isempty(density)
+            error(['medium_pct_attenuation: mcdannold requires density argument. ' ...
+                   'Call with 7 arguments: ..., algorithm, density']);
+        end
+        p = [1.36e-10, -1.41e-6, 5.40e-3, -9.02, 5.71e3];
+        % Att[Np/m] at f_MHz: polyval(p,ρ) * f_MHz / 0.66
+        % alpha_coeff = Att_at_1MHz_Npm * 0.08686 [dB/cm/MHz]
+        att_1MHz_Npm = polyval(p, density(skull_idx)) / 0.66;
+        alpha_coeff(skull_idx) = att_1MHz_Npm * 0.08686;
+        alpha_power(skull_idx) = 1;
 
     case 'none'
 

@@ -160,6 +160,16 @@ Mapping algorithm is governed by `pct_mapping_density`.
     </span>
     <br>
 
+- `air-tissue` | Linear air-to-bone calibration (BabelBrain-compatible) <br>
+
+    Linear HU→density calibrated between air (HU ≈ −1000) and cortical bone (HU ≈ 1000), matching the `HUtoDensityAirTissue` function used by BabelBrain in its Pichardo and McDannold workflows.
+
+    $$ \rho_\text{skull} = 1.01237293 \cdot \text{HU} + 1013.67 $$
+
+    Density is regularized at the minimum to water density. **Use this algorithm when `pct_mapping_soundspeed` or `pct_mapping_attenuation` is set to `pichardo` or `mcdannold`**, as those methods require a density input derived from the same calibration.
+
+    <br>
+
 #### Mapping skull sound speed
 
 Mapping algorithm is governed by `pct_mapping_soundspeed`.
@@ -201,6 +211,53 @@ Mapping algorithm is governed by `pct_mapping_soundspeed`.
     **References:**    
     Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
     Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).
+    </span>
+    <br>
+
+- `webb` | Linear HU-based mapping from Webb et al. (2018) <br>
+
+    $$ c_\text{skull} = \text{slope} \cdot \text{HU} + \text{intercept} \times 1000 $$
+
+    Default parameters (GE 120 kVp, B kernel, 0.5 × 0.6 mm resolution): slope = 0.75, intercept = 1.32 (giving c = 0.75 · HU + 1320 m/s). Scanner-specific values from Webb et al. Tables I and II can be set via `pct.webb_sos_slope` and `pct.webb_sos_intercept` in the config.
+
+    The minimum sound speed is regularized to water sound speed.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Velocity and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **65**(7):1111–1124 (2018). DOI: 10.1109/TUFFC.2018.2827899
+    </span>
+    <br>
+
+- `pichardo` | Frequency-dependent ρ→c from Pichardo et al. 2D interpolation map <br>
+
+    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal speed of sound [m/s] as a function of tissue density [kg/m³] and frequency [MHz]. Interpolation is bilinear with nearest-neighbour extrapolation.
+
+    Requires:
+    - `pct_mapping_density: air-tissue` (or another density algorithm run first)
+    - BabelBrain submodule initialised at `external/BabelBrain`
+    - Simulation frequency specified in `parameters.transducer(1).freq_hz`
+
+    The minimum sound speed is regularized to water sound speed.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Pichardo, S., et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. *Phys. Med. Biol.* **56**(1):219–250 (2011). DOI: 10.1088/0031-9155/56/1/014
+    </span>
+    <br>
+
+- `mcdannold` | Polynomial ρ→c from McDannold et al. <br>
+
+    Fourth-order polynomial relating tissue density to longitudinal speed of sound:
+
+    $$ c_\text{skull} = \frac{1}{p(\rho_\text{skull})} $$
+
+    where $p(\rho) = -2.79 \times 10^{-18}\,\rho^4 + 5.31 \times 10^{-16}\,\rho^3 + 1.69 \times 10^{-10}\,\rho^2 - 7.63 \times 10^{-7}\,\rho + 1.24 \times 10^{-3}$.
+
+    Requires density to be filled first (use `pct_mapping_density: air-tissue` or `marsac`). The minimum sound speed is regularized to water sound speed.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    McDannold, N., et al. Transcranial magnetic resonance imaging-guided focused ultrasound surgery of brain tumors: initial findings in 3 patients. *Neurosurgery* **66**(2):323–332 (2010).
     </span>
     <br>
 
@@ -249,5 +306,47 @@ Mapping algorithm is governed by `pct_mapping_attenuation`.
     **References:**    
     Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
     Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
+    </span>
+    <br>
+
+- `webb` | Exponential HU-based model from Webb et al. (2020) <br>
+
+    Per-voxel attenuation coefficient as a function of HU and frequency:
+
+    $$ \alpha_\text{skull}(f) = \alpha_0 \cdot \left(\frac{f}{1\,\text{MHz}}\right)^{\beta} \cdot \exp(c \cdot \text{HU}) $$
+
+    Output is converted to k-Wave's `alpha_coeff` [dB/cm/MHz$^\beta$] format with `alpha_power = β`. Default parameters (GE 120 kVp, B kernel, 0.5 × 0.6 mm): α₀ = 26, β = 1.3, c = −0.0016. Scanner-specific values from Webb et al. Table IV can be set via `pct.webb_att_alpha0`, `pct.webb_att_beta`, and `pct.webb_att_c` in the config.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Attenuation and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **68**(5):1532–1545 (2020). DOI: 10.1109/TUFFC.2020.3039743
+    </span>
+    <br>
+
+- `pichardo` | Frequency-dependent ρ→Att from Pichardo et al. 2D interpolation map <br>
+
+    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal attenuation [Np/m] as a function of tissue density [kg/m³] and frequency [MHz]. The map value at the simulation frequency is converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1` (linear frequency scaling assumed).
+
+    Requires the same prerequisites as `pichardo` sound speed mapping (see above), plus the `density` argument being pre-filled (pass density to `medium_pct_attenuation`).
+
+    <span style="font-size: 12px;">
+    **References:**    
+    Pichardo, S., et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. *Phys. Med. Biol.* **56**(1):219–250 (2011). DOI: 10.1088/0031-9155/56/1/014
+    </span>
+    <br>
+
+- `mcdannold` | Polynomial ρ→Att from McDannold et al. with linear frequency scaling <br>
+
+    Fourth-order polynomial relating tissue density to attenuation, scaled linearly with frequency relative to a 660 kHz reference:
+
+    $$ \alpha_\text{skull}(f) = p(\rho_\text{skull}) \cdot \frac{f}{660\,\text{kHz}} $$
+
+    where $p(\rho) = 1.36 \times 10^{-10}\,\rho^4 - 1.41 \times 10^{-6}\,\rho^3 + 5.40 \times 10^{-3}\,\rho^2 - 9.02\,\rho + 5.71 \times 10^{3}$ [Np/m].
+
+    Converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1`. Requires density to be filled first.
+
+    <span style="font-size: 12px;">
+    **References:**    
+    McDannold, N., et al. Transcranial magnetic resonance imaging-guided focused ultrasound surgery of brain tumors: initial findings in 3 patients. *Neurosurgery* **66**(2):323–332 (2010).
     </span>
     <br>

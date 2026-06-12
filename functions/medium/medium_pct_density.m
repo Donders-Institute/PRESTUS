@@ -1,12 +1,14 @@
 function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, algorithm)
 % MEDIUM_PCT_DENSITY  Map pseudo-CT Hounsfield values to skull bone density
 %
-% Applies one of five algorithms to fill density for skull voxels indexed
+% Applies one of six algorithms to fill density for skull voxels indexed
 % by skull_idx. Algorithm 'k-plan' uses the piece-wise linear HU-density
 % look-up from the k-Plan pipeline; 'k-wave' uses hounsfield2density with
 % a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
 % 2017; 'aubry' uses the porosity mixture model from Aubry et al. 2003;
-% 'none' uses the fixed scalar from parameters.medium_properties.skull.
+% 'air-tissue' uses the linear air-to-bone model (Pichardo and McDannold
+% workflows); 'none' uses the
+% fixed scalar from parameters.medium_properties.skull.
 % All algorithms clamp density to at least water density.
 %
 % Use as:
@@ -30,7 +32,7 @@ arguments
     density    {mustBeNumeric}
     pseudoCT   {mustBeNumeric}
     skull_idx  {mustBeNumericOrLogical}
-    algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','none'})}
+    algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','air-tissue','none'})}
 end
 
 switch algorithm
@@ -114,6 +116,12 @@ switch algorithm
         phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx))); % [Aubry et al., 2003; Guo et al., 2019]
         density(skull_idx) = rho_water * phi(skull_idx) + ...
             rho_bone * (1-phi(skull_idx));
+
+    case 'air-tissue'
+        % Linear HU→density calibrated to air (HU≈-1000) and cortical bone (HU≈1000).
+        % Coefficients: slope=1.01237293, intercept=1013.66593 kg/m³.
+        density(skull_idx) = 1.01237293 * pseudoCT(skull_idx) + 1013.66593;
+        density(skull_idx) = max(parameters.medium_properties.water.density, density(skull_idx));
 
     case 'none'
 

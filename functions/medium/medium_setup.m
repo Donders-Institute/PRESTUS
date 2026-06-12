@@ -118,7 +118,7 @@ end
             else
                 pct_mapping_attenuation = 'none';
             end
-            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation);
+            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation, density);
             
             % [DEBUG] save pCT mapping overview
             if parameters.simulation.debug == 1
