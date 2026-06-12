@@ -16,7 +16,7 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
 %   calibration_output_folder - folder containing per-run YAML files
 %                               (default: current directory)
 %   library_path              - folder for the transducer library
-%                               (default: config/transducer/ under PRESTUS root)
+%                               (default: config/calibration/ under PRESTUS root)
 %
 % Output:
 %   (none) — writes/updates {library_path}/{combo_name}.yaml
@@ -27,7 +27,7 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         calibration_output_folder = pwd();
     end
     if nargin < 3 || isempty(library_path)
-        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
 
     %% Scan for matching calibration files

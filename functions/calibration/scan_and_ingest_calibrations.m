@@ -14,7 +14,7 @@ function scan_and_ingest_calibrations(calibration_output_folder, library_path)
 %   calibration_output_folder - folder containing per-run YAML files
 %                               (default: current directory)
 %   library_path              - folder for the transducer library
-%                               (default: config/transducer/ under PRESTUS root)
+%                               (default: config/calibration/ under PRESTUS root)
 %
 % Output:
 %   (none) — calls update_transducer_library for each combo found
@@ -25,7 +25,7 @@ function scan_and_ingest_calibrations(calibration_output_folder, library_path)
         calibration_output_folder = pwd();
     end
     if nargin < 2 || isempty(library_path)
-        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
 
     %% Scan for all calibration files

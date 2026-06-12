@@ -18,9 +18,9 @@ function result = calibrate_transducer(parameters, charac_data, ...
 %
 %   'multi_depth'
 %     Runs PERFORM_JOINT_DEPTH_FIT across all available calibration depths
-%     simultaneously. Mirrors BabelBrain's TxCalibration approach: a single
-%     depth-independent hardware correction and velocity are fitted jointly
-%     to all empirical profiles. Uses Rayleigh forward model by default.
+%     simultaneously. A single depth-independent hardware correction and
+%     velocity are fitted jointly to all empirical profiles. Uses Rayleigh
+%     forward model by default.
 %     Requires PhaseTable and Tran. Lambda (L2 regularisation on delta
 %     phases) defaults to 0; set options.Lambda to a small positive value
 %     (e.g. 1e-3) to penalise large hardware corrections.
@@ -34,7 +34,6 @@ function result = calibrate_transducer(parameters, charac_data, ...
 %   'rayleigh'  (default for 'multi_depth')
 %     Rayleigh–Sommerfeld numerical integral via RAYLEIGH_AXIAL_INTENSITY.
 %     More accurate for large steering offsets and ring gaps.
-%     Used by BabelBrain's calibration pipeline.
 %
 % Use as:
 %   result = calibrate_transducer(parameters, charac_data, ...
@@ -56,7 +55,8 @@ function result = calibrate_transducer(parameters, charac_data, ...
 %                         (default: 'oneil' for single_ref, 'rayleigh' for multi_depth)
 %     .RefDepth         - reference depth [mm] for result packaging and export
 %                         (default: median of available_depths_ep)
-%     .PhaseTable       - phase table struct for SET_REAL_PHASES (required)
+%     .PhaseTable       - phase table struct for SET_REAL_PHASES, or [] for
+%                         geometry-only mode (default: [])
 %     .Tran             - transducer struct from load_equipment_config (required)
 %     .Lambda           - L2 regularisation weight on delta phases for multi_depth
 %                         (default: 0)
@@ -111,8 +111,6 @@ assert(ismember(mode, {'single_ref', 'multi_depth'}), ...
     'calibrate_transducer: Mode must be ''single_ref'' or ''multi_depth''');
 assert(ismember(forward_model, {'oneil', 'rayleigh'}), ...
     'calibrate_transducer: ForwardModel must be ''oneil'' or ''rayleigh''');
-assert(~isempty(phase_table), ...
-    'calibrate_transducer: PhaseTable is required');
 assert(~isempty(tran), ...
     'calibrate_transducer: Tran is required');
 

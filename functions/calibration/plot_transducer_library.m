@@ -13,7 +13,7 @@ function plot_transducer_library(combo_name, library_path, equip_param)
 % Input:
 %   combo_name   - equipment combination key (library filename without .yaml)
 %   library_path - path to transducer library folder
-%                  (default: config/transducer/ under PRESTUS root)
+%                  (default: config/calibration/ under PRESTUS root)
 %   equip_param  - struct from load_equipment_config (optional; loaded if missing)
 %
 % Output:
@@ -22,7 +22,7 @@ function plot_transducer_library(combo_name, library_path, equip_param)
 % See also: UPDATE_TRANSDUCER_LIBRARY, VALIDATE_TRANSDUCER_LIBRARY
 
     if nargin < 2 || isempty(library_path)
-        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
     if nargin < 3 || isempty(equip_param)
         equip_param = load_equipment_config();

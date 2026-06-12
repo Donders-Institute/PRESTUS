@@ -21,7 +21,8 @@ function correction_deg = calibration_extract_correction(...
 %   parameters           - PRESTUS config; uses medium_properties.water.sound_speed
 %                          and calibration.path_output_profiles / equipment_name
 %   tran                 - transducer struct (from load_transducer_from_library)
-%   phase_table          - manufacturer phase data (table or ini struct)
+%   phase_table          - manufacturer phase data (table or ini struct), or []
+%                          for geometry-only mode (default: [])
 %   ref_depth_ep         - reference focal depth w.r.t. exit plane [mm]
 %
 % Output:
@@ -34,7 +35,7 @@ arguments
     calibrated_yaml_path (1,:) char
     parameters           (1,1) struct
     tran                 (1,1) struct
-    phase_table
+    phase_table                = []
     ref_depth_ep         (1,1) {mustBeNumeric}
 end
 

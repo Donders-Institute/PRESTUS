@@ -5,10 +5,9 @@ function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %
 % Optimises a single per-element delta phase (hardware correction) and
 % particle velocity simultaneously across all calibration depths, by
-% minimising the sum of profile errors over depths. This mirrors
-% BabelBrain's TxCalibration approach: the transfer matrix is built with
-% geometric (Rayleigh-steered) phases at each depth and a single correction
-% vector b is fitted across all depths.
+% minimising the sum of profile errors over depths. The transfer matrix is
+% built with geometric (Rayleigh-steered) phases at each depth and a single
+% correction vector b is fitted across all depths.
 %
 % The drive signal at depth j is:
 %   phases_j = geo_phases(j) + delta_phases
@@ -35,7 +34,7 @@ function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %   dist_bowl           - [N_pts x 1] axial positions from bowl [mm]
 %   dist_bowl_offset    - curv_radius_mm - dist_geom_ep_mm [mm]
 %   desired_intensity   - target peak Isppa [W/cm²] used for per-depth scaling
-%   phase_table         - phase table struct for SET_REAL_PHASES
+%   phase_table         - phase table struct for SET_REAL_PHASES, or [] for geometry-only mode
 %   tran                - transducer struct from load_equipment_config
 %   options             - struct with optional fields:
 %     .ForwardModel     - 'rayleigh' (default) | 'oneil'
@@ -57,7 +56,7 @@ arguments
     dist_bowl           (:,1) {mustBeNumeric}
     dist_bowl_offset    (1,1) {mustBeNumeric}
     desired_intensity   (1,1) {mustBeNumeric}
-    phase_table         (1,1) struct
+    phase_table                = []
     tran                (1,1) struct
     options             (1,1) struct = struct()
 end
@@ -168,7 +167,7 @@ if ~isfield(parameters.calibration, 'opt_upper_velocity') || ...
     parameters.calibration.opt_upper_velocity = 0.2;
 end
 
-% Start from zero delta (= geometric steering), like BabelBrain
+% Start from zero delta (= geometric steering)
 initial_guess = [zeros(1, n_elem), v0];
 lower_bounds  = [-pi * ones(1, n_elem), 0.001];
 upper_bounds  = [ pi * ones(1, n_elem), parameters.calibration.opt_upper_velocity];

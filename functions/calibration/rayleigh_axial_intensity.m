@@ -3,8 +3,7 @@ function I_axial = rayleigh_axial_intensity(phases_rad, velocity, parameters, di
 %
 % Computes the on-axis complex pressure by numerically integrating the
 % Rayleigh–Sommerfeld kernel over the surface of each annular ring element,
-% then converts to intensity. This is the forward model used by BabelBrain's
-% calibration pipeline (TxCalibration.py, RayleighCoeff).
+% then converts to intensity.
 %
 % For element i with inner radius a_i, outer radius b_i, amplitude u0,
 % phase phi_i:

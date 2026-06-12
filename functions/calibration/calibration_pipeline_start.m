@@ -130,9 +130,9 @@ function job_id = calibration_pipeline_start(...
             if isfield(parameters.hpc, 'wait_for_job') && parameters.hpc.wait_for_job
                 fprintf('Waiting for calibration job %d to complete...\n', job_id);
                 if isfield(parameters.hpc, 'max_wait_checks') && ~isempty(parameters.hpc.max_wait_checks)
-                    hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks);
+                    hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks, parameters, log_dir);
                 else
-                    hpc_wait_for_completion(job_id, platform);
+                    hpc_wait_for_completion(job_id, platform, [], parameters, log_dir);
                 end
             else
                 fprintf('Calibration job submitted (ID: %d). Continuing.\n', job_id);

@@ -50,7 +50,7 @@ end
         % precedence over library values.
         if any(has_serial)
             equip_param = load_equipment_config();
-            library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            library_path = fullfile(get_prestus_path(), 'config', 'calibration');
             % Resolve each serial-bearing transducer.  Because resolution may
             % add fields (e.g. type, freq_hz) that were absent from the
             % original struct array element, we rebuild the array from scratch
@@ -124,10 +124,23 @@ end
 
         parameters.transducer = new_transducers;
 
-        % Warn if transducers have mismatched frequencies
+        % Multi-transducer + multi-frequency is not supported: coherent k-Wave
+        % superposition with different CW frequencies produces physically invalid
+        % interference patterns, and the acoustic analysis assumes a single frequency
+        % for MI and intensity calculations.  Error rather than warn to prevent
+        % silently wrong results.  Use separate single-transducer runs and combine
+        % intensities incoherently (transducer_coupling: async) if different
+        % frequencies are required.
         all_freqs = [parameters.transducer.freq_hz];
-        if numel(unique(all_freqs)) > 1
-            warn('Transducers have different frequencies: %s Hz. This is not fully supported.', ...
+        if numel(unique(all_freqs)) > 1 && numel(parameters.transducer) > 1
+            error('prestus:multiFreqMultiTransducer', ...
+                ['Multiple transducers with different frequencies are not supported ' ...
+                 '(%s Hz). Use separate single-transducer runs and combine intensities ' ...
+                 'incoherently (simulation.transducer_coupling: async).'], ...
+                num2str(unique(all_freqs)));
+        elseif numel(unique(all_freqs)) > 1
+            warn('prestus:multiFreq', ...
+                'Transducer has multiple drive frequencies (%s Hz). Verify MI uses the intended frequency.', ...
                 num2str(unique(all_freqs)));
         end
 

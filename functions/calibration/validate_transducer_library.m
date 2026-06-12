@@ -12,7 +12,7 @@ function report = validate_transducer_library(library_path, equipment_path)
 %
 % Input:
 %   library_path   - path to transducer library folder
-%                    (default: config/transducer/ under PRESTUS root)
+%                    (default: config/calibration/ under PRESTUS root)
 %   equipment_path - path to equipment config folder
 %                    (default: config/equipment/ under PRESTUS root)
 %
@@ -30,7 +30,7 @@ function report = validate_transducer_library(library_path, equipment_path)
 % See also: UPDATE_TRANSDUCER_LIBRARY, CHECK_EQUIPMENT_CONFIG
 
     if nargin < 1 || isempty(library_path)
-        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
     if nargin < 2 || isempty(equipment_path)
         equipment_path = fullfile(get_prestus_path(), 'config', 'equipment');

@@ -75,7 +75,7 @@ for i = 1:N_i
         combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
         phase_table = read_ini_file(combo.phase_table);
     else
-        phase_table = struct();   % unused; set_real_phases calls generate_tran_ini_from_geometry
+        phase_table = [];   % geometry-only mode; set_real_phases calls generate_tran_ini_from_geometry
     end
 
     % Load pre-calibrated per-element correction from the transducer equipment YAML.

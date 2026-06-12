@@ -6,10 +6,6 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % element phases from the fitted parametric model and looks up (or scales)
 % the amplitude for the desired intensity.
 %
-% This is the PRESTUS equivalent of how BabelBrain loads a device YAML at
-% runtime: geometry + fitted model -> ready-to-use transducer parameters.
-% The difference is that BabelBrain trusts the manufacturer phase table
-% directly, while PRESTUS uses phases fitted by calibration_transducer.
 %
 % When the library YAML contains a global_model section (phases calibrated
 % across all depths simultaneously), phases are interpolated linearly at the
@@ -29,18 +25,22 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %   desired_intensity  - target ISPPA [W/cm²]
 %   equip_param        - struct from load_equipment_config()
 %   library_path       - (optional) path to transducer library folder;
-%                        defaults to config/transducer/ under PRESTUS root
+%                        defaults to config/calibration/ under PRESTUS root
 %
 % Output:
 %   parameters - struct with:
-%     .transducer          — geometry + calibrated phases and amplitude
-%     .library_meta        — provenance from the library YAML meta section
-%     .library_focal_used  — actual calibrated focal depth used [mm]
+%     .transducer              — geometry + calibrated phases and amplitude
+%     .transducer.tx_calibration.isppa_wcm2        — ISPPA the elem_amp produces [W/cm²]
+%     .transducer.tx_calibration.focal_depth_ep_mm — calibrated depth used [mm]
+%     .transducer.tx_calibration.phase_source      — 'library'
+%     .transducer.tx_calibration.isppa_source      — 'library'
+%     .transducer.tx_calibration.library_key       — combo name used for lookup
+%     .transducer.tx_calibration.library_meta      — provenance from the library YAML
 %
 % See also: UPDATE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER
 
     if nargin < 5 || isempty(library_path)
-        library_path = fullfile(get_prestus_path(), 'config', 'transducer');
+        library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
 
     %% Load calibration library entry
@@ -145,11 +145,12 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
             parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
                 (tran.transducer.annular.curv_radius_mm - ...
                  tran.transducer.annular.dist_geom_ep_mm);
-            parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
-
-            %% Provenance
-            parameters.library_meta       = lib.meta;
-            parameters.library_focal_used = used_depth_gm;
+            parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
+            parameters.transducer.tx_calibration.focal_depth_ep_mm = used_depth_gm;
+            parameters.transducer.tx_calibration.phase_source       = 'library';
+            parameters.transducer.tx_calibration.isppa_source       = 'library';
+            parameters.transducer.tx_calibration.library_key        = combo_name;
+            parameters.transducer.tx_calibration.library_meta       = lib.meta;
 
             fprintf('Library loaded (global model): %s | focal %.1f mm (interp from %.1f mm) | amp %d @ %.1f W/cm²\n', ...
                 combo_name, focal_distance_ep, used_depth_gm, elem_amp(1), desired_intensity);
@@ -238,11 +239,12 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
         (tran.transducer.annular.curv_radius_mm - ...
          tran.transducer.annular.dist_geom_ep_mm);
-    parameters.transducer.set_intensity_w_per_cm2 = desired_intensity;
-
-    %% Provenance
-    parameters.library_meta       = lib.meta;
-    parameters.library_focal_used = focal_used;
+    parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
+    parameters.transducer.tx_calibration.focal_depth_ep_mm = focal_used;
+    parameters.transducer.tx_calibration.phase_source       = 'library';
+    parameters.transducer.tx_calibration.isppa_source       = 'library';
+    parameters.transducer.tx_calibration.library_key        = combo_name;
+    parameters.transducer.tx_calibration.library_meta       = lib.meta;
 
     fprintf('Library loaded: %s | focal %.1f mm (calibrated %.1f mm) | amp %d @ %.1f W/cm²\n', ...
         combo_name, focal_distance_ep, focal_used, elem_amp(1), desired_intensity);
