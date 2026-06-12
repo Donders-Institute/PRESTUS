@@ -19,7 +19,7 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
 %                    .series_index   integer — maps into trans_pos / target_pos rows
 %                    .transducer_id  integer — which parameters.transducer() to use
 %                    .target_name    char    — must start with 'L_' or 'R_'
-%   parameters   - PRESTUS config struct.  Must contain parameters.seg_path.
+%   parameters   - PRESTUS config struct.  Must contain parameters.path.seg.
 %   output_dir   - folder where the PNG is saved
 %   params_plot  - (optional) separate config struct whose transducer array
 %                  is used for geometry/visualisation.  Pass when the main
@@ -38,7 +38,7 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
     % ------------------------------------------------------------------
     % Load segmentation
     % ------------------------------------------------------------------
-    seg_file = fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz');
+    seg_file = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz');
     if ~exist(seg_file, 'file')
         warning('neuronav_plot_placement: segmentation not found for %s, skipping plot.', sub_id);
         fig = [];

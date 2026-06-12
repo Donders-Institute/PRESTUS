@@ -64,7 +64,7 @@ for ti = 1:numel(parameters.transducer)
             focal_distance = norm(tr.focus_pos - tr.trans_pos);
 
             try
-                t1_file = dir(fullfile(parameters.data_path, sprintf(parameters.t1_path_template, parameters.subject_id)));
+                t1_file = dir(fullfile(parameters.path.anat, sprintf(parameters.t1_path_template, parameters.subject_id)));
                 t1_header = niftiinfo(fullfile(t1_file.folder, t1_file.name));
                 t1_resolution_mm = round(mean(t1_header.PixelDimensions(1:3)));
                 tr.focal_distance_bowl = focal_distance * t1_resolution_mm;

@@ -13,7 +13,7 @@ function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
 %
 % Input:
 %   sub_id     - subject identifier string (e.g. ‘sub-010’)
-%   parameters - PRESTUS config struct with parameters.seg_path field
+%   parameters - PRESTUS config struct with parameters.path.seg field
 %   trans_mm   - [Nx3] transducer coordinates in MNI space [mm RAS]
 %   targ_mm    - [Nx3] target coordinates in MNI space [mm RAS]
 %
@@ -27,8 +27,8 @@ function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
 
     Npos = size(trans_mm,1); % Number of positions
 
-    t1seg_info = niftiinfo(fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
-    m2m_folder = fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id));
+    t1seg_info = niftiinfo(fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
+    m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id));
     transformation_type = 'nonl';
 
     for i = 1:Npos

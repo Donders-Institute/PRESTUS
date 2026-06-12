@@ -23,7 +23,7 @@ function [trans_ras_seg, ...
 % Input:
 %   sub_id     - subject identifier string (e.g. 'sub-010')
 %   parameters - PRESTUS config struct with parameters.path.localite_raw
-%                and parameters.seg_path fields
+%                and parameters.path.seg fields
 %   trans_ras  - [Nx3] transducer RAS coordinates in native space [mm]
 %   target_ras - [Nx3] target RAS coordinates in native space [mm]
 %   side_order - cell array of laterality strings {'left','right',...} (optional)
@@ -61,10 +61,10 @@ function [trans_ras_seg, ...
             sub_id, fullfile(t1_root, sub_id), t1_root, t1plan_pat);
     end
     t1plan_info = niftiinfo(fullfile(t1plan_files(1).folder, t1plan_files(1).name));
-    t1seg_info = niftiinfo(fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
-    mni_info = niftiinfo(fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'toMNI', 'final_tissues_MNI.nii.gz'));
+    t1seg_info = niftiinfo(fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));
+    mni_info = niftiinfo(fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'toMNI', 'final_tissues_MNI.nii.gz'));
 
-    warp_file = fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id), 'toMNI', 'Conform2MNI_nonl.nii.gz');
+    warp_file = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'toMNI', 'Conform2MNI_nonl.nii.gz');
     warp_field = niftiread(warp_file);     % [X Y Z 3] nonlinear field: native→MNI displacement (mm)
     warp_info  = niftiinfo(warp_file);     % Contains the affine
     
@@ -73,7 +73,7 @@ function [trans_ras_seg, ...
     warp_affine = warp_info.Transform.T;
     mni_affine = mni_info.Transform.T;
 
-    m2m_folder = fullfile(parameters.seg_path, sprintf('m2m_%s', sub_id));
+    m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id));
     transformation_type = 'nonl';
 
     % Intermission: ensure that segmentation coordinates map onto MNI
