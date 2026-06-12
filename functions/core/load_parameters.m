@@ -94,6 +94,7 @@ function parameters = load_parameters(varargin)
             extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true);
         end
         parameters = mergestruct(parameters, extra_parameters);
+        parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
@@ -225,6 +226,27 @@ function parameters = load_parameters(varargin)
                                    'Yes', 'No')), 'Exiting');
     end
 
+    %% Validate acoustic_backend value
+    if isfield(parameters, 'acoustic_backend') && ~isempty(parameters.acoustic_backend)
+        valid_backends = {'kwave', 'babelbrain', 'jwave'};
+        if ~any(strcmpi(parameters.acoustic_backend, valid_backends))
+            error('prestus:unknownAcousticBackend', ...
+                'Unknown acoustic_backend "%s". Valid options: %s.', ...
+                parameters.acoustic_backend, strjoin(valid_backends, ', '));
+        end
+    end
+
+    %% jwave compatibility: kWaveArray source is not supported
+    if isfield(parameters, 'acoustic_backend') && ...
+            strcmpi(parameters.acoustic_backend, 'jwave') && ...
+            isfield(parameters, 'grid') && isfield(parameters.grid, 'use_kWaveArray') && ...
+            parameters.grid.use_kWaveArray
+        warning('prestus:jwaveKWaveArrayUnsupported', ...
+            ['jwave backend does not support kWaveArray sources. ' ...
+             'Overriding grid.use_kWaveArray to 0.']);
+        parameters.grid.use_kWaveArray = 0;
+    end
+
     %% [DEBUG] Summary of requested parameters
     % With debugging off, the parameters are saved to the log at the
     % start of pipeline execution (see path_log_setup).
@@ -257,6 +279,24 @@ function merged = restore_struct_arrays(merged, extra)
                 result(k) = mergestruct(base, extra.(f)(k));
             end
             merged.(f) = result;
+        end
+    end
+
+    % Verify that all elements of any restored struct array carry the same field
+    % set. Heterogeneous arrays cause cryptic errors deep in the pipeline.
+    fn_merged = fieldnames(merged);
+    for i = 1:numel(fn_merged)
+        f = fn_merged{i};
+        if isstruct(merged.(f)) && numel(merged.(f)) > 1
+            base_fields = sort(fieldnames(merged.(f)(1)));
+            for k = 2:numel(merged.(f))
+                elem_fields = sort(fieldnames(merged.(f)(k)));
+                assert(isequal(base_fields, elem_fields), ...
+                    ['prestus:heterogeneousStructArray — field "%s" element %d has different ' ...
+                     'fields from element 1 after config merge. ' ...
+                     'Check that your override config defines the same sub-fields for every ' ...
+                     'array element (or leave extra elements entirely to inherit defaults).'], f, k);
+            end
         end
     end
 end
