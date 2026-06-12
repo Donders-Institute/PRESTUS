@@ -243,6 +243,23 @@ function [parameters] = prestus_pipeline(parameters, options)
     else
         disp('No grid setup requested...no simulations will be performed.')
     end
+
+    % Ensure trans_pos / focus_pos local vars are always defined after the grid block.
+    % When run_grid_setup == 0 the block above is skipped entirely; fall back to
+    % whatever the transducer struct already carries (e.g. from a previous run or
+    % a manual config).  Downstream code that guards on ~isempty() will skip safely
+    % if neither source is available.
+    if ~exist('trans_pos', 'var')
+        if isfield(parameters, 'transducer') && numel(parameters.transducer) >= 1 && ...
+                isfield(parameters.transducer(1), 'trans_pos') && ~isempty(parameters.transducer(1).trans_pos)
+            trans_pos = parameters.transducer(1).trans_pos;
+            focus_pos = parameters.transducer(1).focus_pos;
+        else
+            trans_pos = [];
+            focus_pos = [];
+        end
+    end
+
     log_timer('stop','preproc');
 
     % ====================================================================
@@ -311,7 +328,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     % (lateral = diameter, axial = length, both centred on the focus).
     % Either field may be set to 'auto':
     %   acoustic_fov_length_mm   'auto' -> focal_depth_mm + grid.z_beyond_focus_mm
-    %                                      (default 40 mm, matching BabelBrain)
+    %                                      (default 40 mm)
     %   acoustic_fov_diameter_mm 'auto' -> outermost element diameter of the
     %                                      first transducer (max elem_od_mm)
     % The crop offsets are stored in acoustic_provenance so that
@@ -320,12 +337,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     % ====================================================================
 
     % Resolve 'auto' settings before the has_acoustic_fov check.
+    % Guard: both require a valid focal geometry; skip silently if not available.
     if isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
             ischar(parameters.grid.acoustic_fov_length_mm) && ...
-            strcmpi(parameters.grid.acoustic_fov_length_mm, 'auto')
+            strcmpi(parameters.grid.acoustic_fov_length_mm, 'auto') && ...
+            ~isempty(trans_pos) && ~isempty(focus_pos)
         focal_depth_vox = norm(focus_pos - trans_pos);
         focal_depth_mm  = focal_depth_vox * parameters.grid.resolution_mm;
-        z_beyond_mm     = 40.0;  % default matching BabelBrain
+        z_beyond_mm     = 40.0;
         if isfield(parameters.grid, 'z_beyond_focus_mm') && ...
                 ~isempty(parameters.grid.z_beyond_focus_mm)
             z_beyond_mm = parameters.grid.z_beyond_focus_mm;
@@ -397,7 +416,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     fprintf('========================================\n\n');
     log_timer('start','source', parameters.io.dir_output);
 
-    if ~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1
+    use_babelbrain_acoustic = isfield(parameters, 'acoustic_backend') && ...
+        strcmpi(parameters.acoustic_backend, 'babelbrain');
+
+    if (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1) && ...
+            ~use_babelbrain_acoustic
         max_sound_speed = max(kwave_medium.sound_speed(:));
         min_sound_speed = min(kwave_medium.sound_speed(:));
         [kgrid, source, sensor, source_labels] = ...
@@ -423,8 +446,12 @@ function [parameters] = prestus_pipeline(parameters, options)
                     parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
             end
         end
+    elseif use_babelbrain_acoustic
+        disp('[pipeline] BabelBrain acoustic backend: skipping source setup.')
+        source_labels = [];
     else
         disp('No source setup requested...no simulations will be performed.')
+        source_labels = [];
     end
     log_timer('stop', 'source');
 
@@ -447,18 +474,55 @@ function [parameters] = prestus_pipeline(parameters, options)
         acoustic_provenance.full_ac_dims  = full_ac_dims_saved;
     end
 
+    % Carry tx_calibration provenance into acoustic_provenance so that
+    % combine_async_intensity and apply_isppa_scaling can use the calibrated
+    % ISPPA as a baseline without requiring a fresh water simulation.
+    % Set by load_transducer_from_library; absent for inline elem_amp configs.
+    tr1 = parameters.transducer(1);
+    if isfield(tr1, 'tx_calibration') && isfield(tr1.tx_calibration, 'isppa_wcm2') && ...
+            isscalar(tr1.tx_calibration.isppa_wcm2) && isfinite(tr1.tx_calibration.isppa_wcm2)
+        acoustic_provenance.tx_calibration = tr1.tx_calibration;
+    end
+
+    % Determine whether a water-baseline simulation is needed.
+    % Only required when the target ISPPA differs from the calibration level —
+    % i.e., when actual scaling will be applied.  When they match (common case:
+    % simulate at the calibrated drive level), the calibration ISPPA serves
+    % directly as freefield_isppa_wcm2 and no extra simulation is run.
     has_per_transducer_target = isfield(parameters, 'transducer') && ...
         any(arrayfun(@(t) isfield(t, 'target_isppa_wcm2') && ...
                           ~isempty(t.target_isppa_wcm2) && ...
                           any(isfinite(t.target_isppa_wcm2)), parameters.transducer));
+
+    cal_isppa = NaN;
+    if isfield(acoustic_provenance, 'tx_calibration') && ...
+            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2')
+        cal_isppa = acoustic_provenance.tx_calibration.isppa_wcm2;
+    end
+
+    target_differs_from_cal = has_per_transducer_target && isfinite(cal_isppa) && ...
+        abs(parameters.transducer(1).target_isppa_wcm2(1) - cal_isppa) / cal_isppa > 0.01;
+
     run_baseline = (isfield(parameters.modules, 'run_water_baseline') && ...
                     parameters.modules.run_water_baseline == 1) || ...
-                   has_per_transducer_target;
+                   target_differs_from_cal;
+
+    if has_per_transducer_target && ~run_baseline && isfinite(cal_isppa)
+        % Target matches calibration level: use library value directly.
+        acoustic_provenance.freefield_isppa_wcm2 = cal_isppa;
+        fprintf('Skipping free-water baseline: target ISPPA matches calibration level (%.2f W/cm²).\n', cal_isppa);
+    end
+
     if run_baseline && ...
             (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
         log_timer('start', 'freefield_baseline', parameters.io.dir_output);
         acoustic_provenance.freefield_isppa_wcm2 = ...
             water_baseline(parameters, kgrid, source, sensor);
+        % Mark that the ISPPA was measured by k-Wave simulation.
+        if isfield(acoustic_provenance, 'tx_calibration')
+            acoustic_provenance.tx_calibration.isppa_wcm2  = acoustic_provenance.freefield_isppa_wcm2;
+            acoustic_provenance.tx_calibration.isppa_source = 'kwave_simulation';
+        end
         log_timer('stop', 'freefield_baseline');
     end
 
@@ -516,14 +580,18 @@ function [parameters] = prestus_pipeline(parameters, options)
 
         use_babelbrain = isfield(parameters, 'acoustic_backend') && ...
             strcmpi(parameters.acoustic_backend, 'babelbrain');
+        use_jwave = isfield(parameters, 'acoustic_backend') && ...
+            strcmpi(parameters.acoustic_backend, 'jwave');
 
         if use_babelbrain
             % --- BabelBrain acoustic backend ---
             equip_param_bb = struct();
             if exist('equip_param', 'var'), equip_param_bb = equip_param; end
+            pct_for_bb = [];
+            if exist('pseudoCT', 'var'), pct_for_bb = pseudoCT; end
             sensor_data = babelbrain_wrapper( ...
                 parameters, medium_masks, kwave_medium, ...
-                focus_pos, trans_pos, planimg, equip_param_bb);
+                focus_pos, trans_pos, planimg, equip_param_bb, pct_for_bb);
             % Store BabelBrain version in provenance so it is cached with sensor_data.
             if isfield(sensor_data, 'babelbrain_version')
                 acoustic_provenance.babelbrain_version = sensor_data.babelbrain_version;
@@ -531,6 +599,13 @@ function [parameters] = prestus_pipeline(parameters, options)
                     sensor_data.babelbrain_version.version_txt, ...
                     sensor_data.babelbrain_version.git_describe);
             end
+        elseif use_jwave
+            % --- jwave acoustic backend ---
+            if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
+                error('[pipeline] jwave backend does not support axisymmetric grids.');
+            end
+
+            sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels);
         else
             % --- k-Wave acoustic backend (default) ---
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
@@ -554,6 +629,24 @@ function [parameters] = prestus_pipeline(parameters, options)
         [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
             cache_acoustic('load', filename_sensor_data, parameters);
         parameters.state.acoustics_available = 1;
+        % In axisymmetric runs the cache holds expanded (2D/3D bilateral) sensor_data,
+        % while source_labels from source_sensor_setup has the pre-expansion shape.
+        % Clear the stale source_labels so plot_overlay receives empty (no bowl mask).
+        if exist('source_labels','var') && ~isempty(source_labels) && ...
+                ~isequal(size(source_labels), size(sensor_data.p_max_all))
+            % source_labels was built on the pre-expansion (axisymmetric) grid; the cached
+            % sensor_data has been expanded to the bilateral/3-D grid.  The expansion
+            % mapping is not invertible here, so overlay plots will show no transducer bowl
+            % mask.  To avoid this, clear the grid cache and re-run with run_grid_setup=1
+            % so source_labels is built on the same expanded grid.
+            warning('prestus_pipeline:sourceLabelsMismatch', ...
+                ['source_labels size %s does not match cached sensor_data size %s. ' ...
+                 'This occurs after axisymmetric grid expansion when the grid cache predates ' ...
+                 'the acoustic cache. Clearing source_labels — transducer bowl overlay will be ' ...
+                 'absent. Re-run with run_grid_setup=1 to regenerate a consistent source_labels.'], ...
+                mat2str(size(source_labels)), mat2str(size(sensor_data.p_max_all)));
+            source_labels = zeros(size(sensor_data.p_max_all), 'like', source_labels);
+        end
     else
         disp('No acoustic simulation available or requested ... skipping analysis')
         parameters.state.acoustics_available = 0;
@@ -747,7 +840,10 @@ function [parameters] = prestus_pipeline(parameters, options)
             % restoring full-grid state kgrid must be rebuilt for the full domain;
             % when thermal_use_acoustic_fov is true, thermal_grid_setup still
             % needs to be called to compute the correct transf_th for NIfTI export.
+            % BabelBrain acoustic never produces kgrid/source/sensor, so
+            % thermal_grid_setup must always build its own grid and placeholders.
             use_thermal_grid = has_external_acoustic || has_acoustic_fov || ...
+                use_babelbrain_acoustic || ...
                 (isfield(parameters.grid, 'thermal_resolution_mm') && ...
                  ~isempty(parameters.grid.thermal_resolution_mm) && ...
                  parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...
@@ -768,9 +864,20 @@ function [parameters] = prestus_pipeline(parameters, options)
                 kwave_medium_th = kwave_medium;
                 medium_masks_th = medium_masks;
                 parameters_th   = parameters;
+                assert(isfield(planimg, 'transf') && ~isempty(planimg.transf), ...
+                    ['prestus_pipeline:missingPlanimg — planimg.transf is required for thermal ' ...
+                     'NIfTI export but was not found in the workspace. ' ...
+                     'Re-run with run_grid_setup=1 to regenerate the grid cache and planimg sidecar.']);
                 transf_th       = planimg.transf;
-                sensor_th       = sensor;
-                source_th       = source;
+                if exist('sensor', 'var') && ~isempty(sensor)
+                    sensor_th   = sensor;
+                    source_th   = source;
+                else
+                    sensor_th        = struct();
+                    sensor_th.mask   = ones(parameters_th.grid.dims);
+                    source_th        = struct();
+                    source_th.Q      = zeros(parameters_th.grid.dims);
+                end
             end
 
             use_bb_thermal = isfield(parameters, 'thermal_backend') && ...
@@ -808,6 +915,9 @@ function [parameters] = prestus_pipeline(parameters, options)
             parameters.state.heating_available = 1;
         elseif exist(filename_heating_data, 'file')
             disp('Skipping thermal simulation, loading existing output file.')
+            % Pre-initialize in case the cache was written by an older PRESTUS version
+            % that did not include time_status_seq (thermal_analysis handles [] gracefully).
+            time_status_seq = [];
             load(filename_heating_data);
             if exist('kwave_medium_th', 'var') && isfield(kwave_medium_th, 'temp_0')
                 kwave_medium.temp_0 = kwave_medium_th.temp_0;
@@ -935,7 +1045,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             if transducer_N_water > 1
                 % Isolate to single transducer; index range preserves [1×1] struct array type.
                 water_parameters.transducer = parameters.transducer(it_water:it_water);
-                water_parameters.io.output_affix = sprintf('%s_tx%d', parameters.io.output_affix, it_water);
+                water_parameters.io.output_affix = [parameters.io.output_affix, trans_suffix(it_water, transducer_N_water)];
             end
             prestus_pipeline_start(water_parameters);
         end
