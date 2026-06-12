@@ -1063,11 +1063,11 @@ end
         sec(gl, 17, 'Optimisation Settings');
         lbl(gl, 18, 1, 'Calibration mode');
         drp(gl, 18, 2, 'calibration.Mode', {'single_ref','multi_depth'}, 'single_ref');
-        note_lbl(gl, 19, '"single_ref" optimises at one reference depth and extrapolates; "multi_depth" fits all depths jointly (BabelBrain-style, slower).');
+        note_lbl(gl, 19, '"single_ref" optimises at one reference depth and extrapolates; "multi_depth" fits all depths jointly (slower).');
 
         lbl(gl, 20, 1, 'Forward model');
         drp(gl, 20, 2, 'calibration.ForwardModel', {'oneil','rayleigh'}, 'oneil');
-        note_lbl(gl, 21, '"oneil" is faster; "rayleigh" matches BabelBrain and is more accurate for ring gaps. Default for multi_depth is rayleigh.');
+        note_lbl(gl, 21, '"oneil" is faster; "rayleigh" is more accurate for ring gaps. Default for multi_depth is rayleigh.');
 
         lbl(gl, 22, 1, 'Reference depth');
         nedt(gl, 22, 2, 'calibration.RefDepth', NaN);
@@ -1282,11 +1282,11 @@ end
 
         % ── Helpers ───────────────────────────────────────────────────
         function refresh_tx_library()
-            lib_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            lib_path = fullfile(get_prestus_path(), 'config', 'calibration');
             lb = findobj(fig, 'Tag', 'tx_lib_list');
             if ~isfolder(lib_path)
                 lb.Items = {'(library folder not found)'};
-                set_lib_status('Library folder missing: config/transducer/');
+                set_lib_status('Library folder missing: config/calibration/');
                 return
             end
             d = dir(fullfile(lib_path, '*.yaml'));
@@ -1310,7 +1310,7 @@ end
                 load_btn.Enable = 'off';
                 return
             end
-            lib_path = fullfile(get_prestus_path(), 'config', 'transducer');
+            lib_path = fullfile(get_prestus_path(), 'config', 'calibration');
             yaml_path = fullfile(lib_path, [combo_name, '.yaml']);
             if ~isfile(yaml_path)
                 detail.Value = {'File not found.'};
@@ -1828,7 +1828,7 @@ end
             return;
         end
         try
-            lib_path  = fullfile(get_prestus_path(), 'config', 'transducer');
+            lib_path  = fullfile(get_prestus_path(), 'config', 'calibration');
             yaml_path = fullfile(lib_path, [serial_val '.yaml']);
             if isfile(yaml_path)
                 lib = yaml.loadFile(yaml_path, 'ConvertToArray', true);

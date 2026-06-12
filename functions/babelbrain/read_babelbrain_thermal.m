@@ -91,6 +91,19 @@ cem_end_g   = resample_vol(cem_end);
 cem_final_g = resample_vol(cem_final);
 p_map_g     = resample_vol(p_map);
 
+% Hard check: every resampled volume must match the declared PRESTUS grid dims
+exp = prestus_dims(:)';
+for chk_ = {{'T_end_fus', T_end_fus_g}, {'T_final', T_final_g}, ...
+             {'cem_end', cem_end_g}, {'cem_final', cem_final_g}, {'p_map', p_map_g}}
+    act = size(chk_{1}{2});
+    if ~isequal(act, exp)
+        error(['read_babelbrain_thermal: resampled %s has size [%d %d %d] but expected ' ...
+            'PRESTUS grid [%d %d %d].\nCheck planimg affine transforms and BabelBrain coordinate vectors.'], ...
+            chk_{1}{1}, act(1), act(2), act(3), exp(1), exp(2), exp(3));
+    end
+end
+clear chk_ act exp;
+
 %% Assemble results struct
 % Field names match thermal_simulation output exactly so that
 % thermal_analysis and nifti_thermal work without modification.

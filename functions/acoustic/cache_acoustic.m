@@ -103,6 +103,14 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 % Legacy full caches may contain additional fields; they are ignored here
 % so that in-scope variables from the grid/medium/source stages are used.
 cached = load(filename, 'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info');
+required = {'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info'};
+missing = required(~isfield(cached, required));
+if ~isempty(missing)
+    error('cache_acoustic:corruptCache', ...
+        ['Acoustic cache is missing variable(s): %s\n' ...
+         'Delete the cache file and re-run the acoustic stage:\n  %s'], ...
+        strjoin(missing, ', '), filename);
+end
 sensor_data         = cached.sensor_data;
 kgrid               = cached.kgrid;
 acoustic_provenance = cached.acoustic_provenance;

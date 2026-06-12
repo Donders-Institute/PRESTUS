@@ -396,7 +396,8 @@ status = system(cmd_args);
 elapsed = toc(t0);
 
 if status ~= 0
-    error('babelbrain_wrapper: BabelBrain Python process exited with status %d.', status);
+    error('babelbrain_wrapper: BabelBrain Python process exited with status %d.\nCommand was:\n  %s', ...
+        status, cmd_args);
 end
 fprintf('[babelbrain_wrapper] BabelBrain finished in %.1f s.\n', elapsed);
 
@@ -493,10 +494,11 @@ function [backend, device] = resolve_bb_backend(backend, device)
         end
     end
 
-    % Fallback: CPU
+    % Fallback: CPU — warn so users on GPU machines notice driver/detection issues
     backend = 4;
     device  = 'CPU';
-    fprintf('[babelbrain_wrapper] Auto-detected backend: CPU\n');
+    warning('babelbrain_wrapper:cpuFallback', ...
+        '[babelbrain_wrapper] No GPU detected (nvidia-smi failed or returned no devices); falling back to CPU. Simulation may be slow.');
 end
 
 function device = default_device_for_backend(backend)

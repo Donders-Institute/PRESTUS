@@ -49,6 +49,14 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
         error('load_transducer_from_library: library file not found:\n  %s', yaml_path);
     end
     lib = yaml.loadFile(yaml_path, 'ConvertToArray', true);
+    if ~isstruct(lib) || ~isfield(lib, 'meta')
+        error('load_transducer_from_library:missingMeta', ...
+            'Library file is missing a ''meta'' section:\n  %s', yaml_path);
+    end
+    if ~isfield(lib.meta, 'tran_serial')
+        error('load_transducer_from_library:missingSerial', ...
+            'Library file meta section is missing ''tran_serial'':\n  %s', yaml_path);
+    end
 
     %% Load geometry from equipment config
     tran_serial = lib.meta.tran_serial;

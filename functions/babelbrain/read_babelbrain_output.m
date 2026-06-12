@@ -20,7 +20,7 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 %   /p_complex      - [Nx x Ny x Nz] complex64, steady-state Fourier pressure [Pa]
 %                     stored by h5py as a compound type with fields 'r' and 'i'
 %   /p_complex_refocus - same, after refocusing (optional)
-%   /XDim, /YDim, /ZDim - voxel centre coordinates [m]
+%   /x_vec, /y_vec, /z_vec - voxel centre coordinates [m] (cropped simulation grid)
 %
 % Use as:
 %   sensor_data = read_babelbrain_output(h5_path)
@@ -64,6 +64,10 @@ info     = h5info(h5_path);
 ds_names = {info.Datasets.Name};
 
 % Select amplitude pressure key
+if ~any(strcmp(ds_names, 'p_amp'))
+    error('read_babelbrain_output:missingDataset', ...
+        '/p_amp dataset not found in BabelBrain output:\n  %s', h5_path);
+end
 p_key = '/p_amp';
 if use_refocus
     if any(strcmp(ds_names, 'p_amp_refocus'))
@@ -86,34 +90,34 @@ has_params = isfield(parameters, 'grid') ...
 xdim = []; ydim = []; zdim = [];
 coord_read_ok = false;
 try
-    xdim = h5read(h5_path, '/XDim');   % [m]
-    ydim = h5read(h5_path, '/YDim');
-    zdim = h5read(h5_path, '/ZDim');
+    % BabelBrain saves coordinate vectors as /x_vec /y_vec /z_vec [m]
+    xdim = h5read(h5_path, '/x_vec');
+    ydim = h5read(h5_path, '/y_vec');
+    zdim = h5read(h5_path, '/z_vec');
     coord_read_ok = true;
     dx_bb_mm = mean(diff(xdim)) * 1e3;
     dy_bb_mm = mean(diff(ydim)) * 1e3;
     dz_bb_mm = mean(diff(zdim)) * 1e3;
     fprintf('[read_babelbrain_output] BabelBrain grid: [%d %d %d]  dx=%.4f dy=%.4f dz=%.4f mm\n', ...
         size(p_amp,1), size(p_amp,2), size(p_amp,3), dx_bb_mm, dy_bb_mm, dz_bb_mm);
-    sensor_data.babelbrain_xdim = xdim;
-    sensor_data.babelbrain_ydim = ydim;
-    sensor_data.babelbrain_zdim = zdim;
+    sensor_data.babelbrain_x_vec = xdim;
+    sensor_data.babelbrain_y_vec = ydim;
+    sensor_data.babelbrain_z_vec = zdim;
 catch ME
     dx_bb_mm = NaN;
     p_dims = size(p_amp);
     if has_params
         expected = parameters.grid.dims(:)';
         if isequal(p_dims, expected)
-            warning(['read_babelbrain_output: coordinate vectors /XDim /YDim /ZDim not found in:\n  %s\n' ...
+            warning(['read_babelbrain_output: coordinate vectors /x_vec /y_vec /z_vec not found in:\n  %s\n' ...
                 'BabelBrain output dims [%d %d %d] match the PRESTUS grid — skipping resampling.\n' ...
-                'Delete the cached .h5 file and re-run to get coordinate outputs ' ...
-                '(requires BabelBrain >=0.9).'], ...
+                'Delete the cached .h5 file and re-run to get coordinate outputs.'], ...
                 h5_path, p_dims(1), p_dims(2), p_dims(3));
         else
-            error(['read_babelbrain_output: coordinate vectors /XDim /YDim /ZDim not found in:\n  %s\n' ...
+            error(['read_babelbrain_output: coordinate vectors /x_vec /y_vec /z_vec not found in:\n  %s\n' ...
                 'Error: %s\n' ...
                 'BabelBrain output dims [%d %d %d] do not match PRESTUS grid [%d %d %d].\n' ...
-                'Delete the cached .h5 and re-run with BabelBrain >=0.9 to enable resampling.'], ...
+                'Delete the cached .h5 and re-run to enable resampling.'], ...
                 h5_path, ME.message, p_dims(1), p_dims(2), p_dims(3), expected(1), expected(2), expected(3));
         end
     end

@@ -42,7 +42,14 @@ end
 
     sequential_configs = options.sequential_configs;
     fields   = fieldnames(sequential_configs);
-    numbers  = cellfun(@(x) sscanf(x, 'config_%d'), fields);
+    numbers  = cellfun(@(x) sscanf(x, 'config_%d'), fields, 'UniformOutput', false);
+    valid    = cellfun(@(n) ~isempty(n), numbers);
+    if ~all(valid)
+        error('sequential_pipeline:badFieldName', ...
+            'sequential_configs contains field(s) that do not match ''config_N'' pattern: %s', ...
+            strjoin(fields(~valid), ', '));
+    end
+    numbers  = cell2mat(numbers);
     [~, minIdx]   = min(numbers);
     lowestField   = fields{minIdx};
 

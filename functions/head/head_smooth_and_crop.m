@@ -1,6 +1,6 @@
 function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
     focus_pos_final, translation_matrix] = head_smooth_and_crop(parameters, segmentation, ...
-    bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
+    bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img, all_trans_pos_grid, all_focus_pos_grid)
 % HEAD_SMOOTH_AND_CROP  Convert segmentation to medium masks and crop to simulation grid
 %
 % Converts layered tissue segmentations into medium masks indexed by
@@ -35,12 +35,14 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 % See also: PREPROC_CROP_GRID, PREPROC_MEDIUM_MASK
 
     arguments
-        parameters     (1,1) struct
-        segmentation   (:,:,:) {mustBeNumericOrLogical}
-        bone_mask_img  (:,:,:) {mustBeNumericOrLogical}
-        trans_pos_grid (1,:)   double
-        focus_pos_grid (1,:)   double
-        pseudoCT_img           {mustBeNumericOrLogical} = []
+        parameters          (1,1) struct
+        segmentation        (:,:,:) {mustBeNumericOrLogical}
+        bone_mask_img       (:,:,:) {mustBeNumericOrLogical}
+        trans_pos_grid      (1,:)   double
+        focus_pos_grid      (1,:)   double
+        pseudoCT_img                {mustBeNumericOrLogical} = []
+        all_trans_pos_grid  (:,3)   double = zeros(0,3)
+        all_focus_pos_grid  (:,3)   double = zeros(0,3)
     end
 
     % This function turns the original `layered` segmentations into medium masks such
@@ -80,7 +82,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     % Crop the simulation grid outside layered medium + transducer + PML for efficiency
     [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, focus_pos_final, translation_matrix] = ...
-         preproc_crop_grid(parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img);
+         preproc_crop_grid(parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img, all_trans_pos_grid, all_focus_pos_grid);
 
     % [DEBUG] plot the smoothed and unsmoothed skull segmentation with transducer and focus locations
     if parameters.simulation.debug == 1

@@ -82,7 +82,7 @@ function parameters = load_parameters(varargin)
              '  parameters = load_parameters(''config_projectX.yaml'', ''/path/to/project/config'');']);
     end
 
-    parameters = yaml.loadFile(default_config_path, "ConvertToArray", true);
+    parameters = yaml_load_validated(default_config_path);
 
     %% Merge with additional configuration files or structures
 
@@ -91,14 +91,14 @@ function parameters = load_parameters(varargin)
         if isstruct(extra_config_file)
             extra_parameters = extra_config_file; % Use provided struct directly
         else
-            extra_parameters = yaml.loadFile(fullfile(extra_config_file), "ConvertToArray", true);
+            extra_parameters = yaml_load_validated(fullfile(extra_config_file));
         end
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargin == 2
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
-        extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
+        extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargin > 2
@@ -110,7 +110,7 @@ function parameters = load_parameters(varargin)
         for i = 1:2:numel(varargin)
             extra_config_file = varargin{i};
             extra_config_location = varargin{i+1};
-            extra_parameters = yaml.loadFile(fullfile(extra_config_location, extra_config_file), "ConvertToArray", true);
+            extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
             parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
         end
@@ -298,5 +298,15 @@ function merged = restore_struct_arrays(merged, extra)
                      'array element (or leave extra elements entirely to inherit defaults).'], f, k);
             end
         end
+    end
+end
+
+function s = yaml_load_validated(yaml_path)
+% Wrapper around yaml.loadFile that fails early with a clear message when
+% the returned value is not a struct (malformed or empty YAML file).
+    s = yaml.loadFile(yaml_path, "ConvertToArray", true);
+    if ~isstruct(s)
+        error('load_parameters:invalidConfig', ...
+            'Config file did not parse to a struct (got %s):\n  %s', class(s), yaml_path);
     end
 end
