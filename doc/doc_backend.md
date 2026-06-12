@@ -1,5 +1,14 @@
 # Simulation backend
 
+PRESTUS supports three acoustic backends: **k-Wave** (default), **BabelBrain**, and **jwave**. The backend is selected via `parameters.acoustic_backend` (`'kwave'` / `'babelbrain'` / `'jwave'`). All pre- and post-processing stages are backend-agnostic.
+
+- [BabelBrain backend](doc_babelbrain.md) — viscoelastic solver with shear waves; CUDA/OpenCL/Metal GPU support
+- [jwave backend](doc_jwave.md) — JAX-based scalar solver; Helmholtz frequency-domain option; fully differentiable
+
+---
+
+## k-Wave backend
+
 PRESTUS allows k-Wave deployment using different computing setups (`parameters.code_type`). This will primarily affect acoustic simulations. With either of the GPU variants, thermal simulations will also use GPU acceleration (if k-Wave 1.4.1 is provided).
 
 - `matlab_cpu`

@@ -21,6 +21,9 @@ The main reasons to use BabelBrain instead of (or alongside) k-Wave are:
 
 See [Simulation backends](doc_backend.md) for the k-Wave-only backend options.
 
+> **Important — acoustic material properties are not shared with PRESTUS.**
+> BabelBrain assigns tissue properties (speed of sound, density, attenuation, shear parameters) from its own internal frequency-fitted literature tables. It does not read `medium_properties` from the PRESTUS config. As a result, BabelBrain and k-Wave use different baseline property values (see [Tissue labels and material properties](#tissue-labels-and-material-properties) for a direct comparison), and **the liberal/conservative property variants used in uncertainty mode have no effect on BabelBrain acoustic simulations.** Results from the two backends should not be compared directly without accounting for these differences.
+
 ---
 
 ## Quick start
@@ -36,7 +39,7 @@ babelbrain:
   tx_system: R15473            # BabelBrain preset name; auto-detected if empty
   computing_backend: 3         # 1=CUDA  2=OpenCL  3=Metal  4=CPU
   device_name: Apple           # GPU device identifier string
-  ppw: 6                       # points-per-wavelength (never less than the auto-computed minimum)
+  ppw: 6                       # points-per-wavelength floor; actual PPW = max(ppw, round(c_brain / (freq × res_mm × 1e-3))). See note below.
   do_refocusing: false         # skull back-propagation refocusing
   z_beyond_focus_mm: 40        # axial domain truncation past the focal point [mm]
   python_env: ''               # path to conda/venv environment; empty = system python3
@@ -44,6 +47,8 @@ babelbrain:
   tx_mech_adjust_z_m: 0.0      # transducer z offset into skin [m] (0 = geometry in NIfTI)
   z_steering_m: ~              # ZSteering [m]; null = auto-derived from focal distance
 ```
+
+> **PPW and simulation resolution.** `ppw` sets a floor; PRESTUS resolves the actual PPW as `max(ppw, round(c_brain / (freq × res_mm × 1e-3)))` where `c_brain` is taken from `medium_properties.brain.sound_speed` (default 1500 m/s). BabelBrain then internally sets its spatial step to `SmallestSOS / (PPW × freq)`, where `SmallestSOS` is the minimum speed of sound across all tissue types in BabelBrain's own tables — including bone shear waves (~1473 m/s at 300 kHz), which can be slightly lower than water or brain longitudinal SoS. In practice the NIfTI voxel size written by PRESTUS (`grid.resolution_mm`) must match BabelBrain's expected `SpatialStep`; BabelBrain will print a warning if they differ. To ensure consistency, `grid.resolution_mm` should equal `c_min / (freq × PPW × 1e-3)` using the same `c_min` as BabelBrain's `SmallestSOS`. Because shear SoS is slightly below 1500 m/s, using the default `c_brain = 1500 m/s` for `ppw_auto` is conservative and will not underestimate the required PPW.
 
 **Acoustic + thermal (both in BabelBrain):**
 
@@ -152,6 +157,50 @@ BabelBrain identifies tissues from a single NIfTI file (`BabelViscoInput.nii.gz`
 | *(focal voxel)* | — | 5 | — |
 
 The focal voxel (label 5) is placed at the focus grid index. It is the only mechanism BabelBrain provides for specifying the target location.
+
+### CT-based skull properties (`ct_mapping`)
+
+By default PRESTUS passes a label mask only and BabelBrain applies its internal `MatFreq` literature values for each tissue type. Optionally, a pseudo-CT (HU) volume can be passed so that BabelBrain derives per-voxel skull properties from Hounsfield units using one of its fitted mapping models.
+
+Set `parameters.babelbrain.ct_mapping` to a non-empty string to activate this path:
+
+```yaml
+babelbrain:
+  ct_mapping: Webb-Marsac   # one of the values in the table below
+  ct_use_petra: false        # true only for PETRA-sequence-derived pCT
+```
+
+**When to use this path.** Only when you want BabelBrain's own HU→acoustic-property conversion to apply to raw UTE or PETRA pseudo-CT Hounsfield values. This is the equivalent of BabelBrain's built-in `bUseCT` mode.
+
+> **Do not set `ct_mapping` when PRESTUS's pCT pipeline (`pct.enabled: 1`) has already converted HU to acoustic properties.** In that case, the mapping has been applied inside PRESTUS and k-Wave is already using voxel-wise values; BabelBrain receives only a label mask and uses its own `MatFreq` values for bone, which differ from the pCT-derived values k-Wave uses. There is currently no path to pass PRESTUS's pre-mapped per-voxel acoustic properties into BabelBrain (see [Limitations](#limitations-and-unsupported-prestus-modes)).
+
+#### Supported `ct_mapping` values
+
+The following HU→property mapping methods are available in BabelBrain. PRESTUS does not replicate all of them.
+
+| `ct_mapping` value | Density | SoS | Attenuation | PRESTUS equivalent |
+|---|---|---|---|---|
+| `Webb-Marsac` (default) | Marsac linear HU→ρ | Webb 2018 tabulated (freq-dep.) | Webb 2020 tabulated (freq-dep.) | partial: `marsac` density + no Webb |
+| `Aubry` | Porosity→ρ (Aubry 2003) | Porosity→SoS | Porosity→Att | `aubry` |
+| `Pichardo` | HU→ρ air–tissue linear | Density→SoS (Pichardo 2D map, freq-dep.) | Density→Att (Pichardo map) | none |
+| `McDannold` | HU→ρ air–tissue linear | Density→SoS (McDannold polynomial) | Density→Att (McDannold polynomial, freq-dep.) | none |
+| `Marsac-Aubry` | Marsac linear HU→ρ | Porosity→SoS (Aubry) | Porosity→Att (Aubry) | partial |
+| `Pichardo-Marsac` | Marsac linear HU→ρ | Pichardo 2D map (freq-dep.) | Pichardo map | none |
+| `McDannold-Marsac` | Marsac linear HU→ρ | McDannold polynomial | McDannold polynomial (freq-dep.) | none |
+
+The `Pichardo`, `McDannold`, and their `-Marsac` hybrids are **not replicated in PRESTUS** (`medium_pct_*` functions support `k-plan`, `k-wave`, `marsac`, and `aubry` only). If you want results comparable across backends, use `Webb-Marsac` (closest to the internal PRESTUS `marsac`/`mueller` combination) or `Aubry` (directly available in both).
+
+#### PETRA pCT density formula
+
+When `ct_use_petra: true`, BabelBrain uses Björn's formula for the density step inside `Webb-Marsac` mode (`SimNIBS_PETRApct_Density`). This is appropriate when the pseudo-CT HU values were generated from a PETRA sequence via SimNIBS's ZTE/PETRA pipeline. For UTE-derived pCT (the default PRESTUS pCT source), leave `ct_use_petra: false`.
+
+#### UTE image as direct BabelBrain CT input
+
+Providing the raw UTE NIfTI directly (rather than a pre-processed pseudo-CT) is technically supported by setting `ct_mapping` and passing a UTE volume as `pseudoCT`. The UTE HU-like intensities will then be fed into BabelBrain's mapping pipeline. However:
+
+- UTE images do not use standard 120 kVp CT Hounsfield calibration, so `Webb-Marsac` and `McDannold` models (which are calibrated to conventional CT HU) will produce inaccurate results.
+- `Aubry` (porosity-based) is less sensitive to the absolute HU scale and is the most defensible choice for raw UTE input.
+- The recommended practice for UTE data is to run PRESTUS's pCT pipeline first (UTE → calibrated pseudo-CT HU → PRESTUS `marsac`/`aubry` mapping), which applies bias correction and skull-specific calibration before any HU→property conversion.
 
 ### BabelBrain material properties
 
@@ -323,15 +372,88 @@ Not all PRESTUS pipeline features are currently compatible with the BabelBrain b
 | PRESTUS feature | BabelBrain support | Details |
 |---|---|---|
 | **Single transducer** | ✓ Full | Standard use case. |
-| **Multi-transducer** (`parameters.transducer(2:N)`) | ✗ Not supported | `babelbrain_wrapper` reads `transducer(1)` only. The multi-transducer workflow requires per-transducer acoustic runs followed by field combination (`assemble_limited_fov_fields`); BabelBrain thermal cannot accept a combined multi-source field. |
+| **Multi-transducer — async/incoherent** (`simulation.transducer_coupling: async`) | ✓ Supported | `async_transducer_pipeline` runs one independent acoustic simulation per transducer (each a single-transducer BabelBrain call), then combines intensity fields incoherently via `combine_async_intensity`. `acoustic_backend: babelbrain` is inherited by each per-transducer sub-run automatically. |
+| **Multi-transducer — coherent** (`simulation.transducer_coupling: coherent`) | ✓ Supported | `babelbrain_wrapper` detects `numel(parameters.transducer) > 1` and recurses once per transducer with a unique `output_affix` (`_t01`, `_t02`, …). Each sub-run reads `/p_complex` (the complex Fourier pressure field stored by BabelBrain alongside `/p_amp`) from its `DataForSim.h5`. The complex fields are summed coherently; `p_max_all = abs(Σ p_complex_i)`. Unlike k-Wave's native coherent mode (all transducers in one simulation), this treats transducer interactions as independent and ignores mutual acoustic coupling between transducers. |
 | **Limited acoustic FOV** (`grid.acoustic_fov_*`) | ✗ Not supported | The NIfTI passed to BabelBrain always covers the full grid. BabelBrain performs its own narrow-beam domain cropping internally (`bTightNarrowBeamDomain`). Setting `acoustic_fov_*` alongside `acoustic_backend: babelbrain` will cause a shape mismatch during the back-projection step and an error. |
 | **Axisymmetric 2D** (`simulation.axisymmetric: 1`) | ✗ Not supported | BabelBrain is always a 3D solver. Axisymmetric mode must use the k-Wave backend. |
 | **`multi_isppa` mode** | ✗ Not supported | `multi_isppa_pipeline` dispatches internally without propagating `acoustic_backend`, so all ISPPA sweep runs silently use k-Wave. |
 | **`phantom` / `water` test medium** | ⚠ Untested | BabelBrain expects a realistic segmented NIfTI. Purely water or phantom media are geometrically valid but BabelBrain's material property tables will apply skull properties to any non-background label, which may produce unexpected results. |
 | **Post-hoc water simulation** | ⚠ Untested | The free-field water reference loop at the end of the pipeline always calls the k-Wave path and bypasses `use_babelbrain`. The reference field will be from k-Wave regardless of the acoustic backend setting. |
 | **BabelBrain thermal without BabelBrain acoustic** | ✗ Not supported | `thermal_backend: babelbrain` requires the `*DataForSim.h5` file produced by `acoustic_backend: babelbrain`. It cannot consume a k-Wave acoustic result. |
+| **CT-based skull properties into BabelBrain** | ✓ Supported (via `ct_mapping`) | Set `babelbrain.ct_mapping` to a non-empty mapping method (e.g. `'Webb-Marsac'`) and pass the pseudoCT HU volume as the 8th argument to `babelbrain_wrapper`. `babelbrain_wrapper` writes a `CT.nii.gz` alongside `BabelViscoInput.nii.gz` and passes `--use_ct`, `--ct_mapping`, and (optionally) `--use_petra` flags to `run_babelbrain_case.py`, which forwards them to BabelBrain's `RUN_SIM().RunCases()`. BabelBrain then performs its own HU→property conversion internally. **Note:** use this path only when passing raw HU values from a UTE/PETRA scan. If PRESTUS's pCT pipeline (`pct.enabled: 1`) has already converted HU to acoustic properties, use the default label-based path (`ct_mapping` empty) — the per-voxel acoustic properties k-Wave uses cannot be passed to BabelBrain. See [CT-based skull properties](#ct-based-skull-properties-ct_mapping) for available mapping methods. |
+| **Uncertainty mode** | ✗ Not supported | BabelBrain does not accept different acoustic medium property variations. The liberal and conservative configs vary `medium_properties` (skull/brain sound speed, density, attenuation coefficient). k-Wave reads these directly when building the simulation medium. BabelBrain does not: it assigns material properties internally from frequency-fitted literature tables (see [Tissue labels and material properties](#tissue-labels-and-material-properties)), and `babelbrain_wrapper` never forwards `medium_properties` to the Python bridge. The only use of `medium_properties.brain.sound_speed` inside `babelbrain_wrapper` is to compute the minimum required PPW — it does not affect the BabelBrain simulation itself. |
 
-> **Recommended workaround for multi-transducer + BabelBrain.** Run each transducer independently with `acoustic_backend: babelbrain`; combine the resulting pressure fields with `assemble_limited_fov_fields` (treating each BabelBrain output as a full-grid result); then run thermal with `thermal_backend: kwave` on the combined field.
+---
+
+## Developer notes: PRESTUS integration architecture
+
+> This section describes how the BabelBrain integration is wired inside PRESTUS. It is intended for developers working on the backend or extending GPU platform support.
+
+### Call chain
+
+```
+single_subject_pipeline.m
+  └─ acoustic_wrapper.m          ← dispatches on parameters.acoustic_backend
+       └─ babelbrain_wrapper.m   ← MATLAB orchestrator
+            ├─ babelbrain_transducer_map.m   (preset resolution)
+            ├─ write_babelbrain_input.m       (NIfTI label mask)
+            ├─ export_babelbrain_weights.m    (calibration HDF5)
+            └─ system() → run_babelbrain_case.py   ← Python bridge
+                 └─ BabelBrain RUN_SIM().RunCases()
+```
+
+`babelbrain_wrapper.m` never imports Python directly. It constructs a command string and calls `system()`, which invokes `run_babelbrain_case.py` as a subprocess. All BabelBrain Python dependencies are therefore isolated in the conda environment pointed to by `babelbrain.python_env`; the MATLAB process only needs to call `system()`.
+
+`run_babelbrain_case.py` adds the BabelBrain source tree (`external/BabelBrain`) to `sys.path` at runtime, imports `TranscranialModeling.BabelIntegrationBASE` dynamically, and calls `RUN_SIM().RunCases()`. The output `*DataForSim.h5` is written to `<dir_cache>/<subject_id>/`; PRESTUS reads it back with `read_babelbrain_output.m`.
+
+### GPU backend selection and platform support
+
+`computing_backend` maps directly to BabelBrain's `ComputingBackend` integer:
+
+| Value | Backend | Supported hardware | Typical environment |
+|---|---|---|---|
+| `1` | CUDA | NVIDIA GPUs | Linux HPC / workstation with CUDA toolkit |
+| `2` | OpenCL | AMD GPUs, Intel GPUs, some NVIDIA | Linux, any OpenCL-capable GPU |
+| `3` | Metal | Apple Silicon (M1/M2/M3/M4) | macOS on ARM |
+| `4` | CPU | Any | Fallback; much slower |
+
+**Mac / Apple Silicon.** The default config (`computing_backend: 3`, `device_name: Apple`) targets Metal. This is the recommended path on M-series Macs. k-Wave's CUDA binary is unavailable on Apple Silicon, so BabelBrain + Metal is the only GPU-accelerated acoustic solver available on that platform.
+
+**Linux / NVIDIA.** Set `computing_backend: 1`. The Python bridge auto-detects the first CUDA GPU via `nvidia-smi` when `device_name` is left at the default sentinel `'Apple'`, so you normally do not need to set `device_name` explicitly on SLURM clusters. Ensure the SLURM job requests a GPU (`--gres=gpu:1`).
+
+**Linux / AMD or other OpenCL GPU.** Set `computing_backend: 2`. The bridge uses `pyopencl` to auto-detect the first available GPU device. Install `pyopencl` in the BabelBrain conda environment if not already present.
+
+**macOS Intel.** Metal is available but performance is limited on Intel integrated graphics. Use `computing_backend: 3` with `environment_mac_x64-314.yml`; for CPU-only runs use `computing_backend: 4`.
+
+**Windows.** PRESTUS has not been tested on Windows. BabelBrain ships an `environment_win-314.yml`; the MATLAB `system()` call uses Unix-style path separators which would need adjustment.
+
+### Device name auto-detection
+
+`run_babelbrain_case.py::resolve_device_name()` handles the common case where `device_name` is left at the default `'Apple'` but a non-Metal backend is selected:
+
+- **CUDA (backend 1):** calls `nvidia-smi --query-gpu=name` and uses the first result.
+- **OpenCL (backend 2):** iterates `pyopencl.get_platforms()` and picks the first GPU device.
+- **Metal (backend 3):** `'Apple'` is already the correct device name; no detection needed.
+
+Set `device_name` explicitly to target a specific GPU when multiple are present.
+
+### ZSteering derivation
+
+BabelBrain's Rayleigh pre-step always focuses at `FocalLength + ZSteering`. PRESTUS derives `ZSteering` automatically:
+
+- **With calibrated phases** (`tr.annular.elem_phase_rad` populated): the phases already encode the steering offset, so `ZSteering = 0`.
+- **Without calibrated phases**: `ZSteering = focal_distance_mm/1000 − preset FocalLength`, read from `Babel_{tx_system}/default.yaml` in the BabelBrain source tree.
+
+Override with `babelbrain.z_steering_m` if the auto-derivation is wrong for a custom preset.
+
+### BabelBrain output format
+
+The bridge writes `*DataForSim.h5` under `<dir_cache>/<subject_id>/`. `read_babelbrain_output.m` reads:
+
+- `/p_amp` — peak positive pressure [Pa], shape `[Nx, Ny, Nz]`
+- `/p_amp_refocus` — skull-corrected pressure (only when `do_refocusing: true`)
+
+`p_max_all` in the returned `sensor_data` struct is set to `/p_amp` (or `/p_amp_refocus` when refocusing is active), matching the convention used by `acoustic_wrapper`.
 
 ---
 

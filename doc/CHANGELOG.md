@@ -6,43 +6,94 @@ Notable changes to this project are documented here.
 
 ## v0.6.2-pre (development)
 
-Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an expanded transducer library, and GUI updates for Placement, Multi-Transducer, and Calibration tabs. Several fixes improve reliability of the thermal, sequential, and NeuroNav workflows.
+Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain gains a CT path for HU-based skull property mapping, HDF5 blosc compatibility, and an improved thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows.
+
+#### BabelBrain acoustic backend
+
+BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).
+
+- **Solver bridge** — `babelbrain_wrapper` translates the PRESTUS grid, medium masks, and transducer geometry into BabelBrain's NIfTI input format, invokes the Python FDTD engine, and returns `sensor_data` in the same format as the k-Wave backend
+- **Transducer preset resolution** — transducer serial is automatically matched to a named BabelBrain preset; novel transducers are written to a temporary CSV so BabelBrain can handle them without a matching built-in entry
+- **Calibrated phase export** — optimised element phases from the transducer library are exported as an `OptimizedWeightsFile` (H5); geometric (Rayleigh) focusing is used as a fallback when no library entry is present
+- **CT path** — `babelbrain_wrapper` optionally accepts a pseudo-CT HU volume and writes it as `CT.nii.gz` alongside `BabelViscoInput.nii.gz`; activated by setting `babelbrain.ct_mapping` (e.g. `'Webb-Marsac'`, `'Pichardo'`); `babelbrain.ct_use_petra` selects the PETRA-specific density formula
+- **PPW consistency** — points-per-wavelength is resolved from the simulation frequency and grid resolution and passed consistently to both the BabelBrain input NIfTI filename and the write step
+- **Provenance** — BabelBrain version and git describe string are stored in the acoustic provenance cache so cached results are invalidated on submodule updates
+- **Simulation report** — backend, transducer preset, PPW, and GPU compute backend (CUDA / OpenCL / Metal / CPU) reported in the HTML simulation report
+
+#### jwave acoustic backend
+
+jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave` (see [doc_jwave.md](doc_jwave.md)).
+
+- Supports `time_domain` (default) and `helmholtz` solvers, configurable PML size, and `single`/`double` floating-point precision
+- Translates PRESTUS kgrid/medium/source structs to HDF5, invokes `run_jwave_sim.py`, and returns `sensor_data` in the same format as the k-Wave backend
+- Axisymmetric grids and kWaveArray sources are not supported; both raise a clear error at pipeline entry
+- `benchmark_jwave` test class compares k-Wave CPU, jwave time-domain, and jwave Helmholtz on a water phantom (wall-clock time, peak pressure, focal FWHM, field correlation)
 
 #### Acoustic simulation
 - Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
 - Multi-transducer incoherent field assembly for independent-element arrays
 - External acoustic NIfTI can now be passed directly as input to the thermal pipeline
+- Per-transducer operating frequency supported in kWaveArray multi-transducer mode
+- Exit-plane mask now unions contributions from all transducers (was transducer(1) only)
+- FOV length and diameter derived automatically from focal geometry; post-hoc water simulation runs independently per transducer
+- `planimg` affine sidecar serialised alongside the medium cache, enabling stage-3+ resumption without re-running the head pipeline
+- ⚠️ **Fixed:** MI is now computed from peak rarefaction pressure (`abs(p_min_all)`) per IEC 62359; previously `p_max_all` was used
 - ⚠️ **Fixed:** simulation end time (`t_end`) now derived from the minimum sound speed (soft tissue / water, ~1500 m/s) rather than the maximum (bone, ~2800 m/s); the previous behaviour truncated the simulation ~1.9× too early, causing an artefactual pressure drop before steady state was reached
 
-#### Thermal simulation
-- `thermal_grid_setup` exposed as a standalone utility
-- ⚠️ **Fixed:** initial temperature (`temp_0`) now correctly loaded from cached heating files
+#### Pseudo-CT acoustic property mapping
 
-#### Head pipeline
+Three new algorithms added for density, sound speed, and attenuation mapping (see [doc_pseudoCT.md](doc_pseudoCT.md)):
+
+- `air-tissue` density — linear HU→ρ calibrated to air and cortical bone; matches `HUtoDensityAirTissue` in BabelBrain; required input for `pichardo` and `mcdannold` workflows
+- `webb` sound speed — linear HU→c from Webb et al. (2018); scanner-specific slope and intercept configurable via `pct.webb_sos_slope` / `pct.webb_sos_intercept`
+- `webb` attenuation — exponential HU model from Webb et al. (2020); scanner-specific coefficients configurable via `pct.webb_att_alpha0`, `.webb_att_beta`, `.webb_att_c`
+- `pichardo` sound speed and attenuation — frequency-dependent 2D ρ–freq interpolation from the `MapPichardo.h5` look-up table in the BabelBrain submodule
+- `mcdannold` sound speed and attenuation — polynomial ρ-based model (McDannold et al.)
+
+#### Head pipeline / grid
+- **Principal-axis alignment** is now the default grid orientation (`grid.mode: principal_axis`): rotates the grid so the first principal component of all transducer positions aligns with z; for bilateral setups this equals the inter-transducer axis; for single-transducer setups it is identical to `transducer_axis`
+- Grid cropping now includes the bowl geometry of every configured transducer in the crop mask (was transducer(1) only), preventing the contralateral side from being over-extended
 - Automated defacing via pydeface, with optional integration into the segmentation pipeline
 - Defaced regions shown transparently in placement and 3D head views
 
-#### Calibration
-- Transducer library: scan equipment, store validated parametric models, plot and compare entries
+#### Transducer library
+- Scan equipment, store validated parametric models, plot and compare entries
 - Joint-depth phase/amplitude fit for more robust free-field characterisation
-- Transducers can now be resolved automatically from a serial-number-based equipment library
+- Transducers resolved automatically from a serial-number-based equipment library; DS-agnostic `{serial}.yaml` fallback used when no DS-specific entry exists, with a warning
+- `build_geometric_library_entry` creates a manufacturer-report baseline entry (no empirical data required) as an immediate-use fallback before characterisation
+- `config/calibration/library_version.yaml` — version manifest listing all combo YAMLs with calibration metadata; follows semantic versioning
+
+#### Thermal simulation
+- Thermal FOV can optionally be cropped to match the acoustic FOV (`thermal.match_acoustic_fov`), reducing memory for off-axis targets
+- `thermal_grid_setup` exposed as a standalone utility
+- ⚠️ **Fixed:** three runtime crashes in `thermal_analysis` corrected
+- ⚠️ **Fixed:** initial temperature (`temp_0`) now correctly loaded from cached heating files
 
 #### NeuroNav
 - Multi-coil ingestion supported via `parameters.neuronav.coil_map`
 - ⚠️ **Fixed:** T1 NIfTI lookup now works reliably across all conversion functions
+- ⚠️ **Fixed:** `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` updated to use `parameters.path.seg` (was `parameters.seg_path`)
 
 #### Sequential / Reporting
 - Run labels derived automatically from output affixes in consolidated reports
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
+- HTML simulation report extended with BabelBrain and jwave backend sections
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs
+- Transducer library browser tab
+- Lazy tab initialisation (tabs load on first selection, reducing startup time)
+- Parameter values seeded into unbuilt tabs on config load
+- ⚠️ **Fixed:** NaN placeholder fields no longer write `0` into `grid.source_ppw`, which caused an Inf time step
+- ⚠️ **Fixed:** 2D phantom / axisymmetric coordinate handling in collect and load
+- ⚠️ **Fixed:** thermal timing enable state re-synced on config load
 
 #### Infrastructure
 - `overwrite_files` setting now respected by `simnibs_t1_to_mni`
 - Compromised polyfill.io CDN replaced with Cloudflare drop-in
 - `pydeface` added to environment setup script
+- ⚠️ **Fixed:** SimNIBS path guard added in `subject2mni_coords_LDfix` to prevent crashes when SimNIBS is not on the path
 
 ---
 
