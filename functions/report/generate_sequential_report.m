@@ -369,7 +369,7 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
         p     = run_data{ri}.params;
         affix = run_data{ri}.affix;
         img   = fullfile(p.io.dir_img, ...
-            sprintf('sub-%03d_%s_intensity_t1%s.png', subject_id, medium, affix));
+            sprintf('sub-%03d_%s_intensity_t1w%s.png', subject_id, medium, affix));
         if ~isfile(img)
             img = fullfile(p.io.dir_img, ...
                 sprintf('sub-%03d_%s_intensity%s.png', subject_id, medium, affix));
