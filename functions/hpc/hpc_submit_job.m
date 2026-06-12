@@ -55,6 +55,9 @@ switch hpc_type
 end
 
 fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters), sprintf('%d', job_id));
+if strcmp(hpc_type, 'slurm')
+    fprintf('Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
+end
 
 % ========== LOCAL FUNCTIONS ==========
 function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)

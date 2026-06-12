@@ -138,7 +138,11 @@ if nargin >= 6 && ~isempty(cost_params)
 end
 
 % ---- Initialise report struct ----
-job_id_str = sprintf('%.0f', job_id);
+if isnumeric(job_id)
+    job_id_str = sprintf('%.0f', job_id);
+else
+    job_id_str = strtrim(char(job_id));
+end
 
 report.job_id           = job_id_str;
 report.job_state        = 'UNKNOWN';
@@ -197,7 +201,10 @@ end
 
 % ---- Print and write report ----
 print_report(report, cp, bp);
-if nargin >= 4 && ~isempty(log_dir) && isfolder(log_dir)
+if nargin >= 4 && ~isempty(log_dir)
+    if ~isfolder(log_dir)
+        mkdir(log_dir);
+    end
     write_report_file(report, parameters, log_dir, cp, bp);
 end
 
@@ -417,7 +424,11 @@ end
 
 % --------------------------------------------------------------------------
 function write_report_file(report, parameters, log_dir, cp, bp)
-subj_str = sprintf('sub-%03d', parameters.subject_id);
+if isfield(parameters, 'subject_id')
+    subj_str = sprintf('sub-%03d', parameters.subject_id);
+else
+    subj_str = 'sub-unknown';
+end
 fname = fullfile(log_dir, sprintf('%s_job%s_report.txt', subj_str, report.job_id));
 
 fid = fopen(fname, 'w');

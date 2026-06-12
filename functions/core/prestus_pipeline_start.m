@@ -131,9 +131,10 @@ function job_id = prestus_pipeline_start(parameters, options)
             if isfield(parameters.hpc, 'wait_for_job') && parameters.hpc.wait_for_job
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
-                hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks);
+                hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks, parameters, log_dir);
             else
                 fprintf('➡️  Continuing in MATLAB ...\n\n');
+                hpc_submit_report_job(job_id, platform, parameters, log_dir, prestus_path);
             end
             
             % job_id is already set by hpc_submit_job above
