@@ -10,7 +10,7 @@ classdef test_transducer_library < matlab.unittest.TestCase
 
     properties
         equip_param      % loaded once per test class
-        library_path     % path to config/transducer/
+        library_path     % path to config/calibration/
         repo_root        % PRESTUS root
         tmp_lib_dir      % temp dir for synthetic calibration YAMLs
     end

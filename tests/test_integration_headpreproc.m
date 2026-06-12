@@ -14,6 +14,7 @@ classdef test_integration_headpreproc < matlab.unittest.TestCase
 
     methods (TestMethodSetup)
         function setup(tc)
+            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             tc.Parameters   = make_minimal_parameters();
             tc.Segmentation = make_synthetic_segmentation([64, 64, 80]);
 

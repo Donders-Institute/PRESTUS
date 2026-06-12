@@ -155,6 +155,63 @@ Tests skip gracefully when `PRESTUS_DEMO_DATA` is not set.
 
 ---
 
+## BabelBrain backend benchmark (standalone)
+
+File: `benchmark_babelbrain.m`
+
+Staged integration tests for the PRESTUS–BabelBrain acoustic backend. Not part of `run_all_tests` — it requires the BabelBrain conda environment and (for the final stage) a GPU.
+
+The class setup skips gracefully if `PRESTUS_DEMO_DATA` is not set. Individual stages skip if their specific prerequisites (BabelBrain importable, GPU) are absent.
+
+```bash
+export PRESTUS_DEMO_DATA=/path/to/prestus_testdata
+export BABELBRAIN_PYTHON=/path/to/conda/envs/BabelBrainLinux   # or a direct python executable
+```
+
+| Tag | What it checks | GPU needed |
+|---|---|---|
+| `paths` | PRESTUS functions on path, Python accessible, submodule present | no |
+| `write` | `write_babelbrain_input` output NIfTI labels and resolution | no |
+| `transducer` | Preset matching and novel-transducer CSV generation | no |
+| `dry_run` | Python bridge imports BabelBrain and writes input NIfTI | no |
+| `full` | Full FDTD acoustic simulation, checks p_max_all | **yes** |
+| `quick` | Stages 1–3 (paths + write + transducer) | no |
+| `nogpu` | Stages 1–4 (all except full simulation) | no |
+
+```matlab
+% No-GPU check (stages 1–4):
+runtests('tests/benchmark_babelbrain.m', 'Tag', 'nogpu')
+
+% Full suite including GPU simulation:
+runtests('tests/benchmark_babelbrain.m')
+table(results)
+```
+
+---
+
+## jwave backend benchmark (standalone)
+
+File: `benchmark_jwave.m`
+
+Compares the jwave (time-domain and Helmholtz) and k-Wave CPU backends on the same small water simulation. Not part of `run_all_tests` — it requires jwave installed in a Python environment and takes several minutes even on a small grid.
+
+The class setup skips gracefully if jwave is not importable.
+
+```bash
+export JWAVE_PYTHON=/path/to/python_with_jwave   # or omit to try system python3
+```
+
+```matlab
+% correctness + agreement tests only (no timing sweep)
+runtests('tests/benchmark_jwave.m', 'Tag', 'quick')
+
+% full suite including timing sweep across grid sizes
+runtests('tests/benchmark_jwave.m')
+table(results)
+```
+
+---
+
 ## Adding new tests
 
 - **New pure function** → add a `methods (Test)` block to the relevant `test_*.m` file, or create a new one following the same `matlab.unittest.TestCase` pattern.
