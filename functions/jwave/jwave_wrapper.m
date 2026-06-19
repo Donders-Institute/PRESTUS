@@ -5,6 +5,11 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 % run_jwave_sim.py, and reads back the pressure field in the same
 % sensor_data format returned by acoustic_simulation.m.
 %
+% Uses the jwave Helmholtz solver: solves the heterogeneous Helmholtz equation
+% with Fourier spectral collocation and GMRES, matching the solver used in the
+% ITRUSST intercomparison benchmarks. Attenuation is applied via db2neper with
+% fixed exponent y=2.0 inside jwave's wavevector operator.
+%
 % Only the direct-geometry source path (use_kWaveArray == 0) is supported.
 % Axisymmetric grids are not supported. Thermal simulation is not supported.
 %
@@ -24,15 +29,10 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %   .python_env     - path to CPU Python venv/conda env root or bin dir, or '' for system python3
 %   .python_env_gpu - path to GPU (CUDA) Python env bin dir; leave empty to always use CPU
 %   .use_gpu        - [] auto-detect via nvidia-smi (default) | true force GPU | false force CPU
-%   .solver         - 'pseudo_spectral' (default) | 'helmholtz' | 'finite_differences'
-%                     'finite_differences': same time-stepping loop as pseudo_spectral but
-%                     spatial derivatives use local FD stencils (JaxDF FiniteDifferences)
-%                     instead of global FFT (FourierSeries).
-%   .fd_accuracy    - FD stencil accuracy order for finite_differences solver (default: 8, must be even)
 %   .pml_size       - PML thickness in grid points, or 'auto' to use
 %                     getOptimalPMLSize (same algorithm as k-Wave; default: 'auto')
-%   .gmres_restart  - GMRES restart parameter for Helmholtz solver (default: 40)
-%   .gmres_maxiter  - Max GMRES outer iterations for Helmholtz solver (default: 300)
+%   .gmres_restart  - GMRES restart parameter (default: 40)
+%   .gmres_maxiter  - Max GMRES outer iterations (default: 300)
 %   .precision      - 'single' (default) | 'double'
 %   .dry_run        - true to write inputs and exit without simulating (default false)
 %
@@ -65,21 +65,14 @@ end
 python_env     = get_field(jw, 'python_env',     '');
 python_env_gpu = get_field(jw, 'python_env_gpu', '');
 use_gpu        = get_field(jw, 'use_gpu',        []);   % [] = auto-detect
-solver         = get_field(jw, 'solver',          'pseudo_spectral');
-fd_accuracy    = get_field(jw, 'fd_accuracy',     8);
 pml_size       = get_field(jw, 'pml_size',        'auto');
 gmres_restart  = get_field(jw, 'gmres_restart',   40);
 gmres_maxiter  = get_field(jw, 'gmres_maxiter',   300);
 precision      = get_field(jw, 'precision',       'single');
 dry_run        = get_field(jw, 'dry_run',         false);
 
-% Helmholtz convergence checks
-%   convergence_threshold  — relative spectral residual above which a warning is issued
-%   benchmark_fov_mm       — [lat_mm, ax_mm] lateral+axial FOV for the pseudo-spectral benchmark.
-%                            If set (helmholtz only), also runs pseudo_spectral on a small
-%                            cropped subgrid to validate GMRES convergence.
+% convergence_threshold — relative spectral residual above which a warning is issued
 convergence_threshold = get_field(jw, 'convergence_threshold', 0.05);
-benchmark_fov_mm      = get_field(jw, 'benchmark_fov_mm',      []);
 
 % Resolve python executable, selecting GPU env when appropriate
 [python_bin, using_gpu_env] = resolve_python_env(python_env, python_env_gpu, use_gpu);
@@ -95,13 +88,6 @@ bridge_py  = fullfile(this_dir, 'run_jwave_sim.py');
 if ~isfile(bridge_py)
     error('jwave_wrapper: run_jwave_sim.py not found at:\n  %s\n%s', ...
         bridge_py, 'This file must be in functions/jwave/ alongside jwave_wrapper.m.');
-end
-
-% Validate solver choice
-valid_solvers = {'pseudo_spectral', 'helmholtz', 'finite_differences'};
-if ~ismember(solver, valid_solvers)
-    error('jwave_wrapper: Unknown solver ''%s''. Choose from: %s', ...
-        solver, strjoin(valid_solvers, ', '));
 end
 
 % -------------------------------------------------------------------------
@@ -151,22 +137,9 @@ else
     log_redirect = '';
 end
 
-gmres_flags = '';
-benchmark_flag = '';
-fd_flag = '';
-if strcmp(solver, 'finite_differences')
-    fd_flag = sprintf(' --fd_accuracy %d', fd_accuracy);
-end
-if strcmp(solver, 'helmholtz')
-    gmres_flags = sprintf(' --gmres_restart %d --gmres_maxiter %d', gmres_restart, gmres_maxiter);
-
-    % Build FOV benchmark bounding box if requested
-    if ~isempty(benchmark_fov_mm)
-        benchmark_flag = build_benchmark_flag(source, parameters, benchmark_fov_mm);
-    end
-end
-cmd = sprintf('%s"%s" "%s" --input "%s" --output "%s" --solver %s%s%s%s%s', ...
-    jax_prefix, python_bin, bridge_py, input_h5, output_h5, solver, fd_flag, gmres_flags, benchmark_flag, log_redirect);
+gmres_flags = sprintf(' --gmres_restart %d --gmres_maxiter %d', gmres_restart, gmres_maxiter);
+cmd = sprintf('%s"%s" "%s" --input "%s" --output "%s"%s%s', ...
+    jax_prefix, python_bin, bridge_py, input_h5, output_h5, gmres_flags, log_redirect);
 
 fprintf('[jwave_wrapper] Launching jwave simulation...\n');
 fprintf('[jwave_wrapper] Command:\n  %s\n', cmd);
@@ -200,44 +173,24 @@ sensor_data.jwave_input_h5  = input_h5;
 sensor_data.jwave_output_h5 = output_h5;
 
 % -------------------------------------------------------------------------
-% 5b. Read convergence diagnostics (helmholtz only)
+% 5b. Read convergence diagnostics
 % -------------------------------------------------------------------------
 
-if strcmp(solver, 'helmholtz')
-    sensor_data.diagnostics = read_jwave_diagnostics(output_h5);
-    diag = sensor_data.diagnostics;
+sensor_data.diagnostics = read_jwave_diagnostics(output_h5);
+diag = sensor_data.diagnostics;
 
-    if isfield(diag, 'residual_norm') && ~isnan(diag.residual_norm)
-        if diag.residual_norm > convergence_threshold
-            warning('jwave_wrapper:helmholtzResidual', ...
-                ['Helmholtz spectral residual %.4e exceeds threshold %.4e.\n' ...
-                 'GMRES may not have converged — consider:\n' ...
-                 '  1. Increasing parameters.jwave.gmres_maxiter (currently %d).\n' ...
-                 '  2. Using parameters.jwave.solver = ''pseudo_spectral'' instead.\n' ...
-                 '  3. Reducing grid size via acoustic_fov_mm settings.\n' ...
-                 'Result p_max_all may be unreliable.'], ...
-                diag.residual_norm, convergence_threshold, gmres_maxiter);
-        else
-            fprintf('[jwave_wrapper] Helmholtz residual: %.4e (threshold %.4e) — OK\n', ...
-                diag.residual_norm, convergence_threshold);
-        end
-    end
-
-    if isfield(diag, 'benchmark_correlation') && ~isnan(diag.benchmark_correlation)
-        r     = diag.benchmark_correlation;
-        ratio = diag.benchmark_amplitude_ratio;
-        dist  = diag.benchmark_peak_dist_vox;
-        fprintf('[jwave_wrapper] FOV benchmark — correlation: %.4f  amplitude ratio: %.3f  peak dist: %.1f vox\n', ...
-            r, ratio, dist);
-        if r < 0.95 || ratio < 0.8 || ratio > 1.2 || dist >= 5
-            warning('jwave_wrapper:benchmarkMismatch', ...
-                ['FOV benchmark shows poor Helmholtz/pseudo-spectral agreement:\n' ...
-                 '  Spatial correlation = %.4f (need >0.95)\n' ...
-                 '  Amplitude ratio     = %.3f (need 0.8–1.2)\n' ...
-                 '  Peak distance       = %.1f vox (need <5)\n' ...
-                 'The Helmholtz result on the full grid is likely unreliable.'], ...
-                r, ratio, dist);
-        end
+if isfield(diag, 'residual_norm') && ~isnan(diag.residual_norm)
+    if diag.residual_norm > convergence_threshold
+        warning('jwave_wrapper:helmholtzResidual', ...
+            ['Helmholtz spectral residual %.4e exceeds threshold %.4e.\n' ...
+             'GMRES may not have converged — consider:\n' ...
+             '  1. Increasing parameters.jwave.gmres_maxiter (currently %d).\n' ...
+             '  2. Reducing grid size via acoustic_fov_mm settings.\n' ...
+             'Result p_max_all may be unreliable.'], ...
+            diag.residual_norm, convergence_threshold, gmres_maxiter);
+    else
+        fprintf('[jwave_wrapper] Helmholtz residual: %.4e (threshold %.4e) — OK\n', ...
+            diag.residual_norm, convergence_threshold);
     end
 end
 
@@ -375,9 +328,7 @@ function diag = read_jwave_diagnostics(h5_path)
 % Missing fields are returned as NaN so callers can use isfield + isnan.
 
 diag = struct();
-diag_fields = {'residual_norm', ...
-               'benchmark_correlation', 'benchmark_amplitude_ratio', ...
-               'benchmark_peak_dist_vox', 'benchmark_fov_vox'};
+diag_fields = {'residual_norm'};
 for f = diag_fields
     key = ['/diagnostics/' f{1}];
     try
@@ -386,64 +337,6 @@ for f = diag_fields
         diag.(f{1}) = NaN;
     end
 end
-end
-
-
-% =========================================================================
-% Local helper: build_benchmark_flag
-% =========================================================================
-
-function flag = build_benchmark_flag(source, parameters, benchmark_fov_mm)
-% Compute the --benchmark_fov_vox bounding box from the source mask and
-% benchmark_fov_mm = [lat_mm, ax_mm] (lateral full-width, axial depth).
-%
-% Lateral: ±lat_mm/2 around the source centroid (dims 1 & 2).
-% Axial:   from source far face backward by ax_mm (dim 3).
-
-flag = '';
-if isempty(benchmark_fov_mm)
-    return;
-end
-
-lat_mm = benchmark_fov_mm(1);
-ax_mm  = benchmark_fov_mm(end);
-res    = parameters.grid.resolution_mm;
-dims   = parameters.grid.dims(:)';
-
-% Find source voxel positions
-[ix, iy, iz] = ind2sub(size(source.p_mask), find(source.p_mask));
-if isempty(ix)
-    warning('jwave_wrapper:benchmarkNoSource', ...
-        'build_benchmark_flag: source mask is empty — skipping benchmark.');
-    return;
-end
-
-cx = round(mean(ix));
-cy = round(mean(iy));
-
-% Lateral half-width in voxels
-lat_vox = round((lat_mm / 2) / res);
-
-x0 = max(1,       cx - lat_vox);
-x1 = min(dims(1), cx + lat_vox);
-y0 = max(1,       cy - lat_vox);
-y1 = min(dims(2), cy + lat_vox);
-
-% Axial: source face is at max iz; FOV extends ax_vox towards focus
-z_src_max = max(iz);
-z_src_min = min(iz);
-ax_vox    = round(ax_mm / res);
-z0 = max(1,       z_src_min - ax_vox);
-z1 = min(dims(3), z_src_max + round(5 / res));   % 5 mm buffer past transducer face
-
-n_vox = (x1-x0+1) * (y1-y0+1) * (z1-z0+1);
-n_full = prod(dims);
-fprintf('[jwave_wrapper] FOV benchmark bbox: [%d,%d,%d]→[%d,%d,%d] vox (%.1f%% of grid)\n', ...
-    x0, y0, z0, x1, y1, z1, n_vox / n_full * 100);
-
-% Convert to 0-based for Python
-flag = sprintf(' --benchmark_fov_vox %d,%d,%d,%d,%d,%d', ...
-    x0-1, y0-1, z0-1, x1-1, y1-1, z1-1);
 end
 
 

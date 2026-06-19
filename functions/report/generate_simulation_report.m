@@ -748,32 +748,16 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             mat_prop_str,                                                               ...
             medium_desc, seg_sentence, skull_sentence, props_sentence, gpu_str);
     elseif use_jwave_acoustic
-        solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'pseudo_spectral');
+        solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'helmholtz');
         precision_str = iff(~isempty(jw_precision), html_utils.escape(jw_precision), 'single');
         % PML: prefer the jwave-specific field; fall back to the global pml variable
         jw_pml_val = iff(~isnan(jw_pml), jw_pml, pml);
         pml_str = fmt(jw_pml_val, '%d', '?');
-        % fd_accuracy suffix (only relevant for finite_differences solver)
-        if strcmpi(jw_solver, 'finite_differences') && ~isnan(jw_fd_accuracy)
-            solver_desc = sprintf('finite-differences (stencil accuracy order %d)', jw_fd_accuracy);
-        elseif strcmpi(jw_solver, 'helmholtz')
-            solver_desc = 'frequency-domain Helmholtz (GMRES)';
-        else
-            solver_desc = 'pseudo-spectral time-domain';
-        end
+        solver_desc = 'frequency-domain Helmholtz (GMRES)';
         compute_str = iff(~isempty(jw_compute), sprintf(' Computation was performed on %s.', jw_compute), '');
-        % j-Wave runs in JAX so kgrid.Nt/dt are not set by PRESTUS — report only if
-        % the time-domain solver was used and the fields were written to the CSV.
-        if strcmpi(jw_solver, 'helmholtz')
-            jw_timing_sentence = '';      % frequency-domain: no time steps
-            jw_window_sentence = '';
-        else
-            jw_timing_sentence = build_timing_sentence(sim_Nt, sim_dt_us, sim_dur_us, ...
-                                                       sim_ppw, sim_cfl, sim_ref_sos, ...
-                                                       sim_gx_mm, sim_gy_mm, sim_gz_mm, ...
-                                                       grid_res);
-            jw_window_sentence = 'Steady-state pressure was recorded over the final 3 wave periods. ';
-        end
+        % j-Wave Helmholtz is frequency-domain: no time steps to report
+        jw_timing_sentence = '';
+        jw_window_sentence = '';
         para2 = sprintf([...
             '%s '                                                                        ...
             'Acoustic pressure field propagation was modelled in %dD '                  ...
