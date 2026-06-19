@@ -86,7 +86,7 @@ try
     % Section 3: Methods Boilerplate (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Methods', ...
-            build_methods_boilerplate(parameters, is_layered), false, 'methods');
+            build_methods_boilerplate(parameters, is_layered, csv_table), false, 'methods');
     catch ME
         html_parts{end+1} = html_utils.section_error('Methods', ME);
     end
@@ -330,6 +330,14 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
         html = [html sprintf('<tr><th>Affix</th><td>%s</td></tr>', html_utils.escape(affix))];
     end
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
+    prestus_v = get_prestus_version(parameters);
+    if ~isempty(prestus_v)
+        html = [html sprintf('<tr><th>PRESTUS version</th><td>%s</td></tr>', html_utils.escape(prestus_v))];
+    end
+    kwave_v = get_kwave_version(parameters);
+    if ~isempty(kwave_v)
+        html = [html sprintf('<tr><th>k-Wave version</th><td>%s</td></tr>', html_utils.escape(kwave_v))];
+    end
     if isfield(parameters, 'output_dir')
         html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.dir_output))];
     end
@@ -337,7 +345,7 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     html = [html '</section>'];
 end
 
-function html = build_methods_boilerplate(parameters, is_layered)
+function html = build_methods_boilerplate(parameters, is_layered, csv_table)
 % Build a CC0-licensed, fMRIPrep-style methods boilerplate aligned with
 % ITRUSST standardised reporting guidelines (Martin et al., 2024,
 % Brain Stimulation 17:607-615; DOI:10.1016/j.brs.2024.04.013).
@@ -353,11 +361,81 @@ function html = build_methods_boilerplate(parameters, is_layered)
 % verbatim into manuscript Methods sections.
 
     % --- inline helpers ---
+    function s = detect_mri_sequence(params)
+        % Infer MRI sequence label from path field names in parameters.paths.
+        % Returns a string like 'T1-weighted' or 'T2-weighted'.
+        s = 'MRI';  % safe fallback
+        if ~isfield(params, 'paths'); return; end
+        flds = fieldnames(params.paths);
+        has_t2 = any(~cellfun(@isempty, regexpi(flds, 'T2', 'once')));
+        has_t1 = any(~cellfun(@isempty, regexpi(flds, 'T1', 'once')));
+        if has_t2 && ~has_t1
+            s = 'T2-weighted MRI';
+        elseif has_t1
+            s = 'T1-weighted MRI';
+        end
+    end
     function s = fmt(val, fmtstr, fallback)
         if isnumeric(val) && isscalar(val) && ~isnan(val)
             s = sprintf(fmtstr, val);
         else
             s = fallback;
+        end
+    end
+    function s = build_timing_sentence(Nt, dt_us, dur_us, ppw, cfl, ref_sos, ...
+                                        gx_mm, gy_mm, gz_mm, grid_res_mm)
+        % Compose the temporal-discretisation sentence for the methods block.
+        % Any unavailable (NaN) value is omitted gracefully.
+        parts = {};
+
+        % Grid domain extent (mm)
+        if ~isnan(gx_mm) && ~isnan(gy_mm) && ~isnan(gz_mm)
+            parts{end+1} = sprintf('total grid extent: %.0f&#8201;&#215;&#8201;%.0f&#8201;&#215;&#8201;%.0f&#8201;mm', ...
+                gx_mm, gy_mm, gz_mm);
+        end
+
+        % Spatial sampling
+        if ~isnan(ppw)
+            if ~isnan(grid_res_mm)
+                parts{end+1} = sprintf('%.1f points per wavelength at %.2g&#8201;mm resolution', ...
+                    ppw, grid_res_mm);
+            else
+                parts{end+1} = sprintf('%.1f points per wavelength', ppw);
+            end
+        end
+
+        % Temporal discretisation
+        if ~isnan(Nt) && ~isnan(dt_us)
+            parts{end+1} = sprintf('%d time steps of %.2f&#8201;&#956;s', Nt, dt_us);
+        end
+        if ~isnan(dur_us)
+            parts{end+1} = sprintf('total simulation duration %.1f&#8201;&#956;s', dur_us);
+        end
+
+        % CFL and reference sound speed
+        if ~isnan(cfl)
+            if ~isnan(ref_sos)
+                parts{end+1} = sprintf('CFL&#8201;=&#8201;%.2f (reference sound speed: %.0f&#8201;m/s)', ...
+                    cfl, ref_sos);
+            else
+                parts{end+1} = sprintf('CFL&#8201;=&#8201;%.2f', cfl);
+            end
+        end
+
+        if isempty(parts)
+            s = '';
+        else
+            s = ['Simulation parameters: ' strjoin(parts, '; ') '. '];
+        end
+    end
+    function v = csv_num(tbl, col)
+        % Read a scalar numeric from csv_table; return NaN if unavailable.
+        v = NaN;
+        if ~isempty(tbl) && istable(tbl) && ismember(col, tbl.Properties.VariableNames)
+            raw = tbl.(col);
+            if isnumeric(raw) && ~isempty(raw)
+                v = raw(1);
+            end
         end
     end
     function s = fmt_pml(val)
@@ -382,6 +460,17 @@ function html = build_methods_boilerplate(parameters, is_layered)
     pml       = safe_field(parameters.grid, 'pml_size_effective', ...
                   safe_field(parameters.grid, 'pml_size', NaN));
     code_type = safe_field(parameters.simulation, 'code_type', 'MATLAB');
+
+    % Grid timing & discretisation (written by acoustic_analysis into the CSV)
+    sim_Nt      = csv_num(csv_table, 'sim_Nt');
+    sim_dt_us   = csv_num(csv_table, 'sim_dt_us');
+    sim_dur_us  = csv_num(csv_table, 'sim_duration_us');
+    sim_ppw     = csv_num(csv_table, 'sim_ppw');
+    sim_cfl     = csv_num(csv_table, 'sim_cfl');
+    sim_ref_sos = csv_num(csv_table, 'sim_ref_sound_speed_mps');
+    sim_gx_mm   = csv_num(csv_table, 'sim_grid_x_mm');
+    sim_gy_mm   = csv_num(csv_table, 'sim_grid_y_mm');
+    sim_gz_mm   = csv_num(csv_table, 'sim_grid_z_mm');
 
     % Transducer (first element)
     td       = parameters.transducer(1);
@@ -439,8 +528,11 @@ function html = build_methods_boilerplate(parameters, is_layered)
     use_jwave_acoustic       = isfield(parameters, 'acoustic_backend') && ...
                                strcmpi(parameters.acoustic_backend, 'jwave');
 
-    jw_solver    = '';
-    jw_precision = '';
+    jw_solver      = '';
+    jw_precision   = '';
+    jw_pml         = NaN;
+    jw_fd_accuracy = NaN;
+    jw_compute     = '';
     if use_jwave_acoustic && isfield(parameters, 'jwave')
         jw = parameters.jwave;
         if isfield(jw, 'solver') && ~isempty(jw.solver)
@@ -448,6 +540,20 @@ function html = build_methods_boilerplate(parameters, is_layered)
         end
         if isfield(jw, 'precision') && ~isempty(jw.precision)
             jw_precision = jw.precision;
+        end
+        if isfield(jw, 'pml_size') && ~isempty(jw.pml_size)
+            jw_pml = jw.pml_size;
+        end
+        if isfield(jw, 'fd_accuracy') && ~isempty(jw.fd_accuracy)
+            jw_fd_accuracy = jw.fd_accuracy;
+        end
+        % Resolve compute backend: explicit use_gpu flag or auto-detect hint
+        if isfield(jw, 'use_gpu')
+            if isequal(jw.use_gpu, true) || isequal(jw.use_gpu, 1)
+                jw_compute = 'GPU (CUDA)';
+            elseif isequal(jw.use_gpu, false) || isequal(jw.use_gpu, 0)
+                jw_compute = 'CPU';
+            end
         end
     end
 
@@ -471,6 +577,13 @@ function html = build_methods_boilerplate(parameters, is_layered)
             end
         end
     end
+
+    % Software versions
+    prestus_ver  = get_prestus_version(parameters);
+    kw_ver       = get_kwave_version(parameters);
+    kw_ver_str   = iff(~isempty(kw_ver),      sprintf('v%s ', kw_ver), '');
+    bb_ver_str   = '';   % BabelBrain version not yet captured at runtime
+    jw_ver_str   = '';   % j-Wave version not yet captured at runtime
 
     % pseudoCT
     use_pct    = isfield(parameters, 'pct') && ...
@@ -536,9 +649,10 @@ function html = build_methods_boilerplate(parameters, is_layered)
     if is_layered
         medium_desc = sprintf(['a layered, subject-specific head model '       ...
             'comprising %d tissue compartments (%s)'], n_layers, tissue_list);
-        seg_sentence = [' Tissue segmentation was derived from T1-weighted '   ...
-            'MRI using the SimNIBS ' em('charm') ' pipeline '                  ...
-            '(Thielscher et al., 2015; Puonti et al., 2020).'];
+        seg_sentence = sprintf([' Tissue segmentation was derived from %s '    ...
+            'using the SimNIBS ' em('charm') ' pipeline '                      ...
+            '(Thielscher et al., 2015; Puonti et al., 2020).'],                 ...
+            detect_mri_sequence(parameters));
     else
         medium_desc  = 'a homogeneous water medium (free-field reference condition)';
         seg_sentence = '';
@@ -562,8 +676,19 @@ function html = build_methods_boilerplate(parameters, is_layered)
     end
 
     if use_babelbrain_acoustic
-        ppw_str = iff(~isempty(bb_ppw), sprintf('%s points per wavelength', bb_ppw), '');
         gpu_str = iff(~isempty(bb_gpu), sprintf(' GPU acceleration used the %s backend.', bb_gpu), '');
+        % BabelBrain has no PRESTUS-side kgrid, so Nt/dt/CFL are NaN.
+        % Grid extent and PPW can be derived from parameters directly.
+        bb_ppw_num = str2double(bb_ppw);   % bb_ppw is a fmt'd string; convert back
+        bb_gx_mm = NaN; bb_gy_mm = NaN; bb_gz_mm = NaN;
+        if isfield(parameters, 'grid') && isfield(parameters.grid, 'dims') && ...
+                isfield(parameters.grid, 'resolution_mm') && numel(parameters.grid.dims) >= 3
+            bb_gx_mm = parameters.grid.dims(1) * parameters.grid.resolution_mm;
+            bb_gy_mm = parameters.grid.dims(2) * parameters.grid.resolution_mm;
+            bb_gz_mm = parameters.grid.dims(3) * parameters.grid.resolution_mm;
+        end
+        bb_timing_sentence = build_timing_sentence(NaN, NaN, NaN, ...
+            bb_ppw_num, NaN, NaN, bb_gx_mm, bb_gy_mm, bb_gz_mm, grid_res);
         % BabelBrain material properties at simulation frequency
         % All attenuations are linear in frequency (power-law exponent 1).
         % Coefficients from BabelIntegrationBASE.py:
@@ -605,57 +730,95 @@ function html = build_methods_boilerplate(parameters, is_layered)
         para2 = sprintf([...
             '%s '                                                                       ...
             'Acoustic pressure field propagation was modelled in 3D '                  ...
-            'using BabelBrain (Pichardo, 2023), which solves the full viscoelastic '   ...
+            'using BabelBrain %s(Pichardo, 2023), which solves the full viscoelastic ' ...
             'wave equation via an explicit staggered-grid finite-difference '           ...
             'time-domain method (BabelViscoFDTD), including both longitudinal and '    ...
             'shear wave propagation in bone and mode conversion at the skull. '        ...
             'A Rayleigh integral pre-step was used to propagate the transducer '       ...
             'field through the water coupling layer prior to the skull. '              ...
-            '%s '                                                                       ...
+            '%s'                                                                        ...
             '%s '                                                                       ...
             'The medium was represented as %s.%s%s%s%s '                               ...
             'The method used to obtain ' em('in situ') ' exposure estimates '          ...
             'was full-wave acoustic simulation through the individual skull '           ...
             'and brain geometry.'],                                                     ...
             b(['Acoustic simulation and ' em('in situ') ' exposure estimates.']),       ...
-            ppw_str,                                                                    ...
+            bb_ver_str,                                                                 ...
+            bb_timing_sentence,                                                         ...
             mat_prop_str,                                                               ...
             medium_desc, seg_sentence, skull_sentence, props_sentence, gpu_str);
     elseif use_jwave_acoustic
-        solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'time-domain');
+        solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'pseudo_spectral');
         precision_str = iff(~isempty(jw_precision), html_utils.escape(jw_precision), 'single');
+        % PML: prefer the jwave-specific field; fall back to the global pml variable
+        jw_pml_val = iff(~isnan(jw_pml), jw_pml, pml);
+        pml_str = fmt(jw_pml_val, '%d', '?');
+        % fd_accuracy suffix (only relevant for finite_differences solver)
+        if strcmpi(jw_solver, 'finite_differences') && ~isnan(jw_fd_accuracy)
+            solver_desc = sprintf('finite-differences (stencil accuracy order %d)', jw_fd_accuracy);
+        elseif strcmpi(jw_solver, 'helmholtz')
+            solver_desc = 'frequency-domain Helmholtz (GMRES)';
+        else
+            solver_desc = 'pseudo-spectral time-domain';
+        end
+        compute_str = iff(~isempty(jw_compute), sprintf(' Computation was performed on %s.', jw_compute), '');
+        % j-Wave runs in JAX so kgrid.Nt/dt are not set by PRESTUS — report only if
+        % the time-domain solver was used and the fields were written to the CSV.
+        if strcmpi(jw_solver, 'helmholtz')
+            jw_timing_sentence = '';      % frequency-domain: no time steps
+            jw_window_sentence = '';
+        else
+            jw_timing_sentence = build_timing_sentence(sim_Nt, sim_dt_us, sim_dur_us, ...
+                                                       sim_ppw, sim_cfl, sim_ref_sos, ...
+                                                       sim_gx_mm, sim_gy_mm, sim_gz_mm, ...
+                                                       grid_res);
+            jw_window_sentence = 'Steady-state pressure was recorded over the final 3 wave periods. ';
+        end
         para2 = sprintf([...
             '%s '                                                                        ...
             'Acoustic pressure field propagation was modelled in %dD '                  ...
-            'using jwave (Stanziola et al., 2023), a JAX-based spectral solver, '       ...
-            'with the %s solver and %s-precision arithmetic, '                          ...
+            'using j-Wave %s(Stanziola et al., 2023), a JAX-based open-source '         ...
+            'differentiable wave simulator. '                                            ...
+            'The %s solver was used with %s-precision (float%s) arithmetic, '           ...
             'on a %s&#8201;mm isotropic Cartesian grid '                                ...
-            '(perfectly matched layer: %s grid points). '                               ...
+            '(perfectly matched layer thickness: %s grid points). %s%s%s'               ...
             'The medium was represented as %s.%s%s%s '                                  ...
             'The method used to obtain ' em('in situ') ' exposure estimates '           ...
             'was full-wave acoustic simulation through the individual skull '            ...
             'and brain geometry.'],                                                      ...
             b(['Acoustic simulation and ' em('in situ') ' exposure estimates.']),        ...
             n_dims,                                                                      ...
-            solver_str, precision_str,                                                   ...
+            jw_ver_str,                                                                  ...
+            solver_desc, precision_str,                                                  ...
+            iff(strcmpi(precision_str,'single'),'32','64'),                              ...
             fmt(grid_res, '%.2g', '?'),                                                 ...
-            fmt_pml(pml),                                                               ...
+            pml_str, jw_timing_sentence, jw_window_sentence, compute_str,               ...
             medium_desc, seg_sentence, skull_sentence, props_sentence);
     else
+        % k-Wave pseudo-spectral time-domain
+        timing_sentence = build_timing_sentence(sim_Nt, sim_dt_us, sim_dur_us, ...
+                                                sim_ppw, sim_cfl, sim_ref_sos, ...
+                                                sim_gx_mm, sim_gy_mm, sim_gz_mm, ...
+                                                grid_res);
         para2 = sprintf([...
             '%s '                                                                   ...
             'Acoustic pressure field propagation was modelled in %dD '             ...
-            'using the pseudospectral time-domain method '                          ...
+            'using the pseudospectral time-domain method implemented in the '       ...
+            'k-Wave Toolbox %s(Treeby &amp; Cox, 2010), '                          ...
             'on a %s&#8201;mm isotropic Cartesian grid '                           ...
             '(perfectly matched layer: %s grid points). '                          ...
+            '%s'                                                                    ...
+            'Steady-state pressure was recorded over the final 3 wave periods. '   ...
             'The medium was represented as %s.%s%s%s '                             ...
             'The method used to obtain ' em('in situ') ' exposure estimates '      ...
             'was full-wave acoustic simulation through the individual skull '       ...
             'and brain geometry.'],                                                 ...
             b(['Acoustic simulation and ' em('in situ') ' exposure estimates.']),   ...
             n_dims,                                                                 ...
+            kw_ver_str,                                                             ...
             fmt(grid_res, '%.2g', '?'),                                            ...
             fmt_pml(pml),                                                          ...
+            timing_sentence,                                                       ...
             medium_desc, seg_sentence, skull_sentence, props_sentence);
     end
 
@@ -772,9 +935,14 @@ function html = build_methods_boilerplate(parameters, is_layered)
         'use_pct',                 use_pct);
     refs_html = build_references_block(ref_flags);
 
+    if ~isempty(prestus_ver)
+        prestus_ver_str = sprintf(' (PRESTUS %s)', prestus_ver);
+    else
+        prestus_ver_str = '';
+    end
     cc0 = ['<div class="boilerplate-license">'                                 ...
         '<strong>License.</strong> '                                            ...
-        'The above methods text was automatically generated by PRESTUS '        ...
+        sprintf('The above methods text was automatically generated by PRESTUS%s ', prestus_ver_str) ...
         'and conforms to ITRUSST standardised reporting (Martin et al., 2024). '...
         'It has been released under the '                                       ...
         '<a href="https://creativecommons.org/publicdomain/zero/1.0/" '        ...
@@ -797,44 +965,44 @@ function html = build_references_block(f)
     if f.use_babelbrain_acoustic
         refs{end+1} = ref( ...
             'Pichardo, 2023', ...
-            ['Pichardo, S. BabelBrain: An Open-Source Application for Prospective Modeling of Transcranial Focused Ultrasound for Neuromodulation Applications. ' ...
-            '<em>IEEE Trans Ultrason Ferroelectr Freq Control</em> <strong>70</strong>, 587&#8211;599 (2023). ' ...
+            ['Pichardo, S. (2023). BabelBrain: An Open-Source Application for Prospective Modeling of Transcranial Focused Ultrasound for Neuromodulation Applications. ' ...
+            '<em>IEEE Trans Ultrason Ferroelectr Freq Control</em>, <strong>70</strong>, 587&#8211;599. ' ...
             '<a href="https://doi.org/10.1109/TUFFC.2023.3274046" target="_blank" rel="noopener">https://doi.org/10.1109/TUFFC.2023.3274046</a>']);
         refs{end+1} = ref( ...
             'Pichardo et al., 2011', ...
-            ['Pichardo, S., Sin, V. W., &amp; Hynynen, K. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. ' ...
-            '<em>Phys Med Biol</em> <strong>56</strong>, 219&#8211;250 (2011). ' ...
+            ['Pichardo, S., Sin, V. W., &amp; Hynynen, K. (2011). Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. ' ...
+            '<em>Phys Med Biol</em>, <strong>56</strong>, 219&#8211;250. ' ...
             '<a href="https://doi.org/10.1088/0031-9155/56/1/014" target="_blank" rel="noopener">https://doi.org/10.1088/0031-9155/56/1/014</a>']);
         refs{end+1} = ref( ...
             'Pichardo et al., 2017', ...
-            ['Pichardo, S., Bhatt, C., Huang, Y., &amp; Hynynen, K. Treatment of the skull in transcranial focused ultrasound. ' ...
-            '<em>Phys Med Biol</em> <strong>62</strong>, 7834&#8211;7857 (2017). ' ...
+            ['Pichardo, S., Bhatt, C., Huang, Y., &amp; Hynynen, K. (2017). Treatment of the skull in transcranial focused ultrasound. ' ...
+            '<em>Phys Med Biol</em>, <strong>62</strong>, 7834&#8211;7857. ' ...
             '<a href="https://doi.org/10.1088/1361-6560/aa8d6c" target="_blank" rel="noopener">https://doi.org/10.1088/1361-6560/aa8d6c</a>']);
         refs{end+1} = ref( ...
             'Goss et al., 1978', ...
-            ['Goss, S. A., Johnston, R. L., &amp; Dunn, F. Comprehensive compilation of empirical ultrasonic properties of mammalian tissues. ' ...
-            '<em>J Acoust Soc Am</em> <strong>64</strong>, 423&#8211;457 (1978). ' ...
+            ['Goss, S. A., Johnston, R. L., &amp; Dunn, F. (1978). Comprehensive compilation of empirical ultrasonic properties of mammalian tissues. ' ...
+            '<em>J Acoust Soc Am</em>, <strong>64</strong>, 423&#8211;457. ' ...
             '<a href="https://doi.org/10.1121/1.382016" target="_blank" rel="noopener">https://doi.org/10.1121/1.382016</a>']);
     elseif f.use_jwave_acoustic
         refs{end+1} = ref( ...
             'Stanziola et al., 2023', ...
-            ['Stanziola, A., Arridge, S. R., Cox, B. T., &amp; Treeby, B. E. jwave: An open-source differentiable wave simulator. ' ...
-            '<em>SoftwareX</em> <strong>22</strong>, 101338 (2023). ' ...
+            ['Stanziola, A., Arridge, S. R., Cox, B. T., &amp; Treeby, B. E. (2023). j-Wave: An open-source differentiable wave simulator. ' ...
+            '<em>SoftwareX</em>, <strong>22</strong>, 101338. ' ...
             '<a href="https://doi.org/10.1016/j.softx.2023.101338" target="_blank" rel="noopener">https://doi.org/10.1016/j.softx.2023.101338</a>']);
     end
 
     % k-Wave (always cited for transducer modelling; also the kwave backend)
     refs{end+1} = ref( ...
         'Treeby &amp; Cox, 2010', ...
-        ['Treeby, B. E. &amp; Cox, B. T. k-Wave: MATLAB toolbox for the simulation and reconstruction of photoacoustic wave fields. ' ...
-        '<em>J Biomed Opt</em> <strong>15</strong>, 021314 (2010). ' ...
+        ['Treeby, B. E., &amp; Cox, B. T. (2010). k-Wave: MATLAB toolbox for the simulation and reconstruction of photoacoustic wave fields. ' ...
+        '<em>J Biomed Opt</em>, <strong>15</strong>, 021314. ' ...
         '<a href="https://doi.org/10.1117/1.3360308" target="_blank" rel="noopener">https://doi.org/10.1117/1.3360308</a>']);
 
     if f.use_kwave
         refs{end+1} = ref( ...
             'Wise et al., 2019', ...
-            ['Wise, E. S., Cox, B. T., Jaros, J., &amp; Treeby, B. E. Representing arbitrary acoustic source and sensor distributions in Fourier collocation methods. ' ...
-            '<em>J Acoust Soc Am</em> <strong>146</strong>, 278&#8211;288 (2019). ' ...
+            ['Wise, E. S., Cox, B. T., Jaros, J., &amp; Treeby, B. E. (2019). Representing arbitrary acoustic source and sensor distributions in Fourier collocation methods. ' ...
+            '<em>J Acoust Soc Am</em>, <strong>146</strong>, 278&#8211;288. ' ...
             '<a href="https://doi.org/10.1121/1.5116132" target="_blank" rel="noopener">https://doi.org/10.1121/1.5116132</a>']);
     end
 
@@ -842,13 +1010,13 @@ function html = build_references_block(f)
     if f.is_layered
         refs{end+1} = ref( ...
             'Thielscher et al., 2015', ...
-            ['Thielscher, A., Antunes, A., &amp; Saturnino, G. B. Field modeling for transcranial magnetic stimulation: A useful tool to understand the physiological effects of TMS? ' ...
-            '<em>Proc IEEE EMBC</em>, 222&#8211;225 (2015). ' ...
+            ['Thielscher, A., Antunes, A., &amp; Saturnino, G. B. (2015). Field modeling for transcranial magnetic stimulation: A useful tool to understand the physiological effects of TMS? ' ...
+            '<em>Proc IEEE EMBC</em>, 222&#8211;225. ' ...
             '<a href="https://doi.org/10.1109/EMBC.2015.7318340" target="_blank" rel="noopener">https://doi.org/10.1109/EMBC.2015.7318340</a>']);
         refs{end+1} = ref( ...
             'Puonti et al., 2020', ...
-            ['Puonti, O., Van Leemput, K., Saturnino, G. B., Siebner, H. R., Madsen, K. H., &amp; Thielscher, A. Reproducible and automated T1-only segmentation of the brain and skull using the SimNIBS <em>charm</em> pipeline. ' ...
-            '<em>NeuroImage</em> <strong>204</strong>, 116237 (2020). ' ...
+            ['Puonti, O., Van Leemput, K., Saturnino, G. B., Siebner, H. R., Madsen, K. H., &amp; Thielscher, A. (2020). Reproducible and automated T1-only segmentation of the brain and skull using the SimNIBS <em>charm</em> pipeline. ' ...
+            '<em>NeuroImage</em>, <strong>204</strong>, 116237. ' ...
             '<a href="https://doi.org/10.1016/j.neuroimage.2019.116237" target="_blank" rel="noopener">https://doi.org/10.1016/j.neuroimage.2019.116237</a>']);
     end
 
@@ -856,26 +1024,26 @@ function html = build_references_block(f)
     if f.run_thermal
         refs{end+1} = ref( ...
             'Pennes, 1948', ...
-            ['Pennes, H. H. Analysis of tissue and arterial blood temperatures in the resting human forearm. ' ...
-            '<em>J Appl Physiol</em> <strong>1</strong>, 93&#8211;122 (1948). ' ...
+            ['Pennes, H. H. (1948). Analysis of tissue and arterial blood temperatures in the resting human forearm. ' ...
+            '<em>J Appl Physiol</em>, <strong>1</strong>, 93&#8211;122. ' ...
             '<a href="https://doi.org/10.1152/jappl.1948.1.2.93" target="_blank" rel="noopener">https://doi.org/10.1152/jappl.1948.1.2.93</a>']);
         refs{end+1} = ref( ...
             'Sapareto &amp; Dewey, 1984', ...
-            ['Sapareto, S. A. &amp; Dewey, W. C. Thermal dose determination in cancer therapy. ' ...
-            '<em>Int J Radiat Oncol Biol Phys</em> <strong>10</strong>, 787&#8211;800 (1984). ' ...
+            ['Sapareto, S. A., &amp; Dewey, W. C. (1984). Thermal dose determination in cancer therapy. ' ...
+            '<em>Int J Radiat Oncol Biol Phys</em>, <strong>10</strong>, 787&#8211;800. ' ...
             '<a href="https://doi.org/10.1016/0360-3016(84)90379-1" target="_blank" rel="noopener">https://doi.org/10.1016/0360-3016(84)90379-1</a>']);
     end
 
     % ITRUSST (always cited)
     refs{end+1} = ref( ...
         'Martin et al., 2024', ...
-        ['Martin, E., Treeby, B. E., &amp; Bhatt, M. et al. Recommendations for standardised reporting of focused ultrasound neuromodulation studies. ' ...
-        '<em>Brain Stimul</em> <strong>17</strong>, 140&#8211;151 (2024). ' ...
+        ['Martin, E., Treeby, B. E., Bhatt, M., et al. (2024). Recommendations for standardised reporting of focused ultrasound neuromodulation studies. ' ...
+        '<em>Brain Stimul</em>, <strong>17</strong>, 140&#8211;151. ' ...
         '<a href="https://doi.org/10.1016/j.brs.2024.01.007" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2024.01.007</a>']);
     refs{end+1} = ref( ...
         'Aubry et al., 2025', ...
-        ['Aubry, J.-F. et al. ITRUSST consensus on biophysical safety for low-intensity transcranial ultrasound stimulation. ' ...
-        '<em>Brain Stimul</em> (2025). ' ...
+        ['Aubry, J.-F., et al. (2025). ITRUSST consensus on biophysical safety for low-intensity transcranial ultrasound stimulation. ' ...
+        '<em>Brain Stimul</em>. ' ...
         '<a href="https://doi.org/10.1016/j.brs.2024.11.012" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2024.11.012</a>']);
 
     items_html = strjoin(refs, '');
@@ -887,12 +1055,61 @@ end
 
 function s = ref(tag, text_html)
 % Format a single reference list item.
-    s = sprintf('<li><span class="ref-tag">%s</span> %s</li>', tag, text_html);
+    s = sprintf('<li>%s</li>', text_html);
 end
 
-function s = iff(cond, a, b)
-% Inline conditional: return a if cond is true, else b.
-    if cond; s = a; else; s = b; end
+
+function v = get_prestus_version(parameters)
+% Read PRESTUS version from VERSION file next to this function's directory.
+% Returns version string (e.g. 'v0.6.1') or empty string if not found.
+    v = '';
+    try
+        this_dir = fileparts(mfilename('fullpath'));   % functions/report/
+        repo_root = fullfile(this_dir, '..', '..');    % PRESTUS root
+        ver_file  = fullfile(repo_root, 'VERSION');
+        if isfile(ver_file)
+            raw = strtrim(fileread(ver_file));
+            if ~isempty(raw)
+                v = raw;
+            end
+        end
+    catch
+    end
+    % Also allow override via parameters.version for non-standard installs
+    if isfield(parameters, 'version') && ischar(parameters.version) && ~isempty(parameters.version)
+        v = parameters.version;
+    end
+end
+
+function v = get_kwave_version(parameters)
+% Read k-Wave version from its Contents.m file, resolved via the toolbox path.
+% Returns version string (e.g. '1.4') or empty string if not found.
+    v = '';
+    try
+        % Prefer path stored in parameters if set
+        kw_root = '';
+        if isfield(parameters, 'paths') && isfield(parameters.paths, 'kwave_toolbox')
+            kw_root = parameters.paths.kwave_toolbox;
+        end
+        if isempty(kw_root)
+            % Fall back: find kWaveGrid on the MATLAB path
+            kw_grid = which('kWaveGrid');
+            if ~isempty(kw_grid)
+                kw_root = fileparts(kw_grid);
+            end
+        end
+        if ~isempty(kw_root)
+            contents = fullfile(kw_root, 'Contents.m');
+            if isfile(contents)
+                txt = fileread(contents);
+                tok = regexp(txt, 'Version\s+([\d.]+)', 'tokens', 'once');
+                if ~isempty(tok)
+                    v = tok{1};
+                end
+            end
+        end
+    catch
+    end
 end
 
 function html = build_simulation_summary(csv_table, parameters, is_layered)
@@ -967,6 +1184,15 @@ end
 
 function html = build_medium_properties_section(parameters)
     html = '';
+
+    use_bb = isfield(parameters, 'acoustic_backend') && ...
+             strcmpi(parameters.acoustic_backend, 'babelbrain');
+
+    if use_bb
+        html = build_medium_properties_babelbrain(parameters);
+        return
+    end
+
     if ~isfield(parameters, 'medium_properties') || ~isfield(parameters, 'layers')
         html = '<p class="placeholder">Missing medium or layers data.</p>';
         return
@@ -974,33 +1200,29 @@ function html = build_medium_properties_section(parameters)
 
     med = parameters.medium_properties;
     layer_names = fieldnames(parameters.layers);
-    
-    % === CORRECT FILTER: layers in BOTH parameters.layers AND parameters.simulation.medium ===
+
     valid_tissues = {};
     tissue_labels = {};
     for i = 1:length(layer_names)
         layer_name = layer_names{i};
-        if isfield(med, layer_name)  % Only include if medium has properties for this layer
+        if isfield(med, layer_name)
             valid_tissues{end+1} = layer_name;
-            
-            % Human-readable labels
             switch layer_name
                 case 'skull_cortical'
                     tissue_labels{end+1} = 'Skull (cortical)';
-                case 'skull_trabecular' 
+                case 'skull_trabecular'
                     tissue_labels{end+1} = 'Skull (trabecular)';
                 otherwise
                     tissue_labels{end+1} = strrep(layer_name, '_', ' ');
             end
         end
     end
-    
+
     if isempty(valid_tissues)
         html = '<p class="placeholder">No matching layers found in medium properties.</p>';
         return
     end
 
-    % Rest unchanged...
     props = {'sound_speed', 'Sound speed', 'm/s'; ...
              'density', 'Density', 'kg/m³'; ...
              'alpha_coeff', 'Attenuation coeff.', 'dB/(MHz^y·cm)'; ...
@@ -1032,9 +1254,119 @@ function html = build_medium_properties_section(parameters)
         html = [html '</tr>'];
     end
     html = [html '</tbody></table></div>'];
-    
+
     html = [html sprintf('<p class="note"><strong>Active layers:</strong> %s</p>', ...
         strjoin(tissue_labels, ', '))];
+end
+
+function html = build_medium_properties_babelbrain(parameters)
+% Build the Medium Properties section for BabelBrain runs.
+% Reads the Material matrix from the DataForSim.h5 output and converts
+% units for display. BabelBrain Material rows: Water(0), Skin(1),
+% Cortical(2), Trabecular(3), Brain(4), [WhiteMatter(5), GrayMatter(6), CSF(7)].
+% Columns: [Density(kg/m³), LongSoS(m/s), ShearSoS(m/s), LongAtt(Np/m), ShearAtt(Np/m)].
+    html = '';
+
+    % Locate DataForSim.h5 — same naming logic as babelbrain_wrapper
+    h5_path = '';
+    try
+        out_dir  = parameters.io.dir_cache;
+        subj_id  = sprintf('sub-%03d', parameters.subject_id);
+        target   = strrep(parameters.io.output_affix, '_', '');
+        if isempty(target), target = 'target'; end
+        bb       = safe_field(parameters, 'babelbrain', struct());
+        freq_hz  = parameters.transducer(1).freq_hz;
+        freq_kHz = round(freq_hz / 1e3);
+        ppw      = safe_field(bb, 'ppw', 6);
+        h5_name  = sprintf('%s_%dkHz_%dPPW_DataForSim.h5', target, freq_kHz, ppw);
+        h5_path  = fullfile(out_dir, subj_id, h5_name);
+        if ~isfile(h5_path)
+            candidates = dir(fullfile(out_dir, subj_id, '*DataForSim.h5'));
+            if ~isempty(candidates)
+                h5_path = fullfile(candidates(end).folder, candidates(end).name);
+            else
+                h5_path = '';
+            end
+        end
+    catch
+        h5_path = '';
+    end
+
+    mat = [];
+    if ~isempty(h5_path) && isfile(h5_path)
+        try
+            ensure_hdf5_plugin_path('', 'babelbrain');
+            mat_raw = h5read(h5_path, '/Material');
+            % h5read returns [5 x N] (column-major); transpose to [N x 5]
+            if size(mat_raw, 1) == 5 && size(mat_raw, 2) > 1
+                mat_raw = mat_raw';
+            end
+            mat = double(mat_raw);
+        catch
+        end
+    end
+
+    if isempty(mat)
+        html = ['<p class="placeholder">BabelBrain material properties not available ' ...
+                '(DataForSim.h5 not found or /Material dataset missing).</p>'];
+        return
+    end
+
+    % BabelBrain material row labels (fixed ordering from BabelIntegrationBASE.py)
+    bb_row_labels  = {'Water', 'Skin', 'Skull (cortical)', 'Skull (trabecular)', 'Brain', ...
+                      'White matter', 'Gray matter', 'CSF'};
+    n_rows = min(size(mat, 1), numel(bb_row_labels));
+
+    % Frequency for attenuation unit conversion (Np/m → dB/cm/MHz)
+    freq_mhz = NaN;
+    try
+        freq_mhz = parameters.transducer(1).freq_hz / 1e6;
+    catch
+    end
+
+    % CT-derived skull note
+    use_ct = isfield(parameters, 'babelbrain') && ...
+             isfield(parameters.babelbrain, 'ct_mapping') && ...
+             ~isempty(parameters.babelbrain.ct_mapping);
+    skull_note = '';
+    if use_ct
+        skull_note = ' Skull properties are CT-derived (voxel-by-voxel); values shown are the simulation-wide mean.';
+    end
+
+    html = '<div class="table-wrapper"><table class="data-table">';
+    html = [html '<thead><tr>' ...
+        '<th>Tissue</th>' ...
+        '<th>Density<br><small>kg/m³</small></th>' ...
+        '<th>Long. SoS<br><small>m/s</small></th>' ...
+        '<th>Shear SoS<br><small>m/s</small></th>' ...
+        '<th>Long. att.<br><small>Np/m</small></th>' ...
+        '<th>Long. att.<br><small>dB/cm</small></th>'];
+    if ~isnan(freq_mhz)
+        html = [html sprintf('<th>Long. att.<br><small>dB/cm/MHz @ %.3g MHz</small></th>', freq_mhz)];
+    end
+    html = [html '<th>Shear att.<br><small>Np/m</small></th></tr></thead><tbody>'];
+
+    NP_TO_DB_PER_CM = 20 / log(10) / 100;  % Np/m → dB/cm
+
+    for r = 1:n_rows
+        row = mat(r, :);
+        den   = row(1);  lsos  = row(2);  ssos  = row(3);
+        latt  = row(4);  satt  = row(5);
+        latt_db = latt * NP_TO_DB_PER_CM;
+        html = [html sprintf('<tr><td><strong>%s</strong></td>', ...
+            html_utils.escape(bb_row_labels{r}))];
+        html = [html sprintf('<td>%.4g</td><td>%.4g</td><td>%.4g</td><td>%.4g</td><td>%.4g</td>', ...
+            den, lsos, ssos, latt, latt_db)];
+        if ~isnan(freq_mhz) && freq_mhz > 0
+            html = [html sprintf('<td>%.4g</td>', latt_db / freq_mhz)];
+        end
+        html = [html sprintf('<td>%.4g</td></tr>', satt)];
+    end
+    html = [html '</tbody></table></div>'];
+
+    html = [html sprintf(['<p class="note">Properties as used by BabelBrain (frequency-dependent; ' ...
+        'evaluated at %.3g MHz). Longitudinal attenuation in both Np/m and dB/cm for reference.%s</p>'], ...
+        freq_mhz, skull_note)];
 end
 
 function html = build_config_summary(parameters)
@@ -1234,10 +1566,6 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
     td = parameters.io.dir_img;
     thermal_images = {
         fullfile(td, sprintf('sub-%03d_%s_maxT%s.png',            subject_id, medium, affix)), 'Max temperature overlay';
-        fullfile(td, sprintf('sub-%03d_%s_thermal%s.png',         subject_id, medium, affix)), 'Temperature vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_%s_thermalrise%s.png',     subject_id, medium, affix)), 'Temperature rise vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_%s_CEM%s.png',             subject_id, medium, affix)), 'CEM43 (kWave) vs time (focal)';
-        fullfile(td, sprintf('sub-%03d_%s_CEM_iso%s.png',         subject_id, medium, affix)), 'CEM43 (ISO) vs time (focal)';
         fullfile(td, sprintf('sub-%03d_%s_thermal_max%s.png',     subject_id, medium, affix)), 'Temperature vs time (layer max)';
         fullfile(td, sprintf('sub-%03d_%s_thermalrise_max%s.png', subject_id, medium, affix)), 'Temperature rise vs time (layer max)';
         fullfile(td, sprintf('sub-%03d_%s_CEM_max%s.png',         subject_id, medium, affix)), 'CEM43 (kWave) vs time (layer max)';
@@ -1714,7 +2042,11 @@ newline ...
 '/* Print */' newline ...
 '@media print { html { scroll-behavior: auto; } body { background: white; } ' ...
   '.report-section { box-shadow: none; border: 1px solid #e2e8f0; break-inside: avoid; } ' ...
-  'details { display: block; } details > summary { display: none; } details > .section-content { padding: 0 24px 24px 24px; } ' ...
+  'details { display: block; } details > summary { display: none; } ' ...
+  'details > *:not(summary) { display: block !important; } ' ...
+  'details > .section-content { padding: 0 24px 24px 24px; } ' ...
+  '.boilerplate-refs { border: none; } ' ...
+  '.boilerplate-ref-list { display: block !important; padding-left: 1.5em; } ' ...
   '.log-block { max-height: none; } .toc { display: none; } .lb-overlay { display: none; } ' ...
   'figure { break-inside: avoid; } .safety-grid { break-inside: avoid; } ' ...
   'figure img { cursor: default; } ' ...

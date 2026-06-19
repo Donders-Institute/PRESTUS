@@ -10,7 +10,7 @@ classdef test_jwave < matlab.unittest.TestCase
 % Backends compared
 % -----------------
 %   kwave_cpu   : parameters.simulation.code_type = 'matlab_cpu'  (k-Wave, no jwave)
-%   jwave_td    : parameters.acoustic_backend = 'jwave', solver = 'time_domain'
+%   jwave_td    : parameters.acoustic_backend = 'jwave', solver = 'pseudo_spectral'
 %   jwave_helm  : parameters.acoustic_backend = 'jwave', solver = 'helmholtz'
 %
 % Environment variables
@@ -122,7 +122,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_jwave_td_runs_without_error(tc)
         % jwave time-domain backend should complete without throwing.
-            p = tc.make_jwave_params('td_basic', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('td_basic', [48 48 80], 'pseudo_spectral');
             tc.verifyWarningFree(@() prestus_pipeline(p));
         end
 
@@ -136,7 +136,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_jwave_td_returns_positive_pressure(tc)
         % Peak pressure field should be non-empty and contain positive values.
-            p   = tc.make_jwave_params('td_pos', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_pos', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             sd  = out.sensor_data;
             tc.verifyNotEmpty(sd.p_max_all,           'p_max_all is empty');
@@ -155,7 +155,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_jwave_td_output_fields_present(tc)
         % jwave_wrapper must return the same field names as acoustic_simulation.
-            p   = tc.make_jwave_params('td_fields', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_fields', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             sd  = out.sensor_data;
             for f = {'p_max_all', 'p_min_all', 'p_final'}
@@ -166,7 +166,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_jwave_td_p_min_negative(tc)
         % Peak negative pressure should be strictly negative (rarefaction).
-            p   = tc.make_jwave_params('td_pmin', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_pmin', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             sd  = out.sensor_data;
             tc.verifyLessThan(min(sd.p_min_all(:)), 0, 'p_min_all has no negative values');
@@ -175,7 +175,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_axisymmetric_raises_error(tc)
         % jwave backend must refuse axisymmetric grids with a clear message.
-            p = tc.make_jwave_params('td_as', [1 48 80], 'time_domain');
+            p = tc.make_jwave_params('td_as', [1 48 80], 'pseudo_spectral');
             p.grid.axisymmetric = 1;
             tc.verifyError(@() prestus_pipeline(p), '');
         end
@@ -184,7 +184,7 @@ classdef test_jwave < matlab.unittest.TestCase
         function test_kWaveArray_overridden_with_warning(tc)
         % load_parameters should silently override use_kWaveArray=1 to 0 when
         % the jwave backend is selected, emitting a warning rather than erroring.
-            p = tc.make_jwave_params('td_kwa', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('td_kwa', [48 48 80], 'pseudo_spectral');
             p.grid.use_kWaveArray = 1;
             % load_parameters has already run in make_jwave_params; simulate the
             % post-load state by calling load_parameters with the patched struct.
@@ -199,7 +199,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_dry_run_skips_simulation(tc)
         % Dry-run flag should write HDF5 input but return empty pressure.
-            p = tc.make_jwave_params('td_dryrun', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('td_dryrun', [48 48 80], 'pseudo_spectral');
             p.jwave.dry_run = true;
             out = prestus_pipeline(p);
             sd  = out.sensor_data;
@@ -217,7 +217,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_force_cpu_uses_cpu_env(tc)
         % use_gpu = false must select python_env regardless of GPU presence.
-            p = tc.make_jwave_params('env_cpu', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('env_cpu', [48 48 80], 'pseudo_spectral');
             p.jwave.use_gpu = false;
             p.jwave.dry_run = true;
             tc.verifyWarningFree(@() prestus_pipeline(p));
@@ -226,7 +226,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % -------------------------------------------------------------- %
         function test_force_gpu_errors_without_gpu_env(tc)
         % use_gpu = true with python_env_gpu unset must throw.
-            p = tc.make_jwave_params('env_gpu_noenv', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('env_gpu_noenv', [48 48 80], 'pseudo_spectral');
             p.jwave.use_gpu        = true;
             p.jwave.python_env_gpu = '';
             p.jwave.dry_run        = true;
@@ -238,7 +238,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % use_gpu = true with python_env_gpu set must select the GPU env.
         % Skipped when JWAVE_PYTHON_GPU is not configured.
             tc.assumeNotEmpty(tc.PyBinGpu, 'JWAVE_PYTHON_GPU not set — skipping GPU-env test.');
-            p = tc.make_jwave_params('env_gpu_ok', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('env_gpu_ok', [48 48 80], 'pseudo_spectral');
             p.jwave.use_gpu        = true;
             p.jwave.python_env_gpu = tc.PyBinGpu;
             p.jwave.dry_run        = true;
@@ -251,7 +251,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % jwave_wrapper should issue a warning and fall back to CPU env.
             [smi_status, ~] = system('nvidia-smi -L 2>/dev/null');
             tc.assumeEqual(smi_status, 0, 'No GPU detected — skipping this test.');
-            p = tc.make_jwave_params('env_auto_nogpuenv', [48 48 80], 'time_domain');
+            p = tc.make_jwave_params('env_auto_nogpuenv', [48 48 80], 'pseudo_spectral');
             p.jwave.use_gpu        = [];   % auto
             p.jwave.python_env_gpu = '';
             p.jwave.dry_run        = true;
@@ -270,7 +270,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % jwave time-domain peak pressure should be within REL_TOL of k-Wave.
             ref_peak = max(tc.get_ref_data().sensor_data.p_max_all(:));
 
-            p   = tc.make_jwave_params('td_agree', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_agree', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             jw_peak = max(out.sensor_data.p_max_all(:));
 
@@ -287,7 +287,7 @@ classdef test_jwave < matlab.unittest.TestCase
         function test_jwave_td_spatial_correlation(tc)
         % Pearson r between jwave and k-Wave p_max_all should exceed MIN_CORRELATION.
             ref = tc.get_ref_data().sensor_data.p_max_all(:);
-            p   = tc.make_jwave_params('td_corr', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_corr', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             jw  = out.sensor_data.p_max_all(:);
 
@@ -323,7 +323,7 @@ classdef test_jwave < matlab.unittest.TestCase
             ref_axial = squeeze(max(max(ref_sd.p_max_all, [], 1), [], 2));
             [~, ref_z] = max(ref_axial);
 
-            p   = tc.make_jwave_params('td_focal', [48 48 80], 'time_domain');
+            p   = tc.make_jwave_params('td_focal', [48 48 80], 'pseudo_spectral');
             out = prestus_pipeline(p);
             jw_axial = squeeze(max(max(out.sensor_data.p_max_all, [], 1), [], 2));
             [~, jw_z] = max(jw_axial);
@@ -359,7 +359,7 @@ classdef test_jwave < matlab.unittest.TestCase
                             case 'kwave_cpu'
                                 p = tc.make_params(sprintf('timing_kw_%d', N), grid_dims);
                             case 'jwave_td'
-                                p = tc.make_jwave_params(sprintf('timing_td_%d', N), grid_dims, 'time_domain');
+                                p = tc.make_jwave_params(sprintf('timing_td_%d', N), grid_dims, 'pseudo_spectral');
                             case 'jwave_helm'
                                 p = tc.make_jwave_params(sprintf('timing_helm_%d', N), grid_dims, 'helmholtz');
                         end
