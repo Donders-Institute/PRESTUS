@@ -9,8 +9,11 @@ function results_heating = read_babelbrain_thermal(thermal_h5, parameters, plani
 % BabelBrain thermal output fields used (from CalculateTemperatureEffects.py):
 %   TempEndFUS   - [Nx x Ny x Nz] temperature at end of sonication [°C]
 %   FinalTemp    - [Nx x Ny x Nz] final temperature after cooling [°C]
-%   DoseEndFUS   - [Nx x Ny x Nz] CEM43 at end of sonication [min]
-%   FinalDose    - [Nx x Ny x Nz] final CEM43 after cooling [min]
+%   DoseEndFUS   - [Nx x Ny x Nz] raw CEM43 accumulation at end of sonication [CEM43·s]
+%   FinalDose    - [Nx x Ny x Nz] raw CEM43 accumulation after cooling [CEM43·s]
+%                  (divided by 60 on read to convert to [min] — BabelBrain's BHTE
+%                   accumulates with dt in seconds; scalar summaries CEMBrain/CEMSkin
+%                   are already in minutes but 3D arrays are not)
 %   p_map        - [Nx x Ny x Nz] peak pressure map [Pa]
 %   x_vec / y_vec / z_vec - spatial coordinates [mm]
 %   TempProfileTarget / TimeProfileTarget - temperature time course at focus
@@ -51,8 +54,12 @@ read_field = @(key) double(h5read(thermal_h5, ['/' key]));
 
 T_end_fus  = read_field('TempEndFUS');   % temperature at end of sonication
 T_final    = read_field('FinalTemp');    % final temperature after cooling
-cem_end    = read_field('DoseEndFUS');   % CEM43 at end of sonication
-cem_final  = read_field('FinalDose');    % final CEM43
+% BabelBrain accumulates CEM43 with the BHTE time step in SECONDS; the 3D
+% DoseEndFUS/FinalDose arrays are therefore in CEM43·s, not CEM43·min.
+% BabelBrain itself divides by 60 for its scalar summaries (CEMBrain etc.),
+% and PRESTUS uses minutes throughout (thermal_simulation.m line ~390).
+cem_end    = read_field('DoseEndFUS') / 60;   % CEM43 at end of sonication [min]
+cem_final  = read_field('FinalDose')  / 60;   % final CEM43 [min]
 
 p_map      = read_field('p_map');        % peak pressure [Pa]
 
