@@ -81,6 +81,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` updated to use `parameters.path.seg` (was `parameters.seg_path`)
 
 #### Sequential / Reporting
+- HTML simulation report shows a per-transducer Ipa table for `asyncJoint` runs, listing each transducer's Isppa at its own focus sampled from the joint combined intensity map
 - Run labels derived automatically from output affixes in consolidated reports
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
 - HTML simulation report extended with BabelBrain and jwave backend sections

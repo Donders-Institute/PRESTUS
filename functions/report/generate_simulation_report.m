@@ -1465,6 +1465,22 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             limits = get_risk_limits(is_layered);
             acoustic_cols = get_acoustic_columns();
             html = [html table2html(csv_table, limits, acoustic_cols)];
+
+            % For async joint runs show per-transducer Ipa at each transducer's focus
+            % extracted from the joint combined intensity map.
+            if contains(affix, 'asyncJoint') && ...
+                    ismember('Ipa_target_per_trans_wcm2', csv_table.Properties.VariableNames)
+                raw = csv_table.Ipa_target_per_trans_wcm2{1};   % bracketed string "[v1,v2,...]"
+                vals = str2num(raw(2:end-1)); %#ok<ST2NM>       % strip brackets
+                n_tr = numel(vals);
+                tbl_html = '<table class="data-table"><thead><tr><th>Transducer</th><th>Ipa at focus (joint map) [W/cm²]</th></tr></thead><tbody>';
+                for ti_r = 1:n_tr
+                    tbl_html = [tbl_html sprintf('<tr><td>%d</td><td>%.4f</td></tr>', ti_r, vals(ti_r))]; %#ok<AGROW>
+                end
+                tbl_html = [tbl_html '</tbody></table>'];
+                html = [html '<p class="note">Per-transducer I<sub>sppa</sub> at each transducer&apos;s focus, sampled from the joint combined intensity map:</p>'];
+                html = [html tbl_html];
+            end
         else
             % Water: filter to water-relevant columns only, no safety color coding
             water_cols = get_acoustic_columns_water();
