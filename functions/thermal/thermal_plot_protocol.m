@@ -71,9 +71,11 @@ function [t_high, signal_high] = generate_segment(t_start, total_duration, dt_co
         t_local = t_local + dt_coarse;
     end
     
-    t_high(end) = t_start + total_duration;
-    if is_on
-        signal_high(end) = sin(2*pi * CYCLES_PER_PD);
+    if ~isempty(t_high)
+        t_high(end) = t_start + total_duration;
+        if is_on
+            signal_high(end) = sin(2*pi * CYCLES_PER_PD);
+        end
     end
 end
 
@@ -84,12 +86,12 @@ total_off_dur = params_thermal.pt_off_steps_n * params_thermal.pt_off_steps_dur;
 
 t_first_pulse = []; signal_first_pulse = []; t_current = 0;
 
-[t_on, s_on] = generate_segment(t_current, total_on_dur, params_thermal.pt_dt, true, upsample);
+[t_on, s_on] = generate_segment(t_current, total_on_dur, params_thermal.pt_on_steps_dur, true, upsample);
 t_first_pulse = [t_first_pulse; t_on]; signal_first_pulse = [signal_first_pulse; s_on];
 t_current = t_current + total_on_dur;
 
 if params_thermal.pt_off_steps_n > 0 && params_thermal.pt_off_steps_dur>0
-    [t_off, s_off] = generate_segment(t_current, total_off_dur, params_thermal.pt_dt, false, upsample);
+    [t_off, s_off] = generate_segment(t_current, total_off_dur, params_thermal.pt_off_steps_dur, false, upsample);
     t_first_pulse = [t_first_pulse; t_off]; signal_first_pulse = [signal_first_pulse; s_off];
 end
 
