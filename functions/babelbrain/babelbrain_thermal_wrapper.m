@@ -75,14 +75,17 @@ bb = struct();
 if isfield(parameters, 'babelbrain')
     bb = parameters.babelbrain;
 end
-bb = apply_default(bb, 'computing_backend',  3);
-bb = apply_default(bb, 'device_name',        'Apple');
+bb = apply_default(bb, 'computing_backend',  'auto');
+bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'python_env',         '');
 bb = apply_default(bb, 'root',               '');
 bb = apply_default(bb, 'isppa_w_per_cm2',    get_tx_isppa(parameters.transducer(1)));
 
+[bb.computing_backend, bb.device_name] = resolve_backend(bb.computing_backend, bb.device_name);
+
 %% Locate Python binary
 python_bin = resolve_python_env(bb.python_env, 'python');
+ensure_hdf5_plugin_path(python_bin);
 
 %% Locate runner script
 this_dir  = fileparts(mfilename('fullpath'));
@@ -115,8 +118,8 @@ if duration_s <= 0
     error(['babelbrain_thermal_wrapper: duration=%.4f s is <= 0.\n' ...
         'Check parameters.timing.ptrd.'], duration_s);
 end
-if bb.isppa_w_per_cm2 <= 0
-    error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is <= 0.\n' ...
+if ~isfinite(bb.isppa_w_per_cm2) || bb.isppa_w_per_cm2 <= 0
+    error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is invalid (<= 0 or non-finite).\n' ...
         'Check transducer(1).tx_calibration.isppa_wcm2.'], bb.isppa_w_per_cm2);
 end
 
@@ -172,17 +175,20 @@ cmd = sprintf([ ...
     '--sel_p "%s" '  ...
     '--computing_backend %d '  ...
     '--device_name "%s" '  ...
-    '--log_file "%s" '  ...
-    '%s '], ...
+    '--log_file "%s" '], ...
     python_bin, bb_runner, ...
     acoustic_h5, ...
     bb.isppa_w_per_cm2, duty_cycle, prf_hz, duration_s, duration_off_s, sel_p, ...
     bb.computing_backend, bb.device_name, ...
-    log_file, ...
-    bb_root_flag(bb.root));
+    log_file);
 
 if ~isempty(bb.root)
     cmd = [cmd sprintf('--babelbrain_root "%s" ', bb.root)];
+end
+
+if isfield(parameters, 'transducer') && ~isempty(parameters.transducer) && ...
+        isfield(parameters.transducer(1), 'source_freq_hz')
+    cmd = [cmd sprintf('--frequency %.0f ', parameters.transducer(1).source_freq_hz)];
 end
 
 fprintf('[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  duration_off=%.1f s\n', ...
@@ -223,6 +229,41 @@ results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg);
 end
 
 %% Helpers
+
+function [backend, device] = resolve_backend(backend, device)
+% Resolve 'auto' computing_backend / device_name to concrete integers/strings.
+% Priority: Metal (macOS) > CUDA (nvidia-smi) > CPU.
+    if ~(ischar(backend) && strcmp(backend, 'auto'))
+        if ischar(device) && strcmp(device, 'auto')
+            switch backend
+                case 3;  device = 'Apple';
+                otherwise; device = 'CPU';
+            end
+        end
+        return
+    end
+    if ismac
+        backend = 3;
+        device  = 'Apple';
+        fprintf('[babelbrain_thermal_wrapper] Auto-detected backend: Metal (macOS)\n');
+        return
+    end
+    [status, out] = system('nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null');
+    if status == 0
+        lines = strtrim(strsplit(strtrim(out), newline));
+        lines = lines(~cellfun(@isempty, lines));
+        if ~isempty(lines)
+            backend = 1;
+            device  = lines{1};
+            fprintf('[babelbrain_thermal_wrapper] Auto-detected backend: CUDA, device="%s"\n', device);
+            return
+        end
+    end
+    backend = 4;
+    device  = 'CPU';
+    warning('babelbrain_thermal_wrapper:cpuFallback', ...
+        '[babelbrain_thermal_wrapper] No GPU detected; falling back to CPU.');
+end
 
 function s = apply_default(s, field, val)
     if ~isfield(s, field) || isempty(s.(field))

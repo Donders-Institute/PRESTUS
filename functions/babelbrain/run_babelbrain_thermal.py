@@ -69,6 +69,12 @@ def parse_args():
                    help='Off duration per cycle [s] (default 0)')
     p.add_argument('--repetitions',        default=1, type=int,
                    help='Number of sonication repetitions (default 1)')
+    p.add_argument('--frequency',          default=7e5, type=float,
+                   help='Transducer centre frequency [Hz] (default 700000)')
+    p.add_argument('--tx_system',          default='',
+                   help='BabelBrain TxSystem identifier (default empty string)')
+    p.add_argument('--limit_bhte_iter',    default=100, type=int,
+                   help='Max BHTE iterations per subprocess (default 100)')
     p.add_argument('--log_file',            default='',
                    help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     return p.parse_args()
@@ -129,11 +135,13 @@ def main():
     q = queue.Queue()
 
     AllDC_PRF_Duration = [{
-        'DC':          args.duty_cycle,
-        'PRF':         args.prf,
-        'Duration':    args.duration_s,
-        'DurationOff': args.duration_off_s,
-        'Repetitions': args.repetitions,
+        'DC':                           args.duty_cycle,
+        'PRF':                          args.prf,
+        'Duration':                     args.duration_s,
+        'DurationOff':                  args.duration_off_s,
+        'Repetitions':                  args.repetitions,
+        'NumberGroupedSonications':     1,
+        'PauseBetweenGroupedSonications': 0.0,
     }]
 
     print(f'[run_babelbrain_thermal] Acoustic: {args.acoustic_h5}')
@@ -143,15 +151,19 @@ def main():
 
     try:
         CalculateThermalProcess(
-            queue          = q,
-            case           = args.acoustic_h5,
-            AllDC_PRF_Duration = AllDC_PRF_Duration,
-            ExtraData      = {},
-            Isppa          = args.isppa,
-            sel_p          = args.sel_p,
-            BaselineTemperature = args.baseline_temp,
-            COMPUTING_BACKEND   = args.computing_backend,
-            deviceName          = args.device_name,
+            queueMsg                    = q,
+            case                        = args.acoustic_h5,
+            AllDC_PRF_Duration          = AllDC_PRF_Duration,
+            ExtraData                   = {},
+            Isppa                       = args.isppa,
+            sel_p                       = args.sel_p,
+            BaselineTemperature         = args.baseline_temp,
+            COMPUTING_BACKEND           = args.computing_backend,
+            deviceName                  = args.device_name,
+            Frequency                   = args.frequency,
+            TxSystem                    = args.tx_system,
+            LimitBHTEIterationsPerProcess = args.limit_bhte_iter,
+            bConcatenateSimulations     = False,
         )
     except Exception as e:
         print(f'[run_babelbrain_thermal] CalculateThermalProcess error: {e}',
