@@ -6,7 +6,7 @@ Notable changes to this project are documented here.
 
 ## v0.6.2-pre (development)
 
-Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain gains a CT path for HU-based skull property mapping, HDF5 blosc compatibility, and an improved thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows.
+Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain gains a CT path for HU-based skull property mapping, HDF5 blosc compatibility, and an improved thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows. Async multi-transducer simulations are stabilised with a shared grid preproc stage and ras_plus enforcement. Pulse amplitude ramping is modelled in thermal simulation. TUS_entry is added as a new transducer placement mode.
 
 #### BabelBrain acoustic backend
 
@@ -18,16 +18,21 @@ BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: b
 - **CT path** — `babelbrain_wrapper` optionally accepts a pseudo-CT HU volume and writes it as `CT.nii.gz` alongside `BabelViscoInput.nii.gz`; activated by setting `babelbrain.ct_mapping` (e.g. `'Webb-Marsac'`, `'Pichardo'`); `babelbrain.ct_use_petra` selects the PETRA-specific density formula
 - **PPW consistency** — points-per-wavelength is resolved from the simulation frequency and grid resolution and passed consistently to both the BabelBrain input NIfTI filename and the write step
 - **Provenance** — BabelBrain version and git describe string are stored in the acoustic provenance cache so cached results are invalidated on submodule updates
-- **Simulation report** — backend, transducer preset, PPW, and GPU compute backend (CUDA / OpenCL / Metal / CPU) reported in the HTML simulation report
+- **Simulation report** — backend, transducer preset, PPW, and GPU compute backend (CUDA / OpenCL / Metal / CPU) reported in the HTML simulation report; material properties (density, SoS, attenuation per tissue type) read from DataForSim.h5 and displayed when `acoustic_backend: babelbrain`
+- **Grid registration and HDF5 output parsing overhauled** — dimension ordering corrected (MATLAB h5read Fortran-order vs BabelBrain C-order), resampling anchored on TargetLocation + focus_pos; same fix applied to all volumetric thermal output fields
+- **Thermal timing mapping corrected** — `ptd`→DurationUS, `ptri−ptd`→DurationOff, `ptrd/ptri`→Repetitions, `post_ptri_dur`→PostPause (previously `ptrd` was used as DurationUS, producing a single-block simulation instead of repeated trains)
+- **Preset resolution improved** — folder name mapping and element counts corrected for CTX_500, CTX_250, and R15287
 
 #### jwave acoustic backend
 
 jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave` (see [doc_jwave.md](doc_jwave.md)).
 
-- Supports `time_domain` (default) and `helmholtz` solvers, configurable PML size, and `single`/`double` floating-point precision
+- Supports `time_domain` and `helmholtz` solvers (Helmholtz is the primary workflow), configurable PML size, and `single`/`double` floating-point precision
 - Translates PRESTUS kgrid/medium/source structs to HDF5, invokes `run_jwave_sim.py`, and returns `sensor_data` in the same format as the k-Wave backend
 - Axisymmetric grids and kWaveArray sources are not supported; both raise a clear error at pipeline entry
 - `benchmark_jwave` test class compares k-Wave CPU, jwave time-domain, and jwave Helmholtz on a water phantom (wall-clock time, peak pressure, focal FWHM, field correlation)
+- **Helmholtz convergence diagnostics** — spectral residual reported after each solve; optional time-domain FOV benchmark (`jwave.benchmark_fov_mm`) cross-validates GMRES convergence on a cropped subgrid; time_domain retained for cross-validation
+- **Grid crop margin** — `preproc_crop_grid` now reserves `pml_size` voxels when the jwave backend is active (jwave embeds its PML inside the declared grid N; k-Wave adds it outside)
 
 #### Acoustic simulation
 - `resolve_acoustic_fov_params` resolves `'auto'` sentinel values for `grid.acoustic_fov_length_mm` and `grid.acoustic_fov_diameter_mm` from focal geometry; `has_acoustic_fov` flag gates all downstream crop/restore logic
@@ -36,7 +41,9 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - `assemble_pfov_fields` back-projects N per-FOV acoustic results onto the shared full grid and combines them via incoherent intensity sum, producing a standard PRESTUS cache compatible with the thermal pipeline
 - `acoustic_analysis` accepts an optional `acoustic_provenance` struct; per-transducer Ipa at each focus stored as bracketed CSV strings via internal `vec2csvstr` helper
 - `resolve_thermal_grid` selects between an independent thermal grid and direct acoustic-grid reuse; centralises the logic previously spread across `prestus_pipeline`
-- Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
+- Beam-axis-aligned partial FOV (pFOV) crop reduces memory and compute for deep targets; renamed from "limited FOV" throughout; FOV direction corrected for ras_plus mode
+- pFOV crop now compatible with async multi-transducer mode: per-transducer pFOV caches are backprojected before field combination
+- Intensity plot orientation corrected in ras_plus mode; matrix transducer beam direction generalised beyond +Z
 - Multi-transducer incoherent field assembly for independent-element arrays
 - External acoustic NIfTI can now be passed directly as input to the thermal pipeline
 - Per-transducer operating frequency supported in kWaveArray multi-transducer mode
@@ -56,7 +63,11 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - `pichardo` sound speed and attenuation — frequency-dependent 2D ρ–freq interpolation from the `MapPichardo.h5` look-up table in the BabelBrain submodule
 - `mcdannold` sound speed and attenuation — polynomial ρ-based model (McDannold et al.)
 
+#### Placement
+- **TUS_entry placement mode** (`placement.mode: 'tus_entry'`) — integrates the TUS_entry R toolbox (Atkinson et al.) to select a scalp entry point minimising coupling geometry error (SD of transducer-disk-edge to scalp distances); complementary to PlanTUS which optimises acoustic objectives
+
 #### Head pipeline / grid
+- Pipeline grid, medium, and thermal grid stages extracted into standalone functions (`run_grid_stage`, `run_medium_stage`, `resolve_thermal_grid`)
 - **Principal-axis alignment** is now the default grid orientation (`grid.mode: principal_axis`): rotates the grid so the first principal component of all transducer positions aligns with z; for bilateral setups this equals the inter-transducer axis; for single-transducer setups it is identical to `transducer_axis`
 - Grid cropping now includes the bowl geometry of every configured transducer in the crop mask (was transducer(1) only), preventing the contralateral side from being over-extended
 - Automated defacing via pydeface, with optional integration into the segmentation pipeline
@@ -69,7 +80,15 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - `build_geometric_library_entry` creates a manufacturer-report baseline entry (no empirical data required) as an immediate-use fallback before characterisation
 - `config/calibration/library_version.yaml` — version manifest listing all combo YAMLs with calibration metadata; follows semantic versioning
 
+#### Multi-transducer async (experimental)
+- Shared grid+medium preproc stage (Stage 0) runs over all transducers before per-transducer acoustic jobs, ensuring a common voxel grid for field combination
+- `grid.mode: ras_plus` enforced at startup with a clear error and config snippet
+- pFOV crop compatible with async: per-transducer pFOV-cropped caches backprojected before field combination
+- HPC: acoustic jobs depend on Stage 0 via SLURM job dependencies
+
 #### Thermal simulation
+- **Pulse amplitude ramping** — `timing.pulse_ramp_dur` and `timing.pulse_ramp_shape` (`'linear'` or `'tukey'`) model symmetric rise/fall ramps; the ramp_factor (ISPPA/ISPTP) propagates into duty cycle products and the volumetric heat source Q
+- Focal-axis temperature extraction and plot orientation corrected for ras_plus mode
 - Thermal FOV can optionally be cropped to match the acoustic FOV (`thermal.match_acoustic_fov`), reducing memory for off-axis targets
 - `thermal_grid_setup` exposed as a standalone utility
 - ⚠️ **Fixed:** three runtime crashes in `thermal_analysis` corrected

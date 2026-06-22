@@ -70,6 +70,46 @@ The sensor then records `p_max_all` and `p_final` over the last three wave perio
 
 ---
 
+## Amplitude ramping
+
+Amplitude ramping reduces spectral splatter by smoothing the transducer drive at pulse onset and offset, rather than switching abruptly. Because intensity scales as amplitude², a ramped pulse delivers less pulse-average intensity (ISPPA) than the temporal-peak intensity (ISPTP). The ratio
+
+```
+f = ISPPA / ISPTP
+```
+
+depends on the ramp shape and the fraction of the pulse occupied by the ramp. PRESTUS provides `compute_ramp_factor(pd, ramp_dur, shape)` to compute this correction factor.
+
+**Parameters**
+
+| Parameter | Description |
+|---|---|
+| `pd` | Pulse duration [s] |
+| `ramp_dur` | Ramp duration per edge [s]; applied symmetrically at onset **and** offset, so the total ramped interval per pulse is `2 × ramp_dur` |
+| `shape` | `'linear'` — linear amplitude taper (intensity integral factor k = 1/3); `'tukey'` — raised-cosine taper (k = 3/8) |
+
+The factor equals 1 when `ramp_dur = 0` (no ramping, ISPPA = ISPTP).
+
+**Formula**
+
+```
+t_flat = pd - 2 × ramp_dur
+f      = (k × ramp_dur + t_flat + k × ramp_dur) / pd
+```
+
+**Example** — 20 ms pulse, 2 ms ramp per edge (10% of pd per edge, 20% total):
+
+| Shape  | k    | f (ISPPA/ISPTP) |
+|--------|------|-----------------|
+| linear | 1/3  | ≈ 0.867         |
+| tukey  | 3/8  | ≈ 0.875         |
+
+> **Note.** The correction is applied automatically in `acoustic_analysis` when `parameters.timing.pulse_ramp_dur > 0`. The `acoustic_Ipa` map and all derived ISPPA values (per-tissue, at-target, etc.) are scaled by `f` before any further analysis. When `pulse_ramp_dur` is absent or zero the factor is 1 and no correction is applied.
+
+See [`benchmark_ramp_factor.m`](../code/benchmark_ramp_factor.m) for a minimal timing comparison of the no-ramp fast path versus both ramp shapes.
+
+---
+
 ## Axisymmetric simulations
 
 For debugging, it can be useful to specify and model symmetric 2D tissues (e.g, 2D `phantom` or `water` media). However, [`kspaceFirstOrder2D`](http://www.k-wave.org/documentation/kspaceFirstOrder2D.php) models an infinite cylinder, not a focusing shell. It uses a 2D Cartesian grid with **X and Y axes**. These are assumed to map onto the second and first dimensions of input matrices and coordinates (i.e., [y, x]), respectively. This may at first may seem unintuitive, but it is designed to facilitate the mapping to 3D image space voxel coordinates [i,j,k], which traditionally map onto [Y,X,Z]. In the future, this could also be resolved by assuming a XY mapping for k-Wave, and introducing a remapping of voxel space coordinates.
