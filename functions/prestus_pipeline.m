@@ -668,8 +668,10 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('start','acoustic_analysis', parameters.io.dir_output);
 
     if (~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis)
+        prov_for_analysis = struct();
+        if exist('acoustic_provenance', 'var'); prov_for_analysis = acoustic_provenance; end
         [results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
-            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels);
+            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels, [], prov_for_analysis);
     else
         disp('No acoustic simulation results available (or requested). Skipping analysis...')
         results_acoustic = [];

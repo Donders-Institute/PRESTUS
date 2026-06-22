@@ -30,6 +30,12 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - `benchmark_jwave` test class compares k-Wave CPU, jwave time-domain, and jwave Helmholtz on a water phantom (wall-clock time, peak pressure, focal FWHM, field correlation)
 
 #### Acoustic simulation
+- `resolve_acoustic_fov_params` resolves `'auto'` sentinel values for `grid.acoustic_fov_length_mm` and `grid.acoustic_fov_diameter_mm` from focal geometry; `has_acoustic_fov` flag gates all downstream crop/restore logic
+- `resolve_water_baseline` encapsulates the decision of whether to run a free-water baseline simulation and stores the result in `acoustic_provenance.freefield_isppa_wcm2`
+- `prepare_thermal_domain` restores full-grid state (or adjusts `planimg` affines for thermal-in-FOV mode) after an acoustic FOV crop
+- `assemble_pfov_fields` back-projects N per-FOV acoustic results onto the shared full grid and combines them via incoherent intensity sum, producing a standard PRESTUS cache compatible with the thermal pipeline
+- `acoustic_analysis` accepts an optional `acoustic_provenance` struct; per-transducer Ipa at each focus stored as bracketed CSV strings via internal `vec2csvstr` helper
+- `resolve_thermal_grid` selects between an independent thermal grid and direct acoustic-grid reuse; centralises the logic previously spread across `prestus_pipeline`
 - Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
 - Multi-transducer incoherent field assembly for independent-element arrays
 - External acoustic NIfTI can now be passed directly as input to the thermal pipeline

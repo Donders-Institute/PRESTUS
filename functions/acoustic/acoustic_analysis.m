@@ -65,6 +65,24 @@ end
     % Calculates the Isppa for every gridpoint
     acoustic_Ipa = acoustic_pressure.^2./...
         (2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
+
+    % Apply amplitude-ramp correction (ISPPA = f * ISPTP, f <= 1).
+    % Ramping reduces the pulse-average intensity relative to the temporal
+    % peak because intensity scales as amplitude^2.  The correction is only
+    % applied when timing.pulse_ramp_dur > 0; otherwise f = 1 (no effect).
+    if isfield(parameters, 'timing') && isfield(parameters.timing, 'pulse_ramp_dur') ...
+            && parameters.timing.pulse_ramp_dur > 0
+        ramp_shape = "linear";
+        if isfield(parameters.timing, 'pulse_ramp_shape')
+            ramp_shape = string(parameters.timing.pulse_ramp_shape);
+        end
+        ramp_f = compute_ramp_factor(parameters.timing.pd, ...
+                                     parameters.timing.pulse_ramp_dur, ramp_shape);
+        acoustic_Ipa = acoustic_Ipa * ramp_f;
+        fprintf('Amplitude ramp correction applied: f = %.4f (shape: %s, ramp_dur = %.4g s)\n', ...
+                ramp_f, ramp_shape, parameters.timing.pulse_ramp_dur);
+    end
+
     % Calculates the ISPPA (spatial peak pulse-average intensity)
     results.Isppa = max(acoustic_Ipa(:));
 
@@ -316,4 +334,11 @@ end
             close(h);
         end
     end
+end
+
+% -------------------------------------------------------------------------
+function s = vec2csvstr(v)
+% Format a numeric row vector as a bracketed comma-separated string, e.g.
+% [1.23,4.56].  Used to store per-transducer vectors in a single CSV cell.
+    s = ['[' strjoin(arrayfun(@(x) sprintf('%.6g', x), v, 'UniformOutput', false), ',') ']'];
 end
