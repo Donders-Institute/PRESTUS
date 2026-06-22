@@ -92,6 +92,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 #### Infrastructure
 - `iff(cond, a, b)` — inline conditional utility for one-liner expressions
 - `compute_ramp_factor(pd, ramp_dur, shape)` — returns ISPPA/ISPTP ratio for linear or Tukey amplitude ramps applied to a pulse
+- Grid-setup and medium-setup blocks extracted from `prestus_pipeline` into standalone functions `run_grid_stage`, `run_medium_stage`, and `load_grid_cache_file`; both cache-hit and cache-miss paths share identical load logic
 - `overwrite_files` setting now respected by `simnibs_t1_to_mni`
 - Compromised polyfill.io CDN replaced with Cloudflare drop-in
 - `pydeface` added to environment setup script
