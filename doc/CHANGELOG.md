@@ -76,6 +76,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** initial temperature (`temp_0`) now correctly loaded from cached heating files
 
 #### NeuroNav
+- `placement.mode = 'tus_entry'` integrates the TUS_entry R toolbox (Atkinson et al.) as an optional placement backend: selects a scalp entry point that minimises coupling geometry error (SD of transducer-disk-edge to scalp distances) subject to an optional depth constraint; see [doc_placement_tus_entry.md](doc_placement_tus_entry.md)
 - Multi-coil ingestion supported via `parameters.neuronav.coil_map`
 - ⚠️ **Fixed:** T1 NIfTI lookup now works reliably across all conversion functions
 - ⚠️ **Fixed:** `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` updated to use `parameters.path.seg` (was `parameters.seg_path`)
