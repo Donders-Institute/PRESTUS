@@ -98,6 +98,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** thermal timing enable state re-synced on config load
 
 #### Infrastructure
+- `doc_pfov.md` — user guide for the acoustic FOV crop feature
+- `config/transducer/IS_PCD15473_01001_IGT_32_ch_comb_10_ch.yaml` — transducer config for the IGT 32-channel combined 10-channel array
 - `iff(cond, a, b)` — inline conditional utility for one-liner expressions
 - `compute_ramp_factor(pd, ramp_dur, shape)` — returns ISPPA/ISPTP ratio for linear or Tukey amplitude ramps applied to a pulse
 - Grid-setup and medium-setup blocks extracted from `prestus_pipeline` into standalone functions `run_grid_stage`, `run_medium_stage`, and `load_grid_cache_file`; both cache-hit and cache-miss paths share identical load logic
