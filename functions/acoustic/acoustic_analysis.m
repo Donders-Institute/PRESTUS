@@ -1,6 +1,6 @@
 function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
-                                segmentation, source_labels)
+                                segmentation, source_labels, reserved, provenance)
 % ACOUSTIC_ANALYSIS  Compute acoustic intensity metrics and generate output plots and tables
 %
 % Derives spatial pressure, intensity (Isppa), and mechanical index (MI) maps
@@ -12,6 +12,7 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 %   [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
 %       acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
 %                         segmentation, source_labels)
+%   [results, ...] = acoustic_analysis(..., [], provenance)
 %
 % Input:
 %   parameters   - PRESTUS config with transducer, grid, analysis, io fields
@@ -20,6 +21,8 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 %   sensor_data  - k-Wave output; requires p_max_all [Pa] and p_min_all [Pa] (for MI)
 %   segmentation - CHARM tissue label map
 %   source_labels- transducer element label map (for overlay plots)
+%   reserved     - unused placeholder (pass [] or omit)
+%   provenance   - acoustic provenance struct from prestus_pipeline (optional)
 %
 % Output:
 %   results          - struct with fields: Isppa, Isppa_after_exit_plane, Psptp,
@@ -39,6 +42,8 @@ arguments
     sensor_data  (1,1) struct
     segmentation {mustBeNumericOrLogical}
     source_labels{mustBeNumericOrLogical}
+    reserved     = []    %#ok<INUSA>
+    provenance   struct  = struct()
 end
 
     disp('Processing the results of acoustic simulations...')
