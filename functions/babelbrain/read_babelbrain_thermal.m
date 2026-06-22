@@ -63,12 +63,19 @@ cem_final  = read_field('FinalDose')  / 60;   % final CEM43 [min]
 
 p_map      = read_field('p_map');        % peak pressure [Pa]
 
-x_mm = read_field('x_vec');   % [1 x N1] mm
-y_mm = read_field('y_vec');   % [1 x N2] mm
-z_mm = read_field('z_vec');   % [1 x N3] mm
+% BabelBrain stores volumes in Python/RAS axis order (x=lateral, y=AP,
+% z=depth); MATLAB's h5read reverses dimensions.  MATLAB dim 1 ↔ BB z,
+% dim 2 ↔ BB y, dim 3 ↔ BB x.  Assign coordinate vectors accordingly.
+x_mm = read_field('z_vec');   % MATLAB dim 1 ↔ BabelBrain z [mm]
+y_mm = read_field('y_vec');   % MATLAB dim 2 ↔ BabelBrain y [mm]
+z_mm = read_field('x_vec');   % MATLAB dim 3 ↔ BabelBrain x [mm]
 
-temp_profile  = read_field('TempProfileTarget');  % [1 x Nt] °C
-time_profile  = read_field('TimeProfileTarget');  % [1 x Nt] s
+temp_profile      = read_field('TempProfileTarget');   % [1 x Nt] °C at focal target
+time_profile      = read_field('TimeProfileTarget');   % [1 x Nt] s
+% TemperaturePoints: [4 x Nt] — rows are skin(1), brain(2), skull(3), target(4).
+% Row 4 may be absent when the target coincides with the brain maximum
+% (in that case BabelBrain uses IndTarget=2 and only 3 monitor points exist).
+temp_points_raw   = read_field('TemperaturePoints');   % [Npts x Nt]
 
 MaxIsppa = double(h5read(thermal_h5, '/MaxIsppa'));
 MaxIspta = double(h5read(thermal_h5, '/MaxIspta'));
@@ -127,18 +134,25 @@ results_heating.focal_planeT         = [];    % BabelBrain has no focal-plane sl
 results_heating.CEM43                = cem_end_g;
 results_heating.CEM43_end            = cem_final_g;
 results_heating.focal_planeCEM43     = [];
-% BabelBrain does not compute iso-contour CEM43; use the same map (conservative)
-results_heating.CEM43_iso            = cem_end_g;
-results_heating.CEM43_iso_end        = cem_final_g;
+% BabelBrain does not compute ISO-formula CEM43 (R-value method); set to NaN
+% so downstream code does not silently treat it as ISO-compliant.
+results_heating.CEM43_iso            = NaN(size(cem_end_g));
+results_heating.CEM43_iso_end        = NaN(size(cem_final_g));
 results_heating.focal_planeCEM43_iso = [];
-% Build a minimal timeseries struct compatible with thermal_plot_sim.
-% BabelBrain provides only a single time-course at the focal target, not
-% per-layer timeseries. Initialise an empty struct via thermal_update_timeseries
-% so field names are correct, then attach the focal time course separately.
+% Build timeseries struct.  BabelBrain stores per-tissue time courses in
+% TemperaturePoints [Npts x Nt]: row 1=skin, row 2=brain, row 3=skull,
+% row 4=target (only present when target ≠ brain maximum).
+t_ax = time_profile(:)';
 results_heating.timeseries           = struct('T', struct(), 'Tdiff', struct(), ...
     'CEM43', struct(), 'CEM43_iso', struct());
 results_heating.timeseries.TempProfileTarget = temp_profile(:)';
-results_heating.timeseries.TimeProfileTarget = time_profile(:)';
+results_heating.timeseries.TimeProfileTarget = t_ax;
+tissue_labels = {'skin', 'brain', 'skull', 'target'};
+for ti = 1:min(size(temp_points_raw, 1), numel(tissue_labels))
+    lbl = tissue_labels{ti};
+    results_heating.timeseries.T.(lbl)      = temp_points_raw(ti, :);
+    results_heating.timeseries.Tdiff.(lbl)  = [0, diff(temp_points_raw(ti, :))];
+end
 results_heating.dx_step              = res_mm * 1e-3;   % [m]
 results_heating.MaxIsppa             = MaxIsppa;
 results_heating.MaxIspta             = MaxIspta;

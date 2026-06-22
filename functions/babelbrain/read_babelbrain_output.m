@@ -90,19 +90,26 @@ has_params = isfield(parameters, 'grid') ...
 xdim = []; ydim = []; zdim = [];
 coord_read_ok = false;
 try
-    % BabelBrain saves coordinate vectors as /x_vec /y_vec /z_vec [m]
-    xdim = h5read(h5_path, '/x_vec');
-    ydim = h5read(h5_path, '/y_vec');
-    zdim = h5read(h5_path, '/z_vec');
+    % BabelBrain saves coordinate vectors as /x_vec /y_vec /z_vec [m] in
+    % Python/RAS axis order (x=lateral, y=AP, z=depth).  MATLAB's h5read
+    % reverses the dimension order relative to Python, so MATLAB dim 1 of
+    % p_amp corresponds to BabelBrain's z axis, dim 2 to y, dim 3 to x.
+    % Assign accordingly so vector lengths match p_amp dimensions.
+    x_vec_bb = h5read(h5_path, '/x_vec');   % BabelBrain x (lateral)
+    y_vec_bb = h5read(h5_path, '/y_vec');   % BabelBrain y (AP)
+    z_vec_bb = h5read(h5_path, '/z_vec');   % BabelBrain z (depth)
+    xdim = z_vec_bb;   % MATLAB dim 1 ↔ BabelBrain z
+    ydim = y_vec_bb;   % MATLAB dim 2 ↔ BabelBrain y
+    zdim = x_vec_bb;   % MATLAB dim 3 ↔ BabelBrain x
     coord_read_ok = true;
     dx_bb_mm = mean(diff(xdim)) * 1e3;
     dy_bb_mm = mean(diff(ydim)) * 1e3;
     dz_bb_mm = mean(diff(zdim)) * 1e3;
     fprintf('[read_babelbrain_output] BabelBrain grid: [%d %d %d]  dx=%.4f dy=%.4f dz=%.4f mm\n', ...
         size(p_amp,1), size(p_amp,2), size(p_amp,3), dx_bb_mm, dy_bb_mm, dz_bb_mm);
-    sensor_data.babelbrain_x_vec = xdim;
-    sensor_data.babelbrain_y_vec = ydim;
-    sensor_data.babelbrain_z_vec = zdim;
+    sensor_data.babelbrain_x_vec = x_vec_bb;
+    sensor_data.babelbrain_y_vec = y_vec_bb;
+    sensor_data.babelbrain_z_vec = z_vec_bb;
 catch ME
     dx_bb_mm = NaN;
     p_dims = size(p_amp);
