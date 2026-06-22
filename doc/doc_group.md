@@ -2,6 +2,15 @@
 
 To facilitate group analysis, PRESTUS automatically outputs key results as Nifti images in MNI space. Projection to MNI space can be done either using SimNIBS’ subject2mni command, or in MATLAB by reading in MNI2conform_12DOF.txt. 
 
+PRESTUS provides two complementary group-level workflows:
+
+- **MNI-space group plots** — `create_group_MNI_plots` (via the `prestus_group_start` entry point) render per-metric maps in MNI space with a shared colour scale and optional ROI overlays. Documented immediately below.
+- **Group HTML report** — `prestus_group_report_start` aggregates the per-subject CSV/PNG outputs into a single self-contained, interactive HTML file. See [Group HTML report](#group-html-report).
+
+Neither workflow runs simulations; both read existing per-subject outputs.
+
+## MNI-space group plots
+
 ### create_group_MNI_plots
 
 #### Rationale
@@ -33,3 +42,59 @@ To facilitate group analysis, PRESTUS automatically outputs key results as Nifti
     options.skip_missing = 0 # Binary option to skip subjects with missing files
     options.brightness_correction = 0 # Binary option to normalise the brightness between structural T1's
     options.average_target_brightness = 100 # Average targetted brightness, only used when brightness correction is enabled
+
+## Group HTML report
+
+`prestus_group_report_start` aggregates the per-subject outputs (CSV tables and PNG figures) of every subject sharing the same `simulation.medium` and `io.output_affix` into one **self-contained, interactive HTML report**. It runs no simulations — it only reads outputs that already exist on disk.
+
+The report is written to:
+
+```
+<path.sim>/group_<medium>_report<affix>.html
+```
+
+with its box-plot images saved alongside in `<path.sim>/group_plots/`. See [Outputs](doc_outputs.md#group-outputs) for the full file listing.
+
+### Running the report
+
+**Manually**, point it at your project config (a YAML path or a loaded `parameters` struct). Subjects are auto-discovered, or you can pass an explicit list:
+
+```matlab
+% Auto-discover all completed subjects under path.sim
+prestus_group_report_start('config/config_study.yaml');
+
+% Restrict to an explicit subject list
+prestus_group_report_start('config/config_study.yaml', [1 2 3 5 7]);
+```
+
+**Automatically**, set the module flag so the report is regenerated at the end of every per-subject pipeline run:
+
+```yaml
+modules:
+  generate_group_report: 1   # regenerate the group report after each subject
+```
+
+When enabled, `prestus_pipeline` calls `discover_group_subjects` and rebuilds the report over all subjects completed so far. The call is best-effort (wrapped in `try`/`catch`): a group-report problem never aborts the subject's own pipeline. See [Modules](doc_modules.md).
+
+### Requirements
+
+Each included subject must already have its per-subject output table on disk:
+
+```
+<path.sim>/sub-NNN/sub-NNN_<medium><affix>.csv
+```
+
+Per-subject PNGs (positioning, intensity, and max-temperature overlays) are embedded when present. The report reads `path.sim`, `simulation.medium`, `io.output_affix`, and `modules.run_heating_sims` (the latter gates the thermal plots).
+
+### Report contents
+
+- **Header** — subject count, medium, affix, and simulation path.
+- **Subject filter** — checkboxes to toggle subjects in / out.
+- **Exposure dashboard** — per-metric mean ± SD with min–max range, colour-coded against ITRUSST non-significant-risk limits.
+- **Subject roster** — one row per subject with key metrics and a link to that subject's own report.
+- **Group acoustic summary** — two box plots: **Intensity** (Isppa / Ipa_target, W/cm²) and **Mechanical Index** (per tissue, unitless).
+- **Group thermal summary** *(layered medium with heating simulations only)* — three box plots: **maximum temperature**, **temperature rise**, and **CEM43 thermal dose**, each on its own scale.
+- **Per-subject cards** — collapsible panels embedding each subject's figures.
+- **Configuration summary** — the parameters used for the run.
+
+> **Note:** The subject filter updates the dashboard and per-subject cards live, but the group box plots are static images rendered over the full subject set — they do not change when subjects are toggled.

@@ -110,4 +110,4 @@ Subject IDs, file paths, or directory names that carries a risk of containing id
 
 ## Usage statistics
 
-See the [Usage Statistics](doc_usage-statistics.md) page for live charts populated from the anonymised telemetry database.
+See the [Usage Statistics](doc_usage_statistics.md) page for live charts populated from the anonymised telemetry database.
