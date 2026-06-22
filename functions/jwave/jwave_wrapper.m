@@ -80,7 +80,7 @@ convergence_threshold = get_field(jw, 'convergence_threshold', 0.05);
 % -------------------------------------------------------------------------
 % 1. Ensure HDF5 plugin path is valid before any h5read/h5write call
 % -------------------------------------------------------------------------
-ensure_hdf5_plugin_path(python_bin, 'jwave');
+ensure_hdf5_plugin_path(python_bin);
 
 % Locate the Python bridge script (same folder as this .m file)
 this_dir   = fileparts(mfilename('fullpath'));
