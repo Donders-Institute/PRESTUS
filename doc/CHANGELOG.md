@@ -90,6 +90,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** thermal timing enable state re-synced on config load
 
 #### Infrastructure
+- `iff(cond, a, b)` — inline conditional utility for one-liner expressions
+- `compute_ramp_factor(pd, ramp_dur, shape)` — returns ISPPA/ISPTP ratio for linear or Tukey amplitude ramps applied to a pulse
 - `overwrite_files` setting now respected by `simnibs_t1_to_mni`
 - Compromised polyfill.io CDN replaced with Cloudflare drop-in
 - `pydeface` added to environment setup script
