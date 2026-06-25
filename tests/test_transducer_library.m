@@ -137,7 +137,7 @@ classdef test_transducer_library < matlab.unittest.TestCase
                 'elem_phase_deg not resolved');
             tc.verifyEqual(numel(out.annular.elem_phase_deg), n_elem, ...
                 'Wrong number of phase elements');
-            tc.verifyTrue(isfield(out.annular, 'elem_amp'), 'elem_amp not resolved');
+            tc.verifyTrue(isfield(out.annular, 'elem_p_amp'), 'elem_p_amp not resolved');
         end
 
         function test_inline_phases_not_overwritten_by_library(tc)
@@ -150,13 +150,13 @@ classdef test_transducer_library < matlab.unittest.TestCase
 
             tr = tc.minimal_tr_with_targets(serial, 60, 32);
             tr.annular.elem_phase_deg = zeros(1, n_elem);  % inline override
-            tr.annular.elem_amp       = ones(1, n_elem) * 99999;
+            tr.annular.elem_p_amp       = ones(1, n_elem) * 99999;
 
             out = resolve_transducer_from_serial(tr, tc.equip_param, lib_dir, 1);
 
             tc.verifyEqual(out.annular.elem_phase_deg, zeros(1, n_elem), ...
                 'Inline phases were overwritten');
-            tc.verifyEqual(out.annular.elem_amp, ones(1, n_elem)*99999, ...
+            tc.verifyEqual(out.annular.elem_p_amp, ones(1, n_elem)*99999, ...
                 'Inline amplitude was overwritten');
         end
 
@@ -198,7 +198,7 @@ classdef test_transducer_library < matlab.unittest.TestCase
             tr.focal_distance_ep   = 60;
             tr.target_isppa_wcm2   = 5;
             tr.annular.elem_phase_deg = zeros(1, n);
-            tr.annular.elem_amp       = ones(1, n) * 100000;
+            tr.annular.elem_p_amp       = ones(1, n) * 100000;
 
             out = resolve_transducer_from_serial(tr, tc.equip_param, tc.library_path, 1);
 

@@ -88,9 +88,17 @@ function tr = validate_annular_transducer(tr, t_i)
         error('Transducer %i; Phase must be specified as elem_phase_rad or elem_phase_deg.', t_i);
     end 
 
+    % Backward-compatibility shim: rename deprecated elem_amp → elem_p_amp
+    if isfield(annular_tr, 'elem_amp') && ~isfield(annular_tr, 'elem_p_amp')
+        warning('prestus:deprecatedField', ...
+            'annular.elem_amp is deprecated; rename to elem_p_amp in your config.');
+        annular_tr.elem_p_amp = annular_tr.elem_amp;
+        annular_tr = rmfield(annular_tr, 'elem_amp');
+    end
+
     % Ensure source amplitude matches number of transducer elements
-    if numel(annular_tr.elem_amp) == 1 && annular_tr.elem_n > 1
-        annular_tr.elem_amp = repmat(annular_tr.elem_amp, [1, annular_tr.elem_n]);
+    if numel(annular_tr.elem_p_amp) == 1 && annular_tr.elem_n > 1
+        annular_tr.elem_p_amp = repmat(annular_tr.elem_p_amp, [1, annular_tr.elem_n]);
     end
 
     % Default depth_mm for visualization (if not set in config).

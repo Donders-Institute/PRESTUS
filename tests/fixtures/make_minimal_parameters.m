@@ -68,7 +68,7 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.transducer.annular.curv_radius_mm     = 63.2;
     parameters.transducer.annular.dist_geom_ep_mm   = 52.38;
     parameters.transducer.freq_hz                     = 250e3;
-    parameters.transducer.annular.elem_amp         = 91590;
+    parameters.transducer.annular.elem_p_amp         = 91590;
     parameters.transducer.annular.elem_phase_deg   = 0;
     parameters.transducer.annular.elem_phase_rad   = 0;
 

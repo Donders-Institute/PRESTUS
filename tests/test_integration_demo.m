@@ -185,7 +185,7 @@ classdef test_integration_demo < matlab.unittest.TestCase
             p = tc.load_demo_config('config_demo_manual.yaml');
             tc.verifyClass(p, 'struct');
             tc.verifyEqual(p.placement.mode, 'manual');
-            tc.verifyEqual(numel(p.transducer.annular.elem_amp), 10);
+            tc.verifyEqual(numel(p.transducer.annular.elem_p_amp), 10);
         end
 
         function test_localite_config_loads(tc)

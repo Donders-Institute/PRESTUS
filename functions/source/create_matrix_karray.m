@@ -19,7 +19,7 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 %                and simulation.debug
 %   tr         - transducer geometry: tr.matrix.elem_shape, tr.matrix.curv_radius_mm [mm],
 %                tr.matrix.elem_height_mm [mm], tr.matrix.elem_width_mm [mm],
-%                tr.matrix.elem_amp, tr.freq_hz [Hz]
+%                tr.matrix.elem_p_amp, tr.freq_hz [Hz]
 %   elem_pos_m - [3xN] element positions [m]
 %   trans_pos  - [1x3] transducer reference position (grid indices)
 %   focus_pos  - [1x3] desired focus position (grid indices)
@@ -27,7 +27,7 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 % Output:
 %   karray - kWaveArray with all elements added
 %   tr     - updated with tr.matrix.elem_phase_rad, tr.matrix.elem_phase_deg,
-%            tr.matrix.elem_n, tr.matrix.elem_amp
+%            tr.matrix.elem_n, tr.matrix.elem_p_amp
 %
 % See also: CREATE_CLOVER_ARRAY, SOURCE_CREATE
 
@@ -64,7 +64,7 @@ end
     tr.matrix.elem_n = size(elem_pos_m, 2);
 
     % Initialize source amplitudes (uniform)
-    tr.matrix.elem_amp = tr.matrix.elem_amp(1) * ones(1, tr.matrix.elem_n);
+    tr.matrix.elem_p_amp = tr.matrix.elem_p_amp(1) * ones(1, tr.matrix.elem_n);
 
     % Wavelength and wavenumber for phase calculation
     lambda = parameters.medium_properties.water.sound_speed / tr.freq_hz;

@@ -144,9 +144,9 @@ analysis:
 # target_isppa_wcm2: target free-water ISPPA for this transducer [W/cm²].
 #   Scalar  → scale to that intensity before thermal analysis.
 #   Vector  → run one thermal job per value (multi-ISPPA sweep mode).
-#   Empty   → no scaling; use elem_amp drive level as-is.
+#   Empty   → no scaling; use elem_p_amp drive level as-is.
 #
-# The acoustic simulation always runs at the elem_amp specified below.
+# The acoustic simulation always runs at the elem_p_amp specified below.
 # modules.run_water_baseline must be enabled to record the free-water baseline
 # ISPPA so that post-hoc pressure scaling can be applied.
 
@@ -169,7 +169,7 @@ transducer:
     elem_n: []            # Number of elements in the transducer [#]
     elem_id_mm: []        # Inner diameter of each element [mm]
     elem_od_mm: []        # Outer diameter of each element [mm]
-    elem_amp: []          # Pressure amplitude [Pa]
+    elem_p_amp: []          # Pressure amplitude [Pa]
     elem_phase_deg: []    # Source phase of each element [deg] (0-360)
     curv_radius_mm: []    # Radius of curvature of the bowl [mm]
     dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
@@ -179,7 +179,7 @@ transducer:
   # Matrix transducer parameters
   # --------------------------
   matrix:
-    elem_amp: []          # Pressure amplitude [Pa]
+    elem_p_amp: []          # Pressure amplitude [Pa]
     steering: []          # '1D' (Axial steering) or '3D' (Volumetric steering)
     elem_shape: []        # 'rect', 'disc', or 'bowl' - physical shape of each element
     elem_height_mm: []    # Element height [mm]
@@ -426,6 +426,26 @@ thermal:
   sensor_xy_halfsize: 100 # maximum size of the sensor window in which the temperature is recorded (in grid units)
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
   log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
+
+#------------ BabelBrain solver settings (used when simulation.acoustic_backend = 'babelbrain')
+jwave:
+  python_env: ''            # Path to Python environment or executable; empty = system python
+  python_env_gpu: ''        # Path to GPU-capable Python environment; empty = same as python_env
+  use_gpu: ~                # Use GPU acceleration: true | false | ~ (auto-detect)
+  pml_size: auto            # Perfectly matched layer size in grid points: integer or 'auto'
+  gmres_restart: 40         # GMRES restart parameter (Krylov subspace size)
+  gmres_maxiter: 300        # Maximum GMRES iterations
+  precision: single         # Computational precision: 'single' | 'double'
+
+babelbrain:
+  computing_backend: auto   # GPU/CPU backend: 'auto' | 'cuda' | 'opencl' | 'cpu'
+  device_name: auto         # Device to use: 'auto' selects the first available
+  ppw: 6                    # Points-per-wavelength for BabelBrain's internal FDTD grid
+  do_refocusing: false      # Apply BabelBrain refocusing step
+  z_beyond_focus_mm: 40     # How far beyond the focus to extend the simulation domain [mm]
+  python_env: ''            # Path to Python environment or executable; empty = system python
+  ct_mapping: ''            # CT Hounsfield-to-property mapping name for CT-based skull modelling; empty = label-based path
+  cleanup_cache: true       # Delete per-subject BabelBrain cache dir after reading output; set false to keep HDF5/NIfTI files for debugging
 
 #------------  Medium properties
 # References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);

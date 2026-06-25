@@ -409,7 +409,7 @@ classdef test_babelbrain < matlab.unittest.TestCase
             p.io.dir_cache                          = tc.SimPath;
             p.transducer(1).annular.elem_phase_rad  = ...
                 [0.003 352.671 345.725 25.437 46.156 36.306 33.659 32.695 60.623 336.098] * pi/180;
-            p.transducer(1).annular.elem_amp        = repmat(156587.0, 1, 10);
+            p.transducer(1).annular.elem_p_amp        = repmat(156587.0, 1, 10);
         end
 
         function skip_if_babelbrain_missing(tc)

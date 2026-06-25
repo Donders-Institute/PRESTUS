@@ -1388,7 +1388,7 @@ function html = build_config_summary(parameters)
         if isfield(td, 'type') && isfield(td, td.type)
             html = config_row(html, 'Elements', sprintf('%d', safe_field(td.(td.type), 'elem_n', NaN)));
             html = config_row(html, 'Curvature radius', sprintf('%.0f mm', safe_field(td.(td.type), 'curv_radius_mm', NaN)));
-            html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'elem_amp', NaN)));
+            html = config_row(html, 'Source amplitude', sprintf('%.1f Pa', safe_field(td.(td.type), 'elem_p_amp', NaN)));
         end
         focal = safe_field(td, 'focal_distance_bowl', NaN);
         if isnumeric(focal) && isscalar(focal) && ~isnan(focal)

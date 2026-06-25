@@ -138,7 +138,7 @@ class TabTransducer(BaseTab):
         _row("* Radius of curvature",
              FloatEdit("transducer.annular.curv_radius_mm", 63.2, registry=r))
         _row("* Pressure amplitude",
-             FloatEdit("transducer.annular.elem_amp", 1, registry=r))
+             FloatEdit("transducer.annular.elem_p_amp", 1, registry=r))
         _row("Phase per element (°)",
              CSVArrayEdit("transducer.annular.elem_phase_deg", "0", registry=r))
         _row("Geometric focus-to-EP dist.",
@@ -185,7 +185,7 @@ class TabTransducer(BaseTab):
         _mrow("Outer diameter",
               FloatEdit("transducer.matrix.outer_diameter_mm", 70, registry=r))
         _mrow("Pressure amplitude",
-              FloatEdit("transducer.matrix.elem_amp", 1, registry=r))
+              FloatEdit("transducer.matrix.elem_p_amp", 1, registry=r))
         _mrow("Curved surface",
               Checkbox("transducer.matrix.is_curved", "Curved aperture", False, registry=r))
         _mrow("Radius of curvature",

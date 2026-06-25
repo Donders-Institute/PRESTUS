@@ -49,7 +49,6 @@ fprintf('\n');
 
 fprintf('📐 SIMULATION GRID\n');
 grid = get_struct_or_default(parameters, 'grid');
-print_if_field(grid, 'n_dims', '%dD');
 print_if_field(grid, 'resolution_mm', '%.2f mm');
 print_flag(grid, 'axisymmetric');
 print_if_field(grid, 'default_dims', '%s');
@@ -174,7 +173,7 @@ for t_i = 1:numel(parameters.transducer)
     end
 
     print_if_field(tr, 'freq_hz', '%.1f Hz');
-    print_if_field(tr.(tr.type), 'elem_amp', '%.1f Pa');
+    print_if_field(tr.(tr.type), 'elem_p_amp', '%.1f Pa');
     print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
     print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
 	print_if_field(tr, 'focal_distance_ep', '%.1f mm');

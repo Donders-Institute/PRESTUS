@@ -21,7 +21,7 @@ transducer:
     focal_distance_bowl: []           # Expected focal distance from transducer bowl [mm]
 
   annular:
-    elem_amp: 91590 # [Pa]
+    elem_p_amp: 91590 # [Pa]
     elem_phase_deg: [0, 0, 0, 274]
     depth_mm: 16 # depth of transducer used for visualization purposes
     elem_n: 4 # number of elements in the transducer
@@ -31,7 +31,7 @@ transducer:
     dist_geom_ep_mm: 52.38 # distance to the transducer plane from the geometric focus # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
 
   matrix:
-    elem_amp: 91590 # [Pa]
+    elem_p_amp: 91590 # [Pa]
     depth_mm: 16 # depth of transducer used for visualization purposes
     steering: 3D # 1D (Axial steering) or 3D (Volumetric steering)
 

@@ -292,8 +292,16 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                 t_i, matrix_tr.matrix_shape.type);
     end
     
-    assert(isfield(matrix_tr,'elem_amp'), ...
-            'Transducer %i; Missing elem_amp field.', t_i);
+    % Backward-compatibility shim: rename deprecated elem_amp → elem_p_amp
+    if isfield(matrix_tr, 'elem_amp') && ~isfield(matrix_tr, 'elem_p_amp')
+        warning('prestus:deprecatedField', ...
+            'matrix.elem_amp is deprecated; rename to elem_p_amp in your config.');
+        matrix_tr.elem_p_amp = matrix_tr.elem_amp;
+        matrix_tr = rmfield(matrix_tr, 'elem_amp');
+    end
+
+    assert(isfield(matrix_tr,'elem_p_amp'), ...
+            'Transducer %i; Missing elem_p_amp field.', t_i);
 
     % Initialize depth_mm for visualization purposes (if not provided)
     if ~isfield(matrix_tr, 'depth_mm')

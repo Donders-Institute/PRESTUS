@@ -452,7 +452,7 @@ end
         lbl(gl_ann, 5, 3, 'mm');
 
         lbl(gl_ann, 6, 1, '* Pressure amplitude');
-        nedt(gl_ann, 6, 2, 'transducer.annular.elem_amp', 1);
+        nedt(gl_ann, 6, 2, 'transducer.annular.elem_p_amp', 1);
         lbl(gl_ann, 6, 3, 'Pa');
 
         lbl(gl_ann, 7, 1, 'Phase per element (°)');
@@ -501,7 +501,7 @@ end
         lbl(gl_mat, 5, 3, 'mm');
 
         lbl(gl_mat, 6, 1, 'Pressure amplitude');
-        nedt(gl_mat, 6, 2, 'transducer.matrix.elem_amp', 1);
+        nedt(gl_mat, 6, 2, 'transducer.matrix.elem_p_amp', 1);
         lbl(gl_mat, 6, 3, 'Pa');
 
         lbl(gl_mat, 7, 1, 'Curved surface');
@@ -1038,11 +1038,7 @@ end
         brw(gl, 4, 3, 'calibration.path_input_axial', 'dir');
         note_lbl(gl, 5, 'Directory containing per-equipment axial hydrophone CSVs.');
 
-        lbl(gl, 6, 1, 'Phase table folder');
-        edt(gl, 6, 2, 'calibration.path_input_phase', '', 0);
-        brw(gl, 6, 3, 'calibration.path_input_phase', 'dir');
-        note_lbl(gl, 7, 'Directory with manufacturer phase tables (Sonic Concepts / Imasonic).');
-        sp(gl, 8);
+        sp(gl, 6);
 
         sec(gl, 9, 'Calibration Targets');
         lbl(gl, 10, 1, 'Focal depths (ep)');
@@ -1200,14 +1196,18 @@ end
         % Two-column layout: list on left, detail panel on right.
         gl = uigridlayout(t, ...
             'RowHeight',    {'1x'}, ...
-            'ColumnWidth',  {220, '1x'}, ...
+            'ColumnWidth',  {260, '1x'}, ...
             'Padding',      [12 12 12 12], ...
             'ColumnSpacing', 12, ...
             'BackgroundColor', st.bg_panel);
 
+        % Custom library path (empty = PRESTUS built-in config/calibration/).
+        % Shared by refresh, show, and load helpers via closure.
+        custom_lib_path = '';
+
         % ── Left: list panel ──────────────────────────────────────────
         left_gl = uigridlayout(gl, ...
-            'RowHeight',    {28, '1x', 36}, ...
+            'RowHeight',    {28, 28, '1x', 36}, ...
             'ColumnWidth',  {'1x'}, ...
             'Padding',      [0 0 0 0], 'RowSpacing', 6, ...
             'BackgroundColor', st.bg_panel);
@@ -1220,18 +1220,42 @@ end
             'HorizontalAlignment', 'left');
         lbl_list_hdr.Layout.Row = 1;
 
+        % ── Custom path row ──────────────────────────────────────────
+        path_gl = uigridlayout(left_gl, ...
+            'RowHeight',    {'1x'}, ...
+            'ColumnWidth',  {'1x', 32}, ...
+            'Padding',      [0 0 0 0], 'ColumnSpacing', 4, ...
+            'BackgroundColor', st.bg_panel);
+        path_gl.Layout.Row = 2;
+
+        lib_path_edt = uieditfield(path_gl, ...
+            'Value',            '', ...
+            'Placeholder',      'Default (config/calibration/)', ...
+            'FontName',         st.font, 'FontSize', st.fs_sm, ...
+            'BackgroundColor',  st.bg_edit, 'FontColor', st.text_main, ...
+            'Tag',              'tx_lib_custom_path');
+        lib_path_edt.Layout.Column = 1;
+        lib_path_edt.ValueChangedFcn = @(src,~) on_lib_path_changed(src.Value);
+
+        btn_browse_lib_path = uibutton(path_gl, ...
+            'Text',     '…', ...
+            'FontName', st.font, 'FontSize', st.fs);
+        btn_browse_lib_path.Layout.Column = 2;
+        btn_browse_lib_path.ButtonPushedFcn = @(~,~) browse_lib_path();
+        % ─────────────────────────────────────────────────────────────
+
         lib_list = uilistbox(left_gl, ...
             'Items',     {}, ...
-            'FontName',  st.font, 'FontSize', st.fs, ...
+            'FontName',  st.font, 'FontSize', st.fs_sm, ...
             'BackgroundColor', st.bg_edit, ...
             'FontColor', st.text_main, ...
             'Tag',       'tx_lib_list');
-        lib_list.Layout.Row = 2;
+        lib_list.Layout.Row = 3;
 
         btn_refresh_lib = uibutton(left_gl, ...
             'Text',      '🔄  Refresh', ...
             'FontName',  st.font, 'FontSize', st.fs);
-        btn_refresh_lib.Layout.Row = 3;
+        btn_refresh_lib.Layout.Row = 4;
         btn_refresh_lib.ButtonPushedFcn = @(~,~) refresh_tx_library();
 
         % ── Right: detail panel ───────────────────────────────────────
@@ -1281,44 +1305,86 @@ end
         refresh_tx_library();
 
         % ── Helpers ───────────────────────────────────────────────────
+        function p = active_lib_path()
+            if isempty(strtrim(custom_lib_path))
+                p = fullfile(get_prestus_path(), 'config', 'calibration');
+            else
+                p = strtrim(custom_lib_path);
+            end
+        end
+
+        function on_lib_path_changed(p)
+            custom_lib_path = p;
+            refresh_tx_library();
+        end
+
+        function browse_lib_path()
+            p = uigetdir('', 'Select calibration library folder');
+            if ischar(p) && ~isequal(p, 0)
+                custom_lib_path = p;
+                edt = findobj(fig, 'Tag', 'tx_lib_custom_path');
+                if ~isempty(edt), edt.Value = p; end
+                refresh_tx_library();
+            end
+        end
+
         function refresh_tx_library()
-            lib_path = fullfile(get_prestus_path(), 'config', 'calibration');
+            lib_path = active_lib_path();
             lb = findobj(fig, 'Tag', 'tx_lib_list');
             if ~isfolder(lib_path)
-                lb.Items = {'(library folder not found)'};
-                set_lib_status('Library folder missing: config/calibration/');
+                lb.Items     = {'(library folder not found)'};
+                lb.ItemsData = {};
+                set_lib_status('Library folder missing.');
                 return
             end
             d = dir(fullfile(lib_path, '*.yaml'));
             if isempty(d)
-                lb.Items = {'(no entries yet)'};
+                lb.Items     = {'(no entries yet)'};
+                lb.ItemsData = {};
                 set_lib_status('Run update_transducer_library() to populate.');
             else
-                names = {d.name};
-                lb.Items = cellfun(@(n) strrep(n, '.yaml', ''), names, 'UniformOutput', false);
-                set_lib_status(sprintf('%d entr%s found.', numel(d), ternary(numel(d)==1,'y','ies')));
+                names  = cellfun(@(n) strrep(n, '.yaml', ''), {d.name}, 'UniformOutput', false);
+                labels = cell(size(names));
+                for ki = 1:numel(names)
+                    try
+                        m = yaml.loadFile(fullfile(lib_path, [names{ki}, '.yaml']), 'ConvertToArray', true);
+                        cal_type = '';
+                        if isfield(m, 'meta') && isfield(m.meta, 'calibration_type')
+                            cal_type = m.meta.calibration_type;
+                        end
+                        if ~isempty(cal_type)
+                            labels{ki} = sprintf('[%s]  %s', cal_type, names{ki});
+                        else
+                            labels{ki} = names{ki};
+                        end
+                    catch
+                        labels{ki} = names{ki};
+                    end
+                end
+                lb.Items     = labels;
+                lb.ItemsData = names;
+                set_lib_status(sprintf('%d entr%s found.  Path: %s', ...
+                    numel(d), ternary(numel(d)==1,'y','ies'), lib_path));
             end
         end
 
         function show_tx_library_entry(combo_name)
-            detail = findobj(fig, 'Tag', 'tx_lib_detail');
+            detail   = findobj(fig, 'Tag', 'tx_lib_detail');
             name_lbl = findobj(fig, 'Tag', 'tx_lib_entry_name');
             load_btn = findobj(fig, 'Tag', 'tx_lib_load_btn');
-            if isempty(combo_name) || startsWith(combo_name, '(')
+            if isempty(combo_name)
                 detail.Value = {''};
                 name_lbl.Text = 'Select an entry to inspect';
                 load_btn.Enable = 'off';
                 return
             end
-            lib_path = fullfile(get_prestus_path(), 'config', 'calibration');
-            yaml_path = fullfile(lib_path, [combo_name, '.yaml']);
+            yaml_path = fullfile(active_lib_path(), [combo_name, '.yaml']);
             if ~isfile(yaml_path)
                 detail.Value = {'File not found.'};
                 load_btn.Enable = 'off';
                 return
             end
             name_lbl.Text = combo_name;
-            % Read raw YAML text for display
             fid = fopen(yaml_path, 'r');
             raw = fread(fid, '*char')';
             fclose(fid);
@@ -1327,10 +1393,11 @@ end
         end
 
         function load_tx_from_library()
-            lb       = findobj(fig, 'Tag', 'tx_lib_list');
-            combo    = lb.Value;
-            if isempty(combo) || startsWith(combo, '('), return; end
-            ud = fig.UserData;
+            lb    = findobj(fig, 'Tag', 'tx_lib_list');
+            combo = lb.Value;
+            if isempty(combo), return; end
+            if iscell(combo), combo = combo{1}; end
+            ud     = fig.UserData;
             params = ud.last_params;
             if isempty(params)
                 set_lib_status('Load a config first (I/O tab).');
@@ -1340,10 +1407,15 @@ end
                 equip_param = load_equipment_config();
                 focal_ep    = params.transducer(1).dist_to_exit_plane;
                 intensity   = [];
-                if isfield(params.calibration, 'desired_intensities')
+                if isfield(params, 'calibration') && isfield(params.calibration, 'desired_intensities')
                     intensity = params.calibration.desired_intensities(1);
                 end
-                params = load_transducer_from_library(combo, focal_ep, intensity, equip_param);
+                lib_path_arg = [];
+                if ~isempty(strtrim(custom_lib_path))
+                    lib_path_arg = strtrim(custom_lib_path);
+                end
+                lib_params = load_transducer_from_library(combo, focal_ep, intensity, equip_param, lib_path_arg);
+                params.transducer = lib_params.transducer;
                 apply_params_to_gui(params);
                 set_lib_status(sprintf('Loaded ''%s'' into active config.', combo));
             catch ME

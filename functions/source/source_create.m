@@ -110,11 +110,11 @@ end
         for it = 1:transducer_N
             tr = tr_arr(it);
 
-            % elem_amp and elem_phase_rad are per-element vectors
+            % elem_p_amp and elem_phase_rad are per-element vectors
             cw_signals_all{it} = createCWSignals( ...
                 kgrid.t_array, ...
                 freqs(it), ...              % per-transducer frequency
-                tr.(tr.type).elem_amp, ...
+                tr.(tr.type).elem_p_amp, ...
                 tr.(tr.type).elem_phase_rad);       % [elem_n x Nt]
 
             n_elements_per_T(it) = tr.(tr.type).elem_n;
@@ -240,7 +240,7 @@ end
             karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, tr.annular.elem_od_mm * 1e-3, focus_vec);
 
             cw_signal = createCWSignals(kgrid.t_array, tr.freq_hz, ...
-                tr.(tr.type).elem_amp, tr.(tr.type).elem_phase_rad);
+                tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
@@ -363,7 +363,7 @@ end
 
                 elem_counts(it)    = tr.(tr.type).elem_n;
                 cw_signals_all{it} = createCWSignals(kgrid.t_array, tr.freq_hz, ...
-                                                      tr.(tr.type).elem_amp, tr.(tr.type).elem_phase_rad);
+                                                      tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
                 tr_arr(it) = tr;
             end
 
@@ -383,28 +383,29 @@ end
             mask_ind    = find(binary_mask);
             num_src     = sum(binary_mask(:));
 
-            distributed_source_signal = zeros(num_src, Nt);
-            source_labels             = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
-
+            % Stack all element CW signals: total_elements x Nt
+            all_cw = zeros(total_elements, Nt);
             for it = 1:transducer_N
-                cw_signal = cw_signals_all{it};
-                if canUseGPU
-                    cw_signal                 = gpuArray(cw_signal);
-                    distributed_source_signal = gpuArray(distributed_source_signal);
-                end
-                for el_i = 1:elem_counts(it)
-                    ind              = offsets(it) + el_i;
-                    source_weights   = squeeze(grid_weights_4d(ind,:,:,:));
-                    el_binary_mask   = source_weights ~= 0;
-                    if canUseGPU; source_weights = gpuArray(source_weights); end
-                    element_mask_ind = find(el_binary_mask);
-                    local_ind        = ismember(mask_ind, element_mask_ind);
-                    distributed_source_signal(local_ind,:) = ...
-                        distributed_source_signal(local_ind,:) + ...
-                        source_weights(element_mask_ind) * cw_signal(el_i,:);
-                    source_labels = source_labels + ind * el_binary_mask;
-                end
+                r = offsets(it) + (1:elem_counts(it));
+                all_cw(r, :) = cw_signals_all{it};
             end
+
+            % Extract source-point weights: reshape grid_weights_4d (zero-copy view),
+            % then pick only the num_src active columns -> num_src x total_elements.
+            W_flat = reshape(grid_weights_4d, total_elements, []);
+            W_src  = W_flat(:, mask_ind)';   % num_src x total_elements
+
+            % Single matrix multiply replaces the double element loop.
+            if canUseGPU
+                distributed_source_signal = gather(gpuArray(W_src) * gpuArray(all_cw));
+            else
+                distributed_source_signal = W_src * all_cw;
+            end
+
+            % source_labels: sum of element indices weighted by binary occupancy.
+            labels_at_src = (W_src ~= 0) * (1:total_elements)';  % num_src x 1
+            source_labels = zeros(kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+            source_labels(mask_ind) = labels_at_src;
 
             source.p_mask = binary_mask;
             source.p      = distributed_source_signal;

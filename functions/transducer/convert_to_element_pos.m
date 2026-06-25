@@ -150,7 +150,7 @@ function [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, 
             tr.matrix.elem_n = size(elem_pos_m,1);
 
             % Duplicate source amplitude per element
-            tr.elem_amp = tr.elem_amp(1) * ...
+            tr.elem_p_amp = tr.elem_p_amp(1) * ...
                 ones(1,tr.matrix.elem_n);
 
             % [DEBUG] visualize circular aperture
