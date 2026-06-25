@@ -232,6 +232,9 @@ end
         grid_mm = parameters.grid.resolution_mm;
         smooth_method = parameters.headmodel.smooth_method;
 
+        sigma_vox = fwhm_mm ./ (grid_mm * 2.35482);
+        fprintf('Smoothing medium properties: FWHM=[%s] mm → σ=[%s] vox\n', num2str(fwhm_mm), num2str(sigma_vox));
+
         sound_speed = smooth_img(sound_speed, fwhm_mm, grid_mm, 0, smooth_method);
         density = smooth_img(density, fwhm_mm, grid_mm, 0, smooth_method);
         alpha_coeff_fixed = smooth_img(alpha_coeff_fixed, fwhm_mm, grid_mm, 0, smooth_method);

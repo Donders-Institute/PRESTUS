@@ -38,9 +38,13 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     % ==============================================================================
     
     % Keep the largest connected skull component
-    
+
     sz = size(BW);
-    CC = bwconncomp_3d(BW, 26);
+    if license('test', 'image_toolbox')
+        CC = bwconncomp(BW, 26);
+    else
+        CC = bwconncomp_3d(BW, 26);
+    end
     if CC.NumObjects == 0, error("Skull mask is empty."); end
     sizes = cellfun(@numel, CC.PixelIdxList);
     [~, iBig] = max(sizes);

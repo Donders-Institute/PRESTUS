@@ -43,6 +43,10 @@ end
     end
     
     % === MAIN LOOP: Process non-special layers ===
+    fwhm_mm  = parameters.headmodel.smooth_fwhm_mm;
+    grid_mm  = parameters.grid.resolution_mm;
+    sigma_vox = fwhm_mm ./ (grid_mm * 2.35482);
+    fprintf('Smoothing medium masks: FWHM=[%s] mm → σ=[%s] vox\n', num2str(fwhm_mm), num2str(sigma_vox));
     for label_i = 1:length(loop_layer_labels)
         label_name = loop_layer_labels{label_i};
         sim_nibs_layers = parameters.layers.(label_name);

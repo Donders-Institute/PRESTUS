@@ -55,8 +55,7 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
     sigma_voxels = fwhm_voxels / 2.35482;  % FWHM = 2.35482 × σ [web:9]
 
     if any(fwhm_voxels > 0)
-        fprintf('Smoothing: FWHM=[%s] mm, voxel=[%s] mm → FWHM=[%s] vox → σ=[%s] vox\n', ...
-            num2str(fwhm_mm), num2str(voxel_size_mm), num2str(fwhm_voxels), num2str(sigma_voxels));
+
 
         if ndims_img == 2
             sig = sigma_voxels(1:2);
@@ -92,10 +91,11 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
             switch method
                 case "gaussian"
                     hw = ceil(3 * max(sig));
-                    [gx,gy,gz] = ndgrid(-hw:hw, -hw:hw, -hw:hw);
-                    g = exp(-0.5*(gx.^2/sig(1)^2 + gy.^2/sig(2)^2 + gz.^2/sig(3)^2));
-                    g = g / sum(g(:));
-                    smoothed_img = convn(img, g, 'same');
+                    x = (-hw:hw)';
+                    g1 = exp(-0.5*(x.^2/sig(1)^2)); g1 = reshape(g1/sum(g1), [], 1, 1);
+                    g2 = exp(-0.5*(x.^2/sig(2)^2)); g2 = reshape(g2/sum(g2), 1, [], 1);
+                    g3 = exp(-0.5*(x.^2/sig(3)^2)); g3 = reshape(g3/sum(g3), 1, 1, []);
+                    smoothed_img = convn(convn(convn(img, g1, 'same'), g2, 'same'), g3, 'same');
 
                 case "box"
                     ksz = round(fwhm_voxels(1:3));
