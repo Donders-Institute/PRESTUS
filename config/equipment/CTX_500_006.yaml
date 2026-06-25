@@ -21,7 +21,6 @@ combos:
       manufact: Sonic Concepts
       available_ch: 4
     char_data_path: Axial_profiles_CTX-500-006~TPO-203-035.csv
-    phase_table: CTX-500-006 - TPO-203-035 - Steer Table.csv
   SC_105_010:
     ds:
       serial: SC_105_010
@@ -29,4 +28,3 @@ combos:
       manufact: Sonic Concepts
       available_ch: 4
     char_data_path: Axial_profiles_CTX-500-006~TPO-105-010.csv
-    phase_table: CTX-500-006 - TPO-105-010 - Steer Table.csv

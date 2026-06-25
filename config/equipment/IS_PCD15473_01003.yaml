@@ -21,7 +21,6 @@ combos:
       manufact: IGT
       available_ch: 128
     char_data_path: Axial_profiles_IS_PCD15473_01003~IGT_128_ch_comb_10_ch.csv
-    phase_table: transducer_15473_10_300kHz.ini
   IGT_32_ch_comb_10_ch:
     ds:
       serial: IGT_32_ch_comb_10_ch
@@ -29,4 +28,3 @@ combos:
       manufact: IGT
       available_ch: 32
     char_data_path: Axial_profiles_IS_PCD15473_01003~IGT_32_ch_comb_10_ch.csv
-    phase_table: transducer_15473_10_300kHz.ini
