@@ -14,7 +14,7 @@ function correction_deg = import_babelbrain_weights(...
 % with geometric Rayleigh phases already applied as source excitation, and
 % optimises correction weights b starting from zero phases. Consequently:
 %   angle(w_i) = opt_phase_i - geo_phase_i    [hardware delta, rad]
-%   abs(w_i)   = amplitude scaling (ignored — PRESTUS uses elem_amp)
+%   abs(w_i)   = amplitude scaling (ignored — PRESTUS uses elem_p_amp)
 %
 % To derive the PRESTUS correction (also a delta from geo), the absolute
 % phases are first reconstructed:
@@ -36,8 +36,7 @@ function correction_deg = import_babelbrain_weights(...
 %   equipment_yaml_path - path to the transducer equipment YAML to update
 %                         (e.g. {equip_param.path}/{tran_serial}.yaml)
 %   tran                - transducer struct from load_equipment_config;
-%                         used to compute geometric phases via
-%                         generate_tran_ini_from_geometry / set_real_phases.
+%                         used to compute geometric phases via set_real_phases.
 %   ref_depth_ep        - focal depth at which the BabelBrain calibration
 %                         was performed, measured from the exit plane [mm].
 %                         This must match the depth used in BabelBrain's
@@ -92,12 +91,12 @@ end
     amplitude = abs(phasors);
     if any(abs(amplitude - 1) > 0.05)
         fprintf(['  Note: phasors have non-unit amplitude (range [%.3f, %.3f]).\n' ...
-                 '  Amplitude scaling is ignored — PRESTUS uses elem_amp for drive level.\n'], ...
+                 '  Amplitude scaling is ignored — PRESTUS uses elem_p_amp for drive level.\n'], ...
             min(amplitude), max(amplitude));
     end
 
     % ── Compute geometric phases at the reference depth ───────────────────
-    geo_phases_deg = set_real_phases([], tran, ref_depth_ep, parameters);
+    geo_phases_deg = set_real_phases(tran, ref_depth_ep, parameters);
 
     if numel(geo_phases_deg) ~= n_elem_tran
         error(['import_babelbrain_weights: set_real_phases returned %d phases ' ...

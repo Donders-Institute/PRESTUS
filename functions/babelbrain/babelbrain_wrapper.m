@@ -27,7 +27,9 @@ function sensor_data = babelbrain_wrapper( ...
 %                         'auto' (default): derived from computing_backend.
 %   .ppw                - points-per-wavelength (default 6)
 %   .do_refocusing      - logical; use BabelBrain skull refocusing (default false)
-%   .z_beyond_focus_mm  - axial truncation past focus (default 40, mm)
+%   (domain size)       - controlled by parameters.grid.acoustic_fov_length_mm (not babelbrain.*).
+%                         BabelBrain default domain when unset; narrow-beam enabled automatically
+%                         when acoustic_fov_length_mm is numeric, with post-focus extent = fov - focal_depth.
 %   .python_env         - path to Python venv/conda env with BabelBrain installed;
 %                         empty string = use system Python
 %   .tx_mech_adjust_z_m - transducer mechanical Z offset into skin [m] (default 0: placement
@@ -94,13 +96,40 @@ bb = apply_default(bb, 'computing_backend',  'auto');
 bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'ppw',                6);
 bb = apply_default(bb, 'do_refocusing',      false);
-bb = apply_default(bb, 'z_beyond_focus_mm',  40);
+
+% Domain size: derived from parameters.grid.acoustic_fov_length_mm (not user-facing
+% on the babelbrain sub-struct).  Full-brain is the default; the tight narrow-beam
+% domain is enabled only when an explicit numeric FOV is configured for the PRESTUS
+% grid, in which case the post-focus extent is set to fov_length - focal_depth.
+fov_len_mm = [];
+if isfield(parameters, 'grid') && isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+        isnumeric(parameters.grid.acoustic_fov_length_mm)
+    fov_len_mm = parameters.grid.acoustic_fov_length_mm;
+end
+
+tight_narrow_beam = ~isempty(fov_len_mm);
+
+if tight_narrow_beam
+    focal_depth_mm = 0;
+    if isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_mm')
+        focal_depth_mm = parameters.transducer(1).focal_distance_mm;
+    elseif isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_ep')
+        focal_depth_mm = parameters.transducer(1).focal_distance_ep;
+    end
+    z_beyond_focus_mm = max(40, fov_len_mm - focal_depth_mm);
+    fprintf('[babelbrain_wrapper] Narrow-beam domain: z_beyond_focus=%.1f mm (fov=%.1f, depth=%.1f)\n', ...
+        z_beyond_focus_mm, fov_len_mm, focal_depth_mm);
+else
+    z_beyond_focus_mm = 40;  % irrelevant when tight domain is off, but pass a sane value
+    fprintf('[babelbrain_wrapper] BabelBrain default domain (set grid.acoustic_fov_length_mm to enable narrow-beam)\n');
+end
 bb = apply_default(bb, 'python_env',         '');
 bb = apply_default(bb, 'tx_mech_adjust_z_m', 0.0);  % 0: geometry already in NIfTI
 bb = apply_default(bb, 'z_steering_m',       []);   % empty = auto-derived below
 bb = apply_default(bb, 'root',               '');
 bb = apply_default(bb, 'ct_mapping',         '');   % empty = label-based path
 bb = apply_default(bb, 'ct_use_petra',       false);
+bb = apply_default(bb, 'cleanup_cache',      true);  % delete BabelBrain cache dir after reading output
 
 %% Locate BabelBrain Python package and runner script
 % The runner script lives in functions/babelbrain/ alongside this file.
@@ -234,6 +263,26 @@ end
 ppw_auto = round(c_min / (freq_hz * res_mm * 1e-3));
 ppw_use  = max(bb.ppw, ppw_auto);
 
+% Estimate BabelBrain's internal FDTD grid step.
+% BabelBrain determines its spatial step from the minimum SOS across all wave
+% modes (including shear) and the CFL condition. The water-based estimate below
+% gives the step for a tissue-free run; the actual step may be smaller when
+% bone shear waves are present (BabelBrain will print a warning if so).
+% Water: lambda = c_water / freq, dx_BB = lambda / ppw
+c_water  = 1500;
+dx_bb_est_mm = c_water / freq_hz / ppw_use * 1e3;   % mm, water-based estimate
+if abs(res_mm - dx_bb_est_mm) > 0.01
+    fprintf(['[babelbrain_wrapper] Resolution note:\n' ...
+        '  PRESTUS grid:  %.4f mm (parameters.grid.resolution_mm)\n' ...
+        '  BabelBrain est: %.4f mm (%d PPW at %.0f Hz in water, c=%.0f m/s)\n' ...
+        '  These differ — BabelBrain will run at %.4f mm and the result will be\n' ...
+        '  resampled back to %.4f mm. To avoid resampling, set:\n' ...
+        '    parameters.grid.resolution_mm = %.4f\n' ...
+        '  Note: with bone layers present BabelBrain may use a finer step than\n' ...
+        '  estimated here (driven by the minimum shear-wave speed).\n'], ...
+        res_mm, dx_bb_est_mm, ppw_use, freq_hz, c_water, dx_bb_est_mm, res_mm, dx_bb_est_mm);
+end
+
 %% Step 1 — Transducer preset
 if isempty(bb.tx_system)
     [bb.tx_system, csv_path] = babelbrain_transducer_map(parameters, equip_param, out_dir);
@@ -254,36 +303,33 @@ fprintf('[babelbrain_wrapper] Using preset: %s\n', bb.tx_system);
 
 %% Derive ZSteering from focal distance vs preset FocalLength
 % ZSteering shifts BabelBrain's Rayleigh pre-step target axially (metres).
-% When calibrated phases are provided, the phases already encode any steering
-% offset, so ZSteering should stay 0. When no weights file is available,
-% derive ZSteering from the difference between the PRESTUS focal distance and
-% the preset's natural focal length so that geometric focusing is correct.
+% ZSteering must always equal (focal_distance - preset_FocalLength) so that
+% BabelBrain's internal Rayleigh geometric phases are computed at the same
+% depth used by PRESTUS when calculating delta = calibrated - geo_at_target.
+% When calibrated weights are provided, the delta encodes skull aberration
+% relative to PRESTUS geometric phases at focal_distance; BabelBrain must use
+% that same focal depth as its Rayleigh reference, which requires the same
+% ZSteering as the uncalibrated case.
 if isempty(bb.z_steering_m)
-    has_calib_weights = isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') ...
-        && ~isempty(tr.annular.elem_phase_rad);
-    if ~has_calib_weights
-        % Attempt to read FocalLength from the preset default.yaml
-        preset_yaml = fullfile(bb_root, sprintf('Babel_%s', bb.tx_system), 'default.yaml');
-        preset_focal_length_m = [];
-        if isfile(preset_yaml)
-            try
-                preset_cfg = read_yaml(preset_yaml);
-                if isfield(preset_cfg, 'FocalLength')
-                    preset_focal_length_m = preset_cfg.FocalLength;
-                end
-            catch
+    % Attempt to read FocalLength from the preset default.yaml
+    preset_yaml = fullfile(bb_root, sprintf('Babel_%s', bb.tx_system), 'default.yaml');
+    preset_focal_length_m = [];
+    if isfile(preset_yaml)
+        try
+            preset_cfg = read_yaml(preset_yaml);
+            if isfield(preset_cfg, 'FocalLength')
+                preset_focal_length_m = preset_cfg.FocalLength;
             end
+        catch
         end
-        if ~isempty(preset_focal_length_m) && isfield(tr, 'focal_distance_mm')
-            focal_dist_m = tr.focal_distance_mm / 1000;
-            z_steering_m = focal_dist_m - preset_focal_length_m;
-            fprintf('[babelbrain_wrapper] ZSteering=%.4f m (focal_dist=%.3f m, preset FL=%.3f m)\n', ...
-                z_steering_m, focal_dist_m, preset_focal_length_m);
-        else
-            z_steering_m = 0.0;
-        end
+    end
+    if ~isempty(preset_focal_length_m) && isfield(tr, 'focal_distance_ep')
+        focal_dist_m = tr.focal_distance_ep / 1000;
+        z_steering_m = focal_dist_m - preset_focal_length_m;
+        fprintf('[babelbrain_wrapper] ZSteering=%.4f m (focal_dist=%.3f m, preset FL=%.3f m)\n', ...
+            z_steering_m, focal_dist_m, preset_focal_length_m);
     else
-        z_steering_m = 0.0;  % calibrated phases absorb the steering delta
+        z_steering_m = 0.0;
     end
 else
     z_steering_m = bb.z_steering_m;
@@ -296,18 +342,52 @@ nii_path = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, 
 %% Step 3 — Write OptimizedWeightsFile (calibrated phases)
 weights_path = fullfile(out_dir, subj_id, [target '_CalibWeights.h5']);
 
-if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_amp')
+if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_p_amp')
     phases_rad = tr.annular.elem_phase_rad;
-    elem_amp   = tr.annular.elem_amp(1);
+    elem_p_amp   = tr.annular.elem_p_amp(1);
 
-    % Geometric phases at the calibration focal depth for delta computation.
-    % If available from the calibration pipeline, pass them through.
+    % Geometric phases at the focal depth for delta computation.
+    % BabelBrain applies its own geometric phases internally; weights must
+    % encode only the hardware correction (delta from geometric phases).
     geo_phases_rad = [];
     if isfield(tr.annular, 'geo_phase_rad')
         geo_phases_rad = tr.annular.geo_phase_rad;
+    elseif isfield(tr.annular, 'elem_id_mm') && isfield(tr.annular, 'elem_od_mm') && ...
+            isfield(tr.annular, 'curv_radius_mm') && isfield(tr.annular, 'dist_geom_ep_mm') && ...
+            isfield(tr, 'focal_distance_ep') && isfield(tr, 'freq_hz') && ...
+            isfield(parameters, 'medium_properties') && ...
+            isfield(parameters.medium_properties, 'water') && ...
+            isfield(parameters.medium_properties.water, 'sound_speed')
+        try
+            tran_geo.n_elem             = tr.annular.elem_n;
+            tran_geo.manufact           = '';
+            tran_geo.transducer.freq_hz = tr.freq_hz;
+            tran_geo.transducer.annular = tr.annular;
+            geo_phases_deg = compute_phases( ...
+                parameters.medium_properties.water.sound_speed, ...
+                tran_geo, tr.focal_distance_ep);
+            geo_phases_rad = geo_phases_deg * pi / 180;
+            fprintf('[babelbrain_wrapper] Geometric phases computed at %.1f mm (%.0f Hz).\n', ...
+                tr.focal_distance_ep, tr.freq_hz);
+        catch ME
+            error('babelbrain_wrapper:geoPhases', ...
+                ['Could not auto-compute geometric phases: %s\n' ...
+                 'Provide tr.annular.geo_phase_rad (from compute_phases() or calibration output) ' ...
+                 'or ensure tr.annular has elem_id_mm, elem_od_mm, tr.focal_distance_ep, tr.freq_hz,' ...
+                 'and parameters.medium_properties.water.sound_speed.'], ...
+                ME.message);
+        end
     end
 
-    export_babelbrain_weights(phases_rad, elem_amp, parameters, weights_path, geo_phases_rad);
+    if isempty(geo_phases_rad)
+        error('babelbrain_wrapper:geoPhasesMissing', ...
+            ['geo_phases_rad could not be determined.\n' ...
+             'Set tr.annular.geo_phase_rad (from compute_phases() or calibration output), or\n' ...
+             'ensure tr.annular has elem_id_mm, elem_od_mm, tr.focal_distance_ep, tr.freq_hz,' ...
+             'and parameters.medium_properties.water.sound_speed so they can be auto-computed.']);
+    end
+
+    export_babelbrain_weights(phases_rad, elem_p_amp, parameters, weights_path, geo_phases_rad);
 else
     weights_path = '';
     fprintf('[babelbrain_wrapper] No element phases found — BabelBrain will use geometric focusing.\n');
@@ -355,6 +435,18 @@ fprintf('[babelbrain_wrapper] Launching BabelBrain simulation...\n');
 
 dry_run = isfield(bb, 'dry_run') && bb.dry_run;
 
+% BabelBrain's source amplitude ('pressure' kwarg) is the source pressure in Pa.
+% PRESTUS stores elem_p_amp directly as a source pressure in Pa (the k-Wave path
+% feeds it straight into createCWSignals as source.p; calibration relates it to
+% particle velocity via v = elem_p_amp / (rho_water * c_water)). So elem_p_amp is
+% passed through unchanged — do NOT multiply by rho*c.
+source_amp_pa_flag = '';
+if ~isempty(weights_path) && isfile(weights_path) && exist('elem_p_amp', 'var') && elem_p_amp > 0
+    source_amp_pa = elem_p_amp;
+    source_amp_pa_flag = sprintf('--source_amp_pa %.2f', source_amp_pa);
+    fprintf('[babelbrain_wrapper] Source amplitude: %.1f Pa\n', source_amp_pa);
+end
+
 cmd_args = sprintf([ ...
     '"%s" "%s" '  ...
     '--basedir "%s" '  ...
@@ -371,20 +463,24 @@ cmd_args = sprintf([ ...
     '--log_file "%s" '  ...
     '%s '  ...  % optional babelbrain_root flag
     '%s '  ...  % optional weights flag
+    '%s '  ...  % optional source amplitude flag
     '%s '  ...  % optional refocusing flag
     '%s '  ...  % optional dry_run flag
+    '%s '  ...  % optional tight_narrow_beam flag
     '%s '  ...  % optional use_ct flag
     '%s '  ...  % optional ct_mapping flag
     '%s '], ...  % optional use_petra flag
     python_bin, bb_runner, ...
     out_dir, subj_id, target, bb.tx_system, ...
     freq_hz, ppw_use, bb.computing_backend, bb.device_name, ...
-    bb.tx_mech_adjust_z_m, z_steering_m, bb.z_beyond_focus_mm, ...
+    bb.tx_mech_adjust_z_m, z_steering_m, z_beyond_focus_mm,...
     log_file, ...
     bb_root_flag(bb_root), ...
     bb_weights_flag(weights_path), ...
+    source_amp_pa_flag, ...
     bb_refocus_flag(bb.do_refocusing), ...
     bb_dryrun_flag(dry_run), ...
+    bb_no_tight_flag(tight_narrow_beam), ...
     bb_usect_flag(~isempty(bb.ct_mapping)), ...
     bb_ctmapping_flag(bb.ct_mapping), ...
     bb_petra_flag(bb.ct_use_petra));
@@ -415,23 +511,174 @@ h5_name  = sprintf('%s_%dkHz_%dPPW_DataForSim.h5', target, freq_kHz, ppw_use);
 h5_path  = fullfile(out_dir, subj_id, h5_name);
 
 if ~isfile(h5_path)
-    % Try glob in case BabelBrain version uses a slightly different naming
+    % Fallback: glob for DataForSim.h5 files (BabelBrain version may name differently)
     candidates = dir(fullfile(out_dir, subj_id, '*DataForSim.h5'));
+    % Exclude water baseline files from the acoustic output search
+    candidates = candidates(~contains({candidates.name}, 'Water'));
     if isempty(candidates)
-        error('babelbrain_wrapper: Output HDF5 not found.\n  Expected: %s', h5_path);
+        error('babelbrain_wrapper: Output HDF5 not found.\n  Expected: %s\n  No *DataForSim.h5 files in: %s', ...
+            h5_path, fullfile(out_dir, subj_id));
     end
-    h5_path = fullfile(candidates(end).folder, candidates(end).name);
-    fprintf('[babelbrain_wrapper] Using output: %s\n', h5_path);
+    [~, newest] = max([candidates.datenum]);
+    h5_path = fullfile(candidates(newest).folder, candidates(newest).name);
+    warning('babelbrain_wrapper:outputNameMismatch', ...
+        'Expected output not found; using most-recently-modified DataForSim.h5:\n  %s', h5_path);
 end
 
 rewrite_hdf5_no_blosc(h5_path, python_bin, this_dir);
 
-sensor_data = read_babelbrain_output(h5_path, bb.do_refocusing, parameters, planimg);
-sensor_data.babelbrain_version = bb_version;
+% focal_length_mm: BabelBrain's internal z_vec is offset so that the focal-spot
+% voxel equals preset_focal_length_m (the transducer's geometric focal length).
+% This anchors the BB-internal → PRESTUS-grid coordinate mapping in resample_babelbrain_vol.
+focal_length_mm_for_resample = [];
+if ~isempty(preset_focal_length_m)
+    focal_length_mm_for_resample = preset_focal_length_m * 1e3;
+elseif isfield(tr, 'focal_distance_ep')
+    focal_length_mm_for_resample = tr.focal_distance_ep;   % fallback: assume no steering
+    fprintf('[babelbrain_wrapper] preset_focal_length_m unavailable; using focal_distance_ep=%.1f mm as focal_length_mm.\n', ...
+        focal_length_mm_for_resample);
+end
+if isempty(focal_length_mm_for_resample)
+    error('babelbrain_wrapper: cannot determine focal_length_mm for resampling. Provide preset FocalLength in default.yaml.');
+end
+sensor_data = read_babelbrain_output(h5_path, bb.do_refocusing, parameters, planimg, focus_pos, focal_length_mm_for_resample);
+sensor_data.babelbrain_version   = bb_version;
+sensor_data.focus_pos            = focus_pos;
+sensor_data.focal_length_mm      = focal_length_mm_for_resample;
+
+% Derive free-water ISPPA from the BabelBrain water simulation output.
+% The water baseline output is named <prefix>_Water_DataForSim.h5 in the same
+% directory. If absent (e.g. run_water_baseline=0 or external workflow), the
+% water-only simulation is triggered here before reading. The ISPPA is needed
+% downstream for babelbrain_thermal_wrapper.
+water_h5 = strrep(h5_path, '_DataForSim.h5', '_Water_DataForSim.h5');
+if ~isfile(water_h5)
+    % Water file missing — run the water-only simulation now.
+    % This can happen when the acoustic run was done without the water baseline
+    % (e.g. run_water_baseline=0 in config, or via an external workflow).
+    fprintf('[babelbrain_wrapper] Water_DataForSim.h5 not found — running water-only simulation...\n');
+    water_log = strrep(log_file, '_babelbrain_acoustic.log', '_babelbrain_water.log');
+    water_cmd = sprintf([ ...
+        '"%s" "%s" '  ...
+        '--basedir "%s" '  ...
+        '--id "%s" '  ...
+        '--target "%s" '  ...
+        '--tx_system "%s" '  ...
+        '--freq %.0f '  ...
+        '--ppw %d '  ...
+        '--computing_backend %d '  ...
+        '--device_name "%s" '  ...
+        '--tx_mech_adjust_z %.6f '  ...
+        '--z_steering %.6f '  ...
+        '--z_beyond_focus_mm %.1f '  ...
+        '--log_file "%s" '  ...
+        '--water_only '  ...
+        '%s '  ...  % optional babelbrain_root flag
+        '%s '  ...  % optional weights flag (needed for z-steering geometry match)
+        '%s '  ...  % optional refocusing flag
+        '%s '  ...  % optional tight_narrow_beam flag
+        '%s '  ...  % optional use_ct flag
+        '%s '  ...  % optional ct_mapping flag
+        '%s '], ...  % optional use_petra flag
+        python_bin, bb_runner, ...
+        out_dir, subj_id, target, bb.tx_system, ...
+        freq_hz, ppw_use, bb.computing_backend, bb.device_name, ...
+        bb.tx_mech_adjust_z_m, z_steering_m, z_beyond_focus_mm,...
+        water_log, ...
+        bb_root_flag(bb_root), ...
+        bb_weights_flag(weights_path), ...
+        bb_refocus_flag(bb.do_refocusing), ...
+        bb_no_tight_flag(tight_narrow_beam), ...
+        bb_usect_flag(~isempty(bb.ct_mapping)), ...
+        bb_ctmapping_flag(bb.ct_mapping), ...
+        bb_petra_flag(bb.ct_use_petra));
+    fprintf('[babelbrain_wrapper] Water-only command:\n  %s\n', water_cmd);
+    t0_w = tic;
+    status_w = system(water_cmd);
+    elapsed_w = toc(t0_w);
+    if status_w ~= 0
+        warning('babelbrain_wrapper:waterSimFailed', ...
+            'Water-only simulation exited with status %d (%.1f s). ISPPA normalization may be inaccurate.', ...
+            status_w, elapsed_w);
+    else
+        fprintf('[babelbrain_wrapper] Water-only simulation finished in %.1f s.\n', elapsed_w);
+    end
+end
+if ~isfile(water_h5)
+    candidates_w = dir(fullfile(fileparts(h5_path), '*Water_DataForSim.h5'));
+    if ~isempty(candidates_w)
+        [~, newest_w] = max([candidates_w.datenum]);
+        water_h5 = fullfile(candidates_w(newest_w).folder, candidates_w(newest_w).name);
+        warning('babelbrain_wrapper:waterNameMismatch', ...
+            'Expected water output not found; using most-recently-modified Water_DataForSim.h5:\n  %s', water_h5);
+    end
+end
+if isfile(water_h5)
+    rewrite_hdf5_no_blosc(water_h5, python_bin, this_dir);
+    try
+        p_water = double(h5read(water_h5, '/p_amp'));
+        % ISPPA = p_peak^2 / (2 * rho_water * c_water), converted Pa→W/cm²
+        sensor_data.freefield_isppa_wcm2 = max(p_water(:))^2 / (2 * 1000 * 1500) / 1e4;
+        fprintf('[babelbrain_wrapper] Free-water ISPPA: %.4f W/cm²\n', ...
+            sensor_data.freefield_isppa_wcm2);
+    catch ME
+        warning('babelbrain_wrapper:waterIsppa', ...
+            'Could not read water ISPPA from %s: %s', water_h5, ME.message);
+    end
+else
+    warning('babelbrain_wrapper:noWaterH5', ...
+        'Water_DataForSim.h5 not found — babelbrain thermal will need isppa_wcm2 set manually.');
+end
+
+%% Step 6 — Optional cache cleanup
+if bb.cleanup_cache
+    bb_cache_dir = fullfile(out_dir, subj_id);
+    if isfolder(bb_cache_dir)
+        % Move DataForSim.h5 and Water_DataForSim.h5 out of the cache before
+        % deleting it so that babelbrain_thermal_wrapper can still find them.
+        persistent_h5 = fullfile(out_dir, h5_name);
+        try
+            movefile(h5_path, persistent_h5);
+            sensor_data.babelbrain_source = persistent_h5;
+            fprintf('[babelbrain_wrapper] Moved acoustic HDF5 to: %s\n', persistent_h5);
+        catch ME
+            warning('babelbrain_wrapper:h5MoveFailed', ...
+                'Could not move DataForSim.h5 before cache cleanup — skipping cleanup: %s', ME.message);
+            bb.cleanup_cache = false;
+        end
+        if bb.cleanup_cache && isfile(water_h5)
+            water_h5_name    = sprintf('%s_%dkHz_%dPPW_Water_DataForSim.h5', target, freq_kHz, ppw_use);
+            persistent_water = fullfile(out_dir, water_h5_name);
+            try
+                movefile(water_h5, persistent_water);
+                water_h5 = persistent_water;
+                fprintf('[babelbrain_wrapper] Moved water HDF5 to: %s\n', persistent_water);
+            catch ME
+                warning('babelbrain_wrapper:waterH5MoveFailed', ...
+                    'Could not move Water_DataForSim.h5 before cache cleanup: %s', ME.message);
+            end
+        end
+        if bb.cleanup_cache
+            try
+                rmdir(bb_cache_dir, 's');
+                fprintf('[babelbrain_wrapper] Cache cleaned up: %s\n', bb_cache_dir);
+            catch ME
+                warning('babelbrain_wrapper:rmdirFailed', ...
+                    'Cache cleanup failed (NFS lock or permissions): %s\n  %s', ...
+                    bb_cache_dir, ME.message);
+            end
+        end
+    end
+end
 
 end
 
 %% Local helpers
+
+function sfx = trans_suffix(ti, n_tx)
+% Return a unique affix for transducer ti of n_tx (e.g. '_tx1of3').
+    sfx = sprintf('_tx%dof%d', ti, n_tx);
+end
 
 function s = apply_default(s, field, val)
     if ~isfield(s, field) || isempty(s.(field))
@@ -536,6 +783,14 @@ end
 function flag = bb_petra_flag(use_petra)
     if use_petra
         flag = '--use_petra';
+    else
+        flag = '';
+    end
+end
+
+function flag = bb_no_tight_flag(tight_narrow_beam)
+    if ~tight_narrow_beam
+        flag = '--no_tight_narrow_beam';
     else
         flag = '';
     end

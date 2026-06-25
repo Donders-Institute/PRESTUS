@@ -120,7 +120,12 @@ def parse_args():
                    help='ZSteering: axial offset of electronic focus from preset FocalLength [m]. '
                         'Derived automatically from focal_distance_mm vs FocalLength when no '
                         'calibrated weights file is provided.')
-    p.add_argument('--z_beyond_focus_mm',   default=40.0, type=float)
+    p.add_argument('--z_beyond_focus_mm',      default=40.0,  type=float,
+                   help='Axial domain extent beyond focal point [mm] (default 40). '
+                        'Increase to reduce boundary reflections at the focus.')
+    p.add_argument('--no_tight_narrow_beam',   action='store_true',
+                   help='Disable bTightNarrowBeamDomain (use full BabelBrain domain). '
+                        'Slower but eliminates lateral truncation artefacts.')
     p.add_argument('--babelbrain_root',     default='',
                    help='Path to BabelBrain source root (contains TranscranialModeling/). '
                         'If empty, searches relative to this script and common v05 locations.')
@@ -130,6 +135,10 @@ def parse_args():
                    help='Enable BabelBrain skull refocusing back-propagation')
     p.add_argument('--dry_run',             action='store_true',
                    help='Pass bDryRun=True to RunCases — validates paths and imports without GPU')
+    p.add_argument('--water_only',          action='store_true',
+                   help='Run water-only baseline simulation (bWaterOnly=True). '
+                        'Produces *_Water_DataForSim.h5 alongside the tissue DataForSim.h5. '
+                        'Required by BabelBrain thermal for ISPPA normalization.')
     p.add_argument('--use_ct',              action='store_true',
                    help='Activate BabelBrain CT path (bUseCT=True). Requires a CT.nii.gz '
                         'alongside the BabelViscoInput mask. Use when passing raw HU values '
@@ -144,6 +153,10 @@ def parse_args():
                         'PETRA-sequence-derived pseudo-CT. Leave unset for ZTE/UTE pCT.')
     p.add_argument('--log_file',            default='',
                    help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
+    p.add_argument('--source_amp_pa',       default=0.0, type=float,
+                   help='Source pressure amplitude [Pa] derived from calibrated particle velocity '
+                        '(velocity_m_s * rho_water * c_water). When provided, overrides '
+                        "BabelBrain's default of 50 kPa so simulated ISPPA matches calibration.")
     return p.parse_args()
 
 
@@ -464,7 +477,8 @@ def main():
         TxMechanicalAdjustmentZ     = args.tx_mech_adjust_z,
         ZSteering                   = args.z_steering,
         bUseRayleighForWater        = True,
-        bTightNarrowBeamDomain      = True,
+        bWaterOnly                  = args.water_only,
+        bTightNarrowBeamDomain      = not args.no_tight_narrow_beam,
         zLengthBeyonFocalPointWhenNarrow = args.z_beyond_focus_mm / 1e3,  # mm → m
         bDoRefocusing               = args.do_refocusing,
         bDisplay                    = False,
@@ -486,6 +500,11 @@ def main():
     else:
         print('[run_babelbrain_case] No weights file — using geometric focusing.')
 
+    if args.source_amp_pa > 0:
+        kw['pressure'] = args.source_amp_pa
+        print(f'[run_babelbrain_case] Source pressure amplitude: {args.source_amp_pa:.1f} Pa '
+              f'({args.source_amp_pa/1e3:.2f} kPa)')
+
     if args.dry_run:
         print('[run_babelbrain_case] DRY RUN — no GPU computation will occur.')
 
@@ -506,6 +525,9 @@ def main():
             print(f'[run_babelbrain_case] Output: {f}')
     elif args.dry_run:
         print('[run_babelbrain_case] Dry run completed (no output files expected).')
+    elif args.water_only:
+        # Some BabelBrain versions return None/empty for water-only runs even on success.
+        print('[run_babelbrain_case] Water-only run completed (output file list may be empty).')
     else:
         print('[run_babelbrain_case] Warning: RunCases returned no output files.',
               file=sys.stderr)

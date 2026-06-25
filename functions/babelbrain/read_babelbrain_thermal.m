@@ -1,4 +1,4 @@
-function results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg)
+function results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, focus_pos, focal_length_mm)
 % READ_BABELBRAIN_THERMAL  Read BabelBrain thermal HDF5 into PRESTUS results_heating
 %
 % Reads the ThermalField HDF5 written by BabelBrain's CalculateTemperatureEffects,
@@ -39,9 +39,11 @@ function results_heating = read_babelbrain_thermal(thermal_h5, parameters, plani
 % See also: BABELBRAIN_THERMAL_WRAPPER, THERMAL_ANALYSIS, NIFTI_THERMAL
 
 arguments
-    thermal_h5   (1,:) char
-    parameters   (1,1) struct
-    planimg      (1,1) struct
+    thermal_h5      (1,:) char
+    parameters      (1,1) struct
+    planimg         (1,1) struct
+    focus_pos       (1,3) double  = [NaN NaN NaN]
+    focal_length_mm (1,1) double  = NaN
 end
 
 if ~isfile(thermal_h5)
@@ -52,23 +54,31 @@ end
 % BabelBrain writes via SaveToH5py which produces one dataset per key.
 read_field = @(key) double(h5read(thermal_h5, ['/' key]));
 
-T_end_fus  = read_field('TempEndFUS');   % temperature at end of sonication
-T_final    = read_field('FinalTemp');    % final temperature after cooling
+% h5read reverses Python axis order: MATLAB dim 1 = BB z (depth), dim 2 = BB y, dim 3 = BB x.
+% PRESTUS grid: dim 1 = lateral X (BB x), dim 2 = lateral Y (BB y), dim 3 = axial (BB z).
+% Permute all 3D volumes immediately to PRESTUS axis order [N_x, N_y, N_z].
+perm321 = @(v) permute(v, [3, 2, 1]);
+T_end_fus  = perm321(read_field('TempEndFUS'));   % temperature at end of sonication
+T_final    = perm321(read_field('FinalTemp'));    % final temperature after cooling
 % BabelBrain accumulates CEM43 with the BHTE time step in SECONDS; the 3D
 % DoseEndFUS/FinalDose arrays are therefore in CEM43·s, not CEM43·min.
-% BabelBrain itself divides by 60 for its scalar summaries (CEMBrain etc.),
-% and PRESTUS uses minutes throughout (thermal_simulation.m line ~390).
-cem_end    = read_field('DoseEndFUS') / 60;   % CEM43 at end of sonication [min]
-cem_final  = read_field('FinalDose')  / 60;   % final CEM43 [min]
+cem_end    = perm321(read_field('DoseEndFUS')) / 60;   % CEM43 at end of sonication [min]
+cem_final  = perm321(read_field('FinalDose'))  / 60;   % final CEM43 [min]
 
-p_map      = read_field('p_map');        % peak pressure [Pa]
+p_map      = perm321(read_field('p_map'));        % peak pressure [Pa]
 
-% BabelBrain stores volumes in Python/RAS axis order (x=lateral, y=AP,
-% z=depth); MATLAB's h5read reverses dimensions.  MATLAB dim 1 ↔ BB z,
-% dim 2 ↔ BB y, dim 3 ↔ BB x.  Assign coordinate vectors accordingly.
-x_mm = read_field('z_vec');   % MATLAB dim 1 ↔ BabelBrain z [mm]
-y_mm = read_field('y_vec');   % MATLAB dim 2 ↔ BabelBrain y [mm]
-z_mm = read_field('x_vec');   % MATLAB dim 3 ↔ BabelBrain x [mm]
+% Coordinate vectors [mm] for the thermal output domain.
+% BabelBrain thermal also applies np.flip on load (axis=2); z_vec is NOT flipped
+% → flip z_vec here.  After permute([3,2,1]):
+%   dim 1 = BB x (lateral X), 0 at focal spot
+%   dim 2 = BB y (lateral Y), 0 at focal spot
+%   dim 3 = BB z (depth, flip-corrected), FocalLength at focal spot
+x_vec_raw = read_field('x_vec');   % BB x [mm]
+y_vec_raw = read_field('y_vec');   % BB y [mm]
+z_vec_raw = read_field('z_vec');   % BB z [mm], un-flipped
+x_mm = x_vec_raw;                 % PRESTUS dim 1: lateral X, 0 at focal spot [mm]
+y_mm = y_vec_raw;                 % PRESTUS dim 2: lateral Y, 0 at focal spot [mm]
+z_mm = z_vec_raw(end:-1:1);      % PRESTUS dim 3: depth (flip-corrected), FocalLength at focal [mm]
 
 temp_profile      = read_field('TempProfileTarget');   % [1 x Nt] °C at focal target
 time_profile      = read_field('TimeProfileTarget');   % [1 x Nt] s
@@ -82,22 +92,29 @@ MaxIspta = double(h5read(thermal_h5, '/MaxIspta'));
 Isppa    = double(h5read(thermal_h5, '/Isppa'));
 Ispta    = double(h5read(thermal_h5, '/Ispta'));
 
-fprintf('[read_babelbrain_thermal] Grid: [%d %d %d]  dx=%.3f mm\n', ...
+fprintf('[read_babelbrain_thermal] Grid (PRESTUS order): [%d %d %d]  dx_lat=%.3f dz_depth=%.3f mm\n', ...
     size(T_end_fus,1), size(T_end_fus,2), size(T_end_fus,3), ...
-    mean(diff(x_mm(:)')));
+    mean(diff(x_mm(:)')), abs(mean(diff(z_mm(:)'))));
 fprintf('[read_babelbrain_thermal] Peak T rise: %.2f °C  MaxIsppa: %.2f W/cm²\n', ...
     max(T_end_fus(:)) - min(T_end_fus(:)), MaxIsppa);
 
 %% Resample BabelBrain volumes → PRESTUS grid
-% BabelBrain coordinates (x_vec/y_vec/z_vec) are in RAS mm.
-% planimg.transf maps T1 voxels → PRESTUS acoustic grid voxels.
-% Build affine from BabelBrain RAS mm → PRESTUS grid voxels and resample.
+% After permute([3,2,1]) and coord reassignment (see above):
+%   x_mm (PRESTUS dim 1): lateral X, 0 at focal spot [mm]
+%   y_mm (PRESTUS dim 2): lateral Y, 0 at focal spot [mm]
+%   z_mm (PRESTUS dim 3): depth (flip-corrected), FocalLength at focal spot [mm]
+% Resampling is anchored at focus_pos (PRESTUS grid voxels) using focal_length_mm.
+if any(isnan(focus_pos)) || isnan(focal_length_mm)
+    error(['read_babelbrain_thermal: focus_pos and focal_length_mm are required for ' ...
+        'BabelBrain→PRESTUS resampling but were not provided.\n' ...
+        'Pass them as the 4th and 5th arguments.']);
+end
 
 prestus_dims = parameters.grid.dims;
 res_mm       = parameters.grid.resolution_mm;
 
 resample_vol = @(vol) resample_bb_to_prestus( ...
-    vol, x_mm(:)', y_mm(:)', z_mm(:)', planimg, prestus_dims, res_mm);
+    vol, x_mm(:)', y_mm(:)', z_mm(:)', planimg, prestus_dims, res_mm, focus_pos, focal_length_mm);
 
 T_end_fus_g = resample_vol(T_end_fus);
 T_final_g   = resample_vol(T_final);
@@ -125,11 +142,11 @@ clear chk_ act exp;
 %   maxT, focal_planeT, heating_endT, CEM43, focal_planeCEM43,
 %   CEM43_end, timeseries, CEM43_iso, focal_planeCEM43_iso, CEM43_iso_end
 
-T_rise_g     = T_end_fus_g - parameters.thermal.temp_0.brain;
-T_final_rise = T_final_g   - parameters.thermal.temp_0.brain;
-
-results_heating.maxT                 = T_rise_g;
-results_heating.heating_endT         = T_final_rise;
+% Store absolute temperature (matching thermal_simulation convention).
+% thermal_analysis subtracts temp_0 itself when computing riseT_* fields.
+results_heating.p_amp                = p_map_g;
+results_heating.maxT                 = T_end_fus_g;
+results_heating.heating_endT         = T_final_g;
 results_heating.focal_planeT         = [];    % BabelBrain has no focal-plane slice; filled as empty
 results_heating.CEM43                = cem_end_g;
 results_heating.CEM43_end            = cem_final_g;
@@ -164,40 +181,6 @@ end
 
 %% Local helpers
 
-function vol_out = resample_bb_to_prestus(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm)
-% Resample a BabelBrain 3D volume (in RAS mm coordinates) to the PRESTUS
-% acoustic grid via affine_resample_3d.
-%
-% BabelBrain grid origin in RAS mm: [x_mm(1), y_mm(1), z_mm(1)]
-% BabelBrain voxel spacing: mean(diff(x_mm)) mm (assumed isotropic)
-%
-% planimg.inv_transf maps PRESTUS-grid voxels → T1 voxels (row-vector convention).
-% We need BabelBrain voxels → PRESTUS grid voxels.
-
-    dx_bb = mean(diff(x_mm));   % mm per voxel in BabelBrain grid
-
-    % Build RAS-mm → BabelBrain-voxel affine (4x4, column-major for MATLAB)
-    % BabelBrain voxel index (1-based) = (ras_mm - origin) / dx + 1
-    % Written as affine: P_vox = M * P_ras
-    origin = [x_mm(1), y_mm(1), z_mm(1)];
-    M_ras_to_bb = diag([1/dx_bb, 1/dx_bb, 1/dx_bb, 1]);
-    M_ras_to_bb(1:3, 4) = (-origin ./ dx_bb + 1)';  % 1-based voxel offset
-
-    % planimg.transf: T1-voxels → acoustic-grid-voxels (row-vector convention)
-    % planimg.t1_header.Transform: MATLAB affine3d (T1 RAS mm → T1 voxels)
-    if ~isempty(planimg) && isfield(planimg, 't1_header') && ~isempty(planimg.t1_header)
-        % T1 RAS mm → T1 voxels via inverse of t1_header.Transform
-        T_ras_to_t1vox = inv(planimg.t1_header.Transform.T');  % 4x4
-        % T1 voxels → acoustic grid voxels
-        T_t1vox_to_acgrid = planimg.transf;  % 4x4
-        % Combined: BabelBrain RAS mm → acoustic grid voxels
-        M_bb_to_acgrid = T_t1vox_to_acgrid * T_ras_to_t1vox * inv(M_ras_to_bb);
-    else
-        % Non-layered / phantom: diagonal affine assuming same RAS origin
-        % and converting mm to voxel indices via resolution_mm
-        M_bb_to_acgrid = diag([dx_bb/res_mm, dx_bb/res_mm, dx_bb/res_mm, 1]);
-    end
-
-    vol_out = affine_resample_3d(single(vol_bb), M_bb_to_acgrid, prestus_dims, 'linear', 0);
-    vol_out = double(vol_out);
+function vol_out = resample_bb_to_prestus(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm)
+    vol_out = resample_babelbrain_vol(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm);
 end

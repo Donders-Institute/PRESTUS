@@ -72,9 +72,13 @@ SERIAL_MAP = struct( ...
     'IGT64_500',         'IGT64_500' ...
 );
 
-% Try serial lookup from equipment config
+% Try serial lookup: prefer the active transducer's own serial field so that
+% multi-transducer equipment configs pick the correct entry rather than
+% always falling back to the first fieldname.
 tran_serial = '';
-if ~isempty(equip_param) && isfield(equip_param, 'trans')
+if isfield(tr, 'serial') && ~isempty(tr.serial)
+    tran_serial = tr.serial;
+elseif ~isempty(equip_param) && isfield(equip_param, 'trans')
     fnames = fieldnames(equip_param.trans);
     if ~isempty(fnames)
         tran_serial = fnames{1};

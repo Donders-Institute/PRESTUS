@@ -175,11 +175,13 @@ cmd = sprintf([ ...
     '--sel_p "%s" '  ...
     '--computing_backend %d '  ...
     '--device_name "%s" '  ...
+    '--baseline_temp %.2f '  ...
     '--log_file "%s" '], ...
     python_bin, bb_runner, ...
     acoustic_h5, ...
     bb.isppa_w_per_cm2, duty_cycle, prf_hz, duration_s, duration_off_s, sel_p, ...
     bb.computing_backend, bb.device_name, ...
+    baseline_temp, ...
     log_file);
 
 if ~isempty(bb.root)
@@ -187,8 +189,8 @@ if ~isempty(bb.root)
 end
 
 if isfield(parameters, 'transducer') && ~isempty(parameters.transducer) && ...
-        isfield(parameters.transducer(1), 'source_freq_hz')
-    cmd = [cmd sprintf('--frequency %.0f ', parameters.transducer(1).source_freq_hz)];
+        isfield(parameters.transducer(1), 'freq_hz')
+    cmd = [cmd sprintf('--frequency %.0f ', parameters.transducer(1).freq_hz)];
 end
 
 fprintf('[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  duration_off=%.1f s\n', ...
@@ -206,15 +208,14 @@ end
 fprintf('[babelbrain_thermal_wrapper] BabelBrain thermal finished in %.1f s.\n', elapsed);
 
 %% Locate thermal output HDF5
-% BabelBrain names output: same prefix as DataForSim but with thermal suffix
-thermal_candidates = dir(fileparts(acoustic_h5));
+% BabelBrain names output: same prefix as DataForSim but with thermal suffix.
+% Use a glob to avoid scanning unrelated files and pick the newest match in
+% case a prior run left a stale file.
+thermal_candidates = dir(fullfile(fileparts(acoustic_h5), '*ThermalField*.h5'));
 thermal_h5 = '';
-for k = 1:numel(thermal_candidates)
-    if contains(thermal_candidates(k).name, 'ThermalField') && ...
-            endsWith(thermal_candidates(k).name, '.h5')
-        thermal_h5 = fullfile(thermal_candidates(k).folder, thermal_candidates(k).name);
-        break
-    end
+if ~isempty(thermal_candidates)
+    [~, newest_idx] = max([thermal_candidates.datenum]);
+    thermal_h5 = fullfile(thermal_candidates(newest_idx).folder, thermal_candidates(newest_idx).name);
 end
 
 if isempty(thermal_h5)
@@ -223,8 +224,30 @@ if isempty(thermal_h5)
 end
 fprintf('[babelbrain_thermal_wrapper] Reading thermal output: %s\n', thermal_h5);
 
+% BabelBrain writes thermal HDF5 with blosc compression; rewrite to gzip so
+% MATLAB's h5read can load it without a blosc filter plugin.
+rewriter = fullfile(this_dir, 'rewrite_hdf5_no_blosc.py');
+if isfile(rewriter)
+    cmd_rw = sprintf('"%s" "%s" "%s"', python_bin, rewriter, thermal_h5);
+    [st_rw, out_rw] = system(cmd_rw);
+    if st_rw ~= 0
+        warning('babelbrain_thermal_wrapper:bloscRewrite', ...
+            'Thermal HDF5 blosc-rewrite failed (exit %d):\n%s\n  h5read may fail.', ...
+            st_rw, out_rw);
+    end
+end
+
 %% Read thermal output and resample to PRESTUS grid
-results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg);
+% focus_pos and focal_length_mm are stored in sensor_data by babelbrain_wrapper
+% so that the thermal reader can anchor BB's internal coordinate system.
+if isfield(sensor_data, 'focus_pos') && isfield(sensor_data, 'focal_length_mm')
+    thermal_focus_pos       = sensor_data.focus_pos;
+    thermal_focal_length_mm = sensor_data.focal_length_mm;
+else
+    error(['babelbrain_thermal_wrapper: sensor_data is missing focus_pos or focal_length_mm.\n' ...
+        'These are set by babelbrain_wrapper — re-run babelbrain_wrapper to refresh sensor_data.']);
+end
+results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, thermal_focus_pos, thermal_focal_length_mm);
 
 end
 

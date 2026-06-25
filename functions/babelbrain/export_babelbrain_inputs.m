@@ -84,9 +84,27 @@ bb = apply_default(bb, 'computing_backend',   3);
 bb = apply_default(bb, 'device_name',         'Apple');
 bb = apply_default(bb, 'ppw',                 6);
 bb = apply_default(bb, 'do_refocusing',       false);
-bb = apply_default(bb, 'z_beyond_focus_mm',   40);
 bb = apply_default(bb, 'python_env',          '');
-bb = apply_default(bb, 'tx_mech_adjust_z_m',  0.003);
+
+% Domain size: derived from parameters.grid.acoustic_fov_length_mm, not from babelbrain.*
+fov_len_mm = [];
+if isfield(parameters, 'grid') && isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+        isnumeric(parameters.grid.acoustic_fov_length_mm)
+    fov_len_mm = parameters.grid.acoustic_fov_length_mm;
+end
+tight_narrow_beam = ~isempty(fov_len_mm);
+if tight_narrow_beam
+    focal_depth_mm = 0;
+    if isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_mm')
+        focal_depth_mm = parameters.transducer(1).focal_distance_mm;
+    elseif isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_ep')
+        focal_depth_mm = parameters.transducer(1).focal_distance_ep;
+    end
+    z_beyond_focus_mm = max(40, fov_len_mm - focal_depth_mm);
+else
+    z_beyond_focus_mm = 40;
+end
+bb = apply_default(bb, 'tx_mech_adjust_z_m',  0.0);
 
 if isempty(bb.tx_system)
     [bb.tx_system, ~] = babelbrain_transducer_map(parameters, equip_param, out_dir);
@@ -113,15 +131,36 @@ out_files.mask_nii = write_babelbrain_input( ...
 tr = parameters.transducer(1);
 weights_path = fullfile(out_dir, [target '_CalibWeights.h5']);
 
-if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad')
+if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_p_amp')
     phases_rad     = tr.annular.elem_phase_rad;
-    elem_amp       = tr.annular.elem_amp(1);
+    elem_p_amp       = tr.annular.elem_p_amp(1);
     geo_phases_rad = [];
     if isfield(tr.annular, 'geo_phase_rad')
         geo_phases_rad = tr.annular.geo_phase_rad;
+    elseif isfield(tr.annular, 'elem_id_mm') && isfield(tr.annular, 'elem_od_mm') && ...
+            isfield(tr.annular, 'curv_radius_mm') && isfield(tr.annular, 'dist_geom_ep_mm') && ...
+            isfield(tr, 'focal_distance_ep') && isfield(tr, 'freq_hz') && ...
+            isfield(parameters, 'medium_properties') && ...
+            isfield(parameters.medium_properties, 'water') && ...
+            isfield(parameters.medium_properties.water, 'sound_speed')
+        try
+            tran_geo.n_elem             = tr.annular.elem_n;
+            tran_geo.manufact           = '';
+            tran_geo.transducer.freq_hz = tr.freq_hz;
+            tran_geo.transducer.annular = tr.annular;
+            geo_deg = compute_phases( ...
+                parameters.medium_properties.water.sound_speed, ...
+                tran_geo, tr.focal_distance_ep);
+            geo_phases_rad = geo_deg * pi / 180;
+            fprintf('[export_babelbrain_inputs] Geometric phases auto-computed at %.1f mm.\n', ...
+                tr.focal_distance_ep);
+        catch ME
+            warning('export_babelbrain_inputs:geoPhases', ...
+                'Could not auto-compute geometric phases: %s', ME.message);
+        end
     end
     fprintf('[export_babelbrain_inputs] Writing calibration weights...\n');
-    export_babelbrain_weights(phases_rad, elem_amp, parameters, weights_path, geo_phases_rad);
+    export_babelbrain_weights(phases_rad, elem_p_amp, parameters, weights_path, geo_phases_rad);
     out_files.weights_h5 = weights_path;
 else
     fprintf('[export_babelbrain_inputs] No elem_phase_rad — skipping weights file.\n');
@@ -181,8 +220,8 @@ fprintf(fid, '    COMPUTING_BACKEND           = %d,\n', bb.computing_backend);
 fprintf(fid, '    deviceName                  = r''%s'',\n', bb.device_name);
 fprintf(fid, '    TxMechanicalAdjustmentZ     = %.6f,\n', bb.tx_mech_adjust_z_m);
 fprintf(fid, '    bUseRayleighForWater        = True,\n');
-fprintf(fid, '    bTightNarrowBeamDomain      = True,\n');
-fprintf(fid, '    zLengthBeyonFocalPointWhenNarrow = %.4f,  # m\n', bb.z_beyond_focus_mm/1e3);
+fprintf(fid, '    bTightNarrowBeamDomain      = %s,\n', mat2pyb(tight_narrow_beam));
+fprintf(fid, '    zLengthBeyonFocalPointWhenNarrow = %.4f,  # m\n', z_beyond_focus_mm/1e3);
 fprintf(fid, '    bDoRefocusing               = %s,\n', mat2pyb(bb.do_refocusing));
 fprintf(fid, '    bDisplay                    = False,\n');
 fprintf(fid, '%s', weights_arg);
@@ -232,7 +271,7 @@ fprintf(fid, 'res_mm:       %g\n', res_mm);
 fprintf(fid, 'computing_backend: %d\n', bb.computing_backend);
 fprintf(fid, 'device_name:  %s\n', bb.device_name);
 fprintf(fid, 'tx_mech_adjust_z_m: %.6f\n', bb.tx_mech_adjust_z_m);
-fprintf(fid, 'z_beyond_focus_mm: %.1f\n', bb.z_beyond_focus_mm);
+fprintf(fid, 'z_beyond_focus_mm: %.1f\n', z_beyond_focus_mm);
 fprintf(fid, 'do_refocusing: %s\n', mat2pyb(bb.do_refocusing));
 fprintf(fid, '\nfiles:\n');
 fprintf(fid, '  mask_nii:    %s\n', out_files.mask_nii);

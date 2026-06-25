@@ -47,8 +47,8 @@ def _copy_group(src_grp, dst_grp):
                 'compression': 'gzip',
                 'compression_opts': 4,
             }
-            if data.ndim == 0 or data.size == 0:
-                # Scalar / empty — no chunking/compression
+            if not isinstance(data, np.ndarray) or data.ndim == 0 or data.size == 0:
+                # Scalar, string, or empty — no chunking/compression
                 kwargs = {'data': data}
             dst_grp.create_dataset(name, **kwargs)
             # Copy attributes

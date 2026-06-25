@@ -120,6 +120,14 @@ fp = round(focus_pos);
 fp = max(1, min(fp, size(medium_masks)));  % clamp to grid
 label_map(fp(1), fp(2), fp(3)) = 5;
 
+% Flip label_map along MATLAB dim 3 (the axial/depth axis in PRESTUS) before
+% writing the NIfTI.  BabelBrain unconditionally applies np.flip(data, axis=2)
+% on load, which flips MATLAB dim 3 again → the two flips cancel and BabelBrain
+% sees the original PRESTUS orientation.  Without this pre-flip, BabelBrain
+% would place its acoustic source on the brain side rather than the skin side,
+% producing completely wrong focal profiles.
+label_map = flip(label_map, 3);
+
 fprintf('[write_babelbrain_input] Label counts:\n');
 for lbl = [0 1 2 3 4 5]
     n = sum(label_map(:) == lbl);
@@ -152,7 +160,7 @@ if ~isempty(planimg) && isfield(planimg, 't1_header') && ~isempty(planimg.t1_hea
     % in the same orientation but may have different voxel size — rebuild
     % the sform with the correct pixel dimensions and origin.
     t1hdr = planimg.t1_header;
-    orig_origin = t1hdr.Transform.T(1:3, 4)';  % [x y z] mm; translation is in last column of affine3d.T
+    orig_origin = t1hdr.Transform.T(4, 1:3);    % [x y z] mm; affine3d uses row-vector convention: translation is at T(4,1:3)
     T = diag([res_mm res_mm res_mm 1]);
     T(4, 1:3) = orig_origin;
     hdr.Transform = affine3d(T);
