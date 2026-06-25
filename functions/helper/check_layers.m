@@ -68,7 +68,18 @@ end
         if any(ismember(unique(segmentation), parameters.layers.(layers_requested{i_layer})))
             layers_available(i_layer) = 1;
         else
-            warn(['[Layer] ', layers_requested{i_layer}, ' requested but not available in segmentation. Removing it...']);
+            layer_name = layers_requested{i_layer};
+            % Distinguish "skull split into cortical+trabecular" from truly missing skull
+            if strcmp(layer_name, 'skull') && ...
+                    any(ismember(unique(segmentation), getidx(parameters.layers, {'skull_cortical'}))) || ...
+                    any(ismember(unique(segmentation), getidx(parameters.layers, {'skull_trabecular'})))
+                warn(['[Layer] skull (single compartment) not found in segmentation — ', ...
+                    'skull is represented as separate cortical and trabecular compartments. ', ...
+                    'This is normal for multi-layer skull modelling; skull_cortical and ', ...
+                    'skull_trabecular will be used instead.']);
+            else
+                warn(['[Layer] ', layer_name, ' requested but not available in segmentation. Removing it...']);
+            end
         end
     end
     

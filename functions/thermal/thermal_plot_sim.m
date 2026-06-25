@@ -56,7 +56,16 @@ end
     end
 
     %% Plot data for the focal axis
-    
+    % Skip focal-axis plots when focal_planeT is empty (e.g. BabelBrain thermal
+    % backend does not produce a time-resolved focal-plane volume).
+    if isempty(focal_planeT)
+        % Jump directly to per-tissue timeseries and video sections below.
+        goto_timeseries = true;
+    else
+        goto_timeseries = false;
+    end
+
+    if ~goto_timeseries
     %% Extract temperature profiles along the focal axis (note: not max.!)
     % Change definition to the location of the max. temperature increase in
     % the sagittal transducer plane
@@ -274,6 +283,8 @@ end
         close(g);
     end
 
+    end % if ~goto_timeseries
+
     %% Plot timeseries for maximum in medium
 
     output_plot      = fullfile(td, sprintf('sub-%03d_%s_thermal_max%s.png',     sid, med, aff));
@@ -359,9 +370,11 @@ end
 
     % [layer-max] thermal index over time
 
+    has_cem43_ts = isfield(timeseries, 'CEM43') && ~isempty(fieldnames(timeseries.CEM43));
     h = figure; hold on;
     layer_handles_CEM = gobjects(0);
     for i_layer = 1:numel(available_layers)
+        if ~has_cem43_ts || ~isfield(timeseries.CEM43, available_layers{i_layer}), continue; end
         layer_handles_CEM(end+1) = plot(HEAT.recordedtime, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
@@ -429,7 +442,7 @@ end
     if ~isfield(parameters.io, 'save_heatingvideo')
         parameters.io.save_heatingvideo = 1; % default: create & save video
     end
-    if parameters.io.save_heatingvideo == 1
+    if parameters.io.save_heatingvideo == 1 && ~isempty(focal_planeT)
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
         if ndims(medium_masks) == 3
             brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.trans_pos(2),:)));
