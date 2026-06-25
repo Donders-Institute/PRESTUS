@@ -1,0 +1,9 @@
+name: tus_entry
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - r-base>=4.2
+  - r-oro.nifti
+  - r-cowplot
+  - pip
