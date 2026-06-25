@@ -26,9 +26,18 @@ end
     disp('Checking inputs...');
 
     % Define paths to T1 and T2 images
-    filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    % Patterns may contain sprintf format specifiers (e.g. %03d) or shell-style
+    % globs (e.g. *T1w.nii.gz). Expand via dir() after sprintf so both work.
+    t1_glob = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    d_t1 = dir(t1_glob);
+    assert(~isempty(d_t1), 'No T1 file matched pattern: %s', t1_glob);
+    filename_t1 = fullfile(d_t1(1).folder, d_t1(1).name);
+
     if isfield(parameters.path, 't2_pattern') && ~isempty(parameters.path.t2_pattern)
-        filename_t2 = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
+        t2_glob = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
+        d_t2 = dir(t2_glob);
+        assert(~isempty(d_t2), 'No T2 file matched pattern: %s', t2_glob);
+        filename_t2 = fullfile(d_t2(1).folder, d_t2(1).name);
     else
         filename_t2 = '';
     end

@@ -61,18 +61,33 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
 
     r_int = ceil(wrapRadius);
     [kx,ky,kz] = ndgrid(-r_int:r_int, -r_int:r_int, -r_int:r_int);
-    se = (kx.^2 + ky.^2 + kz.^2) <= wrapRadius^2;
+    se_nhood = (kx.^2 + ky.^2 + kz.^2) <= wrapRadius^2;
 
     % "Shrink-wrap" / morphological hull:
     % Bridge concavities that are smaller than wrapRadius (-> rubber won't go in).
-    BWwrap = convn(logical(BW1), se, 'same') > 0;           % dilate
-    BWwrap = convn(BWwrap, se, 'same') == nnz(se);           % erode  → imclose
+    % bwdist-based imclose is O(N) and identical to the convn dilation+erosion;
+    % falls back to convn when the Image Processing Toolbox is unavailable.
+    if license('test', 'image_toolbox')
+        dilated = bwdist(BW1) <= wrapRadius;
+        BWwrap  = ~(bwdist(~dilated) <= wrapRadius);
+    else
+        BWwrap = convn(logical(BW1), se_nhood, 'same') > 0;        % dilate
+        BWwrap = convn(BWwrap, se_nhood, 'same') == nnz(se_nhood);  % erode
+    end
 
     % Ensure that the wrap is a continuous, filled region
-    BWwrap = imfill_holes_3d(BWwrap);
+    if license('test', 'image_toolbox')
+        BWwrap = imfill(BWwrap, 'holes');
+    else
+        BWwrap = imfill_holes_3d(BWwrap);
+    end
 
     % Optional: remove any stray bits and keep largest component again
-    CCw = bwconncomp_3d(BWwrap, 26);
+    if license('test', 'image_toolbox')
+        CCw = bwconncomp(BWwrap, 26);
+    else
+        CCw = bwconncomp_3d(BWwrap, 26);
+    end
     sizesw = cellfun(@numel, CCw.PixelIdxList);
     [~, iw] = max(sizesw);
     BWwrap2 = false(sz);
