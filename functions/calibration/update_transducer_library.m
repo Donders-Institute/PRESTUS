@@ -50,8 +50,11 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         fpath = fullfile(calibration_output_folder, fname);
         d     = yaml.loadFile(fpath, 'ConvertToArray', true);
 
-        % Parse depth and intensity from filename
-        tok = regexp(fname, '-F([0-9.]+)mm-I([0-9.]+)wpercm2\.yaml$', 'tokens', 'once');
+        % Parse depth and intensity from filename ('p' used as decimal sep for non-integer depths)
+        tok = regexp(fname, '-F([0-9p.]+)mm-I([0-9p.]+)wpercm2\.yaml$', 'tokens', 'once');
+        if ~isempty(tok)
+            tok = cellfun(@(s) strrep(s, 'p', '.'), tok, 'UniformOutput', false);
+        end
         if isempty(tok)
             warning('update_transducer_library: cannot parse depth/intensity from ''%s'', skipping.', fname);
             continue;
@@ -61,7 +64,7 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
 
         tran = d.transducer;
         phases_all{fi} = tran.annular.elem_phase_deg(:)';
-        amps_all(fi)   = double(tran.annular.elem_amp(1));
+        amps_all(fi)   = double(tran.annular.elem_p_amp(1));
 
         % Try to extract tran_serial from meta if present
         if isempty(tran_serial_found) && isfield(d, 'meta') && isfield(d.meta, 'tran_serial')
@@ -142,8 +145,8 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
             diffs = diff(elem_phases);
             if ~all(diffs >= 0) && ~all(diffs <= 0)
                 warning('update_transducer_library:nonMonotonic', ...
-                    'Element %d phases are non-monotonic across depths [%s] deg. ' ...
-                    'Check calibration quality.', ...
+                    ['Element %d phases are non-monotonic across depths [%s] deg. ' ...
+                    'Check calibration quality.'], ...
                     elem_i, num2str(elem_phases, '%.1f '));
             end
         end
@@ -168,6 +171,11 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         lib.meta.created_at = today_str;
     end
     lib.meta.tran_serial   = tran_serial_found;
+    tran_serial_str = char(tran_serial_found);
+    if numel(tran_serial_str) < numel(combo_name) && ...
+            strncmp(combo_name, [tran_serial_str '_'], numel(tran_serial_str)+1)
+        lib.meta.driving_system = combo_name(numel(tran_serial_str)+2:end);
+    end
     lib.meta.last_updated  = today_str;
     try
         [~, ver_str]            = prestus_version();
@@ -221,7 +229,6 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         lib.global_model.depths_ep_mm   = unique_depths;
         lib.global_model.elem_phase_deg = depth_phase_map;
         lib.global_model.amplitude_scaling = amp_struct;
-        lib.global_model.source = 'update_transducer_library';
     end
 
     %% Write updated YAML

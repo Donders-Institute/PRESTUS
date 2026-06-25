@@ -2,8 +2,6 @@ function calibration_setup(parameters, equip_param)
 
 % Set up calibration for multiple setup and depth requests.
 
-% TO DO: Make independent from Donders equipment info.
-
 % Create output folder (if not yet available)
 if ~exist(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
@@ -48,10 +46,10 @@ for i = 1:N_i
     % Configure transducer parameters
     parameters.transducer = tran.transducer;
     parameters.transducer.annular.elem_phase_deg = zeros(1, tran.transducer.annular.elem_n); % initial phases
-    parameters.transducer.annular.elem_amp = repmat(200000, 1, tran.transducer.annular.elem_n); % initial amplitude
+    parameters.transducer.annular.elem_p_amp = repmat(200000, 1, tran.transducer.annular.elem_n); % initial amplitude
 
     % Construct output directory for final profiles
-    if ~isfield(parameters.calibration, 'path_output_profiles') || isempty(parameters.calibration)
+    if ~isfield(parameters.calibration, 'path_output_profiles')
         parameters.calibration.path_output_profiles = ...
             fullfile(parameters.calibration.path_output, equip_param.gen.prestus_virt_folder);
     end
@@ -63,20 +61,6 @@ for i = 1:N_i
     % CSV file name of calibrated profile (prefix + equipment)
     parameters.calibration.filename_calibrated_CSV = ...
         strcat(equip_param.gen.prestus_virt_name, equipment_name, '.csv');
-
-    % Load manufacturer-provided phase data.
-    % Sonic Concepts and Imasonic require an external phase-table file.
-    % For any other manufacturer ('generic' or custom), phases are computed
-    % geometrically from the ring dimensions in the YAML — no file needed.
-    if isequal(tran.manufact, 'Sonic Concepts')
-        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
-        phase_table = readtable(combo.phase_table);
-    elseif isequal(tran.manufact, 'Imasonic')
-        combo.phase_table = fullfile(parameters.calibration.path_input_phase, combo.phase_table);
-        phase_table = read_ini_file(combo.phase_table);
-    else
-        phase_table = [];   % geometry-only mode; set_real_phases calls generate_tran_ini_from_geometry
-    end
 
     % Load pre-calibrated per-element correction from the transducer equipment YAML.
     % Written there by save_elem_correction after a reference-depth calibration.
@@ -92,7 +76,9 @@ for i = 1:N_i
     end
 
     % Load characterization data
-    combo.char_data_path = fullfile(parameters.calibration.path_input_axial, combo.char_data_path);
+    if ~isempty(parameters.calibration.path_input_axial)
+        combo.char_data_path = fullfile(parameters.calibration.path_input_axial, combo.char_data_path);
+    end
     charac_data = readmatrix(combo.char_data_path);
     available_foci_wrt_exit_plane = round(charac_data(2, 2:end), 2);
     dist_from_exit_plane = charac_data(3:end, 1);
@@ -111,7 +97,138 @@ for i = 1:N_i
 
     fprintf('Equipment: transducer %s and driving system %s \n', [tran.name, ds.name])
 
-    % Iterate across focal depths
+    % Determine phase calibration mode.
+    % 'single_depth' (default): per-depth global search + optional k-Wave validation via
+    %   calibration_transducer.
+    % 'multi_depth': joint analytical fit across all measured depths,
+    %   followed by analytical amplitude calibration — no k-Wave needed.
+    if isfield(parameters.calibration, 'phase_mode')
+        phase_mode = parameters.calibration.phase_mode;
+    else
+        phase_mode = 'single_depth';
+    end
+
+    % =========================================================================
+    % MULTI-DEPTH PATH
+    %
+    % Runs perform_joint_depth_fit once across all characterization depths,
+    % saves the resulting per-element phase correction to the equipment YAML,
+    % then calibrates amplitude analytically for each requested depth and
+    % intensity. No k-Wave simulations are run (simulated_analytical_scaling=1).
+    % Users who require simulation-validated amplitude should follow up with
+    % single-depth calibration for specific depths of interest.
+    % =========================================================================
+    if strcmp(phase_mode, 'multi_depth')
+
+        dist_bowl_offset = tran.transducer.annular.curv_radius_mm - ...
+                           tran.transducer.annular.dist_geom_ep_mm;
+        dist_bowl_all    = dist_from_exit_plane + dist_bowl_offset;
+
+        desired_intensities_i = cell2mat(parameters.calibration.desired_intensities{i});
+        ref_intensity = desired_intensities_i(1);
+
+        fprintf('=== multi_depth: joint fit across %d characterization depths ===\n', ...
+            numel(available_foci_wrt_exit_plane));
+
+        [opt_delta_rad, opt_velocity_ref, ~] = perform_joint_depth_fit(...
+            parameters, intens_data, available_foci_wrt_exit_plane, ...
+            dist_bowl_all, dist_bowl_offset, ref_intensity, tran);
+
+        % Persist correction to the library YAML (not the equipment YAML, which
+        % is a read-only hardware spec). Stored as global_model.elem_phase_correction_deg
+        % so load_transducer_from_library can apply it on top of geometric phases
+        % at any requested depth without the correction being baked into the
+        % stored phase table.
+        lib_path = fullfile(get_prestus_path(), 'config', 'calibration');
+        if isfield(parameters.calibration, 'library_path') && ...
+                ~isempty(parameters.calibration.library_path)
+            lib_path = parameters.calibration.library_path;
+        end
+        lib_yaml = fullfile(lib_path, [combo_name, '.yaml']);
+        if isfile(lib_yaml)
+            lib_data = yaml.loadFile(lib_yaml, 'ConvertToArray', true);
+        else
+            lib_data = struct('meta', struct('tran_serial', tran_serial, ...
+                'created_at', datestr(now, 'yyyy-mm-dd'), ...  %#ok<TNOW1,DATST>
+                'calibration_type', 'multi_depth'));
+        end
+        if ~isfield(lib_data, 'global_model')
+            lib_data.global_model = struct();
+        end
+        lib_data.global_model.elem_phase_correction_deg = opt_delta_rad * 180/pi;
+        lib_data.meta.calibration_type = 'multi_depth';
+        yaml.dumpFile(lib_yaml, lib_data);
+        fprintf('Phase correction (%d elements) written to library: %s\n', ...
+            numel(opt_delta_rad), lib_yaml);
+
+        % Analytical amplitude calibration for each requested depth × intensity
+        parameters.calibration.equipment_name = equipment_name;
+        N_j_md = length(parameters.calibration.focal_depths_wrt_exit_plane{i});
+        for j = 1:N_j_md
+            focal_distance_ep = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
+
+            if focal_distance_ep < tran.min_foc || focal_distance_ep > tran.max_foc
+                warning('multi_depth: focus %.2f mm outside range [%.2f, %.2f] mm. Skipping.', ...
+                    focal_distance_ep, tran.min_foc, tran.max_foc);
+                continue;
+            end
+
+            % Phases at this depth: geometric + fitted delta
+            params_j = parameters;
+            params_j.transducer.type = 'annular';
+            params_j.transducer.focal_distance_ep   = focal_distance_ep;
+            params_j.transducer.focal_distance_bowl = focal_distance_ep + dist_bowl_offset;
+            params_j.calibration.desired_focal_distance_ep = focal_distance_ep;
+            params_j = load_parameters(params_j);
+
+            geo_phases_j_deg  = set_real_phases(tran, focal_distance_ep, params_j);
+            opt_phases_j_deg  = mod(geo_phases_j_deg + opt_delta_rad * 180/pi, 360);
+            opt_phases_j_rad  = opt_phases_j_deg * pi / 180;
+
+            params_j.transducer.annular.elem_phase_deg = opt_phases_j_deg;
+            params_j.transducer.annular.elem_phase_rad = opt_phases_j_rad;
+
+            % Analytical bootstrap profile at this depth (provides velocity baseline)
+            profile_bootstrap_j = extract_analytical_profile(params_j);
+
+            for k = 1:numel(desired_intensities_i)
+                desired_intensity_k = desired_intensities_i(k);
+                params_j.calibration.desired_intensity = desired_intensity_k;
+
+                % Fit velocity to target intensity (I ∝ v²)
+                [profile_focus_ep, ~] = extract_real_intensity_profile(...
+                    params_j, available_foci_wrt_exit_plane, focal_distance_ep, ...
+                    intens_data, equipment_name, dist_from_exit_plane);
+                profile_focus_ep(profile_focus_ep < 0) = 0;
+                profile_empirical_jk.axial_intensity    = profile_focus_ep(:);
+                profile_empirical_jk.axial_distance_bowl = dist_bowl_all;
+
+                [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
+                    params_j, profile_bootstrap_j, opt_phases_j_rad, ...
+                    opt_velocity_ref, desired_intensity_k);
+
+                % Source amplitude: velocity scaling from bootstrap (no k-Wave correction)
+                velocity_scaling = opt_velocity_k / profile_bootstrap_j.velocity;
+                opt_amp_k = round(velocity_scaling * params_j.transducer.annular.elem_p_amp(1));
+
+                fprintf('multi_depth: depth=%.1f mm  I=%.0f W/cm²  amp=%d\n', ...
+                    focal_distance_ep, desired_intensity_k, opt_amp_k);
+
+                save_params = params_j;
+                save_params.transducer.annular.elem_phase_deg = opt_phases_j_deg;
+                save_params.transducer.annular.elem_phase_rad = opt_phases_j_rad;
+                save_params.transducer.annular.elem_p_amp = repmat(opt_amp_k, 1, ...
+                    tran.transducer.annular.elem_n);
+                save_params.calibration.desired_focal_distance_ep = focal_distance_ep;
+                save_params.calibration.desired_intensity         = desired_intensity_k;
+                save_optimized_values(save_params);
+            end
+        end
+
+        continue;  % skip single-depth loop for this combo
+    end
+
+    % Iterate across focal depths (single_depth path)
     N_j = length(parameters.calibration.focal_depths_wrt_exit_plane{i});
     for j = 1:N_j
 
@@ -132,7 +249,7 @@ for i = 1:N_i
         end
 
         % [SIM] Set the manufacturer-specified phases of the transducer for the focal distance
-        elem_phase_deg = set_real_phases(phase_table, tran, focal_distance_ep, parameters);
+        elem_phase_deg = set_real_phases(tran, focal_distance_ep, parameters);
         parameters.transducer.annular.elem_phase_deg = elem_phase_deg; clear elem_phase_deg;
 
         % Interpolate or select axial profile

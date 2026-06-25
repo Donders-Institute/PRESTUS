@@ -95,22 +95,25 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % =========================================================================
     % STAGE 3 — Phase determination
     %
-    % Find the per-element phases that steer the focus to the desired depth.
-    % Two modes are available, selected by calibration.elem_phase_correction_deg:
+    % Three modes, selected in order of precedence:
     %
-    %   Geometric correction (field is non-empty):
-    %     Applies pre-measured per-element hardware correction offsets on top of
-    %     the depth-dependent geometric steering phases already in the config.
-    %     No search is run; the offsets encode systematic hardware delays
-    %     (e.g. cable length mismatches) measured at a reference depth.
+    %   Geometric + correction (elem_phase_correction_deg is non-empty):
+    %     Applies a pre-fitted per-element delta on top of depth-dependent
+    %     geometric steering phases. The correction is typically produced by
+    %     the multi_depth path in calibration_setup (perform_joint_depth_fit)
+    %     or imported from BabelBrain (import_babelbrain_weights). No search
+    %     is run.
     %
-    %   Global search (default, field absent or empty):
-    %     perform_global_search jointly optimises phases and velocity to
-    %     minimise the difference between the analytical forward model and the
-    %     scaled empirical profile.  Only the analytical velocity and target
-    %     profile are needed — no simulation data.
-    %     Set calibration.save_elem_correction = true to persist the resulting
-    %     per-element offsets for reuse at other focal depths.
+    %   Geometric only (default, correction absent):
+    %     Uses the geometric steering phases computed by set_real_phases from
+    %     the ring geometry in the equipment YAML. No search is run. This is
+    %     the starting point before any empirical refinement.
+    %
+    %   Single-depth search (phase_mode = 'single_depth', explicit opt-in):
+    %     perform_global_search jointly optimises phases and velocity at this
+    %     depth to match the empirical profile. Set
+    %     calibration.save_elem_correction = true to persist the per-element
+    %     correction for reuse at other depths.
     % =========================================================================
 
     % Configure output folder before any simulation or file I/O
@@ -126,8 +129,13 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     use_geo_correction = isfield(parameters.calibration, 'elem_phase_correction_deg') && ...
         ~isempty(parameters.calibration.elem_phase_correction_deg);
 
+    use_geometric_only = isfield(parameters.calibration, 'phase_mode') && ...
+        strcmp(parameters.calibration.phase_mode, 'geometric');
+
     if use_geo_correction
-        % --- Geometric steering + pre-calibrated hardware correction ----------
+        % --- Geometric steering + pre-fitted correction -----------------------
+        % Correction set by multi_depth calibration or imported from BabelBrain.
+        % Applied on top of depth-adaptive geometric phases; no search needed.
         correction_deg = parameters.calibration.elem_phase_correction_deg(:)';
 
         if numel(correction_deg) ~= parameters.transducer.annular.elem_n
@@ -144,11 +152,22 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         opt_velocity_ref     = profile_sim.velocity;
         min_err              = NaN;
 
-        fprintf('Geometric correction mode: geo + correction phases [deg]: %s\n', ...
+        fprintf('Stage 3: geometric + correction  phases [deg]: %s\n', ...
             mat2str(round(combined_deg)));
 
+    elseif use_geometric_only
+        % --- Geometric phases only (explicit opt-in) -------------------------
+        opt_source_phase_rad = bootstrap_params.transducer.annular.elem_phase_rad;
+        opt_source_phase_deg = bootstrap_params.transducer.annular.elem_phase_deg;
+        opt_velocity_ref     = profile_sim.velocity;
+        min_err              = NaN;
+
+        fprintf('Stage 3: geometric phases only  [deg]: %s\n', ...
+            mat2str(round(opt_source_phase_deg)));
+
     else
-        % --- Global search ----------------------------------------------------
+        % --- Single-depth global search (default) ----------------------------
+        fprintf('Stage 3: single-depth global search at %.1f mm\n', desired_focal_distance_ep);
         [opt_source_phase_rad, opt_velocity_ref, min_err, ~] = perform_global_search(...
             bootstrap_params, profile_target_ref, profile_sim.velocity);
 
@@ -320,11 +339,11 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         % the simulation correction factor (sqrt because amplitude ∝ v ∝ sqrt(I))
         velocity_scaling = opt_velocity_k / profile_sim.velocity;
         opt_source_amp_k = round(velocity_scaling * ...
-            (resolved_params.transducer.annular.elem_amp / ...
+            (resolved_params.transducer.annular.elem_p_amp / ...
             sqrt(simulated_analytical_scaling)));
         opt_source_amp(k) = opt_source_amp_k(1);
 
-        fprintf('The optimized elem_amp = %i (intensity %g W/cm²)\n', ...
+        fprintf('The optimized elem_p_amp = %i (intensity %g W/cm²)\n', ...
             opt_source_amp_k(1), desired_intensity_k);
 
         % Build per-intensity parameter struct for plotting and saving
@@ -347,7 +366,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
         end
 
         opt_param = sim_param;
-        opt_param.transducer.annular.elem_amp       = opt_source_amp_k;
+        opt_param.transducer.annular.elem_p_amp       = opt_source_amp_k;
         opt_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
         opt_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
         opt_param.io.output_affix                   = intensity_affix;

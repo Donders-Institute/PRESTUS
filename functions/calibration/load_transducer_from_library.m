@@ -30,7 +30,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % Output:
 %   parameters - struct with:
 %     .transducer              — geometry + calibrated phases and amplitude
-%     .transducer.tx_calibration.isppa_wcm2        — ISPPA the elem_amp produces [W/cm²]
+%     .transducer.tx_calibration.isppa_wcm2        — ISPPA the elem_p_amp produces [W/cm²]
 %     .transducer.tx_calibration.focal_depth_ep_mm — calibrated depth used [mm]
 %     .transducer.tx_calibration.phase_source      — 'library'
 %     .transducer.tx_calibration.isppa_source      — 'library'
@@ -110,17 +110,30 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
                     used_depth_gm, focal_distance_ep);
             end
 
-            % Apply per-element hardware correction if present
+            % Apply per-element phase correction.
+            % Library YAML takes precedence (written by multi_depth calibration).
+            % Falls back to equipment YAML for backward compatibility with older
+            % calibrations written by save_elem_correction.
             n_elem = tran.transducer.annular.elem_n;
-            if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
-                correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
+            if isfield(gm, 'elem_phase_correction_deg') && ~isempty(gm.elem_phase_correction_deg)
+                correction_rad = gm.elem_phase_correction_deg(:)' * pi/180;
                 if numel(correction_rad) ~= n_elem
-                    warning(['load_transducer_from_library: elem_phase_correction has %d elements ' ...
-                        'but transducer has %d — correction skipped.'], numel(correction_rad), n_elem);
+                    warning(['load_transducer_from_library: library elem_phase_correction_deg has ' ...
+                        '%d elements but transducer has %d — correction skipped.'], ...
+                        numel(correction_rad), n_elem);
                 else
                     elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
-                    fprintf('Applied per-element hardware correction (ref depth %.2f mm).\n', ...
-                        tran.elem_phase_correction.ref_depth_ep_mm);
+                    fprintf('Applied phase correction from library (multi_depth).\n');
+                end
+            elseif isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
+                correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
+                if numel(correction_rad) ~= n_elem
+                    warning(['load_transducer_from_library: equipment elem_phase_correction has ' ...
+                        '%d elements but transducer has %d — correction skipped.'], ...
+                        numel(correction_rad), n_elem);
+                else
+                    elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
+                    fprintf('Applied phase correction from equipment YAML (legacy).\n');
                 end
             end
 
@@ -138,14 +151,14 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 
                 if int_dist / desired_intensity > 0.05
                     base_amp = amp_map.(int_keys{amp_idx});
-                    elem_amp = round(base_amp * sqrt(desired_intensity / int_used));
+                    elem_p_amp = round(base_amp * sqrt(desired_intensity / int_used));
                     warning(['load_transducer_from_library: scaling amplitude from %.1f to %.1f W/cm² ' ...
                         '(%.0f -> %d). Run calibration at this intensity for an exact value.'], ...
-                        int_used, desired_intensity, base_amp, elem_amp);
+                        int_used, desired_intensity, base_amp, elem_p_amp);
                 else
-                    elem_amp = amp_map.(int_keys{amp_idx});
+                    elem_p_amp = amp_map.(int_keys{amp_idx});
                 end
-                parameters.transducer.annular.elem_amp = repmat(elem_amp, 1, n_elem);
+                parameters.transducer.annular.elem_p_amp = repmat(elem_p_amp, 1, n_elem);
             end
 
             %% Focal distance bookkeeping
@@ -160,14 +173,16 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
             parameters.transducer.tx_calibration.library_key        = combo_name;
             parameters.transducer.tx_calibration.library_meta       = lib.meta;
 
-            fprintf('Library loaded (global model): %s | focal %.1f mm (interp from %.1f mm) | amp %d @ %.1f W/cm²\n', ...
-                combo_name, focal_distance_ep, used_depth_gm, elem_amp(1), desired_intensity);
+            cal_type = '';
+            if isfield(lib.meta, 'calibration_type'), cal_type = lib.meta.calibration_type; end
+            fprintf('Library loaded (global model, %s): %s | focal %.1f mm (interp from %.1f mm) | amp %d @ %.1f W/cm²\n', ...
+                cal_type, combo_name, focal_distance_ep, used_depth_gm, elem_p_amp(1), desired_intensity);
             return;
         end
         % fall through to per-depth if use_refinement == true
     end
 
-    %% Find closest calibrated focal depth
+    %% Find closest calibrated focal depth (refinement override or legacy per-depth)
     cal = lib.calibration.focal_depths;
     if isempty(fieldnames(cal))
         error(['load_transducer_from_library: no calibrated focal depths in library ' ...
@@ -205,18 +220,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
                 entry.precession_mode);
     end
 
-    % Apply per-element hardware correction if present in the transducer YAML
-    if isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
-        correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
-        if numel(correction_rad) ~= n_elem
-            warning(['load_transducer_from_library: elem_phase_correction has %d elements ' ...
-                'but transducer has %d — correction skipped.'], numel(correction_rad), n_elem);
-        else
-            elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
-            fprintf('Applied per-element hardware correction (ref depth %.2f mm).\n', ...
-                tran.elem_phase_correction.ref_depth_ep_mm);
-        end
-    end
+    % Per-depth refinement entries store phases from a single-depth global search
+    % which already incorporates any correction — do not apply again.
 
     parameters.transducer.annular.elem_phase_rad = elem_phase_rad;
     parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
@@ -232,15 +237,15 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     if int_dist / desired_intensity > 0.05
         % Scale analytically: amp ∝ sqrt(I) since I ∝ v² ∝ amp²
         base_amp = amp_map.(int_keys{amp_idx});
-        elem_amp = round(base_amp * sqrt(desired_intensity / int_used));
+        elem_p_amp = round(base_amp * sqrt(desired_intensity / int_used));
         warning(['load_transducer_from_library: scaling amplitude from %.1f to %.1f W/cm² ' ...
             '(%.0f -> %d). Run calibration at this intensity for an exact value.'], ...
-            int_used, desired_intensity, base_amp, elem_amp);
+            int_used, desired_intensity, base_amp, elem_p_amp);
     else
-        elem_amp = amp_map.(int_keys{amp_idx});
+        elem_p_amp = amp_map.(int_keys{amp_idx});
     end
 
-    parameters.transducer.annular.elem_amp = repmat(elem_amp, 1, n_elem);
+    parameters.transducer.annular.elem_p_amp = repmat(elem_p_amp, 1, n_elem);
 
     %% Focal distance bookkeeping
     parameters.transducer.focal_distance_ep   = focal_distance_ep;
@@ -254,6 +259,10 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.tx_calibration.library_key        = combo_name;
     parameters.transducer.tx_calibration.library_meta       = lib.meta;
 
-    fprintf('Library loaded: %s | focal %.1f mm (calibrated %.1f mm) | amp %d @ %.1f W/cm²\n', ...
-        combo_name, focal_distance_ep, focal_used, elem_amp(1), desired_intensity);
+    tier = 'per-depth';
+    if use_refinement, tier = 'refinement override'; end
+    cal_type = '';
+    if isfield(lib.meta, 'calibration_type'), cal_type = lib.meta.calibration_type; end
+    fprintf('Library loaded (%s, %s): %s | focal %.1f mm (calibrated %.1f mm) | amp %d @ %.1f W/cm²\n', ...
+        tier, cal_type, combo_name, focal_distance_ep, focal_used, elem_p_amp(1), desired_intensity);
 end

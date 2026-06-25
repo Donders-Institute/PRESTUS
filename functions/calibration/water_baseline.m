@@ -22,7 +22,7 @@ function freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor
 %   sensor     - k-Wave sensor struct from source_sensor_setup
 %
 % Output:
-%   freefield_isppa_wcm2 - peak free-water ISPPA [W/cm²] at current elem_amp
+%   freefield_isppa_wcm2 - peak free-water ISPPA [W/cm²] at current elem_p_amp
 %
 % See also: PRESTUS_PIPELINE, MULTI_ISPPA_PIPELINE, ACOUSTIC_WRAPPER
 

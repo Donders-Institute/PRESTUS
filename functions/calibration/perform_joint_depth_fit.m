@@ -1,6 +1,6 @@
 function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
     parameters, charac_data, available_depths_ep, dist_bowl, dist_bowl_offset, ...
-    desired_intensity, phase_table, tran, options)
+    desired_intensity, tran, options)
 % PERFORM_JOINT_DEPTH_FIT  Multi-depth joint optimisation of hardware phase correction
 %
 % Optimises a single per-element delta phase (hardware correction) and
@@ -15,14 +15,14 @@ function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 % where geo_phases(j) are the geometric phases for focal depth j computed
 % by SET_REAL_PHASES, and delta_phases is the depth-independent hardware
 % correction being optimised. This is the same parameterisation used by
-% CALIBRATE_TRANSDUCER Mode='single_ref' for cross-depth extrapolation,
+% FIT_SOURCE_PARAMETERS Mode='single_ref' for cross-depth extrapolation,
 % but here all depths constrain the fit jointly instead of extrapolating
 % from one reference depth.
 %
 % Use as:
 %   [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %       parameters, charac_data, available_depths_ep, dist_bowl, dist_bowl_offset, ...
-%       desired_intensity, phase_table, tran)
+%       desired_intensity, tran)
 %   [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %       ..., options)
 %
@@ -34,7 +34,6 @@ function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %   dist_bowl           - [N_pts x 1] axial positions from bowl [mm]
 %   dist_bowl_offset    - curv_radius_mm - dist_geom_ep_mm [mm]
 %   desired_intensity   - target peak Isppa [W/cm²] used for per-depth scaling
-%   phase_table         - phase table struct for SET_REAL_PHASES, or [] for geometry-only mode
 %   tran                - transducer struct from load_equipment_config
 %   options             - struct with optional fields:
 %     .ForwardModel     - 'rayleigh' (default) | 'oneil'
@@ -46,7 +45,7 @@ function [opt_delta_phases, opt_velocity, min_err] = perform_joint_depth_fit(...
 %   opt_velocity     - calibrated scalar particle velocity [m/s]
 %   min_err          - final normalised objective value
 %
-% See also: CALIBRATE_TRANSDUCER, PERFORM_GLOBAL_SEARCH, SET_REAL_PHASES,
+% See also: FIT_SOURCE_PARAMETERS, PERFORM_GLOBAL_SEARCH, SET_REAL_PHASES,
 %           RAYLEIGH_AXIAL_INTENSITY
 
 arguments
@@ -56,7 +55,6 @@ arguments
     dist_bowl           (:,1) {mustBeNumeric}
     dist_bowl_offset    (1,1) {mustBeNumeric}
     desired_intensity   (1,1) {mustBeNumeric}
-    phase_table                = []
     tran                (1,1) struct
     options             (1,1) struct = struct()
 end
@@ -91,7 +89,7 @@ for j = 1:n_depths
     params_j.calibration.desired_intensity         = desired_intensity;
     params_j = load_parameters(params_j);
 
-    geo_deg_j = set_real_phases(phase_table, tran, depth_j, params_j);
+    geo_deg_j = set_real_phases(tran, depth_j, params_j);
     geo_phases_all(j, :) = geo_deg_j * pi / 180;
 
     % Normalise empirical profile to desired_intensity

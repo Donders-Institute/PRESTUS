@@ -2,7 +2,7 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
 % RESOLVE_TRANSDUCER_FROM_SERIAL  Populate transducer struct from equipment and calibration library
 %
 % Given a transducer entry with a 'serial' field, loads geometry from the
-% equipment config and—if elem_phase_deg or elem_amp are absent—resolves
+% equipment config and—if elem_phase_deg or elem_p_amp are absent—resolves
 % them from the calibration library.  Fields already set in the study config
 % take precedence over library values.
 %
@@ -76,8 +76,8 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
 
     phases_present = isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_deg') ...
         && ~isempty(tr.annular.elem_phase_deg) && ~all(isnan(tr.annular.elem_phase_deg(:)));
-    amp_present    = isfield(tr, 'annular') && isfield(tr.annular, 'elem_amp') ...
-        && ~isempty(tr.annular.elem_amp) && ~all(isnan(tr.annular.elem_amp(:)));
+    amp_present    = isfield(tr, 'annular') && isfield(tr.annular, 'elem_p_amp') ...
+        && ~isempty(tr.annular.elem_p_amp) && ~all(isnan(tr.annular.elem_p_amp(:)));
 
     if phases_present && amp_present
         return;  % fully specified inline — nothing to resolve
@@ -115,11 +115,9 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
             '(transducer %d).\n' ...
             'Checked:\n  %s\n  %s\n\n' ...
             'Options:\n' ...
-            '  1. Run build_transducer_library to generate an empirically calibrated entry.\n' ...
-            '  2. Run build_geometric_library_entry(''%s'', equip_path, library_path) for a ' ...
-            'manufacturer-report baseline (no empirical data needed).\n' ...
-            '  3. Provide elem_phase_deg and elem_amp inline in the study config to bypass the library.'], ...
-            combo_name, t_i, yaml_path_combo, yaml_path_generic, serial);
+            '  1. Run examples/build_transducer_library.m to build or refresh the library.\n' ...
+            '  2. Provide elem_phase_deg and elem_p_amp inline in the study config to bypass the library.'], ...
+            combo_name, t_i, yaml_path_combo, yaml_path_generic);
     end
 
     % Load from library and merge phases/amplitude (without overwriting inline values).
@@ -131,7 +129,7 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
         tr.annular.elem_phase_rad = lib_params.transducer.annular.elem_phase_rad;
     end
     if ~amp_present
-        tr.annular.elem_amp = lib_params.transducer.annular.elem_amp;
+        tr.annular.elem_p_amp = lib_params.transducer.annular.elem_p_amp;
     end
 
     fprintf(['[transducer %d] Resolved from library: %s | focal %.1f mm ' ...

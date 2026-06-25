@@ -28,7 +28,7 @@ end
     
     % Extract and round phases and amplitudes
     opt_phases = round(parameters.transducer.annular.elem_phase_deg, 2);
-    elem_amp = double(parameters.transducer.annular.elem_amp(1));
+    elem_p_amp = double(parameters.transducer.annular.elem_p_amp(1));
 
     fprintf('CSV file can be found here: %s \n', output_file_path);
     
@@ -58,7 +58,7 @@ end
         end
 
         % Update optimized values
-        virtual_data{row_index_int, col_index_foc} = mat2str([opt_phases, elem_amp]);
+        virtual_data{row_index_int, col_index_foc} = mat2str([opt_phases, elem_p_amp]);
 
         % Handle missing values
         mask = cellfun(@(x) isempty(x) || isa(x, 'missing'), virtual_data);
@@ -80,7 +80,7 @@ end
         % Create a new file
         virtual_data = {
             'Desired Intensity [W/cm^2] - Focus wrt Exit Plane [mm]', parameters.calibration.desired_focal_distance_ep;
-            parameters.calibration.desired_intensity, mat2str([opt_phases, elem_amp])
+            parameters.calibration.desired_intensity, mat2str([opt_phases, elem_p_amp])
         };
 
         writecell(virtual_data, output_file_path, 'FileType', 'text');
@@ -110,6 +110,17 @@ end
     catch
         data.meta.prestus_version = 'unknown';
     end
+    % Calibration provenance
+    cal = parameters.calibration;
+    if isfield(cal, 'phase_mode');       data.meta.calibration.phase_mode       = cal.phase_mode;       end
+    if isfield(cal, 'forward_model');    data.meta.calibration.forward_model    = cal.forward_model;    end
+    if isfield(cal, 'opt_regularization_lambda')
+        data.meta.calibration.lambda = cal.opt_regularization_lambda;
+    end
+    if isfield(cal, 'n_depths_used');    data.meta.calibration.n_depths_used    = cal.n_depths_used;    end
+    if isfield(cal, 'min_fit_error');    data.meta.calibration.min_fit_error    = cal.min_fit_error;    end
+    if isfield(cal, 'opt_velocity');     data.meta.calibration.opt_velocity     = cal.opt_velocity;     end
+    if isfield(cal, 'calibration_type'); data.meta.calibration.calibration_type = cal.calibration_type; end
     data.transducer = parameters.transducer;
     yaml.dumpFile(yaml_path, data);
 

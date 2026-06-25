@@ -3,8 +3,7 @@
   ## Parameters for standalone calibration (using Donders equipment)
 
   # Simulation paths (no defaults; change to your directories...)
-  path_input_axial: '//home/common/matlab/PRESTUS/Axial_profiles/'  # Base path for axial profiles
-  path_input_phase: '//home/common/matlab/PRESTUS/Phase_tables/'    # Base path for phase data
+  path_input_axial: ''  # Base path for axial profiles (set in your site wrapper or leave '' for absolute paths)
 
   # List combinations of setups (e.g., transducer-TPO) and calibration targets (no defaults)
   # Every [] specification will be performed for the corresponding (ordered) index equipment combination. 

@@ -2,7 +2,7 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
 % SCALE_REAL_INTENSITY_PROFILE  Scale an empirical intensity profile to a desired peak intensity
 %
 % Linearly scales the empirical profile so its maximum equals desired_intensity,
-% updates parameters.transducer.annular.elem_amp from the corresponding pressure,
+% updates parameters.transducer.annular.elem_p_amp from the corresponding pressure,
 % and truncates or pads the profile to match the simulation axis length.
 %
 % Use as:
@@ -16,7 +16,7 @@ function [profile_target, parameters] = scale_real_intensity_profile(parameters,
 %
 % Output:
 %   profile_target - struct with axial_intensity [W/cm²] and axial_distance_bowl [mm]
-%   parameters     - updated with scaled transducer.annular.elem_amp
+%   parameters     - updated with scaled transducer.annular.elem_p_amp
 %
 % See also: EXTRACT_REAL_INTENSITY_PROFILE, CALIBRATION_TRANSDUCER
 
@@ -37,7 +37,7 @@ end
     p_pa = sqrt(2 * desired_intensity * 1e4 * DENSITY_WATER * SOUND_SPEED_WATER);
 
     % Update source amplitude in simulation parameters
-    parameters.transducer.annular.elem_amp = repmat(p_pa, 1, parameters.transducer.annular.elem_n);
+    parameters.transducer.annular.elem_p_amp = repmat(p_pa, 1, parameters.transducer.annular.elem_n);
 
     % Linearly scale the intensity profile
     adjustment_factor_intensity = max_intens / desired_intensity;

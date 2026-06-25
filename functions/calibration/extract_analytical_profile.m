@@ -20,7 +20,7 @@ function profile_sim = extract_analytical_profile(parameters)
 %
 % Input:
 %   parameters - PRESTUS config with transducer.annular geometry
-%                (elem_amp, elem_phase_rad, elem_id_mm, elem_od_mm,
+%                (elem_p_amp, elem_phase_rad, elem_id_mm, elem_od_mm,
 %                curv_radius_mm, elem_n, freq_hz),
 %                medium_properties.water (density, sound_speed),
 %                calibration.desired_focal_distance_ep [mm],
@@ -49,7 +49,7 @@ function profile_sim = extract_analytical_profile(parameters)
         forward_model = 'oneil';
     end
 
-    profile_sim.velocity            = parameters.transducer.annular.elem_amp(1) / (rho * c);
+    profile_sim.velocity            = parameters.transducer.annular.elem_p_amp(1) / (rho * c);
     profile_sim.axial_distance_bowl = 0 : dx : parameters.calibration.desired_focal_distance_ep * 2;
 
     if strcmp(forward_model, 'rayleigh')
