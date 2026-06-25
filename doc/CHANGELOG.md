@@ -4,11 +4,11 @@ Notable changes to this project are documented here.
 
 ---
 
-## v0.6.2-pre (development)
+## v0.7-pre (development)
 
-Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain gains a CT path for HU-based skull property mapping, HDF5 blosc compatibility, and an improved thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows. Async multi-transducer simulations are stabilised with a shared grid preproc stage and ras_plus enforcement. Pulse amplitude ramping is modelled in thermal simulation. TUS_entry is added as a new transducer placement mode.
+Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain also contains a CT path for HU-based skull property mapping, and a thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows. Async multi-transducer simulations are stabilised with a shared grid preproc stage and ras_plus enforcement. Pulse amplitude ramping is modelled in thermal simulation. TUS_entry is added as a new transducer placement mode.
 
-#### BabelBrain acoustic backend
+#### BabelBrain acoustic and thermal backend
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).
 
@@ -140,7 +140,7 @@ Extends the calibration pipeline with a unified entry point, parametric model st
 - Optional `transducer.name` field added to transducer config
 
 #### Calibration
-- Unified `calibrate_transducer` entry point with HPC dispatch, multi-intensity mode, and parametric model store
+- Unified `fit_source_parameters` entry point with HPC dispatch, multi-intensity mode, and parametric model store
 - Geometric steering mode with per-element hardware correction
 - Multiple analytical forward models — O'Neil and Rayleigh
 - Transducer library (draft)

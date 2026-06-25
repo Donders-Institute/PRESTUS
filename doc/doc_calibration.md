@@ -1,20 +1,105 @@
 ## Transducer Calibration
 
-To emulate transducers, PRESTUS optimises the velocity and phase settings of virtual transducers such that they produce focal axis profiles similar to those measured with real driving system–transducer setups in free water (measured either in-house via hydrophones or provided by device manufacturers). This calibrated emulation varies between different transducers, for different focal depth settings, and free-water pressures.
+To emulate transducers, PRESTUS calibrates the phase and amplitude settings of virtual transducers so that their analytically predicted focal axis profiles match measurements made with real driving system–transducer setups in free water (measured in-house via hydrophones or provided by device manufacturers). Calibrated settings are stored in a transducer library and loaded at runtime.
 
 Transducer calibration relies on an additional config (`calibration_config`) that should be loaded as `parameters.calibration` (see the example `calibration_standalone`).
 
 ---
 
-### Standalone calibration setup
+## Calibration levels
+
+Calibration in PRESTUS proceeds in two optional layers. The default library provides a geometry-based baseline that covers all measured depths analytically. Users can optionally layer per-depth refinements on top.
+
+| Level | Entry point | Phase source | Amplitude | k-Wave needed | Typical use |
+|---|---|---|---|---|---|
+| **Library baseline** | `build_transducer_library` | Ring geometry (path-length) | Analytical fit per depth | No | Building the shipped library; starting point for any setup |
+| **Multi-depth joint fit** | `calibration_setup` (`phase_mode: multi_depth`) | Joint optimisation across all depths | Analytical fit | No | Finding a single hardware correction that is consistent across all steering angles |
+| **Single-depth refinement** | `calibrate_transducer` (`single_ref`) | Per-depth global search | Simulation-corrected | Optional | Improving accuracy at a specific depth |
+
+### Library baseline
+
+The default library is built by `build_transducer_library.m`. For each equipment combination that has characterisation data, it:
+
+1. Computes **geometric steering phases** at every measured depth using `set_real_phases([], ...)` — path-length geometry only, no manufacturer phase table, no hardware correction. This matches BabelBrain's internal phase model (Rayleigh-Sommerfeld in water), ensuring consistent defaults across standalone PRESTUS and BabelBrain-coupled workflows.
+2. Fits **particle velocity** at each depth × intensity analytically via `fit_velocity_to_intensity` (I ∝ v², so no optimisation is needed).
+3. Writes per-run YAMLs and ingests them into the library via `update_transducer_library`.
+
+The result is a `global_model` entry in `config/transducer/{combo_name}.yaml` whose phases and amplitudes interpolate linearly to any requested depth.
+
+At runtime, load calibrated parameters with:
+```matlab
+parameters = load_transducer_from_library(combo_name, focal_depth_ep, isppa, equip_param);
+```
+
+### Single-depth refinement (optional)
+
+When the geometric baseline is insufficient at a specific depth — for example, due to systematic hardware delays — run `calibrate_transducer` in `single_ref` mode. This performs a global search at one reference depth to find optimised absolute phases and velocity, optionally followed by a k-Wave free-water simulation that corrects the analytical-to-simulation amplitude ratio.
+
+The result is stored as a `calibration.focal_depths` entry with `is_refinement: true` in the library YAML. `load_transducer_from_library` prefers the refinement over the global model when the requested depth is within 1 mm of the stored entry.
+
+---
+
+### Multi-depth joint fit (optional)
+
+When the hardware phase correction is expected to be **depth-independent** — i.e. the same per-element offset applies at every steering angle — the `multi_depth` mode finds a single correction vector by fitting all characterisation depths simultaneously.
+
+Enable it by setting `calibration.phase_mode: multi_depth` in the calibration config. `calibration_setup` then calls `perform_joint_depth_fit` once instead of running `perform_global_search` independently per depth.
+
+#### Algorithm
+
+The optimisation finds a single vector `delta[1..n_elem]` (per-element phase offset in radians) and a scalar particle velocity `vel` that minimise the **mean of per-depth profile errors** across all `N` calibration depths:
+
+$$\text{cost} = \frac{1}{N} \sum_{j=1}^{N} \mathrm{MSE}_j(\delta, v) + \lambda \cdot \overline{\delta^2}$$
+
+where at each depth `j`:
+
+$$\text{phases}_j = \text{geo\_phases}(j) + \delta$$
+
+`geo_phases(j)` are the standard geometric steering phases recomputed fresh for each depth. The forward model (Rayleigh or O'Neil) is evaluated with `phases_j` and `vel` to produce a predicted axial intensity profile, which is compared against the empirical profile normalised to `desired_intensity` within the valid axial range.
+
+The optional L2 term (weight `lambda`, default 0) regularises the magnitude of `delta` to prevent large hardware corrections without empirical support.
+
+Optimisation starts from `delta = 0` (pure geometric steering) and is bounded to `±π` per element. The solver is selected by `opt_method` — `FEXminimize` (default, `popsize = 2000`) or MATLAB `GlobalSearch`.
+
+#### Key difference from single-depth search
+
+| | `multi_depth` | `single_depth` (per-depth global search) |
+|---|---|---|
+| Depths used | All simultaneously | One depth at a time |
+| Shared parameters | One `delta` + one `vel` across all depths | Independent `delta` and `vel` per depth |
+| Constraint | Joint consistency across all steering angles | Best fit at each individual depth |
+| Typical use | Hardware offset is the same regardless of focus | Maximum per-depth accuracy |
+
+The result is stored as `elem_phase_correction_deg` in the library YAML and as `calibration_type: multi_depth` in the `meta` block. At runtime, `load_transducer_from_library` adds these corrections on top of the interpolated geometric phases.
+
+#### Configuration
+
+```yaml
+calibration:
+  phase_mode: multi_depth       # enables joint fit
+  opt_method: FEXminimize       # or GlobalSearch
+  opt_upper_velocity: 0.2       # upper bound on velocity [m/s]
+  opt_limits: [10, 80]          # axial fitting range [mm from bowl] (optional)
+  opt_weights: 0                # 0 = uniform; ≥1 = Gaussian-weighted around focal peak
+  opt_seed: 42                  # integer seed for reproducibility (optional)
+  # lambda: 0                   # L2 regularisation weight (not yet a YAML key; pass via options struct)
+```
+
+A diagnostic figure `JointDepthFit.png` is saved to `outputs/img_calibration/` showing empirical (solid) vs model (dashed) profiles for every depth at the optimised parameters.
+
+---
+
+### Standalone calibration setup (single-depth refinement)
 
 **Script: `examples/calibration_standalone`**
 
+This script is the entry point for **single-depth refinements** — it runs `calibration_transducer` at specific depth × intensity combinations and writes per-depth override entries into the library. Use `build_transducer_library.m` to build the geometric baseline; use this script afterwards to refine specific depths.
+
 #### Use cases
 
-- Create a library of calibration settings for one (or multiple) transducer–depth settings
-- Incorporate manufacturer information
-- Template to set up and generate calibrated profiles for transducer equipment at the Donders Institute
+- Refine calibration at specific focal depths where the geometric baseline is insufficient
+- Incorporate manufacturer phase information or hardware-specific corrections
+- Template to generate calibrated profiles for transducer equipment at the Donders Institute
 
 #### Prerequisites
 
@@ -61,13 +146,15 @@ desired_intensities:
 
 ---
 
-### Calibrate phase and amplitude settings
+### Calibrate phase and amplitude settings (refinement pipeline)
 
 **Function: `calibration_transducer`**
 
+This function implements the single-depth refinement pipeline. It is called by `calibration_standalone` and produces per-depth library entries that override the geometric baseline. For building the default library across all depths, use `build_transducer_library.m` instead.
+
 #### Use cases
 
-- Flexibility: only need to specify the desired axial profile
+- Per-depth refinement with measured hydrophone profiles
 - Dynamic integration into end-to-end simulation loops (e.g., iterating across an amplitude–distance parameter space)
 
 #### Prerequisites
@@ -217,6 +304,85 @@ After all simulations complete, k-Wave `.mat` result files written to the cache 
 
 ---
 
+## Library YAML format
+
+Each combo has one YAML file at `config/calibration/{combo_name}.yaml`. The file has three top-level sections.
+
+### `meta`
+
+Provenance fields written by `build_transducer_library` or `update_transducer_library`:
+
+| Field | Description |
+|---|---|
+| `tran_serial` | Transducer serial — must match an entry in `config/equipment/` |
+| `created_at` | ISO date the file was first written |
+| `calibration_type` | `geometric` or `empirical` |
+| `prestus_version` | Git commit hash at build time |
+| `note` | Free-text description of the build method |
+
+### `global_model`
+
+Stores phases (and optionally amplitudes) across all characterised depths. Written by `build_transducer_library` / `update_transducer_library`; read and interpolated by `load_transducer_from_library`.
+
+| Field | Type | Description |
+|---|---|---|
+| `depths_ep_mm` | `[1 × N]` | Focal depths from the exit plane [mm] in ascending order |
+| `elem_phase_deg` | `N`-element cell array, each `[1 × n_elem]` | Per-element phases [°] at each depth |
+| `amplitude_scaling` | struct, keys `i{int}` or `i{int}p{frac}` | Scalar `elem_amp` value per calibrated intensity [W/cm²]. Keys use integer or decimal notation with `p` replacing `.` (e.g. `i30`, `i32p5`). |
+| `elem_phase_correction_deg` | `[1 × n_elem]` *(optional)* | Depth-independent per-element hardware delta [°] applied on top of interpolated phases |
+| `source` | string *(optional)* | Provenance tag, e.g. `update_transducer_library` |
+
+At runtime, `load_transducer_from_library` linearly interpolates `elem_phase_deg` at the requested focal depth. If the requested intensity differs from a stored key by more than 5 %, amplitude is scaled analytically via $\text{amp} \propto \sqrt{I}$ with a warning.
+
+**Example (geometric-only, 10-element transducer, 2 depths shown):**
+
+```yaml
+meta: {tran_serial: IS_PCD15473_01001, calibration_type: geometric, ...}
+global_model:
+  depths_ep_mm: [44.9, 54.4, 64.0, ...]
+  elem_phase_deg:
+  - [178.3, 211.6, 244.5, 277.9, 312.0, 346.4, 21.2, 56.6, 91.7, 127.4]  # 44.9 mm
+  - [135.9, 158.6, 181.1, 203.9, 227.4, 251.2, 275.3, 299.9, 324.4, 349.4]  # 54.4 mm
+  - ...
+  amplitude_scaling:
+    i30: 14200    # elem_amp for 30 W/cm²
+```
+
+### `calibration.focal_depths` *(optional)*
+
+Per-depth refinement entries added by `calibrate_transducer` (single-depth mode) and stored via `update_transducer_library`. When `is_refinement: true` and the requested depth is within 1 mm of the stored entry, `load_transducer_from_library` uses the refinement instead of the interpolated global model.
+
+Keys are formatted as `f{depth_ep_mm}` with `.` replaced by `p` (e.g. `f44p9` for 44.9 mm).
+
+| Field | Type | Description |
+|---|---|---|
+| `is_refinement` | bool | `true` → overrides global model at this depth |
+| `precession_mode` | `linear` \| `monotonic` | Phase parametrisation |
+| `phase_start_deg` | scalar | Phase of element 0 [°] |
+| `phase_step_deg` | scalar | Constant step between elements [°] (`linear` only) |
+| `phase_increments_deg` | `[1 × (n_elem-1)]` | Per-element increments [°] (`monotonic` only) |
+| `amplitude_scaling` | struct | Same format as `global_model.amplitude_scaling` |
+
+**Example:**
+
+```yaml
+calibration:
+  focal_depths:
+    f44p9:
+      is_refinement: true
+      precession_mode: linear
+      phase_start_deg: 178.3
+      phase_step_deg: 33.4
+      amplitude_scaling:
+        i30: 14200
+```
+
+### `library_version.yaml`
+
+A manifest at `config/calibration/library_version.yaml` lists every combo, its depth range, calibrated intensities, and calibration type. Bump the version field when adding or changing entries — patch for new depths in an existing combo, minor for a new combo, major for schema changes.
+
+---
+
 ## In-pipeline ISPPA targeting
 
 Rather than scaling `elem_amp` before the acoustic simulation, PRESTUS uses a two-step approach: a **water baseline measurement** records the free-water ISPPA at the current drive level, and **post-hoc pressure scaling** is applied when loading the cached acoustic results for thermal analysis. This means the acoustic simulation never needs to be repeated when changing the target intensity.
@@ -292,9 +458,10 @@ The following fields are saved in the acoustic cache alongside `sensor_data`:
 |---|---|
 | `acoustic_provenance.freefield_isppa_wcm2` | Free-water ISPPA measured at the drive level used for the acoustic simulation [W/cm²] |
 
-### Relationship to `calibration_transducer`
+### Relationship to calibration
 
 The typical workflow is:
 
-1. **Once per transducer/depth setup**: Run `calibration_transducer` to obtain optimized phases and an initial amplitude at a reference intensity. The output YAML encodes `elem_phase_deg` and `elem_amp`.
-2. **Per subject simulation**: Load the calibration YAML into your study config. Set `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.
+1. **Once per transducer (library build)**: Run `build_transducer_library.m` to produce geometric-baseline phases and velocity fits for all measured depths. Results are stored in `config/transducer/{combo_name}.yaml`.
+2. **Optionally, per depth (refinement)**: Run `calibration_transducer` at specific depths where greater accuracy is required. Refined entries override the library baseline at ±1 mm.
+3. **Per subject simulation**: Load calibrated parameters via `load_transducer_from_library`. Set `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.
