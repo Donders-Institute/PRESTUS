@@ -33,16 +33,34 @@ end
     assert(~isempty(d_t1), 'No T1 file matched pattern: %s', t1_glob);
     filename_t1 = fullfile(d_t1(1).folder, d_t1(1).name);
 
+    % Determine whether segmentation will actually need to run so we can decide
+    % whether a missing T2 is a hard error or a soft warning.
+    segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+    filename_segmented  = fullfile(segmentation_folder, 'final_tissues.nii.gz');
+    seg_needed = confirm_overwriting(filename_segmented, parameters) && ...
+        (~isfield(parameters.io,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ...
+         ~exist(filename_segmented,'file'));
+
     if isfield(parameters.path, 't2_pattern') && ~isempty(parameters.path.t2_pattern)
         t2_glob = fullfile(parameters.path.anat, sprintf(parameters.path.t2_pattern, parameters.subject_id));
         d_t2 = dir(t2_glob);
-        assert(~isempty(d_t2), 'No T2 file matched pattern: %s', t2_glob);
-        filename_t2 = fullfile(d_t2(1).folder, d_t2(1).name);
+        if ~isempty(d_t2)
+            filename_t2 = fullfile(d_t2(1).folder, d_t2(1).name);
+        elseif seg_needed
+            % T2 required to run charm — hard error.
+            error('preproc_segmentation:t2Missing', ...
+                'No T2 file matched pattern: %s\n(Required for SimNIBS segmentation.)', t2_glob);
+        else
+            % Segmentation already exists; T2 was probably deleted after charm completed.
+            warning('preproc_segmentation:t2Missing', ...
+                'T2 file not found: %s\nSegmentation exists — continuing without T2.', t2_glob);
+            filename_t2 = '';
+        end
     else
         filename_t2 = '';
     end
 
-    % Validate existence of files (T2 is optional)
+    % Validate existence of input files (T2 is optional).
     files_to_check = {filename_t1};
     if ~isempty(filename_t2)
         files_to_check{end+1} = filename_t2;
@@ -53,13 +71,8 @@ end
 
     disp('Starting segmentation...');
 
-    % Define output folder for segmentation results
-    segmentation_folder = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
-    filename_segmented = fullfile(segmentation_folder, 'final_tissues.nii.gz');
-
     % Run segmentation (if necessary)
-    if confirm_overwriting(filename_segmented, parameters) && ...
-       (~isfield(parameters.io,'overwrite_simnibs') || parameters.io.overwrite_simnibs || ~exist(filename_segmented,'file'))
+    if seg_needed
 
         if parameters.simulation.interactive == 0 || confirmation_dlg('This will run SEGMENTATION WITH SIMNIBS that takes a long time. Are you sure?', 'Yes', 'No')
             segmentation_run(parameters.path.anat, parameters.subject_id, filename_t1, filename_t2, parameters);

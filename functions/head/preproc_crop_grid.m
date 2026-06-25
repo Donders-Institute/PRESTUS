@@ -92,6 +92,60 @@ else
     n_bowls = 1;
 end
 
+% === AUTO-PAD: guarantee every transducer centre is inside the volume ===
+% makeBowl hard-errors when the centre falls outside the grid.  This can
+% happen when head_pad_mm is insufficient for a given anatomy/placement.
+% Compute the minimum extra padding needed per face and apply it now.
+all_centres = zeros(n_bowls, 3);
+for i_t_chk = 1:n_bowls
+    if ~isempty(all_trans_pos_grid)
+        all_centres(i_t_chk,:) = all_trans_pos_grid(i_t_chk,:);
+    else
+        all_centres(i_t_chk,:) = trans_pos_grid;
+    end
+end
+cur_dims  = size(medium_masks);
+need_pre  = max(0, ceil(1 - min(all_centres, [], 1)));   % shortfall at low faces
+need_post = max(0, ceil(max(all_centres, [], 1) - cur_dims));  % shortfall at high faces
+if any(need_pre > 0) || any(need_post > 0)
+    need_pre_mm  = need_pre  * parameters.grid.resolution_mm;
+    need_post_mm = need_post * parameters.grid.resolution_mm;
+    warning(['preproc_crop_grid: transducer centre(s) outside volume after head_pad_mm=%.1f mm. '  ...
+             'Auto-adding [%d %d %d] vox pre / [%d %d %d] vox post to fit bowl. '                  ...
+             '(%.1f / %.1f / %.1f mm pre; %.1f / %.1f / %.1f mm post). '                           ...
+             'Consider increasing headmodel.head_pad_mm by ~%.0f mm.'], ...
+            parameters.headmodel.head_pad_mm, ...
+            need_pre(1), need_pre(2), need_pre(3), ...
+            need_post(1), need_post(2), need_post(3), ...
+            need_pre_mm(1), need_pre_mm(2), need_pre_mm(3), ...
+            need_post_mm(1), need_post_mm(2), need_post_mm(3), ...
+            max([need_pre_mm, need_post_mm]));
+    if any(need_pre > 0)
+        segmentation    = pad3_pre(segmentation,    need_pre, 0);
+        medium_masks    = pad3_pre(medium_masks,    need_pre, i_water);
+        bone_mask_img   = pad3_pre(bone_mask_img,   need_pre, 0);
+        if ~isempty(pseudoCT_img)
+            pseudoCT_img = pad3_pre(pseudoCT_img,   need_pre, NaN);
+        end
+        total_pre_offset    = total_pre_offset + need_pre;
+        trans_pos_grid      = trans_pos_grid  + need_pre;
+        focus_pos_grid      = focus_pos_grid  + need_pre;
+        if ~isempty(all_trans_pos_grid)
+            all_trans_pos_grid  = all_trans_pos_grid  + need_pre;
+            all_focus_pos_grid  = all_focus_pos_grid  + need_pre;
+        end
+    end
+    if any(need_post > 0)
+        segmentation    = pad3_post(segmentation,    need_post, 0);
+        medium_masks    = pad3_post(medium_masks,    need_post, i_water);
+        bone_mask_img   = pad3_post(bone_mask_img,   need_post, 0);
+        if ~isempty(pseudoCT_img)
+            pseudoCT_img = pad3_post(pseudoCT_img,   need_post, NaN);
+        end
+    end
+end
+% === END AUTO-PAD ===
+
 combinedmask = (medium_masks ~= i_water);
 for i_t = 1:n_bowls
     if ~isempty(all_trans_pos_grid)
