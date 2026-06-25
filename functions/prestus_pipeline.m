@@ -206,12 +206,25 @@ function [parameters] = prestus_pipeline(parameters, options)
         if ~confirm_overwriting(filename_grid_cache, parameters)
             disp('Loading grid cache - skipping head preprocessing.')
             load(filename_grid_cache);
-            parameters.grid       = grid_cache_info.parameters.grid;
-            parameters.transducer = grid_cache_info.parameters.transducer;
+            parameters.grid = grid_cache_info.parameters.grid;
+            % For layered simulations: do NOT restore parameters.transducer from cache.
+            % The caller may be a single-transducer acoustic sub-run (e.g. async
+            % trans-02) that was deliberately stripped before entering the pipeline.
+            % Re-map the caller's T1-space transducer positions onto the loaded grid
+            % using the planimg affine from this cache (shared grid, shared transform).
+            % For non-layered simulations: fall back to restoring from cache, since
+            % transducer positions may be grid-derived (focal distance) rather than
+            % coming from T1-space coordinates.
+            if contains(parameters.simulation.medium, 'layered') && ...
+                    isfield(planimg, 'transf') && ~isempty(planimg.transf)
+                parameters = load_transducer_parameters(parameters);
+                [parameters] = grid_transducer_location(parameters, planimg);
+            else
+                parameters.transducer = grid_cache_info.parameters.transducer;
+                % Cache may be from an older PRESTUS version without all derived fields.
+                parameters = load_transducer_parameters(parameters);
+            end
             clear grid_cache_info
-            % Cache was written by an older PRESTUS version that did not store
-            % all derived transducer fields; recompute them from the loaded config.
-            parameters = load_transducer_parameters(parameters);
             trans_pos = parameters.transducer(1).trans_pos;
             focus_pos = parameters.transducer(1).focus_pos;
         else
@@ -219,6 +232,13 @@ function [parameters] = prestus_pipeline(parameters, options)
 
             [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
                 grid_tissue_setup(parameters);
+
+            % Detect and apply padding if any transducer/focus position falls outside the
+            % cropped grid (common when the grid was sized for a single transducer and is
+            % later reused by a multi-transducer joint stage, e.g. asyncJoint).
+            [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
+                autopad_grid_for_transducers(parameters, medium_masks, segmentation, ...
+                                             bone_mask, pseudoCT, planimg);
 
             [parameters] = grid_transducer_location(parameters, planimg);
 
@@ -477,7 +497,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     % Carry tx_calibration provenance into acoustic_provenance so that
     % combine_async_intensity and apply_isppa_scaling can use the calibrated
     % ISPPA as a baseline without requiring a fresh water simulation.
-    % Set by load_transducer_from_library; absent for inline elem_amp configs.
+    % Set by load_transducer_from_library; absent for inline elem_p_amp configs.
     tr1 = parameters.transducer(1);
     if isfield(tr1, 'tx_calibration') && isfield(tr1.tx_calibration, 'isppa_wcm2') && ...
             isscalar(tr1.tx_calibration.isppa_wcm2) && isfinite(tr1.tx_calibration.isppa_wcm2)
@@ -598,6 +618,13 @@ function [parameters] = prestus_pipeline(parameters, options)
                 fprintf('[pipeline] BabelBrain %s  (%s)\n', ...
                     sensor_data.babelbrain_version.version_txt, ...
                     sensor_data.babelbrain_version.git_describe);
+            end
+            % Store free-water ISPPA for downstream thermal_wrapper.
+            if isfield(sensor_data, 'freefield_isppa_wcm2') && ...
+                    isfinite(sensor_data.freefield_isppa_wcm2)
+                acoustic_provenance.freefield_isppa_wcm2 = sensor_data.freefield_isppa_wcm2;
+                acoustic_provenance.tx_calibration.isppa_wcm2  = sensor_data.freefield_isppa_wcm2;
+                acoustic_provenance.tx_calibration.isppa_source = 'babelbrain_water_sim';
             end
         elseif use_jwave
             % --- jwave acoustic backend ---
@@ -887,10 +914,41 @@ function [parameters] = prestus_pipeline(parameters, options)
 
             if use_bb_thermal
                 % --- BabelBrain thermal backend ---
+                % Propagate free-water ISPPA into parameters_th so babelbrain_thermal_wrapper
+                % can resolve it via get_tx_isppa.  This covers two cases:
+                %   1. BabelBrain acoustic: freefield_isppa_wcm2 set from Water_DataForSim.h5
+                %   2. Cache reload: tx_calibration carried in acoustic_provenance
+                if exist('acoustic_provenance', 'var') && ...
+                        (~isfield(parameters_th.transducer(1), 'tx_calibration') || ...
+                         ~isfield(parameters_th.transducer(1).tx_calibration, 'isppa_wcm2') || ...
+                         ~isfinite(parameters_th.transducer(1).tx_calibration.isppa_wcm2))
+                    if isfield(acoustic_provenance, 'freefield_isppa_wcm2') && ...
+                            isfinite(acoustic_provenance.freefield_isppa_wcm2)
+                        parameters_th.transducer(1).tx_calibration.isppa_wcm2  = acoustic_provenance.freefield_isppa_wcm2;
+                        parameters_th.transducer(1).tx_calibration.isppa_source = 'acoustic_provenance';
+                    elseif isfield(acoustic_provenance, 'tx_calibration') && ...
+                            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2') && ...
+                            isfinite(acoustic_provenance.tx_calibration.isppa_wcm2)
+                        parameters_th.transducer(1).tx_calibration = acoustic_provenance.tx_calibration;
+                    end
+                end
                 results_heating = babelbrain_thermal_wrapper( ...
                     parameters_th, sensor_data, planimg, kwave_medium_th);
                 kwaveDiffusion  = [];
-                time_status_seq = [];
+                % Build synthetic time_status_seq from BabelBrain time axis so that
+                % thermal_plot_sim can render the per-tissue timeseries plots.
+                if isfield(results_heating, 'timeseries') && ...
+                        isfield(results_heating.timeseries, 'TimeProfileTarget') && ...
+                        ~isempty(results_heating.timeseries.TimeProfileTarget)
+                    t_ax = results_heating.timeseries.TimeProfileTarget(:)';
+                    N_t  = numel(t_ax);
+                    time_status_seq = struct( ...
+                        'time',     num2cell(t_ax), ...
+                        'recorded', num2cell(ones(1, N_t, 'int32')), ...
+                        'status',   repmat({'on'}, 1, N_t));
+                else
+                    time_status_seq = struct([]);
+                end
             else
                 % --- k-Wave thermal backend (default) ---
                 [kwaveDiffusion, time_status_seq, results_heating] = ...
@@ -911,6 +969,12 @@ function [parameters] = prestus_pipeline(parameters, options)
                     '-v7.3');
             end
 
+            % Propagate thermal-grid temp_0 to kwave_medium so nifti_thermal can
+            % compute temperature rise correctly (kwave_medium_th may use a different
+            % grid resolution/FOV than kwave_medium when use_thermal_grid is true).
+            if exist('kwave_medium_th', 'var') && isfield(kwave_medium_th, 'temp_0')
+                kwave_medium.temp_0 = kwave_medium_th.temp_0;
+            end
             clear sensor_data source source_th sensor sensor_th kgrid kgrid_th kwaveDiffusion
             clear kwave_medium_th medium_masks_th parameters_th transf_th
 
