@@ -225,8 +225,10 @@ function [parameters] = prestus_pipeline(parameters, options)
                 parameters = load_transducer_parameters(parameters);
             end
             clear grid_cache_info
-            trans_pos = parameters.transducer(1).trans_pos;
-            focus_pos = parameters.transducer(1).focus_pos;
+            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
+            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
+            trans_pos_grid = trans_pos;                            % explicit sim-grid alias
+            focus_pos_grid = focus_pos;                            % explicit sim-grid alias
         else
             parameters = load_transducer_parameters(parameters);
 
@@ -245,11 +247,16 @@ function [parameters] = prestus_pipeline(parameters, options)
             [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
                 grid_axisymmetry(parameters, segmentation, bone_mask, pseudoCT, medium_masks);
 
-            trans_pos = parameters.transducer(1).trans_pos;
-            focus_pos = parameters.transducer(1).focus_pos;
+            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
+            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
+            trans_pos_grid = trans_pos;                            % explicit sim-grid alias
+            focus_pos_grid = focus_pos;                            % explicit sim-grid alias
 
             if should_save_output(parameters.io, 'save_grid_cache')
                 grid_cache_info.parameters = parameters;
+                % trans_pos / focus_pos saved here are [sim-grid vox] (post grid_transducer_location,
+                % pre FOV crop).  Variable names are kept as-is for backward compatibility with
+                % existing cache files; load() below populates trans_pos_grid from them.
                 save(filename_grid_cache, ...
                     'planimg', 'medium_masks', 'segmentation', 'bone_mask', 'pseudoCT', ...
                     'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
@@ -272,11 +279,15 @@ function [parameters] = prestus_pipeline(parameters, options)
     if ~exist('trans_pos', 'var')
         if isfield(parameters, 'transducer') && numel(parameters.transducer) >= 1 && ...
                 isfield(parameters.transducer(1), 'trans_pos') && ~isempty(parameters.transducer(1).trans_pos)
-            trans_pos = parameters.transducer(1).trans_pos;
-            focus_pos = parameters.transducer(1).focus_pos;
+            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
+            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
+            trans_pos_grid = trans_pos;
+            focus_pos_grid = focus_pos;
         else
-            trans_pos = [];
-            focus_pos = [];
+            trans_pos      = [];  % [sim-grid vox; unavailable — run_grid_setup=0 with no prior cache]
+            focus_pos      = [];
+            trans_pos_grid = [];
+            focus_pos_grid = [];
         end
     end
 
@@ -402,11 +413,15 @@ function [parameters] = prestus_pipeline(parameters, options)
         kwave_medium_full  = kwave_medium;
         medium_masks_full  = medium_masks;
         segmentation_full  = segmentation;
-        trans_pos_full     = trans_pos;
-        focus_pos_full     = focus_pos;
+        trans_pos_full     = trans_pos;   % [sim-grid vox, full domain — preserved for thermal restore]
+        focus_pos_full     = focus_pos;   % [sim-grid vox, full domain — preserved for thermal restore]
         grid_dims_full     = parameters.grid.dims;
-        [parameters, kwave_medium, medium_masks, trans_pos, focus_pos, fov_offset_ac] = ...
+        % acoustic_grid_fov returns positions in FOV-grid voxels; capture with explicit names.
+        [parameters, kwave_medium, medium_masks, trans_pos_fov, focus_pos_fov, fov_offset_ac] = ...
             acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos);
+        % Keep trans_pos/focus_pos in sync as backward-compatible aliases for downstream code.
+        trans_pos = trans_pos_fov;  % [FOV-grid vox]
+        focus_pos = focus_pos_fov;  % [FOV-grid vox]
         fprintf('[pipeline] Acoustic FOV crop active: offset [%s], new dims [%s]\n', ...
             num2str(fov_offset_ac), num2str(parameters.grid.dims));
         % Crop segmentation to the same FOV so analysis masks match sensor_data size.
@@ -419,6 +434,8 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
     else
         fov_offset_ac        = [];
+        trans_pos_fov        = [];   % no FOV crop — trans_pos remains in sim-grid space
+        focus_pos_fov        = [];   % no FOV crop — focus_pos remains in sim-grid space
         full_ac_dims_saved   = [];
     end
 
@@ -699,6 +716,8 @@ function [parameters] = prestus_pipeline(parameters, options)
         if exist('acoustic_provenance', 'var'); prov_for_analysis = acoustic_provenance; end
         [results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels, [], prov_for_analysis);
+        % highlighted_pos is in the *current* simulation grid (FOV-grid vox if acoustic FOV is
+        % active, sim-grid vox otherwise).  Convert to sim-grid before NIfTI export below.
     else
         disp('No acoustic simulation results available (or requested). Skipping analysis...')
         results_acoustic = [];
@@ -723,7 +742,7 @@ function [parameters] = prestus_pipeline(parameters, options)
                 fov_backproject_volume(acoustic_Ipa,      fov_offset_ac, full_ac_dims_saved), ...
                 fov_backproject_volume(acoustic_MI,       fov_offset_ac, full_ac_dims_saved), ...
                 fov_backproject_volume(acoustic_pressure, fov_offset_ac, full_ac_dims_saved), ...
-                highlighted_pos + fov_offset_ac - 1);
+                fov_to_grid_pos(highlighted_pos, fov_offset_ac));  % [FOV-grid vox] → [sim-grid vox]
             clear params_nii;
         else
             nifti_acoustic(parameters, planimg, results_acoustic, ...
@@ -818,16 +837,16 @@ function [parameters] = prestus_pipeline(parameters, options)
                 kwave_medium  = kwave_medium_full;
                 medium_masks  = medium_masks_full;
                 segmentation  = segmentation_full;
-                trans_pos     = trans_pos_full;
-                focus_pos     = focus_pos_full;
+                trans_pos     = trans_pos_full;   % [sim-grid vox, full domain restored]
+                focus_pos     = focus_pos_full;   % [sim-grid vox, full domain restored]
                 parameters.grid.dims = grid_dims_full;
                 parameters.transducer(1).trans_pos = trans_pos_full;
                 if isfield(parameters.transducer(1), 'focus_pos')
                     parameters.transducer(1).focus_pos = focus_pos_full;
                 end
-                % Translate highlighted_pos from FOV to full-grid voxels.
+                % Translate highlighted_pos from FOV-grid to sim-grid voxels.
                 if ~isempty(highlighted_pos)
-                    highlighted_pos = highlighted_pos + fov_offset_ac - 1;
+                    highlighted_pos = fov_to_grid_pos(highlighted_pos, fov_offset_ac);  % [FOV-grid vox] → [sim-grid vox]
                 end
                 clear kwave_medium_full medium_masks_full segmentation_full ...
                       trans_pos_full focus_pos_full grid_dims_full;
