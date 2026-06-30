@@ -391,6 +391,10 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters.transducer(1), 'elem_od_mm') && ...
                 ~isempty(parameters.transducer(1).elem_od_mm)
             parameters.grid.acoustic_fov_diameter_mm = max(parameters.transducer(1).elem_od_mm);
+        elseif isfield(parameters.transducer(1), 'annular') && ...
+                isfield(parameters.transducer(1).annular, 'elem_od_mm') && ...
+                ~isempty(parameters.transducer(1).annular.elem_od_mm)
+            parameters.grid.acoustic_fov_diameter_mm = max(parameters.transducer(1).annular.elem_od_mm);
         else
             error('pipeline:autoFovDiameter', ...
                 ['acoustic_fov_diameter_mm=''auto'' requires transducer(1).elem_od_mm. ' ...
@@ -406,6 +410,36 @@ function [parameters] = prestus_pipeline(parameters, options)
         isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
         ~isempty(parameters.grid.acoustic_fov_length_mm) && ...
         isnumeric(parameters.grid.acoustic_fov_length_mm);
+
+    % When the jwave backend is active, PML is embedded *inside* the domain
+    % (jwave has no PMLInside=false option).  k-Wave uses PMLInside=false, so
+    % its PML is added outside parameters.grid.dims and the entire pfov grid
+    % is usable.  For jwave, the outer pml_size voxels on each face are
+    % absorbing layers — source elements placed there are corrupted.
+    % Fix: expand the pfov mm settings by 2*pml_size*dx on each side so the
+    % requested physical FOV occupies jwave's inner non-PML region.
+    use_jwave_acoustic = isfield(parameters, 'acoustic_backend') && ...
+        strcmpi(parameters.acoustic_backend, 'jwave');
+    if has_acoustic_fov && use_jwave_acoustic
+        jw_pml_raw = 'auto';
+        if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'pml_size')
+            jw_pml_raw = parameters.jwave.pml_size;
+        end
+        if (ischar(jw_pml_raw) || isstring(jw_pml_raw)) && strcmp(jw_pml_raw, 'auto')
+            % Approximate: resolve_pml_size in jwave_wrapper uses getOptimalPMLSize,
+            % which requires a kgrid (not yet built here). Use 20 as the safe default
+            % matching jwave_wrapper's resolve_pml_size fallback for small grids.
+            jw_pml_eff = 20;
+            fprintf('[pipeline] jwave pfov PML expansion: pml_size=''auto'' → using %d voxels as estimate.\n', jw_pml_eff);
+        else
+            jw_pml_eff = double(jw_pml_raw);
+        end
+        jw_pml_mm = jw_pml_eff * parameters.grid.resolution_mm;
+        parameters.grid.acoustic_fov_diameter_mm = parameters.grid.acoustic_fov_diameter_mm + 2 * jw_pml_mm;
+        parameters.grid.acoustic_fov_length_mm   = parameters.grid.acoustic_fov_length_mm   + 2 * jw_pml_mm;
+        fprintf('[pipeline] jwave pfov PML expansion (+%.0f mm each side): diameter=%.1f mm, length=%.1f mm\n', ...
+            jw_pml_mm, parameters.grid.acoustic_fov_diameter_mm, parameters.grid.acoustic_fov_length_mm);
+    end
 
     if has_acoustic_fov
         full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
@@ -670,8 +704,31 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     elseif exist(filename_sensor_data, 'file')
         disp('Skipping acoustic simulation, loading existing output file.')
-        [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
-            cache_acoustic('load', filename_sensor_data, parameters);
+        try
+            [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
+                cache_acoustic('load', filename_sensor_data, parameters);
+        catch ME
+            if strcmp(ME.identifier, 'cache_acoustic:staleGrid')
+                % This transducer's acoustic cache was produced on a different grid
+                % (e.g. after re-segmentation or a grid config change).  Re-run the
+                % acoustic simulation on the current grid.
+                fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation.\n');
+                [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+                    acoustic_wrapper( ...
+                    parameters, ...
+                    kgrid, ...
+                    kwave_medium, ...
+                    source, ...
+                    sensor, ...
+                    medium_masks, ...
+                    filename_sensor_data, ...
+                    segmentation, ...
+                    source_labels, ...
+                    acoustic_provenance);
+            else
+                rethrow(ME);
+            end
+        end
         parameters.state.acoustics_available = 1;
         % In axisymmetric runs the cache holds expanded (2D/3D bilateral) sensor_data,
         % while source_labels from source_sensor_setup has the pre-expansion shape.
@@ -738,6 +795,20 @@ function [parameters] = prestus_pipeline(parameters, options)
             % nifti_acoustic places them at the correct spatial location.
             params_nii           = parameters;
             params_nii.grid.dims = full_ac_dims_saved;
+            % Restore full-domain transducer positions so plot_intensity_t1_overlay
+            % applies inv_transf (full sim-grid → T1 space) with correct coordinates.
+            params_nii.transducer(1).trans_pos = trans_pos_full;
+            if isfield(params_nii.transducer(1), 'focus_pos')
+                params_nii.transducer(1).focus_pos = focus_pos_full;
+            end
+            % Back-project focal masks (binary → nearest-neighbour; store back in results)
+            for fmf = {'focal_mask_3dB', 'focal_mask_6dB'}
+                fn = fmf{1};
+                if isfield(results_acoustic, fn) && ~isempty(results_acoustic.(fn))
+                    results_acoustic.(fn) = fov_backproject_volume( ...
+                        uint8(results_acoustic.(fn)), fov_offset_ac, full_ac_dims_saved) > 0;
+                end
+            end
             nifti_acoustic(params_nii, planimg, results_acoustic, ...
                 fov_backproject_volume(acoustic_Ipa,      fov_offset_ac, full_ac_dims_saved), ...
                 fov_backproject_volume(acoustic_MI,       fov_offset_ac, full_ac_dims_saved), ...
@@ -749,6 +820,13 @@ function [parameters] = prestus_pipeline(parameters, options)
                 acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
         end
         log_timer('stop', 'nifti_acoustic');
+    end
+    % Stash acoustic metrics and sensor_data for callers that set
+    % modules.store_acoustic_results (e.g. benchmark_solver_pipeline).
+    if isfield(parameters, 'modules') && isfield(parameters.modules, 'store_acoustic_results') ...
+            && parameters.modules.store_acoustic_results
+        if exist('results_acoustic', 'var'), parameters.results_acoustic    = results_acoustic; end
+        if exist('sensor_data',      'var'), parameters.benchmark_sensor_data = sensor_data;    end
     end
     % acoustic pressure maps no longer needed after NIfTI export;
     % highlighted_pos still required by thermal_analysis below
@@ -954,17 +1032,38 @@ function [parameters] = prestus_pipeline(parameters, options)
                 results_heating = babelbrain_thermal_wrapper( ...
                     parameters_th, sensor_data, planimg, kwave_medium_th);
                 kwaveDiffusion  = [];
-                % Build synthetic time_status_seq from BabelBrain time axis so that
-                % thermal_plot_sim can render the per-tissue timeseries plots.
+                % Build a sparse k-Wave-compatible time_status_seq from timing parameters
+                % so that thermal_plot_sim shades on/off periods correctly.
+                % One entry per protocol block boundary (k-Wave convention):
+                %   t=0 off → t=ptrd on → t=ptri off → ... → t_end off
+                % The dense timeseries x-axis (TimeProfileTarget) is stored inside
+                % the timeseries struct and used by thermal_plot_sim for plot axes.
                 if isfield(results_heating, 'timeseries') && ...
                         isfield(results_heating.timeseries, 'TimeProfileTarget') && ...
                         ~isempty(results_heating.timeseries.TimeProfileTarget)
-                    t_ax = results_heating.timeseries.TimeProfileTarget(:)';
-                    N_t  = numel(t_ax);
-                    time_status_seq = struct( ...
-                        'time',     num2cell(t_ax), ...
-                        'recorded', num2cell(ones(1, N_t, 'int32')), ...
-                        'status',   repmat({'on'}, 1, N_t));
+                    t_ax_bb  = results_heating.timeseries.TimeProfileTarget(:)';
+                    t_timing = parameters_th.timing;
+                    bb_ptrd  = t_timing.ptrd;
+                    bb_ptri  = bb_ptrd;
+                    if isfield(t_timing, 'ptri') && t_timing.ptri > t_timing.ptrd
+                        bb_ptri = t_timing.ptri;
+                    end
+                    bb_nreps = 1;
+                    if isfield(t_timing, 'n_ptri_reps') && t_timing.n_ptri_reps > 1
+                        bb_nreps = t_timing.n_ptri_reps;
+                    end
+                    tss = struct('time', {0}, 'recorded', {1}, 'status', {'off'});
+                    for i_bb_rep = 1:bb_nreps
+                        t0_rep = (i_bb_rep - 1) * bb_ptri;
+                        tss(end+1) = struct('time', t0_rep + bb_ptrd, 'recorded', 1, 'status', 'on');
+                        if bb_ptri > bb_ptrd
+                            tss(end+1) = struct('time', t0_rep + bb_ptri, 'recorded', 1, 'status', 'off');
+                        end
+                    end
+                    if t_ax_bb(end) > tss(end).time + 1e-6
+                        tss(end+1) = struct('time', t_ax_bb(end), 'recorded', 1, 'status', 'off');
+                    end
+                    time_status_seq = tss;
                 else
                     time_status_seq = struct([]);
                 end

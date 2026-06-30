@@ -51,7 +51,7 @@ An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical N
 | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
 | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
 
-Water/free-field simulations additionally include `Psptp` (spatial peak temporal peak pressure) and `Ptp_target` (temporal peak pressure at the target).
+Water/free-field simulations additionally include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target), and the full set of ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_dist_mm`) computed over the region beyond the transducer exit plane.
 
 #### Tissue-specific *(layered simulations only)*
 
@@ -69,7 +69,10 @@ Water/free-field simulations additionally include `Psptp` (spatial peak temporal
 | `MI_skin` | — | Maximum mechanical index within skin |
 | `MI_tc` | — | **Transcranial MI** — maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
 | `Ix_brain_vox`, `Iy_brain_vox`, `Iz_brain_vox` | voxels | Grid coordinates of peak IPA within brain |
-| `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −6 dB focal region within brain (voxels where IPA ≥ 50 % of `Isppa_brain`) |
+| `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −3 dB intensity region within brain (IPA ≥ 50 % of `Isppa_brain`; preserved for backward compatibility — equals `focal_vol_3dB_mm3`) |
+| `focal_vol_3dB_mm3` | mm³ | Volume of the −3 dB focal zone within brain (IPA ≥ 50 % of peak; 10·log₁₀(0.5) = −3 dB) |
+| `focal_vol_6dB_mm3` | mm³ | Volume of the −6 dB focal zone within brain (IPA ≥ 25 % of peak = pressure ≥ 50 % of peak; FWHM) |
+| `focal_centroid_3dB_dist_mm` | mm | Distance from the transducer to the geometric centroid of the −3 dB focal region |
 
 ---
 
@@ -146,6 +149,8 @@ Filename patterns:
 | `intensity` | Pulse-average intensity (IPA) [W/cm²] |
 | `MI` | Mechanical index |
 | `pressure` | Peak pressure [Pa] |
+| `focal_mask_3dB` | −3 dB focal zone binary mask (IPA ≥ 50 % of peak; restricted to brain for layered, to beyond-exit-plane for free-field) |
+| `focal_mask_6dB` | −6 dB / FWHM focal zone binary mask (IPA ≥ 25 % of peak = P ≥ Pmax/2; same region restriction) |
 
 ### Thermal maps *(written after thermal analysis)*
 

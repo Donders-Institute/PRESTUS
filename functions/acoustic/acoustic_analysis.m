@@ -27,7 +27,14 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 % Output:
 %   results          - struct with fields: Isppa, Isppa_after_exit_plane, Psptp,
 %                      Ipa_target, Ipa_target_radius, real_focal_distance, and per-tissue
-%                      Isppa/Psptp/MI fields for layered/phantom media [W/cm², Pa, -]
+%                      Isppa/Psptp/MI fields for layered/phantom media [W/cm², Pa, -].
+%                      ITRUSST focal metrics (Martin et al., 2025, Brain Stimulation)
+%                      are computed for both layered (brain-masked) and free-field
+%                      (after-exit-plane-masked) simulations:
+%                        focal_mask_3dB / focal_mask_6dB  — logical focal zone masks
+%                        focal_vol_3dB/6dB_mm3            — focal zone volumes [mm³]
+%                        focal_centroid_3dB_dist_mm       — distance of −3 dB centroid
+%                                                           from transducer [mm]
 %   acoustic_Ipa     - spatial Isppa map [W/cm²]
 %   acoustic_MI      - spatial mechanical index map [-]
 %   acoustic_pressure- temporal peak pressure map [Pa]
@@ -132,7 +139,7 @@ end
         % Assumption: the beam travels along the last grid dimension (z / axial),
         % and whether the transducer is on the "high-z" or "low-z" face is inferred
         % from whether trans_pos(beam_dim) > grid_size(beam_dim)/2.
-        % This holds for all standard PRESTUS grid modes ('principal_axis',
+        % This holds for all standard PRESTUS grid modes ('focal_axis',
         % 'transducer_axis', 'ras_plus') because grid_tissue_setup always places
         % the transducer along z.  It would NOT hold for a fully arbitrary rotation
         % applied outside of PRESTUS.
@@ -140,16 +147,20 @@ end
         if numel(parameters.grid.dims) == 3
             beam_dim = numel(parameters.grid.dims);
             if trans_pos_it(beam_dim) > comp_grid_size(beam_dim) / 2
-                mask_it(:,:,1:(trans_pos_it(beam_dim) - bowl_depth_grid_it)) = 0;
+                % HIGH-z transducer: beam propagates toward low-z.
+                % Zero the near-transducer (high-z) region; keep the focus side.
+                mask_it(:,:,(trans_pos_it(beam_dim) - bowl_depth_grid_it):end) = 0;
             else
-                mask_it(:,:,(trans_pos_it(beam_dim) + bowl_depth_grid_it):end) = 0;
+                % LOW-z transducer: beam propagates toward high-z.
+                % Zero the near-transducer (low-z) region; keep the focus side.
+                mask_it(:,:,1:(trans_pos_it(beam_dim) + bowl_depth_grid_it)) = 0;
             end
         elseif numel(parameters.grid.dims) == 2
             beam_dim = numel(parameters.grid.dims);
             if trans_pos_it(beam_dim) > comp_grid_size(beam_dim) / 2
-                mask_it(:,1:(trans_pos_it(beam_dim) - bowl_depth_grid_it)) = 0;
+                mask_it(:,(trans_pos_it(beam_dim) - bowl_depth_grid_it):end) = 0;
             else
-                mask_it(:,(trans_pos_it(beam_dim) + bowl_depth_grid_it):end) = 0;
+                mask_it(:,1:(trans_pos_it(beam_dim) + bowl_depth_grid_it)) = 0;
             end
         end
         % Union: voxel is "after exit" if it clears at least one transducer's exit plane.
@@ -209,8 +220,21 @@ end
         [results.Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = ...
             masked_max_3d(acoustic_Ipa, mask.brain);
         [results.min_Isppa_brain] = min(acoustic_Ipa(mask.brain));
-        half_max = acoustic_Ipa >= results.Isppa_brain/2 & mask.brain;
-        half_max_ISPPA_volume_brain = sum(half_max(:))*(parameters.grid.resolution_mm^3);
+
+        % ITRUSST focal metrics (Martin et al., 2025, Brain Stimulation):
+        %   −3 dB: I ≥ Isppa/2   (half-intensity; 10·log10(0.5) = −3 dB)
+        %   −6 dB: I ≥ Isppa/4   (half-pressure; P ≥ Pmax/2; 10·log10(0.25) = −6 dB)
+        fm = compute_focal_metrics(acoustic_Ipa, results.Isppa_brain, mask.brain, ...
+                                   trans_pos, parameters.grid.resolution_mm);
+        results.focal_mask_3dB        = fm.mask_3dB;
+        results.focal_mask_6dB        = fm.mask_6dB;
+        results.focal_vol_3dB_mm3          = fm.vol_3dB_mm3;
+        results.focal_vol_6dB_mm3          = fm.vol_6dB_mm3;
+        results.focal_centroid_3dB_dist_mm = fm.centroid_3dB_dist_mm;
+
+        % Keep backward-compatible alias (−3 dB volume)
+        half_max_ISPPA_volume_brain = fm.vol_3dB_mm3;
+
         [results.Psptp_brain] = masked_max_3d(acoustic_pressure, mask.brain);
         [results.MI_brain] = masked_max_3d(acoustic_MI, mask.brain);
 
@@ -239,6 +263,8 @@ end
             results.Psptp_brain, results.Ptp_target, results.MI_skin, results.MI_skull, ...
             results.MI_brain, results.MI_tc, Ix_brain, Iy_brain, Iz_brain, trans_pos, focus_pos, ...
             results.Ipa_target, results.Ipa_target_radius, half_max_ISPPA_volume_brain, ...
+            results.focal_vol_3dB_mm3, results.focal_vol_6dB_mm3, ...
+            results.focal_centroid_3dB_dist_mm, ...
             'VariableNames', { 'subject_id', 'freq_Hz', ...
             'Isppa', 'Isppa_after_exitplane', 'real_focal_distance_mm', ...
             'Isppa_skin', 'Isppa_skull', 'Isppa_brain', ...
@@ -247,17 +273,32 @@ end
             'Ix_brain_vox', 'Iy_brain_vox', 'Iz_brain_vox', ...
             'trans_pos_vox', 'focus_pos_vox', ...
             'Ipa_target', 'Ipa_target_radius', ...
-            'halfmax_ISPPA_volume_brain_mm3'}), ...
+            'halfmax_ISPPA_volume_brain_mm3', ...
+            'focal_vol_3dB_mm3', 'focal_vol_6dB_mm3', ...
+            'focal_centroid_3dB_dist_mm'}), ...
             parameters.io.filename_table);
     else
-        % If no layered tissue was selected, the max Isppa is highlighted on the plane and written in a table.
+        % Free-field simulation: compute ITRUSST focal metrics using after-exit-plane mask.
+        % Region mask restricts the focal zone to beyond the transducer exit plane.
+        fm_ff = compute_focal_metrics(acoustic_Ipa, results.Isppa_after_exit_plane, ...
+                                      after_exit_plane_mask, trans_pos, parameters.grid.resolution_mm);
+        results.focal_mask_3dB        = fm_ff.mask_3dB;
+        results.focal_mask_6dB        = fm_ff.mask_6dB;
+        results.focal_vol_3dB_mm3          = fm_ff.vol_3dB_mm3;
+        results.focal_vol_6dB_mm3          = fm_ff.vol_6dB_mm3;
+        results.focal_centroid_3dB_dist_mm = fm_ff.centroid_3dB_dist_mm;
+
         highlighted_pos = results.max_isppa_eplane_pos;
         writetable(table(parameters.subject_id, freq_Hz, results.Isppa, results.Isppa_after_exit_plane, ...
             results.Psptp, results.Ptp_target, real_focal_distance, trans_pos, focus_pos, ...
             results.Ipa_target, results.Ipa_target_radius, ...
+            results.focal_vol_3dB_mm3, results.focal_vol_6dB_mm3, ...
+            results.focal_centroid_3dB_dist_mm, ...
             'VariableNames', {'subject_id', 'freq_Hz', 'Isppa', 'Isppa_after_exitplane', ...
             'Psptp', 'Ptp_target', 'real_focal_distance_mm', 'trans_pos_vox', 'focus_pos_vox', ...
-            'Ipa_target', 'Ipa_target_radius'}), ...
+            'Ipa_target', 'Ipa_target_radius', ...
+            'focal_vol_3dB_mm3', 'focal_vol_6dB_mm3', ...
+            'focal_centroid_3dB_dist_mm'}), ...
         parameters.io.filename_table);
     end
 
@@ -277,11 +318,15 @@ end
         all_fpos(ti, :) = parameters.transducer(ti).focus_pos;
     end
 
-    for ti = 1:n_plots
+    % Sync mode: all transducers fire together — one combined plot, no trans-XX suffix.
+    sync_mode = n_plots > 1 && ~is_async_mode(parameters);
+    n_iters   = 1 + (~sync_mode) * (n_plots - 1);  % 1 for sync, n_plots for async/single
+
+    for ti = 1:n_iters
 
         fpos_sim = parameters.transducer(ti).focus_pos;
 
-        t_suffix = trans_suffix(ti, n_plots);
+        t_suffix = trans_suffix(ti, n_iters);
 
         if numel(parameters.grid.dims)==3
             slices = struct( ...
@@ -347,3 +392,5 @@ function s = vec2csvstr(v)
 % [1.23,4.56].  Used to store per-transducer vectors in a single CSV cell.
     s = ['[' strjoin(arrayfun(@(x) sprintf('%.6g', x), v, 'UniformOutput', false), ',') ']'];
 end
+
+
