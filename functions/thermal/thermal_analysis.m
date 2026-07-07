@@ -88,6 +88,11 @@ end
         results_thermal.riseT_brain = masked_max_3d(results_heating.maxT, mask.brain)-parameters.thermal.temp_0.brain;
         results_thermal.riseT_skull = masked_max_3d(results_heating.maxT, mask.skull)-parameters.thermal.temp_0.skull; 
         results_thermal.riseT_skin = masked_max_3d(results_heating.maxT, mask.skin)-parameters.thermal.temp_0.skin;
+        % absolute temperature rise from a fixed 37 C baseline (ITRUSST convention:
+        % T_max - 37), independent of the per-tissue baseline temp_0 used above
+        results_thermal.riseT37_brain = results_thermal.maxT_brain - 37;
+        results_thermal.riseT37_skull = results_thermal.maxT_skull - 37;
+        results_thermal.riseT37_skin  = results_thermal.maxT_skin  - 37;
         % temperature rise (at simulation offset)
         results_thermal.rise_endT_brain = results_thermal.endT_brain-parameters.thermal.temp_0.brain;
         results_thermal.rise_endT_skull = results_thermal.endT_skull-parameters.thermal.temp_0.skull; 
