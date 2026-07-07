@@ -23,6 +23,16 @@ function parameters = preproc_transducer_placement(parameters)
 %               pipeline exits so the user can re-run after the job finishes
 %               (same pattern as segmentation_only).
 %
+%   'mni'       Place the transducer and focus directly from MNI coordinates.
+%               Requires placement.mni.trans_pos_mm and placement.mni.focus_pos_mm
+%               ([1x3] MNI mm). The focus is converted with the nonlinear (nonl)
+%               SimNIBS transform (like the heuristic target); the transducer
+%               point is converted with the linear (12dof) transform because it
+%               lies outside the brain where the nonlinear warp is unreliable.
+%               The transducer is then snapped to the nearest scalp voxel and
+%               offset outward by placement.mni.skin_gap_mm (default 5 mm) using
+%               the same standoff geometry as the heuristic (no search).
+%
 %   'plantus'   Call the external PlanTUS tool (Lueckel et al., Mainz) to
 %               optimise transducer placement against five geometric objectives:
 %               beam–target overlap, angle at skin, skin–skull angle, skull
@@ -91,13 +101,17 @@ end
         case 'heuristic'
             parameters = run_heuristic_placement(parameters);
 
+        % ── MNI ───────────────────────────────────────────────────────────
+        case 'mni'
+            parameters = run_mni_placement(parameters);
+
         % ── PLANTUS ───────────────────────────────────────────────────────
         case 'plantus'
             parameters = run_plantus_placement(parameters);
 
         otherwise
             error(['Unknown placement.mode ''%s''. ' ...
-                   'Use ''manual'', ''localite'', ''heuristic'', or ''plantus''.'], mode);
+                   'Use ''manual'', ''localite'', ''heuristic'', ''mni'', or ''plantus''.'], mode);
     end
 
 end
@@ -232,6 +246,73 @@ function parameters = read_tpos_file(tpos_file, parameters)
         parameters.transducer(ti).trans_pos = trans_pos;
         parameters.transducer(ti).focus_pos = focus_pos;
     end
+end
+
+% ── MNI placement dispatcher ─────────────────────────────────────────────
+function parameters = run_mni_placement(parameters)
+% Place the transducer and focus directly from MNI coordinates.
+%
+% The focus (an in-brain target) is converted with the nonlinear (nonl)
+% SimNIBS transform, identical to the heuristic. The transducer point lies
+% outside the brain, so it is converted with the linear (12dof) transform
+% (where the nonlinear warp is unreliable), then snapped to the nearest scalp
+% voxel and offset outward by skin_gap_mm using the heuristic's standoff
+% geometry (transducer_scalp_geometry). No search is performed.
+
+    % Validate required config
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'mni')
+        error('PRESTUS:placement:missingConfig', ...
+            'placement.mni sub-struct is missing. See config_default.yaml for required fields.');
+    end
+    mni = parameters.placement.mni;
+    if ~isfield(mni, 'trans_pos_mm') || numel(mni.trans_pos_mm) ~= 3 || isempty(mni.trans_pos_mm)
+        error(['placement.mni.trans_pos_mm must be a [1x3] MNI coordinate in mm ' ...
+               'for mode=''mni''.']);
+    end
+    if ~isfield(mni, 'focus_pos_mm') || numel(mni.focus_pos_mm) ~= 3 || isempty(mni.focus_pos_mm)
+        error(['placement.mni.focus_pos_mm must be a [1x3] MNI coordinate in mm ' ...
+               'for mode=''mni''.']);
+    end
+    skin_gap_mm = 5;
+    if isfield(mni, 'skin_gap_mm') && ~isempty(mni.skin_gap_mm)
+        skin_gap_mm = mni.skin_gap_mm;
+    end
+
+    % Load segmentation image + header (same source as the heuristic)
+    m2m = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+    seg_file   = fullfile(m2m, 'final_tissues.nii.gz');
+    img        = niftiread(seg_file);
+    img_header = niftiinfo(seg_file);
+    pixel_size = mean(img_header.PixelDimensions(1:3));
+
+    % ── Coordinate conversion (per-point transform type) ──────────────────
+    % Transducer scalp point -> LINEAR 12dof (outside brain; nonl unreliable).
+    % transform_coordinates hardcodes nonl in its 'mni' branch, so do the
+    % MNI->RAS+ step explicitly with '12dof', then RAS+->grid via the affine.
+    trans_ras = mni2subject_coords_LDfix(mni.trans_pos_mm(:)', m2m, parameters, '12dof');
+    trans_vox = transform_coordinates(parameters, trans_ras, 'ras_plus', 'grid', img_header);
+
+    % Focus -> NONLINEAR nonl, identical to the heuristic target.
+    focus_pos = transform_coordinates(parameters, mni.focus_pos_mm(:)', 'mni', 'grid', img_header);
+
+    % ── Snap transducer to scalp, then apply standoff geometry ────────────
+    scalp  = tp_scalp_boundary(img);                 % [N x 3] outer-boundary voxels
+    [~, j] = min(pdist2(scalp, trans_vox));          % nearest scalp voxel
+    trans_pos = transducer_scalp_geometry(scalp(j,:), focus_pos, ...
+                    parameters.transducer(1), pixel_size, skin_gap_mm);
+    trans_pos = round(trans_pos);
+
+    fprintf('MNI placement resolved (skin_gap_mm = %.1f):\n', skin_gap_mm);
+    fprintf('  trans_pos = [%d %d %d]\n', trans_pos);
+    fprintf('  focus_pos = [%d %d %d]\n', focus_pos);
+
+    for ti = 1:numel(parameters.transducer)
+        parameters.transducer(ti).trans_pos = trans_pos;
+        parameters.transducer(ti).focus_pos = focus_pos;
+    end
+    plot_placement_t1_overlay(parameters, ...
+        parameters.transducer(1).trans_pos, ...
+        parameters.transducer(1).focus_pos, 'mni');
 end
 
 % ── PlanTUS placement dispatcher ─────────────────────────────────────────

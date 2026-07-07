@@ -22,6 +22,10 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Automated defacing via pydeface, with optional integration into the segmentation pipeline
 - Defaced regions shown transparently in placement and 3D head views
 
+#### Placement
+- New `placement.mode = 'mni'`: specify both transducer scalp-entry point and focus directly in MNI mm, alongside the existing `manual`/`localite`/`heuristic`/`plantus` modes. The focus converts via the nonlinear SimNIBS warp (as the heuristic target does); the transducer point converts via the linear 12dof affine, since the nonlinear warp is unreliable outside the brain
+- Scalp-boundary extraction and transducer standoff-geometry math extracted into shared helpers (`tp_scalp_boundary`, `transducer_scalp_geometry`), reused by both the heuristic candidate-mesh search and the new MNI mode
+
 #### Calibration
 - Transducer library: scan equipment, store validated parametric models, plot and compare entries
 - Joint-depth phase/amplitude fit for more robust free-field characterisation
