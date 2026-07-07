@@ -51,7 +51,7 @@ An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical N
 | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
 | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
 
-Water/free-field simulations additionally include `Psptp` (spatial peak temporal peak pressure) and `Ptp_target` (temporal peak pressure at the target).
+Water/free-field simulations additionally include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target), and `MI` (global mechanical index, unitless; ITRUSST limit 1.9, labelled "MI (free water)" in the report).
 
 #### Tissue-specific *(layered simulations only)*
 
@@ -63,6 +63,7 @@ Water/free-field simulations additionally include `Psptp` (spatial peak temporal
 | `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
 | `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
 | `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
+| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (same column also written for water/free-field runs). Max pressure safety limit: 2 MPa |
 | `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
 | `MI_brain` | — | Maximum mechanical index within brain tissue (GM + WM) |
 | `MI_skull` | — | Maximum mechanical index within skull bone |
@@ -112,6 +113,8 @@ The HTML report flags each metric against the ITRUSST consensus non-significant 
 | Metric | Limit |
 |---|---|
 | MI transcranial | 1.9 |
+| MI (free water) | 1.9 |
+| Max pressure | 2 MPa |
 | Temperature rise (a) | 2 °C |
 | Maximum temperature (b) | 39 °C |
 | CEM43 (brain) (c) | 2 min |
@@ -230,4 +233,4 @@ group_plots/                              ← group-level box-plot images
     group_<medium>_cem43<affix>.png         CEM43 thermal dose   (heating runs)
 ```
 
-The thermal plots are produced only for layered media with heating simulations. The HTML aggregates each subject's existing CSV metrics and PNG overlays; it is regenerable at any time and runs no simulations. See [Group analysis](doc_group.md#group-html-report) for usage.
+The thermal plots are produced only for layered media with heating simulations. The HTML aggregates each subject's existing CSV metrics and PNG overlays; it is regenerable at any time and runs no simulations. Box plots auto-scale their figure size to the number of plotted columns and are exported as PNGs (see [Group analysis](doc_group.md#group-html-report)). The group Safety dashboard's Mechanical grid always shows both `MI` (free water) and `MItc` tiles plus Max pressure; whichever MI variant has no data for the report's medium renders grayed out ("N/A") — see [Group HTML report](doc_group.md#group-html-report) for details.

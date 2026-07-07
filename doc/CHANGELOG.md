@@ -35,6 +35,9 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Run labels derived automatically from output affixes in consolidated reports
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
+- New global `MI` (free-water mechanical index) and `Psptp` (global peak pressure, now also written for layered runs) output columns, for consistency across media
+- Safety dashboards (per-subject and group) now flag peak pressure against a 2 MPa non-significant-risk limit
+- Safety dashboards (per-subject and group) now show both `MI` (free water) and `MItc` (transcranial) tiles side by side instead of per-tissue `MI_brain`/`MI_skull`/`MI_skin` cards; whichever variant has no data for the report's medium renders grayed out
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs
