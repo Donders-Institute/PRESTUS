@@ -10,15 +10,15 @@
 
 #------------ General
 
-subject_id: 0    # Participant ID (integer, used for path substitution in path.t1_pattern and path.t2_pattern) 
+subject_id: 0    # Participant ID (integer, used for path substitution in path.t1_pattern and path.t2_pattern)
 platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matlab (recommended for debugging)
+# acoustic_backend: 'kwave'   # Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'
+# thermal_backend:  'kwave'   # Thermal solver: 'kwave' (default) | 'babelbrain'
 
 #------------ Simulation type & execution
 
 simulation:
   medium: layered     # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
-  # acoustic_backend: 'kwave'   # Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'
-  # thermal_backend:  'kwave'   # Thermal solver: 'kwave' (default) | 'babelbrain'
   code_type: matlab_gpu # Select which k-Wave code to run:
                         #   MATLAB CPU code 'matlab_cpu'
                         #   MATLAB GPU code 'matlab_gpu'
@@ -76,6 +76,8 @@ io:
   save_heatingvideo: 0      # Save a video of incremental heating?
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
+  save_Ipa: 1              # Save pulse-average intensity (Ipa) NIfTI map; suppressed automatically when timing.pd absent
+  save_Ita: 1              # Save temporal-average intensity (Ita) NIfTI map; suppressed automatically when timing.pd/.pri absent
   save_p_complex: 0         # Save complex pressure field (p_complex) alongside p_max_all in the acoustic cache? (large)
 
   # --- Advanced / optional fields (not set by default; uncomment to enable) ---
@@ -338,13 +340,14 @@ grid:
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
-  mode: 'principal_axis'   # Grid orientation mode:
-                           #   'principal_axis' (default) — rotate volume so the first principal
-                           #     component of all transducer positions aligns with z. For N=1
-                           #     this equals transducer_axis (focal axis of trans(1)); for N=2
-                           #     it equals the inter-transducer axis; for N≥3 it is the
-                           #     direction of maximum spread of the transducer position cloud.
-                           #     Gives a symmetric, compact grid for any transducer configuration.
+  mode: 'focal_axis'       # Grid orientation mode:
+                           #   'focal_axis' (default) — rotate volume so the mean focal unit
+                           #     vector of all transducers aligns with z. For N=1 this equals
+                           #     transducer_axis; for bilateral setups it equals the
+                           #     inter-transducer axis (identical to the old principal_axis
+                           #     result); for angled multi-transducer setups z correctly points
+                           #     toward the beam convergence zone. Falls back to transducer(1)
+                           #     focal axis if beams are too spread (norm < grid.focal_axis_min_norm).
                            #   'transducer_axis' — rotate volume so the focal axis of
                            #     transducer(1) aligns with z. Compact grid, z-aligned beam.
                            #     Useful when transducer(1) is the primary beam and other
@@ -354,6 +357,7 @@ grid:
                            #     aligns with k-Plan / BabelBrain conventions. Requires that
                            #     transducer_setup can place a bowl at an arbitrary angle, which
                            #     k-Wave supports via makeBowl(grid, trans_pos, r, d, focus_pos).
+                           #   'principal_axis' — deprecated alias for focal_axis; emits a warning.
 
 #------------ Segmentation
 
@@ -427,7 +431,7 @@ thermal:
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
   log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
 
-#------------ BabelBrain solver settings (used when simulation.acoustic_backend = 'babelbrain')
+#------------ BabelBrain solver settings (used when acoustic_backend = 'babelbrain')
 jwave:
   python_env: ''            # Path to Python environment or executable; empty = system python
   python_env_gpu: ''        # Path to GPU-capable Python environment; empty = same as python_env

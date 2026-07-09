@@ -1,15 +1,23 @@
-function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
+function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
                                 segmentation, source_labels, reserved, provenance)
 % ACOUSTIC_ANALYSIS  Compute acoustic intensity metrics and generate output plots and tables
 %
-% Derives spatial pressure, intensity (Isppa), and mechanical index (MI) maps
-% from k-Wave sensor output. For layered and phantom media, computes per-tissue
-% peak values (skin, skull, brain) and transcranial MI. Writes a summary CSV and
-% saves overlay plots of the intensity on the segmentation.
+% Derives spatial pressure, intensity, and mechanical index (MI) maps from
+% k-Wave sensor output.  Three intensity quantities are computed:
+%
+%   Itp  — intensity at temporal peak: p²/(2ρc), derived from peak pressure [W/cm²]
+%   Ipa  — intensity of pulse average: Itp × ramp_factor (= Itp for square pulses)
+%            requires parameters.timing.pd; otherwise Ipa = Itp and saving is suppressed
+%   Ita  — intensity of temporal average: Ipa × duty_cycle  [W/cm²]
+%            requires parameters.timing.pd and .pri; otherwise Ita = []
+%
+% For layered and phantom media, computes per-tissue peak values (skin, skull,
+% brain) and transcranial MI (all Ipa-based).  Writes a summary CSV and saves
+% overlay plots of the intensity on the segmentation.
 %
 % Use as:
-%   [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
+%   [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
 %       acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
 %                         segmentation, source_labels)
 %   [results, ...] = acoustic_analysis(..., [], provenance)
@@ -25,9 +33,9 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 %   provenance   - acoustic provenance struct from prestus_pipeline (optional)
 %
 % Output:
-%   results          - struct with fields: Isppa, Isppa_after_exit_plane, Psptp,
-%                      Ipa_target, Ipa_target_radius, real_focal_distance, and per-tissue
-%                      Isppa/Psptp/MI fields for layered/phantom media [W/cm², Pa, -].
+%   results          - struct with fields: Isptp, Isppa, [Ispta], Isppa_after_exit_plane,
+%                      Psptp, Ipa_target, Ipa_target_radius, real_focal_distance, and
+%                      per-tissue Isppa/Psptp/MI fields for layered/phantom media.
 %                      ITRUSST focal metrics (Martin et al., 2025, Brain Stimulation)
 %                      are computed for both layered (brain-masked) and free-field
 %                      (after-exit-plane-masked) simulations:
@@ -35,7 +43,9 @@ function [results, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos
 %                        focal_vol_3dB/6dB_mm3            — focal zone volumes [mm³]
 %                        focal_centroid_3dB_dist_mm       — distance of −3 dB centroid
 %                                                           from transducer [mm]
-%   acoustic_Ipa     - spatial Isppa map [W/cm²]
+%   acoustic_Itp     - intensity at temporal peak map [W/cm²]
+%   acoustic_Ipa     - intensity of pulse average map [W/cm²]  (empty when timing absent)
+%   acoustic_Ita     - intensity of temporal average map [W/cm²] (empty when timing absent)
 %   acoustic_MI      - spatial mechanical index map [-]
 %   acoustic_pressure- temporal peak pressure map [Pa]
 %   highlighted_pos  - [1x3] grid coordinates of peak intensity for plots [voxels]
@@ -53,7 +63,7 @@ arguments
     provenance   struct  = struct()
 end
 
-    disp('Processing the results of acoustic simulations...')
+    fprintf('[acoustic_analysis] Processing the results of acoustic simulations...\n')
 
     % select transducer info
     tr = parameters.transducer(1);
@@ -74,29 +84,47 @@ end
     end
     results.Psptp = max(acoustic_pressure(:)); % spatial peak temporal peak pressure
 
-    % Calculates the Isppa for every gridpoint
-    acoustic_Ipa = acoustic_pressure.^2./...
-        (2*(kwave_medium.sound_speed.*kwave_medium.density)).*1e-4;
+    % Itp: intensity at temporal peak — p²/(2ρc) at each voxel [W/cm²].
+    % Derived directly from the peak pressure field; no pulse-envelope correction.
+    acoustic_Itp = acoustic_pressure.^2 ./ ...
+        (2 * (kwave_medium.sound_speed .* kwave_medium.density)) .* 1e-4;
 
-    % Apply amplitude-ramp correction (ISPPA = f * ISPTP, f <= 1).
-    % Ramping reduces the pulse-average intensity relative to the temporal
-    % peak because intensity scales as amplitude^2.  The correction is only
-    % applied when timing.pulse_ramp_dur > 0; otherwise f = 1 (no effect).
-    if isfield(parameters, 'timing') && isfield(parameters.timing, 'pulse_ramp_dur') ...
-            && parameters.timing.pulse_ramp_dur > 0
-        ramp_shape = "linear";
-        if isfield(parameters.timing, 'pulse_ramp_shape')
-            ramp_shape = string(parameters.timing.pulse_ramp_shape);
+    results.Isptp = max(acoustic_Itp(:)); % spatial-peak temporal-peak intensity [W/cm²]
+
+    % Ipa: intensity of pulse average — Itp scaled by the ramp factor (Ipa ≤ Itp).
+    % For square pulses (no ramp) Ipa = Itp; ramp_f = 1.
+    % Requires timing.pd to be meaningful; when timing is absent acoustic_Ipa is
+    % returned as empty so that nifti_acoustic can suppress the redundant _Ipa map.
+    timing_has_pd = isfield(parameters, 'timing') && isfield(parameters.timing, 'pd');
+    if timing_has_pd
+        ramp_f = 1;
+        if isfield(parameters.timing, 'pulse_ramp_dur') && parameters.timing.pulse_ramp_dur > 0
+            ramp_shape = "linear";
+            if isfield(parameters.timing, 'pulse_ramp_shape')
+                ramp_shape = string(parameters.timing.pulse_ramp_shape);
+            end
+            ramp_f = compute_ramp_factor(parameters.timing.pd, ...
+                                         parameters.timing.pulse_ramp_dur, ramp_shape);
+            fprintf('[acoustic_analysis] Ramp correction: Ipa = %.4f * Itp (shape: %s, ramp_dur = %.4g s)\n', ...
+                    ramp_f, ramp_shape, parameters.timing.pulse_ramp_dur);
         end
-        ramp_f = compute_ramp_factor(parameters.timing.pd, ...
-                                     parameters.timing.pulse_ramp_dur, ramp_shape);
-        acoustic_Ipa = acoustic_Ipa * ramp_f;
-        fprintf('Amplitude ramp correction applied: f = %.4f (shape: %s, ramp_dur = %.4g s)\n', ...
-                ramp_f, ramp_shape, parameters.timing.pulse_ramp_dur);
+        acoustic_Ipa = acoustic_Itp * ramp_f;
+    else
+        acoustic_Ipa = acoustic_Itp;  % fallback for analysis; not saved as a separate map
     end
 
-    % Calculates the ISPPA (spatial peak pulse-average intensity)
-    results.Isppa = max(acoustic_Ipa(:));
+    results.Isppa = max(acoustic_Ipa(:)); % spatial-peak pulse-average intensity [W/cm²]
+
+    % Ita: intensity of temporal average — Ipa × duty_cycle [W/cm²].
+    % Empty when timing.pd and .pri are not both available.
+    acoustic_Ita = [];
+    if timing_has_pd && isfield(parameters.timing, 'pri') && parameters.timing.pri > 0
+        duty_cycle = parameters.timing.pd / parameters.timing.pri;
+        acoustic_Ita = acoustic_Ipa * duty_cycle;
+        results.Ispta = max(acoustic_Ita(:)); % spatial-peak temporal-average intensity [W/cm²]
+        fprintf('[acoustic_analysis] Ita = %.6g * Ipa (duty_cycle = pd/pri = %.4g/%.4g s)\n', ...
+                duty_cycle, parameters.timing.pd, parameters.timing.pri);
+    end
 
     % Calculates the Mechanical Index for every gridpoint.
     % MI = |p_neg| / sqrt(f) per IEC 62359 / FDA: peak rarefaction pressure.
@@ -105,14 +133,16 @@ end
     freq_Hz    = min(freqs_all);
     freq_MHz   = freq_Hz / 1e6;
     if numel(unique(freqs_all)) > 1
-        fprintf(['Multi-frequency setup: MI computed using lowest frequency %g Hz ' ...
+        fprintf(['[acoustic_analysis] Multi-frequency setup: MI computed using lowest frequency %g Hz ' ...
                  '(conservative; transducer frequencies: %s Hz).\n'], freq_Hz, num2str(freqs_all));
     end
 
     % Select peak negative pressure map (p_min_all / p_min_async are ≤ 0).
-    if isfield(sensor_data, 'p_min_async')
+    % Guard against empty fields (e.g. jwave sets p_min_all=[] when the HDF5
+    % read fails) — treat those the same as a missing field.
+    if isfield(sensor_data, 'p_min_async') && ~isempty(sensor_data.p_min_async)
         acoustic_p_neg = abs(gather(sensor_data.p_min_async));
-    elseif isfield(sensor_data, 'p_min_all')
+    elseif isfield(sensor_data, 'p_min_all') && ~isempty(sensor_data.p_min_all)
         acoustic_p_neg = abs(gather(sensor_data.p_min_all));
     else
         warning('acoustic_analysis:noPeakNeg', ...
@@ -121,6 +151,16 @@ end
     end
 
     acoustic_MI = (acoustic_p_neg/10^6)/sqrt(freq_MHz);
+
+    fprintf('[acoustic_analysis] ---- acoustic analysis summary ----\n');
+    fprintf('[acoustic_analysis] Grid dims:            %s  |  resolution: %.4g mm\n', ...
+        num2str(parameters.grid.dims), parameters.grid.resolution_mm);
+    fprintf('[acoustic_analysis] p_max range [Pa]:     %.4g  –  %.4g\n', ...
+        min(acoustic_pressure(:)), max(acoustic_pressure(:)));
+    fprintf('[acoustic_analysis] Frequency:            %.4g kHz\n', freq_Hz / 1e3);
+    fprintf('[acoustic_analysis] Medium type:          %s\n', parameters.simulation.medium);
+    fprintf('[acoustic_analysis] Active sensor voxels: %d\n', numel(acoustic_pressure));
+    fprintf('[acoustic_analysis] ------------------------------------\n');
 
     % Creates a mask for voxels beyond the exit plane of any transducer.
     % For multi-transducer setups the mask is the union across transducers:
@@ -201,7 +241,7 @@ end
     elseif numel(parameters.grid.dims)==2
         results.max_isppa_eplane_pos = [Ix_eplane, Iy_eplane];
     end
-    disp('Final transducer, expected focus, and max ISPPA positions')
+    fprintf('[acoustic_analysis] Final transducer, expected focus, and max ISPPA positions\n')
     
     % [3] calculate the realized focal distance
     real_focal_distance = norm(results.max_isppa_eplane_pos-trans_pos)*parameters.grid.resolution_mm; % [mm]
@@ -256,17 +296,28 @@ end
             results.MI_tc = NaN; % intracranial tissues not modelled
         end
 
+        % Free-field ISPPA from provenance (BabelBrain water run, or NaN otherwise).
+        % Enables normalized comparison across solvers: Isppa_brain / freefield_isppa_wcm2.
+        freefield_isppa_wcm2 = NaN;
+        if isfield(provenance, 'freefield_isppa_wcm2') && isfinite(provenance.freefield_isppa_wcm2)
+            freefield_isppa_wcm2 = provenance.freefield_isppa_wcm2;
+            results.freefield_isppa_wcm2 = freefield_isppa_wcm2;
+        end
+
+        Isptp_val = results.Isptp;
+        Ispta_val = NaN; if isfield(results, 'Ispta'), Ispta_val = results.Ispta; end
+
         writetable(table(parameters.subject_id, freq_Hz, ...
-            results.Isppa, results.Isppa_after_exit_plane, ...
+            Isptp_val, results.Isppa, Ispta_val, results.Isppa_after_exit_plane, ...
             real_focal_distance, results.Isppa_skin, results.Isppa_skull, ...
             results.Isppa_brain, results.Psptp_skin, results.Psptp_skull, ...
             results.Psptp_brain, results.Ptp_target, results.MI_skin, results.MI_skull, ...
             results.MI_brain, results.MI_tc, Ix_brain, Iy_brain, Iz_brain, trans_pos, focus_pos, ...
             results.Ipa_target, results.Ipa_target_radius, half_max_ISPPA_volume_brain, ...
             results.focal_vol_3dB_mm3, results.focal_vol_6dB_mm3, ...
-            results.focal_centroid_3dB_dist_mm, ...
+            results.focal_centroid_3dB_dist_mm, freefield_isppa_wcm2, ...
             'VariableNames', { 'subject_id', 'freq_Hz', ...
-            'Isppa', 'Isppa_after_exitplane', 'real_focal_distance_mm', ...
+            'Isptp', 'Isppa', 'Ispta', 'Isppa_after_exitplane', 'real_focal_distance_mm', ...
             'Isppa_skin', 'Isppa_skull', 'Isppa_brain', ...
             'Psptp_skin', 'Psptp_skull', 'Psptp_brain', 'Ptp_target', ...
             'MI_skin', 'MI_skull', 'MI_brain', 'MI_tc', ...
@@ -275,7 +326,7 @@ end
             'Ipa_target', 'Ipa_target_radius', ...
             'halfmax_ISPPA_volume_brain_mm3', ...
             'focal_vol_3dB_mm3', 'focal_vol_6dB_mm3', ...
-            'focal_centroid_3dB_dist_mm'}), ...
+            'focal_centroid_3dB_dist_mm', 'freefield_isppa_wcm2'}), ...
             parameters.io.filename_table);
     else
         % Free-field simulation: compute ITRUSST focal metrics using after-exit-plane mask.
@@ -289,12 +340,16 @@ end
         results.focal_centroid_3dB_dist_mm = fm_ff.centroid_3dB_dist_mm;
 
         highlighted_pos = results.max_isppa_eplane_pos;
-        writetable(table(parameters.subject_id, freq_Hz, results.Isppa, results.Isppa_after_exit_plane, ...
+        Isptp_val = results.Isptp;
+        Ispta_val = NaN; if isfield(results, 'Ispta'), Ispta_val = results.Ispta; end
+        writetable(table(parameters.subject_id, freq_Hz, ...
+            Isptp_val, results.Isppa, Ispta_val, results.Isppa_after_exit_plane, ...
             results.Psptp, results.Ptp_target, real_focal_distance, trans_pos, focus_pos, ...
             results.Ipa_target, results.Ipa_target_radius, ...
             results.focal_vol_3dB_mm3, results.focal_vol_6dB_mm3, ...
             results.focal_centroid_3dB_dist_mm, ...
-            'VariableNames', {'subject_id', 'freq_Hz', 'Isppa', 'Isppa_after_exitplane', ...
+            'VariableNames', {'subject_id', 'freq_Hz', ...
+            'Isptp', 'Isppa', 'Ispta', 'Isppa_after_exitplane', ...
             'Psptp', 'Ptp_target', 'real_focal_distance_mm', 'trans_pos_vox', 'focus_pos_vox', ...
             'Ipa_target', 'Ipa_target_radius', ...
             'focal_vol_3dB_mm3', 'focal_vol_6dB_mm3', ...
@@ -382,6 +437,18 @@ end
             set(h, 'InvertHardcopy', 'off'); % keep original colours
             saveas(h, output_plot, 'png')
             close(h);
+        end
+    end
+
+    % Axial profile (3-D only): pressure and intensity along beam axis through focus,
+    % with tissue-layer shading. Saves PNG + CSV alongside the overlay plots.
+    if numel(parameters.grid.dims) == 3 && ~isempty(medium_masks)
+        try
+            plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
+                parameters, trans_pos, focus_pos, highlighted_pos);
+        catch ME
+            warning('acoustic_analysis:axialProfile', ...
+                'plot_axial_profile failed: %s', ME.message);
         end
     end
 end

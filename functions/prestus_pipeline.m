@@ -8,21 +8,19 @@ function [parameters] = prestus_pipeline(parameters, options)
 % Pipeline stages (each independently toggled via parameters.modules.*):
 %   1. Segmentation      SimNIBS charm segmentation of structural MRI
 %   2. Transducer placement  Neuronavigation-guided entry/target point setup
-%   3. Grid & head model Reorientation, rescaling, smoothing, and cropping
-%                        of the segmented head to the simulation grid
-%   4. Medium setup      Assignment of acoustic/thermal tissue properties
-%                        (density, sound speed, attenuation, heat capacity …)
+%   3. Grid & head model grid_stage — reorientation, rescaling, smoothing,
+%                        and cropping of the segmented head to the simulation grid
+%   4. Medium setup      medium_stage — assignment of acoustic/thermal tissue
+%                        properties (density, sound speed, attenuation, …)
 %   5. Source setup      Construction of the transducer source array
 %                        (kWaveArray or analytical; annular or matrix)
-%   6. Acoustic sim      k-Wave pressure field simulation
-%   7. Acoustic analysis ISPPA, ISPTA, MI, and focal metrics; NIfTI export
-%   8. Thermal sim       Bio-heat equation solved over the sonication protocol
-%   9. Thermal analysis  Peak temperature, CEM43, and safety metrics; NIfTI export
+%   6. Acoustic sim      acoustic_stage — k-Wave / jwave / BabelBrain
+%   7. Acoustic analysis ISPPA, ISPTA, MI, focal metrics; NIfTI export
+%   8. Thermal sim       thermal_stage — bio-heat equation over sonication protocol
+%   9. Thermal analysis  Peak temperature, CEM43, safety metrics; NIfTI export
 %  10. Report            Self-contained HTML summary report
 %  11. Post-hoc water sim  Optional repeat of acoustic sim in homogeneous water
-%                          (for free-field reference without skull)
-%  12. Sequential follow-up  Optional chained simulation using end-temperature
-%                             of this run as the starting state for the next
+%  12. Sequential follow-up  Optional chained simulation (end-temperature handoff)
 %
 % Cache files written at each stage allow individual stages to be skipped on
 % re-runs.  Stage-level toggles live in parameters.modules.*; see
@@ -32,24 +30,15 @@ function [parameters] = prestus_pipeline(parameters, options)
 %   parameters = prestus_pipeline(parameters)
 %   parameters = prestus_pipeline(parameters, options)
 %
-%   Typically invoked via prestus_pipeline_start, which handles platform
-%   selection (MATLAB / SLURM / qsub) and special-mode dispatch.
-%
 % Input:
-%   parameters - struct built from config_default.yaml and a subject-specific
+%   parameters - struct built from config_default.yaml and subject-specific
 %                override config; must include subject_id, path.sim, and all
-%                transducer/grid settings; see config/config_default.yaml for
-%                the full list of available fields
-%   options    - (optional) struct; currently supports:
-%                  .sequential_configs  struct of follow-up configs to run in
-%                                       sequence after this simulation, each
-%                                       starting from the current run's
-%                                       end-temperature and CEM43 state
+%                transducer/grid settings
+%   options    - (optional) struct; supports:
+%                  .sequential_configs  struct of follow-up configs for chained runs
 %
 % Output:
-%   parameters - updated struct with fields added by path_log_setup and
-%                intermediate processing steps (e.g. io.dir_output,
-%                io.filename_kwave_source, transducer positions)
+%   parameters - updated struct with pipeline outputs (io.dir_output, etc.)
 %
 % Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB >= 2023b
 %
@@ -73,39 +62,26 @@ function [parameters] = prestus_pipeline(parameters, options)
     %% TELEMETRY  (opt-in, fully anonymous)
     % ====================================================================
 
-    telemetry_setup();   % reads/writes consent flag on first call, no-op after
+    telemetry_setup();
     telemetry_t0  = tic;
     telemetry_rid = generate_run_id();
     try
 
     % ====================================================================
     %% SPECIAL-MODE INTERCEPTS
-    %
-    % Several orchestration modes reuse prestus_pipeline as their entry
-    % point but redirect execution to a dedicated pipeline function before
-    % any simulation work begins.  Each returns immediately after dispatch
-    % so the rest of this function is not reached.
     % ====================================================================
 
-    % Uncertainty mode: runs default / liberal / conservative tissue-property
-    % variants and combines them into a single uncertainty HTML report.
     if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
             parameters.simulation.uncertainty
         uncertainty_pipeline(parameters, options);
         return;
     end
 
-    % Multi-ISPPA mode: sweeps a list of target intensities and compares
-    % focal metrics across the sweep without re-running the full pipeline
-    % for each point.
     if is_multi_isppa_mode(parameters)
         multi_isppa_pipeline(parameters, options);
         return;
     end
 
-    % Async-combine stage: a lightweight HPC job that merges intensity
-    % volumes from independently simulated transducers.  No k-Wave is
-    % invoked — the job only calls combine_async_intensity and exits.
     if isfield(parameters, 'modules') && isfield(parameters.modules, 'combine_async') && ...
             parameters.modules.combine_async
         targets = [];
@@ -124,15 +100,9 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % ====================================================================
     %% STAGE 1 — SEGMENTATION
-    %
-    % Runs SimNIBS charm to segment the structural MRI into tissue classes
-    % (skin, skull, CSF, brain, …).  Only needed for layered simulations;
-    % water / phantom runs skip this stage entirely.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','segmentation', parameters.path.seg);
 
     if contains(parameters.simulation.medium, {'layered'})
@@ -151,15 +121,9 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % ====================================================================
     %% STAGE 2 — TRANSDUCER PLACEMENT
-    %
-    % Resolves entry and target coordinates from neuronavigation data
-    % (e.g. Localite) or from coordinates provided directly in the config.
-    % Writes a placement QC figure to the output folder.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','placement', parameters.io.dir_output);
 
     if ~isfield(parameters.modules, 'run_transducer_placement') || ...
@@ -172,337 +136,61 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % ====================================================================
     %% STAGE 3 — GRID SETUP & HEAD PREPROCESSING
-    %
-    % Reorients and crops the segmented head, places the transducer and
-    % target within the k-Wave grid, and optionally applies axisymmetric
-    % reduction for 2-D simulations.  Results are cached so that
-    % re-runs with the same config reuse the grid without recomputing.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','preproc', parameters.io.dir_output);
 
-    % sequential_pipeline sets preproc_affix to the base run's output_affix so
-    % follow-up simulations reuse the existing grid without recomputing it.
-    if isfield(parameters.io, 'preproc_affix')
-        preproc_affix = parameters.io.preproc_affix;
-    else
-        preproc_affix = parameters.io.output_affix;
-    end
-    filename_grid_cache = fullfile(parameters.io.dir_cache, ...
-        sprintf('sub-%03d_%s_grid_cache%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, preproc_affix));
-
-    % Compact sidecar carrying planimg (transforms + header only, no image volumes).
-    % Written alongside the grid cache; allows downstream stages to resume
-    % without the full grid cache when only planimg is needed.
-    filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
-        sprintf('sub-%03d_%s_planimg%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, preproc_affix));
-
-    if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup == 1
-        if ~confirm_overwriting(filename_grid_cache, parameters)
-            disp('Loading grid cache - skipping head preprocessing.')
-            load(filename_grid_cache);
-            parameters.grid = grid_cache_info.parameters.grid;
-            % For layered simulations: do NOT restore parameters.transducer from cache.
-            % The caller may be a single-transducer acoustic sub-run (e.g. async
-            % trans-02) that was deliberately stripped before entering the pipeline.
-            % Re-map the caller's T1-space transducer positions onto the loaded grid
-            % using the planimg affine from this cache (shared grid, shared transform).
-            % For non-layered simulations: fall back to restoring from cache, since
-            % transducer positions may be grid-derived (focal distance) rather than
-            % coming from T1-space coordinates.
-            if contains(parameters.simulation.medium, 'layered') && ...
-                    isfield(planimg, 'transf') && ~isempty(planimg.transf)
-                parameters = load_transducer_parameters(parameters);
-                [parameters] = grid_transducer_location(parameters, planimg);
-            else
-                parameters.transducer = grid_cache_info.parameters.transducer;
-                % Cache may be from an older PRESTUS version without all derived fields.
-                parameters = load_transducer_parameters(parameters);
-            end
-            clear grid_cache_info
-            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
-            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
-            trans_pos_grid = trans_pos;                            % explicit sim-grid alias
-            focus_pos_grid = focus_pos;                            % explicit sim-grid alias
-        else
-            parameters = load_transducer_parameters(parameters);
-
-            [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
-                grid_tissue_setup(parameters);
-
-            % Detect and apply padding if any transducer/focus position falls outside the
-            % cropped grid (common when the grid was sized for a single transducer and is
-            % later reused by a multi-transducer joint stage, e.g. asyncJoint).
-            [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
-                autopad_grid_for_transducers(parameters, medium_masks, segmentation, ...
-                                             bone_mask, pseudoCT, planimg);
-
-            [parameters] = grid_transducer_location(parameters, planimg);
-
-            [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
-                grid_axisymmetry(parameters, segmentation, bone_mask, pseudoCT, medium_masks);
-
-            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
-            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
-            trans_pos_grid = trans_pos;                            % explicit sim-grid alias
-            focus_pos_grid = focus_pos;                            % explicit sim-grid alias
-
-            if should_save_output(parameters.io, 'save_grid_cache')
-                grid_cache_info.parameters = parameters;
-                % trans_pos / focus_pos saved here are [sim-grid vox] (post grid_transducer_location,
-                % pre FOV crop).  Variable names are kept as-is for backward compatibility with
-                % existing cache files; load() below populates trans_pos_grid from them.
-                save(filename_grid_cache, ...
-                    'planimg', 'medium_masks', 'segmentation', 'bone_mask', 'pseudoCT', ...
-                    'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
-                clear grid_cache_info
-            end
-            % Sidecar is always written when grid setup runs, independent of save_grid_cache,
-            % so downstream stages can recover planimg even if the full cache is deleted.
-            save(filename_planimg_sidecar, 'planimg', '-v7.3');
-            fprintf('[pipeline] planimg sidecar written: %s\n', filename_planimg_sidecar);
-        end
-    else
-        disp('No grid setup requested...no simulations will be performed.')
-    end
-
-    % Ensure trans_pos / focus_pos local vars are always defined after the grid block.
-    % When run_grid_setup == 0 the block above is skipped entirely; fall back to
-    % whatever the transducer struct already carries (e.g. from a previous run or
-    % a manual config).  Downstream code that guards on ~isempty() will skip safely
-    % if neither source is available.
-    if ~exist('trans_pos', 'var')
-        if isfield(parameters, 'transducer') && numel(parameters.transducer) >= 1 && ...
-                isfield(parameters.transducer(1), 'trans_pos') && ~isempty(parameters.transducer(1).trans_pos)
-            trans_pos      = parameters.transducer(1).trans_pos;  % [sim-grid vox]
-            focus_pos      = parameters.transducer(1).focus_pos;  % [sim-grid vox]
-            trans_pos_grid = trans_pos;
-            focus_pos_grid = focus_pos;
-        else
-            trans_pos      = [];  % [sim-grid vox; unavailable — run_grid_setup=0 with no prior cache]
-            focus_pos      = [];
-            trans_pos_grid = [];
-            focus_pos_grid = [];
-        end
-    end
+    [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, trans_pos, focus_pos] = ...
+        grid_stage(parameters);
 
     log_timer('stop','preproc');
 
     % ====================================================================
     %% STAGE 4 — MEDIUM PROPERTY MAPPING
-    %
-    % Maps tissue-class labels from the segmentation onto acoustic and
-    % thermal material properties (density, sound speed, attenuation,
-    % heat capacity, perfusion rate, …) using the lookup tables in the
-    % config.  Produces kwave_medium and medium_plus structs consumed by
-    % the acoustic and thermal stages respectively.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','medium', parameters.io.dir_output);
 
-    filename_medium_cache = fullfile(parameters.io.dir_cache, ...
-        sprintf('sub-%03d_%s_medium_cache%s.mat', ...
-        parameters.subject_id, parameters.simulation.medium, preproc_affix));
+    [kwave_medium, medium_plus, planimg, medium_masks] = ...
+        medium_stage(parameters, medium_masks, planimg, pseudoCT);
 
-    if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup == 1
-        if ~confirm_overwriting(filename_medium_cache, parameters)
-            disp('Loading medium cache - skipping medium property mapping.')
-            load(filename_medium_cache);
-            % If the grid cache was deleted but the medium cache exists, planimg
-            % and medium_masks may not be in workspace.  Recover planimg from the
-            % compact sidecar so NIfTI export and thermal stages work correctly.
-            if ~exist('planimg', 'var') || isempty(planimg)
-                if isfile(filename_planimg_sidecar)
-                    fprintf('[pipeline] Grid cache absent — loading planimg from sidecar: %s\n', ...
-                        filename_planimg_sidecar);
-                    load(filename_planimg_sidecar, 'planimg');
-                else
-                    warning('prestus_pipeline:missingPlanimg', ...
-                        ['planimg not found in workspace or sidecar (%s). ' ...
-                         'NIfTI exports and thermal transforms may fail. ' ...
-                         'Re-run with run_grid_setup=1 to regenerate.'], ...
-                        filename_planimg_sidecar);
-                    planimg = struct();
-                end
-            end
-        else
-            [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, planimg, pseudoCT);
-
-            if should_save_output(parameters.io, 'save_medium_cache')
-                % medium_masks saved here so this cache is self-contained:
-                % thermal and NIfTI stages need it when the grid cache is absent.
-                save(filename_medium_cache, 'kwave_medium', 'medium_plus', 'medium_masks', '-v7.3');
-            end
-        end
-    else
-        disp('No medium mapping requested...no simulations will be performed.')
-    end
     log_timer('stop','medium');
 
     log_timer('start', 'nifti_medium', parameters.io.dir_output);
     nifti_medium(parameters, planimg, medium_masks, kwave_medium, pseudoCT);
     log_timer('stop', 'nifti_medium');
+    clear bone_mask
 
     % ====================================================================
     %% ACOUSTIC FOV CROP  (between medium and source setup)
     %
-    % When grid.acoustic_fov_diameter_mm and/or grid.acoustic_fov_length_mm
-    % are set, the acoustic simulation runs on a beam-axis aligned sub-grid
-    % (lateral = diameter, axial = length, both centred on the focus).
-    % Either field may be set to 'auto':
-    %   acoustic_fov_length_mm   'auto' -> focal_depth_mm + grid.z_beyond_focus_mm
-    %                                      (default 40 mm)
-    %   acoustic_fov_diameter_mm 'auto' -> outermost element diameter of the
-    %                                      first transducer (max elem_od_mm)
-    % The crop offsets are stored in acoustic_provenance so that
-    % ASSEMBLE_LIMITED_FOV_FIELDS can back-project N independent limited-FOV
-    % results onto the full acoustic grid before thermal simulation.
+    % Resolves 'auto' FOV settings, applies jwave PML expansion if needed,
+    % and crops medium/masks/segmentation to the beam-axis FOV sub-grid.
+    % fov_state carries the full-grid backups for thermal restore and
+    % nifti_acoustic back-projection.
     % ====================================================================
 
-    % Resolve 'auto' settings before the has_acoustic_fov check.
-    % Guard: both require a valid focal geometry; skip silently if not available.
-    if isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
-            ischar(parameters.grid.acoustic_fov_length_mm) && ...
-            strcmpi(parameters.grid.acoustic_fov_length_mm, 'auto') && ...
-            ~isempty(trans_pos) && ~isempty(focus_pos)
-        focal_depth_vox = norm(focus_pos - trans_pos);
-        focal_depth_mm  = focal_depth_vox * parameters.grid.resolution_mm;
-        z_beyond_mm     = 40.0;
-        if isfield(parameters.grid, 'z_beyond_focus_mm') && ...
-                ~isempty(parameters.grid.z_beyond_focus_mm)
-            z_beyond_mm = parameters.grid.z_beyond_focus_mm;
-        end
-        parameters.grid.acoustic_fov_length_mm = focal_depth_mm + z_beyond_mm;
-        fprintf('[pipeline] acoustic_fov_length_mm auto -> %.1f mm (focal depth %.1f + z_beyond %.1f)\n', ...
-            parameters.grid.acoustic_fov_length_mm, focal_depth_mm, z_beyond_mm);
-    end
-
-    if isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
-            ischar(parameters.grid.acoustic_fov_diameter_mm) && ...
-            strcmpi(parameters.grid.acoustic_fov_diameter_mm, 'auto')
-        if isfield(parameters.transducer(1), 'elem_od_mm') && ...
-                ~isempty(parameters.transducer(1).elem_od_mm)
-            parameters.grid.acoustic_fov_diameter_mm = max(parameters.transducer(1).elem_od_mm);
-        elseif isfield(parameters.transducer(1), 'annular') && ...
-                isfield(parameters.transducer(1).annular, 'elem_od_mm') && ...
-                ~isempty(parameters.transducer(1).annular.elem_od_mm)
-            parameters.grid.acoustic_fov_diameter_mm = max(parameters.transducer(1).annular.elem_od_mm);
-        else
-            error('pipeline:autoFovDiameter', ...
-                ['acoustic_fov_diameter_mm=''auto'' requires transducer(1).elem_od_mm. ' ...
-                 'Set acoustic_fov_diameter_mm explicitly instead.']);
-        end
-        fprintf('[pipeline] acoustic_fov_diameter_mm auto -> %.1f mm (transducer outer diameter)\n', ...
-            parameters.grid.acoustic_fov_diameter_mm);
-    end
-
-    has_acoustic_fov = isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
-        ~isempty(parameters.grid.acoustic_fov_diameter_mm) && ...
-        isnumeric(parameters.grid.acoustic_fov_diameter_mm) && ...
-        isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
-        ~isempty(parameters.grid.acoustic_fov_length_mm) && ...
-        isnumeric(parameters.grid.acoustic_fov_length_mm);
-
-    % When the jwave backend is active, PML is embedded *inside* the domain
-    % (jwave has no PMLInside=false option).  k-Wave uses PMLInside=false, so
-    % its PML is added outside parameters.grid.dims and the entire pfov grid
-    % is usable.  For jwave, the outer pml_size voxels on each face are
-    % absorbing layers — source elements placed there are corrupted.
-    % Fix: expand the pfov mm settings by 2*pml_size*dx on each side so the
-    % requested physical FOV occupies jwave's inner non-PML region.
-    use_jwave_acoustic = isfield(parameters, 'acoustic_backend') && ...
-        strcmpi(parameters.acoustic_backend, 'jwave');
-    if has_acoustic_fov && use_jwave_acoustic
-        jw_pml_raw = 'auto';
-        if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'pml_size')
-            jw_pml_raw = parameters.jwave.pml_size;
-        end
-        if (ischar(jw_pml_raw) || isstring(jw_pml_raw)) && strcmp(jw_pml_raw, 'auto')
-            % Approximate: resolve_pml_size in jwave_wrapper uses getOptimalPMLSize,
-            % which requires a kgrid (not yet built here). Use 20 as the safe default
-            % matching jwave_wrapper's resolve_pml_size fallback for small grids.
-            jw_pml_eff = 20;
-            fprintf('[pipeline] jwave pfov PML expansion: pml_size=''auto'' → using %d voxels as estimate.\n', jw_pml_eff);
-        else
-            jw_pml_eff = double(jw_pml_raw);
-        end
-        jw_pml_mm = jw_pml_eff * parameters.grid.resolution_mm;
-        parameters.grid.acoustic_fov_diameter_mm = parameters.grid.acoustic_fov_diameter_mm + 2 * jw_pml_mm;
-        parameters.grid.acoustic_fov_length_mm   = parameters.grid.acoustic_fov_length_mm   + 2 * jw_pml_mm;
-        fprintf('[pipeline] jwave pfov PML expansion (+%.0f mm each side): diameter=%.1f mm, length=%.1f mm\n', ...
-            jw_pml_mm, parameters.grid.acoustic_fov_diameter_mm, parameters.grid.acoustic_fov_length_mm);
-    end
-
-    if has_acoustic_fov
-        full_ac_dims_saved = parameters.grid.dims;   % keep for provenance
-        % Save full-grid state so thermal simulation can use the full domain.
-        kwave_medium_full  = kwave_medium;
-        medium_masks_full  = medium_masks;
-        segmentation_full  = segmentation;
-        trans_pos_full     = trans_pos;   % [sim-grid vox, full domain — preserved for thermal restore]
-        focus_pos_full     = focus_pos;   % [sim-grid vox, full domain — preserved for thermal restore]
-        grid_dims_full     = parameters.grid.dims;
-        % acoustic_grid_fov returns positions in FOV-grid voxels; capture with explicit names.
-        [parameters, kwave_medium, medium_masks, trans_pos_fov, focus_pos_fov, fov_offset_ac] = ...
-            acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos);
-        % Keep trans_pos/focus_pos in sync as backward-compatible aliases for downstream code.
-        trans_pos = trans_pos_fov;  % [FOV-grid vox]
-        focus_pos = focus_pos_fov;  % [FOV-grid vox]
-        fprintf('[pipeline] Acoustic FOV crop active: offset [%s], new dims [%s]\n', ...
-            num2str(fov_offset_ac), num2str(parameters.grid.dims));
-        % Crop segmentation to the same FOV so analysis masks match sensor_data size.
-        fov_end_ac = fov_offset_ac + parameters.grid.dims - 1;
-        if ~isempty(segmentation) && isequal(size(segmentation), double(full_ac_dims_saved))
-            segmentation = segmentation( ...
-                fov_offset_ac(1):fov_end_ac(1), ...
-                fov_offset_ac(2):fov_end_ac(2), ...
-                fov_offset_ac(3):fov_end_ac(3));
-        end
-    else
-        fov_offset_ac        = [];
-        trans_pos_fov        = [];   % no FOV crop — trans_pos remains in sim-grid space
-        focus_pos_fov        = [];   % no FOV crop — focus_pos remains in sim-grid space
-        full_ac_dims_saved   = [];
-    end
+    [parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos, fov_state] = ...
+        acoustic_fov_crop(parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos);
 
     % ====================================================================
     %% STAGE 5 — SOURCE & SENSOR SETUP
-    %
-    % Constructs the k-Wave source matrix from the transducer geometry and
-    % focus/steering settings.  Optionally runs a CFL stability check and
-    % reduces the time step if the default kgrid.dt would produce an
-    % unstable simulation (relevant for high-attenuation skull models).
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','source', parameters.io.dir_output);
 
     use_babelbrain_acoustic = isfield(parameters, 'acoustic_backend') && ...
         strcmpi(parameters.acoustic_backend, 'babelbrain');
 
-    if (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup==1) && ...
+    if (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1) && ...
             ~use_babelbrain_acoustic
         max_sound_speed = max(kwave_medium.sound_speed(:));
         min_sound_speed = min(kwave_medium.sound_speed(:));
-        [kgrid, source, sensor, source_labels] = ...
-            source_sensor_setup(...
-            parameters, ...
-            max_sound_speed, ...
-            trans_pos, ...
-            focus_pos, ...
-            [], ...
-            min_sound_speed);
-
+        [kgrid, source, sensor, source_labels] = source_sensor_setup( ...
+            parameters, max_sound_speed, trans_pos, focus_pos, [], min_sound_speed);
         if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~= 0
             disp('Checking CFL stability condition...')
             dt_stability_limit = checkStability(kgrid, kwave_medium);
@@ -510,8 +198,6 @@ function [parameters] = prestus_pipeline(parameters, options)
             if ~isinf(dt_stability_limit) && kgrid.dt > dt_stability_limit
                 disp('Adapting time step for simulation stability...')
                 clear source sensor source_labels
-                % checkStability is an approximation for heterogeneous media;
-                % source_limit_fraction adds a safety margin below the estimate.
                 grid_time_step = dt_stability_limit * parameters.grid.source_limit_fraction;
                 [kgrid, source, sensor, source_labels] = source_sensor_setup( ...
                     parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
@@ -519,620 +205,148 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
     elseif use_babelbrain_acoustic
         disp('[pipeline] BabelBrain acoustic backend: skipping source setup.')
-        source_labels = [];
+        kgrid = []; source = []; sensor = []; source_labels = [];
     else
         disp('No source setup requested...no simulations will be performed.')
-        source_labels = [];
+        kgrid = []; source = []; sensor = []; source_labels = [];
     end
     log_timer('stop', 'source');
 
     % ====================================================================
-    %% FREE-WATER BASELINE
-    %
-    % Runs a brief in-water simulation with the same source to measure the
-    % unobstructed free-field ISPPA.  This is used as a provenance record
-    % and, when per-transducer target intensities are specified, to derive
-    % the per-element amplitude scaling that maps the simulated output onto
-    % the requested in-situ intensity.
+    %% ACOUSTIC PROVENANCE INIT & FREE-WATER BASELINE
     % ====================================================================
 
     acoustic_provenance = struct();
-
-    % Record limited-FOV crop metadata in provenance so ASSEMBLE_LIMITED_FOV_FIELDS
-    % can back-project this result onto the full acoustic grid.
-    if has_acoustic_fov
-        acoustic_provenance.fov_offset_ac = fov_offset_ac;
-        acoustic_provenance.full_ac_dims  = full_ac_dims_saved;
+    if fov_state.active
+        acoustic_provenance.fov_offset_ac = fov_state.offset;
+        acoustic_provenance.full_ac_dims  = fov_state.full_dims;
     end
-
-    % Carry tx_calibration provenance into acoustic_provenance so that
-    % combine_async_intensity and apply_isppa_scaling can use the calibrated
-    % ISPPA as a baseline without requiring a fresh water simulation.
-    % Set by load_transducer_from_library; absent for inline elem_p_amp configs.
     tr1 = parameters.transducer(1);
     if isfield(tr1, 'tx_calibration') && isfield(tr1.tx_calibration, 'isppa_wcm2') && ...
             isscalar(tr1.tx_calibration.isppa_wcm2) && isfinite(tr1.tx_calibration.isppa_wcm2)
         acoustic_provenance.tx_calibration = tr1.tx_calibration;
     end
+    clear tr1
 
-    % Determine whether a water-baseline simulation is needed.
-    % Only required when the target ISPPA differs from the calibration level —
-    % i.e., when actual scaling will be applied.  When they match (common case:
-    % simulate at the calibrated drive level), the calibration ISPPA serves
-    % directly as freefield_isppa_wcm2 and no extra simulation is run.
-    has_per_transducer_target = isfield(parameters, 'transducer') && ...
-        any(arrayfun(@(t) isfield(t, 'target_isppa_wcm2') && ...
-                          ~isempty(t.target_isppa_wcm2) && ...
-                          any(isfinite(t.target_isppa_wcm2)), parameters.transducer));
-
-    cal_isppa = NaN;
-    if isfield(acoustic_provenance, 'tx_calibration') && ...
-            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2')
-        cal_isppa = acoustic_provenance.tx_calibration.isppa_wcm2;
-    end
-
-    target_differs_from_cal = has_per_transducer_target && isfinite(cal_isppa) && ...
-        abs(parameters.transducer(1).target_isppa_wcm2(1) - cal_isppa) / cal_isppa > 0.01;
-
-    run_baseline = (isfield(parameters.modules, 'run_water_baseline') && ...
-                    parameters.modules.run_water_baseline == 1) || ...
-                   target_differs_from_cal;
-
-    if has_per_transducer_target && ~run_baseline && isfinite(cal_isppa)
-        % Target matches calibration level: use library value directly.
-        acoustic_provenance.freefield_isppa_wcm2 = cal_isppa;
-        fprintf('Skipping free-water baseline: target ISPPA matches calibration level (%.2f W/cm²).\n', cal_isppa);
-    end
-
-    if run_baseline && ...
-            (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
-        log_timer('start', 'freefield_baseline', parameters.io.dir_output);
-        acoustic_provenance.freefield_isppa_wcm2 = ...
-            water_baseline(parameters, kgrid, source, sensor);
-        % Mark that the ISPPA was measured by k-Wave simulation.
-        if isfield(acoustic_provenance, 'tx_calibration')
-            acoustic_provenance.tx_calibration.isppa_wcm2  = acoustic_provenance.freefield_isppa_wcm2;
-            acoustic_provenance.tx_calibration.isppa_source = 'kwave_simulation';
-        end
-        log_timer('stop', 'freefield_baseline');
-    end
+    acoustic_provenance = acoustic_water_baseline( ...
+        parameters, acoustic_provenance, kgrid, source, sensor, source_labels);
 
     % ====================================================================
     %% STAGE 6 — ACOUSTIC SIMULATION
-    %
-    % Runs k-Wave to propagate the pressure field through the medium.
-    % If a cached result file already exists (and overwriting is not
-    % requested), it is loaded directly.  The acoustic_cache_affix field
-    % lets sequential follow-up runs point back to the base run's result
-    % rather than re-running the simulation.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','acoustic', parameters.io.dir_output);
 
-    % Thermal jobs use a per-target output_affix; acoustic_cache_affix points back to the base run.
-    if isfield(parameters.io, 'acoustic_cache_affix')
-        acoustic_file_affix = parameters.io.acoustic_cache_affix;
-    else
-        acoustic_file_affix = parameters.io.output_affix;
-    end
-    filename_sensor_data = fullfile(parameters.io.dir_cache, ...
-        sprintf('sub-%03d_%s_results%s.mat',...
-        parameters.subject_id, parameters.simulation.medium, acoustic_file_affix));
+    [sensor_data, parameters, kgrid, kwave_medium, medium_masks, segmentation, ...
+     source, source_labels, acoustic_provenance] = ...
+        acoustic_stage(parameters, kgrid, kwave_medium, source, sensor, ...
+                       medium_masks, segmentation, source_labels, acoustic_provenance, ...
+                       planimg, trans_pos, focus_pos, pseudoCT);
+    clear pseudoCT
 
-    parameters.state.acoustics_available = 0;
-
-    % --- External acoustic NIfTI (e.g. from BabelBrain or a previous PRESTUS run) ---
-    % When io.external_acoustic_nifti is set, the acoustic simulation stages are
-    % skipped and the NIfTI (p_max_all [Pa] in T1 space) is passed directly to
-    % thermal_simulation, which resamples it into the (thermal) grid.
-    % Acoustic analysis (ISPPA, MI) is not available in this path.
-    has_external_acoustic = isfield(parameters.io, 'external_acoustic_nifti') && ...
-        ~isempty(parameters.io.external_acoustic_nifti);
-
-    if has_external_acoustic
-        ext_nii = parameters.io.external_acoustic_nifti;
-        if ~isfile(ext_nii)
-            error('prestus_pipeline:externalAcousticNotFound', ...
-                'io.external_acoustic_nifti not found: %s', ext_nii);
-        end
-        fprintf('[pipeline] Using external acoustic NIfTI: %s\n', ext_nii);
-        sensor_data = ext_nii;   % char path; thermal_simulation handles NIfTI loading
-        parameters.state.acoustics_available = 1;
-        parameters.modules.run_acoustic_analysis = 0;
-        % source/sensor/kgrid placeholders are built in Stage 8 via thermal_grid_setup.
-
-    elseif isfield(parameters.modules, 'run_acoustic_sims') && parameters.modules.run_acoustic_sims && ...
-        confirm_overwriting(filename_sensor_data, parameters) && ...
-        (parameters.simulation.interactive == 0 || ...
-        confirmation_dlg('Running the simulations will take a long time, are you sure?', 'Yes', 'No'))
-
-        use_babelbrain = isfield(parameters, 'acoustic_backend') && ...
-            strcmpi(parameters.acoustic_backend, 'babelbrain');
-        use_jwave = isfield(parameters, 'acoustic_backend') && ...
-            strcmpi(parameters.acoustic_backend, 'jwave');
-
-        if use_babelbrain
-            % --- BabelBrain acoustic backend ---
-            equip_param_bb = struct();
-            if exist('equip_param', 'var'), equip_param_bb = equip_param; end
-            pct_for_bb = [];
-            if exist('pseudoCT', 'var'), pct_for_bb = pseudoCT; end
-            sensor_data = babelbrain_wrapper( ...
-                parameters, medium_masks, kwave_medium, ...
-                focus_pos, trans_pos, planimg, equip_param_bb, pct_for_bb);
-            % Store BabelBrain version in provenance so it is cached with sensor_data.
-            if isfield(sensor_data, 'babelbrain_version')
-                acoustic_provenance.babelbrain_version = sensor_data.babelbrain_version;
-                fprintf('[pipeline] BabelBrain %s  (%s)\n', ...
-                    sensor_data.babelbrain_version.version_txt, ...
-                    sensor_data.babelbrain_version.git_describe);
-            end
-            % Store free-water ISPPA for downstream thermal_wrapper.
-            if isfield(sensor_data, 'freefield_isppa_wcm2') && ...
-                    isfinite(sensor_data.freefield_isppa_wcm2)
-                acoustic_provenance.freefield_isppa_wcm2 = sensor_data.freefield_isppa_wcm2;
-                acoustic_provenance.tx_calibration.isppa_wcm2  = sensor_data.freefield_isppa_wcm2;
-                acoustic_provenance.tx_calibration.isppa_source = 'babelbrain_water_sim';
-            end
-        elseif use_jwave
-            % --- jwave acoustic backend ---
-            if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
-                error('[pipeline] jwave backend does not support axisymmetric grids.');
-            end
-
-            sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels);
-        else
-            % --- k-Wave acoustic backend (default) ---
-            [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                acoustic_wrapper( ...
-                parameters, ...
-                kgrid, ...
-                kwave_medium, ...
-                source, ...
-                sensor, ...
-                medium_masks, ...
-                filename_sensor_data, ...
-                segmentation, ...
-                source_labels, ...
-                acoustic_provenance);
-        end
-
-        parameters.state.acoustics_available = 1;
-
-    elseif exist(filename_sensor_data, 'file')
-        disp('Skipping acoustic simulation, loading existing output file.')
-        try
-            [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
-                cache_acoustic('load', filename_sensor_data, parameters);
-        catch ME
-            if strcmp(ME.identifier, 'cache_acoustic:staleGrid')
-                % This transducer's acoustic cache was produced on a different grid
-                % (e.g. after re-segmentation or a grid config change).  Re-run the
-                % acoustic simulation on the current grid.
-                fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation.\n');
-                [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                    acoustic_wrapper( ...
-                    parameters, ...
-                    kgrid, ...
-                    kwave_medium, ...
-                    source, ...
-                    sensor, ...
-                    medium_masks, ...
-                    filename_sensor_data, ...
-                    segmentation, ...
-                    source_labels, ...
-                    acoustic_provenance);
-            else
-                rethrow(ME);
-            end
-        end
-        parameters.state.acoustics_available = 1;
-        % In axisymmetric runs the cache holds expanded (2D/3D bilateral) sensor_data,
-        % while source_labels from source_sensor_setup has the pre-expansion shape.
-        % Clear the stale source_labels so plot_overlay receives empty (no bowl mask).
-        if exist('source_labels','var') && ~isempty(source_labels) && ...
-                ~isequal(size(source_labels), size(sensor_data.p_max_all))
-            % source_labels was built on the pre-expansion (axisymmetric) grid; the cached
-            % sensor_data has been expanded to the bilateral/3-D grid.  The expansion
-            % mapping is not invertible here, so overlay plots will show no transducer bowl
-            % mask.  To avoid this, clear the grid cache and re-run with run_grid_setup=1
-            % so source_labels is built on the same expanded grid.
-            warning('prestus_pipeline:sourceLabelsMismatch', ...
-                ['source_labels size %s does not match cached sensor_data size %s. ' ...
-                 'This occurs after axisymmetric grid expansion when the grid cache predates ' ...
-                 'the acoustic cache. Clearing source_labels — transducer bowl overlay will be ' ...
-                 'absent. Re-run with run_grid_setup=1 to regenerate a consistent source_labels.'], ...
-                mat2str(size(source_labels)), mat2str(size(sensor_data.p_max_all)));
-            source_labels = zeros(size(sensor_data.p_max_all), 'like', source_labels);
-        end
-    else
-        disp('No acoustic simulation available or requested ... skipping analysis')
-        parameters.state.acoustics_available = 0;
-        parameters.modules.run_acoustic_analysis = 0;
-    end
     log_timer('stop', 'acoustic');
 
     % ====================================================================
     %% STAGE 7 — ACOUSTIC ANALYSIS & NIFTI EXPORT
-    %
-    % Derives ISPPA, ISPTA, mechanical index, focal distance, and skull
-    % normalised ratio from the pressure field.  Writes the intensity and
-    % pressure maps to NIfTI (T1w space and optionally MNI space).
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','acoustic_analysis', parameters.io.dir_output);
 
-    if (~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis)
-        prov_for_analysis = struct();
-        if exist('acoustic_provenance', 'var'); prov_for_analysis = acoustic_provenance; end
-        [results_acoustic, acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
-            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, segmentation, source_labels, [], prov_for_analysis);
-        % highlighted_pos is in the *current* simulation grid (FOV-grid vox if acoustic FOV is
-        % active, sim-grid vox otherwise).  Convert to sim-grid before NIfTI export below.
+    if ~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis
+        [results_acoustic, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
+            acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
+                              segmentation, source_labels, [], acoustic_provenance);
     else
         disp('No acoustic simulation results available (or requested). Skipping analysis...')
-        results_acoustic = [];
-        acoustic_Ipa     = [];
-        acoustic_MI      = [];
+        results_acoustic  = [];
+        acoustic_Itp      = [];
+        acoustic_Ipa      = [];
+        acoustic_Ita      = [];
+        acoustic_MI       = [];
         acoustic_pressure = [];
-        highlighted_pos  = [];
+        highlighted_pos   = [];
     end
     log_timer('stop', 'acoustic_analysis');
 
     if parameters.state.acoustics_available
         log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
-        % When the acoustic FOV crop is active, back-project the analysis
-        % volumes (Ipa, MI, pressure) from FOV coords to the full grid so
-        % that nifti_acoustic places them at the correct spatial location.
-        if has_acoustic_fov && ~isempty(fov_offset_ac)
-            % Back-project FOV-sized analysis volumes to the full grid so
-            % nifti_acoustic places them at the correct spatial location.
+        if fov_state.active
+            % Back-project FOV-sized analysis volumes onto the full grid before
+            % NIfTI export so outputs are in full simulation-grid space.
             params_nii           = parameters;
-            params_nii.grid.dims = full_ac_dims_saved;
-            % Restore full-domain transducer positions so plot_intensity_t1_overlay
-            % applies inv_transf (full sim-grid → T1 space) with correct coordinates.
-            params_nii.transducer(1).trans_pos = trans_pos_full;
+            params_nii.grid.dims = fov_state.full_dims;
+            params_nii.transducer(1).trans_pos = fov_state.trans_pos_full;
             if isfield(params_nii.transducer(1), 'focus_pos')
-                params_nii.transducer(1).focus_pos = focus_pos_full;
+                params_nii.transducer(1).focus_pos = fov_state.focus_pos_full;
             end
-            % Back-project focal masks (binary → nearest-neighbour; store back in results)
             for fmf = {'focal_mask_3dB', 'focal_mask_6dB'}
                 fn = fmf{1};
                 if isfield(results_acoustic, fn) && ~isempty(results_acoustic.(fn))
                     results_acoustic.(fn) = fov_backproject_volume( ...
-                        uint8(results_acoustic.(fn)), fov_offset_ac, full_ac_dims_saved) > 0;
+                        uint8(results_acoustic.(fn)), fov_state.offset, fov_state.full_dims) > 0;
                 end
             end
+            acoustic_Ita_full = [];
+            if ~isempty(acoustic_Ita)
+                acoustic_Ita_full = fov_backproject_volume(acoustic_Ita, fov_state.offset, fov_state.full_dims);
+            end
             nifti_acoustic(params_nii, planimg, results_acoustic, ...
-                fov_backproject_volume(acoustic_Ipa,      fov_offset_ac, full_ac_dims_saved), ...
-                fov_backproject_volume(acoustic_MI,       fov_offset_ac, full_ac_dims_saved), ...
-                fov_backproject_volume(acoustic_pressure, fov_offset_ac, full_ac_dims_saved), ...
-                fov_to_grid_pos(highlighted_pos, fov_offset_ac));  % [FOV-grid vox] → [sim-grid vox]
-            clear params_nii;
+                fov_backproject_volume(acoustic_Itp,      fov_state.offset, fov_state.full_dims), ...
+                fov_backproject_volume(acoustic_Ipa,      fov_state.offset, fov_state.full_dims), ...
+                acoustic_Ita_full, ...
+                fov_backproject_volume(acoustic_MI,       fov_state.offset, fov_state.full_dims), ...
+                fov_backproject_volume(acoustic_pressure, fov_state.offset, fov_state.full_dims), ...
+                fov_to_grid_pos(highlighted_pos, fov_state.offset));
+            clear params_nii acoustic_Ita_full
         else
             nifti_acoustic(parameters, planimg, results_acoustic, ...
-                acoustic_Ipa, acoustic_MI, acoustic_pressure, highlighted_pos);
+                acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos);
         end
         log_timer('stop', 'nifti_acoustic');
     end
-    % Stash acoustic metrics and sensor_data for callers that set
-    % modules.store_acoustic_results (e.g. benchmark_solver_pipeline).
-    if isfield(parameters, 'modules') && isfield(parameters.modules, 'store_acoustic_results') ...
-            && parameters.modules.store_acoustic_results
-        if exist('results_acoustic', 'var'), parameters.results_acoustic    = results_acoustic; end
-        if exist('sensor_data',      'var'), parameters.benchmark_sensor_data = sensor_data;    end
-    end
-    % acoustic pressure maps no longer needed after NIfTI export;
-    % highlighted_pos still required by thermal_analysis below
-    clear results_acoustic acoustic_Ipa acoustic_MI acoustic_pressure
 
-    % Optional BabelBrain input export — enabled by io.export_babelbrain = true
-    % or acoustic_backend = 'babelbrain'. Writes BabelViscoInput NIfTI,
-    % CalibWeights.h5, and a ready-to-run RunBabelBrain.py to dir_babelbrain.
-    do_bb_export = (isfield(parameters.io, 'export_babelbrain') && ...
-                    parameters.io.export_babelbrain) || ...
-                   (isfield(parameters, 'acoustic_backend') && ...
-                    strcmpi(parameters.acoustic_backend, 'babelbrain'));
+    if isfield(parameters, 'modules') && isfield(parameters.modules, 'store_acoustic_results') && ...
+            parameters.modules.store_acoustic_results
+        if exist('results_acoustic', 'var'), parameters.results_acoustic      = results_acoustic; end
+        if exist('sensor_data',      'var'), parameters.benchmark_sensor_data = sensor_data;      end
+    end
+    clear results_acoustic acoustic_Itp acoustic_Ipa acoustic_Ita acoustic_MI acoustic_pressure
+
+    % Optional BabelBrain input export (io.export_babelbrain or acoustic_backend='babelbrain').
+    do_bb_export = (isfield(parameters.io, 'export_babelbrain') && parameters.io.export_babelbrain) || ...
+                   (isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain'));
     if do_bb_export
-        equip_param_bb = struct();
-        if exist('equip_param', 'var'); equip_param_bb = equip_param; end
         if ~isfield(parameters.io, 'dir_babelbrain') || isempty(parameters.io.dir_babelbrain)
             parameters.io.dir_babelbrain = fullfile(parameters.io.dir_output, 'babelbrain');
         end
-        export_babelbrain_inputs( ...
-            parameters, medium_masks, focus_pos, planimg, equip_param_bb);
+        export_babelbrain_inputs(parameters, medium_masks, focus_pos, planimg, struct());
     end
 
     clear source_labels
 
     % ====================================================================
     %% STAGE 8 — THERMAL SIMULATION
-    %
-    % Solves the Pennes bio-heat equation using k-Wave's thermal diffusion
-    % solver over the full sonication sequence (on/off pulses, ISI, …).
-    % Heat deposition is proportional to the acoustic absorption at each
-    % voxel derived from the pressure field above.
-    %
-    % In sequential mode (follow-up run), the temperature and CEM43 maps
-    % from the previous run are used as initial conditions so that
-    % cumulative heating is captured correctly across stimulation bouts.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','thermal', parameters.io.dir_output);
 
-    parameters.state.heating_available = 0;
-    if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims && parameters.state.acoustics_available == 1
+    [results_heating, time_status_seq, kwave_medium, medium_masks, segmentation, ...
+     planimg, highlighted_pos, parameters] = ...
+        thermal_stage(parameters, sensor_data, kgrid, kwave_medium, medium_plus, ...
+                      medium_masks, segmentation, planimg, source, sensor, ...
+                      trans_pos, focus_pos, acoustic_provenance, fov_state, highlighted_pos);
 
-        disp('Starting thermal simulations...')
-        % sequential_pipeline gives each follow-up run a unique thermal_cache_affix
-        % (e.g. <base_affix>_seq1) so the "already done" cache check does not
-        % silently load the base run's thermal result.
-        if isfield(parameters.io, 'thermal_cache_affix')
-            thermal_file_affix = parameters.io.thermal_cache_affix;
-        else
-            thermal_file_affix = parameters.io.output_affix;
-        end
-        filename_heating_data = fullfile(parameters.io.dir_cache,...
-            sprintf('sub-%03d_%s_heating_res%s.mat',...
-            parameters.subject_id, parameters.simulation.medium, thermal_file_affix));
-        
-        if confirm_overwriting(filename_heating_data, parameters) && (parameters.simulation.interactive == 0 || ...
-            confirmation_dlg('Running the thermal simulations will take a long time, are you sure?', 'Yes', 'No'))
-
-            % Decide whether thermal reuses the acoustic FOV or works on the full grid.
-            thermal_use_acoustic_fov = has_acoustic_fov && ...
-                isfield(parameters.grid, 'thermal_use_acoustic_fov') && ...
-                parameters.grid.thermal_use_acoustic_fov;
-
-            if has_acoustic_fov && ~thermal_use_acoustic_fov
-                % Default: restore full-grid state — acoustic FOV is scoped to
-                % acoustic simulation only.
-                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_all')
-                    sensor_data.p_max_all = fov_backproject_volume( ...
-                        single(sensor_data.p_max_all), fov_offset_ac, grid_dims_full);
-                end
-                if ~isempty(sensor_data) && isfield(sensor_data, 'p_max_async')
-                    sensor_data.p_max_async = fov_backproject_volume( ...
-                        single(sensor_data.p_max_async), fov_offset_ac, grid_dims_full);
-                end
-                if ~isempty(sensor_data) && isfield(sensor_data, 'p_min_async')
-                    sensor_data.p_min_async = fov_backproject_volume( ...
-                        single(sensor_data.p_min_async), fov_offset_ac, grid_dims_full);
-                end
-                if ~isempty(sensor_data) && isfield(sensor_data, 'p_min_all')
-                    sensor_data.p_min_all = fov_backproject_volume( ...
-                        single(sensor_data.p_min_all), fov_offset_ac, grid_dims_full);
-                end
-                kwave_medium  = kwave_medium_full;
-                medium_masks  = medium_masks_full;
-                segmentation  = segmentation_full;
-                trans_pos     = trans_pos_full;   % [sim-grid vox, full domain restored]
-                focus_pos     = focus_pos_full;   % [sim-grid vox, full domain restored]
-                parameters.grid.dims = grid_dims_full;
-                parameters.transducer(1).trans_pos = trans_pos_full;
-                if isfield(parameters.transducer(1), 'focus_pos')
-                    parameters.transducer(1).focus_pos = focus_pos_full;
-                end
-                % Translate highlighted_pos from FOV-grid to sim-grid voxels.
-                if ~isempty(highlighted_pos)
-                    highlighted_pos = fov_to_grid_pos(highlighted_pos, fov_offset_ac);  % [FOV-grid vox] → [sim-grid vox]
-                end
-                clear kwave_medium_full medium_masks_full segmentation_full ...
-                      trans_pos_full focus_pos_full grid_dims_full;
-
-            elseif thermal_use_acoustic_fov
-                % Stay in acoustic FOV coords for thermal simulation.
-                % Adjust planimg affines so that thermal_grid_setup and
-                % nifti_thermal produce correctly georeferenced outputs.
-                %   planimg.transf:     T1w vox → full-ac vox  (row-vector convention)
-                %   We want:            T1w vox → fov-ac vox
-                %   fov_vox = ac_vox - (fov_offset_ac - 1)
-                M_ac2fov        = eye(4);
-                M_ac2fov(4,1:3) = -(fov_offset_ac - 1);
-                planimg.transf  = planimg.transf * M_ac2fov;
-                if isfield(planimg, 'inv_transf')
-                    %   inv_transf: full-ac vox → T1w vox
-                    %   We want:   fov-ac vox  → T1w vox
-                    M_fov2ac            = eye(4);
-                    M_fov2ac(4,1:3)     = (fov_offset_ac - 1);
-                    planimg.inv_transf  = M_fov2ac * planimg.inv_transf;
-                end
-                clear kwave_medium_full medium_masks_full segmentation_full ...
-                      trans_pos_full focus_pos_full grid_dims_full;
-                fprintf('[pipeline] Thermal FOV = acoustic FOV (offset [%s], dims [%s]).\n', ...
-                    num2str(fov_offset_ac), num2str(parameters.grid.dims));
-            end
-
-            kwave_medium.temp_0              = medium_plus.temp_0;
-            kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
-            clear medium_plus;
-
-            % --- Independent thermal grid setup ---
-            % Use thermal_grid_setup when:
-            %   (a) A coarser thermal resolution is requested, OR
-            %   (b) An independent thermal FOV is specified, OR
-            %   (c) An external acoustic NIfTI was provided (no acoustic kgrid exists).
-            % In all other cases the acoustic kgrid, medium, and masks are used as-is.
-            % Also force thermal grid rebuild when acoustic FOV was active: when
-            % restoring full-grid state kgrid must be rebuilt for the full domain;
-            % when thermal_use_acoustic_fov is true, thermal_grid_setup still
-            % needs to be called to compute the correct transf_th for NIfTI export.
-            % BabelBrain acoustic never produces kgrid/source/sensor, so
-            % thermal_grid_setup must always build its own grid and placeholders.
-            use_thermal_grid = has_external_acoustic || has_acoustic_fov || ...
-                use_babelbrain_acoustic || ...
-                (isfield(parameters.grid, 'thermal_resolution_mm') && ...
-                 ~isempty(parameters.grid.thermal_resolution_mm) && ...
-                 parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...
-                (isfield(parameters.grid, 'thermal_fov_mm') && ...
-                 ~isempty(parameters.grid.thermal_fov_mm));
-
-            if use_thermal_grid
-                [kgrid_th, kwave_medium_th, medium_masks_th, parameters_th, transf_th] = ...
-                    thermal_grid_setup(parameters, planimg, kwave_medium, medium_masks, ...
-                                       trans_pos, focus_pos);
-                % Build placeholder sensor and source sized to thermal grid
-                sensor_th        = struct();
-                sensor_th.mask   = ones(parameters_th.grid.dims);
-                source_th        = struct();
-                source_th.Q      = zeros(parameters_th.grid.dims);
-            else
-                kgrid_th        = kgrid;
-                kwave_medium_th = kwave_medium;
-                medium_masks_th = medium_masks;
-                parameters_th   = parameters;
-                assert(isfield(planimg, 'transf') && ~isempty(planimg.transf), ...
-                    ['prestus_pipeline:missingPlanimg — planimg.transf is required for thermal ' ...
-                     'NIfTI export but was not found in the workspace. ' ...
-                     'Re-run with run_grid_setup=1 to regenerate the grid cache and planimg sidecar.']);
-                transf_th       = planimg.transf;
-                if exist('sensor', 'var') && ~isempty(sensor)
-                    sensor_th   = sensor;
-                    source_th   = source;
-                else
-                    sensor_th        = struct();
-                    sensor_th.mask   = ones(parameters_th.grid.dims);
-                    source_th        = struct();
-                    source_th.Q      = zeros(parameters_th.grid.dims);
-                end
-            end
-
-            use_bb_thermal = isfield(parameters, 'thermal_backend') && ...
-                strcmpi(parameters.thermal_backend, 'babelbrain');
-
-            if use_bb_thermal
-                % --- BabelBrain thermal backend ---
-                % Propagate free-water ISPPA into parameters_th so babelbrain_thermal_wrapper
-                % can resolve it via get_tx_isppa.  This covers two cases:
-                %   1. BabelBrain acoustic: freefield_isppa_wcm2 set from Water_DataForSim.h5
-                %   2. Cache reload: tx_calibration carried in acoustic_provenance
-                if exist('acoustic_provenance', 'var') && ...
-                        (~isfield(parameters_th.transducer(1), 'tx_calibration') || ...
-                         ~isfield(parameters_th.transducer(1).tx_calibration, 'isppa_wcm2') || ...
-                         ~isfinite(parameters_th.transducer(1).tx_calibration.isppa_wcm2))
-                    if isfield(acoustic_provenance, 'freefield_isppa_wcm2') && ...
-                            isfinite(acoustic_provenance.freefield_isppa_wcm2)
-                        parameters_th.transducer(1).tx_calibration.isppa_wcm2  = acoustic_provenance.freefield_isppa_wcm2;
-                        parameters_th.transducer(1).tx_calibration.isppa_source = 'acoustic_provenance';
-                    elseif isfield(acoustic_provenance, 'tx_calibration') && ...
-                            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2') && ...
-                            isfinite(acoustic_provenance.tx_calibration.isppa_wcm2)
-                        parameters_th.transducer(1).tx_calibration = acoustic_provenance.tx_calibration;
-                    end
-                end
-                results_heating = babelbrain_thermal_wrapper( ...
-                    parameters_th, sensor_data, planimg, kwave_medium_th);
-                kwaveDiffusion  = [];
-                % Build a sparse k-Wave-compatible time_status_seq from timing parameters
-                % so that thermal_plot_sim shades on/off periods correctly.
-                % One entry per protocol block boundary (k-Wave convention):
-                %   t=0 off → t=ptrd on → t=ptri off → ... → t_end off
-                % The dense timeseries x-axis (TimeProfileTarget) is stored inside
-                % the timeseries struct and used by thermal_plot_sim for plot axes.
-                if isfield(results_heating, 'timeseries') && ...
-                        isfield(results_heating.timeseries, 'TimeProfileTarget') && ...
-                        ~isempty(results_heating.timeseries.TimeProfileTarget)
-                    t_ax_bb  = results_heating.timeseries.TimeProfileTarget(:)';
-                    t_timing = parameters_th.timing;
-                    bb_ptrd  = t_timing.ptrd;
-                    bb_ptri  = bb_ptrd;
-                    if isfield(t_timing, 'ptri') && t_timing.ptri > t_timing.ptrd
-                        bb_ptri = t_timing.ptri;
-                    end
-                    bb_nreps = 1;
-                    if isfield(t_timing, 'n_ptri_reps') && t_timing.n_ptri_reps > 1
-                        bb_nreps = t_timing.n_ptri_reps;
-                    end
-                    tss = struct('time', {0}, 'recorded', {1}, 'status', {'off'});
-                    for i_bb_rep = 1:bb_nreps
-                        t0_rep = (i_bb_rep - 1) * bb_ptri;
-                        tss(end+1) = struct('time', t0_rep + bb_ptrd, 'recorded', 1, 'status', 'on');
-                        if bb_ptri > bb_ptrd
-                            tss(end+1) = struct('time', t0_rep + bb_ptri, 'recorded', 1, 'status', 'off');
-                        end
-                    end
-                    if t_ax_bb(end) > tss(end).time + 1e-6
-                        tss(end+1) = struct('time', t_ax_bb(end), 'recorded', 1, 'status', 'off');
-                    end
-                    time_status_seq = tss;
-                else
-                    time_status_seq = struct([]);
-                end
-            else
-                % --- k-Wave thermal backend (default) ---
-                [kwaveDiffusion, time_status_seq, results_heating] = ...
-                    thermal_simulation(...
-                    parameters_th, sensor_data, kgrid_th, kwave_medium_th, ...
-                    sensor_th, source_th, transf_th, medium_masks_th);
-            end
-
-            if ~should_save_output(parameters.io, 'save_thermal_matrices')
-                disp('Not saving thermal simulation output matrices ...')
-            else
-                save(filename_heating_data, ...
-                    'kwaveDiffusion',...
-                    'time_status_seq',...
-                    'sensor_th',...
-                    'results_heating',...
-                    'kwave_medium_th', ...
-                    '-v7.3');
-            end
-
-            % Propagate thermal-grid temp_0 to kwave_medium so nifti_thermal can
-            % compute temperature rise correctly (kwave_medium_th may use a different
-            % grid resolution/FOV than kwave_medium when use_thermal_grid is true).
-            if exist('kwave_medium_th', 'var') && isfield(kwave_medium_th, 'temp_0')
-                kwave_medium.temp_0 = kwave_medium_th.temp_0;
-            end
-            clear sensor_data source source_th sensor sensor_th kgrid kgrid_th kwaveDiffusion
-            clear kwave_medium_th medium_masks_th parameters_th transf_th
-
-            parameters.state.heating_available = 1;
-        elseif exist(filename_heating_data, 'file')
-            disp('Skipping thermal simulation, loading existing output file.')
-            % Pre-initialize in case the cache was written by an older PRESTUS version
-            % that did not include time_status_seq (thermal_analysis handles [] gracefully).
-            time_status_seq = [];
-            load(filename_heating_data);
-            if exist('kwave_medium_th', 'var') && isfield(kwave_medium_th, 'temp_0')
-                kwave_medium.temp_0 = kwave_medium_th.temp_0;
-            end
-            parameters.state.heating_available = 1;
-        else
-            warning('prestus_pipeline:thermalNoAcoustics', ...
-                ['Heating simulations requested but no acoustic results are available. ' ...
-                 'Check that run_acoustic_sims is enabled and the acoustic cache file exists.']);
-            parameters.state.heating_available = 0;
-            parameters.modules.run_thermal_analysis = 0;
-            results_heating = struct();
-        end
-    else
-        parameters.state.heating_available = 0;
-        results_heating = struct();
-    end
     log_timer('stop','thermal');
+    clear sensor_data source sensor kgrid medium_plus acoustic_provenance
 
     % ====================================================================
     %% STAGE 9 — THERMAL ANALYSIS & NIFTI EXPORT
-    %
-    % Extracts safety metrics (peak temperature rise, CEM43, ISO CEM43)
-    % per tissue layer and compares them against regulatory limits.
-    % Writes heating and CEM43 maps as NIfTI volumes in T1w (and
-    % optionally MNI) space.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('start','thermal_analysis', parameters.io.dir_output);
 
     if parameters.state.heating_available == 1 && ...
@@ -1143,7 +357,6 @@ function [parameters] = prestus_pipeline(parameters, options)
         disp('No heating simulation results available (or requested). Skipping thermal analysis...')
     end
     log_timer('stop','thermal_analysis');
-    % highlighted_pos and segmentation consumed by thermal_analysis above
     clear highlighted_pos segmentation
 
     if parameters.state.heating_available
@@ -1152,19 +365,13 @@ function [parameters] = prestus_pipeline(parameters, options)
         log_timer('stop', 'nifti_thermal');
     end
 
-    clear time_status_seq segmentation bone_mask pseudoCT acoustic_* results_heating medium_masks kwave_medium planimg
+    clear time_status_seq results_heating medium_masks kwave_medium planimg fov_state
 
     % ====================================================================
     %% STAGE 10 — REPORTS
-    %
-    % Generates one or more HTML summary reports depending on which report
-    % flags are set.  Reports are written after all simulation outputs are
-    % on disk so they can embed figures and metrics from this run.
     % ====================================================================
 
-    fprintf('========================================\n');
-    fprintf('\n');
-    fprintf('========================================\n\n');
+    fprintf('========================================\n\n========================================\n\n');
     log_timer('stop','prestus_pipeline')
     disp('Pipeline finished successfully');
 
@@ -1173,10 +380,6 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
 
     if isfield(parameters.modules, 'generate_group_report') && parameters.modules.generate_group_report
-        % Best-effort: aggregate all subjects completed so far into the group
-        % HTML report. Wrapped in try/catch because it reads other subjects'
-        % outputs (which may be mid-write during parallel runs) — a failure
-        % here must never abort this subject's own pipeline.
         try
             group_subjects = discover_group_subjects(parameters);
             if ~isempty(group_subjects)
@@ -1193,7 +396,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             generate_multi_isppa_report(parameters, parameters.multi_isppa);
         else
             warning('prestus_pipeline:missingMultiIsppa', ...
-                'multi_isppa_report flag set but parameters.multi_isppa is missing - skipping.');
+                'multi_isppa_report flag set but parameters.multi_isppa is missing — skipping.');
         end
     end
 
@@ -1212,54 +415,40 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % ====================================================================
     %% STAGE 11 — POST-HOC WATER SIMULATION  (optional)
-    %
-    % Re-runs the acoustic simulation in a homogeneous water medium using
-    % the same transducer and grid geometry.  Provides a skull-free
-    % reference for normalisation (e.g. skull transmission ratio).
-    % Only applicable to layered / phantom media; water simulations skip
-    % this stage automatically.
     % ====================================================================
 
-    if isfield(parameters.modules, 'run_posthoc_water_sims') && parameters.modules.run_posthoc_water_sims && ...
+    if isfield(parameters.modules, 'run_posthoc_water_sims') && ...
+            parameters.modules.run_posthoc_water_sims && ...
             contains(parameters.simulation.medium, {'layered', 'phantom'})
 
-        fprintf('========================================\n');
-        fprintf('\n');
-        fprintf('========================================\n\n');
-
+        fprintf('========================================\n\n========================================\n\n');
         transducer_N_water = numel(parameters.transducer);
         for it_water = 1:transducer_N_water
             if transducer_N_water > 1
                 fprintf('[pipeline] Post-hoc water sim — transducer %d / %d\n', it_water, transducer_N_water);
             end
             water_parameters = parameters;
-            water_parameters.simulation.medium = 'water';
-            water_parameters.modules.run_heating_sims = 0;
+            water_parameters.simulation.medium           = 'water';
+            water_parameters.modules.run_heating_sims    = 0;
             water_parameters.modules.run_posthoc_water_sims = 0;
-            water_parameters.simulation.debug = 0;
-            water_parameters.grid.default_dims = water_parameters.grid.dims;
-            water_parameters.io.log_file = '';  % new log file so water run does not append to the layered diary
-            water_parameters.hpc.timelimit = '05:00:00';
-            water_parameters.hpc.memorylimit = 40;
-            water_parameters.hpc.wait_for_job = false;
+            water_parameters.simulation.debug            = 0;
+            water_parameters.grid.default_dims           = water_parameters.grid.dims;
+            water_parameters.io.log_file                 = '';
+            water_parameters.hpc.timelimit               = '05:00:00';
+            water_parameters.hpc.memorylimit             = 40;
+            water_parameters.hpc.wait_for_job            = false;
             if transducer_N_water > 1
-                % Isolate to single transducer; index range preserves [1×1] struct array type.
-                water_parameters.transducer = parameters.transducer(it_water:it_water);
-                water_parameters.io.output_affix = [parameters.io.output_affix, trans_suffix(it_water, transducer_N_water)];
+                water_parameters.transducer      = parameters.transducer(it_water:it_water);
+                water_parameters.io.output_affix = [parameters.io.output_affix, ...
+                    trans_suffix(it_water, transducer_N_water)];
             end
             prestus_pipeline_start(water_parameters);
         end
-        clear water_parameters;
+        clear water_parameters
     end
 
     % ====================================================================
     %% STAGE 12 — SEQUENTIAL FOLLOW-UP SIMULATION  (optional)
-    %
-    % When options.sequential_configs is present, dispatches the next
-    % simulation in the sequence with the end-temperature and CEM43 maps
-    % of this run wired up as initial conditions.  The entire chain
-    % recurses through sequential_pipeline until all configs are consumed,
-    % then a multi-run summary report is generated.
     % ====================================================================
 
     if any(strcmp(fieldnames(options), 'sequential_configs'))
@@ -1269,17 +458,8 @@ function [parameters] = prestus_pipeline(parameters, options)
         sequential_pipeline(parameters, options);
     end
 
-    % ====================================================================
-    %% CLEANUP
-    % Clear simulation workspace variables that are no longer needed after
-    % all pipeline stages and dispatches have completed.
-    % ====================================================================
-
-    clear kgrid source sensor sensor_data trans_pos focus_pos ...
-          acoustic_provenance results_acoustic ...
-          acoustic_Ipa acoustic_MI acoustic_pressure highlighted_pos
-
-    track_usage('run_end', parameters, struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid), options);
+    track_usage('run_end', parameters, ...
+        struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid), options);
 
     catch me_
         track_usage('run_error', parameters, struct( ...
