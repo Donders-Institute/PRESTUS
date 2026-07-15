@@ -1,6 +1,6 @@
 function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, trans_pos, focus_pos] = ...
-    run_grid_stage(parameters)
-% RUN_GRID_STAGE  Build or load the head model grid cache (Stage 3).
+    grid_stage(parameters)
+% GRID_STAGE  Build or load the head model grid cache (Stage 3).
 %
 % Determines whether to run full grid setup or load a cached result, then
 % writes a planimg sidecar for downstream stages.  When grid setup is
@@ -9,7 +9,7 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 %
 % Use as:
 %   [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, ...
-%    trans_pos, focus_pos] = run_grid_stage(parameters)
+%    trans_pos, focus_pos] = grid_stage(parameters)
 
 arguments
     parameters (1,1) struct
@@ -39,6 +39,10 @@ if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid
 
         [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
             grid_tissue_setup(parameters);
+
+        [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] = ...
+            autopad_grid_for_transducers(parameters, medium_masks, segmentation, ...
+                                         bone_mask, pseudoCT, planimg);
 
         [parameters] = grid_transducer_location(parameters, planimg);
 
