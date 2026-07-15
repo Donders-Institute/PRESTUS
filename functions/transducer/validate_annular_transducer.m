@@ -89,7 +89,7 @@ function tr = validate_annular_transducer(tr, t_i)
     end 
 
     % Backward-compatibility shim: rename deprecated elem_amp → elem_p_amp
-    if isfield(annular_tr, 'elem_amp') && ~isfield(annular_tr, 'elem_p_amp')
+    if isfield(annular_tr, 'elem_amp') && (~isfield(annular_tr, 'elem_p_amp') || isempty(annular_tr.elem_p_amp))
         warning('prestus:deprecatedField', ...
             'annular.elem_amp is deprecated; rename to elem_p_amp in your config.');
         annular_tr.elem_p_amp = annular_tr.elem_amp;

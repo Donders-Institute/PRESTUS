@@ -293,7 +293,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     end
     
     % Backward-compatibility shim: rename deprecated elem_amp → elem_p_amp
-    if isfield(matrix_tr, 'elem_amp') && ~isfield(matrix_tr, 'elem_p_amp')
+    if isfield(matrix_tr, 'elem_amp') && (~isfield(matrix_tr, 'elem_p_amp') || isempty(matrix_tr.elem_p_amp))
         warning('prestus:deprecatedField', ...
             'matrix.elem_amp is deprecated; rename to elem_p_amp in your config.');
         matrix_tr.elem_p_amp = matrix_tr.elem_amp;
