@@ -89,9 +89,26 @@ end
     end
 
     % ---- accumulate run configs and affix registry for the sequential report ----
+    if isfield(sequential_parameters.io, 'acoustic_cache_affix') && ...
+            ~isempty(sequential_parameters.io.acoustic_cache_affix)
+        seq_acoustic_affix = sequential_parameters.io.acoustic_cache_affix;
+    else
+        seq_acoustic_affix = sequential_parameters.io.output_affix;
+    end
     seq_affix_entry = struct( ...
-        'output_affix',       sequential_parameters.io.output_affix, ...
-        'thermal_cache_affix', sequential_parameters.io.thermal_cache_affix);
+        'output_affix',        sequential_parameters.io.output_affix, ...
+        'thermal_cache_affix', sequential_parameters.io.thermal_cache_affix, ...
+        'acoustic_cache_affix', seq_acoustic_affix);
+
+    % Propagate dir_output from the completed base run so that report
+    % generators can resolve dir_cache / dir_img without re-running
+    % path_log_setup.  All sequential runs share the same output directory.
+    if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
+        if ~isfield(sequential_parameters.io, 'dir_output') || ...
+                isempty(sequential_parameters.io.dir_output)
+            sequential_parameters.io.dir_output = parameters.io.dir_output;
+        end
+    end
 
     if ~isfield(options, 'sequential_report_runs')
         % First sequential call: register the base run, then this run.
@@ -100,9 +117,16 @@ end
                 ~isempty(parameters.io.thermal_cache_affix)
             base_t_affix = parameters.io.thermal_cache_affix;
         end
+        if isfield(parameters.io, 'acoustic_cache_affix') && ...
+                ~isempty(parameters.io.acoustic_cache_affix)
+            base_ac_affix = parameters.io.acoustic_cache_affix;
+        else
+            base_ac_affix = parameters.io.output_affix;
+        end
         base_affix_entry = struct( ...
-            'output_affix',       parameters.io.output_affix, ...
-            'thermal_cache_affix', base_t_affix);
+            'output_affix',        parameters.io.output_affix, ...
+            'thermal_cache_affix', base_t_affix, ...
+            'acoustic_cache_affix', base_ac_affix);
         all_run_params  = [{parameters}, {sequential_parameters}];
         run_affixes     = {base_affix_entry, seq_affix_entry};
     else
