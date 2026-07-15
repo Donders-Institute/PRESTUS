@@ -110,7 +110,23 @@ end
         end
         % Courant-Friedrichs-Lewy: Fraction of dx/c for dt; matches config_default.yaml.
         if ~isfield(parameters.grid, 'source_cfl') || isempty(parameters.grid.source_cfl)
-            cfl = 0.15;
+            % jwave time-domain solvers (PSTD, FD) use a Stokes (y=2) absorber whose
+            % stability margin depends on alpha_coeff.  High-attenuation skull tissue
+            % (>~15 dB/cm/MHz) tightens the effective stability limit beyond the pure
+            % acoustic CFL bound of 1/(pi*sqrt(ndim)).  A conservative default of 0.10
+            % keeps the absorption metric well within the stable regime; users can
+            % override with grid.source_cfl if the medium is low-absorption.
+            is_jwave_td = isfield(parameters, 'acoustic_backend') && ...
+                startsWith(lower(parameters.acoustic_backend), 'jwave') && ...
+                (~isfield(parameters, 'jwave') || ~isfield(parameters.jwave, 'solver') || ...
+                 ~strcmpi(parameters.jwave.solver, 'helmholtz'));
+            if is_jwave_td
+                cfl = 0.10;
+                fprintf(['[source_sensor_setup] jwave time-domain backend detected: ' ...
+                         'using conservative CFL=%.2f (override with grid.source_cfl).\n'], cfl);
+            else
+                cfl = 0.15;
+            end
         else
             cfl = parameters.grid.source_cfl;
         end
@@ -135,13 +151,23 @@ end
         ppw_actual = c_check / (tx.freq_hz * parameters.grid.resolution_mm / 1e3);
         if ppw_actual < min_ppw
             dx_required_mm = c_check / (tx.freq_hz * min_ppw) * 1e3;
-            prev_state = warning('off', 'backtrace');
-            warn(['PPW %.1f < minimum %.0f at %.0f Hz with %.2f mm resolution ' ...
+            msg = sprintf(['PPW %.1f < minimum %.0f at %.0f Hz with %.2f mm resolution ' ...
                      '(based on min. sound speed %.0f m/s). ' ...
-                     'Reduce grid.resolution_mm to ≤ %.2f mm.'], ...
+                     'Reduce grid.resolution_mm to \x2264 %.2f mm.'], ...
                 ppw_actual, min_ppw, tx.freq_hz, parameters.grid.resolution_mm, ...
                 c_check, dx_required_mm);
-            warn(prev_state);
+            % jwave's Stokes absorption amplifies aliased high-k modes at PPW < 6,
+            % causing divergence (NaN). Treat as hard error for jwave backends.
+            is_jwave = isfield(parameters, 'acoustic_backend') && ...
+                       startsWith(parameters.acoustic_backend, 'jwave');
+            if is_jwave
+                error('source_sensor_setup:ppwTooLow', '%s\n%s', msg, ...
+                    'jwave PSTD/FD with absorption diverges (NaN) at PPW < min_ppw. Reduce resolution.');
+            else
+                prev_state = warning('off', 'backtrace');
+                warn(msg);
+                warn(prev_state);
+            end
         end
         % Print parameter summary
         fprintf('Calculating the time step of %.1d based on PPW %.1f, CFL= %.2f and PPP %d.\n', ...
@@ -163,6 +189,35 @@ end
         t_end_speed = max_sound_speed;
     end
     t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / t_end_speed;    % [s]
+
+    % jwave steady-state safety margin.
+    % jwave's PML sits INSIDE the declared grid (k-Wave's sits outside), so
+    % run_jwave_sim.py's auto_pad_for_pml silently EXPANDS the domain actually
+    % propagated over whenever the transducer source lands within pml_size
+    % voxels of the FOV boundary -- which can still happen even after
+    % acoustic_fov_crop.m's own PML pre-expansion (observed empirically: a
+    % source landed exactly at the pre-expanded boundary, 1 voxel from the
+    % edge, triggering a further ~pml_size-voxel Python-side pad). t_end above
+    % has no visibility into that later, Python-side expansion, so without
+    % this margin the "last num_periods" recording window can start BEFORE
+    % the wavefront has even crossed the domain that is actually simulated
+    % (confirmed via run_jwave_sim.py --debug: margin of -5.23 periods, i.e.
+    % negative, on a benchmark run with this exact source-near-PML geometry).
+    % Add worst-case margin (pml on both ends of one axis) so recording start
+    % stays safely past the true one-way transit regardless of whether the
+    % Python-side pad actually triggers.
+    if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
+        if isfield(parameters.grid, 'pml_size') && isnumeric(parameters.grid.pml_size)
+            pml_voxels = max(parameters.grid.pml_size(:));
+        else
+            pml_voxels = 40;   % worst case: resolve_jwave_pml_size.m clips 'auto' to [10, 40]
+        end
+        pml_margin_s = 2 * pml_voxels * parameters.grid.resolution_mm * 1e-3 / t_end_speed;
+        fprintf('[source_sensor_setup] jwave steady-state safety margin: +%.2f periods (t_end +%.2f us) for possible PML auto-padding\n', ...
+            pml_margin_s / wave_period, pml_margin_s * 1e6);
+        t_end = t_end + pml_margin_s;
+    end
+
     simulation_time_points = round(t_end / grid_time_step);
 
     % Create the time array
@@ -180,8 +235,8 @@ end
         parameters.subject_id, parameters.simulation.medium, source_affix));
     if confirm_overwriting(parameters.io.filename_kwave_source, parameters)
 
-        % build per-transducer positions for geometry when not using kWaveArray
-        if numel(parameters.transducer)>1 && parameters.grid.use_kWaveArray == 0
+        % build per-transducer positions for geometry (both kWaveArray and non-kWaveArray paths)
+        if numel(parameters.transducer) > 1
             nT = numel(parameters.transducer);
             trans_pos = zeros(nT, numel(parameters.grid.dims));
             focus_pos = zeros(nT, numel(parameters.grid.dims));
@@ -201,8 +256,8 @@ end
                 end
 
                 % focus position in grid
-                if isfield(tr, 'focus_pos_grid') && ~isempty(tr.focus_pos_grid)
-                    fpos = tr.focus_pos_grid;
+                if isfield(tr, 'focus_pos') && ~isempty(tr.focus_pos)
+                    fpos = tr.focus_pos;
                     if size(fpos,1) > size(fpos,2)
                         fpos = fpos';
                     end
@@ -212,7 +267,7 @@ end
                 end
             end
         else
-            % legacy / single-transducer / kWaveArray case
+            % single-transducer case
             trans_pos = trans_pos_final;
             focus_pos = focus_pos_final;
         end
@@ -240,5 +295,21 @@ end
     time_points_to_record = round(num_periods * wave_period / kgrid.dt);
     sensor.record_start_index = simulation_time_points - time_points_to_record + 1;
     % alternative (EM): sensor.record_start_index = simulation_time_points - 3*points_per_period;
+
+    fprintf('[source_sensor_setup] ---- simulation grid summary ----\n');
+    fprintf('[source_sensor_setup] Grid dims         : %s\n', num2str(parameters.grid.dims));
+    fprintf('[source_sensor_setup] Resolution        : %.4f mm\n', parameters.grid.resolution_mm);
+    fprintf('[source_sensor_setup] Frequency         : %.2f kHz\n', tx.freq_hz / 1e3);
+    if ~isempty(min_sound_speed)
+        ppw_report = min_sound_speed / (tx.freq_hz * parameters.grid.resolution_mm / 1e3);
+    else
+        ppw_report = max_sound_speed / (tx.freq_hz * parameters.grid.resolution_mm / 1e3);
+    end
+    fprintf('[source_sensor_setup] PPW (min speed)   : %.2f\n', ppw_report);
+    fprintf('[source_sensor_setup] dt                : %.4e s\n', kgrid.dt);
+    fprintf('[source_sensor_setup] Nt                : %d\n', simulation_time_points);
+    fprintf('[source_sensor_setup] t_end             : %.4f ms\n', simulation_time_points * kgrid.dt * 1e3);
+    fprintf('[source_sensor_setup] Record start idx  : %d  (steady-state window: last %d periods)\n', sensor.record_start_index, num_periods);
+    fprintf('[source_sensor_setup] ------------------------------------\n');
 
 end
