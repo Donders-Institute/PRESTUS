@@ -157,9 +157,9 @@ try
     end
 
     % ------------------------------------------------------------------ %
-    %% Build voxelwise-max intensity NIfTI
+    %% Build voxelwise-max intensity NIfTI and overview image
     % ------------------------------------------------------------------ %
-    max_intensity_nii = build_max_intensity_nii(run_data, base_p, subject_id, medium);
+    [max_intensity_nii, max_intensity_img] = build_max_intensity_nii(run_data, base_p, subject_id, medium);
 
     % ------------------------------------------------------------------ %
     %% Build HTML
@@ -183,6 +183,15 @@ try
 
     % Header
     html_parts{end+1} = build_header_section(subject_id, medium, n_runs, run_labels, base_p);
+
+    % Intensity dashboard
+    try
+        html_parts{end+1} = html_utils.collapsible('Intensity Dashboard', ...
+            build_sequential_dashboard(run_data, run_labels, is_layered, max_intensity_nii, max_intensity_img), ...
+            true, 'dashboard');
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Intensity Dashboard', ME);
+    end
 
     % Acoustic overview
     try
@@ -250,23 +259,43 @@ end
 %  MAX INTENSITY NIFTI
 %% ========================================================================
 
-function out_path = build_max_intensity_nii(run_data, base_p, subject_id, medium)
-% Load each run's T1w intensity NIfTI and write the voxelwise maximum.
-    out_path = '';
-    vol_max  = [];
-    hdr_ref  = [];
+function [out_path, img_path] = build_max_intensity_nii(run_data, base_p, subject_id, medium)
+% Load each run's T1w-space pulse-average intensity (Ipa / Isppa) NIfTI and
+% write the voxelwise maximum across all sequential runs.  Falls back to the
+% temporal-peak intensity (Itp) when Ipa is absent.  Also generates a
+% 3-panel slice-montage PNG overview image for the dashboard.
+%
+% Output filename encodes both the intensity quantity and the aggregation:
+%   sub-{ID}_{medium}_T1w_sequential_Ipa_max.nii.gz
+%   sub-{ID}_{medium}_T1w_sequential_Itp_max.nii.gz  (fallback)
+    out_path   = '';
+    img_path   = '';
+    vol_max    = [];
+    hdr_ref    = [];
+    found_type = '';  % 'Ipa' or 'Itp'
 
     for ri = 1:numel(run_data)
-        p   = run_data{ri}.params;
-        nii = fullfile(p.io.dir_nii_T1w, ...
-            sprintf('sub-%03d_%s_T1w%s_intensity.nii.gz', ...
-                subject_id, medium, p.io.output_affix));
-        if ~isfile(nii), continue; end
+        p     = run_data{ri}.params;
+        affix = run_data{ri}.affix;
+        % Prefer Ipa (pulse-average = Isppa); fall back to Itp (temporal-peak).
+        nii = '';
+        for try_type = {'Ipa', 'Itp'}
+            candidate = fullfile(p.io.dir_nii_T1w, ...
+                sprintf('sub-%03d_%s_T1w%s_%s.nii.gz', subject_id, medium, affix, try_type{1}));
+            if isfile(candidate)
+                nii = candidate;
+                if isempty(found_type)
+                    found_type = try_type{1};
+                end
+                break;
+            end
+        end
+        if isempty(nii), continue; end
         try
             vol = single(niftiread(nii));
             if isempty(vol_max)
-                vol_max  = vol;
-                hdr_ref  = niftiinfo(nii);
+                vol_max = vol;
+                hdr_ref = niftiinfo(nii);
             else
                 vol_max = max(vol_max, vol);
             end
@@ -275,18 +304,129 @@ function out_path = build_max_intensity_nii(run_data, base_p, subject_id, medium
     end
 
     if isempty(vol_max), return; end
+    if isempty(found_type), found_type = 'Ipa'; end
 
     out_path = fullfile(base_p.io.dir_nii_T1w, ...
-        sprintf('sub-%03d_%s_T1w_sequential_maxIntensity.nii.gz', subject_id, medium));
+        sprintf('sub-%03d_%s_T1w_sequential_%s_max.nii.gz', subject_id, medium, found_type));
     try
         hdr_ref.Filename = out_path;
         hdr_ref.Datatype = 'single';
         niftiwrite(vol_max, strrep(out_path, '.nii.gz', '.nii'), hdr_ref, 'Compressed', true);
-        fprintf('Max-intensity NIfTI saved to: %s\n', out_path);
+        fprintf('Voxelwise-max %s NIfTI saved to: %s\n', found_type, out_path);
     catch ME
-        warn('generate_sequential_report:nifti', 'Could not save max-intensity NIfTI: %s', ME.message);
+        warn('generate_sequential_report:nifti', 'Could not save voxelwise-max %s NIfTI: %s', ...
+            found_type, ME.message);
         out_path = '';
     end
+
+    img_path = build_max_intensity_overview_img(vol_max, base_p, subject_id, medium, found_type);
+end
+
+function img_path = build_max_intensity_overview_img(vol_max, base_p, subject_id, medium, intensity_type)
+% Generate a 3-panel coronal/axial/sagittal slice montage PNG of the
+% voxelwise-max intensity volume.  When a T1w anatomical NIfTI is found
+% it is used as a grayscale background; otherwise slices are shown
+% on a black background.  Saved into dir_img alongside per-run images.
+    img_path = '';
+    if ~isfield(base_p.io, 'dir_img') || isempty(base_p.io.dir_img)
+        return;
+    end
+    dir_img = base_p.io.dir_img;
+    if ~isfolder(dir_img)
+        try; mkdir(dir_img); catch; return; end
+    end
+    out_png = fullfile(dir_img, ...
+        sprintf('sub-%03d_%s_sequential_%s_max_overview.png', subject_id, medium, intensity_type));
+
+    max_val = max(vol_max(:));
+    if ~isfinite(max_val) || max_val <= 0; return; end
+    vol_norm = vol_max / max_val;  % 0–1
+
+    % Peak voxel location
+    [~, peak_lin]    = max(vol_max(:));
+    [vx_i, vx_j, vx_k] = ind2sub(size(vol_max), peak_lin);
+
+    % Try to load T1w anatomical background (same space as intensity volume)
+    t1w_norm = [];
+    if isfield(base_p, 'path') && isfield(base_p.path, 'anat') && ...
+            isfield(base_p.path, 't1_pattern')
+        t1w_glob = fullfile(base_p.path.anat, ...
+            sprintf(base_p.path.t1_pattern, base_p.subject_id));
+        t1w_hits = dir(t1w_glob);
+        if ~isempty(t1w_hits)
+            try
+                t1w_raw = single(niftiread(fullfile(t1w_hits(1).folder, t1w_hits(1).name)));
+                if isequal(size(t1w_raw), size(vol_max))
+                    t1w_max = max(t1w_raw(:));
+                    if t1w_max > 0
+                        t1w_norm = t1w_raw / t1w_max;
+                    end
+                end
+            catch
+            end
+        end
+    end
+
+    % 'hot' colormap: black→red→yellow→white
+    cmap_n = 256;
+    cmap   = hot(cmap_n);
+
+    make_slice = @(ipa_sl, t1w_sl) slice_to_rgb(ipa_sl, t1w_sl, cmap, cmap_n);
+
+    try
+        % Coronal slice at peak column vx_j (A/P axis)
+        sl_cor = squeeze(vol_norm(:, vx_j, :));
+        bg_cor = []; if ~isempty(t1w_norm); bg_cor = squeeze(t1w_norm(:, vx_j, :)); end
+        % Axial slice at peak slice vx_k (I/S axis)
+        sl_ax  = squeeze(vol_norm(:, :, vx_k));
+        bg_ax  = []; if ~isempty(t1w_norm); bg_ax  = squeeze(t1w_norm(:, :, vx_k));  end
+        % Sagittal slice at peak row vx_i (L/R axis)
+        sl_sag = squeeze(vol_norm(vx_i, :, :));
+        bg_sag = []; if ~isempty(t1w_norm); bg_sag = squeeze(t1w_norm(vx_i, :, :));  end
+
+        rgb_cor = make_slice(sl_cor, bg_cor);
+        rgb_ax  = make_slice(sl_ax,  bg_ax);
+        rgb_sag = make_slice(sl_sag, bg_sag);
+
+        % Pad all panels to equal height; separate with a thin gray bar
+        h_max = max([size(rgb_cor,1), size(rgb_ax,1), size(rgb_sag,1)]);
+        pad_fn = @(im) [im; zeros(h_max-size(im,1), size(im,2), 3, 'uint8')];
+        sep    = uint8(240 * ones(h_max, 3, 3));  % 3-px light-gray separator
+        label_bar = make_label_bar(16, size(rgb_cor,2), size(rgb_ax,2), size(rgb_sag,2));
+        montage = cat(2, pad_fn(rgb_cor), sep, pad_fn(rgb_ax), sep, pad_fn(rgb_sag));
+        montage = cat(1, montage, label_bar);
+
+        imwrite(montage, out_png);
+        img_path = out_png;
+        fprintf('Overview PNG for %s max saved to: %s\n', intensity_type, out_png);
+    catch ME
+        warn('generate_sequential_report:overviewPng', ...
+            'Failed to generate overview image: %s', ME.message);
+    end
+end
+
+function rgb = slice_to_rgb(ipa_sl, t1w_sl, cmap, cmap_n)
+% Convert a normalized 2D intensity slice to uint8 RGB, blended with T1w.
+    ipa_sl  = rot90(ipa_sl);  % orient for standard radiological view
+    idx     = min(cmap_n, max(1, round(ipa_sl * (cmap_n-1)) + 1));
+    ipa_rgb = reshape(cmap(idx(:), :), [size(ipa_sl), 3]);
+
+    if ~isempty(t1w_sl)
+        t1w_sl  = rot90(t1w_sl);
+        t1w_rgb = repmat(t1w_sl, [1, 1, 3]);
+        alpha   = repmat(min(1, ipa_sl * 4), [1, 1, 3]);  % transparent where near-zero
+        blended = t1w_rgb .* (1 - alpha) + ipa_rgb .* alpha;
+        rgb     = uint8(blended * 255);
+    else
+        rgb = uint8(ipa_rgb * 255);
+    end
+end
+
+function bar = make_label_bar(bar_h, w1, w2, w3)
+% Thin white spacer strip below the slice montage.
+    sep_w   = 3;
+    total_w = w1 + sep_w + w2 + sep_w + w3;
+    bar     = uint8(255 * ones(bar_h, total_w, 3));
 end
 
 %% ========================================================================
@@ -310,6 +450,103 @@ function html = build_header_section(subject_id, medium, n_runs, run_labels, bas
     html = [html '</table></section>'];
 end
 
+function html = build_sequential_dashboard(run_data, run_labels, is_layered, max_nii_path, max_img_path)
+% BUILD_SEQUENTIAL_DASHBOARD  Per-metric cards showing the worst-case value
+%   across all sequential runs, colour-coded against ITRUSST NSR limits.
+%   Analogous to the async-mode intensity summary: the reported value is the
+%   per-metric maximum observed across the sequential run chain.
+    if nargin < 5; max_img_path = ''; end
+
+    limits       = get_risk_limits(is_layered);
+    metric_names = fieldnames(limits);
+    html         = '';
+
+    % Compute per-metric maximum across runs and record which run achieved it
+    max_vals = struct();
+    max_runs = struct();
+    for mi = 1:numel(metric_names)
+        name = metric_names{mi};
+        max_vals.(name) = NaN;
+        max_runs.(name) = 0;
+        for ri = 1:numel(run_data)
+            csv = run_data{ri}.csv;
+            if ~isempty(csv) && ismember(name, csv.Properties.VariableNames)
+                v = csv.(name);
+                if isnumeric(v) && ~isempty(v) && isfinite(v(end))
+                    if isnan(max_vals.(name)) || v(end) > max_vals.(name)
+                        max_vals.(name) = v(end);
+                        max_runs.(name) = ri;
+                    end
+                end
+            end
+        end
+    end
+
+    html = [html '<p style="font-size:0.85em;color:#64748b;margin:0 0 12px;">' ...
+        'Peak value across all sequential runs per metric. ' ...
+        'Run label shows which run reached the maximum. ' ...
+        'Colour coding follows ITRUSST NSR limits (green &lt; 50%, amber 50&ndash;100%, red &gt; limit).</p>'];
+    html = [html '<div class="safety-grid">'];
+
+    for mi = 1:numel(metric_names)
+        name  = metric_names{mi};
+        info  = limits.(name);
+        value = max_vals.(name);
+        ri_mx = max_runs.(name);
+
+        color = risk_color(value, info.limit);
+
+        html = [html sprintf('<div class="safety-card safety-%s">', color)];
+        html = [html sprintf('<div class="safety-label">%s</div>', html_utils.escape(info.label))];
+
+        if isnan(value)
+            html = [html '<div class="safety-value">N/A</div>'];
+            html = [html '<div class="risk-limit">No data</div>'];
+        else
+            html = [html sprintf('<div class="safety-value">%.3g</div>', value)];
+            if ri_mx > 0 && ri_mx <= numel(run_labels)
+                html = [html sprintf('<div class="dash-run-label">Peak: %s</div>', ...
+                    html_utils.escape(run_labels{ri_mx}))];
+            end
+            if isinf(info.limit)
+                html = [html sprintf('<div class="risk-limit">%s (informational)</div>', ...
+                    html_utils.escape(info.unit))];
+            else
+                html = [html sprintf('<div class="risk-limit">NSR limit: %.3g %s</div>', ...
+                    info.limit, html_utils.escape(info.unit))];
+                pct  = min(100, max(0, (value / info.limit) * 100));
+                html = [html sprintf(['<div class="safety-bar-track">' ...
+                    '<div class="safety-bar" style="width:%.0f%%"></div></div>'], pct)];
+            end
+        end
+        html = [html '</div>'];
+    end
+    html = [html '</div>'];
+
+    % Voxelwise-max intensity overview image
+    if ~isempty(max_img_path) && isfile(max_img_path)
+        img_html = html_utils.embed_image(max_img_path, ...
+            'Voxelwise-max intensity overview (coronal / axial / sagittal)', ...
+            'Voxelwise-max intensity');
+        if ~isempty(img_html)
+            html = [html '<div style="margin:12px 0;">' img_html '</div>'];
+        end
+    end
+
+    % NIfTI provenance note
+    if ~isempty(max_nii_path) && isfile(max_nii_path)
+        html = [html sprintf(['<p class="note" style="margin-top:12px;">' ...
+            '<strong>Voxelwise-max intensity NIfTI</strong> (maximum across all runs): ' ...
+            '<code>%s</code></p>'], html_utils.escape(max_nii_path))];
+    end
+
+    html = [html '<p class="safety-footnote">NSR limits per ITRUSST consensus ' ...
+        '(Aubry et al., 2025; ' ...
+        '<a href="https://doi.org/10.1016/j.brs.2025.10.007">DOI: 10.1016/j.brs.2025.10.007</a>). ' ...
+        'A red tile for any individual metric does not by itself indicate that NSR cannot be assumed. ' ...
+        'Always refer to current community guidelines.</p>'];
+end
+
 function html = build_acoustic_overview(run_data, run_labels, is_layered, max_nii_path, subject_id, medium)
     html = '';
 
@@ -317,6 +554,32 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
     acoustic_cols = {'MI_tc', 'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
                      'MI_brain', 'Psptp_brain', 'real_focal_distance_mm', 'Ipa_target'};
     limits = get_risk_limits(is_layered);
+
+    % Collect all values upfront so we can compute column maxima
+    all_vals = NaN(numel(run_data), numel(acoustic_cols));
+    for ri = 1:numel(run_data)
+        csv = run_data{ri}.csv;
+        for ci = 1:numel(acoustic_cols)
+            col = acoustic_cols{ci};
+            if ~isempty(csv) && ismember(col, csv.Properties.VariableNames)
+                v = csv.(col);
+                if isnumeric(v) && ~isempty(v)
+                    all_vals(ri, ci) = v(end);
+                end
+            end
+        end
+    end
+
+    % Per-column max and which run achieved it (ignore NaN entries)
+    col_max     = NaN(1, numel(acoustic_cols));
+    col_max_run = ones(1, numel(acoustic_cols));
+    for ci = 1:numel(acoustic_cols)
+        finite_rows = find(isfinite(all_vals(:, ci)));
+        if ~isempty(finite_rows)
+            [col_max(ci), idx] = max(all_vals(finite_rows, ci));
+            col_max_run(ci)    = finite_rows(idx);
+        end
+    end
 
     table_html = '<div class="table-wrapper"><table class="data-table"><thead><tr>';
     table_html = [table_html '<th>Run</th>'];
@@ -328,19 +591,19 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
     for ri = 1:numel(run_data)
         table_html = [table_html sprintf('<tr><td><strong>%s</strong></td>', ...
             html_utils.escape(run_labels{ri}))];
-        csv = run_data{ri}.csv;
         for ci = 1:numel(acoustic_cols)
             col = acoustic_cols{ci};
-            val = NaN;
-            if ~isempty(csv) && ismember(col, csv.Properties.VariableNames)
-                v = csv.(col);
-                if isnumeric(v) && ~isempty(v)
-                    val = v(end);
-                end
-            end
+            val = all_vals(ri, ci);
+            is_col_max = ~isnan(val) && ~isnan(col_max(ci)) && val == col_max(ci);
             cell_class = '';
             if isfield(limits, col) && ~isnan(val)
-                cell_class = sprintf(' class="cell-%s"', risk_color(val, limits.(col).limit));
+                if is_col_max
+                    cell_class = sprintf(' class="cell-%s cell-max"', risk_color(val, limits.(col).limit));
+                else
+                    cell_class = sprintf(' class="cell-%s"', risk_color(val, limits.(col).limit));
+                end
+            elseif is_col_max
+                cell_class = ' class="cell-max"';
             end
             if isnan(val)
                 table_html = [table_html sprintf('<td%s>—</td>', cell_class)];
@@ -350,6 +613,25 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
         end
         table_html = [table_html '</tr>'];
     end
+
+    % Max-across-runs summary row
+    table_html = [table_html '<tr class="max-summary-row"><td><strong>&#9650; Max</strong></td>'];
+    for ci = 1:numel(acoustic_cols)
+        col = acoustic_cols{ci};
+        val = col_max(ci);
+        cell_class = ' class="max-summary-cell"';
+        if isfield(limits, col) && ~isnan(val)
+            cell_class = sprintf(' class="max-summary-cell cell-%s"', risk_color(val, limits.(col).limit));
+        end
+        if isnan(val)
+            table_html = [table_html sprintf('<td%s>—</td>', cell_class)];
+        else
+            table_html = [table_html sprintf('<td%s>%.4g<br><small class="max-run-label">%s</small></td>', ...
+                cell_class, val, html_utils.escape(run_labels{col_max_run(ci)}))];
+        end
+    end
+    table_html = [table_html '</tr>'];
+
     table_html = [table_html '</tbody></table></div>'];
     html = [html table_html];
 
@@ -368,15 +650,13 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
     for ri = 1:numel(run_data)
         p     = run_data{ri}.params;
         affix = run_data{ri}.affix;
-        img   = fullfile(p.io.dir_img, ...
-            sprintf('sub-%03d_%s_intensity_t1w%s.png', subject_id, medium, affix));
-        if ~isfile(img)
-            img = fullfile(p.io.dir_img, ...
-                sprintf('sub-%03d_%s_intensity%s.png', subject_id, medium, affix));
-        end
+        % Search for intensity overlay: single-transducer T1w overlay,
+        % then multi-transducer (_t01), then fallback 2-D pattern.
+        img = find_intensity_image(p.io.dir_img, subject_id, medium, affix);
+        run_title = html_utils.escape(run_labels{ri});
         html = [html '<div class="run-col">'];
-        html = [html sprintf('<h4>%s</h4>', html_utils.escape(run_labels{ri}))];
-        img_html = html_utils.embed_image(img, run_labels{ri}, run_labels{ri});
+        html = [html sprintf('<h4>%s</h4>', run_title)];
+        img_html = html_utils.embed_image(img, run_title, run_title);
         if ~isempty(img_html)
             html = [html img_html];
         else
@@ -385,6 +665,23 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
         html = [html '</div>'];
     end
     html = [html '</div>'];
+end
+
+function img = find_intensity_image(dir_img, subject_id, medium, affix)
+% Return the path of the first existing intensity overlay image for this run.
+% Priority: T1w combined > T1w _t01 > 2-D intensity > empty string.
+    candidates = { ...
+        fullfile(dir_img, sprintf('sub-%03d_%s_intensity_t1w%s.png',     subject_id, medium, affix)); ...
+        fullfile(dir_img, sprintf('sub-%03d_%s_intensity_t1w_t01%s.png', subject_id, medium, affix)); ...
+        fullfile(dir_img, sprintf('sub-%03d_%s_intensity%s.png',          subject_id, medium, affix)); ...
+    };
+    img = '';
+    for k = 1:numel(candidates)
+        if isfile(candidates{k})
+            img = candidates{k};
+            return;
+        end
+    end
 end
 
 function html = build_thermal_timeseries(run_data, run_labels, is_layered, subject_id, medium, ...
@@ -865,6 +1162,7 @@ end
 function html = build_toc(is_layered)
     html = '<nav class="toc" id="toc">';
     html = [html '<a href="#header">Overview</a>'];
+    html = [html '<a href="#dashboard">Dashboard</a>'];
     html = [html '<a href="#acoustic">Acoustic</a>'];
     if is_layered
         html = [html '<a href="#thermal">Thermal</a>'];
@@ -887,8 +1185,20 @@ css = [css_styles_base() newline ...
 '.cell-amber { background:#fffbeb !important; }' newline ...
 '.cell-red   { background:#fef2f2 !important; font-weight:600; }' newline ...
 '.cell-gray  { background:#f9fafb !important; color:#94a3b8; }' newline ...
+'.cell-max   { outline:2px solid #64748b; outline-offset:-2px; font-weight:600; }' newline ...
+'.max-summary-row { border-top:2px solid #cbd5e1; background:#f1f5f9 !important; font-weight:600; }' newline ...
+'.max-summary-cell { vertical-align:top; }' newline ...
+'.max-run-label { font-size:0.75em; font-weight:400; color:#64748b; white-space:nowrap; }' newline ...
 '.run-grid   { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr)); gap:16px; margin:12px 0; }' newline ...
 '.run-col    { border:1px solid #e2e8f0; border-radius:6px; padding:12px; background:#fafafa; }' newline ...
 '.run-col h4 { margin:0 0 8px; font-size:0.95em; color:#475569; }' newline ...
+'.dash-run-label { font-size:0.78em; color:#64748b; margin:2px 0 4px; font-style:italic; }' newline ...
+'.safety-bar-track { height:4px; background:#e2e8f0; border-radius:2px; margin-top:6px; overflow:hidden; }' newline ...
+'.safety-bar       { height:100%; border-radius:2px; }' newline ...
+'.safety-green .safety-bar { background:var(--green); }' newline ...
+'.safety-amber .safety-bar { background:var(--amber); }' newline ...
+'.safety-red   .safety-bar { background:var(--red); }' newline ...
+'.safety-gray  .safety-bar { background:var(--gray); }' newline ...
+'.safety-footnote { font-size:0.8em; color:#94a3b8; margin-top:8px; }' newline ...
 ];
 end
