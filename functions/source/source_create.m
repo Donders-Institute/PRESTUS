@@ -132,8 +132,8 @@ end
         
         for it = 1:transducer_N
             tr          = tr_arr(it);
-            trans_pos_i = tr_arr(it).trans_pos;
-            focus_pos_i = tr_arr(it).focus_pos;
+            trans_pos_i = trans_pos(it,:);
+            focus_pos_i = focus_pos(it,:);
         
             for el_i = 1:tr.(tr.type).elem_n
                 global_el = offsets(it) + el_i;  % 1..n_elements_total
@@ -222,7 +222,8 @@ end
         karray = kWaveArray('Axisymmetric', false, ...
                            'BLITolerance', 0.1, ...
                            'UpsamplingRate', 10, ...
-                           'BLIType', 'sinc');
+                           'BLIType', 'sinc', ...
+                           'SinglePrecision', strcmp(parameters.simulation.precision, 'single'));
 
         if axisymmetric
 
@@ -370,36 +371,91 @@ end
             total_elements = sum(elem_counts);
             offsets        = [0, cumsum(elem_counts(1:end-1))];
 
-            % Compute BLI grid weights for every element across all transducers
-            grid_weights_4d = zeros(total_elements, kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+            % Two-pass weight computation: never store more than one element's
+            % weight vector at a time (avoids total_elements x Ngrid peak allocation).
+            Ngrid = kgrid.Nx * kgrid.Ny * max(kgrid.Nz, 1);
+            Nt    = size(cw_signals_all{1}, 2);
+
+            % Pass 1: build union binary mask using getElementBinaryMask, which
+            % returns a logical array and skips the sinc BLI accumulation
+            % entirely (MaskOnly=true path in offGridPoints).
+            acc_mask = false(Ngrid, 1);
             for ind = 1:total_elements
-                fprintf('Computing weights for element %i...', ind);
-                grid_weights_4d(ind,:,:,:) = karray.getElementGridWeights(kgrid, ind);
+                fprintf('Computing weights for element %i (pass 1)...', ind);
+                w = karray.getElementBinaryMask(kgrid, ind);
+                acc_mask = acc_mask | w(:);
                 fprintf(' done\n');
             end
 
-            binary_mask = squeeze(sum(grid_weights_4d, 1)) ~= 0;
-            Nt          = size(cw_signals_all{1}, 2);
-            mask_ind    = find(binary_mask);
-            num_src     = sum(binary_mask(:));
+            binary_mask = reshape(acc_mask, kgrid.Nx, kgrid.Ny, max(kgrid.Nz, 1));
+            mask_ind    = find(acc_mask);
+            num_src     = numel(mask_ind);
 
-            % Stack all element CW signals: total_elements x Nt
-            all_cw = zeros(total_elements, Nt);
-            for it = 1:transducer_N
-                r = offsets(it) + (1:elem_counts(it));
-                all_cw(r, :) = cw_signals_all{it};
+            % Pass 2: build sparse W_src (num_src x total_elements) via COO triplets.
+            % Pre-allocate conservatively; each element typically covers O(1000) mask pts.
+            coo_i = zeros(num_src * total_elements, 1, 'double');  % over-alloc, trimmed below
+            coo_j = zeros(num_src * total_elements, 1, 'double');
+            coo_v = zeros(num_src * total_elements, 1, 'double');
+            ptr   = 0;
+            for ind = 1:total_elements
+                fprintf('Computing weights for element %i (pass 2)...', ind);
+                w    = karray.getElementGridWeights(kgrid, ind);
+                col  = w(mask_ind);
+                clear w;   % release 604 MB before next iteration
+                nz   = find(col);
+                nnz_ = numel(nz);
+                if nnz_ > 0
+                    coo_i(ptr+1:ptr+nnz_) = nz;
+                    coo_j(ptr+1:ptr+nnz_) = ind;
+                    coo_v(ptr+1:ptr+nnz_) = col(nz);
+                    ptr = ptr + nnz_;
+                end
+                fprintf(' done\n');
             end
+            W_src = sparse(coo_i(1:ptr), coo_j(1:ptr), coo_v(1:ptr), num_src, total_elements);
+            clear coo_i coo_j coo_v;
 
-            % Extract source-point weights: reshape grid_weights_4d (zero-copy view),
-            % then pick only the num_src active columns -> num_src x total_elements.
-            W_flat = reshape(grid_weights_4d, total_elements, []);
-            W_src  = W_flat(:, mask_ind)';   % num_src x total_elements
+            % For matlab_cpu and matlab_gpu: use lazy rank-2 CWSourceMatrix
+            % instead of the full num_src x Nt dense matrix. Every CW voxel
+            % signal is:
+            %   p(i,t) = Re(C_i)*cos(omega*t) - Im(C_i)*sin(omega*t)
+            % where C_i = W_src(i,:) * C_elem — a single complex scalar per
+            % voxel. This saves O(num_src * Nt) RAM (typically tens–hundreds
+            % of MB). k-Wave's dataCast passes through harmlessly:
+            %   single(source.p)   → CWSourceMatrix.single() → obj unchanged
+            %   gpuArray(source.p) → CWSourceMatrix.gpuArray() → Re_C/Im_C
+            %                        uploaded to GPU; subsref then returns
+            %                        gpuArray slices for the GPU time loop.
+            % NOT valid for cpp backends (source.p written to HDF5 → needs
+            % a dense matrix), or when transducers have different frequencies.
+            use_cw_lazy = ismember(parameters.simulation.code_type, {'matlab_cpu', 'matlab_gpu'}) && ...
+                          numel(unique([tr_arr.freq_hz])) == 1;
 
-            % Single matrix multiply replaces the double element loop.
-            if canUseGPU
-                distributed_source_signal = gather(gpuArray(W_src) * gpuArray(all_cw));
+            if use_cw_lazy
+                % Build per-element complex amplitude: A_j * exp(i*phi_j)
+                C_elem = zeros(total_elements, 1);
+                omega_cw = 2 * pi * tr_arr(1).freq_hz;
+                for it = 1:transducer_N
+                    r = offsets(it) + (1:elem_counts(it));
+                    C_elem(r) = tr_arr(it).(tr_arr(it).type).elem_p_amp(:) .* ...
+                                 exp(1i * tr_arr(it).(tr_arr(it).type).elem_phase_rad(:));
+                end
+                % Per-voxel complex amplitude: sparse matrix multiply (negligible cost)
+                C_src = W_src * C_elem;   % num_src x 1 complex
+                distributed_source_signal = CWSourceMatrix( ...
+                    real(C_src), imag(C_src), omega_cw, kgrid.dt, Nt);
+                fprintf('[source_create] %s: using lazy CWSourceMatrix (%d src x %d steps, %.1f MB saved)\n', ...
+                    parameters.simulation.code_type, num_src, Nt, num_src * Nt * 4 / 1e6);
             else
-                distributed_source_signal = W_src * all_cw;
+                % Stack all element CW signals: total_elements x Nt
+                all_cw = zeros(total_elements, Nt, parameters.simulation.precision);
+                for it = 1:transducer_N
+                    r = offsets(it) + (1:elem_counts(it));
+                    all_cw(r, :) = cw_signals_all{it};
+                end
+                % Sparse CPU multiply. Cast immediately to simulation precision:
+                % W_src (double sparse) * all_cw (single) would upcast to double otherwise.
+                distributed_source_signal = cast(W_src * double(all_cw), parameters.simulation.precision);
             end
 
             % source_labels: sum of element indices weighted by binary occupancy.
@@ -415,4 +471,30 @@ end
             end
         end
     end
+
+    fprintf('[source_create] ---- source summary ----\n');
+    fprintf('[source_create]   transducers       : %d\n', transducer_N);
+    for it = 1:transducer_N
+        tr_s = tr_arr(it);
+        elem_n_s = tr_s.(tr_s.type).elem_n;
+        amps_s = tr_s.(tr_s.type).elem_p_amp;
+        if numel(amps_s) == 1
+            fprintf('[source_create]   transducer %d elements : %d | p_amp : %.2f Pa\n', it, elem_n_s, amps_s);
+        else
+            fprintf('[source_create]   transducer %d elements : %d | p_amp : %.2f – %.2f Pa\n', it, elem_n_s, min(amps_s), max(amps_s));
+        end
+    end
+    fprintf('[source_create]   active voxels     : %d\n', nnz(source.p_mask));
+    freqs_s = [tr_arr.freq_hz];
+    if numel(unique(freqs_s)) == 1
+        fprintf('[source_create]   frequency         : %.0f Hz (%.3f kHz)\n', freqs_s(1), freqs_s(1)/1e3);
+    else
+        for it = 1:transducer_N
+            fprintf('[source_create]   freq transducer %d  : %.0f Hz (%.3f kHz)\n', it, freqs_s(it), freqs_s(it)/1e3);
+        end
+    end
+    if exist('axisymmetric', 'var') && axisymmetric
+        fprintf('[source_create]   mode              : axisymmetric (mirrored-grid approximation)\n');
+    end
+    fprintf('[source_create] ------------------------------------\n');
 end

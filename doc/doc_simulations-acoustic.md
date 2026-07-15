@@ -110,6 +110,48 @@ See [`benchmark_ramp_factor.m`](../code/benchmark_ramp_factor.m) for a minimal t
 
 ---
 
+## Memory and source signal optimisation
+
+Acoustic simulation memory is dominated by two components:
+
+- **Grid fields** — pressure, velocity, and medium maps proportional to the number of grid voxels. For a 0.5 mm head grid this is roughly 7–8 GB and scales with resolution, not transducer size.
+- **Source signal matrix** — one waveform per active source voxel over all time steps. For a focused single-element transducer this is negligible; for a large multi-element phased array it can exceed the grid fields.
+
+The source signal matrix has size `num_source_voxels × Nt`. For a kHz-range aperture at 0.5 mm resolution with a standard CFL of 0.15, `Nt` is on the order of several thousand, making the naive dense matrix several gigabytes for large transducers.
+
+### How PRESTUS reduces source memory by backend
+
+PRESTUS applies different compression strategies depending on the backend:
+
+**`matlab_cpu` — lazy rank-2 factorisation for CW sources.**
+For continuous-wave (CW) stimulation, every source voxel's time signal has the form
+
+```
+p(voxel, t) = A_voxel · cos(ω t + φ_voxel)
+```
+
+which can be parameterised by two real numbers per voxel (amplitude and phase, or equivalently the real and imaginary part of a complex amplitude). PRESTUS constructs a compact representation storing only those two numbers per voxel and evaluates each time column on demand during the simulation. Memory scales with `num_source_voxels` only, not `num_source_voxels × Nt`. For typical parameters this reduces source memory by a factor of ~2 000–5 000 compared to the dense matrix.
+
+This path is activated automatically when `code_type = matlab_cpu` and all transducer elements share a single frequency.
+
+**`matlab_gpu` — dense matrix in GPU memory.**
+The full source matrix is allocated as a dense single-precision array and transferred to the GPU before the simulation loop. No compression is applied. GPU memory must accommodate both the grid fields and the full source matrix.
+
+**`cpp_cpu` / `cpp_gpu` — HDF5 streaming from disk.**
+The source matrix is written to an HDF5 file before the simulation and the C++ binary reads it in blocks during execution. Peak memory is bounded by the block size rather than the full matrix, at the cost of I/O throughput.
+
+### Backend comparison
+
+| Backend | Simulation device | Source signal representation | Peak additional RAM / VRAM |
+|---|---|---|---|
+| `matlab_gpu` | GPU | Dense single, full matrix in VRAM | `num_src × Nt × 4 B` on GPU |
+| `matlab_cpu` | CPU | Lazy rank-2 (CW) or dense single | `2 × num_src × 4 B` (CW) |
+| `cpp_cpu` / `cpp_gpu` | CPU / GPU | HDF5 file, streamed | Bounded by I/O block size |
+
+For a 10 000-voxel source at Nt = 9 000 time steps: dense = **360 MB**; CW lazy = **0.08 MB**.
+
+---
+
 ## Axisymmetric simulations
 
 For debugging, it can be useful to specify and model symmetric 2D tissues (e.g, 2D `phantom` or `water` media). However, [`kspaceFirstOrder2D`](http://www.k-wave.org/documentation/kspaceFirstOrder2D.php) models an infinite cylinder, not a focusing shell. It uses a 2D Cartesian grid with **X and Y axes**. These are assumed to map onto the second and first dimensions of input matrices and coordinates (i.e., [y, x]), respectively. This may at first may seem unintuitive, but it is designed to facilitate the mapping to 3D image space voxel coordinates [i,j,k], which traditionally map onto [Y,X,Z]. In the future, this could also be resolved by assuming a XY mapping for k-Wave, and introducing a remapping of voxel space coordinates.
