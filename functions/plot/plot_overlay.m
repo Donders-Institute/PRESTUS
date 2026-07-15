@@ -87,7 +87,9 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     if isempty(options.overlay_color_range)
         clim_lo = max([options.overlay_threshold_low, min(overlay_image(:)), 0]);
         clim_hi = max(overlay_image(:));
-        if clim_hi <= clim_lo
+        if isnan(clim_lo) || isnan(clim_hi)
+            clim_lo = 0; clim_hi = 1;  % all-NaN map — use unit range
+        elseif clim_hi <= clim_lo
             clim_hi = clim_lo + 1;  % degenerate range (e.g. all-zero map) — use unit range
         end
         options.overlay_color_range = [clim_lo, clim_hi];
@@ -283,6 +285,17 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
         for ti_draw = 1:nT_draw
             fp_draw = focus_pos(min(ti_draw, size(focus_pos,1)), :);
             nf_draw = natural_focus(ti_draw, :);
+            % Skip the overlay when the beam is nearly perpendicular to the
+            % slice plane: the 2D projected trans→focus vector would be
+            % degenerate, producing a garbage orientation (e.g. a lateral
+            % transducer on a sagittal/z-slice).
+            beam2d = fp_draw - trans_pos(ti_draw,:);
+            fp3_ti = focus_pos_3d(min(ti_draw, size(focus_pos_3d,1)), :);
+            beam3d = fp3_ti - trans_pos_3d(ti_draw,:);
+            in_plane_frac = norm(beam2d) / max(norm(beam3d), eps);
+            if in_plane_frac < 0.2
+                continue;
+            end
             plot_transducer_overlay(parameters, trans_pos(ti_draw,:), fp_draw, nf_draw, ...
                 max_data_pos, options, 0.3, [0.2 0.6 1], ti_draw);
         end
@@ -307,7 +320,9 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     imagesc(ax2, overlay_image,'alphadata', intensity_alpha);
 
     cr = options.overlay_color_range;
-    if cr(2) <= cr(1)
+    if any(isnan(cr))
+        cr = [0, 1];
+    elseif cr(2) <= cr(1)
         cr(2) = cr(1) + 1;
     end
     if exist("clim")==2 % renamed in R2022a

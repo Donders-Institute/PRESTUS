@@ -13,7 +13,9 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
 %   segmented_img  - [Nx x Ny x Nz] tissue label volume
 %   target_xyz     - [Kx3] target positions in voxel coordinates
 %   trans_xyz      - [Kx3] transducer positions in voxel coordinates
-%   parameters     - (1,1) simulation parameters struct with transducer geometry
+%   parameters     - (1,1) simulation parameters struct. parameters.transducer(k)
+%                    supplies the geometry for pair k; if it has fewer entries
+%                    than pairs, the last entry is reused for the remainder.
 %   pixel_size     - voxel size [mm]
 %   coord_mesh_xyz - [Mx3] voxel coordinate grid
 %   crop_at_target - [1x3] crop flags per axis (default: [0 0 0])
@@ -107,12 +109,17 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     lighting gouraud;
     hcap.AmbientStrength = 0.6;
 
+    [X, Y, Z] = sphere(8);
+
     %% Plot for each transducer/target pair (K pairs)
     for k = 1:nPairs
         thisTrans = trans_xyz(k,:);
         thisTarg = target_xyz(k,:);
 
-        tr = parameters.transducer(1);
+        % parameters.transducer may carry one geometry per pair (e.g. distinct
+        % left/right transducers); index it per-pair, clamping to the last
+        % entry if fewer geometries than pairs were supplied.
+        tr = parameters.transducer(min(k, numel(parameters.transducer)));
 
         c = color_list(k,:);
         % Plot transducer exit plane if not cropped
@@ -124,7 +131,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
                 case 'matrix'
                     max_od_mm = tr.matrix.outer_diameter_mm;
                 otherwise
-                    error('Array type %s is unknown or not implemented.', parameters.transducer(1).type)
+                    error('Array type %s is unknown or not implemented.', tr.type)
             end
 
             % All shapes in downsampled space
@@ -180,19 +187,14 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             patch(ep_surf, 'FaceColor', c, 'EdgeColor', 'none', 'FaceAlpha', 0.6);
         end
 
-        % Plot target sphere
+        % Plot target sphere for this pair
         sphere_mask = zeros(size(segmented_img_ds));
-        for k = 1:nPairs
-            % Search in full-res coordinates (coord_mesh_xyz is full-res),
-            % then downsample found indices to fill sphere_mask.
-            dists = sqrt(sum((coord_mesh_xyz - target_xyz(k,:)).^2, 2));
-            flag_full = dists < 3 * ds_factor;
+        dists = sqrt(sum((coord_mesh_xyz - thisTarg).^2, 2));
+        flag_full = dists < 3 * ds_factor;
 
-            if ~any(flag_full)
-                warn('Target lies outside plotted volume – no sphere drawn. Check transform & cropping (preproc_smooth_and_crop.m)')
-                continue
-            end
-
+        if ~any(flag_full)
+            warning('show_3d_head: Target lies outside plotted volume – no sphere drawn.');
+        else
             full_idx = find(flag_full);
             [x_full, y_full, z_full] = ind2sub(size(segmented_img), full_idx);
             idx_x = round((x_full + (ds_factor-1))/ds_factor);
@@ -204,26 +206,25 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
                      idx_z >= 1 & idx_z <= size(sphere_mask,3);
             idx_x = idx_x(inside); idx_y = idx_y(inside); idx_z = idx_z(inside);
 
-            targ_ds = round((target_xyz(k,:) + (ds_factor-1))/ds_factor);
-        
+            targ_ds = round((thisTarg + (ds_factor-1))/ds_factor);
             lin_idx = sub2ind(size(sphere_mask), idx_x, idx_y, idx_z);
             sphere_mask(lin_idx) = 1;
-        
+
             sphere_surf = isosurface(smooth3(sphere_mask));
             sphere_surf.vertices = sphere_surf.vertices - origin_shift;
             patch(sphere_surf, 'FaceColor', c, 'EdgeColor', c, 'facealpha', 0.9);
-    
-            % Optionally, plot the actual transducer voxel as a small sphere
+
             hold on
-            [X,Y,Z] = sphere(8);
             surf(targ_ds(2) + 1.2*X, targ_ds(1) + 1.2*Y, targ_ds(3) + 1.2*Z, ...
                 'FaceColor', c, 'EdgeColor', 'none', 'FaceAlpha', 1);
-    
-            trans_ds = round((thisTrans +(ds_factor-1)) / ds_factor);
-            surf(trans_ds(2) + 1.2*X, trans_ds(1) + 1.2*Y, trans_ds(3) + 1.2*Z, ...
-                'FaceColor', c*.7, 'EdgeColor', 'none', 'FaceAlpha', 1);
         end
-        
+
+        % Plot transducer position as a darker sphere
+        hold on
+        trans_ds = round((thisTrans + (ds_factor-1)) / ds_factor);
+        surf(trans_ds(2) + 1.2*X, trans_ds(1) + 1.2*Y, trans_ds(3) + 1.2*Z, ...
+            'FaceColor', c*0.7, 'EdgeColor', 'none', 'FaceAlpha', 1);
+
     end
 
     %% Adjust viewing angles and axis labels
