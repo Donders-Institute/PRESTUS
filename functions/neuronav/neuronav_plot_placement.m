@@ -2,8 +2,9 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
 % NEURONAV_PLOT_PLACEMENT  Visualise transducer placements on a segmented head.
 %
 % Loads the SimNIBS segmentation for the subject and renders a two-panel
-% 3-D figure (one panel per laterality: left / right) showing the transducer
-% and target positions returned by NEURONAV_CONVERT_TRIGGER_TO_VOXELS.
+% 3-D figure — both panels show every active transducer/target pair from
+% target_map, viewed from two camera angles (left view, right view).
+% Positions come from NEURONAV_CONVERT_TRIGGER_TO_VOXELS.
 % Figures are saved as PNG to output_dir.
 %
 % Use as:
@@ -53,71 +54,77 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
     coord_mesh = [reshape(gx,[],1), reshape(gy,[],1), reshape(gz,[],1)];
 
     % ------------------------------------------------------------------
-    % Separate active_sides into left and right groups via target_map
+    % Gather every active target_map entry's position, per-pair transducer
+    % geometry, and name, in target_map order. Both panels show every pair
+    % (both lateralities); only the camera azimuth differs between panels.
     % ------------------------------------------------------------------
-    sides_L = [];  trans_L = zeros(0,3);  target_L = zeros(0,3);  params_L = [];
-    sides_R = [];  trans_R = zeros(0,3);  target_R = zeros(0,3);  params_R = [];
+    all_trans  = zeros(0,3);
+    all_target = zeros(0,3);
+    all_td     = {};   % one transducer struct per pair, row-aligned with all_trans
+    all_names  = {};
 
     for k = 1:numel(target_map)
         si = target_map(k).series_index;
         if ~ismember(si, active_sides)
             continue
         end
-        ti  = target_map(k).transducer_id;
+        ti   = target_map(k).transducer_id;
         name = target_map(k).target_name;
 
-        % Build a parameters struct with only the relevant transducer at index 1.
-        % Clamp ti to available transducers (single-transducer configs use index 1).
-        p1 = params_plot;
-        ti_clamped = min(ti, numel(params_plot.transducer));
-        p1.transducer = coerce_transducer(params_plot.transducer(ti_clamped));
+        % target_map(k).transducer_id is the hardware coil index, which is
+        % 0-based (see NEURONAV_BUILD_TARGET_MAP), so it must be shifted by
+        % one to become a valid 1-based index into params_plot.transducer.
+        % Clamp to the available transducers (single-transducer configs only
+        % have index 1).
+        ti_clamped = max(1, min(ti + 1, numel(params_plot.transducer)));
 
-        if startsWith(name, 'L', 'IgnoreCase', true)
-            trans_L  (end+1, :) = trans_pos(si, :);
-            target_L (end+1, :) = target_pos(si, :);
-            params_L = p1;
-        elseif startsWith(name, 'R', 'IgnoreCase', true)
-            trans_R  (end+1, :) = trans_pos(si, :);
-            target_R (end+1, :) = target_pos(si, :);
-            params_R = p1;
-        end
-    end
-
-    % Fall back to first transducer if one side had no target_map entry
-    if isempty(params_L)
-        params_L = params_plot;
-        params_L.transducer = coerce_transducer(params_plot.transducer(1));
-    end
-    if isempty(params_R)
-        params_R = params_plot;
-        params_R.transducer = coerce_transducer(params_plot.transducer(min(2, numel(params_plot.transducer))));
+        all_trans(end+1, :)  = trans_pos(si, :);
+        all_target(end+1, :) = target_pos(si, :);
+        all_td{end+1}        = coerce_transducer(params_plot.transducer(ti_clamped));
+        all_names{end+1}     = name;
     end
 
     % ------------------------------------------------------------------
-    % Plot
+    % Plot — both pairs in each panel (viewed from two camera angles),
+    % each pair rendered with its own transducer geometry.
     % ------------------------------------------------------------------
     apply_deface = ~isfield(parameters, 'io') || ~isfield(parameters.io, 'deface_plots') || parameters.io.deface_plots;
 
-    fig = figure('Position', [100 100 900 380], 'Visible', 'off');
-
-    subplot(1, 2, 1)
-    if ~isempty(trans_L)
-        show_3d_head(seg_img, target_L, trans_L, params_L, pixel_size, coord_mesh, ...
-            [0 0 0], [-90 10], 0, apply_deface)
-        title(sprintf('%s — left', sub_id), 'Interpreter', 'none')
-    else
-        axis off
-        title(sprintf('%s — left (no data)', sub_id), 'Interpreter', 'none')
+    n_pairs = size(all_trans, 1);
+    plot_params = params_plot;
+    if n_pairs > 0
+        plot_params.transducer = [all_td{:}];
     end
 
-    subplot(1, 2, 2)
-    if ~isempty(trans_R)
-        show_3d_head(seg_img, target_R, trans_R, params_R, pixel_size, coord_mesh, ...
-            [0 0 0], [90 10], 0, apply_deface)
-        title(sprintf('%s — right', sub_id), 'Interpreter', 'none')
-    else
-        axis off
-        title(sprintf('%s — right (no data)', sub_id), 'Interpreter', 'none')
+    fig = figure('Position', [100 100 900 380], 'Visible', 'off');
+
+    view_azimuths = [-90, 90];
+    view_names    = {'left view', 'right view'};
+
+    for i_view = 1:2
+        subplot(1, 2, i_view);
+        if n_pairs == 0
+            axis off;
+            title(sprintf('%s — no data', sub_id), 'Interpreter', 'none');
+            continue
+        end
+        show_3d_head(seg_img, all_target, all_trans, plot_params, pixel_size, coord_mesh, ...
+            [0 0 0], [view_azimuths(i_view) 10], 0, apply_deface);
+        title(sprintf('%s — %s', sub_id, view_names{i_view}), 'Interpreter', 'none');
+
+        % Legend proxies matching the color_list used inside show_3d_head,
+        % one per actual target name (row-aligned with all_trans), so every
+        % pair gets its own correctly colored legend entry regardless of how
+        % many targets fall on each side.
+        color_list = lines(max(7, n_pairs));
+        hold on;
+        leg_h = gobjects(1, n_pairs);
+        for ip = 1:n_pairs
+            leg_h(ip) = patch('XData', NaN, 'YData', NaN, ...
+                'FaceColor', color_list(ip,:), 'EdgeColor', 'none', ...
+                'DisplayName', all_names{ip});
+        end
+        legend(leg_h, all_names, 'Location', 'northeast', 'Interpreter', 'none');
     end
 
     saveas(fig, fullfile(output_dir, sprintf('%s_%s_placement', sub_id, session)), 'png');
