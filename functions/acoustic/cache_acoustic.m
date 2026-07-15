@@ -77,19 +77,25 @@ function acoustic_cache_save(filename, parameters, sensor_data, kgrid, ...
 % include kwave_medium when explicitly requested.
 % async_transducer_pipeline sets save_kwave_medium=1 for per-transducer runs
 % so combine_async_intensity has access to per-voxel density/sound_speed.
+% Record the grid dimensions at save time so the load path can detect a
+% stale cache (e.g. grid was regenerated after the acoustic run).
+acoustic_grid_dims = parameters.grid.dims; %#ok<NASGU>
+
 if should_save_output(parameters.io, 'save_kwave_medium')
     save(filename, ...
         'sensor_data', ...
         'kgrid', ...
         'kwave_medium', ...
         'acoustic_info', ...
-        'acoustic_provenance', '-v7.3')
+        'acoustic_provenance', ...
+        'acoustic_grid_dims', '-v7.3')
 else
     save(filename, ...
         'sensor_data', ...
         'kgrid', ...
         'acoustic_info', ...
-        'acoustic_provenance', '-v7.3')
+        'acoustic_provenance', ...
+        'acoustic_grid_dims', '-v7.3')
 end
 
 end
@@ -102,7 +108,8 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 % Load only the slim variables the cache is guaranteed to contain.
 % Legacy full caches may contain additional fields; they are ignored here
 % so that in-scope variables from the grid/medium/source stages are used.
-cached = load(filename, 'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info');
+cached = load(filename, 'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info', ...
+              'acoustic_grid_dims');
 required = {'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info'};
 missing = required(~isfield(cached, required));
 if ~isempty(missing)
@@ -115,6 +122,29 @@ sensor_data         = cached.sensor_data;
 kgrid               = cached.kgrid;
 acoustic_provenance = cached.acoustic_provenance;
 acoustic_info       = cached.acoustic_info;
+
+% Grid compatibility check.
+% If acoustic_grid_dims was recorded at save time, compare it against the
+% current grid.  A mismatch means the cache was produced on a different grid —
+% e.g. from a different run, a different subject segmentation, or an
+% independent per-transducer run with a different grid extent.
+%
+% The cache file is NOT deleted: combine_async_intensity can remap fields
+% from different grids onto a common reference.  The mismatch is signalled
+% via a named error so callers can decide whether to re-run or proceed.
+if isfield(cached, 'acoustic_grid_dims') && numel(parameters.grid.dims) == 3
+    if ~isequal(cached.acoustic_grid_dims(:)', parameters.grid.dims(:)')
+        fprintf(['[cache_acoustic] Acoustic cache grid [%s] does not match current ' ...
+                 'grid [%s].\n  Cache retained for potential grid remapping: %s\n'], ...
+            num2str(cached.acoustic_grid_dims(:)'), ...
+            num2str(parameters.grid.dims(:)'), filename);
+        error('cache_acoustic:staleGrid', ...
+            ['Acoustic cache was built on a different grid [%s] than the current ' ...
+             'grid [%s].\nCache file retained — the caller can re-run the acoustic ' ...
+             'simulation or use combine_async_intensity to remap the field.'], ...
+            num2str(cached.acoustic_grid_dims(:)'), num2str(parameters.grid.dims(:)'));
+    end
+end
 
 % Axisymmetric coordinate fix-up.
 % acoustic_wrapper saves sensor_data after expanding the axisymmetric
@@ -146,3 +176,4 @@ end
 sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
 
 end
+

@@ -71,6 +71,19 @@ end
 % Define scale for plotting
 input_args.PlotScale = [-1, 1] * parameters.transducer(1).(parameters.transducer(1).type).elem_p_amp(1);
 
+% k-Wave C++ backends write large scratch .h5 files (input + output) that are
+% removed on success (DeleteData=true). Their names are deterministic
+% (subject + medium + output_affix), so two jobs sharing an affix — e.g. a
+% re-launched run while a prior one is still in flight — would otherwise fight
+% over the same file and fail with an HDF5 "cannot create file" iostream error.
+% Prefer per-job node-local scratch ($TMPDIR, set by SLURM/qsub): it is unique
+% per job and keeps the 100s-of-MB I/O off the shared (network) project mount.
+% Falls back to the cache dir for local runs where $TMPDIR is unset.
+kwave_scratch_dir = getenv('TMPDIR');
+if isempty(kwave_scratch_dir) || ~isfolder(kwave_scratch_dir)
+    kwave_scratch_dir = char(parameters.io.dir_cache);
+end
+
 % Select submission based on code type
 switch parameters.simulation.code_type
     case 'cpp_cpu'
@@ -81,7 +94,7 @@ switch parameters.simulation.code_type
       sensor  = cast_struct(sensor, parameters.simulation.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      h5_dir = char(parameters.io.dir_cache);
+      h5_dir = kwave_scratch_dir;
       input_args.SaveToDisk = char(fullfile(h5_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
          parameters.simulation.medium, parameters.io.output_affix)));
@@ -106,24 +119,26 @@ switch parameters.simulation.code_type
 
    case 'cpp_gpu'
 
-      % Force precision for C++ HDF5 compatibility
-      medium  = cast_struct(medium, parameters.simulation.precision);
-      source  = cast_struct(source, parameters.simulation.precision);
-      sensor  = cast_struct(sensor, parameters.simulation.precision);
-
-      input_args_cell = zip_fields(input_args);
-
       if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
          % No CUDA binary supports axisymmetric geometry; fall back to matlab_gpu path
-         % (kspaceFirstOrderAS with GPU data cast) which preserves GPU acceleration.
+         % (kspaceFirstOrderAS with GPU DataCast) which preserves GPU acceleration.
+         % Do NOT cast medium/source/sensor to CPU precision first — DataCast handles
+         % both precision conversion and GPU transfer in one step, avoiding an
+         % intermediate in-memory copy of every medium array at full precision.
          warn('kspaceFirstOrder-CUDA does not support axisymmetric simulations. Falling back to matlab_gpu (kspaceFirstOrderAS with gpuArray).');
          as_args = zip_fields(rmfield(input_args, intersect(fieldnames(input_args), ...
              {'SaveToDisk','DataName','DataPath','DeleteData','FunctionName','DeviceNum','NumThreads'})));
          as_args_cast = [as_args, {'DataCast', ['gpuArray-', char(parameters.simulation.precision)]}];
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, as_args_cast{:}, 'RadialSymmetry', 'WSWA-FFT');
       else
+         % Force precision for C++ HDF5 compatibility (only needed for the C++ path;
+         % the axisymmetric fallback above uses DataCast instead).
+         medium  = cast_struct(medium, parameters.simulation.precision);
+         source  = cast_struct(source, parameters.simulation.precision);
+         sensor  = cast_struct(sensor, parameters.simulation.precision);
+
          % Pathname for the input and output files
-         h5_dir = char(parameters.io.dir_cache);
+         h5_dir = kwave_scratch_dir;
          input_args.SaveToDisk = char(fullfile(h5_dir, ...
            sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
            parameters.simulation.medium, parameters.io.output_affix)));

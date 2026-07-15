@@ -1,5 +1,5 @@
-function acoustic_provenance = resolve_water_baseline(parameters, acoustic_provenance, kgrid, source, sensor)
-% RESOLVE_WATER_BASELINE  Decide and run the free-water baseline simulation.
+function acoustic_provenance = acoustic_water_baseline(parameters, acoustic_provenance, kgrid, source, sensor, source_labels)
+% ACOUSTIC_WATER_BASELINE  Decide and run the free-water baseline simulation.
 %
 % Determines whether a water-baseline acoustic simulation is needed, runs it
 % if so, and stores the result in acoustic_provenance.freefield_isppa_wcm2.
@@ -10,14 +10,16 @@ function acoustic_provenance = resolve_water_baseline(parameters, acoustic_prove
 % differs from the calibration level by more than 1%.
 %
 % Use as:
-%   acoustic_provenance = resolve_water_baseline(parameters, acoustic_provenance, kgrid, source, sensor)
+%   acoustic_provenance = acoustic_water_baseline(parameters, acoustic_provenance, kgrid, source, sensor)
+%   acoustic_provenance = acoustic_water_baseline(parameters, acoustic_provenance, kgrid, source, sensor, source_labels)
 
 arguments
-    parameters         (1,1) struct
+    parameters          (1,1) struct
     acoustic_provenance (1,1) struct
     kgrid
     source
     sensor
+    source_labels = []
 end
 
 has_per_transducer_target = isfield(parameters, 'transducer') && ...
@@ -47,10 +49,14 @@ if run_baseline && ...
         (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
     log_timer('start', 'freefield_baseline', parameters.io.dir_output);
     acoustic_provenance.freefield_isppa_wcm2 = ...
-        water_baseline(parameters, kgrid, source, sensor);
+        water_baseline(parameters, kgrid, source, sensor, source_labels);
     if isfield(acoustic_provenance, 'tx_calibration')
         acoustic_provenance.tx_calibration.isppa_wcm2   = acoustic_provenance.freefield_isppa_wcm2;
-        acoustic_provenance.tx_calibration.isppa_source = 'kwave_simulation';
+        if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
+            acoustic_provenance.tx_calibration.isppa_source = 'jwave_water_sim';
+        else
+            acoustic_provenance.tx_calibration.isppa_source = 'kwave_simulation';
+        end
     end
     log_timer('stop', 'freefield_baseline');
 end
