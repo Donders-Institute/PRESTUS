@@ -49,6 +49,11 @@ function async_transducer_pipeline(parameters, options)
 %                (N ≥ 2) and simulation.transducer_coupling = 'async'.
 %                Each transducer may carry a scalar or vector
 %                target_isppa_wcm2.  Do NOT set io.output_affix.
+%                simulation.async_grid_mode (optional): 'shared' (default) —
+%                one grid sized/aligned to fit every transducer; or
+%                'per_transducer' — each transducer gets its own optimally
+%                aligned, minimally cropped grid, resampled onto
+%                transducer(1)'s grid at combine time. See doc_multitransducer.md.
 %   options    - (optional) struct with HPC knobs:
 %                .acoustic_timelimit   wall time per acoustic job ('06:00:00')
 %                .combine_timelimit    wall time per combine job  ('00:30:00')
@@ -152,9 +157,34 @@ for ti = 1:N
     affix_per_t{ti} = [base_affix, trans_suffix(ti, N)];
 end
 
-% Shared preproc affix: all transducers are used to size the grid, then each
-% acoustic sub-run loads this cache so every trans result lands on the same grid.
-affix_preproc = [base_affix, '_desc-asyncPreproc'];
+% Grid geometry mode: 'shared' (default) sizes/aligns one grid to fit every
+% transducer (mean focal axis, union bounding box); 'per_transducer' gives
+% each transducer its own optimally-aligned, minimally-cropped grid (matching
+% solo/sequential mode) and resamples onto transducer(1)'s grid at combine
+% time. See doc_multitransducer.md.
+async_grid_mode = 'shared';
+if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'async_grid_mode') && ...
+        ~isempty(parameters.simulation.async_grid_mode)
+    async_grid_mode = parameters.simulation.async_grid_mode;
+end
+if ~ismember(async_grid_mode, {'shared', 'per_transducer'})
+    error('async_transducer_pipeline:unknownGridMode', ...
+        'simulation.async_grid_mode must be ''shared'' or ''per_transducer'', got ''%s''.', ...
+        async_grid_mode);
+end
+per_transducer_grid = strcmp(async_grid_mode, 'per_transducer');
+
+% Preproc affix(es): shared mode builds one grid sized to fit every
+% transducer; per_transducer mode builds N independent grids, each aligned
+% and cropped to just its own transducer.
+if per_transducer_grid
+    affix_preproc = cell(1, N);
+    for ti = 1:N
+        affix_preproc{ti} = [base_affix, sprintf('_desc-asyncPreproc-t%02d', ti)];
+    end
+else
+    affix_preproc = [base_affix, '_desc-asyncPreproc'];
+end
 
 % Combined and thermal affixes — include sweep index when M > 1.
 affix_combined = cell(1, n_points);
@@ -175,12 +205,16 @@ end
 
 p_acoustic = cell(1, N);
 for ti = 1:N
-    p_acoustic{ti} = make_acoustic_params(parameters, ti, affix_per_t{ti}, affix_preproc);
+    p_acoustic{ti} = make_acoustic_params(parameters, ti, affix_per_t{ti}, ...
+        preproc_affix_for(affix_preproc, ti));
 end
 
+% Thermal always keys off transducer(1)'s grid — matches the reference frame
+% combine_async_intensity uses for both 'shared' and 'per_transducer' modes.
 p_thermal = cell(1, n_points);
 for j = 1:n_points
-    p_thermal{j} = make_thermal_params(parameters, affix_combined{j}, affix_thermal{j}, affix_preproc);
+    p_thermal{j} = make_thermal_params(parameters, affix_combined{j}, affix_thermal{j}, ...
+        preproc_affix_for(affix_preproc, 1));
 end
 
 % =========================================================================
@@ -192,8 +226,16 @@ medium     = parameters.simulation.medium;
 output_dir = get_output_dir(parameters);
 cache_dir  = fullfile(output_dir, 'cache');
 
-file_preproc = fullfile(cache_dir, ...
-    sprintf('sub-%03d_%s_grid_cache%s.mat', subject_id, medium, affix_preproc));
+if per_transducer_grid
+    files_preproc = cell(1, N);
+    for ti = 1:N
+        files_preproc{ti} = fullfile(cache_dir, ...
+            sprintf('sub-%03d_%s_grid_cache%s.mat', subject_id, medium, affix_preproc{ti}));
+    end
+else
+    files_preproc = {fullfile(cache_dir, ...
+        sprintf('sub-%03d_%s_grid_cache%s.mat', subject_id, medium, affix_preproc))};
+end
 
 files_acoustic = cell(1, N);
 for ti = 1:N
@@ -250,8 +292,15 @@ switch platform
     case 'matlab'
     % ---------------------------------------------------------------------
 
-        run_stage(0, 'Preproc — shared grid for all transducers', ...
-                  @() prestus_pipeline(make_preproc_params(parameters, affix_preproc)));
+        if per_transducer_grid
+            for ti = 1:N
+                run_stage(ti, sprintf('Preproc — transducer %d/%d (own grid)', ti, N), ...
+                          @() prestus_pipeline(make_preproc_params(parameters, affix_preproc{ti}, ti)));
+            end
+        else
+            run_stage(0, 'Preproc — shared grid for all transducers', ...
+                      @() prestus_pipeline(make_preproc_params(parameters, affix_preproc)));
+        end
 
         for ti = 1:N
             run_stage(ti, sprintf('Acoustic — transducer %d/%d', ti, N), ...
@@ -287,21 +336,41 @@ switch platform
 
         subj = sprintf('sub-%03d', subject_id);
 
-        % ── Stage 0: Preproc — shared grid for all transducers ───────────
-        fprintf('[Stage 0] Preproc — shared grid\n');
-        job_id_preproc    = 0;
-        preproc_submitted = false;
-        if isfile(file_preproc)
-            fprintf('           Cache exists — skipping.\n');
+        % ── Stage 0: Preproc grid(s) ──────────────────────────────────────
+        job_ids_preproc   = zeros(1, N);
+        preproc_submitted = false(1, N);
+
+        if per_transducer_grid
+            for ti = 1:N
+                fprintf('[Stage 0.%d] Preproc — transducer %d/%d (own grid)\n', ti, ti, N);
+                if isfile(files_preproc{ti})
+                    fprintf('             Cache exists — skipping.\n');
+                else
+                    p_prep = make_preproc_params(parameters, affix_preproc{ti}, ti);
+                    p_prep.hpc.timelimit = options.preproc_timelimit;
+                    p_prep.hpc.job_name  = sprintf('PRESTUS-at%02d-pp_%s', ti, subj);
+                    p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
+                    p_prep = apply_partition(p_prep, options.preproc_partition);
+                    job_ids_preproc(ti)   = prestus_pipeline_start(p_prep);
+                    preproc_submitted(ti) = true;
+                    fprintf('             → job %s\n', num2str(job_ids_preproc(ti)));
+                end
+            end
         else
-            p_prep = make_preproc_params(parameters, affix_preproc);
-            p_prep.hpc.timelimit = options.preproc_timelimit;
-            p_prep.hpc.job_name  = sprintf('PRESTUS-at-pp_%s', subj);
-            p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
-            p_prep = apply_partition(p_prep, options.preproc_partition);
-            job_id_preproc    = prestus_pipeline_start(p_prep);
-            preproc_submitted = true;
-            fprintf('           → job %s\n', num2str(job_id_preproc));
+            fprintf('[Stage 0] Preproc — shared grid\n');
+            if isfile(files_preproc{1})
+                fprintf('           Cache exists — skipping.\n');
+            else
+                p_prep = make_preproc_params(parameters, affix_preproc);
+                p_prep.hpc.timelimit = options.preproc_timelimit;
+                p_prep.hpc.job_name  = sprintf('PRESTUS-at-pp_%s', subj);
+                p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
+                p_prep = apply_partition(p_prep, options.preproc_partition);
+                job_id_shared        = prestus_pipeline_start(p_prep);
+                job_ids_preproc(:)   = job_id_shared;
+                preproc_submitted(:) = true;
+                fprintf('           → job %s\n', num2str(job_id_shared));
+            end
         end
         fprintf('\n');
 
@@ -319,8 +388,8 @@ switch platform
                 pa.hpc.job_name  = sprintf('PRESTUS-at%02d-ac_%s', ti, subj);
                 pa = apply_memorylimit(pa, options.acoustic_memorylimit);
                 pa = apply_partition(pa, options.acoustic_partition);
-                if preproc_submitted
-                    pa.hpc.depend_job_ids = job_id_preproc;
+                if preproc_submitted(ti)
+                    pa.hpc.depend_job_ids = job_ids_preproc(ti);
                 end
                 job_ids_acoustic(ti)   = prestus_pipeline_start(pa);
                 acoustic_submitted(ti) = true;
@@ -438,9 +507,14 @@ end
 %% Parameter builders
 % =========================================================================
 
-function p = make_preproc_params(base, affix_preproc)
+function p = make_preproc_params(base, affix_preproc, transducer_idx)
     p = base;
-    % Keep ALL transducers so grid_tissue_setup sizes the grid to contain all of them.
+    if nargin >= 3 && ~isempty(transducer_idx)
+        % Per-transducer grid: align/crop to this transducer alone, reusing
+        % the same single-transducer preproc_head path as solo/sequential mode.
+        p.transducer = base.transducer(transducer_idx);
+    end
+    % Otherwise (shared mode) keep ALL transducers so grid_tissue_setup sizes the grid to contain all of them.
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_water_baseline     = 0;
@@ -547,6 +621,17 @@ function p = make_water_params(base, transducer_idx, affix)
     p.io.save_kwave_medium            = 0;
     p.io.save_thermal_matrices        = 0;
     p.simulation.interactive          = 0;
+end
+
+function affix = preproc_affix_for(affix_preproc, ti)
+% Resolve the preproc affix for transducer ti regardless of grid mode:
+% a cell array (per_transducer mode) indexes by ti; a plain string (shared
+% mode) is the same for every transducer.
+    if iscell(affix_preproc)
+        affix = affix_preproc{ti};
+    else
+        affix = affix_preproc;
+    end
 end
 
 % =========================================================================

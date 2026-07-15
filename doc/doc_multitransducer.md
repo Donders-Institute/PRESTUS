@@ -121,6 +121,39 @@ $$p_\mathrm{thermal} = \sqrt{2 \cdot I_\mathrm{total} \cdot \rho c}$$
 
 > **Limitation.** The thermal model does not yet explicitly represent the relative firing schedule of the two transducers. The intensity-sum approximation is exact when both DCs are equal and non-overlapping; it becomes an over-estimate when $\mathrm{DC}_1 + \mathrm{DC}_2 < $ total protocol DC.
 
+### Grid geometry mode
+
+By default (`simulation.async_grid_mode: 'shared'`), all transducers share one grid — see
+[Grid alignment](#grid-alignment) and [Grid cropping](#grid-cropping) above. This means each
+transducer's own acoustic sub-run (`_desc-t01`, `_desc-t02`, …) is simulated on a grid aligned to
+the *mean* focal axis and cropped to enclose every transducer's bowl, not just its own — so a
+per-transducer result (e.g. focal distance, ISPPA) can differ noticeably from what the same
+transducer would show run alone (solo/sequential mode), even though only that transducer drives
+sound in its own acoustic stage. This is a genuine geometric effect (different beam incidence
+through the skull), not a bug.
+
+Setting `simulation.async_grid_mode: 'per_transducer'` instead gives each transducer its own
+optimally aligned, minimally cropped grid — identical to what solo/sequential mode would produce
+for that transducer. `combine_async_intensity` then resamples every transducer's field onto
+transducer(1)'s grid (the reference frame) via each run's `planimg` sidecar (sim-voxel → world RAS
+mm affine), so per-voxel max/sum combination remains correct even though each field was simulated
+on a different grid. Use this mode when per-transducer characterization (focal distance, ISPPA,
+focal volume) needs to match the solo/sequential result, or when transducers are widely separated
+or steeply angled (where the shared union-bbox grid would otherwise grow large or badly aligned).
+
+```yaml
+simulation:
+  transducer_coupling: async
+  async_grid_mode: per_transducer   # default: 'shared'
+```
+
+**Scalability.** `per_transducer` mode scales *better* than `shared` mode as the number of
+transducers grows: each transducer's grid stays sized to its own bowl+tissue crop regardless of N,
+whereas the shared grid's union bounding box grows with the spread of all N transducers. The added
+cost is N independent (HPC-parallel) preproc jobs instead of one, plus one world-space affine
+resample per transducer in the combine step — linear in N, and folded into the already
+lightweight, CPU-only combine stage.
+
 ### Configuration
 
 **Basic setup — two transducers, one thermal target each**
@@ -170,6 +203,12 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
 ### Pipeline stages
 
 ```
+[Stage 0]       Preproc grid(s).
+                 async_grid_mode='shared' (default): one shared grid.
+                 async_grid_mode='per_transducer': N independent grids, one
+                 per transducer (parallel on HPC), affixes
+                 _desc-asyncPreproc-t01, …, -tNN.
+
 [Stage 1…N]    Acoustic simulation — one per transducer (parallel on HPC)
                Each runs at its configured elem_amp and records a water baseline.
                Affixes: _desc-t01, _desc-t02, …, _desc-tNN
@@ -178,6 +217,8 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
  N+M]          Scales each p_i to target_i(j); writes combined acoustic cache
                containing p_max_all (intensity sum, for thermal) and
                p_max_async (per-voxel pressure max, for acoustic safety).
+               In per_transducer mode, each field is first resampled onto
+               transducer(1)'s grid via its planimg world-space affine.
                Affixes: _desc-asyncCombined (M=1) or _desc-asyncCombinedS01… (M>1)
 
 [Stage N+M+1…  Thermal simulation — one per sweep point j
@@ -185,7 +226,11 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
                Affixes: _desc-asyncThermal (M=1) or _desc-asyncThermalS01… (M>1)
 ```
 
-On HPC (SLURM/qsub): all N acoustic stages are submitted simultaneously; each combine stage depends on all N acoustic jobs (`afterok`); each thermal stage depends on its corresponding combine stage.
+On HPC (SLURM/qsub): in `shared` mode, all N acoustic stages are submitted simultaneously after the
+one preproc job; in `per_transducer` mode, N preproc jobs are submitted simultaneously and each
+acoustic job depends only on its own transducer's preproc job (not on the others). Each combine
+stage depends on all N acoustic jobs (`afterok`); each thermal stage depends on its corresponding
+combine stage.
 
 ### Output files
 
