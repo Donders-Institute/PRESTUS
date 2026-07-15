@@ -576,8 +576,8 @@ end
 
         sec(gl, 21, 'Grid Orientation & Thermal Grid');
         lbl(gl, 22, 1, 'Grid orientation mode');
-        drp(gl, 22, 2, 'grid.mode', {'transducer_axis','ras_plus'}, 'transducer_axis');
-        note_lbl(gl, 23, 'transducer_axis: rotate volume so focal axis aligns with z (compact grid). ras_plus: keep scanner RAS+ orientation without rotation.');
+        drp(gl, 22, 2, 'grid.mode', {'focal_axis','transducer_axis','ras_plus'}, 'focal_axis');
+        note_lbl(gl, 23, 'focal_axis: rotate volume so mean focal axis of all transducers aligns with z (default, correct for angled multi-transducer). transducer_axis: use focal axis of transducer(1) only. ras_plus: keep scanner RAS+ orientation without rotation.');
 
         lbl(gl, 24, 1, 'Thermal resolution');
         nedt(gl, 24, 2, 'grid.thermal_resolution_mm', NaN);
