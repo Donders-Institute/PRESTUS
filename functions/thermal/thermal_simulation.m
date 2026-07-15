@@ -311,12 +311,35 @@ params_thermal = thermal_parameters(parameters);
 % Visualize the thermal parameters
 thermal_plot_protocol(params_thermal, parameters);
 
+fprintf('[thermal_simulation] ---- thermal simulation summary ----\n');
+fprintf('[thermal_simulation]   grid dims      : %d x %d x %d\n', parameters.grid.dims(1), parameters.grid.dims(2), parameters.grid.dims(3));
+fprintf('[thermal_simulation]   resolution     : %.2f x %.2f x %.2f mm\n', kgrid.dx*1e3, kgrid.dy*1e3, kgrid.dz*1e3);
+fprintf('[thermal_simulation]   ON phases      : %d  (n_ptri_reps=%d, n_pulses_per_pt=%d)\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt, params_thermal.n_ptri_reps, params_thermal.n_pulses_per_pt);
+fprintf('[thermal_simulation]   OFF phases     : %d\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt*(params_thermal.pt_off_steps_n>0) + params_thermal.n_ptri_reps*(params_thermal.ptri_off_steps_n>0) + (params_thermal.post_ptri_steps_n>0));
+fprintf('[thermal_simulation]   heating dur    : %.1f ms\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt*params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur*1e3);
+fprintf('[thermal_simulation]   total sim time : %.1f ms\n', (params_thermal.n_ptri_reps*(params_thermal.n_pulses_per_pt*(params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur + params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur) + params_thermal.ptri_off_steps_n*params_thermal.ptri_off_step_dur) + params_thermal.post_ptri_steps_n*params_thermal.post_ptri_step_dur)*1e3);
+if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
+    fprintf('[thermal_simulation]   compute mode   : GPU (%s)\n', parameters.simulation.code_type);
+else
+    fprintf('[thermal_simulation]   compute mode   : CPU (%s)\n', parameters.simulation.code_type);
+end
+fprintf('[thermal_simulation]   medium type    : %s\n', parameters.simulation.medium);
+fprintf('[thermal_simulation] ------------------------------------\n');
+
 % Total timepoints estimation
 % Records: 1 per ON, 1 per OFF (inside PT), 1 per PTRI-off block, 1 per post-PTRI step
 n_ptri_reps = params_thermal.n_ptri_reps;
 n_pulses_pt = params_thermal.n_pulses_per_pt;
 snapshots_per_ptri = n_pulses_pt * 2 + (params_thermal.ptri_off_steps_n > 0);
 total_timepoints = 1 + n_ptri_reps * snapshots_per_ptri + params_thermal.post_ptri_steps_n;
+
+% Total kWaveDiffusion.takeTimeStep steps across the whole run (used for the
+% ETA below). kWaveDiffusion's own built-in estimate (external/k-wave)
+% requires >=10 steps within a single takeTimeStep call to fire, which the
+% short per-pulse ON/OFF calls here rarely reach — so PRESTUS times the first
+% ON-phase call itself and extrapolates across calls instead.
+total_thermal_steps = n_ptri_reps * (n_pulses_pt * (params_thermal.pt_on_steps_n + params_thermal.pt_off_steps_n) ...
+    + params_thermal.ptri_off_steps_n) + params_thermal.post_ptri_steps_n;
 
 % Resize focal arrays
 if ndims(T_max) == 3
@@ -347,6 +370,9 @@ fprintf('Starting %d PTRI reps (PTRD=%.1fs), each with %d pulses (PTD=%.2fs)\n',
 % === Outer loop - PTRI (Pulse Train Repetitions) ===
 for rep_i = 1:n_ptri_reps
     fprintf('Pulse Train Repetition %d/%d\n', rep_i, n_ptri_reps);
+    if mod(rep_i, max(1, floor(n_ptri_reps/5))) == 0
+        fprintf('[thermal_simulation]   phase %d/%d\n', rep_i, n_ptri_reps);
+    end
     
     % === 1. Inner loop: Pulse Trains (multiple pulses) ===
     for pulse_i = 1:n_pulses_pt
@@ -357,9 +383,21 @@ for rep_i = 1:n_ptri_reps
         tmp_status = 'on';
 
         if log_thermal_updates || is_first_thermal_step
+            if is_first_thermal_step
+                first_step_timer = tic;
+            end
             thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
-            if is_first_thermal_step && ~log_thermal_updates
-                fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+            if is_first_thermal_step
+                % k-Wave-style ETA: time a known number of steps, extrapolate
+                % linearly to the full run (analogous to kWaveDiffusion's own
+                % num_time_steps_before_simulation_time_estimate, but computed
+                % across takeTimeStep calls rather than within a single one).
+                per_step_s = toc(first_step_timer) / max(params_thermal.pt_on_steps_n, 1);
+                fprintf('[thermal_simulation]   estimated total thermal sim time: %s (%d steps @ %.3f s/step)\n', ...
+                    scaleTime(per_step_s * total_thermal_steps), total_thermal_steps, per_step_s);
+                if ~log_thermal_updates
+                    fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+                end
             end
             is_first_thermal_step = false;
         else

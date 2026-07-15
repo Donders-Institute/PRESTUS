@@ -296,16 +296,25 @@ end
     HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
     available_layers = fieldnames(timeseries.T);
     n_ts = numel(timeseries.T.(available_layers{1}));
-    if numel(HEAT.recordedtime) == n_ts + 1
-        HEAT.recordedtime = HEAT.recordedtime(2:end);
-    elseif numel(HEAT.recordedtime) ~= n_ts
-        warning('thermal_plot_sim:timeseriesLengthMismatch', ...
-            'recordedtime length (%d) does not match timeseries length (%d); truncating to min.', ...
-            numel(HEAT.recordedtime), n_ts);
-        n_min = min(numel(HEAT.recordedtime), n_ts);
-        HEAT.recordedtime = HEAT.recordedtime(end-n_min+1:end);
-        for il = 1:numel(available_layers)
-            timeseries.T.(available_layers{il}) = timeseries.T.(available_layers{il})(end-n_min+1:end);
+    % When a dense time axis is available (e.g. BabelBrain), use it directly for
+    % the timeseries plots; HEAT.recordedtime (sparse protocol boundaries) is
+    % kept only for the on/off shading loop.
+    if isfield(timeseries, 'TimeProfileTarget') && numel(timeseries.TimeProfileTarget) == n_ts
+        ts_time_ax = timeseries.TimeProfileTarget(:)';
+    else
+        ts_time_ax = HEAT.recordedtime;
+        if numel(ts_time_ax) == n_ts + 1
+            ts_time_ax = ts_time_ax(2:end);
+        elseif numel(ts_time_ax) ~= n_ts
+            warning('thermal_plot_sim:timeseriesLengthMismatch', ...
+                'recordedtime length (%d) does not match timeseries length (%d); truncating to min.', ...
+                numel(ts_time_ax), n_ts);
+            n_min = min(numel(ts_time_ax), n_ts);
+            ts_time_ax = ts_time_ax(1:n_min);
+            for il = 1:numel(available_layers)
+                timeseries.T.(available_layers{il})    = timeseries.T.(available_layers{il})(1:n_min);
+                timeseries.Tdiff.(available_layers{il}) = timeseries.Tdiff.(available_layers{il})(1:n_min);
+            end
         end
     end
     available_layer_labels = strrep(available_layers, '_', ' ');
@@ -313,7 +322,7 @@ end
     h = figure; hold on;
     layer_handles_T = gobjects(0);
     for i_layer = 1:numel(available_layers)
-        layer_handles_T(end+1) = plot(HEAT.recordedtime, timeseries.T.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_T(end+1) = plot(ts_time_ax, timeseries.T.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
@@ -328,7 +337,7 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([1, HEAT.recordedtime(end)]);
+    xlim([ts_time_ax(1), ts_time_ax(end)]);
     hold off
     if ~isempty(layer_handles_T)
         legend(layer_handles_T, available_layer_labels);
@@ -343,11 +352,11 @@ end
     h = figure; hold on;
     layer_handles_Tdiff = gobjects(0);
     for i_layer = 1:numel(available_layers)
-        layer_handles_Tdiff(end+1) = plot(HEAT.recordedtime, timeseries.Tdiff.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_Tdiff(end+1) = plot(ts_time_ax, timeseries.Tdiff.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
-    ylabel('Temperature Change [°C]');
+    ylabel('Temperature Rise [°C]');
     y_range = ylim();
     for i = 2:(length(time_status_seq)-1)
         if ~strcmp(time_status_seq(i).status,'on')
@@ -358,13 +367,13 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([1, HEAT.recordedtime(end)]);
+    xlim([ts_time_ax(1), ts_time_ax(end)]);
     hold off
     if ~isempty(layer_handles_Tdiff)
         legend(layer_handles_Tdiff, available_layer_labels);
         legend('boxoff');
     end
-    title('Temperature change (overall tissue max.)');
+    title('Temperature rise (overall tissue max.)');
     saveas(h, [output_plot_rise], 'png');
     close(h);
 
@@ -375,7 +384,7 @@ end
     layer_handles_CEM = gobjects(0);
     for i_layer = 1:numel(available_layers)
         if ~has_cem43_ts || ~isfield(timeseries.CEM43, available_layers{i_layer}), continue; end
-        layer_handles_CEM(end+1) = plot(HEAT.recordedtime, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
+        layer_handles_CEM(end+1) = plot(ts_time_ax, timeseries.CEM43.(available_layers{i_layer}), 'LineWidth', 2);
     end
     colormap('lines')
     xlabel('Time [s]');
@@ -390,7 +399,7 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([1, HEAT.recordedtime(end)]);
+    xlim([ts_time_ax(1), ts_time_ax(end)]);
     hold off
     if ~isempty(layer_handles_CEM)
         legend(layer_handles_CEM, available_layer_labels);
@@ -408,7 +417,7 @@ end
         layer_labels_CEM_iso = {};
         for i_layer = 1:numel(available_layers)
             if isfield(timeseries.CEM43_iso, available_layers{i_layer})
-                layer_handles_CEM_iso(end+1) = plot(HEAT.recordedtime, timeseries.CEM43_iso.(available_layers{i_layer}), 'LineWidth', 2);
+                layer_handles_CEM_iso(end+1) = plot(ts_time_ax, timeseries.CEM43_iso.(available_layers{i_layer}), 'LineWidth', 2);
                 layer_labels_CEM_iso{end+1} = available_layer_labels{i_layer};
             end
         end
@@ -422,7 +431,7 @@ end
             a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
             a.FaceAlpha = 0.1;
         end
-        xlim([1, HEAT.recordedtime(end)]); hold off
+        xlim([ts_time_ax(1), ts_time_ax(end)]); hold off
         if ~isempty(layer_handles_CEM_iso)
             legend(layer_handles_CEM_iso, layer_labels_CEM_iso); legend('boxoff');
         end

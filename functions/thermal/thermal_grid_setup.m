@@ -118,8 +118,9 @@ if same_grid
     medium_masks_th = medium_masks;
     parameters_th   = parameters;
     transf_th       = planimg.transf;
-    fprintf('[thermal_grid_setup] Thermal grid identical to acoustic grid (%s mm, %s vox).\n', ...
-        num2str(th_dx_mm), num2str(th_dims));
+    fprintf('[thermal_grid_setup] Acoustic grid : %.4f mm | [%s] vox\n', ac_dx_mm, num2str(ac_dims));
+    fprintf('[thermal_grid_setup] Thermal  grid : %.4f mm | [%s] vox\n', th_dx_mm, num2str(th_dims));
+    fprintf('[thermal_grid_setup] Resampling ratio: %.4f (thermal grid identical to acoustic grid — no resampling performed)\n', scale);
     return
 end
 
@@ -132,16 +133,19 @@ else
     kgrid_th = kWaveGrid(th_dims(1), th_dx_m, th_dims(2), th_dx_m);
 end
 
-fprintf('[thermal_grid_setup] Acoustic grid: %.2f mm, [%s] vox\n', ...
-    ac_dx_mm, num2str(ac_dims));
-fprintf('[thermal_grid_setup] Thermal  grid: %.2f mm, [%s] vox  (FOV crop: vox %s–%s)\n', ...
-    th_dx_mm, num2str(th_dims), num2str(fov_start_ac), num2str(fov_end_ac));
+fprintf('[thermal_grid_setup] Acoustic grid : %.4f mm | [%s] vox\n', ac_dx_mm, num2str(ac_dims));
+fprintf('[thermal_grid_setup] Thermal  grid : %.4f mm | [%s] vox\n', th_dx_mm, num2str(th_dims));
+fprintf('[thermal_grid_setup] Resampling ratio: %.4f  (FOV crop: vox [%s] to [%s] on acoustic grid)\n', ...
+    scale, num2str(fov_start_ac), num2str(fov_end_ac));
 
 % -------------------------------------------------------------------------
 % Resample medium fields (linear) and masks (nearest)
 % -------------------------------------------------------------------------
 kwave_medium_th = kwave_medium;
 field_names = fieldnames(kwave_medium);
+grid_fields = field_names(cellfun(@(f) isnumeric(kwave_medium.(f)) && isequal(size(kwave_medium.(f)), double(ac_dims)), field_names));
+fprintf('[thermal_grid_setup] Resampling %d medium field(s): %s\n', numel(grid_fields), strjoin(grid_fields, ', '));
+fprintf('[thermal_grid_setup] Resampling medium_masks (nearest-neighbour)\n');
 for fi = 1:numel(field_names)
     fname = field_names{fi};
     vol   = kwave_medium.(fname);
@@ -179,6 +183,8 @@ if th_dx_mm ~= ac_dx_mm
 else
     medium_masks_th = masks_crop;
 end
+
+fprintf('[thermal_grid_setup] Resampling complete: thermal grid [%s] vox at %.4f mm.\n', num2str(th_dims), th_dx_mm);
 
 % -------------------------------------------------------------------------
 % Update transducer / focus positions in thermal grid voxel coordinates
