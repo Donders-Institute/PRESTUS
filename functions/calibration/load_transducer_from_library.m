@@ -67,54 +67,78 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer = tran.transducer;
 
     %% Reconstruct phases — global model takes precedence when present
-    if isfield(lib, 'global_model') && ~isempty(lib.global_model) && ...
-            isfield(lib.global_model, 'depths_ep_mm') && ...
-            isfield(lib.global_model, 'elem_phase_deg')
+    if isfield(lib, 'global_model') && ~isempty(lib.global_model) && isstruct(lib.global_model)
 
         gm     = lib.global_model;
-        depths = gm.depths_ep_mm(:)';
+        n_elem = tran.transducer.annular.elem_n;
 
-        % elem_phase_deg is stored as a cell array of per-depth row vectors
-        phase_cell = gm.elem_phase_deg;
-        if ~iscell(phase_cell)
-            phase_cell = num2cell(phase_cell, 2);
-        end
-        phase_mat = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
+        % A global model stores phases in one of two forms:
+        %   (a) correction-only — a single depth-independent
+        %       elem_phase_correction_deg added on top of geometric phases
+        %       (written by build_transducer_library and the multi_depth path);
+        %   (b) legacy per-depth phase tables depths_ep_mm + elem_phase_deg,
+        %       interpolated at the requested depth.
+        % An empty/absent elem_phase_correction_deg with no per-depth tables is
+        % a pure geometric entry (zero correction).
+        has_perdepth = isfield(gm, 'depths_ep_mm') && isfield(gm, 'elem_phase_deg') && ...
+            ~isempty(gm.depths_ep_mm) && ~isempty(gm.elem_phase_deg);
 
-        % Check if a per-depth refinement overrides the global model
-        [dist, idx]    = min(abs(depths - focal_distance_ep));
-        used_depth_gm  = depths(idx);
         use_refinement = false;
 
-        if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
-            fkey = sprintf('f%s', strrep(num2str(used_depth_gm), '.', 'p'));
-            if dist < 1 && isfield(lib.calibration.focal_depths, fkey) && ...
-                    isfield(lib.calibration.focal_depths.(fkey), 'is_refinement') && ...
-                    lib.calibration.focal_depths.(fkey).is_refinement
-                use_refinement = true;
+        if has_perdepth
+            depths = gm.depths_ep_mm(:)';
+
+            % elem_phase_deg is stored as a cell array of per-depth row vectors
+            phase_cell = gm.elem_phase_deg;
+            if ~iscell(phase_cell)
+                phase_cell = num2cell(phase_cell, 2);
             end
+            phase_mat = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
+
+            % Check if a per-depth refinement overrides the global model
+            [dist, idx]   = min(abs(depths - focal_distance_ep));
+            used_depth_gm = depths(idx);
+
+            if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
+                fkey = sprintf('f%s', strrep(num2str(used_depth_gm), '.', 'p'));
+                if dist < 1 && isfield(lib.calibration.focal_depths, fkey) && ...
+                        isfield(lib.calibration.focal_depths.(fkey), 'is_refinement') && ...
+                        lib.calibration.focal_depths.(fkey).is_refinement
+                    use_refinement = true;
+                end
+            end
+
+            if ~use_refinement
+                % Interpolate phases from global model
+                if numel(depths) == 1
+                    base_phases_deg = phase_mat(1, :);
+                else
+                    base_phases_deg = interp1(depths, phase_mat, focal_distance_ep, 'linear', 'extrap');
+                end
+                if dist > 5
+                    warning(['load_transducer_from_library: closest global-model depth is %.1f mm ' ...
+                        '(requested %.1f mm). Consider running calibration at this depth.'], ...
+                        used_depth_gm, focal_distance_ep);
+                end
+            end
+        else
+            % Correction-only / geometric entry: compute geometric steering
+            % phases at the requested depth directly from ring geometry.
+            geo_params = struct();
+            geo_params.medium_properties.water.sound_speed = 1500;  % water [m/s]
+            geo_params.transducer        = tran.transducer;
+            geo_params.transducer.n_elem = n_elem;
+            base_phases_deg = set_real_phases(tran, focal_distance_ep, geo_params);
+            used_depth_gm   = focal_distance_ep;
         end
 
         if ~use_refinement
-            % Interpolate phases from global model
-            if numel(depths) == 1
-                interp_phases_deg = phase_mat(1, :);
-            else
-                interp_phases_deg = interp1(depths, phase_mat, focal_distance_ep, 'linear', 'extrap');
-            end
-            elem_phase_rad = interp_phases_deg / 180 * pi;
-
-            if dist > 5
-                warning(['load_transducer_from_library: closest global-model depth is %.1f mm ' ...
-                    '(requested %.1f mm). Consider running calibration at this depth.'], ...
-                    used_depth_gm, focal_distance_ep);
-            end
+            elem_phase_rad = base_phases_deg(:)' / 180 * pi;
 
             % Apply per-element phase correction.
-            % Library YAML takes precedence (written by multi_depth calibration).
-            % Falls back to equipment YAML for backward compatibility with older
-            % calibrations written by save_elem_correction.
-            n_elem = tran.transducer.annular.elem_n;
+            % Library YAML takes precedence (written by build_transducer_library
+            % and the multi_depth path). Falls back to equipment YAML for
+            % backward compatibility with calibrations written by save_elem_correction.
             if isfield(gm, 'elem_phase_correction_deg') && ~isempty(gm.elem_phase_correction_deg)
                 correction_rad = gm.elem_phase_correction_deg(:)' * pi/180;
                 if numel(correction_rad) ~= n_elem
@@ -123,7 +147,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
                         numel(correction_rad), n_elem);
                 else
                     elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
-                    fprintf('Applied phase correction from library (multi_depth).\n');
+                    fprintf('Applied per-element phase correction from library.\n');
                 end
             elseif isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
                 correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
@@ -141,6 +165,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
             parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
 
             % Amplitude from global_model.amplitude_scaling
+            elem_p_amp = [];
             if isfield(gm, 'amplitude_scaling')
                 amp_map    = gm.amplitude_scaling;
                 int_keys   = fieldnames(amp_map);
@@ -175,8 +200,18 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 
             cal_type = '';
             if isfield(lib.meta, 'calibration_type'), cal_type = lib.meta.calibration_type; end
-            fprintf('Library loaded (global model, %s): %s | focal %.1f mm (interp from %.1f mm) | amp %d @ %.1f W/cm²\n', ...
-                cal_type, combo_name, focal_distance_ep, used_depth_gm, elem_p_amp(1), desired_intensity);
+            if has_perdepth
+                src_str = sprintf('interp from %.1f mm', used_depth_gm);
+            else
+                src_str = 'geometric + correction';
+            end
+            if isempty(elem_p_amp)
+                fprintf('Library loaded (global model, %s): %s | focal %.1f mm (%s) | no amplitude calibration\n', ...
+                    cal_type, combo_name, focal_distance_ep, src_str);
+            else
+                fprintf('Library loaded (global model, %s): %s | focal %.1f mm (%s) | amp %d @ %.1f W/cm²\n', ...
+                    cal_type, combo_name, focal_distance_ep, src_str, elem_p_amp(1), desired_intensity);
+            end
             return;
         end
         % fall through to per-depth if use_refinement == true

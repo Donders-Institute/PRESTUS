@@ -28,7 +28,7 @@
 close all;
 
 %% ── Paths ────────────────────────────────────────────────────────────────────
-repo_root    = fullfile(fileparts(mfilename('fullpath')), '..');
+repo_root    = fullfile(fileparts(mfilename('fullpath')), '..', '..');
 equip_path   = fullfile(repo_root, 'config', 'equipment');
 library_path = fullfile(repo_root, 'config', 'calibration');
 
@@ -216,43 +216,18 @@ end
 
 %% ═══════════════════════ Local helpers ════════════════════════════════════════
 
-function build_geometric_entry(tran_serial, ds_serial, tran, library_path, sound_speed)
-% Compute geometric phases from ring dimensions and write library YAML.
+function build_geometric_entry(tran_serial, ds_serial, tran, library_path, sound_speed) %#ok<INUSD>
+% Write a geometry-only library entry (no empirical phase correction).
+%
+% Stores an empty global_model.elem_phase_correction_deg so that
+% load_transducer_from_library reconstructs pure geometric steering phases
+% from ring geometry at the requested depth. No amplitude calibration is
+% available without characterisation data.
 
     if isempty(ds_serial)
         combo_key = tran_serial;
     else
         combo_key = [tran_serial '_' ds_serial];
-    end
-
-    % Auto depth grid: 10 steps from ~15% to ~95% of curvature radius
-    r_c = tran.transducer.annular.curv_radius_mm;
-    lo  = r_c * 0.15;
-    hi  = r_c * 0.95;
-    if isfield(tran, 'min_foc') && ~isempty(tran.min_foc); lo = tran.min_foc; end
-    if isfield(tran, 'max_foc') && ~isempty(tran.max_foc); hi = tran.max_foc; end
-    depths_mm = round(linspace(lo, hi, 10), 1);
-    fprintf('  Depth grid (auto): %s mm\n', mat2str(depths_mm));
-
-    % Minimal parameters struct for set_real_phases
-    params = struct();
-    params.medium_properties.water.sound_speed = sound_speed;
-    params.medium_properties.water.density     = 994;
-    params.transducer                           = tran.transducer;
-    params.transducer.n_elem                   = tran.transducer.annular.elem_n;
-    params = load_parameters(params);
-
-    n_elem   = tran.transducer.annular.elem_n;
-    n_depths = numel(depths_mm);
-    phase_mat = zeros(n_depths, n_elem);
-    dist_bowl_offset = tran.transducer.annular.curv_radius_mm - ...
-                       tran.transducer.annular.dist_geom_ep_mm;
-
-    for j = 1:n_depths
-        d = depths_mm(j);
-        params.transducer.focal_distance_ep   = d;
-        params.transducer.focal_distance_bowl = d + dist_bowl_offset;
-        phase_mat(j, :) = set_real_phases(tran, d, params);
     end
 
     out_file = fullfile(library_path, [combo_key '.yaml']);
@@ -262,16 +237,27 @@ function build_geometric_entry(tran_serial, ds_serial, tran, library_path, sound
         lib = struct();
     end
 
-    lib.meta.tran_serial      = tran_serial;
-    lib.meta.created_at       = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    lib.meta.tran_serial = tran_serial;
+    if ~isempty(ds_serial); lib.meta.driving_system = ds_serial; end
+    if ~isfield(lib, 'meta') || ~isfield(lib.meta, 'created_at') || isempty(lib.meta.created_at)
+        lib.meta.created_at = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    end
+    lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
     lib.meta.calibration_type = 'geometric';
     try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
 
-    lib.global_model.depths_ep_mm   = depths_mm;
-    lib.global_model.elem_phase_deg = num2cell(phase_mat, 2)';
+    % Drop any legacy per-depth phase tables; phases are computed at load time.
+    if isfield(lib, 'global_model')
+        for legacy = {'depths_ep_mm', 'elem_phase_deg'}
+            if isfield(lib.global_model, legacy{1})
+                lib.global_model = rmfield(lib.global_model, legacy{1});
+            end
+        end
+    end
+    lib.global_model.elem_phase_correction_deg = [];
 
     yaml.dumpFile(out_file, lib);
-    fprintf('  Written: %s\n', out_file);
+    fprintf('  Written (geometric): %s\n', out_file);
 end
 
 
@@ -280,8 +266,15 @@ function build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_e
         char_data_root, phase_table_root, ...
         desired_intensities, opt_upper_velocity, opt_weights, ...
         skip_front_peak_mm, initial_velocity, ...
-        output_yaml_folder, library_path)
-% Geometric phases + per-depth velocity fit from axial hydrophone profiles.
+        output_yaml_folder, library_path) %#ok<INUSD>
+% Joint multi-depth phase correction + amplitude scaling from axial profiles.
+%
+% Fits a single depth-independent per-element phase correction
+% (elem_phase_correction_deg) jointly across all characterisation depths
+% via perform_joint_depth_fit, then derives a source amplitude per requested
+% intensity. Only the correction and amplitude scaling are written to the
+% library; geometric phases are reconstructed at load time by
+% load_transducer_from_library.
 
     parameters.transducer = tran.transducer;
     parameters.transducer.annular.elem_phase_deg = zeros(1, tran.transducer.annular.elem_n);
@@ -292,6 +285,7 @@ function build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_e
     parameters.calibration.opt_upper_velocity  = opt_upper_velocity;
     parameters.calibration.opt_weights         = opt_weights;
     parameters.calibration.skip_front_peak_mm  = skip_front_peak_mm;
+    parameters.calibration.initial_velocity    = initial_velocity;
     parameters.calibration.forward_model       = 'rayleigh';
 
     tmp_out = fullfile(tempdir, ['prestus_calib_' combo_name]);
@@ -322,78 +316,58 @@ function build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_e
                        tran.transducer.annular.dist_geom_ep_mm;
     dist_bowl        = dist_ep + dist_bowl_offset;
 
-    % Optionally load manufacturer phase table (ignored for geometric baseline)
-    phase_table = [];
-    if isfield(combo_entry, 'phase_table') && ~isempty(combo_entry.phase_table)
-        pt_rel = combo_entry.phase_table;
-        pt_path = pt_rel;
-        if ~isempty(phase_table_root)
-            pt_path = fullfile(phase_table_root, pt_rel);
-        end
-        if ~isfile(pt_path)
-            fprintf('  [INFO] phase_table not found (%s) — using geometry-only phases.\n', pt_path);
-        elseif strcmpi(tran.manufact, 'Sonic Concepts')
-            phase_table = readtable(pt_path);
-        elseif strcmpi(tran.manufact, 'Imasonic')
-            phase_table = read_ini_file(pt_path);
-        else
-            fprintf('  [INFO] Unknown manufacturer ''%s'' — ignoring phase_table.\n', tran.manufact);
-        end
+    % --- Joint multi-depth phase correction (depth-independent) ---
+    ref_intensity = desired_intensities(1);
+    fit_opts = struct('ForwardModel', parameters.calibration.forward_model);
+    fprintf('  Fitting joint phase correction across %d depths...\n', numel(available_depths_ep));
+    [opt_delta_rad, opt_velocity_ref, ~] = perform_joint_depth_fit( ...
+        parameters, intens_data, available_depths_ep, dist_bowl, dist_bowl_offset, ...
+        ref_intensity, tran, fit_opts);
+    elem_phase_correction_deg = mod(opt_delta_rad(:)' * 180/pi, 360);
+
+    % --- Amplitude scaling per intensity ---
+    % Source amplitude = particle velocity x water impedance; velocity scales
+    % as sqrt(I) since I ∝ v². Anchored on the joint-fit reference velocity.
+    water_Z    = parameters.medium_properties.water.density * ...
+                 parameters.medium_properties.water.sound_speed;
+    amp_struct = struct();
+    for ii = 1:numel(desired_intensities)
+        isppa = desired_intensities(ii);
+        vel_i = opt_velocity_ref * sqrt(isppa / ref_intensity);
+        amp_i = round(vel_i * water_Z);
+        key   = sprintf('i%s', strrep(num2str(isppa), '.', 'p'));
+        amp_struct.(key) = amp_i;
+        fprintf('  I=%g W/cm² -> amp=%d\n', isppa, amp_i);
     end
 
-    n_depths = numel(available_depths_ep);
-    fprintf('  Computing geometric phases and fitting velocity at %d depths...\n', n_depths);
-
-    for j = 1:n_depths
-        depth_j  = available_depths_ep(j);
-        params_j = parameters;
-        params_j.transducer.focal_distance_ep          = depth_j;
-        params_j.transducer.focal_distance_bowl        = depth_j + dist_bowl_offset;
-        params_j.calibration.desired_focal_distance_ep = depth_j;
-        params_j = load_parameters(params_j);
-
-        geo_deg_j  = set_real_phases(tran, depth_j, params_j);
-        phases_rad = geo_deg_j * pi / 180;
-        params_j.transducer.annular.elem_phase_deg = geo_deg_j;
-        params_j.transducer.annular.elem_phase_rad = phases_rad;
-
-        emp_j = intens_data(:, j);
-        emp_j(emp_j < 0) = 0;
-
-        for ii = 1:numel(desired_intensities)
-            isppa  = desired_intensities(ii);
-            emp_sc = emp_j * (isppa / max(emp_j + eps));
-
-            profile_struct.axial_intensity     = emp_sc;
-            profile_struct.axial_distance_bowl = dist_bowl;
-            params_j.calibration.desired_intensity = isppa;
-
-            [vel_fit, ~, ~] = fit_velocity_to_intensity( ...
-                params_j, profile_struct, phases_rad, initial_velocity, isppa);
-
-            water_Z      = params_j.medium_properties.water.density * ...
-                           params_j.medium_properties.water.sound_speed;
-            elem_p_amp_val = round(vel_fit * water_Z);
-
-            foc_str   = strrep(num2str(depth_j), '.', 'p');
-            int_str   = strrep(num2str(isppa),   '.', 'p');
-            yaml_name = sprintf('%s-F%smm-I%swpercm2.yaml', combo_name, foc_str, int_str);
-            yaml_path = fullfile(output_yaml_folder, yaml_name);
-
-            data = struct();
-            data.meta.tran_serial = tran_serial;
-            data.meta.created_at  = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
-            try; data.meta.prestus_version = prestus_version(); catch; data.meta.prestus_version = 'unknown'; end
-            data.transducer.focal_distance_ep       = depth_j;
-            data.transducer.set_intensity_w_per_cm2 = isppa;
-            data.transducer.annular.elem_phase_deg  = geo_deg_j;
-            data.transducer.annular.elem_phase_rad  = phases_rad;
-            data.transducer.annular.elem_p_amp        = repmat(elem_p_amp_val, 1, tran.transducer.annular.elem_n);
-
-            yaml.dumpFile(yaml_path, data);
-            fprintf('  Saved: %s (amp=%d)\n', yaml_name, elem_p_amp_val);
-        end
+    % --- Write library YAML (correction-only global model) ---
+    out_file = fullfile(library_path, [combo_name '.yaml']);
+    if isfile(out_file)
+        lib = yaml.loadFile(out_file, 'ConvertToArray', true);
+    else
+        lib = struct();
     end
 
-    update_transducer_library(combo_name, output_yaml_folder, library_path);
+    lib.meta.tran_serial = tran_serial;
+    if ~isempty(ds_serial); lib.meta.driving_system = ds_serial; end
+    if ~isfield(lib, 'meta') || ~isfield(lib.meta, 'created_at') || isempty(lib.meta.created_at)
+        lib.meta.created_at = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    end
+    lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    lib.meta.calibration_type = 'empirical';
+    try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+
+    % Drop any legacy per-depth phase tables so the entry is correction-only.
+    if isfield(lib, 'global_model')
+        for legacy = {'depths_ep_mm', 'elem_phase_deg'}
+            if isfield(lib.global_model, legacy{1})
+                lib.global_model = rmfield(lib.global_model, legacy{1});
+            end
+        end
+    end
+    lib.global_model.elem_phase_correction_deg = elem_phase_correction_deg;
+    lib.global_model.amplitude_scaling         = amp_struct;
+
+    yaml.dumpFile(out_file, lib);
+    fprintf('  Written (correction-only): %s\n', out_file);
 end
