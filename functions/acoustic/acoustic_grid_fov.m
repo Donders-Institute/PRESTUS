@@ -116,9 +116,17 @@ focus_mm    = (focus_pos  - 1) * dx_mm;   % [1×3]
 fov_lo_mm = zeros(1, 3);
 fov_hi_mm = zeros(1, 3);
 
-% Axial: transducer centre → transducer centre + fov_length_mm
-fov_lo_mm(beam_dim) = trans_mm(beam_dim);
-fov_hi_mm(beam_dim) = trans_mm(beam_dim) + fov_length_mm;
+% Axial: transducer centre → focus direction for fov_length_mm.
+% Extend in the direction the beam actually travels (sign of focus−trans),
+% not always in +beam_dim, so the FOV contains the focus even when the
+% transducer sits at a higher coordinate than the focal point.
+if focus_mm(beam_dim) >= trans_mm(beam_dim)
+    fov_lo_mm(beam_dim) = trans_mm(beam_dim);
+    fov_hi_mm(beam_dim) = trans_mm(beam_dim) + fov_length_mm;
+else
+    fov_lo_mm(beam_dim) = trans_mm(beam_dim) - fov_length_mm;
+    fov_hi_mm(beam_dim) = trans_mm(beam_dim);
+end
 
 % Lateral: centred on focus
 fov_lo_mm(lateral_dims) = focus_mm(lateral_dims) - fov_diameter_mm / 2;
