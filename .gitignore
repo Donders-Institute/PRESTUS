@@ -88,3 +88,7 @@ $RECYCLE.BIN/
 core.*
 .Rhistory
 .claude
+#######################
+# Local Claude context #
+#######################
+/CLAUDE.md
