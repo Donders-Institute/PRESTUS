@@ -95,4 +95,19 @@ function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] 
     mean_dts = mean(dist_to_skin(:));
     var_dts = var(dist_to_skin(:));
 
+    %% Step 10: Compute transducer-to-target distance
+    dist_to_target    = norm(trans_pos - target);
+    dist_to_target_mm = dist_to_target * pixel_size;
+
+    fprintf('[transducer_analyze_position] ---- position analysis ----\n');
+    fprintf('[transducer_analyze_position] Exit plane position (grid): [%.2f, %.2f, %.2f]\n', ex_plane_pos(1), ex_plane_pos(2), ex_plane_pos(3));
+    fprintf('[transducer_analyze_position] Normal vector: [%.4f, %.4f, %.4f]\n', norm_v(1), norm_v(2), norm_v(3));
+    fprintf('[transducer_analyze_position] Distance to target: %.2f mm\n', dist_to_target_mm);
+    fprintf('[transducer_analyze_position] Skull intersection proportion: %.1f%%\n', prop_intersect * 100);
+    if isempty(orth_plane_disk)
+        fprintf('[transducer_analyze_position] WARNING: zero voxels in exit-plane disk\n');
+    end
+    fprintf('[transducer_analyze_position] Skin-to-transducer distance: %.2f mm (mean), %.2f mm^2 (var)\n', mean_dts * pixel_size, var_dts * pixel_size^2);
+    fprintf('[transducer_analyze_position] ------------------------------------\n');
+
 end

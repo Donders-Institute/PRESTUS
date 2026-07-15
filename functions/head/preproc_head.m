@@ -37,7 +37,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     %% CHECK INPUTS
 
-    disp('Checking inputs for head preprocessing ...');
+    fprintf('[preproc_head] %s\n', 'Checking inputs for head preprocessing ...');
     
     % Define path to T1 image (user-specified)
     filename_t1 = fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id));
@@ -53,11 +53,17 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     files_to_check = {filename_t1, filename_segmented, filename_t1_simnibs};
     check_availability(files_to_check)
 
+    fprintf('[preproc_head] ---- head preprocessing summary ----\n');
+    fprintf('[preproc_head] subject_id      : %d\n', parameters.subject_id);
+    fprintf('[preproc_head] T1 path         : %s\n', filename_t1);
+    fprintf('[preproc_head] grid resolution : %.4g mm\n', parameters.grid.resolution_mm);
+    fprintf('[preproc_head] ------------------------------------\n');
+
     %% Load planning, mask, and segmentation images + header information
     % Default: use T1 planning image from the segmentation directory
     % Experimental: use user-specified T1 planning image when position is based on localite
 
-    disp('Loading images...');
+    fprintf('[preproc_head] %s\n', 'Loading images...');
 
     if isfield(parameters.placement,'localite') && isfield(parameters.placement.localite,'enabled') && parameters.placement.localite.enabled
         t1_image = niftiread(filename_t1);
@@ -360,7 +366,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         end
         log_timer('stop','preproc_rotscale');
     else
-        disp('Skipping reorientation; the file already exists. Loading it instead.');
+        fprintf('[preproc_head] %s\n', 'Skipping reorientation; the file already exists. Loading it instead.');
         % Only load the large volumes if file 2 does not yet exist —
         % they are only needed as inputs to the smoothing/cropping step.
         filename_cropped_smoothed_skull_data_check = fullfile(parameters.io.dir_cache, ...
@@ -425,7 +431,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     %% SEG-> MEDIUM, SMOOTH & CROP LAYERED
     % see preproc_smooth_and_crop
     
-    disp('Creating layered medium by smoothing and cropping the head segmentation...')
+    fprintf('[preproc_head] %s\n', 'Creating layered medium by smoothing and cropping the head segmentation...')
 
     % Defines output file location and name
     filename_cropped_smoothed_skull_data = fullfile(parameters.io.dir_cache, ...
@@ -543,7 +549,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             'inv_final_transformation_matrix')
         log_timer('stop','preproc_skullsmooth');
     else
-        disp('Skipping head smoothing and cropping, the file already exists, loading it instead.')
+        fprintf('[preproc_head] %s\n', 'Skipping head smoothing and cropping, the file already exists, loading it instead.')
         load(filename_cropped_smoothed_skull_data);
         % Backward compat: old caches used bone_crop for the dual-purpose variable.
         if exist('bone_crop', 'var') && ~exist('bone_mask_crop', 'var')
@@ -571,10 +577,10 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     
     if any(diff_voxels(:) > 1)
         warn('Backtransformed positions exceed 1-voxel tolerance.');
-        disp('Original coordinates:'); disp([trans_pos_grid; focus_pos_grid]);
-        disp('Final local:'); disp([trans_pos_final; focus_pos_final]);
-        disp('Backtransformed:'); disp(backtransf_coordinates);
-        disp('Voxel differences:'); disp(diff_voxels);
+        fprintf('[preproc_head] %s\n', 'Original coordinates:'); disp([trans_pos_grid; focus_pos_grid]);
+        fprintf('[preproc_head] %s\n', 'Final local:'); disp([trans_pos_final; focus_pos_final]);
+        fprintf('[preproc_head] %s\n', 'Backtransformed:'); disp(backtransf_coordinates);
+        fprintf('[preproc_head] %s\n', 'Voxel differences:'); disp(diff_voxels);
         error('Coordinate mismatch >1 voxel/dim—check cropping/padding.');
     elseif any(diff_voxels(:) > 0)
         warn('Minor backtransform offset (≤1 voxel): %s', mat2str(diff_voxels));

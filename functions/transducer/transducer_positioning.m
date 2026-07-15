@@ -96,7 +96,7 @@ if confirm_overwriting(tpos_output_file, parameters)
     writetable(tpos, tpos_output_file, 'Delimiter', ',');
 
 else
-    disp('Skipping positioning, loading existing output file...')
+    fprintf('[transducer_positioning] Skipping positioning, loading existing output file...\n')
     tpos = readtable(tpos_output_file, 'Delimiter', ',');
 end
 
@@ -114,6 +114,21 @@ end
 tp_plot_heuristic_position(...
     trans_pos, target_pos, img, img_header, parameters, voxel_size, target_name, subject_id);
 
+%% Placement summary
+
+if isfield(parameters, 'placement') && isfield(parameters.placement, 'mode')
+    placement_mode_str = char(parameters.placement.mode);
+else
+    placement_mode_str = 'heuristic';
+end
+dist_to_target_mm = norm(double(trans_pos(:)) - double(target_pos(:))) * voxel_size;
+fprintf('[transducer_positioning] ---- placement summary ----\n');
+fprintf('[transducer_positioning] Final transducer position (voxels): [%d, %d, %d]\n', ...
+    trans_pos(1), trans_pos(2), trans_pos(3));
+fprintf('[transducer_positioning] Distance to target: %.2f mm\n', dist_to_target_mm);
+fprintf('[transducer_positioning] Placement mode: %s\n', placement_mode_str);
+fprintf('[transducer_positioning] ------------------------------------\n');
+
 fprintf('Heuristic transducer placement: %s (sub-%03d) → %s\n', ...
     target_name, subject_id, tpos_output_file);
 
@@ -122,7 +137,7 @@ fprintf('Heuristic transducer placement: %s (sub-%03d) → %s\n', ...
 if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite') && ...
     isfield(parameters.placement.heuristic, 'save_localite_t1') && parameters.placement.heuristic.save_localite_t1 && ...
     isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
-    disp("Requested to transform T1 header for localite ...")
+    fprintf('[transducer_positioning] Requested to transform T1 header for localite ...\n')
     path_t1 = fullfile(m2m_folder, 'T1.nii.gz');
     path_localite_out = fullfile(parameters.path.localite, ...
         ['sub-', sprintf('%03.0f_T1_forneuronav.nii', subject_id)]);
@@ -130,7 +145,7 @@ if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite')
         canonical_affine_transform(path_t1, path_localite_out);
         fprintf('Localite-ready T1 (sub-%03d) → %s\n', subject_id, path_localite_out);
     else
-        disp('... but localite T1 file already exists ... skipping.')
+        fprintf('[transducer_positioning] ... but localite T1 file already exists ... skipping.\n')
     end
 end
 

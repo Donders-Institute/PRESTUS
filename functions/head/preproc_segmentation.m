@@ -23,7 +23,10 @@ end
 
     %% CHECK INPUTS
 
-    disp('Checking inputs...');
+    fprintf('[preproc_segmentation] Subject: %03d | T1 pattern: %s | Seg folder: %s\n', ...
+        parameters.subject_id, parameters.path.t1_pattern, ...
+        fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id)));
+    fprintf('[preproc_segmentation] %s\n', 'Checking inputs...');
 
     % Define paths to T1 and T2 images
     % Patterns may contain sprintf format specifiers (e.g. %03d) or shell-style
@@ -69,7 +72,7 @@ end
 
     %% SEGMENTATION USING SIMNIBS
 
-    disp('Starting segmentation...');
+    fprintf('[preproc_segmentation] %s\n', 'Starting segmentation...');
 
     % Run segmentation (if necessary)
     if seg_needed
@@ -85,7 +88,7 @@ end
             return;
         end
     else
-        disp('Segmentation available...');
+        fprintf('[preproc_segmentation] %s\n', 'Segmentation available...');
     end
 
     %% SEGMENTATION PIPELINE (charm + pseudoCT share the same pipeline)
@@ -100,9 +103,9 @@ end
             error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
         end
         if exist(filename_pseudoCT, 'file')
-            disp('pseudoCT available...');
+            fprintf('[preproc_segmentation] %s\n', 'pseudoCT available...');
         else
-            disp('Starting pseudoCT generation...');
+            fprintf('[preproc_segmentation] %s\n', 'Starting pseudoCT generation...');
             pct_create_pCT_run(parameters);
         end
     end
