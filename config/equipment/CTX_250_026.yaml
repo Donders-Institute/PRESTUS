@@ -8,9 +8,9 @@ max_foc: 61.5
 transducer:
   annular:
     elem_n: 4
-    elem_id_mm: [0.0, 32.9184, 46.1264, 56.0324]
-    elem_od_mm: [32.3596, 45.5676, 55.5244, 64.008]
-    curv_radius_mm: 63.2
+    elem_id_mm: [0.0, 30.1788, 42.1388, 51.1088]
+    elem_od_mm: [29.62, 41.58, 50.55, 57.94]
+    curv_radius_mm: 62.94
     dist_geom_ep_mm: 52.38
   freq_hz: 250000.0
 combos:

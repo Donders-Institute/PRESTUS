@@ -7,11 +7,11 @@ min_foc: 33.2
 max_foc: 79.4
 transducer:
   annular:
-    elem_n: 10
-    elem_id_mm: [0.0, 4.59969, 9.19937, 13.7991, 18.3987, 22.9984, 27.5981, 32.1978, 36.7975, 41.3972]
-    elem_od_mm: [4.09423, 8.69391, 13.2936, 17.8933, 22.493, 27.0927, 31.6923, 36.292, 40.8917, 45.4914]
-    curv_radius_mm: 63.2
-    dist_geom_ep_mm: 56.87
+    elem_n: 2
+    elem_id_mm: [0.0, 30.9588]
+    elem_od_mm: [30.4, 42.7]
+    curv_radius_mm: 62.9
+    dist_geom_ep_mm: 56.9
   freq_hz: 500000.0
 combos:
   SC_203_035:
