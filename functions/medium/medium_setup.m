@@ -183,6 +183,17 @@ end
         parameters.fit_alpha_power = 1;
     end
 
+    % jwave uses a fixed y=2 Stokes absorption law internally, so alpha_coeff
+    % must always be remapped to alpha_power_fixed=2.  Override fit_alpha_power
+    % when the jwave backend is active, regardless of the config value.
+    if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave') ...
+            && parameters.fit_alpha_power ~= 1
+        warning('medium_setup:jwaveAlphaPower', ...
+            'fit_alpha_power=%d overridden to 1 for jwave backend (requires alpha_power_fixed=2).', ...
+            parameters.fit_alpha_power);
+        parameters.fit_alpha_power = 1;
+    end
+
     if parameters.fit_alpha_power == 1
         alpha_power_fixed = 2;
     
@@ -279,6 +290,28 @@ end
                           'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
+    fprintf('[medium_setup] ---- medium summary ----\n');
+    fprintf('[medium_setup] Medium type      : %s\n', parameters.simulation.medium);
+    fprintf('[medium_setup] Tissue layers    : %d (%s)\n', numel(layer_labels), strjoin(layer_labels, ', '));
+    fprintf('[medium_setup] sound_speed      : %.1f – %.1f m/s\n', min(sound_speed(:), [], 'omitnan'), max(sound_speed(:), [], 'omitnan'));
+    fprintf('[medium_setup] density          : %.1f – %.1f kg/m3\n', min(density(:), [], 'omitnan'), max(density(:), [], 'omitnan'));
+    fprintf('[medium_setup] alpha_coeff      : %.4f – %.4f\n', min(alpha_coeff_fixed(:), [], 'omitnan'), max(alpha_coeff_fixed(:), [], 'omitnan'));
+    if parameters.pct.enabled == 1
+        pct_d = 'none'; pct_s = 'none'; pct_a = 'none';
+        if isfield(parameters.pct, 'mapping_density'),     pct_d = char(parameters.pct.mapping_density);     end
+        if isfield(parameters.pct, 'mapping_soundspeed'),  pct_s = char(parameters.pct.mapping_soundspeed);  end
+        if isfield(parameters.pct, 'mapping_attenuation'), pct_a = char(parameters.pct.mapping_attenuation); end
+        fprintf('[medium_setup] pCT mapping      : yes (density=%s, soundspeed=%s, attenuation=%s)\n', pct_d, pct_s, pct_a);
+    else
+        fprintf('[medium_setup] pCT mapping      : no\n');
+    end
+    if isfield(parameters.headmodel, 'smooth_properties') && parameters.headmodel.smooth_properties == true
+        fprintf('[medium_setup] Smoothing        : yes\n');
+    else
+        fprintf('[medium_setup] Smoothing        : no\n');
+    end
+    fprintf('[medium_setup] ------------------------------------\n');
+
     %% Save raw simulation-grid medium matrices (debug only)
     %
     % NOTE: T1-space property maps (back-transformed, with output_affix, in
