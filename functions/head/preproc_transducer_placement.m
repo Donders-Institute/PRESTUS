@@ -95,9 +95,14 @@ end
         case 'plantus'
             parameters = run_plantus_placement(parameters);
 
+        % ── TUS_ENTRY ─────────────────────────────────────────────────────
+        case 'tus_entry'
+            parameters = run_tus_entry_placement(parameters);
+
         otherwise
             error(['Unknown placement.mode ''%s''. ' ...
-                   'Use ''manual'', ''localite'', ''heuristic'', or ''plantus''.'], mode);
+                   'Use ''manual'', ''localite'', ''heuristic'', ''plantus'', ' ...
+                   'or ''tus_entry''.'], mode);
     end
 
 end
@@ -153,6 +158,10 @@ function parameters = run_heuristic_placement(parameters)
 
     mni_coords  = parameters.placement.heuristic.mni_target_mm(:)';
     target_name = char(parameters.placement.heuristic.target_name);
+
+    % Ensure io.dir_output is resolved (derived from path.sim when params were
+    % built before the pipeline ran, e.g. placement-only benchmark scripts).
+    parameters = resolve_io_dirs(parameters);
 
     % Build mni_targets struct expected by transducer_positioning
     % transducer_positioning.m:69 does: target_mni = mni_targets.(target_name)
@@ -260,4 +269,46 @@ function parameters = run_plantus_placement(parameters)
     plot_placement_t1_overlay(parameters, ...
         parameters.transducer(1).trans_pos, ...
         parameters.transducer(1).focus_pos, 'plantus');
+
+    pt_target_name = char(parameters.placement.plantus.target_name);
+    traj_path = fullfile(parameters.path.seg, 'PlanTUS', ...
+        sprintf('sub-%03d', parameters.subject_id), pt_target_name, ...
+        sprintf('sub-%03d_%s_trajectory.txt', parameters.subject_id, pt_target_name));
+    export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, pt_target_name, traj_path);
+end
+
+function parameters = run_tus_entry_placement(parameters)
+% Call position_transducer_tus_entry and write results back into parameters.
+
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'tus_entry')
+        error('PRESTUS:placement:missingConfig', ...
+            'placement.tus_entry sub-struct is missing. See config_default.yaml for required fields.');
+    end
+
+    filename_t1 = fullfile(parameters.path.anat, ...
+        sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    t1_header = niftiinfo(filename_t1);
+
+    [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
+        position_transducer_tus_entry(parameters, t1_header);
+
+    for ti = 1:numel(parameters.transducer)
+        parameters.transducer(ti).trans_pos     = trans_pos;
+        parameters.transducer(ti).focus_pos     = focus_pos;
+        parameters.transducer(ti).trans_pos_ras = trans_pos_ras;
+        parameters.transducer(ti).focus_pos_ras = focus_pos_ras;
+    end
+    plot_placement_t1_overlay(parameters, ...
+        parameters.transducer(1).trans_pos, ...
+        parameters.transducer(1).focus_pos, 'tus_entry');
+
+    te = parameters.placement.tus_entry;
+    tus_target_name = 'target';
+    if isfield(te, 'target_name') && ~isempty(te.target_name)
+        tus_target_name = char(te.target_name);
+    end
+    traj_path = fullfile(parameters.path.seg, 'TUS_entry', ...
+        sprintf('sub-%03d', parameters.subject_id), tus_target_name, ...
+        sprintf('sub-%03d_%s_trajectory.txt', parameters.subject_id, tus_target_name));
+    export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, tus_target_name, traj_path);
 end
