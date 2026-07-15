@@ -130,13 +130,18 @@ Copy this path — it is what you pass to `parameters.jwave.python_env` (see [Co
 acoustic_backend: jwave
 
 jwave:
-  solver: time_domain        # 'time_domain' | 'helmholtz'
-  pml_size: 20               # PML thickness in grid points
+  solver: helmholtz          # 'helmholtz' (default) | 'pseudo_spectral' | 'finite_differences'
   precision: single          # 'single' | 'double'
   python_env: ''             # full path to CPU Python bin dir (see environment setup)
   python_env_gpu: ''         # full path to GPU (CUDA) Python bin dir; leave empty for CPU-only
   use_gpu: ~                 # null = auto-detect via nvidia-smi | true = force GPU | false = force CPU
   dry_run: false             # write HDF5 inputs only, skip simulation (for debugging)
+
+# PML thickness uses the same grid.pml_size field as k-Wave (default: 'auto'),
+# but jwave resolves 'auto' to ~2.5 wavelengths of PML (clipped to [10, 40]
+# grid points), not k-Wave's FFT-prime-factorization heuristic.
+# grid:
+#   pml_size: 20             # override if needed
 ```
 
 Or in MATLAB:
@@ -144,13 +149,13 @@ Or in MATLAB:
 ```matlab
 parameters.acoustic_backend = 'jwave';
 
-parameters.jwave.solver          = 'time_domain';
-parameters.jwave.pml_size        = 20;
+parameters.jwave.solver          = 'helmholtz';
 parameters.jwave.precision       = 'single';
 parameters.jwave.python_env      = '/home/user/.conda/envs/jwave_env/bin/python';
 parameters.jwave.python_env_gpu  = '/home/user/.conda/envs/jwave_env_gpu/bin/python';
 parameters.jwave.dry_run         = false;
 % parameters.jwave.use_gpu = true;   % override auto-detection
+% parameters.grid.pml_size = 20;     % override the wavelength-based 'auto' PML
 ```
 
 `python_env` is the **full path to the Python bin directory** of the CPU environment. `python_env_gpu` points to the GPU (CUDA) environment. At runtime `jwave_wrapper` selects the environment as follows:
@@ -170,7 +175,34 @@ Leaving both fields empty falls back to the system `python3`, which is unlikely 
 
 ## Solver options
 
-### `time_domain` (default)
+### `helmholtz` (default)
+
+Frequency-domain GMRES solver. Computes the complex pressure field `P(r)` at the drive frequency directly, without running a time-domain transient. Returns:
+
+- `p_max_all` = |P| (pressure amplitude) [Pa]
+- `p_min_all` = −|P|
+- `p_final` = Re(P) (real part at phase zero) [Pa]
+
+Significantly faster than `pseudo_spectral` for CW simulations because the steady-state is reached in a single linear solve rather than thousands of time steps. Equivalent accuracy for monochromatic excitation in lossy tissue media. GMRES convergence is controlled by `jwave.gmres_restart` and `jwave.gmres_maxiter`.
+
+> **Convergence is checked and enforced.** After every Helmholtz solve, `jwave_wrapper` compares the relative GMRES residual (see `/diagnostics/residual_norm`) against `jwave.convergence_threshold` (default `0.05`). This residual is computed *exactly*, by re-evaluating jwave's own `helmholtz` operator and `scale_source_helmholtz` on the solved field (`compute_helmholtz_residual` in `run_jwave_sim.py`) — an earlier version approximated it with a hand-rolled NumPy Laplacian that omitted jwave's internal source scaling and the `u = P/(-iω)` relation, which could report a residual off by orders of magnitude (~10⁶ for a typical 300 kHz / 0.75 mm grid) independent of whether GMRES had actually converged. If the (now-exact) residual exceeds the threshold, **the pipeline errors**, since a genuinely unconverged GMRES iterate is dominated by solver noise rather than physics. The error message gives concrete, ranked fixes (revert `gmres_restart`/`gmres_maxiter` to jwave's own defaults rather than enlarging them — a larger restart in single precision can destabilize GMRES instead of helping; try `precision: double`; check the PML fraction of the domain via `--debug`; only then loosen `gmres_tol`). If you have reviewed the field and diagnostics and accept the residual anyway, set `jwave.ignore_convergence_threshold: true` to downgrade this back to a warning and keep the result.
+
+> **Lossless water note.** Setting `alpha_coeff = 0` makes the Helmholtz operator near-singular (purely real wavenumber in the bulk), which causes GMRES to stall and underestimate peak pressure by ~18%. `run_jwave_sim.py` automatically floors `alpha_coeff` to 0.002 dB/(cm·MHz²) — the physical value for distilled water — before building the medium. This regularises GMRES convergence with negligible effect on the acoustic field (< 0.006 % attenuation over 100 mm at 500 kHz).
+
+> **Source-amplitude window.** The Helmholtz solver extracts the complex per-voxel
+> drive amplitude via a single-frequency DFT of the CW source signal. That DFT is
+> restricted to `sensor.record_start_index:end` — the same steady-state window
+> (last N periods, after the wavefront has crossed the domain) that k-Wave and
+> jwave's own time-domain solvers already use for `p_max_all`/`p_min_all`. This
+> matters because `createCWSignals()` applies a startup cosine up-ramp (default
+> 4 periods) to the drive signal; DFT-ing the full signal averages that
+> lower-amplitude ramp in with the steady CW cycles and systematically
+> underestimates the drive amplitude (the time-domain solvers don't have this
+> problem — they peak-track with `max`/`min` rather than average). Restricting
+> to the steady-state window also removes most DFT scalloping loss "for free",
+> since that window is built from an integer number of samples per period.
+
+### `pseudo_spectral`
 
 Pseudo-spectral symplectic time-domain integrator — the same equations as `kspaceFirstOrder*`. Runs for `Nt` time steps with a PML absorbing boundary, records pressure over the last `Nt - record_start_index` steps (the steady-state window), and returns:
 
@@ -180,15 +212,9 @@ Pseudo-spectral symplectic time-domain integrator — the same equations as `ksp
 
 Use this solver when you want direct equivalence with k-Wave output or need the transient pressure field.
 
-### `helmholtz`
+### `finite_differences`
 
-Frequency-domain GMRES solver. Computes the complex pressure field `P(r)` at the drive frequency directly, without running a time-domain transient. Returns:
-
-- `p_max_all` = |P| (pressure amplitude) [Pa]
-- `p_min_all` = −|P|
-- `p_final` = Re(P) (real part at phase zero) [Pa]
-
-Significantly faster than `time_domain` for CW simulations because the steady-state is reached in a single linear solve rather than thousands of time steps. Equivalent accuracy for monochromatic excitation.
+Finite-difference time-domain solver. Use `jwave.fd_accuracy` to set the spatial stencil order (default 8).
 
 ---
 
@@ -196,13 +222,18 @@ Significantly faster than `time_domain` for CW simulations because the steady-st
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `solver` | string | `'time_domain'` | Solver to use: `'time_domain'` or `'helmholtz'` |
-| `pml_size` | int | `20` | PML thickness in grid points. Increase for larger domains or lower frequencies. |
+| `solver` | string | `'helmholtz'` | Solver to use: `'helmholtz'` (default), `'pseudo_spectral'`, or `'finite_differences'` |
 | `precision` | string | `'single'` | Floating-point precision: `'single'` (float32) or `'double'` (float64). Single is faster and sufficient for TUS. |
 | `python_env` | string | `''` | Full path to the **bin directory** of the CPU jwave environment. Empty = system `python3`. |
 | `python_env_gpu` | string | `''` | Full path to the **bin directory** of the GPU (CUDA) jwave environment. Empty = always use CPU env. |
 | `use_gpu` | bool/empty | `[]` | GPU selection override. `[]` = auto-detect via `nvidia-smi`; `true` = force GPU env (errors if `python_env_gpu` unset); `false` = force CPU env. |
 | `dry_run` | bool | `false` | If true, write HDF5 inputs but skip the simulation. Useful for inspecting the grid before running. |
+| `gmres_restart` | int | `10` | GMRES Krylov subspace size. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
+| `gmres_maxiter` | int | `1000` | Maximum GMRES outer iterations. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
+| `fd_accuracy` | int | `8` | Spatial stencil order. `finite_differences` solver only. |
+| `convergence_threshold` | float | `0.05` | Relative spectral residual above which the result is rejected. Helmholtz solver only. By default this **errors**; see `ignore_convergence_threshold`. |
+| `ignore_convergence_threshold` | bool | `false` | If true, exceeding `convergence_threshold` only warns (and returns the unconverged result) instead of erroring. Helmholtz solver only. |
+| `grid.pml_size` | int/`'auto'` | `'auto'` | PML thickness in grid points (set under `grid:`, not `jwave:`, so both backends read the same field — but `'auto'` resolves *differently* per backend: jwave uses a wavelength-based target of ~2.5λ, not k-Wave's FFT-prime-factorization heuristic; see `resolve_jwave_pml_size.m`). |
 
 ---
 

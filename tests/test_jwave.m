@@ -454,7 +454,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % Build parameters for a jwave Helmholtz backend run.
             p = tc.make_params(affix, grid_dims);
             p.acoustic_backend = 'jwave';
-            p.jwave.pml_size   = 20;
+            p.grid.pml_size    = 20;   % jwave.pml_size is ignored by jwave_wrapper.m
             p.jwave.precision  = 'single';
             p.jwave.dry_run    = false;
 
