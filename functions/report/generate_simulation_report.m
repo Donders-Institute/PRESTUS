@@ -1102,10 +1102,12 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
     html = [html '<h2>Simulation Summary</h2>'];
     html = [html '<div class="summary-grid">'];
 
-    % Always show: IPA at target, focal distance, max ISPPA
-    html = [html summary_card('Ipa at target', csv_value(csv_table, 'Ipa_target'), 'W/cm²')];
-    html = [html summary_card('Focal distance', csv_value(csv_table, 'real_focal_distance_mm'), 'mm')];
-    html = [html summary_card('ISPPA', csv_value(csv_table, 'Isppa'), 'W/cm²')];
+    % Always show: Ipa at the nominal target, Isppa/distance at the empirical
+    % peak. These are two different locations — label them so readers don't
+    % conflate target-position with peak-position.
+    html = [html summary_card('Ipa at target (nominal)', csv_value(csv_table, 'Ipa_target'), 'W/cm²')];
+    html = [html summary_card('Focal distance (peak, apex-ref.)', csv_value(csv_table, 'real_focal_distance_mm'), 'mm')];
+    html = [html summary_card('Isppa at peak', csv_value(csv_table, 'Isppa'), 'W/cm²')];
 
     if is_layered
         html = [html summary_card('ISPPA brain', csv_value(csv_table, 'Isppa_brain'), 'W/cm²')];
@@ -1435,12 +1437,17 @@ function html = build_positioning_section(parameters, subject_id, affix)
     if isfield(parameters, 'transducer')
         n_trans = numel(parameters.transducer);
     end
+    % Sync: all transducers share one positioning image — no trans-XX suffix.
+    n_pos_imgs = n_trans;
+    if n_trans > 1 && ~is_async_mode(parameters)
+        n_pos_imgs = 1;
+    end
 
     found_any = false;
     html = [html '<div class="image-grid image-grid--wide">'];
-    for t = 1:n_trans
-        tnn_suffix = trans_suffix(t, n_trans);
-        if n_trans > 1; cap = sprintf('Transducer %d positioning', t); else; cap = 'Transducer positioning'; end
+    for t = 1:n_pos_imgs
+        tnn_suffix = trans_suffix(t, n_pos_imgs);
+        if n_pos_imgs > 1; cap = sprintf('Transducer %d positioning', t); else; cap = 'Transducer positioning'; end
         img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_positioning%s%s.png', subject_id, affix, tnn_suffix));
         img_html = html_utils.embed_image(img_path, sprintf('Positioning%s', tnn_suffix), cap);
@@ -1506,15 +1513,26 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         html = [html '<p class="placeholder">No acoustic CSV data found.</p>'];
     end
 
+    % ITRUSST focal-zone metrics (−3 dB / −6 dB region size + FLHM "manufacturer"
+    % focal distance) — distinct from both the nominal-target and peak-location
+    % values shown above; not part of get_acoustic_columns()/get_acoustic_columns_water()
+    % so it needs its own clearly-labelled table.
+    html = [html build_focal_zone_table(csv_table)];
+
     % Intensity images
     n_trans = 1;
     if isfield(parameters, 'transducer')
         n_trans = numel(parameters.transducer);
     end
+    % Sync: single combined intensity image — no trans-XX suffix.
+    n_int_imgs = n_trans;
+    if n_trans > 1 && ~is_async_mode(parameters)
+        n_int_imgs = 1;
+    end
 
     html = [html '<div class="image-grid">'];
-    for t = 1:n_trans
-        t_suffix = trans_suffix(t, n_trans);
+    for t = 1:n_int_imgs
+        t_suffix = trans_suffix(t, n_int_imgs);
 
         % Intensity on segmentation
         img_path = fullfile(parameters.io.dir_img, ...
@@ -1535,6 +1553,48 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         end
     end
     html = [html '</div>'];
+end
+
+function html = build_focal_zone_table(csv_table)
+% ITRUSST −3 dB / −6 dB focal-zone metrics, kept visually separate from the
+% nominal-target and peak-location numbers above so the three concepts
+% (target, peak, focal-zone extent) are never conflated in the report.
+    rows = {
+        'Peak location, apex-referenced',  'real_focal_distance_mm',       'mm';
+        'Peak location, exit-plane-ref.',  'real_focal_distance_ep_mm',    'mm';
+        'FLHM centre (manufacturer-style focal distance), apex-ref.', 'focal_flhm_center_bowl_mm', 'mm';
+        'FLHM centre (manufacturer-style focal distance), exit-plane-ref.', 'focal_flhm_center_ep_mm', 'mm';
+        '−3 dB focal zone volume',         'focal_vol_3dB_mm3',            'mm³';
+        '−6 dB focal zone volume',         'focal_vol_6dB_mm3',            'mm³';
+        '−3 dB centroid, apex-referenced', 'focal_centroid_3dB_dist_mm',   'mm';
+        '−3 dB centroid, exit-plane-ref.', 'focal_centroid_3dB_ep_mm',     'mm';
+    };
+
+    avail = false(size(rows, 1), 1);
+    if ~isempty(csv_table)
+        for r = 1:size(rows, 1)
+            avail(r) = ismember(rows{r, 2}, csv_table.Properties.VariableNames) && ...
+                       ~isnan(csv_value(csv_table, rows{r, 2}));
+        end
+    end
+
+    if ~any(avail)
+        html = '';
+        return
+    end
+
+    html = '<h3>ITRUSST focal-zone metrics</h3>';
+    html = [html '<p class="note">Region-level metrics (Martin et al. 2025 ITRUSST reporting), ' ...
+            'distinct from the single-point &quot;Ipa at target (nominal)&quot; and ' ...
+            '&quot;Focal distance (peak, apex-ref.)&quot; values above.</p>'];
+    html = [html '<div class="table-wrapper"><table class="data-table"><thead><tr>' ...
+            '<th>Metric</th><th>Value</th><th>Unit</th></tr></thead><tbody>'];
+    for r = find(avail)'
+        val = csv_value(csv_table, rows{r, 2});
+        html = [html sprintf('<tr><td>%s</td><td>%.4g</td><td>%s</td></tr>', ...
+                html_utils.escape(rows{r, 1}), val, html_utils.escape(rows{r, 3}))]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
 end
 
 function html = build_thermal_section(csv_table, parameters, subject_id, medium, affix, is_layered)
@@ -1617,6 +1677,11 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
     if isfield(parameters, 'transducer')
         n_trans = numel(parameters.transducer);
     end
+    % Sync: segmentation is computed on a shared grid — no trans-XX suffix.
+    n_seg_imgs = n_trans;
+    if n_trans > 1 && ~is_async_mode(parameters)
+        n_seg_imgs = 1;
+    end
 
     % Preprocessing debug images
     preproc_images = {
@@ -1636,8 +1701,8 @@ function html = build_debug_section(parameters, subject_id, medium, affix)
     end
 
     % Per-transducer debug images
-    for t = 1:n_trans
-        seg_trans_suffix = trans_suffix(t, n_trans);
+    for t = 1:n_seg_imgs
+        seg_trans_suffix = trans_suffix(t, n_seg_imgs);
         img_path = fullfile(debug_dir_preproc, ...
             sprintf('sub-%03d_%s_segmented_brain_final%s%s.png', subject_id, medium, seg_trans_suffix, affix));
         img_html = html_utils.embed_image(img_path, sprintf('Final segmentation%s', seg_trans_suffix), ...
