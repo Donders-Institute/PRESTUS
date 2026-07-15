@@ -16,7 +16,7 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %                                  medium_masks, kwave_medium, source, source_labels)
 %
 % Input:
-%   sensor_data  - (struct) k-Wave sensor output with fields p_final, p_max_all [Pa]
+%   sensor_data  - (struct) k-Wave sensor output with fields p_final, p_max_all, p_min_all [Pa]
 %   parameters   - (struct) PRESTUS config; grid.dims = [Nz, Nr] on entry
 %   segmentation - [Nz x Nr] uint8, tissue label map
 %   medium_masks - [Nz x Nr] uint8, medium layer label map
@@ -66,6 +66,9 @@ expand = @(A, m) radialExpand2DTo3D(A, m, Nlateral, ax_center);
 % Continuous fields: linear interpolation
 sensor_data.p_final   = expand(sensor_data.p_final,   'linear');
 sensor_data.p_max_all = expand(sensor_data.p_max_all, 'linear');
+if isfield(sensor_data, 'p_min_all') && ~isempty(sensor_data.p_min_all)
+    sensor_data.p_min_all = expand(sensor_data.p_min_all, 'linear');
+end
 if isfield(sensor_data, 'p_complex')
     sensor_data.p_complex = expand(real(sensor_data.p_complex), 'linear') + ...
                         1i .* expand(imag(sensor_data.p_complex), 'linear');
@@ -96,6 +99,9 @@ parameters.transducer(1).focus_pos = focus_pos_final;
 %% assert all expanded fields have consistent size
 expected_size = size(sensor_data.p_max_all);
 assert(isequal(size(sensor_data.p_final),  expected_size), 'convert_axisymmetric_to_3d: p_final size mismatch');
+if isfield(sensor_data, 'p_min_all') && ~isempty(sensor_data.p_min_all)
+    assert(isequal(size(sensor_data.p_min_all), expected_size), 'convert_axisymmetric_to_3d: p_min_all size mismatch');
+end
 assert(isequal(size(segmentation),         expected_size), 'convert_axisymmetric_to_3d: segmentation size mismatch');
 assert(isequal(size(medium_masks),         expected_size), 'convert_axisymmetric_to_3d: medium_masks size mismatch');
 assert(isequal(size(source.p_mask),        expected_size), 'convert_axisymmetric_to_3d: source.p_mask size mismatch');

@@ -75,6 +75,9 @@ mirror = @(A) cat(2, ...
 
 sensor_data.p_final   = mirror(sensor_data.p_final);
 sensor_data.p_max_all = mirror(sensor_data.p_max_all);
+if isfield(sensor_data, 'p_min_all') && ~isempty(sensor_data.p_min_all)
+    sensor_data.p_min_all = mirror(sensor_data.p_min_all);
+end
 if isfield(sensor_data, 'p_complex')
     sensor_data.p_complex = mirror(real(sensor_data.p_complex)) + ...
                         1i .* mirror(imag(sensor_data.p_complex));
@@ -101,6 +104,9 @@ segmentation = segmentation';
 medium_masks = medium_masks';
 sensor_data.p_max_all = sensor_data.p_max_all';
 sensor_data.p_final   = sensor_data.p_final';
+if isfield(sensor_data, 'p_min_all') && ~isempty(sensor_data.p_min_all)
+    sensor_data.p_min_all = sensor_data.p_min_all';
+end
 if isfield(sensor_data, 'p_complex')
     sensor_data.p_complex = sensor_data.p_complex.';
 end
