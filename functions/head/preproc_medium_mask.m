@@ -67,21 +67,35 @@ end
     
     % === SPECIAL MULTI-LAYER SKULL HANDLING ===
     if has_multiskull  % Only when trabecular AND cortical present
-        
-        % Step 1: Assign base skull (skull + cortical) → cortical medium ID
-        cortical_i = find(strcmp(medium_labels, 'skull_cortical'));
-        skull_base_layers = getidx(parameters.layers, {'skull', 'skull_cortical'});
-        layer_mask = ismember(segmented_img, skull_base_layers);
-        layer_mask_smoothed = smooth_img(layer_mask, parameters.headmodel.smooth_fwhm_mm, parameters.grid.resolution_mm, ...
-                                        parameters.headmodel.smooth_threshold_skull, parameters.headmodel.smooth_method);
-        medium_masks(layer_mask_smoothed ~= 0) = cortical_i;
-        
-        % Step 2: Overlay trabecular on top
+
+        % Combined skull extent (skull + cortical + trabecular raw labels),
+        % smoothed ONCE to get a single consistent outer/inner bone-shell
+        % boundary. Smoothing the cortical/base mask and the trabecular mask
+        % INDEPENDENTLY (each with its own Gaussian kernel + threshold) lets
+        % their boundaries disagree at the smoothing edge: trabecular is a
+        % physically-interior (diploe) layer and must never end up directly
+        % adjacent to skin, but independent smoothing can let its boundary
+        % bulge past where the separately-smoothed cortical boundary landed.
+        % Constraining trabecular to be a subset of one combined shell fixes
+        % this regardless of the smoothing kernel/threshold used.
+        cortical_i   = find(strcmp(medium_labels, 'skull_cortical'));
         trabecular_i = find(strcmp(medium_labels, 'skull_trabecular'));
+
+        combined_layers   = getidx(parameters.layers, {'skull', 'skull_cortical', 'skull_trabecular'});
+        combined_mask     = ismember(segmented_img, combined_layers);
+        combined_smoothed = smooth_img(combined_mask, parameters.headmodel.smooth_fwhm_mm, parameters.grid.resolution_mm, ...
+                                        parameters.headmodel.smooth_threshold_skull, parameters.headmodel.smooth_method);
+
+        % Step 1: the whole combined shell defaults to cortical.
+        medium_masks(combined_smoothed ~= 0) = cortical_i;
+
+        % Step 2: trabecular overlay, constrained to the combined shell so it
+        % can never extend past the cortical envelope (e.g. touch skin).
         trabecular_mask = ismember(segmented_img, getidx(parameters.layers, 'skull_trabecular'));
         trabecular_mask_smoothed = smooth_img(trabecular_mask, parameters.headmodel.smooth_fwhm_mm, parameters.grid.resolution_mm, ...
                                              parameters.headmodel.smooth_threshold_skull, parameters.headmodel.smooth_method);
-        medium_masks(trabecular_mask_smoothed ~= 0) = trabecular_i;
+        trabecular_final = (trabecular_mask_smoothed ~= 0) & (combined_smoothed ~= 0);
+        medium_masks(trabecular_final) = trabecular_i;
     end
 
     medium_masks = single(medium_masks);
