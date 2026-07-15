@@ -17,11 +17,11 @@ transducer:
 
 ### Grid alignment
 
-The default `principal_axis` mode rotates the grid so that the first principal component of all transducer positions aligns with z. For bilateral setups this equals the inter-transducer axis, making the grid symmetric with respect to both bowls. No configuration is needed — this is the default:
+The default `focal_axis` mode rotates the grid so that the mean focal unit vector of all transducers aligns with z. For bilateral setups this equals the inter-transducer axis, making the grid symmetric with respect to both bowls. For angled setups (e.g. two transducers at 45° or 90°) z correctly points toward the beam convergence zone rather than the inter-transducer axis. No configuration is needed — this is the default:
 
 ```yaml
 grid:
-  mode: 'principal_axis'   # default; omit to get the same behaviour
+  mode: 'focal_axis'   # default; omit to get the same behaviour
 ```
 
 If you want the grid aligned to transducer(1)'s focal axis instead (e.g. transducer(1) is the primary beam), use `transducer_axis` explicitly. See [Preprocessing — Orientation](doc_preproc.md#orientation) for the full mode table.

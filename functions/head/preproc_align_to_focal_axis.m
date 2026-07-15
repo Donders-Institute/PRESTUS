@@ -155,6 +155,18 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     trans_pos_new = out_mat(1,:); % New transducer position
     focus_pos_new = out_mat(2,:); % New focus position
 
+    fprintf('[preproc_align_to_focal_axis] ---- alignment summary ----\n');
+    fprintf('[preproc_align_to_focal_axis]   input grid dims  : [%d %d %d]\n', size(nii_image, 1), size(nii_image, 2), size(nii_image, 3));
+    fprintf('[preproc_align_to_focal_axis]   resolution_mm    : %.4f\n', parameters.grid_step_mm);
+    fprintf('[preproc_align_to_focal_axis]   angle_x_deg      : %.4f\n', rad2deg(angle_x_rad));
+    fprintf('[preproc_align_to_focal_axis]   angle_y_deg      : %.4f\n', rad2deg(angle_y_rad));
+    fprintf('[preproc_align_to_focal_axis]   trans_pos_before : [%.1f %.1f %.1f]\n', trans_pos_grid(1), trans_pos_grid(2), trans_pos_grid(3));
+    fprintf('[preproc_align_to_focal_axis]   trans_pos_after  : [%.1f %.1f %.1f]\n', trans_pos_new(1), trans_pos_new(2), trans_pos_new(3));
+    fprintf('[preproc_align_to_focal_axis]   focus_pos_before : [%.1f %.1f %.1f]\n', focus_pos_grid(1), focus_pos_grid(2), focus_pos_grid(3));
+    fprintf('[preproc_align_to_focal_axis]   focus_pos_after  : [%.1f %.1f %.1f]\n', focus_pos_new(1), focus_pos_new(2), focus_pos_new(3));
+    fprintf('[preproc_align_to_focal_axis]   output grid dims : [%d %d %d]\n', size(rotated_img, 1), size(rotated_img, 2), size(rotated_img, 3));
+    fprintf('[preproc_align_to_focal_axis] ------------------------------------\n');
+
     %% Step 9: Generate visualization montage
     % Create plots of original and transformed images with overlaid transducer positions
     orig_with_transducer_img = plot_t1_with_transducer(nii_image, nii_header.PixelDimensions(1), ...

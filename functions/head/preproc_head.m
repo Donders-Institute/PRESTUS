@@ -165,24 +165,34 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     % grid.mode='transducer_axis' (default): rotate so focal axis aligns with z.
     % grid.mode='ras_plus': rescale only; volume stays in RAS+ orientation.
 
-    grid_mode = 'principal_axis';
+    grid_mode = 'focal_axis';
     if isfield(parameters, 'grid') && isfield(parameters.grid, 'mode')
         grid_mode = parameters.grid.mode;
     end
 
     switch grid_mode
         case 'ras_plus'
-            disp('Rescaling images to grid resolution (RAS+ mode — no rotation) ...')
+            fprintf('[preproc_head] %s\n', 'Rescaling images to grid resolution (RAS+ mode — no rotation) ...')
             preproc_fn = @preproc_rescale_only;
+        case 'focal_axis'
+            fprintf('[preproc_head] %s\n', 'Rotating images to mean focal axis and rescaling to grid resolution ...')
+            preproc_fn = @preproc_align_to_mean_focal_axis;
         case 'principal_axis'
-            disp('Rotating images to inter-transducer (PCA) axis and rescaling to grid resolution ...')
-            preproc_fn = @preproc_align_to_principal_axis;
-        otherwise  % 'transducer_axis' and any unrecognised value
-            if ~strcmp(grid_mode, 'transducer_axis')
-                warn('Unrecognised grid.mode ''%s''; defaulting to transducer_axis.', grid_mode);
-            end
-            disp('Rotating images to focal axis and rescaling to grid resolution ...')
+            % Deprecated: principal_axis used PCA on transducer positions, which only equals
+            % the beam axis for bilateral (180-degree) setups. Use focal_axis instead.
+            warning('PRESTUS:gridMode:deprecatedPrincipalAxis', ...
+                ['grid.mode=''principal_axis'' is deprecated. ' ...
+                 'Use grid.mode=''focal_axis'' for correct beam-axis alignment. ' ...
+                 'Results are identical for bilateral setups.']);
+            fprintf('[preproc_head] %s\n', 'Rotating images to mean focal axis (via deprecated principal_axis mode) ...')
+            preproc_fn = @preproc_align_to_mean_focal_axis;
+        case 'transducer_axis'
+            fprintf('[preproc_head] %s\n', 'Rotating images to focal axis of transducer(1) and rescaling to grid resolution ...')
             preproc_fn = @preproc_align_to_focal_axis;
+        otherwise
+            warn('Unrecognised grid.mode ''%s''; defaulting to focal_axis.', grid_mode);
+            fprintf('[preproc_head] %s\n', 'Rotating images to mean focal axis and rescaling to grid resolution ...')
+            preproc_fn = @preproc_align_to_mean_focal_axis;
     end
 
     % If the segmentation process was not successful, it will stop preprocessing
