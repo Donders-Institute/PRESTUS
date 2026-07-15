@@ -7,23 +7,37 @@ if ~exist(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
 end
 
-% Coerce list-of-list fields to cell-of-cell if yaml ConvertToArray
-% flattened them into numeric matrices.
-for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
-    f = coerce_field{1};
-    if ~iscell(parameters.calibration.(f))
-        parameters.calibration.(f) = ...
-            cellfun(@num2cell, num2cell(parameters.calibration.(f), 2), ...
-                    'UniformOutput', false);
-    elseif ~iscell(parameters.calibration.(f){1})
-        parameters.calibration.(f) = ...
-            cellfun(@num2cell, parameters.calibration.(f), ...
-                    'UniformOutput', false);
-    end
-end
-
 % Iterate through equipment combinations
 N_i = length(parameters.calibration.combinations);
+
+% Coerce list-of-list fields to cell-of-cell if yaml ConvertToArray
+% flattened them into numeric matrices.
+%
+% Ambiguous case: when every combo's list has exactly one value (e.g.
+% N_i combos each requesting a single focal depth), ConvertToArray
+% flattens "[[85],[85]]" into a plain 1xN_i (or N_ix1) vector that is
+% structurally indistinguishable from "one combo's list of N_i values".
+% Since N_i (from `combinations`) is now known, resolve the ambiguity by
+% treating a flattened vector whose length equals N_i as one scalar per
+% combo -- otherwise a genuinely single-combo multi-value list (N_i==1)
+% would be mis-split, and a per-combo single value would otherwise get
+% (via the old "replicate length-1 list across all combos" step below)
+% incorrectly broadcast to every combo, silently duplicating work.
+for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}
+    f = coerce_field{1};
+    val = parameters.calibration.(f);
+    if ~iscell(val)
+        if N_i > 1 && isvector(val) && numel(val) == N_i
+            parameters.calibration.(f) = arrayfun(@(v) {v}, val(:)', 'UniformOutput', false);
+        else
+            parameters.calibration.(f) = ...
+                cellfun(@num2cell, num2cell(val, 2), 'UniformOutput', false);
+        end
+    elseif ~iscell(val{1})
+        parameters.calibration.(f) = ...
+            cellfun(@num2cell, val, 'UniformOutput', false);
+    end
+end
 
 % If a list-of-list field has only one entry, replicate it for all combinations
 for coerce_field = {'focal_depths_wrt_exit_plane', 'desired_intensities'}

@@ -168,7 +168,30 @@ end
     if ~isfield(parameters.calibration, 'opt_method') || strcmp(parameters.calibration.opt_method, 'FEXminimize')
         % by default use FEXminimize
         func = optimize_phases;
-        options = setoptimoptions('popsize', 5000, 'FinDiffType', 'central', 'TolCon', 1e-8);
+        popsize = 5000;
+
+        % FEX-minimize's `minimize` is a multi-start local search: `popsize`
+        % random starting points are each locally refined with a per-start
+        % budget of floor(MaxFunEvals/popsize/1.2) evaluations (see
+        % external/FEX-minimize/minimize.m). With the library default
+        % MaxFunEvals=1e4 and popsize=5000, each start gets ~1 evaluation --
+        % effectively a one-shot random scatter with no real refinement.
+        % That is dense enough to land near the optimum for the 3-parameter
+        % 'linear' precession mode, but grossly insufficient for higher-
+        % dimensional searches (e.g. 'monotonic': phase_start + (n_elem-1)
+        % deltas + velocity), which need a real per-start refinement budget.
+        % Default here is raised well above the library default so unconstrained
+        % and 'monotonic' searches actually converge; override via
+        % calibration.opt_max_fun_evals for calibrations that want the
+        % lighter (faster) default budget back, e.g. 'linear' precession.
+        if isfield(parameters.calibration, 'opt_max_fun_evals') && ~isempty(parameters.calibration.opt_max_fun_evals)
+            max_fun_evals = parameters.calibration.opt_max_fun_evals;
+        else
+            max_fun_evals = 2e5;
+        end
+
+        options = setoptimoptions('popsize', popsize, 'FinDiffType', 'central', 'TolCon', 1e-8, ...
+            'MaxFunEvals', max_fun_evals);
 
         % Perform the global search to find optimal phases and velocity.
         [opt_phases_and_velocity, min_err] = minimize(...

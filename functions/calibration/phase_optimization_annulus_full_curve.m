@@ -80,14 +80,19 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         sigma = center_pos / weights;  % 1=wide FWHM, 10=narrow peak
         weights = normpdf(axial_position, center_pos, sigma);
     end
-    % Weights always sum to one.
+    % Normalize over the optimization range only (zero weight outside it),
+    % so `error` is a properly-scaled weighted MSE that doesn't shrink with
+    % point density outside opt_limits or with how many points fall inside
+    % it. Normalizing over the full axial_position and then averaging again
+    % over the restricted range double-divides the error, letting it collapse
+    % to a numerically meaningless near-zero value for finely-sampled profiles.
+    weights(~limit_ind) = 0;
     weights = weights / sum(weights);
 
     %% Calculate error metric
     % Compute weighted squared error between computed and desired profiles
     error_v = (i_axial - desired_intensity_curve).^2 .* weights;
-    error_v = error_v(limit_ind); % Restrict error calculation to optimization limits
-    error = mean(error_v); % Mean squared error
+    error = sum(error_v(limit_ind)); % weights already sum to 1 over limit_ind
 
     %% Visualization of results (optional)
     if plot_results
@@ -106,7 +111,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
 
         % Plot error values within optimization limits
         ax2 = subplot(1, 2, 2);
-        plot(axial_position(limit_ind), error_v,'-o', 'Color', [0 0 0], 'MarkerFaceColor', [0 0 0]);
+        plot(axial_position(limit_ind), error_v(limit_ind),'-o', 'Color', [0 0 0], 'MarkerFaceColor', [0 0 0]);
         legend(["error"]);
     end
 
