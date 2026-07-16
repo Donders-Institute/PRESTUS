@@ -232,6 +232,7 @@ placement:
   mode: 'manual'    # Placement mode: 'manual' (use trans_pos/focus_pos as provided) |
                     #   'localite' (derive from Localite XML; set placement.localite.file or path.localite) |
                     #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
+                    #   'mni'       (define trans/focus directly in MNI mm; snapped to scalp + gap; set placement.mni.*) |
                     #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer?
@@ -265,6 +266,16 @@ placement:
     criterion_skin_var: []
     criterion_skull_var: []
     expand_step: 0.01
+  mni:
+    # Direct placement from MNI coordinates. The transducer point is snapped to the
+    # nearest scalp voxel and offset outward by skin_gap_mm using the same geometry
+    # as the heuristic; the focus is used as-is. Requires a SimNIBS m2m_sub-XXX folder.
+    trans_pos_mm: []     # [x y z] desired transducer (scalp entry) position in MNI mm (required for mode='mni')
+                         # Converted with the LINEAR (12dof) MNI->subject transform (it is outside the brain).
+    focus_pos_mm: []     # [x y z] focus / target position in MNI mm (required for mode='mni')
+                         # Converted with the NONLINEAR (nonl) transform, like the heuristic target.
+    skin_gap_mm: 5       # standoff from scalp to transducer along the focal axis [mm]
+                         # (default 5 = same gap as the heuristic placement)
 
   plantus:
     # --- Paths (required) ---

@@ -57,7 +57,8 @@ function run_all_tests(level)
         testsuite(fullfile(here, 'test_load_parameters.m')), ...
         testsuite(fullfile(here, 'test_head_preprocessing.m')), ...
         testsuite(fullfile(here, 'test_deface_m2m.m')), ...
-        testsuite(fullfile(here, 'test_hpc_job_report.m'))];
+        testsuite(fullfile(here, 'test_hpc_job_report.m')), ...
+        testsuite(fullfile(here, 'test_reports.m'))];
 
     integration_file  = fullfile(here, 'test_integration_pipeline.m');
     water_test_file   = fullfile(here, 'test_integration_water.m');
@@ -277,6 +278,15 @@ function m = build_descriptions()
         'test_failed_job_does_not_error',           'hpc_job_report: FAILED job state does not throw an error'
         'test_qsub_produces_nan_metrics_with_warning','hpc_job_report: qsub path warns and returns NaN metrics'
         'test_live_slurm_job_report',               'hpc_job_report (live): submits real sleep job, waits, checks sacct metrics and report file'
+        % --- test_reports ---
+        'test_risk_limits_has_new_metrics',         'get_risk_limits: includes riseT37_* and TIC'
+        'test_compute_tic_valid',                   'compute_tic: finite positive TIC for a valid transducer'
+        'test_compute_tic_missing_aperture_is_nan', 'compute_tic: NaN when aperture is unavailable'
+        'test_embed_image_dims_finds_slices',       'embed_image_dims: embeds _x/_y/_z slice images (3D)'
+        'test_embed_image_dims_no_dim_file',        'embed_image_dims: embeds the single no-dim image (2D)'
+        'test_config_dump_prunes_large_arrays',     'build_config_dump: prunes large numeric arrays'
+        'test_subject_report_generates',            'generate_simulation_report: builds HTML with new sections, no failures'
+        'test_group_report_generates_and_flags',    'generate_group_report: analysis panel + flags one over-limit subject'
         % --- test_integration_demo (demo_inputs) ---
         'test_t1_exists',                           'demo inputs: sub-009 T1w NIfTI is present in BIDS folder'
         'test_ute_exists',                          'demo inputs: sub-009 UTE NIfTI is present in BIDS folder'

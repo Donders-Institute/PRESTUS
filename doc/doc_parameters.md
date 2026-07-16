@@ -244,6 +244,16 @@ See [doc_placement_heuristic.md](doc_placement_heuristic.md).
 | `criterion_skull_var` | Variance of EP voxel distance from skull [quantile]. | `[]` | |
 | `expand_step` | Expansion step for skin intersection criterion. | `0.01` | 1% |
 
+#### `placement.mni`
+
+See [doc_placement_mni.md](doc_placement_mni.md).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `trans_pos_mm` | Desired transducer (scalp entry) position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the linear (12dof) transform, then snapped to scalp. |
+| `focus_pos_mm` | Focus / target position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the nonlinear (nonl) transform, like the heuristic target. |
+| `skin_gap_mm` | Standoff from scalp to transducer along the focal axis [mm]. | `5` | Default matches the heuristic's gap. |
+
 ---
 
 ### Simulation grid (`grid`)

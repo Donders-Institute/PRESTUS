@@ -22,6 +22,10 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Automated defacing via pydeface, with optional integration into the segmentation pipeline
 - Defaced regions shown transparently in placement and 3D head views
 
+#### Placement
+- New `placement.mode = 'mni'`: specify both transducer scalp-entry point and focus directly in MNI mm, alongside the existing `manual`/`localite`/`heuristic`/`plantus` modes. The focus converts via the nonlinear SimNIBS warp (as the heuristic target does); the transducer point converts via the linear 12dof affine, since the nonlinear warp is unreliable outside the brain
+- Scalp-boundary extraction and transducer standoff-geometry math extracted into shared helpers (`tp_scalp_boundary`, `transducer_scalp_geometry`), reused by both the heuristic candidate-mesh search and the new MNI mode
+
 #### Calibration
 - Transducer library: scan equipment, store validated parametric models, plot and compare entries
 - Joint-depth phase/amplitude fit for more robust free-field characterisation
@@ -35,6 +39,12 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Run labels derived automatically from output affixes in consolidated reports
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
+- New global `MI` (free-water mechanical index) and `Psptp` (global peak pressure, now also written for layered runs) output columns, for consistency across media
+- Safety dashboards (per-subject and group) now flag peak pressure against a 2 MPa non-significant-risk limit
+- Safety dashboards (per-subject and group) now show both `MI` (free water) and `MItc` (transcranial) tiles side by side instead of per-tissue `MI_brain`/`MI_skull`/`MI_skin` cards; whichever variant has no data for the report's medium renders grayed out
+- Reports redesigned with a light/dark "instrument" theme, a searchable configuration dump, a sortable subject roster, and client-side distribution/correlation charts
+- New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
+- Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs

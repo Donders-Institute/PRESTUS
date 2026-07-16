@@ -32,7 +32,7 @@ end
 if ~any(strcmp(transformation_type, {'nonl', '12dof', '6dof'}))
     error('transformation_type must be nonl, 12dof, or 6dof')
 end
-assert(size(coords_mni, 2) == 3, 'coords_subject must be in Nx3 format');
+assert(size(coords_mni, 2) == 3, 'coords_mni must be in Nx3 format');
 assert(exist(subdir, 'dir') == 7, ['Could not find directory ' subdir])
 
 % Write CSV file in SimNIBS format

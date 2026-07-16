@@ -60,6 +60,46 @@ classdef html_utils
             html = [html '</figure>'];
         end
 
+        function html = embed_image_dims(img_dir, base, suffix, alt_text, caption)
+        % embed_image_dims  Embed a plot that may be saved either as a single
+        % no-dimension file (2D grids: base+suffix.png) or as per-slice files
+        % with an _x/_y/_z infix between the metric and the suffix (3D grids:
+        % base+_x/_y/_z+suffix.png). Probes all four and embeds every file
+        % found, annotating the caption with the slice dimension. Returns ''
+        % when none exist. This makes the report robust to the per-dimension
+        % naming used by thermal_analysis (maxT) and acoustic_analysis (intensity).
+            html = '';
+            variants = {'', '_x', '_y', '_z'};
+            for k = 1:numel(variants)
+                dim = variants{k};
+                fpath = fullfile(img_dir, [base dim suffix '.png']);
+                if isfile(fpath)
+                    if isempty(dim)
+                        cap = caption;
+                    else
+                        cap = sprintf('%s (%s-slice)', caption, dim(2:end));
+                    end
+                    html = [html html_utils.embed_image(fpath, alt_text, cap)];
+                end
+            end
+        end
+
+        function html = report_logo(logo_height)
+        % report_logo  Inline base64 <img> of the vendored PRESTUS logo, or ''
+        % if the asset is missing. Resolves the path relative to this file so
+        % it works regardless of the working directory (e.g. on the HPC).
+            if nargin < 1 || isempty(logo_height), logo_height = 30; end
+            html = '';
+            here = fileparts(mfilename('fullpath'));
+            fpath = fullfile(here, 'assets', 'logo_PRESTUS.png');
+            if ~isfile(fpath), return; end
+            b64 = html_utils.base64(fpath);
+            if isempty(b64), return; end
+            html = sprintf(['<img class="brand-logo" alt="PRESTUS" ' ...
+                'src="data:image/png;base64,%s" style="height:%dpx;width:auto;display:block">'], ...
+                b64, round(logo_height));
+        end
+
         function html = collapsible(title, content_html, is_open, section_id)
         % collapsible  Wraps content in a <details>/<summary> collapsible section.
         % is_open: true to default open, false to default collapsed.
@@ -82,19 +122,17 @@ classdef html_utils
         end
 
         function html = lightbox()
-        % lightbox  Returns the lightbox overlay markup and JavaScript.
-            html = ['<div id="lightbox" class="lb-overlay" style="display:none;" onclick="closeLightbox()">' ...
-                    '<span class="lb-close" onclick="closeLightbox()">&times;</span>' ...
-                    '<img id="lb-img" src="" alt="Enlarged image" onclick="event.stopPropagation()">' ...
-                    '</div>' ...
-                    '<script>' ...
-                    'document.querySelectorAll(".image-grid figure img,.image-grid--3col figure img").forEach(function(img){' ...
-                    'img.addEventListener("click",function(){' ...
-                    'var lb=document.getElementById("lightbox");' ...
-                    'document.getElementById("lb-img").src=this.src;lb.style.display="flex";});});' ...
-                    'function closeLightbox(){document.getElementById("lightbox").style.display="none";}' ...
-                    'document.addEventListener("keydown",function(e){if(e.key==="Escape")closeLightbox();});' ...
-                    '</script>'];
+        % lightbox  Returns the lightbox overlay markup. The behaviour (open,
+        % zoom, side-by-side compare, Esc-to-close) lives in
+        % report_scripts.common() so there is a single source of JS.
+            html = ['<div id="lightbox" class="lb-overlay" style="display:none">' ...
+                    '<button class="lb-close" type="button" aria-label="Close">&times;</button>' ...
+                    '<div class="lb-stage" id="lb-stage"></div>' ...
+                    '<div class="lb-ctrls">' ...
+                    '<button type="button" id="lb-zoom">Zoom +</button>' ...
+                    '<button type="button" id="lb-reset">Reset</button>' ...
+                    '<span style="color:#9aa7b4;font-size:.8rem">Tip: mark two figures &ldquo;compare&rdquo;, then click either</span>' ...
+                    '</div></div>'];
         end
 
         function str = format_cell(val)

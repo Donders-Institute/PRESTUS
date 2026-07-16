@@ -111,18 +111,23 @@ function [trans_ras_seg, ...
         end
 
         % [1] transform from planning voxel -> RAS -> segmentation RAS
+        %
+        % The planning -> voxel step is computed directly (not via
+        % transform_coordinates('ras_plus','grid',...)) because that helper
+        % rounds to an integer voxel index, while this conversion must keep
+        % the continuous (sub-voxel) position — the planning and
+        % segmentation images share the same voxel grid but have different
+        % headers, so reinterpreting the *unrounded* voxel position under
+        % the segmentation affine is what carries the position across.
+        % The voxel -> segmentation-RAS step (forward, no rounding involved)
+        % reuses transform_coordinates per doc_coordinate_systems.md's rule
+        % against re-implementing affine application elsewhere.
 
         vox_plan = [target_ras(i,1:3) 1] * inv(plan_affine);            % Planning voxel (not rounded) = target_pos(i,:)
-        R = seg_affine(1:3,1:3);
-        T = seg_affine(4,1:3)';
-        ras_seg = (vox_plan(1:3) * R) + T';
-        target_ras_seg(i,:) = ras_seg(1:3);                             % RAS mm in segmentation space
+        target_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
 
         vox_plan = [trans_ras(i,1:3) 1] * inv(plan_affine);
-        R = seg_affine(1:3,1:3);
-        T = seg_affine(4,1:3)';
-        ras_seg = (vox_plan(1:3) * R) + T';
-        trans_ras_seg(i,:) = ras_seg(1:3);
+        trans_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
 
         % clamp transducer values to min/max MNI space
         orig_coord = trans_ras_seg(i,1:3);
@@ -135,16 +140,28 @@ function [trans_ras_seg, ...
         % fits.
 
         targ_mni_mm = subject2mni_coords_LDfix(target_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
-        trans_mni_mm = [0 0 0];
         trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
+        max_shift_iters = 20;
+        shift_iters = 0;
+        orig_trans_x = trans_ras_seg(i,1);
         while all(trans_mni_mm==0)
-            warn('MNI space too contrained for original segmentation-space locations ... adjusting')
-            trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
-            if trans_ras_seg(i,1)>0
+            shift_iters = shift_iters + 1;
+            if shift_iters > max_shift_iters
+                error('neuronav_convert_native_to_MNI:mniFitFailed', ...
+                    ['Side %d: could not fit transducer position into MNI FOV after %d ' ...
+                     '1 mm shifts (starting x = %.1f).'], i, max_shift_iters, orig_trans_x);
+            end
+            if trans_ras_seg(i,1) >= 0
                 trans_ras_seg(i,1) = trans_ras_seg(i,1)-1; % change the right-left location to fall within the frame
-            elseif trans_ras_seg(i,1)<0
+            else
                 trans_ras_seg(i,1) = trans_ras_seg(i,1)+1;
             end
+            trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
+        end
+        if shift_iters > 0
+            warn(['Side %d: MNI space too constrained for original segmentation-space ' ...
+                'location; shifted x by %d mm (%.1f -> %.1f) to fit.'], ...
+                i, shift_iters, orig_trans_x, trans_ras_seg(i,1));
         end
         % alternative: try to transform manually with matrices
 %             targ_mni_mm  = neuronav_apply_deformation(target_ras_seg(1:3), warp_field, warp_affine);

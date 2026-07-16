@@ -17,7 +17,7 @@ The internal simulation grid (passed to k-Wave) uses 1-based MATLAB voxel indice
 | Simulation grid | voxels (1-based) | `grid` | k-Wave internal space. Axes align with the T1 after preprocessing (rotation to focal axis etc.). Not directly tied to anatomy unless a planning image is loaded. |
 | Subject / scanner space | mm | `ras_plus` | RAS mm in the subject's native scanner frame. PRESTUS's entry-point space: Localite markers and external coordinates arrive in RAS mm and are immediately converted to T1 voxels via `ras_to_grid()`. |
 | Localite planning image | mm | `ras_plus` (adjusted header) | Subject space expressed via the diagonal affine written by `canonical_affine_transform`. Voxel-to-world mapping is `world = voxel * voxel_size_mm` (no rotation). See [Localite placement](doc_placement_heuristic.md#save-localite-planning-image). |
-| MNI space | mm | `mni` | MNI152 standard space. **Note: MNI uses LAS orientation (smaller X = right hemisphere), which is the opposite of RAS.** The axis flip is handled explicitly in `neuronav_convert_native_to_MNI`. |
+| MNI space | mm | `mni` | MNI152 standard space, standard world-mm convention (negative X = left, positive X = right — same laterality sense as RAS). The template's voxel *array* happens to be stored in LAS order, but going through the NIfTI affine (as `ras_to_grid()`/`transform_coordinates()` do) already accounts for that. See [MNI voxel storage order vs. world-mm laterality](#mni-voxel-storage-order-vs-world-mm-laterality). |
 | MNI voxel | voxels (1-based) | *(unnamed)* | Integer indices into an MNI template volume (e.g. 181×217×181). Convert via the template's NIfTI affine. |
 
 ---
@@ -68,9 +68,23 @@ This makes the outputs directly openable in ITK-SNAP, 3D Slicer, and k-Plan with
 
 ---
 
-## MNI axis-flip warning
+## MNI voxel storage order vs. world-mm laterality
 
-MNI space uses **LAS** orientation: the X axis increases toward the *left* hemisphere (smaller X = right). Subject RAS space has the opposite convention (smaller X = left). This flip must be accounted for when interpreting laterality in MNI-space outputs. See `neuronav_convert_native_to_MNI` lines ~149–156 for the explicit correction.
+The MNI152 template's voxel array is stored in **LAS** order internally (its sform has a negative
+X scale factor), but this is purely a storage-order detail: world-mm coordinates derived through the
+NIfTI affine (as `ras_to_grid()` and `transform_coordinates()` always do) already come out in
+standard MNI convention — **negative X = left hemisphere, positive X = right** — with no extra
+manual flip required. This was confirmed empirically: a labeled left-hemisphere target's
+peak-intensity voxel in `sub-601_layered_MNI_left_dcPUT_..._intensity.nii.gz` transforms to X =
+-69.0 mm via the plain sform, correctly on the left.
+
+`neuronav_convert_native_to_MNI` (~lines 159-171) has a separate, unrelated `side_order`-conditional
+block that forcibly pins the *transducer's* (not the target's) MNI voxel X-coordinate to the FOV
+edge (`min_voxel_mni`/`max_voxel_mni`). This is a visualization/robustness workaround for the
+relatively cropped out-of-skull MNI window, not a laterality correction — it only runs when the
+optional `side_order` argument is supplied, and it never touches the target coordinate. Do not
+treat it as "the" fix for MNI laterality; laterality is already correct by construction once you go
+through the affine.
 
 ---
 
@@ -105,6 +119,8 @@ PRESTUS reuses nonlinear warp fields produced by SimNIBS/CHARM:
 - `MNI2Conform_nonl.nii.gz` — MNI → subject native (inverse displacement field, mm)
 
 The segmentation (`final_tissues.nii.gz`) is the spatial anchor for these warps. If the planning T1 differs from the segmentation T1, the affine mismatch is handled in `neuronav_convert_native_to_MNI`.
+
+For point (coordinate) transforms, `mni2subject_coords_LDfix` / `subject2mni_coords_LDfix` wrap the SimNIBS CLI and accept a transform type: `nonl` (nonlinear warp), `12dof` (linear affine), or `6dof` (rigid). The nonlinear warp is most accurate **inside the brain** but is unreliable/extrapolated **outside** it. Accordingly, `mni` transducer placement (see [MNI placement](doc_placement_mni.md)) converts the in-brain focus via `mni → nonl warp → RAS+ → grid` (as the heuristic), and the out-of-brain transducer point via `mni → 12dof affine → RAS+ → grid`.
 
 ---
 
