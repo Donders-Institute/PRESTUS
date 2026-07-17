@@ -963,7 +963,18 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
               f'(error={freq_err_pct:.2f}%). '
               'Increase Nt or adjust freq_hz for more accurate frequency matching.',
               file=sys.stderr)
-    fft_coeff = np.fft.rfft(source_p, axis=-1)[:, freq_idx] * (2 / Nt_steady)  # [N_src] complex
+    # np.fft.rfft uses the e^{-i2*pi*k*n/N} convention, so for a real signal
+    # x(t) = A*cos(omega*t + phi) it yields A*e^{+i*phi}. jwave's own Green's
+    # function (angular_spectrum's exp(1j*k*r)/r, an outgoing wave) and its
+    # lossy wavevector (+2j*omega^3*alpha/c, decaying under e^{-i*omega*t})
+    # both fix jwave's time convention as p(x,t) = Re[P(x)*e^{-i*omega*t}], for
+    # which the correct phasor is P = A*e^{-i*phi} -- the CONJUGATE of the raw
+    # DFT coefficient. Feeding the unconjugated value flips the sign of every
+    # element's phase relative to jwave's convention: nearly harmless for a
+    # near-uniform phase array (only relative phase differences steer the
+    # beam), but a real steering phase gradient gets its focusing correction
+    # applied backwards, displacing the focus.
+    fft_coeff = np.conj(np.fft.rfft(source_p, axis=-1)[:, freq_idx]) * (2 / Nt_steady)  # [N_src] complex
 
     N = tuple(inp['N'].tolist())
     source_field = np.zeros(N, dtype=complex)
