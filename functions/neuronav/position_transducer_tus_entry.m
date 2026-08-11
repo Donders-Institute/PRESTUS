@@ -159,7 +159,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     exclu_arg = 'NULL';
     if ~isempty(exclu_mask)
-        exclu_arg = sprintf('oro.nifti::readNIfTI("%s", reorient=FALSE)', exclu_mask);
+        exclu_arg = sprintf('oro.nifti::readNIfTI("%s", reorient=FALSE)', r_quote_string(exclu_mask));
     end
 
     return_cand_r = 'FALSE';
@@ -201,9 +201,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
         '  saveRDS(result$Candidates, "%s")\n' ...
         '}\n' ...
         'cat("TUS_entry: done\\n")\n'], ...
-        script_path, target_mask, scalp_mask, exclu_arg, ...
+        r_quote_string(script_path), r_quote_string(target_mask), r_quote_string(scalp_mask), exclu_arg, ...
         vox_size, max_dist, min_dist, tx_size, res_cm, ...
-        report_path, return_cand_r, cand_rds);
+        r_quote_string(report_path), return_cand_r, r_quote_string(cand_rds));
 
     fid = fopen(runner_path, 'w');
     if fid == -1
@@ -214,7 +214,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     % ── Run TUS_entry ─────────────────────────────────────────────────────────
 
-    cmd = sprintf('"%s" --vanilla "%s"', rscript_bin, runner_path);
+    cmd = sprintf('%s --vanilla %s', shell_quote_arg(rscript_bin), shell_quote_arg(runner_path));
     fprintf('TUS_entry: running placement...\n  %s\n', cmd);
 
     [status, cmdout] = system(cmd);

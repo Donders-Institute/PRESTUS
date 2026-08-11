@@ -58,7 +58,11 @@ function defaced_folder = preproc_deface_m2m(segmentation_folder, parameters)
         % Partial copy from a previous interrupted run - remove and restart
         rmdir(defaced_folder, 's');
     end
-    [status, out] = system(sprintf('cp -r "%s" "%s"', segmentation_folder, defaced_folder));
+    % shell_quote_arg (not "%s") because segmentation_folder/defaced_folder
+    % can contain shell metacharacters ($( ), `, ;, ...) if an attacker
+    % planted a malicious name inside a shared m2m/ folder; double quotes
+    % alone do not stop $(...) command substitution.
+    [status, out] = system(sprintf('cp -r %s %s', shell_quote_arg(segmentation_folder), shell_quote_arg(defaced_folder)));
     if status ~= 0
         warning('preproc_deface_m2m: cp failed:\n%s', out);
         defaced_folder = '';
@@ -84,7 +88,8 @@ function defaced_folder = preproc_deface_m2m(segmentation_folder, parameters)
             continue;
         end
         fprintf('  Defacing %s...\n', anat_files{i});
-        cmd = sprintf('"%s" "%s" --outfile "%s" --force 2>&1', pydeface_bin, fpath, fpath);
+        cmd = sprintf('%s %s --outfile %s --force 2>&1', ...
+            shell_quote_arg(pydeface_bin), shell_quote_arg(fpath), shell_quote_arg(fpath));
         [status, out] = system(cmd);
         if status ~= 0
             warning('preproc_deface_m2m: pydeface failed for %s:\n%s', anat_files{i}, out);

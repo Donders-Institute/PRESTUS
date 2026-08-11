@@ -256,8 +256,17 @@ function [localite, markertype, source_name] = select_raw_file( ...
             is_dup = false;
             for p = 1:numel(prev_files)
                 ppath = fullfile(prev_files(p).folder, prev_files(p).name);
-                [s, ~] = system(sprintf('diff "%s" "%s"', fpath, ppath));
-                if s == 0, is_dup = true; break; end
+                % Native byte comparison instead of system('diff ...'):
+                % fpath/ppath come from dir() scans of the marker folder,
+                % so a filename planted there could otherwise reach a
+                % shell via "%s" interpolation (e.g. a name containing
+                % $(...)); comparing bytes in MATLAB avoids shelling out
+                % entirely.
+                if isequal(dir(fpath).bytes, dir(ppath).bytes) && ...
+                        isequal(fileread_bytes(fpath), fileread_bytes(ppath))
+                    is_dup = true;
+                    break;
+                end
             end
             if is_dup, continue; end
 
@@ -448,4 +457,16 @@ function val = get_nested(s, fields, default)
             return;
         end
     end
+end
+
+function bytes = fileread_bytes(filepath)
+% FILEREAD_BYTES  Read a file's raw bytes for equality comparison.
+%
+% Used in place of system('diff ...') to compare candidate marker files
+% for de-duplication: the filenames being compared come from a dir() scan
+% of a raw neuronav import folder, so reading bytes in MATLAB avoids
+% splicing an untrusted filename into a shell command.
+    fid = fopen(filepath, 'rb');
+    bytes = fread(fid, Inf, '*uint8');
+    fclose(fid);
 end

@@ -88,7 +88,7 @@ end
 function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, options)
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') && ...
             ~isempty(parameters.hpc.ld_library_path) && ~ispc
-        ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.hpc.ld_library_path);
+        ld_command = sprintf('export LD_LIBRARY_PATH=%s; ', shell_quote_arg(parameters.hpc.ld_library_path));
     else
         ld_command = '';
     end
@@ -102,9 +102,9 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
 
     if n > 1 && ~ispc
         for k = 1:n
-            cmd = sprintf('%s"%s" --in "%s" --out "%s" --m2mpath "%s" --interpolation_order %d', ...
-                ld_command, subject2mni_bin, input_list{k}, output_list{k}, ...
-                m2m_folder, options.interpolation_order);
+            cmd = sprintf('%s%s --in %s --out %s --m2mpath %s --interpolation_order %d', ...
+                ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(input_list{k}), shell_quote_arg(output_list{k}), ...
+                shell_quote_arg(m2m_folder), options.interpolation_order);
             system([cmd ' &']);
         end
         t0 = tic;
@@ -118,9 +118,9 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
         end
     else
         for k = 1:n
-            system(sprintf('%s"%s" --in "%s" --out "%s" --m2mpath "%s" --interpolation_order %d', ...
-                ld_command, subject2mni_bin, input_list{k}, output_list{k}, ...
-                m2m_folder, options.interpolation_order));
+            system(sprintf('%s%s --in %s --out %s --m2mpath %s --interpolation_order %d', ...
+                ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(input_list{k}), shell_quote_arg(output_list{k}), ...
+                shell_quote_arg(m2m_folder), options.interpolation_order));
         end
     end
 

@@ -148,14 +148,19 @@ end
     ants_simg_export = '';
     if isfield(parameters, 'startup') && isfield(parameters.startup, 'ants_simg_path') ...
             && ~isempty(parameters.startup.ants_simg_path)
-        ants_simg_export = sprintf('export ANTS_SIMG="%s" && ', parameters.startup.ants_simg_path);
+        ants_simg_export = sprintf('export ANTS_SIMG=%s && ', shell_quote_arg(parameters.startup.ants_simg_path));
     end
 
     % ── Build the core bash call (no PATH prefix — each platform sets PATH in its own env block)
     % Arguments: sub_id  path_simnibs  path_matlab  skullmapping  debug  path_fun  path_pct_out
-    pct_call = sprintf('source "%s" && pct_create_pseudoCT "%s" "%s" "%s" "%s" "%s" "%s" "%s"', ...
-        script_path, subj_id_string, path_seg, matlab_bin, ...
-        skull_mapping, debug_flag, path_fun, path_pct_out);
+    % Every value is shell_quote_arg()-quoted rather than "%s"-wrapped: a
+    % path containing e.g. $(curl ...|sh) would still be expanded by the
+    % shell inside double quotes, but not inside shell_quote_arg's single
+    % quotes.
+    pct_call = sprintf('source %s && pct_create_pseudoCT %s %s %s %s %s %s %s', ...
+        shell_quote_arg(script_path), shell_quote_arg(subj_id_string), shell_quote_arg(path_seg), ...
+        shell_quote_arg(matlab_bin), shell_quote_arg(skull_mapping), shell_quote_arg(debug_flag), ...
+        shell_quote_arg(path_fun), shell_quote_arg(path_pct_out));
 
     % ── Deploy ────────────────────────────────────────────────────────────
     if strcmp(platform, 'matlab')
@@ -194,7 +199,7 @@ end
             fprintf(fid, 'export PATH=%s:$PATH\n', strjoin(extra_paths, ':'));
         end
         if ~isempty(ants_simg_export)
-            fprintf(fid, 'export ANTS_SIMG="%s"\n', parameters.startup.ants_simg_path);
+            fprintf(fid, 'export ANTS_SIMG=%s\n', shell_quote_arg(parameters.startup.ants_simg_path));
         end
         if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') ...
                 && ~isempty(parameters.hpc.ld_library_path)
@@ -251,7 +256,7 @@ end
             fprintf(fid, 'export PATH=%s:$PATH\n', strjoin(extra_paths, ':'));
         end
         if ~isempty(ants_simg_export)
-            fprintf(fid, 'export ANTS_SIMG="%s"\n', parameters.startup.ants_simg_path);
+            fprintf(fid, 'export ANTS_SIMG=%s\n', shell_quote_arg(parameters.startup.ants_simg_path));
         end
         if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') ...
                 && ~isempty(parameters.hpc.ld_library_path)
@@ -301,8 +306,15 @@ end
 end
 
 % ── Helper: quote a string for safe bash -c argument passing ─────────────
+% NOTE: this used to wrap in double quotes, which does NOT stop a POSIX
+% shell from expanding $(...) / `...` / $VAR inside the quoted string. A
+% filename such as sub.msh.$(curl ...|sh) reaching here (e.g. via a path
+% derived from a scanned segmentation folder) would have been executed.
+% shell_quote_arg() single-quotes instead, which blocks all shell
+% expansion. This deliberately shadows shell_quote_arg's behavior under
+% the old name so all existing call sites in this file are fixed in place.
 function s = shellescape(str)
-    s = ['"' strrep(str, '"', '\"') '"'];
+    s = shell_quote_arg(str);
 end
 
 % ── Helper: poll for a file to appear (fallback when job ID is unavailable) ──

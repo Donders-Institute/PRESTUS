@@ -107,9 +107,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     end
 
     % ── Log PlanTUS version ───────────────────────────────────────────────
-    [~, plantus_hash] = system(sprintf('git -C "%s" rev-parse --short HEAD 2>/dev/null', script_path));
+    [~, plantus_hash] = system(sprintf('git -C %s rev-parse --short HEAD 2>/dev/null', shell_quote_arg(script_path)));
     plantus_hash = strtrim(plantus_hash);
-    [~, plantus_tag]  = system(sprintf('git -C "%s" describe --tags --exact-match 2>/dev/null', script_path));
+    [~, plantus_tag]  = system(sprintf('git -C %s describe --tags --exact-match 2>/dev/null', shell_quote_arg(script_path)));
     plantus_tag = strtrim(plantus_tag);
     if ~isempty(plantus_tag)
         plantus_ver = plantus_tag;
@@ -239,9 +239,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
         end
     end
 
-    cmd = sprintf('"%s" "%s" "%s" "%s" "%s" "%s" --plantus_root "%s" --output_dir "%s"', ...
-        python_bin, launcher, filename_t1, mesh_path, mask_path, ...
-        tx_config_path, script_path, work_dir);
+    cmd = sprintf('%s %s %s %s %s %s --plantus_root %s --output_dir %s', ...
+        shell_quote_arg(python_bin), shell_quote_arg(launcher), shell_quote_arg(filename_t1), shell_quote_arg(mesh_path), shell_quote_arg(mask_path), ...
+        shell_quote_arg(tx_config_path), shell_quote_arg(script_path), shell_quote_arg(work_dir));
 
     fprintf('PlanTUS: running placement optimisation...\n  %s\n', cmd);
     [status, cmdout] = system(cmd);

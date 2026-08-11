@@ -38,10 +38,13 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if ~exist(result_simnibs, 'file')
         parameters.io.overwrite_simnibs = 1;
     end
+    % shell_quote_arg (not "%s") because filename_t1/filename_t2 come from
+    % scanned raw-data filenames: double quotes alone do not stop a shell
+    % from expanding $(...) command substitution embedded in a filename.
     if ~isempty(filename_t2)
-        segment_call = sprintf('charm %s "%s" "%s"', subj_id_string, filename_t1, filename_t2);
+        segment_call = sprintf('charm %s %s %s', subj_id_string, shell_quote_arg(filename_t1), shell_quote_arg(filename_t2));
     else
-        segment_call = sprintf('charm %s "%s"', subj_id_string, filename_t1);
+        segment_call = sprintf('charm %s %s', subj_id_string, shell_quote_arg(filename_t1));
     end
     if isfield(parameters, 'overwrite_simnibs') && parameters.io.overwrite_simnibs == 1
         segment_call = [segment_call ' --forcerun'];
@@ -75,9 +78,15 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
         % Anchor the replacement to the start of segment_call so that 'charm'
         % appearing inside T1/T2 paths (e.g. /home/user/charm_study/...) isn't mangled.
-        segment_call_full = regexprep(segment_call, '^charm\b', charm_path);
-        full_cmd = sprintf('cd "%s"; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo "%s" | %s', ...
-            parameters.path.seg, segment_call_full, qsub_call);
+        segment_call_full = regexprep(segment_call, '^charm(?=\s|$)', regexptranslate('escape', shell_quote_arg(charm_path)));
+        % segment_call_full already contains shell_quote_arg()-quoted
+        % filenames (single-quoted tokens). Do NOT wrap it in an extra
+        % pair of double quotes here: a literal " inside a malicious
+        % filename would close that outer double-quoted string early and
+        % re-expose $(...) to the shell. Splicing it in unquoted is safe
+        % because its own single-quoted tokens are self-protecting.
+        full_cmd = sprintf('cd %s; timestamp=$(date +%%Y%%m%%d_%%H%%M%%S); echo %s | %s', ...
+            shell_quote_arg(parameters.path.seg), segment_call_full, qsub_call);
 
         % 3) submit segmentation job
         fprintf('Running segmentation with a command \n%s\n', full_cmd)
@@ -109,11 +118,11 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.hpc.ld_library_path);
 
         % Add segmentation call
-        fprintf(fid, 'cd "%s"\n', parameters.path.seg);
+        fprintf(fid, 'cd %s\n', shell_quote_arg(parameters.path.seg));
         fprintf(fid, 'charm --version\n');
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
         % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
-        segment_call_full = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
+        segment_call_full = regexprep(segment_call, '^charm(?=\s|$)', regexptranslate('escape', shell_quote_arg(charm_path)));
         fprintf(fid, '%s\n', segment_call_full);
         fclose(fid);
 
@@ -141,7 +150,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         % Use FULL PATH to charm (don't rely on PATH).
         % Anchor replacement to the start so 'charm' in T1/T2 paths isn't mangled.
         charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
-        full_segment_call = regexprep(segment_call, '^charm\b', sprintf('"%s"', charm_path));
+        full_segment_call = regexprep(segment_call, '^charm(?=\s|$)', regexptranslate('escape', shell_quote_arg(charm_path)));
         fprintf('Full command: %s\n', full_segment_call);
 
         orig_dir = pwd;

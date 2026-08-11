@@ -62,12 +62,15 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
         imwrite(I, new_name);
     end
 
-    % Combine all modified images into a single montage using the `montage` command-line tool
-    system(sprintf('cd "%s"; montage -background black -gravity south -mode concatenate $(ls -1 *.png | sort -g) ../all_%s.png', ...
-        tmp_path, suffix));
+    % Combine all modified images into a single montage using the `montage` command-line tool.
+    % tmp_path/suffix are quoted with shell_quote_arg (not "%s") since
+    % outputs_path/suffix ultimately come from caller-supplied config.
+    montage_out = sprintf('../all_%s.png', suffix);
+    system(sprintf('cd %s; montage -background black -gravity south -mode concatenate $(ls -1 *.png | sort -g) %s', ...
+        shell_quote_arg(tmp_path), shell_quote_arg(montage_out)));
 
     % Clean up temporary files and remove the temporary directory
-    system(sprintf('cd "%s"; rm *.png', tmp_path));
+    system(sprintf('cd %s; rm *.png', shell_quote_arg(tmp_path)));
     rmdir(tmp_path);
 end
 

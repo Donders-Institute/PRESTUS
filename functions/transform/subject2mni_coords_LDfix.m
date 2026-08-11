@@ -49,7 +49,7 @@ fn_out = [tempname,'.csv'];
 
 % include LD fix
 if isfield(parameters.hpc,'ld_library_path')
-    ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.hpc.ld_library_path);
+    ld_command = sprintf('export LD_LIBRARY_PATH=%s; ', shell_quote_arg(parameters.hpc.ld_library_path));
 else
     ld_command = '';
 end
@@ -59,8 +59,11 @@ simnibs_bin = parameters.startup.simnibs_bin_path;
 assert(~isempty(simnibs_bin) && ~strcmp(simnibs_bin, '/'), ...
     'parameters.startup.simnibs_bin_path must be set to the SimNIBS bin directory (not empty or ''/'')')
 subject2mni_bin = fullfile(simnibs_bin, 'subject2mni_coords');
+% subdir (the m2m folder) may come from a shared/untrusted data directory;
+% shell_quote_arg() (not bare %s) stops shell metacharacters/$() in its
+% name from being interpreted.
 [status,result] = system(sprintf('%s%s -m %s -s %s -o %s -t %s;', ...
-    ld_command, subject2mni_bin, subdir, fn_in, fn_out, transformation_type));
+    ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(subdir), shell_quote_arg(fn_in), shell_quote_arg(fn_out), shell_quote_arg(transformation_type)));
 
 % Check if call was successefull
 if status ~= 0
