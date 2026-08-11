@@ -2024,12 +2024,15 @@ end
             uialert(fig, 'Output directory not set or does not exist.', 'Not found');
             return;
         end
+        % run_command invokes the file-manager opener directly via argv,
+        % no shell at all -- app.dir_output reaches the process as a
+        % literal argument regardless of its contents.
         if ispc
-            system(['explorer "' app.dir_output '"']);
+            run_command({'explorer', app.dir_output}, 'Background', true);
         elseif ismac
-            system(['open "' app.dir_output '"']);
+            run_command({'open', app.dir_output}, 'Background', true);
         else
-            system(['xdg-open "' app.dir_output '"']);
+            run_command({'xdg-open', app.dir_output}, 'Background', true);
         end
     end
 

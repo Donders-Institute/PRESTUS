@@ -7,7 +7,7 @@ Usage
   python -c "import main; main.prestus_gui(params)"  # from Python
 
 Can also be called from MATLAB via:
-  system('python functions/gui_py/main.py config_study.yaml &');
+  run_command({'python', 'functions/gui_py/main.py', 'config_study.yaml'}, 'Background', true);
 """
 
 from __future__ import annotations

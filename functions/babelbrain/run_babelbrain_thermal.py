@@ -2,7 +2,8 @@
 """
 run_babelbrain_thermal.py — PRESTUS → BabelBrain thermal simulation bridge
 
-Called by babelbrain_thermal_wrapper.m via system(). Invokes BabelBrain's
+Called by babelbrain_thermal_wrapper.m via run_command() (java.lang.ProcessBuilder,
+no shell). Invokes BabelBrain's
 CalculateThermalProcess on a *DataForSim.h5 acoustic output file and writes
 a *ThermalField*.h5 result that PRESTUS reads back via read_babelbrain_thermal.m.
 

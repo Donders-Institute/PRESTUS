@@ -46,8 +46,9 @@ while ~job_completed && checks < max_checks
         case 'slurm'
             job_id_str = sprintf('%.0f', job_id);
             
-            % 1. squeue - simple column split for YOUR format
-            [status_q, out_q] = system(sprintf('squeue --noheader -j %s 2>/dev/null', job_id_str));
+            % 1. squeue - simple column split for YOUR format. run_command
+            % invokes squeue directly via argv, no shell at all.
+            [status_q, out_q] = run_command({'squeue', '--noheader', '-j', job_id_str});
             if status_q == 0 && ~isempty(strtrim(out_q))
                 parts = strsplit(strtrim(out_q));
                 if length(parts) >= 5
@@ -62,11 +63,14 @@ while ~job_completed && checks < max_checks
                 end
             end
             
-            % 2. Job gone from squeue → check sacct
-            [status, out] = system(sprintf('sacct -j %s -o State --noheader | tail -n 1 2>/dev/null', job_id_str));
-            if status == 0 && ~isempty(strtrim(out))
+            % 2. Job gone from squeue → check sacct. run_command invokes
+            % sacct directly via argv; the `| tail -n 1` last-line
+            % selection is replicated in MATLAB instead of a shell pipe.
+            [status, out] = run_command({'sacct', '-j', job_id_str, '-o', 'State', '--noheader'});
+            out_lines = strsplit(strtrim(out), newline);
+            if status == 0 && ~isempty(out_lines) && ~isempty(strtrim(out_lines{end}))
                 % Safe first word extraction
-                first_word = strtok(strtrim(out));  % Safer than regex
+                first_word = strtok(strtrim(out_lines{end}));  % Safer than regex
                 terminal_states = {'COMPLETED','FAILED','CANCELLED','TIMEOUT','OUT_OF_MEMORY'};
                 if any(strcmpi(first_word, terminal_states))
                     fprintf('✓ SLURM Job %s FINISHED: %s\n', job_id_str, first_word);
@@ -83,8 +87,19 @@ while ~job_completed && checks < max_checks
         case {'qsub', 'pbs', 'torque'}
             job_id_str = char(job_id);
             
-            % qstat -f for detailed state
-            [status, out] = system(sprintf('qstat -f %s 2>/dev/null | grep job_state', job_id_str));
+            % qstat -f for detailed state. run_command invokes qstat
+            % directly via argv; the `| grep job_state` line selection is
+            % replicated in MATLAB instead of a shell pipe.
+            [status, qstat_out] = run_command({'qstat', '-f', job_id_str});
+            job_state_line = '';
+            qstat_lines = strsplit(qstat_out, newline);
+            for li = 1:numel(qstat_lines)
+                if contains(qstat_lines{li}, 'job_state')
+                    job_state_line = qstat_lines{li};
+                    break;
+                end
+            end
+            out = job_state_line;
             if status == 0 && ~isempty(out)
                 parts = strsplit(strtrim(out), '=');
                 if length(parts) >= 2
@@ -101,8 +116,9 @@ while ~job_completed && checks < max_checks
                 end
             end
             
-            % Fallback: simple qstat
-            [status_check, ~] = system(sprintf('qstat %s >/dev/null 2>&1', job_id_str));
+            % Fallback: simple qstat. run_command invokes qstat directly
+            % via argv, no shell at all.
+            [status_check, ~] = run_command({'qstat', job_id_str});
             persistent seen_once;
             if isempty(seen_once), seen_once = false; end
             

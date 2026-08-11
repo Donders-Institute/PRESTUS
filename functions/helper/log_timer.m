@@ -88,19 +88,21 @@ end
 
 
 function [used_bytes, free_bytes] = log_disk_space(monitor_path) % fetch disk space of specified directory
+    % run_command invokes df/powershell directly via argv, no shell at
+    % all -- monitor_path reaches the process as a literal argument
+    % regardless of its contents. The `| tail -n1` last-line selection is
+    % replicated in MATLAB instead of a shell pipe.
     if isunix
-        cmd_used = sprintf('df --block-size=1 --output=used "%s" | tail -n1', monitor_path);
-        cmd_free = sprintf('df --block-size=1 --output=avail "%s" | tail -n1', monitor_path);
-        [~, out_used] = system(cmd_used);
-        [~, out_free] = system(cmd_free);
-        used_bytes = str2double(strtrim(out_used));
-        free_bytes = str2double(strtrim(out_free));
+        [~, out_used] = run_command({'df', '--block-size=1', '--output=used', monitor_path});
+        [~, out_free] = run_command({'df', '--block-size=1', '--output=avail', monitor_path});
+        used_bytes = str2double(strtrim(last_line(out_used)));
+        free_bytes = str2double(strtrim(last_line(out_free)));
     elseif ispc
         drive = monitor_path(1);
         driveLetter = char(drive);
         driveLetter = driveLetter(1);
-        [~, out_used] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Used"', driveLetter));
-        [~, out_free] = system(sprintf('powershell -c "(Get-PSDrive ''%c'').Free"', driveLetter));
+        [~, out_used] = run_command({'powershell', '-c', sprintf('(Get-PSDrive ''%c'').Used', driveLetter)});
+        [~, out_free] = run_command({'powershell', '-c', sprintf('(Get-PSDrive ''%c'').Free', driveLetter)});
         used_bytes = str2double(strtrim(out_used));
         free_bytes = str2double(strtrim(out_free));
     else
@@ -108,12 +110,17 @@ function [used_bytes, free_bytes] = log_disk_space(monitor_path) % fetch disk sp
     end
 end
 
+function line = last_line(text)
+    lines = strsplit(strtrim(text), newline);
+    line = lines{end};
+end
+
 function ram_gb = log_process_memory() % fetch memory use of a process
     if ispc
         try m = memory; ram_gb = m.MemUsedMATLAB/1e9; catch, ram_gb = NaN; end
     else
         try
-            [status, out] = system(sprintf('ps -o rss= -p %d', feature('getpid')));
+            [status, out] = run_command({'ps', '-o', 'rss=', '-p', num2str(feature('getpid'))});
             if status ~= 0 || isempty(strtrim(out))
                 ram_gb = NaN;
             else

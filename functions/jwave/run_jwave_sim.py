@@ -2,7 +2,8 @@
 """
 run_jwave_sim.py — PRESTUS → jwave acoustic simulation bridge
 
-Called by jwave_wrapper.m via system(). Reads simulation inputs from an HDF5
+Called by jwave_wrapper.m via run_command() (java.lang.ProcessBuilder, no
+shell). Reads simulation inputs from an HDF5
 file written by MATLAB, runs the requested jwave solver, and writes pressure
 field outputs (p_max_all, p_min_all, p_final) to a second HDF5 file that
 MATLAB reads back.

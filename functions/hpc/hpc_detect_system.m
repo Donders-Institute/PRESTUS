@@ -15,8 +15,8 @@ function hpc_type = hpc_detect_system()
 %
 % See also: HPC_SUBMIT_JOB, HPC_VALIDATE_PARAMETERS
 
-[sbatch_out, sbatch_path] = system('which sbatch');
-[qsub_out, qsub_path] = system('which qsub');
+[sbatch_out, sbatch_path] = run_command({'which', 'sbatch'});
+[qsub_out, qsub_path] = run_command({'which', 'qsub'});
 
 if sbatch_out == 0
     hpc_type = 'slurm';

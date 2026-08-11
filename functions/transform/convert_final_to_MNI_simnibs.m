@@ -86,11 +86,12 @@ end
 
 % -------------------------------------------------------------------------
 function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, options)
+    % run_command's Env option sets LD_LIBRARY_PATH natively on the child
+    % process -- no `export ...;` shell syntax needed at all.
+    env_overrides = struct();
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') && ...
             ~isempty(parameters.hpc.ld_library_path) && ~ispc
-        ld_command = sprintf('export LD_LIBRARY_PATH=%s; ', shell_quote_arg(parameters.hpc.ld_library_path));
-    else
-        ld_command = '';
+        env_overrides.LD_LIBRARY_PATH = parameters.hpc.ld_library_path;
     end
     subject2mni_bin = fullfile(parameters.startup.simnibs_bin_path, 'subject2mni');
 
@@ -100,12 +101,14 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
         simnibs_names{k} = strrep(output_list{k}, '.nii.gz', '_MNI.nii.gz');
     end
 
+    % run_command invokes subject2mni directly via argv, no shell at all --
+    % input_list/output_list/m2m_folder reach the process as literal
+    % argument values regardless of their contents.
     if n > 1 && ~ispc
         for k = 1:n
-            cmd = sprintf('%s%s --in %s --out %s --m2mpath %s --interpolation_order %d', ...
-                ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(input_list{k}), shell_quote_arg(output_list{k}), ...
-                shell_quote_arg(m2m_folder), options.interpolation_order);
-            system([cmd ' &']);
+            run_command({subject2mni_bin, '--in', input_list{k}, '--out', output_list{k}, ...
+                '--m2mpath', m2m_folder, '--interpolation_order', num2str(options.interpolation_order)}, ...
+                'Env', env_overrides, 'Background', true);
         end
         t0 = tic;
         while toc(t0) < 3600
@@ -118,9 +121,9 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
         end
     else
         for k = 1:n
-            system(sprintf('%s%s --in %s --out %s --m2mpath %s --interpolation_order %d', ...
-                ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(input_list{k}), shell_quote_arg(output_list{k}), ...
-                shell_quote_arg(m2m_folder), options.interpolation_order));
+            run_command({subject2mni_bin, '--in', input_list{k}, '--out', output_list{k}, ...
+                '--m2mpath', m2m_folder, '--interpolation_order', num2str(options.interpolation_order)}, ...
+                'Env', env_overrides);
         end
     end
 

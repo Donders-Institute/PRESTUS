@@ -58,13 +58,13 @@ function defaced_folder = preproc_deface_m2m(segmentation_folder, parameters)
         % Partial copy from a previous interrupted run - remove and restart
         rmdir(defaced_folder, 's');
     end
-    % shell_quote_arg (not "%s") because segmentation_folder/defaced_folder
-    % can contain shell metacharacters ($( ), `, ;, ...) if an attacker
-    % planted a malicious name inside a shared m2m/ folder; double quotes
-    % alone do not stop $(...) command substitution.
-    [status, out] = system(sprintf('cp -r %s %s', shell_quote_arg(segmentation_folder), shell_quote_arg(defaced_folder)));
-    if status ~= 0
-        warning('preproc_deface_m2m: cp failed:\n%s', out);
+    % Native copyfile() instead of system('cp -r ...'): segmentation_folder
+    % can contain shell metacharacters ($(...), `, ;, ...) if an attacker
+    % planted a malicious name inside a shared m2m/ folder, so this avoids
+    % a shell altogether rather than relying on quoting one correctly.
+    [copy_ok, copy_msg] = copyfile(segmentation_folder, defaced_folder, 'f');
+    if ~copy_ok
+        warning('preproc_deface_m2m: copy failed:\n%s', copy_msg);
         defaced_folder = '';
         return;
     end
@@ -88,9 +88,10 @@ function defaced_folder = preproc_deface_m2m(segmentation_folder, parameters)
             continue;
         end
         fprintf('  Defacing %s...\n', anat_files{i});
-        cmd = sprintf('%s %s --outfile %s --force 2>&1', ...
-            shell_quote_arg(pydeface_bin), shell_quote_arg(fpath), shell_quote_arg(fpath));
-        [status, out] = system(cmd);
+        % run_command (not system()) invokes pydeface via argv directly,
+        % with no shell in the loop at all -- fpath cannot reach a shell
+        % regardless of its contents.
+        [status, out] = run_command({pydeface_bin, fpath, '--outfile', fpath, '--force'});
         if status ~= 0
             warning('preproc_deface_m2m: pydeface failed for %s:\n%s', anat_files{i}, out);
             failed{end+1} = anat_files{i}; %#ok<AGROW>

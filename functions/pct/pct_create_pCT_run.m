@@ -169,7 +169,11 @@ end
         % from within pct_create_pseudoCT.sh.
         full_call = [module_prefix path_prefix ants_simg_export pct_call];
         fprintf('Running pseudoCT generation locally:\n%s\n', full_call);
-        [res, out] = system(sprintf('bash -c %s', shellescape(full_call)));
+        % run_shell_script (not system('bash -c ...')) launches bash
+        % directly via ProcessBuilder as a two-element argv, so full_call
+        % reaches it as one atomic argument -- never re-tokenized by an
+        % outer system()-level shell first.
+        [res, out] = run_shell_script(full_call);
         if res ~= 0
             error('pseudoCT generation failed (exit code %d):\n%s', res, out);
         end
@@ -208,10 +212,9 @@ end
         fprintf(fid, '%s\n', pct_call);
         fclose(fid);
 
-        system(sprintf('chmod +x %s.sh', temp_slurm_file));
-        sbatch_call = sprintf('sbatch --export=MANPATH %s.sh', temp_slurm_file);
-        fprintf('Submitting pseudoCT job:\n%s\n', sbatch_call);
-        [res, out] = system(sbatch_call);
+        java.io.File([temp_slurm_file '.sh']).setExecutable(true);
+        fprintf('Submitting pseudoCT job:\nsbatch --export=MANPATH %s.sh\n', temp_slurm_file);
+        [res, out] = run_command({'sbatch', '--export=MANPATH', [temp_slurm_file '.sh']});
         if res ~= 0
             error('sbatch submission failed (exit code %d):\n%s', res, out);
         end
@@ -262,14 +265,13 @@ end
                 && ~isempty(parameters.hpc.ld_library_path)
             fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.hpc.ld_library_path);
         end
-        fprintf(fid, 'cd %s\n', path_seg);
+        fprintf(fid, 'cd %s\n', shell_quote_arg(path_seg));
         fprintf(fid, '%s\n', pct_call);
         fclose(fid);
 
-        system(sprintf('chmod +x %s.sh', temp_qsub_file));
-        qsub_submit = sprintf('qsub -v MANPATH %s.sh', temp_qsub_file);
-        fprintf('Submitting pseudoCT job:\n%s\n', qsub_submit);
-        [res, out] = system(qsub_submit);
+        java.io.File([temp_qsub_file '.sh']).setExecutable(true);
+        fprintf('Submitting pseudoCT job:\nqsub -v MANPATH %s.sh\n', temp_qsub_file);
+        [res, out] = run_command({'qsub', '-v', 'MANPATH', [temp_qsub_file '.sh']});
         if res ~= 0
             error('qsub submission failed (exit code %d):\n%s', res, out);
         end
@@ -294,7 +296,7 @@ end
         fprintf(['To generate a pseudoCT, run the following command in bash:\n' ...
                  'bash -c %s\n' ...
                  'Rerun the pipeline once pseudoCT.nii.gz exists in the m2m folder.\n'], ...
-                 shellescape(pct_call));
+                 shell_quote_arg(pct_call));
         error('Platform ''%s'' is not supported for automatic pseudoCT generation.', platform);
     end
 
@@ -303,18 +305,6 @@ end
     % for free-text metadata — insufficient for structured provenance.
     write_pct_sidecar(path_pct_out, parameters, skull_mapping);
 
-end
-
-% ── Helper: quote a string for safe bash -c argument passing ─────────────
-% NOTE: this used to wrap in double quotes, which does NOT stop a POSIX
-% shell from expanding $(...) / `...` / $VAR inside the quoted string. A
-% filename such as sub.msh.$(curl ...|sh) reaching here (e.g. via a path
-% derived from a scanned segmentation folder) would have been executed.
-% shell_quote_arg() single-quotes instead, which blocks all shell
-% expansion. This deliberately shadows shell_quote_arg's behavior under
-% the old name so all existing call sites in this file are fixed in place.
-function s = shellescape(str)
-    s = shell_quote_arg(str);
 end
 
 % ── Helper: poll for a file to appear (fallback when job ID is unavailable) ──

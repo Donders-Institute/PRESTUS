@@ -3,11 +3,11 @@ function coords_sub = subject2mni_coords_LDfix(coords_mni, subdir, parameters, t
 %
 % Writes coords_mni to a temporary CSV in SimNIBS Generic format, calls the
 % subject2mni_coords command-line tool, and reads back the result. An optional
-% LD_LIBRARY_PATH export is prepended to the system call when
+% LD_LIBRARY_PATH override is set on the child process's environment when
 % parameters.hpc.ld_library_path is set — this hotfix is required on some HPC
 % systems where SimNIBS bash scripts do not inherit the library path correctly
 % (see: https://github.com/simnibs/simnibs/issues/106). Has a large per-call
-% overhead due to the system() call; do not call inside tight loops.
+% overhead due to the external process call; do not call inside tight loops.
 % Note: despite the function name, this converts subject → MNI (forward direction).
 %
 % Use as:
@@ -47,11 +47,11 @@ end
 fclose( fid );
 fn_out = [tempname,'.csv'];
 
-% include LD fix
+% include LD fix. run_command's Env option sets LD_LIBRARY_PATH natively
+% on the child process -- no `export ...;` shell syntax needed at all.
+env_overrides = struct();
 if isfield(parameters.hpc,'ld_library_path')
-    ld_command = sprintf('export LD_LIBRARY_PATH=%s; ', shell_quote_arg(parameters.hpc.ld_library_path));
-else
-    ld_command = '';
+    env_overrides.LD_LIBRARY_PATH = parameters.hpc.ld_library_path;
 end
 
 % Run mni2subject_coords
@@ -59,11 +59,12 @@ simnibs_bin = parameters.startup.simnibs_bin_path;
 assert(~isempty(simnibs_bin) && ~strcmp(simnibs_bin, '/'), ...
     'parameters.startup.simnibs_bin_path must be set to the SimNIBS bin directory (not empty or ''/'')')
 subject2mni_bin = fullfile(simnibs_bin, 'subject2mni_coords');
-% subdir (the m2m folder) may come from a shared/untrusted data directory;
-% shell_quote_arg() (not bare %s) stops shell metacharacters/$() in its
-% name from being interpreted.
-[status,result] = system(sprintf('%s%s -m %s -s %s -o %s -t %s;', ...
-    ld_command, shell_quote_arg(subject2mni_bin), shell_quote_arg(subdir), shell_quote_arg(fn_in), shell_quote_arg(fn_out), shell_quote_arg(transformation_type)));
+% run_command invokes subject2mni_coords directly via argv, no shell at
+% all -- subdir (the m2m folder, which may come from a shared/untrusted
+% data directory) reaches the process as a literal argument regardless
+% of its contents.
+[status, result] = run_command({subject2mni_bin, '-m', subdir, '-s', fn_in, '-o', fn_out, '-t', transformation_type}, ...
+    'Env', env_overrides);
 
 % Check if call was successefull
 if status ~= 0

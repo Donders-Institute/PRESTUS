@@ -2,7 +2,8 @@
 """
 run_babelbrain_case.py — PRESTUS → BabelBrain acoustic simulation bridge
 
-Called by babelbrain_wrapper.m via system(). Invokes RUN_SIM().RunCases()
+Called by babelbrain_wrapper.m via run_command() (java.lang.ProcessBuilder,
+no shell). Invokes RUN_SIM().RunCases()
 for the requested transducer preset and writes *DataForSim.h5 output that
 PRESTUS reads back via read_babelbrain_output.m.
 

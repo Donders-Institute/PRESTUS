@@ -148,11 +148,11 @@ function [parameters] = extract_snellius_parameters(parameters)
 end
 
 function job_id = submit_slurm_job(temp_slurm_path, log_dir)
-    sbatch_call = sprintf('sbatch %s', temp_slurm_path);
-    full_cmd = sprintf('cd %s; %s', log_dir, sbatch_call);
-    
-    fprintf('SLURM command: %s\n', full_cmd);
-    [status, out] = system(full_cmd);
+    % run_command invokes sbatch directly via argv, no shell at all --
+    % log_dir/temp_slurm_path reach the process as literal arguments
+    % regardless of their contents.
+    fprintf('SLURM command: sbatch %s (in %s)\n', temp_slurm_path, log_dir);
+    [status, out] = run_command({'sbatch', temp_slurm_path}, 'WorkingDir', log_dir);
     if status ~= 0, error('SLURM submission failed: %s', out); end
     
     job_ids = regexp(out, '\d+', 'match');
@@ -187,11 +187,9 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
 end
 
 function job_id = submit_qsub_job(temp_qsub_path, log_dir)
-    qsub_call = sprintf('qsub %s', temp_qsub_path);
-    full_cmd = sprintf('cd %s; %s', log_dir, qsub_call);
-    
-    fprintf('qsub command: %s\n', full_cmd);
-    [status, out] = system(full_cmd);
+    % run_command invokes qsub directly via argv, no shell at all.
+    fprintf('qsub command: qsub %s (in %s)\n', temp_qsub_path, log_dir);
+    [status, out] = run_command({'qsub', temp_qsub_path}, 'WorkingDir', log_dir);
     if status ~= 0, error('qsub submission failed: %s', out); end
     job_id = strtrim(out);
 end

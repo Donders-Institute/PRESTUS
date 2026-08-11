@@ -107,9 +107,19 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     end
 
     % ── Log PlanTUS version ───────────────────────────────────────────────
-    [~, plantus_hash] = system(sprintf('git -C %s rev-parse --short HEAD 2>/dev/null', shell_quote_arg(script_path)));
+    % run_command merges stderr into stdout (like system()'s combined
+    % output), so a failing git call (not a repo, no exact-match tag) must
+    % be judged by its exit status, not just by cmdout being non-empty --
+    % otherwise a git error message would be mistaken for a version string.
+    [hash_status, plantus_hash] = run_command({'git', '-C', script_path, 'rev-parse', '--short', 'HEAD'});
+    if hash_status ~= 0
+        plantus_hash = '';
+    end
     plantus_hash = strtrim(plantus_hash);
-    [~, plantus_tag]  = system(sprintf('git -C %s describe --tags --exact-match 2>/dev/null', shell_quote_arg(script_path)));
+    [tag_status, plantus_tag] = run_command({'git', '-C', script_path, 'describe', '--tags', '--exact-match'});
+    if tag_status ~= 0
+        plantus_tag = '';
+    end
     plantus_tag = strtrim(plantus_tag);
     if ~isempty(plantus_tag)
         plantus_ver = plantus_tag;
@@ -239,12 +249,15 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
         end
     end
 
-    cmd = sprintf('%s %s %s %s %s %s --plantus_root %s --output_dir %s', ...
-        shell_quote_arg(python_bin), shell_quote_arg(launcher), shell_quote_arg(filename_t1), shell_quote_arg(mesh_path), shell_quote_arg(mask_path), ...
-        shell_quote_arg(tx_config_path), shell_quote_arg(script_path), shell_quote_arg(work_dir));
+    plantus_argv = {python_bin, launcher, filename_t1, mesh_path, mask_path, ...
+        tx_config_path, '--plantus_root', script_path, '--output_dir', work_dir};
 
-    fprintf('PlanTUS: running placement optimisation...\n  %s\n', cmd);
-    [status, cmdout] = system(cmd);
+    fprintf('PlanTUS: running placement optimisation...\n  %s\n', strjoin(plantus_argv, ' '));
+    % run_command invokes python directly via argv, with no shell at all --
+    % every path here (config-derived, but still worth removing the shell
+    % rather than trusting quoting) reaches the process as literal
+    % argument values regardless of their contents.
+    [status, cmdout] = run_command(plantus_argv);
 
     if status ~= 0
         error('PRESTUS:plantus:failed', ...

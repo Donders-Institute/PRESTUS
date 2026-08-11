@@ -215,11 +215,11 @@ end
 % ==========================================================================
 
 function report = query_slurm(report, job_id_str, cp, bp)
-% Query main job allocation for timing and CPU info
-cmd_alloc = sprintf( ...
-    'sacct -j %s --allocations --format=State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,AllocTRES --noheader --parsable2 2>/dev/null', ...
-    job_id_str);
-[status, out] = system(cmd_alloc);
+% Query main job allocation for timing and CPU info. run_command invokes
+% sacct directly via argv, no shell at all -- job_id_str reaches the
+% process as a literal argument regardless of its contents.
+[status, out] = run_command({'sacct', '-j', job_id_str, '--allocations', ...
+    '--format=State,ExitCode,ElapsedRaw,CPUTimeRAW,AllocCPUS,AllocTRES', '--noheader', '--parsable2'});
 
 if status == 0 && ~isempty(strtrim(out))
     lines = strtrim(strsplit(out, '\n'));
@@ -239,11 +239,11 @@ if status == 0 && ~isempty(strtrim(out))
     end
 end
 
-% MaxRSS lives in job steps, not the allocation — take max across all steps
-cmd_rss = sprintf( ...
-    'sacct -j %s --format=MaxRSS --noheader --parsable2 2>/dev/null | grep -v "^$"', ...
-    job_id_str);
-[status_r, out_r] = system(cmd_rss);
+% MaxRSS lives in job steps, not the allocation — take max across all
+% steps. run_command invokes sacct directly via argv; the `| grep -v
+% "^$"` blank-line filter is replicated in MATLAB below instead of a
+% shell pipe.
+[status_r, out_r] = run_command({'sacct', '-j', job_id_str, '--format=MaxRSS', '--noheader', '--parsable2'});
 
 if status_r == 0 && ~isempty(strtrim(out_r))
     rss_vals = strtrim(strsplit(out_r, '\n'));

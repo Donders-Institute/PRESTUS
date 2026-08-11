@@ -216,11 +216,13 @@ function v = get_os_version()
     try
         arch = computer('arch');
         if contains(arch, 'mac')
-            [~, v] = system('sw_vers -productVersion');
+            [~, v] = run_command({'sw_vers', '-productVersion'});
         elseif isunix
-            [~, v] = system('uname -r');
+            [~, v] = run_command({'uname', '-r'});
         else
-            [~, v] = system('ver');
+            % 'ver' is a cmd.exe builtin, not a standalone executable --
+            % it needs the one shell layer run_shell_script provides.
+            [~, v] = run_shell_script('ver');
         end
         v = strtrim(v);
     catch
@@ -233,11 +235,19 @@ function m = get_cpu_model()
     try
         arch = computer('arch');
         if contains(arch, 'mac')
-            [~, m] = system('sysctl -n machdep.cpu.brand_string');
+            [~, m] = run_command({'sysctl', '-n', 'machdep.cpu.brand_string'});
         elseif isunix
-            [~, m] = system('grep -m1 "model name" /proc/cpuinfo | cut -d: -f2');
+            % /proc/cpuinfo is a regular (virtual) file -- read it
+            % directly instead of `grep ... | cut ...`, no process at all.
+            cpuinfo = fileread('/proc/cpuinfo');
+            line_match = regexp(cpuinfo, '^model name\s*:\s*(.*)$', 'once', 'tokens', 'lineanchors');
+            if ~isempty(line_match)
+                m = line_match{1};
+            else
+                m = 'unknown';
+            end
         else
-            [~, m] = system('wmic cpu get name /value');
+            [~, m] = run_command({'wmic', 'cpu', 'get', 'name', '/value'});
             m = regexprep(m, 'Name=', '');
         end
         m = strtrim(m);
@@ -251,14 +261,17 @@ function gb = get_ram_gb()
     try
         arch = computer('arch');
         if contains(arch, 'mac')
-            [~, r] = system('sysctl -n hw.memsize');
+            [~, r] = run_command({'sysctl', '-n', 'hw.memsize'});
             gb = round(str2double(strtrim(r)) / 1024^3);
         elseif isunix
-            [~, r] = system('grep MemTotal /proc/meminfo');
+            % /proc/meminfo is a regular (virtual) file -- read it
+            % directly instead of `grep MemTotal /proc/meminfo`.
+            meminfo = fileread('/proc/meminfo');
+            r = regexp(meminfo, '^MemTotal:.*$', 'once', 'match', 'lineanchors');
             kb = str2double(regexp(r, '\d+', 'match', 'once'));
             gb = round(kb / 1024^2);
         else
-            [~, r] = system('wmic computersystem get TotalPhysicalMemory /value');
+            [~, r] = run_command({'wmic', 'computersystem', 'get', 'TotalPhysicalMemory', '/value'});
             bytes = str2double(regexp(r, '\d+', 'match', 'once'));
             gb = round(bytes / 1024^3);
         end

@@ -42,9 +42,8 @@ end
 
 % ---- Try hdf5plugin Python package (most reliable for BabelBrain output) ----
 if ~isempty(python_bin) && isfile(python_bin)
-    [status, out] = system(sprintf( ...
-        '"%s" -c "import hdf5plugin; print(hdf5plugin.FILTERS_PATH)" 2>/dev/null', ...
-        python_bin));
+    % run_command invokes python directly via argv, no shell at all.
+    [status, out] = run_command({python_bin, '-c', 'import hdf5plugin; print(hdf5plugin.FILTERS_PATH)'});
     if status == 0
         plugin_path = strtrim(out);
         if isfolder(plugin_path) && dir_has_plugins(plugin_path)

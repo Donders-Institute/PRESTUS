@@ -116,29 +116,36 @@ function [trans_pos_ras, focus_pos_ras] = launch_web_alignment(parameters, nii_p
     end
 
     %% Start Python HTTP server
-    cmd_server = sprintf('python3 "%s" --port %d --workdir "%s" &', ...
-        server_py, port, work_dir);
-    [status, ~] = system(cmd_server);
-    if status ~= 0
-        error('PRESTUS:webAlignment:serverFailed', ...
-            'Failed to start web alignment server. Ensure python3 is on PATH.');
-    end
+    % run_command invokes python3 directly via argv, no shell at all.
+    % Background=true (not a trailing shell '&') launches it without
+    % waiting; there is no real synchronous status to check either way --
+    % the original shell '&' launch reported success as soon as the shell
+    % forked the background job, before python3 itself could fail to bind.
+    run_command({'python3', server_py, '--port', num2str(port), '--workdir', work_dir}, ...
+        'Background', true);
 
     % Give the server a moment to bind
     pause(1.0);
 
     %% Open browser
+    % run_command/run_shell_script invoke the browser directly via argv
+    % (Background=true, matching the original trailing '&'). options.Browser
+    % is a user-facing config value -- previously spliced into system()
+    % completely unquoted; now it reaches the process as one literal
+    % argument regardless of its contents, with no shell involved.
     url = sprintf('http://localhost:%d/index.html', port);
     if strcmp(options.Browser, 'auto')
         if ismac
-            system(sprintf('open "%s" &', url));
+            run_command({'open', url}, 'Background', true);
         elseif isunix
-            system(sprintf('xdg-open "%s" &', url));
+            run_command({'xdg-open', url}, 'Background', true);
         else
-            system(sprintf('start "" "%s"', url));
+            % 'start' is a cmd.exe builtin, not a standalone executable --
+            % it genuinely needs the one shell layer run_shell_script provides.
+            run_shell_script(sprintf('start "" %s', shell_quote_arg(url)), 'Background', true);
         end
     else
-        system(sprintf('%s "%s" &', options.Browser, url));
+        run_command({options.Browser, url}, 'Background', true);
     end
 
     fprintf('Web alignment viewer opened at %s\n', url);
@@ -157,8 +164,16 @@ function [trans_pos_ras, focus_pos_ras] = launch_web_alignment(parameters, nii_p
     end
 
     %% Kill the server
-    kill_cmd = sprintf('lsof -ti tcp:%d | xargs kill -9 2>/dev/null; true', port);
-    system(kill_cmd);
+    % Native two-step replacement for `lsof ... | xargs kill -9`: no shell
+    % pipe needed since MATLAB itself parses lsof's output and issues one
+    % kill per PID. Best-effort cleanup, so failures (server already gone,
+    % lsof missing) are silently ignored, matching the original's
+    % `2>/dev/null; true`.
+    [~, lsof_out] = run_command({'lsof', '-ti', sprintf('tcp:%d', port)});
+    pids = regexp(strtrim(lsof_out), '\d+', 'match');
+    for i = 1:numel(pids)
+        run_command({'kill', '-9', pids{i}});
+    end
 
     %% Parse result
     if ~result_received

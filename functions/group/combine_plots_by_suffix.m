@@ -62,15 +62,24 @@ function combine_plots_by_suffix(suffix, outputs_path, subject_list, parameters,
         imwrite(I, new_name);
     end
 
-    % Combine all modified images into a single montage using the `montage` command-line tool.
-    % tmp_path/suffix are quoted with shell_quote_arg (not "%s") since
-    % outputs_path/suffix ultimately come from caller-supplied config.
-    montage_out = sprintf('../all_%s.png', suffix);
-    system(sprintf('cd %s; montage -background black -gravity south -mode concatenate $(ls -1 *.png | sort -g) %s', ...
-        shell_quote_arg(tmp_path), shell_quote_arg(montage_out)));
+    % Combine all modified images into a single montage using the `montage`
+    % command-line tool. The file list is built and numerically sorted in
+    % MATLAB via dir() rather than a shell `$(ls -1 *.png | sort -g)` glob,
+    % and passed to run_command() as explicit argv elements -- no shell is
+    % involved for the glob, the sort, or the montage invocation itself.
+    png_files = dir(fullfile(tmp_path, '*.png'));
+    [~, order] = sort(cellfun(@(n) str2double(erase(n, '.png')), {png_files.name}));
+    png_paths = arrayfun(@(f) fullfile(f.folder, f.name), png_files(order), 'UniformOutput', false);
+    png_paths = reshape(png_paths, 1, []);
+
+    montage_out = fullfile(outputs_path, sprintf('all_%s.png', suffix));
+    run_command([{'montage', '-background', 'black', '-gravity', 'south', '-mode', 'concatenate'}, ...
+        png_paths, {montage_out}]);
 
     % Clean up temporary files and remove the temporary directory
-    system(sprintf('cd %s; rm *.png', shell_quote_arg(tmp_path)));
+    for k = 1:numel(png_paths)
+        delete(png_paths{k});
+    end
     rmdir(tmp_path);
 end
 

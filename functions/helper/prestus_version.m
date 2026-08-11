@@ -27,15 +27,18 @@ function [hash, version_str] = prestus_version(prestus_path)
     version_str = 'unknown';
 
     try
-        [status, git_info] = system(sprintf('git -C "%s" rev-parse --short HEAD 2>/dev/null', prestus_path));
-        [~,      branch]   = system(sprintf('git -C "%s" branch --show-current 2>/dev/null', prestus_path));
-        [~,      date]     = system(sprintf('git -C "%s" --no-pager log -1 --format="%%cd" --date=short 2>/dev/null', prestus_path));
+        % run_command invokes git directly via argv, no shell at all --
+        % prestus_path reaches the process as a literal argument
+        % regardless of its contents.
+        [status, git_info] = run_command({'git', '-C', prestus_path, 'rev-parse', '--short', 'HEAD'});
+        [~,      branch]   = run_command({'git', '-C', prestus_path, 'branch', '--show-current'});
+        [~,      date]     = run_command({'git', '-C', prestus_path, '--no-pager', 'log', '-1', '--format=%cd', '--date=short'});
 
         if status == 0 && ~isempty(strtrim(git_info))
             hash = strtrim(git_info);
         end
 
-        [tag_status, tag_str] = system(sprintf('git -C "%s" describe --tags --always 2>/dev/null', prestus_path));
+        [tag_status, tag_str] = run_command({'git', '-C', prestus_path, 'describe', '--tags', '--always'});
         if tag_status == 0 && ~isempty(strtrim(tag_str))
             version_str = strtrim(tag_str);
         else

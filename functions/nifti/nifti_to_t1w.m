@@ -119,7 +119,9 @@ else
     niftiwrite(data, filepath, hdr);
 end
 if exist(gz_path, 'file'), delete(gz_path); end
-[status, msg] = system(['gzip -f "' nii_path '"']);
+% run_command invokes gzip directly via argv, no shell at all -- nii_path
+% reaches the process as a literal argument regardless of its contents.
+[status, msg] = run_command({'gzip', '-f', nii_path});
 if status ~= 0
     error('niftiwrite_gz:gzipFailed', 'gzip failed for %s: %s', nii_path, msg);
 end

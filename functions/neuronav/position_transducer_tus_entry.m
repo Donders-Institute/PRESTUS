@@ -214,10 +214,13 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     % ── Run TUS_entry ─────────────────────────────────────────────────────────
 
-    cmd = sprintf('%s --vanilla %s', shell_quote_arg(rscript_bin), shell_quote_arg(runner_path));
-    fprintf('TUS_entry: running placement...\n  %s\n', cmd);
-
-    [status, cmdout] = system(cmd);
+    fprintf('TUS_entry: running placement...\n  %s --vanilla %s\n', rscript_bin, runner_path);
+    % run_command invokes Rscript directly via argv, no shell involved.
+    % Note this is orthogonal to r_quote_string() above: that protects
+    % against a path breaking out of its R string literal *inside*
+    % runner_path's generated source; this just removes the shell that
+    % would otherwise launch Rscript itself.
+    [status, cmdout] = run_command({rscript_bin, '--vanilla', runner_path});
     fprintf('%s\n', cmdout);
 
     if status ~= 0

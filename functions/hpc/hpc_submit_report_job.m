@@ -76,8 +76,8 @@ fprintf(fid, 'module load %s\n', matlab_module);
 fprintf(fid, 'matlab -batch "%s"\n', m_name);
 fclose(fid);
 
-% Submit
-[status, out] = system(sprintf('cd %s; sbatch %s', log_dir, sh_file));
+% Submit. run_command invokes sbatch directly via argv, no shell at all.
+[status, out] = run_command({'sbatch', sh_file}, 'WorkingDir', log_dir);
 if status ~= 0
     warning('PRESTUS:hpc_submit_report_job:submitFailed', ...
         'Report job submission failed: %s', out);

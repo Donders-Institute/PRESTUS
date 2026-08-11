@@ -368,42 +368,58 @@ end
 % 4. Invoke Python bridge
 % -------------------------------------------------------------------------
 
+% run_command's Env option sets JAX_PLATFORMS natively on the child
+% process -- no `VAR=val cmd` shell prefix syntax needed at all.
+env_overrides = struct();
 if using_gpu_env
-    jax_prefix = 'JAX_PLATFORMS=cuda,cpu ';
+    env_overrides.JAX_PLATFORMS = 'cuda,cpu';
 else
-    jax_prefix = 'JAX_PLATFORMS=cpu ';
+    env_overrides.JAX_PLATFORMS = 'cpu';
 end
 
-% Append Python stdout+stderr directly to the main PRESTUS log (no separate log file).
-if isfield(parameters, 'io') && isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
-    log_redirect = sprintf(' >> "%s" 2>&1', parameters.io.log_file);
-else
-    log_redirect = '';
-end
-
-gmres_flags  = sprintf(' --gmres_restart %d --gmres_maxiter %d --gmres_tol %.1e', gmres_restart, gmres_maxiter, gmres_tol);
-solver_flag  = sprintf(' --solver %s', solver);
-fd_flag      = sprintf(' --fd_accuracy %d', fd_accuracy);
+% run_command invokes python directly via argv, no shell at all --
+% input_h5/output_h5/parameters.io.log_file reach the process (or are
+% used directly by MATLAB) as literal values regardless of their contents.
+jwave_argv = {python_bin, bridge_py, '--input', input_h5, '--output', output_h5, ...
+    '--solver', solver, ...
+    '--gmres_restart', num2str(gmres_restart), ...
+    '--gmres_maxiter', num2str(gmres_maxiter), ...
+    '--gmres_tol', sprintf('%.1e', gmres_tol), ...
+    '--fd_accuracy', num2str(fd_accuracy)};
 % parameters.simulation.debug drives run_jwave_sim.py's --debug: extra prints
 % for PML/domain sizing in wavelengths, time-domain steady-state margin, and
 % a Helmholtz compile-vs-solve time breakdown (see run_jwave_sim.py --help).
 is_debug = isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') ...
     && isequal(parameters.simulation.debug, 1);
-debug_flag = ternary(is_debug, ' --debug', '');
-cmd = sprintf('%s"%s" "%s" --input "%s" --output "%s"%s%s%s%s%s', ...
-    jax_prefix, python_bin, bridge_py, input_h5, output_h5, solver_flag, gmres_flags, fd_flag, debug_flag, log_redirect);
+if is_debug
+    jwave_argv = [jwave_argv, {'--debug'}];
+end
 
 fprintf('[jwave_wrapper] Launching jwave simulation...\n');
-fprintf('[jwave_wrapper] Command:\n  %s\n', cmd);
+fprintf('[jwave_wrapper] Command:\n  %s\n', strjoin(jwave_argv, ' '));
 
-% '-echo' streams the Python subprocess's stdout/stderr to the MATLAB console
-% live as it is produced (matching the cpp_cpu/cpp_gpu backends' behaviour,
-% see kspaceFirstOrder3DC.m), rather than buffering it until the process
-% exits. This is what makes run_jwave_sim.py's progress/ETA prints usable as
-% real-time feedback instead of a wall of text dumped after the fact.
+% Echo=true streams the Python subprocess's stdout/stderr to the MATLAB
+% console live as it is produced (matching the cpp_cpu/cpp_gpu backends'
+% behaviour, see kspaceFirstOrder3DC.m; matches the original system(cmd,
+% '-echo')), rather than buffering it until the process exits. This is
+% what makes run_jwave_sim.py's progress/ETA prints usable as real-time
+% feedback instead of a wall of text dumped after the fact.
 t_start = tic;
-[status, cmd_out] = system(cmd, '-echo');
+[status, cmd_out] = run_command(jwave_argv, 'Env', env_overrides, 'Echo', true);
 elapsed = toc(t_start);
+
+% Append Python stdout+stderr to the main PRESTUS log (no separate log
+% file). Previously a shell `>> logfile 2>&1` redirect diverted the
+% subprocess's output straight to the file (silently, with no console
+% echo); now the full captured output is appended once the process
+% finishes, in addition to the live console echo above.
+if isfield(parameters, 'io') && isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
+    log_fid = fopen(parameters.io.log_file, 'a');
+    if log_fid ~= -1
+        fprintf(log_fid, '%s', cmd_out);
+        fclose(log_fid);
+    end
+end
 
 if status ~= 0
     error('jwave_wrapper: Python process exited with status %d.\n%s', status, cmd_out);
@@ -698,7 +714,7 @@ function [python_bin, is_gpu] = resolve_python_env(cpu_env, gpu_env, use_gpu)
         % nvidia-smi lists all node GPUs regardless of scheduler allocation;
         % CUDA_VISIBLE_DEVICES="" or "NoDevFiles" means no GPU was granted to
         % this job even if hardware is present.
-        [smi_status, smi_out] = system('nvidia-smi -L 2>/dev/null');
+        [smi_status, smi_out] = run_command({'nvidia-smi', '-L'});
         cvd = getenv('CUDA_VISIBLE_DEVICES');
         cvd_blocked = ~isempty(cvd) && (isempty(strtrim(cvd)) || strcmpi(strtrim(cvd), 'nodevfiles'));
         smi_out_trim = strtrim(smi_out);

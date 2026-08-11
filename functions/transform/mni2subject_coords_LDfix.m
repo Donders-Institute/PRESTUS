@@ -3,11 +3,11 @@ function coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters, t
 %
 % Writes coords_mni to a temporary CSV in SimNIBS Generic format, calls the
 % mni2subject_coords command-line tool, and reads back the result. An optional
-% LD_LIBRARY_PATH export is prepended to the system call when
+% LD_LIBRARY_PATH override is set on the child process's environment when
 % parameters.hpc.ld_library_path is set — this hotfix is required on some HPC
 % systems where SimNIBS bash scripts do not inherit the library path correctly
 % (see: https://github.com/simnibs/simnibs/issues/106). Has a large per-call
-% overhead due to the system() call; do not call inside tight loops.
+% overhead due to the external process call; do not call inside tight loops.
 %
 % Use as:
 %   coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters)
@@ -46,24 +46,21 @@ end
 fclose( fid );
 fn_out = [tempname,'.csv'];
 
-% include LD fix (Unix only; Windows does not use LD_LIBRARY_PATH)
+% include LD fix (Unix only; Windows does not use LD_LIBRARY_PATH).
+% run_command's Env option sets LD_LIBRARY_PATH natively on the child
+% process -- no `export ...;` shell syntax needed at all.
+env_overrides = struct();
 if isfield(parameters.hpc,'ld_library_path') && ~isempty(parameters.hpc.ld_library_path) && ~ispc
-    ld_command = sprintf('export LD_LIBRARY_PATH=%s; ', shell_quote_arg(parameters.hpc.ld_library_path));
-else
-    ld_command = '';
+    env_overrides.LD_LIBRARY_PATH = parameters.hpc.ld_library_path;
 end
 
-% Run mni2subject_coords. shell_quote_arg (not "%s") because subdir (the
-% m2m folder) may come from a shared/untrusted data directory: double
-% quotes alone do not stop $(...) command substitution in its name.
+% run_command invokes mni2subject_coords directly via argv, no shell at
+% all -- subdir (the m2m folder, which may come from a shared/untrusted
+% data directory) reaches the process as a literal argument regardless
+% of its contents.
 mni2sub_bin = fullfile(parameters.startup.simnibs_bin_path, 'mni2subject_coords');
-[status,result] = system(sprintf('%s%s -m %s -s %s -o %s -t %s', ...
-    ld_command, shell_quote_arg(mni2sub_bin), shell_quote_arg(subdir), shell_quote_arg(fn_in), shell_quote_arg(fn_out), shell_quote_arg(transformation_type)));
-
-
-% system([simnibs_cli_call('mni2subject_coords')...
-%                          ' -m "' subdir '" -s ' fn_in ' -o ' fn_out ...
-%                          ' -t ' transformation_type]);
+[status, result] = run_command({mni2sub_bin, '-m', subdir, '-s', fn_in, '-o', fn_out, '-t', transformation_type}, ...
+    'Env', env_overrides);
 
 % Check if call was successefull
 if status ~= 0
