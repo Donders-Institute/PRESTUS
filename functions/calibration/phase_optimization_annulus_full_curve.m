@@ -1,4 +1,4 @@
-function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
+function [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
 
 % PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE  Compute intensity profile error for full-curve phase optimisation
 %
@@ -8,7 +8,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
 % profiles and cost function.
 %
 % Use as:
-%   [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, ...
+%   [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, ...
 %       axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
 %
 % Input:
@@ -25,12 +25,12 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
 %                             (default: 0)
 %
 % Output:
-%   error - weighted mean squared error between computed and desired profiles
+%   err   - weighted mean squared error between computed and desired profiles
 %   ax1   - handle to the intensity and weights subplot
 %   ax2   - handle to the error visualisation subplot
 %   h     - handle to the figure
 %
-% See also: PERFORM_GLOBAL_SEARCH, PHASE_OPTIMIZATION_ANNULUS
+% See also: PERFORM_GLOBAL_SEARCH, RAYLEIGH_AXIAL_INTENSITY
 
     arguments
         phase
@@ -42,6 +42,13 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         opt_limits = [1, max(axial_position)]
         weights = 0
     end
+
+    % Use column vectors throughout. The forward models and empirical profiles
+    % differ in orientation (rayleigh_axial_intensity returns a column;
+    % measured profiles are rows), and column-minus-row would silently
+    % broadcast to an N x N matrix instead of an elementwise difference.
+    axial_position          = axial_position(:);
+    desired_intensity_curve = desired_intensity_curve(:);
 
     %% Restrict axial positions to optimization limits
     limit_ind = (axial_position >= opt_limits(1) & axial_position <= opt_limits(2));
@@ -67,6 +74,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
     else
         error('phase_optimization_annulus_full_curve: unknown forward_model ''%s''; expected ''oneil'' or ''rayleigh''.', forward_model);
     end
+    i_axial = i_axial(:);
 
     %% Generate weights if not provided
 
@@ -81,7 +89,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
         weights = normpdf(axial_position, center_pos, sigma);
     end
     % Normalize over the optimization range only (zero weight outside it),
-    % so `error` is a properly-scaled weighted MSE that doesn't shrink with
+    % so `err` is a properly-scaled weighted MSE that doesn't shrink with
     % point density outside opt_limits or with how many points fall inside
     % it. Normalizing over the full axial_position and then averaging again
     % over the restricted range double-divides the error, letting it collapse
@@ -92,7 +100,7 @@ function [error, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, par
     %% Calculate error metric
     % Compute weighted squared error between computed and desired profiles
     error_v = (i_axial - desired_intensity_curve).^2 .* weights;
-    error = sum(error_v(limit_ind)); % weights already sum to 1 over limit_ind
+    err = sum(error_v(limit_ind)); % weights already sum to 1 over limit_ind
 
     %% Visualization of results (optional)
     if plot_results

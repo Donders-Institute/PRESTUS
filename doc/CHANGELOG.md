@@ -92,6 +92,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 #### Transducer library
 - Scan equipment, store validated parametric models, plot and compare entries
 - `calibration.focal_reference` (`flhm_3db` default, `flhm_6db`, `peak`) sets which axial-profile convention a quoted focal depth refers to; used by `compute_flhm_center`/`compute_focal_metrics` and recorded in the calibration sidecar (see [doc_calibration.md](doc_calibration.md))
+- ⚠️ **Fixed:** `phase_optimization_annulus_full_curve` compared a column model profile against a row target profile, which broadcast to an N×N matrix and could accept a degenerate near-zero fit. Calibrations fitted to measured (row-vector) profiles should be re-run
 - Joint-depth phase/amplitude fit for more robust free-field characterisation
 - Transducers resolved automatically from a serial-number-based equipment library; DS-agnostic `{serial}.yaml` fallback used when no DS-specific entry exists, with a warning
 - `build_geometric_library_entry` creates a manufacturer-report baseline entry (no empirical data required) as an immediate-use fallback before characterisation
