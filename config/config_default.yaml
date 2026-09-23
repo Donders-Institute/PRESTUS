@@ -469,8 +469,13 @@ jwave:
 babelbrain:
   computing_backend: auto   # GPU/CPU backend: 'auto' | 'cuda' | 'opencl' | 'cpu'
   device_name: auto         # Device to use: 'auto' selects the first available
-  ppw: 6                    # Points-per-wavelength for BabelBrain's internal FDTD grid
+  ppw: 12                   # Points-per-wavelength for BabelBrain's internal FDTD grid (BabelViscoFDTD benchmark fidelity; lower = faster but more axial numerical dispersion)
   do_refocusing: false      # Apply BabelBrain refocusing step
+  focal_calibration: true           # Geometric-fallback steering only (no explicit element phases): choose the steer so the achieved FWHM-centre (or peak) lands at focal_distance_ep. With explicit phases this runs locate-only (reports the predicted focus, never replaces the drive). Set false to disable.
+  focal_calibration_target: flhm_center  # Quantity placed at focal_distance_ep: 'flhm_center' (−3 dB axial midpoint; manufacturer convention) | 'peak'
+  profile_calibration: false        # Optional refinement (annular explicit-phase drives only): re-fit the BabelBrain drive phases so the discrete-ring Rayleigh field matches the continuous-bowl O'Neil ideal across the WHOLE axial profile (not just the FWHM centre). BabelBrain-specific (only the weights delta uses it; shared library phases for k-Wave/jwave are untouched). OFF by default: once the delta is referenced to the correct steering aim (focal_distance_ep), BabelBrain already reproduces the library phases, matching the k-Wave/jwave cluster; this fit targets the continuous-bowl ideal, which sits slightly distal of that cluster.
+  water_amp_calibration: true       # Scale BabelBrain output pressure so its free-water peak matches the analytic Rayleigh peak for the same drive (calibrates out BabelBrain's residual CFL-correction amplitude bias; requires explicit element phases)
+  use_rayleigh_for_water: false     # Water-only field solver. false: full-wave FDTD (matches k-Wave/jwave for like-for-like backend comparison; recommended). true: BabelBrain's native Rayleigh–Sommerfeld integral (faster, exact linear free-field, but focuses slightly tighter/deeper than a gridded full-wave solve → reads as a rigid axial offset + higher peak vs the other backends). Only affects water-only runs; the transcranial field always uses FDTD.
   z_beyond_focus_mm: 40     # How far beyond the focus to extend the simulation domain [mm]
   python_env: ''            # Path to Python environment or executable; empty = system python
   ct_mapping: ''            # CT Hounsfield-to-property mapping name for CT-based skull modelling; empty = label-based path

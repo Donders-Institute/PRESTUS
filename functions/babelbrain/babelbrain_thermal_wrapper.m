@@ -97,13 +97,22 @@ if ~isfile(bb_runner)
 end
 
 %% Convert PRESTUS timing → BabelBrain convention
+% PRESTUS timing hierarchy (see thermal_parameters.m): pd/pri (single pulse
+% within a train) -> ptd (ON duration of ONE pulse train) -> ptri (period of
+% one pulse-train repetition, ON+OFF) -> ptrd (TOTAL span across ALL
+% repetitions, = n_ptri_reps * ptri) -> post_ptri_dur (extra cooldown after
+% the whole repeated sequence, not currently threaded through to BabelBrain
+% -- see warning below).
 t = parameters.timing;
 if ~isfield(t,'pd') || ~isfield(t,'pri') || t.pri <= 0
     error('babelbrain_thermal_wrapper: parameters.timing.pd and .pri must be set (pri > 0).');
 end
+if ~isfield(t, 'ptd')
+    error('babelbrain_thermal_wrapper: parameters.timing.ptd must be set (single pulse-train ON duration).');
+end
 duty_cycle = t.pd / t.pri;
 prf_hz     = 1 / t.pri;
-duration_s = t.ptrd;   % pulse train repetition duration
+duration_s = t.ptd;   % ON duration of a single pulse-train repetition (NOT ptrd, the total across all reps)
 
 % Validate converted timing parameters before passing to BabelBrain
 if duty_cycle <= 0 || duty_cycle > 1
@@ -116,7 +125,7 @@ if prf_hz <= 0 || ~isfinite(prf_hz)
 end
 if duration_s <= 0
     error(['babelbrain_thermal_wrapper: duration=%.4f s is <= 0.\n' ...
-        'Check parameters.timing.ptrd.'], duration_s);
+        'Check parameters.timing.ptd.'], duration_s);
 end
 if ~isfinite(bb.isppa_w_per_cm2) || bb.isppa_w_per_cm2 <= 0
     error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is invalid (<= 0 or non-finite).\n' ...
@@ -124,23 +133,34 @@ if ~isfinite(bb.isppa_w_per_cm2) || bb.isppa_w_per_cm2 <= 0
 end
 
 % Cooling interval between repetitions (BabelBrain DurationOff).
-% In PRESTUS, ptri is the period of one pulse-train block; the off-time is
-% the remainder after the on-duration (ptrd). If ptri is not set or is not
-% longer than ptrd, there is no inter-train gap.
-if isfield(t, 'ptri') && t.ptri > t.ptrd
-    duration_off_s = t.ptri - t.ptrd;
+% In PRESTUS, ptri is the period of one pulse-train repetition (ON+OFF); the
+% off-time is the remainder after the ON duration (ptd). If ptri is not set
+% or is not longer than ptd, there is no inter-train gap.
+if isfield(t, 'ptri') && t.ptri > t.ptd
+    duration_off_s = t.ptri - t.ptd;
 else
     duration_off_s = 0.0;
 end
 
-% Warn for multi-PTRI protocols: DurationUS maps to one block (ptrd), not
-% the total duration across all repetitions.
+% Number of pulse-train repetitions: PRESTUS computes this as
+% n_ptri_reps = round(ptrd / ptri) (thermal_parameters.m). BabelBrain's
+% Repetitions parameter runs this many (DurationUS on / DurationOff off) cycles,
+% so cooling between trains is modelled.
+repetitions = 1;
 if isfield(t, 'n_ptri_reps') && t.n_ptri_reps > 1
-    warning('PRESTUS:BabelBrain:multiPTRI', ...
-        ['BabelBrain DurationUS maps to one pulse-train block (ptrd = %.1f s). ' ...
-         'Multi-PTRI protocol (%d reps) uses BabelBrain Repetitions parameter ' ...
-         'for the full sonication — verify the timing in the BabelBrain log.'], ...
-        t.ptrd, t.n_ptri_reps);
+    repetitions = round(t.n_ptri_reps);
+end
+
+% NOTE: parameters.timing.post_ptri_dur (cooldown after the whole sequence in
+% the native thermal path) is not passed to BabelBrain. The candidate options,
+% NumberGroupedSonications/PauseBetweenGroupedSonications, are left at their
+% defaults (1, 0.0) until their semantics are confirmed, so FinalTemp/FinalDose
+% reflect the end of the last repetition only.
+if isfield(t, 'post_ptri_dur') && t.post_ptri_dur > 0
+    warning('PRESTUS:BabelBrain:postPtriDurNotApplied', ...
+        ['parameters.timing.post_ptri_dur (%.1f s) is set but not currently passed to BabelBrain -- ' ...
+         'its thermal output reflects cooldown only up to the end of the last repetition, not the ' ...
+         'full post_ptri_dur cooldown window the native thermal path would track.'], t.post_ptri_dur);
 end
 
 % Select pressure field: use refocused map when refocusing was requested.
@@ -174,6 +194,7 @@ thermal_argv = {python_bin, bb_runner, ...
     '--prf', sprintf('%.2f', prf_hz), ...
     '--duration_s', sprintf('%.4f', duration_s), ...
     '--duration_off_s', sprintf('%.4f', duration_off_s), ...
+    '--repetitions', num2str(repetitions), ...
     '--sel_p', sel_p, ...
     '--computing_backend', num2str(bb.computing_backend), ...
     '--device_name', bb.device_name, ...
@@ -189,8 +210,8 @@ if isfield(parameters, 'transducer') && ~isempty(parameters.transducer) && ...
     thermal_argv = [thermal_argv, {'--frequency', sprintf('%.0f', parameters.transducer(1).freq_hz)}];
 end
 
-fprintf('[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  duration_off=%.1f s\n', ...
-    duty_cycle, prf_hz, duration_s, duration_off_s);
+fprintf('[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  duration_off=%.1f s  repetitions=%d\n', ...
+    duty_cycle, prf_hz, duration_s, duration_off_s, repetitions);
 fprintf('[babelbrain_thermal_wrapper] ISPPA: %.2f W/cm²\n', bb.isppa_w_per_cm2);
 fprintf('[babelbrain_thermal_wrapper] Command:\n  %s\n', strjoin(thermal_argv, ' '));
 
@@ -204,19 +225,35 @@ end
 fprintf('[babelbrain_thermal_wrapper] BabelBrain thermal finished in %.1f s.\n', elapsed);
 
 %% Locate thermal output HDF5
-% BabelBrain names output: same prefix as DataForSim but with thermal suffix.
-% Use a glob to avoid scanning unrelated files and pick the newest match in
-% case a prior run left a stale file.
-thermal_candidates = dir(fullfile(fileparts(acoustic_h5), '*ThermalField*.h5'));
-thermal_h5 = '';
-if ~isempty(thermal_candidates)
-    [~, newest_idx] = max([thermal_candidates.datenum]);
-    thermal_h5 = fullfile(thermal_candidates(newest_idx).folder, thermal_candidates(newest_idx).name);
+% BabelBrain names the thermal file by replacing the DataForSim suffix with
+% -ThermalField_AllCombinations.h5.  Try an exact stem match first; fall back
+% to a glob + newest-by-mtime if the convention has changed.
+[acous_dir_, acous_stem_] = fileparts(acoustic_h5);
+stem_prefix_ = regexprep(acous_stem_, '_DataForSim$', '');
+stem_match_  = fullfile(acous_dir_, [stem_prefix_ '-ThermalField_AllCombinations.h5']);
+thermal_h5   = '';
+if isfile(stem_match_)
+    thermal_h5 = stem_match_;
+else
+    thermal_candidates = dir(fullfile(acous_dir_, [stem_prefix_ '*ThermalField*.h5']));
+    if isempty(thermal_candidates)
+        % Wider fallback: any ThermalField file in the same directory
+        thermal_candidates = dir(fullfile(acous_dir_, '*ThermalField*.h5'));
+    end
+    if ~isempty(thermal_candidates)
+        [~, newest_idx] = max([thermal_candidates.datenum]);
+        thermal_h5 = fullfile(thermal_candidates(newest_idx).folder, thermal_candidates(newest_idx).name);
+        if numel(thermal_candidates) > 1
+            warning('babelbrain_thermal_wrapper:ambiguousThermalFile', ...
+                ['%d *ThermalField*.h5 files found; using newest:\n  %s\n' ...
+                'Delete stale files to avoid ambiguity.'], numel(thermal_candidates), thermal_h5);
+        end
+    end
 end
 
 if isempty(thermal_h5)
     error(['babelbrain_thermal_wrapper: thermal output HDF5 not found in %s.\n' ...
-        'Expected a file matching *ThermalField*.h5'], fileparts(acoustic_h5));
+        'Expected a file matching *ThermalField*.h5'], acous_dir_);
 end
 fprintf('[babelbrain_thermal_wrapper] Reading thermal output: %s\n', thermal_h5);
 
@@ -243,7 +280,11 @@ else
     error(['babelbrain_thermal_wrapper: sensor_data is missing focus_pos or focal_length_mm.\n' ...
         'These are set by babelbrain_wrapper — re-run babelbrain_wrapper to refresh sensor_data.']);
 end
-results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, thermal_focus_pos, thermal_focal_length_mm);
+thermal_trans_pos = [];
+if isfield(sensor_data, 'trans_pos')
+    thermal_trans_pos = sensor_data.trans_pos;   % beam-axis direction for the depth resample
+end
+results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, thermal_focus_pos, thermal_focal_length_mm, thermal_trans_pos);
 
 end
 
@@ -251,8 +292,19 @@ end
 
 function [backend, device] = resolve_backend(backend, device)
 % Resolve 'auto' computing_backend / device_name to concrete integers/strings.
-% Priority: Metal (macOS) > CUDA (nvidia-smi) > CPU.
+% Priority: Metal (macOS) > CUDA (nvidia-smi) > error.
+%
+% BabelBrain's thermal engine (CalculateThermalProcess.py) maps backends 1..4
+% to 'CUDA','OpenCL','Metal','MLX' and has no CPU option (unlike the acoustic
+% engine), so backend 4 means MLX (Apple Silicon only). Without a GPU this
+% errors rather than falling back to a CPU path that does not exist.
     if ~(ischar(backend) && strcmp(backend, 'auto'))
+        if backend == 4
+            error('babelbrain_thermal_wrapper:noCpuBackend', ...
+                ['computing_backend=4 requested for the BabelBrain thermal engine, but BabelBrain''s ' ...
+                 'thermal Backend list (CalculateThermalProcess.py) has no CPU option -- index 4 is MLX ' ...
+                 '(Apple Silicon only). Use 1=CUDA, 2=OpenCL, or 3=Metal, matching available hardware.']);
+        end
         if ischar(device) && strcmp(device, 'auto')
             switch backend
                 case 3;  device = 'Apple';
@@ -278,10 +330,10 @@ function [backend, device] = resolve_backend(backend, device)
             return
         end
     end
-    backend = 4;
-    device  = 'CPU';
-    warning('babelbrain_thermal_wrapper:cpuFallback', ...
-        '[babelbrain_thermal_wrapper] No GPU detected; falling back to CPU.');
+    error('babelbrain_thermal_wrapper:noBackendAvailable', ...
+        ['No GPU detected (not macOS, no CUDA device via nvidia-smi) and BabelBrain''s thermal engine ' ...
+         'has no CPU backend -- it cannot run here. Set babelbrain.computing_backend explicitly if a ' ...
+         'supported device (CUDA/OpenCL/Metal) is actually available but was not auto-detected.']);
 end
 
 function s = apply_default(s, field, val)

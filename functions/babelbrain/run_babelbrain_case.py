@@ -140,6 +140,12 @@ def parse_args():
                    help='Run water-only baseline simulation (bWaterOnly=True). '
                         'Produces *_Water_DataForSim.h5 alongside the tissue DataForSim.h5. '
                         'Required by BabelBrain thermal for ISPPA normalization.')
+    p.add_argument('--no_rayleigh_for_water', action='store_true',
+                   help='Compute the water-only field with the full-wave FDTD solver instead of '
+                        'the Rayleigh–Sommerfeld integral (sets bUseRayleighForWater=False). Use '
+                        'this to compare against other full-wave backends (k-Wave/jwave) on a like-'
+                        'for-like basis; the Rayleigh default focuses slightly tighter/deeper and '
+                        'so reads as a rigid axial offset + higher peak vs full-wave solvers.')
     p.add_argument('--use_ct',              action='store_true',
                    help='Activate BabelBrain CT path (bUseCT=True). Requires a CT.nii.gz '
                         'alongside the BabelViscoInput mask. Use when passing raw HU values '
@@ -152,12 +158,37 @@ def parse_args():
     p.add_argument('--use_petra',           action='store_true',
                    help="Pass bPETRA=True to __init__ -- uses Bjorn's density formula for "
                         'PETRA-sequence-derived pseudo-CT. Leave unset for ZTE/UTE pCT.')
+    p.add_argument('--no_skull_atten_fix',  action='store_true',
+                   help='Disable the non-CT skull-attenuation fix. By default, on the non-CT '
+                        '(binary mask) path PRESTUS reproduces BabelBrain CT-mode bone treatment '
+                        '(ShearSoS=0, QCorrArr[bone]=QCorrection) so the skull actually attenuates; '
+                        'without it BabelBrain applies ~zero skull attenuation (ISPPA far too high). '
+                        'Set this flag only to reproduce the un-patched BabelBrain behaviour.')
+    p.add_argument('--no_zdomain_fix',      action='store_true',
+                   help='Disable the ZDomainStart neutralization fix. By default '
+                        'CalculateDomainZReference is patched to return 0 so the transducer is '
+                        'placed at exactly the requested TxMechanicalAdjustmentZ. Without the fix, '
+                        'BabelBrain silently adds a skin-surface-dependent domain correction '
+                        '(GlobalStartSkin - LineOfSightStartSkin) on top of the requested '
+                        'adjustment, moving the source millimetres off the PRESTUS-intended '
+                        'position (observed -5.5 mm). Set this flag only to reproduce the '
+                        'un-patched BabelBrain behaviour.')
+    p.add_argument('--medium_properties_json', default='',
+                   help='Path to a JSON dump of PRESTUS parameters.medium_properties. When given, '
+                        "BabelBrain's built-in non-CT material database (MatFreq) is overwritten "
+                        'with these values (sound_speed, density, attenuation converted from '
+                        'dB/cm/MHz to Np/m; shear set to 0) so k-Wave / jwave / BabelBrain assume '
+                        'identical tissue acoustics. No effect on the CT path bone mapping.')
     p.add_argument('--log_file',            default='',
                    help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     p.add_argument('--source_amp_pa',       default=0.0, type=float,
                    help='Source pressure amplitude [Pa] derived from calibrated particle velocity '
                         '(velocity_m_s * rho_water * c_water). When provided, overrides '
                         "BabelBrain's default of 50 kPa so simulated ISPPA matches calibration.")
+    p.add_argument('--debug',               action='store_true',
+                   help='Keep BabelBrain debug-only outputs that PRESTUS itself does not read, e.g. '
+                        '*_Sub_NORM.nii.gz (brain-masked, normalized FullElasticSolution — useful to '
+                        'see where the brain/skull mask boundary falls relative to the solved field).')
     return p.parse_args()
 
 
@@ -287,6 +318,11 @@ def convert_weights_if_needed(weights_path):
                 f"Unrecognised CALIBRATION layout in {weights_path}. "
                 "Expected complex dataset or group with 'real'/'imag' datasets."
             )
+        # Carry the raw drive (for the AllPhi-referenced correction) through the
+        # conversion — SaveToH5py below rewrites the file from scratch, so these
+        # would otherwise be lost and the correction would silently fall back.
+        drive_phases = np.asarray(f['DRIVE/phases_rad']).ravel() if ('DRIVE' in f and 'phases_rad' in f['DRIVE']) else None
+        drive_amp    = np.asarray(f['DRIVE/amp_ratio']).ravel()  if ('DRIVE' in f and 'amp_ratio'  in f['DRIVE']) else None
 
     weights_complex = (w_real + 1j * w_imag).astype(np.complex64).ravel()
 
@@ -297,6 +333,9 @@ def convert_weights_if_needed(weights_path):
     # Use SaveToH5py so each dataset gets the 'type' attribute that ReadFromH5py requires.
     from BabelViscoFDTD.H5pySimple import SaveToH5py
     data_dict = {'CALIBRATION': weights_complex}
+    if drive_phases is not None and drive_amp is not None:
+        data_dict['DRIVE_phases_rad'] = drive_phases.astype(np.float64)
+        data_dict['DRIVE_amp_ratio']  = drive_amp.astype(np.float64)
     SaveToH5py(data_dict, out_path)
 
     print(f'[run_babelbrain_case] Converted PRESTUS weights → BabelBrain format: {out_path}')
@@ -352,11 +391,18 @@ def get_babelbrain_version(bb_root):
     }
 
 
-def _patch_annular_array_weights(RunSimClass):
+def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
+                                 tx_mech_adjust_z=None):
     """Monkey-patch AdjustWeightAmplitudes on the SimulationConditions class of
     annular-array modules to handle per-ring calibration weights (N_rings values)
     by expanding each ring weight to all its mesh subelements.  Per-subelement
-    weights (N_subelems values) pass through unchanged."""
+    weights (N_subelems values) pass through unchanged.
+
+    When dump_path is given (debug mode), the actual source BabelBrain built —
+    sub-element positions, area weights, per-ring geometric steer (AllPhi),
+    applied weights, and the preset geometry — is written to an HDF5 file the
+    first time AdjustWeightAmplitudes runs, for offline comparison against the
+    ideal (analytical) source geometry."""
     import numpy as np
     import inspect
     import importlib
@@ -373,12 +419,154 @@ def _patch_annular_array_weights(RunSimClass):
               'per-ring weight expansion patch not applied.')
         return
 
+    def _dump_source(self, ret):
+        if not dump_path or getattr(self, '_prestus_source_dumped', False):
+            return
+        try:
+            import h5py, os
+            os.makedirs(os.path.dirname(dump_path), exist_ok=True)
+            bpp = getattr(self, 'BasePhasedArrayProgramming', None)
+            allphi = np.angle(np.asarray(bpp).ravel()) if bpp is not None else np.array([])
+            with h5py.File(dump_path, 'w') as f:
+                # Sub-element source geometry BabelBrain actually integrates over.
+                f['center']   = np.asarray(self._TxRC['center'], dtype=np.float64)   # [N_sub x 3] positions [m]
+                f['ds']       = np.asarray(self._TxRC['ds'], dtype=np.float64).ravel()  # [N_sub] surface-area weights [m^2]
+                f['elemdims'] = np.asarray([int(e[0]) for e in self._TxRC['elemdims']], dtype=np.int64)  # subelems/ring
+                if 'elemcenter' in self._TxRC:
+                    f['elemcenter'] = np.asarray(self._TxRC['elemcenter'], dtype=np.float64)  # [N_rings x 3]
+                f['AllPhi_rad']  = allphi.astype(np.float64)                          # per-ring geometric steer
+                f['weights_ret'] = np.asarray(ret, dtype=np.complex64).ravel()        # applied per-subelem weight
+                for attr, key in [('_SourceAmpPa', 'SourceAmpPa'), ('_SpatialStep', 'SpatialStep'),
+                                  ('_Frequency', 'Frequency'), ('_FocalLength', 'FocalLength'),
+                                  ('_Aperture', 'Aperture')]:
+                    v = getattr(self, attr, None)
+                    if v is not None:
+                        try: f[key] = float(v)
+                        except Exception: pass
+                for attr, key in [('_InDiameters', 'InDiameters'), ('_OutDiameters', 'OutDiameters')]:
+                    v = getattr(self, attr, None)
+                    if v is not None:
+                        f[key] = np.asarray(v, dtype=np.float64).ravel()
+            self._prestus_source_dumped = True
+            print(f'[run_babelbrain_case] Source dump written: {dump_path} '
+                  f'(N_sub={np.asarray(self._TxRC["center"]).shape[0]}, N_rings={self._TxRC["NumberElems"]})')
+        except Exception as e:
+            print(f'[run_babelbrain_case] Source dump failed (non-fatal): {e}')
+
+    def _write_anchor_sidecar(self):
+        # Source-placement DIAGNOSTIC sidecar. The output resample in
+        # read_babelbrain_output.m anchors on the /TargetLocation tissue marker
+        # (the label-5 voxel PRESTUS wrote at focus_pos), which is the exact
+        # inverse of the forward mask transform — so tissue lands back on the
+        # original medium_masks by construction and no anchor correction is
+        # applied from this file. What still matters is whether BabelBrain
+        # actually placed the SOURCE where PRESTUS asked: with the ZDomainStart
+        # neutralization active the only remaining discrepancy is the whole-voxel
+        # snap-back ("Correction") that keeps the bowl behind the FDTD source-
+        # injection plane (typically ≤ 1 native voxel). We record
+        #     residual = realized CoC z - (marker z + TxMechanicalAdjustmentZ)
+        # i.e. realized-minus-requested source position. read_babelbrain_output.m
+        # reads it back purely as a diagnostic and warns when it exceeds a voxel.
+        if not anchor_path:
+            return
+        try:
+            import json, os
+            C = np.asarray(self._TxRC['center'], dtype=np.float64)   # sub-elem positions [m], domain frame
+            Rc = float(self._FocalLength)                            # bowl radius = focal length [m]
+            fsl = getattr(self, '_FocalSpotLocation', None)
+            zdim = getattr(self, '_ZDim', None)
+            if fsl is None or zdim is None:
+                print('[run_babelbrain_case] Anchor sidecar skipped: _FocalSpotLocation/_ZDim unavailable.')
+                return
+            r2 = C[:, 0]**2 + C[:, 1]**2
+            coc_z    = float(np.mean(C[:, 2] + np.sqrt(np.maximum(Rc**2 - r2, 0.0))))  # realized source centre of curvature z [m]
+            marker_z = float(np.asarray(zdim).ravel()[int(fsl[2])])                    # focal-spot marker z [m]
+            # Requested CoC position: marker sits at preset FocalLength from the
+            # unadjusted CoC, so requested CoC z = marker z + TxMechanicalAdjustmentZ
+            # + ZSteering-independent geometry (CoC-at-marker when unadjusted).
+            req_adjust_m = float(tx_mech_adjust_z) if tx_mech_adjust_z is not None else 0.0
+            requested_coc_z = marker_z + req_adjust_m
+            residual_mm = (coc_z - requested_coc_z) * 1e3
+            offset_mm   = (coc_z - marker_z) * 1e3   # kept for backward compat / inspection
+            neutralized = getattr(self, '_prestus_zdomain_neutralized_m', None)
+            os.makedirs(os.path.dirname(anchor_path), exist_ok=True)
+            with open(anchor_path, 'w') as fh:
+                json.dump({'source_residual_mm': residual_mm,
+                           'requested_tx_adjust_mm': req_adjust_m * 1e3,
+                           'zdomain_neutralized_mm': (neutralized * 1e3) if neutralized is not None else None,
+                           'anchor_offset_mm': offset_mm,
+                           'source_coc_z_mm': coc_z * 1e3,
+                           'focalspot_marker_z_mm': marker_z * 1e3,
+                           'curv_radius_mm': Rc * 1e3}, fh)
+            print(f'[run_babelbrain_case] Source placement: realized CoC {coc_z*1e3:.3f} mm, '
+                  f'requested {requested_coc_z*1e3:.3f} mm (marker {marker_z*1e3:.3f} '
+                  f'{req_adjust_m*1e3:+.3f} adj) -> residual {residual_mm:+.3f} mm '
+                  f'-> {anchor_path}')
+        except Exception as e:
+            print(f'[run_babelbrain_case] Anchor sidecar write failed (non-fatal): {e}')
+
     def _adjust_weight_amplitudes(self):
+        ret = _compute_weights(self)
+        _dump_source(self, ret)
+        _write_anchor_sidecar(self)
+        return ret
+
+    def _compute_weights(self):
         if self._OptimizedWeights is None:
             return np.ones((self._TxRC['center'].shape[0], 1), np.complex64)
 
         n_sub = self._TxRC['center'].shape[0]
         n_rings = self._TxRC['NumberElems']
+
+        # AllPhi-referenced correction: if the weights file carries the raw
+        # intended per-ring drive (/DRIVE/phases_rad, /DRIVE/amp_ratio), rebuild
+        # the per-ring weight against BabelBrain's OWN internally-computed
+        # AllPhi so the realised per-ring phase equals phases_rad exactly:
+        #   effective = AllPhi + angle(weight) = AllPhi + (phases_rad - AllPhi)
+        #             = phases_rad.
+        # BasePhasedArrayProgramming (= exp(1j*AllPhi), per ring) is set in
+        # CalculateRayleighFieldsForward BEFORE AdjustWeightAmplitudes is called,
+        # so AllPhi is available here. This sidesteps any analytic reconstruction
+        # of BabelBrain's geometric steer (which does not reproduce the voxelised-
+        # grid AllPhi).
+        drive = None
+        try:
+            import h5py
+            with h5py.File(self._OptimizedWeightsFile, 'r') as _f:
+                # Converted (_bb.h5) layout uses flat keys; original PRESTUS file
+                # uses a /DRIVE group.
+                if 'DRIVE_phases_rad' in _f and 'DRIVE_amp_ratio' in _f:
+                    drive = (np.asarray(_f['DRIVE_phases_rad']).ravel().astype(np.float64),
+                             np.asarray(_f['DRIVE_amp_ratio']).ravel().astype(np.float64))
+                elif 'DRIVE' in _f and 'phases_rad' in _f['DRIVE']:
+                    drive = (np.asarray(_f['DRIVE/phases_rad']).ravel().astype(np.float64),
+                             np.asarray(_f['DRIVE/amp_ratio']).ravel().astype(np.float64))
+        except Exception as _e:
+            print(f'[run_babelbrain_case] Could not read DRIVE from weights file '
+                  f'({_e}); using stored CALIBRATION weights.')
+
+        bpp = getattr(self, 'BasePhasedArrayProgramming', None)
+        if drive is not None and bpp is None:
+            print('[run_babelbrain_case] /DRIVE present but AllPhi (BasePhasedArrayProgramming) '
+                  'not yet computed; using stored CALIBRATION weights for this call.')
+        if drive is not None and bpp is not None:
+            phases_rad, amp_ratio = drive
+            allphi = np.angle(np.asarray(bpp).ravel())
+            if phases_rad.size != n_rings or allphi.size != n_rings:
+                raise ValueError(
+                    f'AllPhi-referenced correction: /DRIVE has {phases_rad.size} rings and '
+                    f'AllPhi has {allphi.size}, but the Tx has {n_rings} rings.')
+            w_ring = amp_ratio * np.exp(1j * (phases_rad - allphi))
+            print('[run_babelbrain_case] AllPhi-referenced weights: realised per-ring phase '
+                  '= intended drive (deg): '
+                  f'{np.round(np.rad2deg(phases_rad - phases_rad[0]), 1).tolist()}')
+            w_expanded = np.empty(n_sub, dtype=np.complex64)
+            base = 0
+            for n in range(n_rings):
+                count = self._TxRC['elemdims'][n][0]
+                w_expanded[base:base + count] = w_ring[n]
+                base += count
+            return w_expanded.reshape((n_sub, 1))
 
         if self._OptimizedWeights.size == n_sub:
             # Already per-subelement — use directly (normal base-class path)
@@ -405,6 +593,593 @@ def _patch_annular_array_weights(RunSimClass):
     SimCond.AdjustWeightAmplitudes = _adjust_weight_amplitudes
     print(f'[run_babelbrain_case] Patched AdjustWeightAmplitudes on SimulationConditions '
           f'for per-ring weight expansion.')
+
+
+def _patch_noncat_skull_attenuation(bb_root):
+    """Make the non-CT (binary-mask) path attenuate through the skull correctly
+    by reproducing BabelBrain's *CT-mode* bone treatment.
+
+    THE BUG
+    -------
+    On the non-CT path, BabelIntegrationBASE.Step1_InitializeConditions builds the
+    per-material Q-correction array as ``QCorrArr = np.ones(5)`` (or ``np.ones(8)``
+    with brain segmentation) — i.e. it applies *no* Q correction to cortical or
+    trabecular bone. In BabelBrain's relaxation FDTD model, at the small
+    water-referenced CFL that the bone *shear* speed forces, a correction factor of
+    1.0 drives the model's target Q for bone towards infinity → essentially *zero*
+    skull attenuation. The transcranial field then comes out almost identical to
+    the water-only field (observed ISPPA ~30 W/cm² vs ~11 W/cm² for k-Wave / jwave
+    with identical settings).
+
+    The CT path does not have this problem: it adds bone with ``ShearSoS = 0`` and
+    sets ``QCorrArr[bone] = self._QCorrection`` (default 3.0). This routine
+    reproduces exactly that configuration on the non-CT path:
+
+      * ``self._Shear = 0``  → bone modelled as a fluid (no shear / mode
+        conversion), matching the CT path and the fluid solvers (k-Wave, jwave).
+        Set *before* Step1 runs so the bone AddMaterial() calls and the CFL /
+        temporal-step calculation in UpdateConditions both see shear = 0.
+      * ``QCorrArr[bone] = self._QCorrection``  → the same Q correction the CT path
+        applies, so the specified bone attenuation is actually realised. Set
+        *after* Step1 runs: the QCorr array is only consumed by the FDTD
+        propagation (Step2+), never by the temporal-step calc, so overwriting it
+        post-setup is safe.
+
+    WHY A PATCH AND NOT A BenchmarkTestFile
+    ---------------------------------------
+    BabelBrain's BenchmarkTestFile mechanism could inject materials + QCorrArr, but
+    it also requires a MaterialMap whose shape matches BabelBrain's *internal*
+    domain exactly. With ``bTightNarrowBeamDomain`` (PRESTUS default) the domain is
+    cropped to follow the acoustic beam, so that shape is emergent from the
+    Rayleigh-field setup and is not known until BabelBrain has already run. A
+    BenchmarkTestFile would therefore need a throw-away run to discover the grid.
+    Patching the two offending values lets BabelBrain build the domain and material
+    map itself, needs no pre-run, and touches nothing under external/.
+
+    The patch is self-guarding: it only alters the non-CT, non-water, non-homogeneous,
+    non-benchmark branch. It is a no-op for CT / water-only / benchmark runs.
+    """
+    import inspect  # noqa: F401  (kept for parity with sibling patch helper)
+
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        from TranscranialModeling.BabelIntegrationBASE import BabelFTD_Simulations_BASE
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not import BabelFTD_Simulations_BASE; '
+              f'non-CT skull-attenuation fix NOT applied ({e}).', file=sys.stderr)
+        return
+
+    if getattr(BabelFTD_Simulations_BASE, '_prestus_skull_fix', False):
+        return  # already patched (idempotent)
+
+    orig_step1 = BabelFTD_Simulations_BASE.Step1_InitializeConditions
+
+    # Bone material indices in the non-CT layered material map:
+    #   0=water 1=skin 2=cortical 3=trabecular 4=brain [5=WM 6=GM 7=CSF]
+    BONE_IDX = (2, 3)
+
+    def patched_step1(self):
+        non_ct_layered = (self._CTFNAME is None
+                          and not self._bWaterOnly
+                          and not getattr(self, '_bForceHomogenousMedium', False)
+                          and len(getattr(self, '_BenchmarkTestFile', '') or '') == 0)
+
+        if non_ct_layered:
+            # Bone → fluid. Must be set before Step1's AddMaterial() calls and the
+            # CFL calculation, both of which read self._Shear.
+            self._Shear = 0.0
+
+        orig_step1(self)
+
+        if non_ct_layered:
+            ss = self._SIM_SETTINGS
+            qc = np.array(ss._QCorrection, dtype=float)
+            if qc.ndim == 1 and qc.size >= 4:
+                qc = qc.copy()
+                for idx in BONE_IDX:
+                    if idx < qc.size:
+                        qc[idx] = self._QCorrection
+                ss._QCorrection = qc
+                print('[run_babelbrain_case] Non-CT skull-attenuation fix applied: '
+                      f'ShearSoS(bone)=0, QCorrArr[bone]→{self._QCorrection} '
+                      f'(QCorrArr now {qc.tolist()}).')
+            else:
+                print('[run_babelbrain_case] Warning: unexpected non-CT QCorrArr '
+                      f'(shape={np.shape(ss._QCorrection)}); skull QCorr fix skipped. '
+                      'Skull attenuation may be too low.', file=sys.stderr)
+
+    patched_step1.__name__ = 'Step1_InitializeConditions'
+    BabelFTD_Simulations_BASE.Step1_InitializeConditions = patched_step1
+    BabelFTD_Simulations_BASE._prestus_skull_fix = True
+    print('[run_babelbrain_case] Patched Step1_InitializeConditions: non-CT skull attenuation '
+          'now matches CT-mode bone treatment (ShearSoS=0, QCorr for bone).')
+
+
+def _patch_zdomain_reference(bb_root):
+    """Neutralize BabelBrain's ZDomainStart so the transducer is placed at exactly
+    the requested TxMechanicalAdjustmentZ.
+
+    THE PROBLEM
+    -----------
+    CalculateRayleighFieldsForward (ANNULAR_ARRAY / CONCAVE_PHASEDARRAY / Single)
+    positions the transducer at
+        Tx_z += TxMechanicalAdjustmentZ + ZDomainStart
+    where ZDomainStart = CalculateDomainZReference() = GlobalStartSkin -
+    LineOfSightStartSkin (SimulationConditionsBASE): the z-difference between the
+    globally shallowest skin voxel anywhere in the domain and the skin voxel on
+    the beam axis. In BabelBrain's own GUI workflow this compensates for oblique
+    trajectories through its full-head domain. PRESTUS, however, computes the
+    intended source position itself (babelbrain_wrapper.m derives
+    TxMechanicalAdjustmentZ = preset_FL - focal_distance_bowl so the apex sits at
+    its true distance from the target) and hands BabelBrain a beam-aligned,
+    possibly FOV-cropped mask — the skin-surface heuristic then silently moves
+    the source off the requested position by GlobalStartSkin - LineOfSightStartSkin
+    (observed: -5.5 mm for a pFOV benchmark, where lateral domain corners contain
+    skin voxels shallower than the on-axis skin). Every millimetre of that shift
+    (a) changes the physical source-to-skull distance the FDTD actually simulates,
+    and (b) desynchronizes the returned field from the tissue mask it was solved
+    on once the output resample re-anchors on the tissue marker.
+
+    THE FIX
+    -------
+    Override SimulationConditionsBASE.CalculateDomainZReference to return 0.0, so
+    Tx placement honours TxMechanicalAdjustmentZ exactly. The original per-run
+    value is recorded on the instance (self._prestus_zdomain_neutralized_m) and
+    printed, so the magnitude of the neutralized correction stays visible in the
+    log. Disable with --no_zdomain_fix to reproduce the un-patched behaviour.
+    """
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        from TranscranialModeling.BabelIntegrationBASE import SimulationConditionsBASE
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not import SimulationConditionsBASE; '
+              f'ZDomainStart neutralization NOT applied ({e}).', file=sys.stderr)
+        return
+
+    if getattr(SimulationConditionsBASE, '_prestus_zdomain_fix', False):
+        return  # already patched (idempotent)
+
+    orig_fn = SimulationConditionsBASE.CalculateDomainZReference
+
+    def patched_zref(self):
+        try:
+            orig_val = float(orig_fn(self))
+        except Exception as e:
+            print(f'[run_babelbrain_case] ZDomainStart: original CalculateDomainZReference '
+                  f'failed ({e}); using 0.')
+            orig_val = float('nan')
+        self._prestus_zdomain_neutralized_m = orig_val
+        print(f'[run_babelbrain_case] ZDomainStart neutralized: BabelBrain wanted '
+              f'{orig_val*1e3:.3f} mm domain correction on top of TxMechanicalAdjustmentZ; '
+              'using 0 so the source is placed exactly as requested.')
+        return 0.0
+
+    patched_zref.__name__ = 'CalculateDomainZReference'
+    SimulationConditionsBASE.CalculateDomainZReference = patched_zref
+    SimulationConditionsBASE._prestus_zdomain_fix = True
+    print('[run_babelbrain_case] Patched CalculateDomainZReference: ZDomainStart forced to 0 '
+          '(source placed at exactly the requested TxMechanicalAdjustmentZ).')
+
+
+def _patch_resave_normalized(bb_root, write_output=False):
+    """Monkeypatch ResaveNormalized: fix its negative-index bug, and only
+    actually write *_Sub_NORM.nii.gz when write_output is True.
+
+    Step10_GetResults calls this solely to write *_Sub_NORM.nii.gz — a
+    brain-masked, max-normalized copy of *_Sub.nii.gz used by BabelBrain's own
+    GUI viewer. PRESTUS never reads it (read_babelbrain_output.m /
+    read_babelbrain_thermal.m only read DataForSim.h5), so it's skipped by
+    default; pass write_output=True (wired from simulation.debug) to keep it
+    as a debug aid — it visualizes where the brain/skull mask boundary falls
+    relative to the solved field.
+
+    Without lower-bounds clamping, voxel coordinates that fall slightly
+    outside the mask volume (affine rounding) produce negative indices, which
+    numpy fancy-indexing wraps around to the end of the array rather than
+    clamping to zero. The upper-bounds clamp was already in BabelBrain; this
+    adds the matching lower-bounds clamp — restoring the three-line fix that
+    previously lived in
+    external/BabelBrain/TranscranialModeling/BabelIntegrationBASE.py.
+    """
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        import TranscranialModeling.BabelIntegrationBASE as BASE
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not patch ResaveNormalized: {e}',
+              file=sys.stderr)
+        return
+
+    if getattr(BASE, '_prestus_resave_fix', False):
+        return
+
+    import numpy as _np
+    import nibabel as _nib
+
+    def _patched_resave_normalized(rpath, mask):
+        assert '_Sub.nii.gz' in rpath
+        if not write_output:
+            return
+        NRPath = rpath.replace('_Sub.nii.gz', '_Sub_NORM.nii.gz')
+        Results = _nib.load(rpath)
+        ResultsData = Results.get_fdata()
+        MaskData = mask.get_fdata()
+        ii, jj, kk = _np.mgrid[0:ResultsData.shape[0],
+                                0:ResultsData.shape[1],
+                                0:ResultsData.shape[2]]
+        Indexes = _np.c_[(ii.flatten().T, jj.flatten().T, kk.flatten().T,
+                          _np.ones((kk.size, 1)))].T
+        PosResults = Results.affine.dot(Indexes)
+        IndexesMask = _np.round(_np.linalg.inv(mask.affine).dot(PosResults)).astype(int)
+        IndexesMask[0, IndexesMask[0, :] < 0] = 0
+        IndexesMask[1, IndexesMask[1, :] < 0] = 0
+        IndexesMask[2, IndexesMask[2, :] < 0] = 0
+        IndexesMask[0, IndexesMask[0, :] >= MaskData.shape[0]] = MaskData.shape[0] - 1
+        IndexesMask[1, IndexesMask[1, :] >= MaskData.shape[1]] = MaskData.shape[1] - 1
+        IndexesMask[2, IndexesMask[2, :] >= MaskData.shape[2]] = MaskData.shape[2] - 1
+        SubMask = MaskData[IndexesMask[0, :],
+                           IndexesMask[1, :],
+                           IndexesMask[2, :]].reshape(ResultsData.shape)
+        ResultsData[SubMask < 4] = 0
+        ResultsData /= ResultsData.max()
+        NormalizedNifti = _nib.Nifti1Image(ResultsData, Results.affine, header=Results.header)
+        NormalizedNifti.to_filename(NRPath)
+
+    _patched_resave_normalized.__name__ = 'ResaveNormalized'
+    BASE.ResaveNormalized = _patched_resave_normalized
+    BASE._prestus_resave_fix = True
+    state = 'writing *_Sub_NORM.nii.gz (debug mode)' if write_output else 'skipped (unused *_Sub_NORM.nii.gz GUI output)'
+    print(f'[run_babelbrain_case] Patched ResaveNormalized: negative-index bounds clamp added; {state}.')
+
+
+def _patch_calculate_temperature_effects(bb_root):
+    """Monkeypatch CalculateTemperatureEffects to guard against empty tissue masks.
+
+    BabelBrain calls .max() on boolean-indexed slices of ResTemp and FinalDose
+    for brain, skin, and skull regions.  If any tissue class is absent from the
+    simulation domain the mask is all-False and .max() raises ValueError on an
+    empty array.
+
+    This patch rewrites the six bare .max() calls (TI / TIS / TIC and CEMBrain /
+    CEMSkin / CEMSkull) to guard with ``if <mask>.any() else 0.0`` — matching
+    the fix previously applied directly to
+    external/BabelBrain/ThermalModeling/CalculateTemperatureEffects.py.
+
+    Implementation: uses inspect.getsource + string replacement + exec to redefine
+    just the function in the module namespace — the 1185-line function body is NOT
+    copied into PRESTUS.  The patch is a safe no-op (with a warning) if the source
+    does not match (different BabelBrain version) or is already guarded.
+    """
+    import inspect
+    import textwrap
+
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        import ThermalModeling.CalculateTemperatureEffects as CTE_mod
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not patch CalculateTemperatureEffects: {e}',
+              file=sys.stderr)
+        return
+
+    if getattr(CTE_mod, '_prestus_thermal_fix', False):
+        return
+
+    orig_fn = CTE_mod.CalculateTemperatureEffects
+    try:
+        src = textwrap.dedent(inspect.getsource(orig_fn))
+    except (OSError, TypeError) as e:
+        print(f'[run_babelbrain_case] Warning: could not get source of '
+              f'CalculateTemperatureEffects: {e}', file=sys.stderr)
+        return
+
+    if 'SelBrain.any()' in src:
+        # Already guarded (either by external edit or a prior run of this patch).
+        CTE_mod._prestus_thermal_fix = True
+        return
+
+    _REPLACEMENTS = [
+        ('ResTemp[SelBrain].max()',
+         'ResTemp[SelBrain].max() if SelBrain.any() else 0.0'),
+        ('ResTemp[SelSkin].max()',
+         'ResTemp[SelSkin].max() if SelSkin.any() else 0.0'),
+        ('ResTemp[SelSkull].max()',
+         'ResTemp[SelSkull].max() if SelSkull.any() else 0.0'),
+        ('FinalDose[SelBrain].max()/60',
+         'FinalDose[SelBrain].max()/60 if SelBrain.any() else 0.0'),
+        ('FinalDose[SelSkin].max()/60',
+         'FinalDose[SelSkin].max()/60 if SelSkin.any() else 0.0'),
+        ('FinalDose[SelSkull].max()/60',
+         'FinalDose[SelSkull].max()/60 if SelSkull.any() else 0.0'),
+    ]
+    if not all(old in src for old, _ in _REPLACEMENTS):
+        print('[run_babelbrain_case] Warning: CalculateTemperatureEffects source does not '
+              'match expected pattern; empty-mask guard NOT applied (BabelBrain version '
+              'mismatch?).', file=sys.stderr)
+        return
+
+    src_patched = src
+    for old, new in _REPLACEMENTS:
+        src_patched = src_patched.replace(old, new, 1)
+
+    try:
+        code = compile(src_patched, inspect.getfile(orig_fn), 'exec')
+        exec(code, CTE_mod.__dict__)  # noqa: S102 — intentional monkeypatch
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: failed to apply '
+              f'CalculateTemperatureEffects patch: {e}', file=sys.stderr)
+        return
+
+    CTE_mod._prestus_thermal_fix = True
+    print('[run_babelbrain_case] Patched CalculateTemperatureEffects: '
+          'empty-mask guards added (TI/TIS/TIC/CEM*).')
+
+
+def _patch_annular_surface(bb_root):
+    """Monkeypatch GenerateSurface: make its ring-band tessellation deterministic.
+
+    BabelIntegrationANNULAR_ARRAY.GenerateSurface lays out each annular ring's
+    surface elements with two `np.arange(step/2, step*(0.5+n), step)` calls — one
+    radial (BetaC, the polar-angle bands) and one azimuthal (AlphaC). Because the
+    stop is a floating-point multiple of the step, np.arange intermittently emits
+    n+1 samples instead of n (the classic arange endpoint bug), appending a
+    spurious extra band beyond the ring's intended outer radius.
+
+    Observed on the 10-ring R15473 at 300 kHz: ring 9 got 4 BetaC bands instead
+    of 3, extending its outer radius from the configured 30.75 mm to 31.215 mm
+    (into ring 10's inner edge, erasing the kerf). That inflated ring 9's emitting
+    area ~41% and the on-axis focal intensity ~7% — enough to push the water
+    free-field ~13% above k-Wave / jwave / the analytical Rayleigh, even though
+    PRESTUS hands BabelBrain the correct OutDiameters. The defect is purely in
+    BabelBrain's tessellation of correct input.
+
+    Fix: replace both aranges with the count-based form
+        BetaC  = Beta1 + BetaStep*(np.arange(int(nrstep)) + 0.5)
+        AlphaC =         sAlpha  *(np.arange(int(nAlpha)) + 0.5)
+    which yields exactly nrstep / nAlpha samples with identical values, no FP
+    endpoint risk. Applies to every annular transducer and frequency, not just
+    the borderline ring that happened to tip over here.
+
+    Implementation mirrors _patch_calculate_temperature_effects: inspect.getsource
+    + targeted string replacement + exec into the module namespace, so the ~100
+    line GenerateSurface body is NOT copied into PRESTUS. GeneratedRingArrayTx
+    resolves GenerateSurface from module globals at call time, so rebinding it in
+    the module dict is sufficient. Safe no-op (with a warning) if the source does
+    not match a known BabelBrain version or is already patched.
+    """
+    import inspect
+    import textwrap
+
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        import TranscranialModeling.BabelIntegrationANNULAR_ARRAY as ANN
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not patch GenerateSurface: {e}',
+              file=sys.stderr)
+        return
+
+    if getattr(ANN, '_prestus_surface_fix', False):
+        return
+
+    orig_fn = getattr(ANN, 'GenerateSurface', None)
+    if orig_fn is None:
+        print('[run_babelbrain_case] Warning: GenerateSurface not found in '
+              'BabelIntegrationANNULAR_ARRAY; ring-tessellation fix NOT applied.',
+              file=sys.stderr)
+        return
+    try:
+        src = textwrap.dedent(inspect.getsource(orig_fn))
+    except (OSError, TypeError) as e:
+        print(f'[run_babelbrain_case] Warning: could not get source of '
+              f'GenerateSurface: {e}', file=sys.stderr)
+        return
+
+    _REPLACEMENTS = [
+        ('np.arange(Beta1+BetaStep/2,Beta1+BetaStep*(1/2 + nrstep),BetaStep)',
+         '(Beta1 + BetaStep*(np.arange(int(nrstep)) + 0.5))'),
+        ('np.arange(sAlpha/2,sAlpha*(1/2 + nAlpha ),sAlpha)',
+         '(sAlpha*(np.arange(int(nAlpha)) + 0.5))'),
+    ]
+    if not all(old in src for old, _ in _REPLACEMENTS):
+        print('[run_babelbrain_case] Warning: GenerateSurface source does not match '
+              'expected pattern; ring-tessellation fix NOT applied (BabelBrain '
+              'version mismatch?).', file=sys.stderr)
+        return
+
+    src_patched = src
+    for old, new in _REPLACEMENTS:
+        src_patched = src_patched.replace(old, new, 1)
+
+    try:
+        code = compile(src_patched, inspect.getfile(orig_fn), 'exec')
+        exec(code, ANN.__dict__)  # noqa: S102 — intentional monkeypatch
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: failed to apply GenerateSurface '
+              f'patch: {e}', file=sys.stderr)
+        return
+
+    ANN._prestus_surface_fix = True
+    print('[run_babelbrain_case] Patched GenerateSurface: deterministic ring-band '
+          'tessellation (fixes np.arange endpoint overshoot inflating outer-ring area).')
+
+
+# dB/cm → Np/m : 1 Np = 8.685889638 dB, and 100 cm per m.
+_DB_CM_TO_NP_M = 100.0 / 8.685889638
+
+# PRESTUS medium_properties field → BabelBrain MatFreq material key. The generic
+# 'skull' is listed first so that, when a config also defines the split
+# cortical/trabecular tissues, those specific entries overwrite it.
+_PRESTUS_TO_BB_MATERIAL = [
+    ('water',            'Water'),
+    ('skin',             'Skin'),
+    ('brain',            'Brain'),
+    ('skull',            'Cortical'),     # undifferentiated skull → both bone slots …
+    ('skull',            'Trabecular'),
+    ('skull_cortical',   'Cortical'),     # … overridden by split tissues when present
+    ('skull_trabecular', 'Trabecular'),
+]
+
+
+def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
+    """Convert the raw-HU CT.nii.gz written by write_babelbrain_input.m into the
+    quantized index-map format + companion CT-cal.npz that BabelBrain's CT path
+    actually requires.
+
+    write_babelbrain_input.m writes CT.nii.gz as a raw Hounsfield-equivalent
+    volume, resampled/gridded identically to BabelViscoInput.nii.gz -- but
+    BabelBrain (BabelDatasetPreps.py Step1) never reads a raw-HU CT.nii.gz
+    directly. It expects CTFNAME to already be a quantized index map (small
+    integers indexing into a sorted table of unique HU levels), with that
+    table saved separately as `<CT.nii.gz prefix>CT-cal.npz` (key
+    'UniqueHU') -- BabelIntegrationBASE.py loads both:
+        DensityCTMap = flip(nibabel.load(CTFNAME).get_fdata(), axis=2).astype(uint32)
+        AllBoneHU = np.load(CTFNAME.split('CT.nii.gz')[0]+'CT-cal.npz')['UniqueHU']
+    and uses DensityCTMap values directly as indices into AllBoneHU / the
+    material table, so an unquantized float/HU CT.nii.gz is either a crash
+    (index far out of range) or silently wrong material properties throughout
+    the skull.
+
+    Quantization mirrors BabelDatasetPreps.py's own scheme exactly (uniform
+    round-to-M-levels quantization, M=2**CT_quantification-1, default
+    CT_quantification=10 bits), restricted to the bone region -- taken here
+    from the label-2/3 (cortical/trabecular) voxels of the tissue mask
+    write_babelbrain_input.m writes alongside it, since PRESTUS has no
+    separate bone-segmentation mask of its own to reuse. Voxels outside the
+    bone region map to index 0, matching BabelDatasetPreps.py's
+    `ndataCTMap[nfct==False]=0`.
+    """
+    import nibabel as nib
+
+    freq_kHz = round(freq / 1e3)
+    ct_path = os.path.join(basedir, subject_id, f'{target}_{freq_kHz}kHz_{ppw}PPW_CT.nii.gz')
+    mask_path = os.path.join(basedir, subject_id, f'{target}_{freq_kHz}kHz_{ppw}PPW_BabelViscoInput.nii.gz')
+
+    if not os.path.isfile(ct_path):
+        raise FileNotFoundError(
+            f'[run_babelbrain_case] CT quantization: {ct_path} not found. '
+            'write_babelbrain_input.m should have written it alongside BabelViscoInput.nii.gz.')
+    if not os.path.isfile(mask_path):
+        raise FileNotFoundError(f'[run_babelbrain_case] CT quantization: {mask_path} not found.')
+
+    ct_nii = nib.load(ct_path)
+    ct_data = np.asarray(ct_nii.get_fdata(), dtype=np.float64)
+    mask_data = np.asarray(nib.load(mask_path).get_fdata())
+
+    bone = (mask_data == 2) | (mask_data == 3)
+    if not np.any(bone):
+        raise ValueError(
+            '[run_babelbrain_case] CT quantization: no cortical/trabecular (label 2/3) voxels found '
+            f'in {mask_path} -- cannot determine the bone region to quantize CT values over.')
+
+    CT_quantification = 10   # bits; matches BabelDatasetPreps.py's own default
+    bone_vals = ct_data[bone]
+    min_data = bone_vals.min()
+    max_data = bone_vals.max()
+    a_range = max_data - min_data
+    if a_range <= 0:
+        raise ValueError(
+            f'[run_babelbrain_case] CT quantization: bone-region HU range is degenerate '
+            f'(min={min_data}, max={max_data}) in {ct_path}.')
+    m_levels = 2 ** CT_quantification - 1
+    res_step = a_range / m_levels
+    qx = res_step * np.round((m_levels / a_range) * (bone_vals - min_data)) + min_data
+    ct_data[bone] = qx
+
+    unique_hu = np.unique(ct_data[bone])
+    print(f'[run_babelbrain_case] CT quantization: {len(unique_hu)} unique bone HU levels '
+          f'(range [{min_data:.1f}, {max_data:.1f}]).')
+
+    ct_map = np.zeros(ct_data.shape, dtype=np.uint32)
+    for n, d in enumerate(unique_hu):
+        ct_map[ct_data == d] = n
+    ct_map[~bone] = 0
+
+    cal_path = ct_path[:ct_path.rindex('CT.nii.gz')] + 'CT-cal.npz'
+    np.savez_compressed(cal_path, UniqueHU=unique_hu)
+    print(f'[run_babelbrain_case] CT calibration table written: {cal_path}')
+
+    ct_map_img = nib.Nifti1Image(ct_map, ct_nii.affine)
+    ct_map_img.header.set_data_dtype(np.uint32)
+    ct_map_img.to_filename(ct_path)
+    print(f'[run_babelbrain_case] CT index map written (overwriting raw-HU CT.nii.gz): {ct_path}')
+
+
+def _inject_prestus_materials(bb_root, freq, props_json_path):
+    """Overwrite BabelBrain's built-in non-CT material database (``MatFreq``) with
+    PRESTUS's configured medium properties, so k-Wave / jwave / BabelBrain all
+    assume identical tissue acoustics.
+
+    PRESTUS stores attenuation as ``alpha_coeff`` in dB/(cm·MHz^alpha_power);
+    BabelBrain's ``MatFreq`` stores a per-frequency longitudinal attenuation in
+    Np/m. This converts ``alpha_coeff * f_MHz**alpha_power`` (dB/cm) to Np/m.
+
+    Shear speed / attenuation are set to 0 (fluid model), consistent with the CT
+    path and with ``_patch_noncat_skull_attenuation``. The realised bone
+    attenuation still depends on the Q-correction applied there; a validation run
+    against k-Wave is the check that the two agree.
+    """
+    import json
+
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    try:
+        import TranscranialModeling.BabelIntegrationBASE as bbase
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not import BabelIntegrationBASE; '
+              f'PRESTUS material injection skipped ({e}).', file=sys.stderr)
+        return
+
+    try:
+        with open(props_json_path) as f:
+            props = json.load(f)
+    except Exception as e:
+        print(f'[run_babelbrain_case] Warning: could not read medium properties JSON '
+              f'{props_json_path}; material injection skipped ({e}).', file=sys.stderr)
+        return
+
+    MatFreq = getattr(bbase, 'MatFreq', None)
+    if not MatFreq:
+        print('[run_babelbrain_case] Warning: MatFreq not found in BabelIntegrationBASE; '
+              'PRESTUS material injection skipped.', file=sys.stderr)
+        return
+
+    # Locate the frequency key BabelBrain will actually index (MatFreq[self._Frequency]).
+    keys = np.array(sorted(MatFreq.keys()), dtype=float)
+    k = float(keys[np.argmin(np.abs(keys - freq))])
+    if abs(k - freq) > 1.0:
+        print(f'[run_babelbrain_case] Warning: no MatFreq entry within 1 Hz of {freq:.0f} Hz '
+              f'(closest {k:.0f}); PRESTUS material injection skipped.', file=sys.stderr)
+        return
+
+    f_MHz = freq / 1e6
+    applied = {}
+    for pk, bk in _PRESTUS_TO_BB_MATERIAL:
+        m = props.get(pk)
+        if not isinstance(m, dict):
+            continue
+        try:
+            density = float(m['density'])
+            c_long  = float(m['sound_speed'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        a_coeff = float(m.get('alpha_coeff', 0.0) or 0.0)
+        a_power = float(m.get('alpha_power', 1.0) or 1.0)
+        long_att_npm = a_coeff * (f_MHz ** a_power) * _DB_CM_TO_NP_M
+        MatFreq[k][bk] = np.array([density, c_long, 0.0, long_att_npm, 0.0])
+        applied[bk] = (density, c_long, long_att_npm)
+
+    if applied:
+        print(f'[run_babelbrain_case] Injected PRESTUS materials into MatFreq[{k:.0f} Hz] '
+              f'(shear set to 0):')
+        for bk, (d, c, a) in applied.items():
+            print(f'    {bk:11s} density={d:7.1f} kg/m³  LongSoS={c:7.1f} m/s  '
+                  f'LongAtt={a:8.2f} Np/m')
+    else:
+        print('[run_babelbrain_case] Warning: no PRESTUS materials matched known tissues; '
+              'BabelBrain built-in database left unchanged.', file=sys.stderr)
 
 
 def main():
@@ -439,6 +1214,46 @@ def main():
     except ImportError as e:
         print(f'[run_babelbrain_case] Import error: {e}', file=sys.stderr)
         sys.exit(1)
+
+    # Fix the non-CT path so the skull actually attenuates (see function docstring).
+    # No-op for CT / water-only runs; disabled with --no_skull_atten_fix.
+    if args.no_skull_atten_fix:
+        print('[run_babelbrain_case] --no_skull_atten_fix set: leaving BabelBrain non-CT '
+              'skull attenuation UN-patched (expect inflated ISPPA).')
+    else:
+        _patch_noncat_skull_attenuation(bb_root)
+
+    # Place the source at exactly the requested TxMechanicalAdjustmentZ (see
+    # function docstring): BabelBrain otherwise adds a skin-surface-dependent
+    # ZDomainStart on top, silently moving the source millimetres off the
+    # PRESTUS-intended position and desynchronizing field vs tissue after the
+    # marker-anchored output resample. Disabled with --no_zdomain_fix.
+    if args.no_zdomain_fix:
+        print('[run_babelbrain_case] --no_zdomain_fix set: leaving BabelBrain ZDomainStart '
+              'UN-patched (source placement will include the skin-surface domain correction; '
+              'tissue-anchored output alignment will be off by that amount).')
+    else:
+        _patch_zdomain_reference(bb_root)
+
+    # Replace BabelBrain's built-in material DB with PRESTUS's configured values so
+    # all solver backends assume identical tissue acoustics. Requires the skull
+    # fix above to be active (otherwise the injected bone attenuation is not
+    # realised). No-op for CT / water-only runs.
+    if args.medium_properties_json:
+        if args.no_skull_atten_fix:
+            print('[run_babelbrain_case] Warning: --medium_properties_json given together with '
+                  '--no_skull_atten_fix; injected bone attenuation will NOT be realised (QCorr '
+                  'left at 1.0 for bone).', file=sys.stderr)
+        _inject_prestus_materials(bb_root, args.freq, args.medium_properties_json)
+
+    # Defensive crash-prevention patches (no result change for normal inputs).
+    _patch_resave_normalized(bb_root, write_output=args.debug)
+    _patch_calculate_temperature_effects(bb_root)
+
+    # Correctness patch: deterministic annular ring-band tessellation. Fixes a
+    # np.arange endpoint overshoot in GenerateSurface that intermittently adds a
+    # spurious outer sub-ring (inflating that ring's area / the focal intensity).
+    _patch_annular_surface(bb_root)
 
     # Load preset geometry from default.yaml
     preset_cfg = load_preset_config(bb_root, args.tx_system)
@@ -477,7 +1292,7 @@ def main():
         deviceName                  = args.device_name,
         TxMechanicalAdjustmentZ     = args.tx_mech_adjust_z,
         ZSteering                   = args.z_steering,
-        bUseRayleighForWater        = True,
+        bUseRayleighForWater        = (not args.no_rayleigh_for_water),
         bWaterOnly                  = args.water_only,
         bTightNarrowBeamDomain      = not args.no_tight_narrow_beam,
         zLengthBeyonFocalPointWhenNarrow = args.z_beyond_focus_mm / 1e3,  # mm → m
@@ -491,13 +1306,32 @@ def main():
         kw['bUseCT'] = True
         kw['MappingMethod'] = args.ct_mapping
         kw['bPETRA'] = args.use_petra
+        # BabelBrain only builds/reads an air mask when bExtractAirRegions=True
+        # (BabelIntegrationBASE.py RunCases: AIRMASK is only set to a real path
+        # in that case, otherwise None). PRESTUS does not currently generate the
+        # AirRegions.nii.gz file that would be required, so this stays disabled
+        # rather than pointing BabelBrain at a file that doesn't exist.
+        kw['bExtractAirRegions'] = False
         print(f'[run_babelbrain_case] CT path enabled: mapping={args.ct_mapping}'
               f'{"  bPETRA=True" if args.use_petra else ""}')
+        _quantize_ct_for_babelbrain(args.basedir, args.subject_id, args.target,
+                                     args.freq, args.ppw)
 
     if args.weights_file and os.path.isfile(args.weights_file):
         kw['OptimizedWeightsFile'] = convert_weights_if_needed(args.weights_file)
         print(f'[run_babelbrain_case] Using weights: {kw["OptimizedWeightsFile"]}')
-        _patch_annular_array_weights(RunSimClass)
+        src_dump = None
+        if args.debug:
+            src_dump = os.path.join(args.basedir, args.subject_id,
+                                    f'{args.target}_babelbrain_source_dump.h5')
+            print(f'[run_babelbrain_case] Debug: will dump BabelBrain source geometry to {src_dump}')
+        # Written every run: source-placement diagnostic (realized vs requested
+        # Tx position). read_babelbrain_output.m reads it back and warns when the
+        # residual exceeds a native voxel (see _write_anchor_sidecar).
+        anchor_sidecar = os.path.join(args.basedir, args.subject_id,
+                                      f'{args.target}_prestus_anchor.json')
+        _patch_annular_array_weights(RunSimClass, dump_path=src_dump, anchor_path=anchor_sidecar,
+                                     tx_mech_adjust_z=args.tx_mech_adjust_z)
     else:
         print('[run_babelbrain_case] No weights file — using geometric focusing.')
 
@@ -512,6 +1346,9 @@ def main():
     print(f'[run_babelbrain_case] Starting RunCases for '
           f'{args.subject_id}/{args.target} '
           f'({args.tx_system}, {args.freq/1e3:.0f} kHz, PPW={args.ppw})')
+    print(f'[run_babelbrain_case] Water field solver: '
+          f'{"Rayleigh-Sommerfeld (analytic)" if not args.no_rayleigh_for_water else "full-wave FDTD"} '
+          f'(bUseRayleighForWater={not args.no_rayleigh_for_water})')
 
     try:
         output_files = R.RunCases(**kw)

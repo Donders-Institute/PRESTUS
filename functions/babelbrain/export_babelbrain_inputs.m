@@ -114,9 +114,22 @@ end
 freq_hz  = parameters.transducer(1).freq_hz;
 freq_kHz = round(freq_hz / 1e3);
 res_mm   = parameters.grid.resolution_mm;
-c_min    = 1500;
-if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'brain')
-    c_min = parameters.medium_properties.brain.sound_speed;
+% PPW target: BabelBrain's own spatial step is SmallestSOS/(freq*PPW), where
+% SmallestSOS is floored by its built-in Pichardo shear-speed reference at
+% density=1000 kg/m3 (1102.515 m/s) under the fluid-bone model -- see
+% write_babelbrain_input.m for the full derivation. Using plain brain/water
+% sound speed here (as this used to) targets the wrong reference and
+% inflates the resampling write_babelbrain_input.m has to do.
+pichardo_shear_floor_ms = 1000.0 * 0.422 + 680.515;
+c_min = pichardo_shear_floor_ms;
+if isfield(parameters, 'medium_properties')
+    mp_names_ = fieldnames(parameters.medium_properties);
+    for mi_ = 1:numel(mp_names_)
+        mp_ = parameters.medium_properties.(mp_names_{mi_});
+        if isfield(mp_, 'sound_speed') && mp_.sound_speed > 0
+            c_min = min(c_min, mp_.sound_speed);
+        end
+    end
 end
 ppw_auto = round(c_min / (freq_hz * res_mm * 1e-3));
 ppw_use  = max(bb.ppw, ppw_auto);
@@ -124,8 +137,15 @@ subj_id  = sprintf('sub-%03d', parameters.subject_id);
 
 %% 1. BabelViscoInput NIfTI
 fprintf('[export_babelbrain_inputs] Writing tissue mask...\n');
+% Pass trans_pos so write_babelbrain_input can orient the depth flip to the
+% actual beam direction (focus_pos(3) vs trans_pos(3)); empty falls back to the
+% beam-+z assumption.
+trans_pos_export = [];
+if isfield(parameters.transducer(1), 'trans_pos') && ~isempty(parameters.transducer(1).trans_pos)
+    trans_pos_export = parameters.transducer(1).trans_pos;
+end
 out_files.mask_nii = write_babelbrain_input( ...
-    medium_masks, focus_pos, parameters, planimg, out_dir, target);
+    medium_masks, focus_pos, parameters, planimg, out_dir, target, ppw_use, [], trans_pos_export);
 
 %% 2. OptimizedWeightsFile (calibrated phases)
 tr = parameters.transducer(1);
@@ -219,7 +239,12 @@ fprintf(fid, '    basePPW        = [%d],\n', ppw_use);
 fprintf(fid, '    COMPUTING_BACKEND           = %d,\n', bb.computing_backend);
 fprintf(fid, '    deviceName                  = r''%s'',\n', bb.device_name);
 fprintf(fid, '    TxMechanicalAdjustmentZ     = %.6f,\n', bb.tx_mech_adjust_z_m);
-fprintf(fid, '    bUseRayleighForWater        = True,\n');
+if isfield(bb, 'use_rayleigh_for_water') && ~isempty(bb.use_rayleigh_for_water)
+    use_rayleigh_water = logical(bb.use_rayleigh_for_water);
+else
+    use_rayleigh_water = false;   % PRESTUS default: FDTD water for backend comparability
+end
+fprintf(fid, '    bUseRayleighForWater        = %s,\n', mat2pyb(use_rayleigh_water));
 fprintf(fid, '    bTightNarrowBeamDomain      = %s,\n', mat2pyb(tight_narrow_beam));
 fprintf(fid, '    zLengthBeyonFocalPointWhenNarrow = %.4f,  # m\n', z_beyond_focus_mm/1e3);
 fprintf(fid, '    bDoRefocusing               = %s,\n', mat2pyb(bb.do_refocusing));

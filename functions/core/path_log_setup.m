@@ -100,9 +100,10 @@ end
     % ├── log/     — diary log files
     % ├── cache/   — regenerable intermediates (checkpoints, matrices)
     % └── debug/   — diagnostic artefacts written only when debug=1
-    %     ├── preproc/  — head preprocessing (rotation, cropping, skull visualizations)
-    %     ├── medium/   — medium mapping (grid-space property matrices, pCT)
-    %     └── source/   — source/transducer setup (element distribution plots)
+    %     ├── preproc/   — head preprocessing (rotation, cropping, skull visualizations)
+    %     ├── medium/    — medium mapping (grid-space property matrices, pCT)
+    %     ├── source/    — source/transducer setup (element distribution plots)
+    %     └── babelbrain/— BabelBrain FOV/domain-coverage diagnostics
     % Reports (.html) and tables (.csv) are written directly to dir_output.
     if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
         out = parameters.io.dir_output;
@@ -121,6 +122,7 @@ end
         parameters.io.dir_debug_preproc    = fullfile(out, 'debug', 'preproc');
         parameters.io.dir_debug_medium     = fullfile(out, 'debug', 'medium');
         parameters.io.dir_debug_source     = fullfile(out, 'debug', 'source');
+        parameters.io.dir_debug_babelbrain = fullfile(out, 'debug', 'babelbrain');
 
         nii_enabled = ~(isfield(parameters, 'modules') && ...
                         isfield(parameters.modules, 'run_nifti_creation') && ...
@@ -134,7 +136,8 @@ end
         if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
                 parameters.simulation.debug == 1
             for d = {parameters.io.dir_debug, parameters.io.dir_debug_preproc, ...
-                     parameters.io.dir_debug_medium, parameters.io.dir_debug_source}
+                     parameters.io.dir_debug_medium, parameters.io.dir_debug_source, ...
+                     parameters.io.dir_debug_babelbrain}
                 if ~isfolder(d{1}); mkdir(d{1}); end
             end
         end

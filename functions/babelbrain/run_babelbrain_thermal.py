@@ -57,7 +57,8 @@ def parse_args():
     p.add_argument('--duration_s',         required=True, type=float,
                    help='Pulse train duration [s]')
     p.add_argument('--computing_backend',  required=True, type=int,
-                   help='1=CUDA 2=OpenCL 3=Metal 4=CPU')
+                   help='1=CUDA 2=OpenCL 3=Metal 4=MLX (Apple Silicon only; BabelBrain''s thermal '
+                        'engine has no CPU backend)')
     p.add_argument('--device_name',        required=True)
     p.add_argument('--babelbrain_root',    default='',
                    help='BabelBrain source root; auto-detected if empty')
@@ -124,6 +125,21 @@ def main():
 
     if bb_root not in sys.path:
         sys.path.insert(0, bb_root)
+
+    # Apply the same empty-tissue-mask guard as the acoustic bridge
+    # (run_babelbrain_case.py). This is a SEPARATE process from that script, so
+    # the patch has to be (re-)applied here too -- CalculateThermalProcess
+    # forks a child process to run CalculateTemperatureEffects, so this must
+    # happen before that call for the fork to inherit the patched function.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    try:
+        from run_babelbrain_case import _patch_calculate_temperature_effects
+        _patch_calculate_temperature_effects(bb_root)
+    except Exception as e:
+        print(f'[run_babelbrain_thermal] Warning: could not apply empty-mask guard patch: {e}',
+              file=sys.stderr)
 
     try:
         from BabelBrain.Babel_Thermal.CalculateThermalProcess import CalculateThermalProcess

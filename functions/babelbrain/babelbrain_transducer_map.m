@@ -61,9 +61,9 @@ freq_hz = tr.freq_hz;
 % Add entries here as new devices are validated.
 % Keys are tran.serial strings from the equipment YAML.
 SERIAL_MAP = struct( ...
-    'IS_PCD15287_01001', 'R15287', ...   % Sonic Concepts H-115 / R15287
-    'IS_PCD15473_01001', 'R15473', ...   % Sonic Concepts 500 kHz annular 4-ring
-    'IS_PCD15646_01001', 'R15646', ...   % Sonic Concepts R15646
+    'IS_PCD15287_01001', 'R15287', ...   % Sonic Concepts H-115 / R15287, 300 kHz annular 10-ring
+    'IS_PCD15473_01001', 'R15473', ...   % Sonic Concepts R15473, 300 kHz annular 10-ring
+    'IS_PCD15646_01001', 'R15646', ...   % Sonic Concepts R15646, 650 kHz single-element mechanical/electronic-steered (no rings)
     'CTX500_default',    'CTX_500', ...
     'CTX250_default',    'CTX_250', ...
     'H317_default',      'H317', ...
@@ -94,18 +94,20 @@ end
 
 %% Geometry-based matching for annular arrays
 % Known preset specs: {preset_name, n_elem, curv_radius_mm, max_od_mm, freq_Hz}
-% Geometry values from BabelBrain/BabelBrain/Babel_<preset>/default.yaml
-% Tolerances: ±2 mm radius, ±3 mm OD, ±5% frequency
+% Geometry values read directly from BabelBrain/BabelBrain/Babel_<preset>/default.yaml
+% (FocalLength = curv_radius_mm; max_od_mm = the largest OutDiameters entry).
+% Tolerances: ±2 mm radius, ±3 mm OD, ±5% frequency.
+%
+% Only presets that default.yaml defines as ring arrays (InDiameters/
+% OutDiameters lists) are matchable by geometry. R15646, H317, H246 and H301 are
+% single-element transducers (or, for H246, have no geometry in default.yaml),
+% so they are reachable only via an exact SERIAL_MAP match.
 GEOM_TABLE = {
     % preset        n_elem  curv_r_mm  max_od_mm  freq_hz
-    'CTX_500',    7,   62.94,  64.0,  500e3;   % CTX500 default.yaml
-    'CTX_250',    7,   62.94,  64.0,  250e3;
-    'R15287',     4,   62.94,  64.0,  500e3;   % R15287 default.yaml (4-ring, 500 kHz)
-    'R15473',    10,  100.00,  65.0,  300e3;   % R15473 default.yaml (10-ring, 300 kHz)
-    'R15646',    10,   72.00,  72.0,  500e3;   % R15646 (10-ring, 500 kHz; verify from yaml)
-    'H317',       1,   62.94,  64.0,  500e3;
-    'H246',       1,   62.94,  32.0,  500e3;
-    'H301',       1,   40.00,  32.0, 1000e3;
+    'CTX_500',    4,   62.94,  60.83,  500e3;   % Babel_CTX500/default.yaml (4 rings; also supports 545 kHz)
+    'CTX_250',    4,   62.94,  57.94,  250e3;   % Babel_CTX250/default.yaml (4 rings)
+    'R15287',    10,   75.00,  65.0,   300e3;   % Babel_R15287/default.yaml (10 rings)
+    'R15473',    10,  100.00,  65.0,   300e3;   % Babel_R15473/default.yaml (10 rings)
     'Single',     1,     [],    [],    [];      % fallback single-element
 };
 

@@ -175,6 +175,16 @@ function [parameters] = prestus_pipeline(parameters, options)
     [parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos, fov_state] = ...
         acoustic_fov_crop(parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos);
 
+    % Record the FOV-crop voxel offset on planimg so any downstream stage that
+    % exports the (possibly FOV-cropped) grid directly to RAS space — e.g.
+    % babelbrain_wrapper's write_babelbrain_input — can build a correct affine
+    % via grid_to_ras_affine without needing fov_state threaded separately.
+    if fov_state.active
+        planimg.fov_offset_ac = fov_state.offset;
+    else
+        planimg.fov_offset_ac = [1 1 1];
+    end
+
     % ====================================================================
     %% STAGE 5 — SOURCE & SENSOR SETUP
     % ====================================================================

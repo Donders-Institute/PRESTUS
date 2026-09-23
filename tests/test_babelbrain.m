@@ -93,7 +93,8 @@ classdef test_babelbrain < matlab.unittest.TestCase
     methods (TestClassTeardown)
 
         function classTeardown(tc)
-            if isfolder(tc.SimPath)
+            % SimPath is unset when classSetup was skipped (no demo data).
+            if ~isempty(tc.SimPath) && isfolder(tc.SimPath)
                 rmdir(tc.SimPath, 's');
             end
         end
@@ -173,9 +174,25 @@ classdef test_babelbrain < matlab.unittest.TestCase
             out_nii = write_babelbrain_input(masks, tc.FocusPos, p, ...
                 tc.make_planimg(), tc.SimPath, 'res_check');
 
+            % The mask is resampled to BabelBrain's own native step
+            % (SmallestSOS / freq / ppw), not written at grid.resolution_mm,
+            % because BabelBrain sizes its domain from the voxel count alone.
+            % Mirror write_babelbrain_input's auto-PPW (ppw_override = 0).
+            smallest_sos = 1000.0 * 0.422 + 680.515;   % Pichardo shear floor
+            mp_names = fieldnames(p.medium_properties);
+            for mi = 1:numel(mp_names)
+                mp = p.medium_properties.(mp_names{mi});
+                if isfield(mp, 'sound_speed') && mp.sound_speed > 0
+                    smallest_sos = min(smallest_sos, mp.sound_speed);
+                end
+            end
+            freq_hz = p.transducer(1).freq_hz;
+            ppw = round(smallest_sos / (freq_hz * p.grid.resolution_mm * 1e-3));
+            expected_res_mm = (smallest_sos / freq_hz) / ppw * 1e3;
+
             info = niftiinfo(out_nii);
-            tc.verifyEqual(info.PixelDimensions(1), p.grid.resolution_mm, ...
-                'NIfTI pixel dimensions do not match resolution_mm.');
+            tc.verifyEqual(info.PixelDimensions(1), expected_res_mm, 'RelTol', 1e-4, ...
+                'NIfTI pixel dimensions do not match BabelBrain''s native resolution.');
         end
 
     end

@@ -1,4 +1,4 @@
-function results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, focus_pos, focal_length_mm)
+function results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, focus_pos, focal_length_mm, trans_pos)
 % READ_BABELBRAIN_THERMAL  Read BabelBrain thermal HDF5 into PRESTUS results_heating
 %
 % Reads the ThermalField HDF5 written by BabelBrain's CalculateTemperatureEffects,
@@ -44,6 +44,7 @@ arguments
     planimg         (1,1) struct
     focus_pos       (1,3) double  = [NaN NaN NaN]
     focal_length_mm (1,1) double  = NaN
+    trans_pos             double  = []   % [1x3] transducer voxel (same grid as focus_pos); sets beam-axis direction
 end
 
 if ~isfile(thermal_h5)
@@ -80,17 +81,47 @@ x_mm = x_vec_raw;                 % PRESTUS dim 1: lateral X, 0 at focal spot [m
 y_mm = y_vec_raw;                 % PRESTUS dim 2: lateral Y, 0 at focal spot [mm]
 z_mm = z_vec_raw(end:-1:1);      % PRESTUS dim 3: depth (flip-corrected), FocalLength at focal [mm]
 
-temp_profile      = read_field('TempProfileTarget');   % [1 x Nt] °C at focal target
-time_profile      = read_field('TimeProfileTarget');   % [1 x Nt] s
-% TemperaturePoints: [4 x Nt] — rows are skin(1), brain(2), skull(3), target(4).
-% Row 4 may be absent when the target coincides with the brain maximum
-% (in that case BabelBrain uses IndTarget=2 and only 3 monitor points exist).
-temp_points_raw   = read_field('TemperaturePoints');   % [Npts x Nt]
+% Inventory root-level datasets once; some fields may only exist nested under
+% AllData/item_0 depending on the BabelBrain version.
+info_        = h5info(thermal_h5);
+root_names_  = {};
+if ~isempty(info_.Datasets)
+    root_names_ = {info_.Datasets.Name};
+end
+nested_prefix_ = '/AllData/item_0/';
+nested_names_  = {};
+try
+    nested_info_ = h5info(thermal_h5, '/AllData/item_0');
+    if ~isempty(nested_info_.Datasets)
+        nested_names_ = {nested_info_.Datasets.Name};
+    end
+catch
+end
 
-MaxIsppa = double(h5read(thermal_h5, '/MaxIsppa'));
-MaxIspta = double(h5read(thermal_h5, '/MaxIspta'));
-Isppa    = double(h5read(thermal_h5, '/Isppa'));
-Ispta    = double(h5read(thermal_h5, '/Ispta'));
+read_any_ = @(key) read_field_any(thermal_h5, key, root_names_, nested_prefix_, nested_names_);
+
+% TempProfileTarget/TimeProfileTarget: root or AllData/item_0
+temp_profile = read_any_('TempProfileTarget');   % [1 x Nt] °C at focal target
+time_profile = read_any_('TimeProfileTarget');   % [1 x Nt] s
+
+% TemperaturePoints: [Npts x Nt] — rows are skin(1), brain(2), skull(3), target(4).
+% Row 4 may be absent when the target coincides with the brain maximum.
+% May be absent in some BabelBrain versions; fall back to empty gracefully.
+if any(strcmp(root_names_, 'TemperaturePoints'))
+    temp_points_raw = read_field('TemperaturePoints');
+elseif any(strcmp(nested_names_, 'TemperaturePoints'))
+    temp_points_raw = double(h5read(thermal_h5, [nested_prefix_ 'TemperaturePoints']));
+else
+    warning('read_babelbrain_thermal:missingTemperaturePoints', ...
+        'TemperaturePoints not found in %s; per-tissue time courses will be empty.', thermal_h5);
+    temp_points_raw = zeros(0, 0);
+end
+
+% Intensity scalars: root or AllData/item_0; NaN when absent.
+MaxIsppa = read_scalar_any_(thermal_h5, 'MaxIsppa', root_names_, nested_prefix_, nested_names_);
+MaxIspta = read_scalar_any_(thermal_h5, 'MaxIspta', root_names_, nested_prefix_, nested_names_);
+Isppa    = read_scalar_any_(thermal_h5, 'Isppa',    root_names_, nested_prefix_, nested_names_);
+Ispta    = read_scalar_any_(thermal_h5, 'Ispta',    root_names_, nested_prefix_, nested_names_);
 
 fprintf('[read_babelbrain_thermal] Grid (PRESTUS order): [%d %d %d]  dx_lat=%.3f dz_depth=%.3f mm\n', ...
     size(T_end_fus,1), size(T_end_fus,2), size(T_end_fus,3), ...
@@ -103,18 +134,63 @@ fprintf('[read_babelbrain_thermal] Peak T rise: %.2f °C  MaxIsppa: %.2f W/cm²\
 %   x_mm (PRESTUS dim 1): lateral X, 0 at focal spot [mm]
 %   y_mm (PRESTUS dim 2): lateral Y, 0 at focal spot [mm]
 %   z_mm (PRESTUS dim 3): depth (flip-corrected), FocalLength at focal spot [mm]
-% Resampling is anchored at focus_pos (PRESTUS grid voxels) using focal_length_mm.
-if any(isnan(focus_pos)) || isnan(focal_length_mm)
+%
+% Same tissue-marker anchor as read_babelbrain_output: /TargetLocation (the
+% label-5 voxel written at focus_pos) is mapped back onto focus_pos, so the
+% thermal volumes align with medium_masks exactly as the acoustic field does.
+% focal_length_mm is only a FALLBACK for files without /TargetLocation.
+% /TargetLocation indexes the RAW z_vec_raw read from the file (pre-flip), not
+% the flip-corrected z_mm.
+focal_length_mm_effective = focal_length_mm;
+if any(strcmp(root_names_, 'TargetLocation')) || any(strcmp(nested_names_, 'TargetLocation'))
+    try
+        target_loc_bb = double(read_any_('TargetLocation')) + 1;   % 0-based (numpy) -> 1-based (MATLAB)
+        z_vec_raw_col = z_vec_raw(:)';
+        if numel(z_vec_raw_col) >= target_loc_bb(3)
+            z_mm_at_target = z_vec_raw_col(target_loc_bb(3));   % raw z_vec_raw, NOT z_mm — see comment above
+            focal_length_mm_effective = z_mm_at_target;
+            if isnan(focal_length_mm) || abs(z_mm_at_target - focal_length_mm) > 1e-6
+                fprintf(['[read_babelbrain_thermal] Anchor: /TargetLocation tissue marker at %.2f mm ' ...
+                    '-> focus_pos (passed fallback anchor was %.2f mm).\n'], ...
+                    z_mm_at_target, focal_length_mm);
+            else
+                fprintf('[read_babelbrain_thermal] Anchor: /TargetLocation tissue marker at %.2f mm -> focus_pos.\n', ...
+                    z_mm_at_target);
+            end
+        end
+    catch ME
+        warning('read_babelbrain_thermal:targetLocationReadFailed', ...
+            'Could not read /TargetLocation for anchor: %s', ME.message);
+    end
+end
+if focal_length_mm_effective == focal_length_mm && ~isnan(focal_length_mm) && ...
+        ~(any(strcmp(root_names_, 'TargetLocation')) || any(strcmp(nested_names_, 'TargetLocation')))
+    fprintf(['[read_babelbrain_thermal] /TargetLocation unavailable — falling back to the passed ' ...
+        'anchor %.2f mm. Tissue alignment is only guaranteed when this equals the marker z ' ...
+        '(preset FocalLength).\n'], focal_length_mm);
+end
+
+if any(isnan(focus_pos)) || isnan(focal_length_mm_effective)
     error(['read_babelbrain_thermal: focus_pos and focal_length_mm are required for ' ...
-        'BabelBrain→PRESTUS resampling but were not provided.\n' ...
+        'BabelBrain→PRESTUS resampling but were not provided (and no /TargetLocation ' ...
+        'was available in the file to derive an anchor automatically).\n' ...
         'Pass them as the 4th and 5th arguments.']);
 end
 
 prestus_dims = parameters.grid.dims;
 res_mm       = parameters.grid.resolution_mm;
 
+% Beam-axis direction (see read_babelbrain_output): −z beams need the depth
+% resample mirrored. Default +1 when trans_pos is unavailable.
+if nargin >= 6 && ~isempty(trans_pos) && numel(trans_pos) >= 3 && ~any(isnan(focus_pos))
+    beam_sign = sign(focus_pos(3) - trans_pos(3));
+    if beam_sign == 0, beam_sign = 1; end
+else
+    beam_sign = 1;
+end
+
 resample_vol = @(vol) resample_bb_to_prestus( ...
-    vol, x_mm(:)', y_mm(:)', z_mm(:)', planimg, prestus_dims, res_mm, focus_pos, focal_length_mm);
+    vol, x_mm(:)', y_mm(:)', z_mm(:)', planimg, prestus_dims, res_mm, focus_pos, focal_length_mm_effective, beam_sign);
 
 T_end_fus_g = resample_vol(T_end_fus);
 T_final_g   = resample_vol(T_final);
@@ -168,7 +244,7 @@ tissue_labels = {'skin', 'brain', 'skull', 'target'};
 for ti = 1:min(size(temp_points_raw, 1), numel(tissue_labels))
     lbl = tissue_labels{ti};
     results_heating.timeseries.T.(lbl)      = temp_points_raw(ti, :);
-    results_heating.timeseries.Tdiff.(lbl)  = [0, diff(temp_points_raw(ti, :))];
+    results_heating.timeseries.Tdiff.(lbl)  = temp_points_raw(ti, :) - temp_points_raw(ti, 1);
 end
 results_heating.dx_step              = res_mm * 1e-3;   % [m]
 results_heating.MaxIsppa             = MaxIsppa;
@@ -181,6 +257,35 @@ end
 
 %% Local helpers
 
-function vol_out = resample_bb_to_prestus(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm)
-    vol_out = resample_babelbrain_vol(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm);
+function vol_out = resample_bb_to_prestus(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm, beam_sign)
+    if nargin < 10 || isempty(beam_sign)
+        beam_sign = 1;
+    end
+    vol_out = resample_babelbrain_vol(vol_bb, x_mm, y_mm, z_mm, planimg, prestus_dims, res_mm, focus_pos, focal_length_mm, 'linear', beam_sign);
+end
+
+function val = read_field_any(h5, key, root_names, nested_prefix, nested_names)
+% Read a scalar or array field from root or nested AllData/item_0 group.
+    if any(strcmp(root_names, key))
+        val = double(h5read(h5, ['/' key]));
+    elseif any(strcmp(nested_names, key))
+        val = double(h5read(h5, [nested_prefix key]));
+    else
+        error('read_babelbrain_thermal:missingField', ...
+            'Required field ''%s'' not found at root or under %s in:\n  %s', ...
+            key, nested_prefix, h5);
+    end
+end
+
+function val = read_scalar_any_(h5, key, root_names, nested_prefix, nested_names)
+% Read an optional scalar from root or nested group; return NaN if absent.
+    if any(strcmp(root_names, key))
+        val = double(h5read(h5, ['/' key]));
+    elseif any(strcmp(nested_names, key))
+        val = double(h5read(h5, [nested_prefix key]));
+    else
+        warning('read_babelbrain_thermal:missingScalar', ...
+            'Optional field ''%s'' not found in thermal HDF5; returning NaN.', key);
+        val = NaN;
+    end
 end
