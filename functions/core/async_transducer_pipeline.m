@@ -549,6 +549,11 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc)
     p.modules.generate_report        = 0;
     p.io.output_affix                = affix;
     p.io.preproc_affix               = affix_preproc;  % load shared grid sized for all transducers
+    % Tell load_grid_cache_file which transducer this sub-job is, so that on a
+    % cache hit it copies this transducer's grid-space trans_pos/focus_pos
+    % (set by grid_transducer_location during Stage 0) instead of leaving the
+    % caller's input-space (e.g. T1-voxel) positions in place.
+    p.io.async_transducer_idx        = transducer_idx;
     p.io.overwrite_files             = 'never';
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 1;
