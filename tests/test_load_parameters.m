@@ -126,4 +126,46 @@ classdef test_load_parameters < matlab.unittest.TestCase
 
     end
 
+    methods (Test, TestTags = {'backends'})
+
+        function test_unknown_thermal_backend_errors(tc)
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            override.thermal_backend = 'fdtd';
+            tc.verifyError(@() load_parameters(override), 'prestus:unknownThermalBackend');
+        end
+
+        function test_babelbrain_thermal_requires_babelbrain_acoustics(tc)
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            override.acoustic_backend = 'kwave';
+            override.thermal_backend  = 'babelbrain';
+            tc.verifyError(@() load_parameters(override), ...
+                'prestus:thermalBackendRequiresBabelBrainAcoustics');
+        end
+
+        function test_babelbrain_thermal_with_babelbrain_acoustics_ok(tc)
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            override.acoustic_backend = 'babelbrain';
+            override.thermal_backend  = 'babelbrain';
+            p = load_parameters(override);
+            tc.verifyEqual(p.thermal_backend, 'babelbrain');
+        end
+
+        function test_computing_backend_name_normalised(tc)
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            override.babelbrain.computing_backend = 'metal';
+            p = load_parameters(override);
+            tc.verifyEqual(p.babelbrain.computing_backend, 3);
+        end
+
+        function test_computing_backend_auto_kept(tc)
+            p = load_parameters(tc.quiet());
+            tc.verifyEqual(char(p.babelbrain.computing_backend), 'auto');
+        end
+
+    end
+
 end

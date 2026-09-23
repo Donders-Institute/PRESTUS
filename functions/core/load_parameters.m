@@ -236,6 +236,48 @@ function parameters = load_parameters(varargin)
         end
     end
 
+    %% Validate thermal_backend value and backend combination
+    % Fail here rather than after the (expensive) acoustic stage.
+    if isfield(parameters, 'thermal_backend') && ~isempty(parameters.thermal_backend)
+        valid_thermal = {'kwave', 'babelbrain'};
+        if ~any(strcmpi(parameters.thermal_backend, valid_thermal))
+            error('prestus:unknownThermalBackend', ...
+                'Unknown thermal_backend "%s". Valid options: %s.', ...
+                parameters.thermal_backend, strjoin(valid_thermal, ', '));
+        end
+        if strcmpi(parameters.thermal_backend, 'babelbrain')
+            ac_is_bb = isfield(parameters, 'acoustic_backend') && ...
+                strcmpi(parameters.acoustic_backend, 'babelbrain');
+            has_ext_ac = isfield(parameters, 'io') && ...
+                isfield(parameters.io, 'external_acoustic_nifti') && ...
+                ~isempty(parameters.io.external_acoustic_nifti);
+            if ~ac_is_bb || has_ext_ac
+                error('prestus:thermalBackendRequiresBabelBrainAcoustics', ...
+                    ['thermal_backend "babelbrain" requires acoustic_backend "babelbrain" ' ...
+                     '(it runs on the *DataForSim.h5 BabelBrain writes) and cannot be combined ' ...
+                     'with io.external_acoustic_nifti. Use thermal_backend "kwave" with ' ...
+                     'k-Wave/jwave/external acoustics.']);
+            end
+        end
+    end
+
+    %% Normalise babelbrain.computing_backend names to BabelBrain's integer codes
+    if isfield(parameters, 'babelbrain') && isfield(parameters.babelbrain, 'computing_backend') && ...
+            (ischar(parameters.babelbrain.computing_backend) || isstring(parameters.babelbrain.computing_backend))
+        cb_names = {'cuda', 'opencl', 'metal', 'cpu'};
+        cb = lower(char(parameters.babelbrain.computing_backend));
+        cb_idx = find(strcmp(cb, cb_names));
+        if ~isempty(cb_idx)
+            parameters.babelbrain.computing_backend = cb_idx;
+        elseif ismember(str2double(cb), 1:4)
+            parameters.babelbrain.computing_backend = str2double(cb);
+        elseif ~strcmp(cb, 'auto')
+            error('prestus:unknownBabelBrainComputingBackend', ...
+                ['Unknown babelbrain.computing_backend "%s". Valid options: auto, cuda, opencl, ' ...
+                 'metal, cpu (or 1-4).'], cb);
+        end
+    end
+
     %% jwave compatibility: kWaveArray source is not supported
     if isfield(parameters, 'acoustic_backend') && ...
             strcmpi(parameters.acoustic_backend, 'jwave') && ...
