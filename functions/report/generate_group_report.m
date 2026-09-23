@@ -120,10 +120,13 @@ try
 
     html_parts = {};
     html_parts{end+1} = '<!DOCTYPE html>';
-    html_parts{end+1} = '<html lang="en">';
+    html_parts{end+1} = '<html lang="en" data-theme="light">';
     html_parts{end+1} = '<head>';
     html_parts{end+1} = '<meta charset="UTF-8">';
     html_parts{end+1} = '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+    html_parts{end+1} = ['<script>try{var t=localStorage.getItem("prestus-theme")||' ...
+        '((window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light");' ...
+        'document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'];
     html_parts{end+1} = sprintf('<title>PRESTUS Group Report — %s%s (N=%d)</title>', ...
         medium, affix, n_subjects);
     html_parts{end+1} = '<style>';
@@ -132,6 +135,7 @@ try
     html_parts{end+1} = '</style>';
     html_parts{end+1} = '</head>';
     html_parts{end+1} = '<body>';
+    html_parts{end+1} = '<a id="top"></a>';
 
     % Table of contents (sticky)
     try
@@ -147,6 +151,13 @@ try
         html_parts{end+1} = html_utils.section_error('Header', ME);
     end
 
+    % Group verdict banner + subjects exceeding NSR limits
+    try
+        html_parts{end+1} = build_group_safety_banner(subjects_meta, group_table, limits);
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Group verdict', ME);
+    end
+
     % Section 2: Filter bar (subject checkboxes)
     try
         html_parts{end+1} = build_filter_bar(subjects_meta);
@@ -154,11 +165,25 @@ try
         html_parts{end+1} = html_utils.section_error('Filter', ME);
     end
 
-    % Section 3: Group Exposure Dashboard
+    % Section 3: Group Safety dashboard (ITRUSST-limited metrics only)
     try
         html_parts{end+1} = build_group_dashboard(subjects_meta, limits, is_layered);
     catch ME
-        html_parts{end+1} = html_utils.section_error('Group Exposure Dashboard', ME);
+        html_parts{end+1} = html_utils.section_error('Group Safety dashboard', ME);
+    end
+
+    % Section 3a: Other (informational) group metrics
+    try
+        html_parts{end+1} = build_group_other_metrics(subjects_meta, limits);
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Other exposure metrics', ME);
+    end
+
+    % Section 3b: Data analysis (client-side distribution / correlation / by-condition)
+    try
+        html_parts{end+1} = build_analysis_section(subjects_meta, limits);
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Data Analysis', ME);
     end
 
     % Section 4: Subject roster table
@@ -216,12 +241,16 @@ try
     % Lightbox overlay
     html_parts{end+1} = html_utils.lightbox();
 
-    % Embedded JSON payload + filter JS
+    % Embedded JSON payload + filter JS (checkbox-driven dashboard recompute)
     try
         html_parts{end+1} = build_filter_script(subjects_meta, limits);
     catch ME
         html_parts{end+1} = html_utils.section_error('Filter Script', ME);
     end
+
+    % Shared interactive scripts: theme/search/lightbox + sortable roster + analysis charts
+    html_parts{end+1} = report_scripts.common();
+    html_parts{end+1} = report_scripts.group_runtime();
 
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
@@ -331,6 +360,26 @@ function T = outerjoin_tables(A, B)
     colsB = B.Properties.VariableNames;
     all_cols = unique([colsA, colsB], 'stable');
 
+    % Columns present in both tables are not padded, so a type mismatch here
+    % (e.g. numeric for one subject, string for another under the same CSV
+    % column name — possible if per-subject CSVs in path.sim were written by
+    % different PRESTUS versions/schemas) would otherwise be silently
+    % coerced or dropped by the concatenation below with no diagnostic.
+    shared_cols = intersect(colsA, colsB, 'stable');
+    for c = 1:numel(shared_cols)
+        col = shared_cols{c};
+        if ~strcmp(class(A.(col)), class(B.(col)))
+            subj_str = '';
+            if ismember('subject_id', colsB)
+                subj_str = sprintf(' (sub-%03d)', B.subject_id(1));
+            end
+            warning('generate_group_report:columnTypeMismatch', ...
+                ['Column "%s"%s has type "%s" here vs "%s" in the accumulated group table; ' ...
+                 'values may be silently coerced or dropped.'], ...
+                col, subj_str, class(B.(col)), class(A.(col)));
+        end
+    end
+
     for c = 1:numel(all_cols)
         col = all_cols{c};
         if ~ismember(col, colsA)
@@ -431,7 +480,8 @@ function cols = get_maxT_plot_cols()
 end
 
 function cols = get_riseT_plot_cols()
-    cols = {'riseT_brain', 'riseT_skull', 'riseT_skin'};
+    cols = {'riseT_brain', 'riseT_skull', 'riseT_skin', ...
+            'riseT37_brain', 'riseT37_skull', 'riseT37_skin'};
 end
 
 function cols = get_cem43_plot_cols()
@@ -445,17 +495,148 @@ end
 %  =========================================================================
 
 function html = build_toc()
-    html = ['<nav class="toc">' ...
-        '<strong>Group Report:</strong>' ...
+    logo = html_utils.report_logo(26);
+    if ~isempty(logo)
+        brand = ['<a class="brand" href="#top">' logo '</a>'];
+    else
+        brand = '<a class="brand" href="#top"><span class="wm">PRE<b>STUS</b></span></a>';
+    end
+    html = ['<nav class="toc">' brand ...
         '<a href="#header">Header</a>' ...
         '<a href="#filter">Filter</a>' ...
-        '<a href="#dashboard">Dashboard</a>' ...
+        '<a href="#dashboard">Safety</a>' ...
+        '<a href="#other-group">Other</a>' ...
+        '<a href="#analysis">Analysis</a>' ...
         '<a href="#roster">Roster</a>' ...
         '<a href="#group-acoustic">Acoustic</a>' ...
         '<a href="#group-thermal">Thermal</a>' ...
         '<a href="#subjects">Subjects</a>' ...
         '<a href="#config">Config</a>' ...
+        '<span class="toc-spacer"></span>' ...
+        '<label class="report-search hide-sm">' ...
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' ...
+        '<input id="report-search" type="search" placeholder="Search&hellip;" autocomplete="off"></label>' ...
+        '<button class="theme-btn" id="theme-btn" type="button" title="Toggle dark mode" aria-label="Toggle theme">' ...
+        '<svg id="theme-sun" width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' ...
+        '<svg id="theme-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" style="display:none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>' ...
+        '</button>' ...
         '</nav>'];
+end
+
+function html = build_group_safety_banner(subjects_meta, group_table, limits) %#ok<INUSL>
+% Group verdict: how many subjects exceed any finite NSR limit, with a
+% clickable list of the offenders (the participant-level flagging).
+    names = fieldnames(limits);
+    lim_names = {};
+    for i = 1:numel(names)
+        if ~isinf(limits.(names{i}).limit); lim_names{end+1} = names{i}; end %#ok<AGROW>
+    end
+    n = numel(subjects_meta);
+    exceed_ids = []; exceed_info = {};
+    for k = 1:n
+        m = subjects_meta(k).metrics;
+        over = {};
+        for i = 1:numel(lim_names)
+            key = matlab.lang.makeValidName(lim_names{i});
+            if isfield(m, key) && isnumeric(m.(key)) && isscalar(m.(key)) && ~isnan(m.(key)) ...
+                    && m.(key) > limits.(lim_names{i}).limit
+                over{end+1} = limits.(lim_names{i}).label; %#ok<AGROW>
+            end
+        end
+        if ~isempty(over)
+            exceed_ids(end+1) = subjects_meta(k).subject_id; %#ok<AGROW>
+            exceed_info{end+1} = sprintf('sub-%03d &middot; %s', ...
+                subjects_meta(k).subject_id, html_utils.escape(strjoin(over, ', '))); %#ok<AGROW>
+        end
+    end
+    nOver = numel(exceed_ids);
+    if nOver == 0
+        cls = 'pass';
+        glyph = '<svg viewBox="0 0 24 24" fill="none"><path d="m5 13 4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        title = sprintf('All %d subjects within NSR limits', n);
+        sub = 'No subject exceeds any ITRUSST non-significant-risk limit.';
+        badges = '';
+    else
+        cls = 'fail';
+        glyph = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.3" fill="currentColor"/><path d="M10.3 3.8 2.5 18a1.9 1.9 0 0 0 1.7 2.9h15.6A1.9 1.9 0 0 0 21.5 18L13.7 3.8a1.9 1.9 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+        title = sprintf('%d of %d subjects exceed an NSR limit', nOver, n);
+        sub = 'Flagged below and in the roster. Click a subject to jump to its row.';
+        b = '';
+        for i = 1:numel(exceed_info)
+            b = [b sprintf('<a class="exbadge" href="#row-%d">%s</a>', exceed_ids(i), exceed_info{i})]; %#ok<AGROW>
+        end
+        badges = ['<div class="exsub">' b '</div>'];
+    end
+    html = sprintf('<section class="verdict %s" id="verdict">', cls);
+    html = [html sprintf('<div class="glyph">%s</div>', glyph)];
+    html = [html sprintf('<div><h2>%s</h2><p>%s</p>%s</div>', html_utils.escape(title), sub, badges)];
+    html = [html '<div class="tally">'];
+    html = [html sprintf('<div class="t g"><div class="n">%d</div><div class="l">Within</div></div>', n - nOver)];
+    html = [html sprintf('<div class="t r"><div class="n">%d</div><div class="l">Over</div></div>', nOver)];
+    html = [html '</div></section>'];
+end
+
+function html = build_analysis_section(subjects_meta, limits)
+% Client-side analysis panel: distribution / correlation / by-condition,
+% rendered from an embedded JSON payload by report_scripts.group_runtime().
+    subs = cell(1, numel(subjects_meta));
+    for k = 1:numel(subjects_meta)
+        m = subjects_meta(k).metrics;
+        m.id = subjects_meta(k).subject_id;
+        subs{k} = m;
+    end
+    if isempty(subs)
+        subjects_json = '[]';
+    else
+        subjects_json = jsonencode(subs);
+    end
+
+    % Metric registry (emitted as a JS literal so informational limits can use Infinity)
+    specs = { ...
+        'MI_tc','MI transcranial','','ac'; ...
+        'TIC','Cranial TI','','ac'; ...
+        'Isppa','ISPPA','W/cm2','ac'; ...
+        'Ipa_target','Ipa at target','W/cm2','ac'; ...
+        'real_focal_distance_mm','Focal distance','mm','ac'; ...
+        'ep_focal_distance_mm','EP-to-focus','mm','ac'; ...
+        'maxT_skull','Max temp skull','C','th'; ...
+        'riseT_skull','dT skull','C','th'; ...
+        'riseT37_skull','dT from 37 skull','C','th'; ...
+        'CEM43_skull','CEM43 skull','min','th'; ...
+        'maxT_brain','Max temp brain','C','th'; ...
+        'CEM43_brain','CEM43 brain','min','th'};
+    met = {};
+    for i = 1:size(specs, 1)
+        key = specs{i, 1};
+        if isfield(limits, key) && ~isinf(limits.(key).limit)
+            lim_s = sprintf('%.6g', limits.(key).limit);
+        else
+            lim_s = 'Infinity';
+        end
+        met{end+1} = sprintf('{"k":"%s","label":"%s","unit":"%s","limit":%s,"dom":"%s"}', ...
+            key, specs{i,2}, specs{i,3}, lim_s, specs{i,4}); %#ok<AGROW>
+    end
+    metrics_json = ['[' strjoin(met, ',') ']'];
+
+    opts = '';
+    for i = 1:size(specs, 1)
+        opts = [opts sprintf('<option value="%s">%s</option>', specs{i,1}, specs{i,2})]; %#ok<AGROW>
+    end
+
+    html = '<section class="report-section" id="analysis">';
+    html = [html '<h2>Data Analysis</h2>'];
+    html = [html '<p class="note">Explore the group distribution of each metric and correlations between metrics; the dashed red line marks the NSR limit. Points are individual subjects.</p>'];
+    html = [html '<div class="an-tabs">' ...
+        '<div class="an-tab on" data-view="dist">Distribution</div>' ...
+        '<div class="an-tab" data-view="corr">Correlation</div>' ...
+        '<div class="an-tab" data-view="cond">By subject</div></div>'];
+    html = [html sprintf('<div class="an-ctrls" id="an-c-dist"><label>Metric <select id="an-dist">%s</select></label></div>', opts)];
+    html = [html sprintf('<div class="an-ctrls" id="an-c-corr" style="display:none"><label>X <select id="an-x">%s</select></label><label>Y <select id="an-y">%s</select></label></div>', opts, opts)];
+    html = [html sprintf('<div class="an-ctrls" id="an-c-cond" style="display:none"><label>Metric <select id="an-cond">%s</select></label><label>Group by <select id="an-by"><option value="id">subject</option></select></label></div>', opts)];
+    html = [html '<div class="an-plot"><svg id="an-plot" viewBox="0 0 760 320" preserveAspectRatio="xMidYMid meet"></svg></div>'];
+    html = [html '<div class="an-legend" id="an-legend"></div>'];
+    html = [html '<script>window.PRESTUS_SUBJECTS=' subjects_json ';window.PRESTUS_METRICS=' metrics_json ';</script>'];
+    html = [html '</section>'];
 end
 
 function html = build_group_header(parameters, subject_list, medium, affix, is_layered)
@@ -504,116 +685,41 @@ function html = build_filter_bar(subjects_meta)
 end
 
 function html = build_group_dashboard(subjects_meta, limits, is_layered)
-% Cross-subject statistics per safety metric, with data-* attributes so the
-% JS filter can recompute on toggle.
+% Group ITRUSST safety section: only finite-limit metrics, split into a
+% Mechanical (MI) and a Thermal sub-grid. Cards carry data-* attributes so the
+% JS filter recomputes on toggle. Informational metrics live in
+% build_group_other_metrics.
     html = '<section class="report-section" id="dashboard">';
-    html = [html '<h2>Group Exposure Dashboard</h2>'];
+    html = [html '<h2>Group Safety &mdash; ITRUSST exposure</h2>'];
 
     if ~is_layered
         html = [html '<div class="medium-banner medium-water">' ...
-            '<strong>Water / Free-field</strong> &mdash; tissue-specific NSR limits are not applicable.</div>'];
+            '<strong>Water / Free-field</strong> &mdash; tissue-specific NSR limits are not applicable. ' ...
+            'See <a href="#other-group">Other exposure metrics</a> below.</div>'];
     end
 
     metric_names = fieldnames(limits);
-
-    html = [html '<div class="safety-grid">'];
+    mech_keys = {}; therm_keys = {};
     for i = 1:numel(metric_names)
         name = metric_names{i};
-        info = limits.(name);
-        js_key = matlab.lang.makeValidName(name);
-        vals = collect_metric(subjects_meta, js_key);
-        s = stat_summary(vals);
-
-        % Colour driven by max (worst case across subjects); matches the
-        % uncertainty report's "conservative variant" colour rule.
-        color = risk_color(s.max, info.limit);
-
-        % Axis baseline: 37 for absolute temperatures, 0 elsewhere
-        if strncmp(name, 'maxT', 4) || strncmp(name, 'endT', 4)
-            scale_min = 37;
-        else
-            scale_min = 0;
+        switch metric_group(name, limits.(name))
+            case 'mechanical'
+                % Group Safety board reports one top-line MI tile per medium
+                % (MI free-water or MI_tc transcranial) plus peak pressure —
+                % per-tissue MI_brain/MI_skull/MI_skin are intentionally
+                % excluded here (still available in the CSV / box plots).
+                if strcmp(name, 'MI_tc') || strcmp(name, 'MI') || strcmp(name, 'Psptp')
+                    mech_keys{end+1} = name; %#ok<AGROW>
+                end
+            case 'thermal'
+                therm_keys{end+1} = name; %#ok<AGROW>
         end
-        % Scale max: large enough to fit both worst-case sim and the NSR limit.
-        if isinf(info.limit)
-            scale_max = max(scale_min + 1, s.max);
-        else
-            scale_max = max([scale_min + 1, s.max, info.limit]);
-        end
-        if isnan(scale_max), scale_max = scale_min + 1; end
-        scale_range = scale_max - scale_min;
-
-        html = [html sprintf( ...
-            '<div class="safety-card safety-%s" data-card-metric="%s" data-scale-min="%.6g" data-scale-max="%.6g" data-limit="%s">', ...
-            color, html_utils.escape(js_key), scale_min, scale_max, ...
-            iff(isinf(info.limit), 'null', sprintf('%.6g', info.limit)))];
-
-        html = [html sprintf('<div class="safety-label">%s</div>', html_utils.escape(info.label))];
-
-        % Main value (mean) + unit
-        if isnan(s.mean)
-            html = [html '<div class="safety-value" data-stat-mean>N/A</div>'];
-        else
-            html = [html sprintf('<div class="safety-value" data-stat-mean>%.3g</div>', s.mean)];
-        end
-
-        % ± SD
-        if isnan(s.sd) || s.n < 1
-            html = [html '<div class="safety-sd" data-stat-sd>&plusmn; &mdash;</div>'];
-        else
-            html = [html sprintf('<div class="safety-sd" data-stat-sd>&plusmn; %.3g %s</div>', s.sd, html_utils.escape(info.unit))];
-        end
-
-        % min – max (N=n)
-        if s.n == 0
-            range_str = '(N=0)';
-        elseif s.n == 1
-            range_str = sprintf('%.3g (N=1)', s.min);
-        else
-            range_str = sprintf('%.3g &ndash; %.3g (N=%d)', s.min, s.max, s.n);
-        end
-        html = [html sprintf('<div class="safety-range" data-stat-range>%s</div>', range_str)];
-
-        % NSR limit annotation
-        if isinf(info.limit)
-            html = [html sprintf('<div class="risk-limit">%s (informational)</div>', html_utils.escape(info.unit))];
-        else
-            html = [html sprintf('<div class="risk-limit">NSR limit: %.3g %s</div>', info.limit, html_utils.escape(info.unit))];
-        end
-
-        % Axis range printed above the bar
-        html = [html sprintf('<div class="safety-bar-range">%.3g &ndash; %.3g %s</div>', ...
-            scale_min, scale_max, html_utils.escape(info.unit))];
-
-        % Bar track: span (min→max), mean marker, NSR limit line
-        bar_html = '<div class="safety-bar-track" data-bar-track>';
-        if ~isnan(s.min) && ~isnan(s.max)
-            bar_left  = clamp((s.min - scale_min) / scale_range * 100, 0, 100);
-            bar_width = max(0, clamp((s.max - scale_min) / scale_range * 100, 0, 100) - bar_left);
-        else
-            bar_left = 0; bar_width = 0;
-        end
-        bar_html = [bar_html sprintf( ...
-            '<div class="safety-bar" data-bar-span style="left:%.2f%%;width:%.2f%%"></div>', ...
-            bar_left, bar_width)];
-        if ~isnan(s.mean)
-            mean_pct = clamp((s.mean - scale_min) / scale_range * 100, 0, 100);
-            bar_html = [bar_html sprintf( ...
-                '<div class="safety-bar-marker safety-bar-marker--default" data-bar-mean style="left:%.2f%%"></div>', mean_pct)];
-        else
-            bar_html = [bar_html '<div class="safety-bar-marker safety-bar-marker--default" data-bar-mean style="display:none"></div>'];
-        end
-        if ~isinf(info.limit)
-            lim_pct = clamp((info.limit - scale_min) / scale_range * 100, 0, 100);
-            bar_html = [bar_html sprintf( ...
-                '<div class="safety-bar-limit" style="left:%.2f%%"></div>', lim_pct)];
-        end
-        bar_html = [bar_html '</div>'];
-        html = [html bar_html];
-
-        html = [html '</div>'];   % /safety-card
     end
-    html = [html '</div>'];
+    html = [html render_group_grid(mech_keys,  'mech', 'Mechanical', 'mechanical index (MI) &amp; peak pressure', limits, subjects_meta)];
+    html = [html render_group_grid(therm_keys, 'th',   'Thermal',    'temperature &amp; dose', limits, subjects_meta)];
+    if isempty(mech_keys) && isempty(therm_keys)
+        html = [html '<p class="placeholder">No tissue-specific ITRUSST-limited metrics for this medium &mdash; see Other exposure metrics below.</p>'];
+    end
     html = [html '<p class="safety-footnote">NSR limits per ITRUSST consensus ' ...
         '(Aubry et al., 2025). One tile per metric. ' ...
         '<strong>Number</strong> = mean across <em>currently selected</em> subjects; ' ...
@@ -624,6 +730,143 @@ function html = build_group_dashboard(subjects_meta, limits, is_layered)
         'Card colour reflects the <strong>worst-case subject</strong> (max) against the NSR limit: ' ...
         'green &lt;50% of limit, amber 50&ndash;100%, red exceeds.</p>'];
     html = [html '</section>'];
+end
+
+function html = build_group_other_metrics(subjects_meta, limits)
+% Informational group metrics (no ITRUSST limit): TIC, ISPPA, peak pressure.
+    metric_names = fieldnames(limits);
+    other_keys = {};
+    for i = 1:numel(metric_names)
+        if strcmp(metric_group(metric_names{i}, limits.(metric_names{i})), 'other')
+            other_keys{end+1} = metric_names{i}; %#ok<AGROW>
+        end
+    end
+    html = '<section class="report-section" id="other-group">';
+    html = [html '<h2>Other exposure metrics</h2>'];
+    if isempty(other_keys)
+        html = [html '<p class="placeholder">No additional metrics.</p></section>'];
+        return
+    end
+    html = [html render_group_grid(other_keys, 'other', '', '', limits, subjects_meta)];
+    html = [html '<p class="safety-footnote">These intensity, pressure and output-display indices have ' ...
+        'no ITRUSST non-significant-risk limit and are shown for reference only.</p>'];
+    html = [html '</section>'];
+end
+
+function g = metric_group(name, info)
+% Classify a metric: 'other' (informational / Inf limit), 'mechanical' (MI*
+% or peak pressure), else 'thermal'. Mirrors the per-subject report split.
+    if isinf(info.limit)
+        g = 'other';
+    elseif startsWith(name, 'MI') || strcmp(name, 'Psptp')
+        g = 'mechanical';
+    else
+        g = 'thermal';
+    end
+end
+
+function html = render_group_grid(keys, dom_class, title, subtitle, limits, subjects_meta)
+% A labelled sub-grid of group cards (skips the label when title is empty).
+    html = '';
+    if isempty(keys); return; end
+    if ~isempty(title)
+        html = sprintf(['<div class="dash-group-label %s"><span class="dot"></span>' ...
+            '<span class="t">%s</span><span class="s">%s</span></div>'], dom_class, title, subtitle);
+    end
+    html = [html '<div class="safety-grid">'];
+    for i = 1:numel(keys)
+        html = [html render_group_card(keys{i}, limits.(keys{i}), subjects_meta)]; %#ok<AGROW>
+    end
+    html = [html '</div>'];
+end
+
+function html = render_group_card(name, info, subjects_meta)
+% One group dashboard tile: mean / SD / range with a min-max bar, mean marker
+% and NSR limit line. Carries data-* attributes for the JS filter recompute.
+    js_key = matlab.lang.makeValidName(name);
+    vals = collect_metric(subjects_meta, js_key);
+    s = stat_summary(vals);
+
+    % Colour driven by max (worst case across subjects).
+    color = risk_color(s.max, info.limit);
+
+    % Axis baseline: 37 for absolute temperatures, 0 elsewhere
+    if strncmp(name, 'maxT', 4) || strncmp(name, 'endT', 4)
+        scale_min = 37;
+    else
+        scale_min = 0;
+    end
+    if isinf(info.limit)
+        scale_max = max(scale_min + 1, s.max);
+    else
+        scale_max = max([scale_min + 1, s.max, info.limit]);
+    end
+    if isnan(scale_max), scale_max = scale_min + 1; end
+    scale_range = scale_max - scale_min;
+
+    html = sprintf( ...
+        '<div class="safety-card safety-%s" data-card-metric="%s" data-scale-min="%.6g" data-scale-max="%.6g" data-limit="%s">', ...
+        color, html_utils.escape(js_key), scale_min, scale_max, ...
+        iff(isinf(info.limit), 'null', sprintf('%.6g', info.limit)));
+
+    html = [html sprintf('<div class="safety-label">%s</div>', html_utils.escape(info.label))];
+
+    if isnan(s.mean)
+        html = [html '<div class="safety-value" data-stat-mean>N/A</div>'];
+    else
+        html = [html sprintf('<div class="safety-value" data-stat-mean>%.3g</div>', s.mean)];
+    end
+
+    if isnan(s.sd) || s.n < 1
+        html = [html '<div class="safety-sd" data-stat-sd>&plusmn; &mdash;</div>'];
+    else
+        html = [html sprintf('<div class="safety-sd" data-stat-sd>&plusmn; %.3g %s</div>', s.sd, html_utils.escape(info.unit))];
+    end
+
+    if s.n == 0
+        range_str = '(N=0)';
+    elseif s.n == 1
+        range_str = sprintf('%.3g (N=1)', s.min);
+    else
+        range_str = sprintf('%.3g &ndash; %.3g (N=%d)', s.min, s.max, s.n);
+    end
+    html = [html sprintf('<div class="safety-range" data-stat-range>%s</div>', range_str)];
+
+    if isinf(info.limit)
+        html = [html sprintf('<div class="risk-limit">%s (informational)</div>', html_utils.escape(info.unit))];
+    else
+        html = [html sprintf('<div class="risk-limit">NSR limit: %.3g %s</div>', info.limit, html_utils.escape(info.unit))];
+    end
+
+    html = [html sprintf('<div class="safety-bar-range">%.3g &ndash; %.3g %s</div>', ...
+        scale_min, scale_max, html_utils.escape(info.unit))];
+
+    bar_html = '<div class="safety-bar-track" data-bar-track>';
+    if ~isnan(s.min) && ~isnan(s.max)
+        bar_left  = clamp((s.min - scale_min) / scale_range * 100, 0, 100);
+        bar_width = max(0, clamp((s.max - scale_min) / scale_range * 100, 0, 100) - bar_left);
+    else
+        bar_left = 0; bar_width = 0;
+    end
+    bar_html = [bar_html sprintf( ...
+        '<div class="safety-bar" data-bar-span style="left:%.2f%%;width:%.2f%%"></div>', ...
+        bar_left, bar_width)];
+    if ~isnan(s.mean)
+        mean_pct = clamp((s.mean - scale_min) / scale_range * 100, 0, 100);
+        bar_html = [bar_html sprintf( ...
+            '<div class="safety-bar-marker safety-bar-marker--default" data-bar-mean style="left:%.2f%%"></div>', mean_pct)];
+    else
+        bar_html = [bar_html '<div class="safety-bar-marker safety-bar-marker--default" data-bar-mean style="display:none"></div>'];
+    end
+    if ~isinf(info.limit)
+        lim_pct = clamp((info.limit - scale_min) / scale_range * 100, 0, 100);
+        bar_html = [bar_html sprintf( ...
+            '<div class="safety-bar-limit" style="left:%.2f%%"></div>', lim_pct)];
+    end
+    bar_html = [bar_html '</div>'];
+    html = [html bar_html];
+
+    html = [html '</div>'];
 end
 
 function y = clamp(x, lo, hi)
@@ -663,35 +906,58 @@ function html = build_subject_roster(group_table, subjects_meta, parameters, med
         return
     end
 
-    % Pick a small set of headline columns to keep the table scannable
-    headline = {'subject_id', 'Isppa', 'Ipa_target', 'real_focal_distance_mm'};
-    if is_layered
-        headline = [headline, {'Isppa_brain', 'MI_tc', 'MI_brain'}];
-        if any(ismember({'maxT', 'maxT_brain'}, group_table.Properties.VariableNames))
-            headline = [headline, {'maxT_brain', 'CEM43_brain'}];
-        end
+    % Headline columns: ITRUSST-relevant metrics first (MI, then thermal NSR
+    % metrics), then the informational intensity / pressure / distance columns.
+    headline = {'subject_id', 'MI_tc'};
+    if is_layered && any(ismember({'maxT_skull'}, group_table.Properties.VariableNames))
+        headline = [headline, {'maxT_skull', 'riseT_skull', 'riseT37_skull', 'CEM43_skull'}];
     end
+    headline = [headline, {'Isppa', 'Ipa_target', 'real_focal_distance_mm', 'ep_focal_distance_mm', 'TIC'}];
     avail = intersect(headline, group_table.Properties.VariableNames, 'stable');
+    lim_names = fieldnames(limits);
 
-    % Build HTML manually so each row gets data-subject-id (table2html can't do that)
-    html = '<div class="table-wrapper"><table class="data-table"><thead><tr>';
+    % Sortable header; each numeric <td> carries data-col + data-value so the
+    % shared roster script can sort, and rows exceeding any NSR limit are flagged.
+    html = '<p class="note">Click a column header to sort. Rows for subjects exceeding any NSR limit are flagged.</p>';
+    html = [html '<div class="table-wrapper"><table class="data-table roster" id="roster-table"><thead><tr>'];
     html = [html '<th>Subject</th>'];
     for c = 1:numel(avail)
         if strcmp(avail{c}, 'subject_id'), continue; end
-        html = [html sprintf('<th>%s</th>', html_utils.escape(avail{c}))];
+        html = [html sprintf('<th data-col="%s">%s</th>', avail{c}, html_utils.escape(avail{c}))];
     end
     html = [html '<th>Report</th>'];
     html = [html '</tr></thead><tbody>'];
 
     for k = 1:numel(subjects_meta)
         id = subjects_meta(k).subject_id;
-        % Find this subject's row in group_table
         row_idx = find(group_table.subject_id == id, 1, 'last');
         if isempty(row_idx)
             continue
         end
-        html = [html sprintf('<tr data-subject-id="%d">', id)];
-        html = [html sprintf('<td>sub-%03d</td>', id)];
+
+        % Flag: does this subject exceed any finite-limit metric in its row?
+        is_exceed = false;
+        for i = 1:numel(lim_names)
+            ln = lim_names{i};
+            if isinf(limits.(ln).limit); continue; end
+            if ismember(ln, group_table.Properties.VariableNames)
+                vv = group_table{row_idx, ln};
+                if iscell(vv); vv = vv{1}; end
+                if isnumeric(vv) && isscalar(vv) && ~isnan(vv) && vv > limits.(ln).limit
+                    is_exceed = true; break
+                end
+            end
+        end
+
+        if is_exceed
+            html = [html sprintf('<tr data-subject-id="%d" class="exceed" id="row-%d">', id, id)];
+            flag = '<span class="roster-flag">over</span>';
+        else
+            html = [html sprintf('<tr data-subject-id="%d" id="row-%d">', id, id)];
+            flag = '';
+        end
+        html = [html sprintf('<td>%ssub-%03d</td>', flag, id)];
+
         for c = 1:numel(avail)
             col = avail{c};
             if strcmp(col, 'subject_id'), continue; end
@@ -699,14 +965,16 @@ function html = build_subject_roster(group_table, subjects_meta, parameters, med
             if iscell(val); val = val{1}; end
             val_str = html_utils.format_cell(val);
 
-            cell_class = '';
-            if isfield(limits, col) && isnumeric(val) && isscalar(val)
-                color = risk_color(val, limits.(col).limit);
-                if ~strcmp(color, 'info')
-                    cell_class = sprintf(' class="cell-%s"', color);
+            dval = ''; cell_class = '';
+            if isnumeric(val) && isscalar(val) && ~isnan(val)
+                dval = sprintf(' data-value="%.6g"', val);
+                if isfield(limits, col)
+                    color = risk_color(val, limits.(col).limit);
+                    if strcmp(color, 'red'); cell_class = ' over';
+                    elseif strcmp(color, 'amber'); cell_class = ' near'; end
                 end
             end
-            html = [html sprintf('<td%s>%s</td>', cell_class, val_str)];
+            html = [html sprintf('<td data-col="%s"%s class="num%s">%s</td>', col, dval, cell_class, val_str)];
         end
 
         rpt = subjects_meta(k).report_path;
@@ -964,6 +1232,9 @@ end
 %  =========================================================================
 
 function css = group_css_extra()
+    % Consolidated into css_styles_base(); kept unreachable for reference.
+    css = '';
+    return; %#ok<UNRCH>
     css = [...
         '/* Group filter bar */' newline ...
         '.filter-bar { position: sticky; top: 60px; z-index: 90; }' newline ...

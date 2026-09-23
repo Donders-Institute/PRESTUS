@@ -20,7 +20,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
 %   final_img                       - 3D image in simulation (subject) space
 %   headreco_folder                 - path to headreco m2m folder containing
 %                                     toMNI/T1fs_nu_12DOF_MNI.nii.gz and T1fs_conform.nii.gz
-%   inv_final_transformation_matrix - [4x3] inverse affine tform from simulation grid
+%   inv_final_transformation_matrix - [4x4] inverse affine tform from simulation grid
 %                                     to T1 conform space
 %   parameters                      - PRESTUS config (overwrite settings)
 %   options.check_nifti_on_disk     - whether to check/write disk file (default: 1)
@@ -39,7 +39,7 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
     arguments
         final_img(:,:,:)
         headreco_folder string
-        inv_final_transformation_matrix (4, 3)
+        inv_final_transformation_matrix (4,4) double
         parameters struct
         options.check_nifti_on_disk = 1
         options.nifti_filename = ''
@@ -70,13 +70,8 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
     mni2subj = readmatrix(fullfile(headreco_folder, 'toMNI', 'MNI2conform_12DOF.txt'), dlmopts, 'OutputType', 'double');
     subj2mni = inv(mni2subj); % Compute inverse transformation matrix
 
-    % Fix bug with transformation matrix length (ensure it's valid)
-    if length(inv_final_transformation_matrix) > 1
-        inv_final_transformation_matrix = inv_final_transformation_matrix(1);
-    end
-
     % Compute affine transformation matrix from final space to MNI space
-    final_to_mni_affine = inv(mni_header.Transform.T') * subj2mni * t1_orig_hdr.Transform.T' * inv_final_transformation_matrix.tdata.T';
+    final_to_mni_affine = inv(mni_header.Transform.T') * subj2mni * t1_orig_hdr.Transform.T' * inv_final_transformation_matrix';
 
     % Check if output NIfTI file exists and handle accordingly
     if options.check_nifti_on_disk

@@ -8,6 +8,10 @@ PRESTUS expects coordinates of both the transducer (`transducer.trans_pos`) and 
 
 Suitable coordinates (x/y/z) may be identified in preferred imaging software based on e.g. an fMRI hotspot, anatomical marker. 
 
+## MNI coordinate selection
+
+Both the transducer position and the focus can be specified directly in MNI (mm) coordinates via `placement.mode = 'mni'`. The focus is converted with the nonlinear SimNIBS warp (as the heuristic target), while the transducer point — which lies outside the brain — is converted with the linear (12dof) transform, snapped to the scalp, and offset by a configurable gap using the heuristic's standoff geometry. See [MNI Transducer Placement](doc_placement_mni.md).
+
 ## Heuristic coordinate selection
 
 PRESTUS can identify heuristic locations for transducer placement (see [Heuristic Transducer Placement](doc_placement_heuristic.md)). This benefits iterative approaches without manual intervention.

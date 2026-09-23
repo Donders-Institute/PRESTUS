@@ -91,18 +91,23 @@ function [trans_ras_seg, ...
         end
 
         % [1] transform from planning voxel -> RAS -> segmentation RAS
+        %
+        % The planning -> voxel step is computed directly (not via
+        % transform_coordinates('ras_plus','grid',...)) because that helper
+        % rounds to an integer voxel index, while this conversion must keep
+        % the continuous (sub-voxel) position — the planning and
+        % segmentation images share the same voxel grid but have different
+        % headers, so reinterpreting the *unrounded* voxel position under
+        % the segmentation affine is what carries the position across.
+        % The voxel -> segmentation-RAS step (forward, no rounding involved)
+        % reuses transform_coordinates per doc_coordinate_systems.md's rule
+        % against re-implementing affine application elsewhere.
 
         vox_plan = [target_ras(i,1:3) 1] * inv(plan_affine);            % Planning voxel (not rounded) = target_pos(i,:)
-        R = seg_affine(1:3,1:3);
-        T = seg_affine(4,1:3)';
-        ras_seg = (vox_plan(1:3) * R) + T';
-        target_ras_seg(i,:) = ras_seg(1:3);                             % RAS mm in segmentation space
+        target_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
 
         vox_plan = [trans_ras(i,1:3) 1] * inv(plan_affine);
-        R = seg_affine(1:3,1:3);
-        T = seg_affine(4,1:3)';
-        ras_seg = (vox_plan(1:3) * R) + T';
-        trans_ras_seg(i,:) = ras_seg(1:3);
+        trans_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
 
         % [2] transform from segmentation RAS to MNI RAS by sampling the
         % SimNIBS coordinate field directly (see NEURONAV_APPLY_DEFORMATION).

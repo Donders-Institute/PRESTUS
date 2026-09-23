@@ -37,7 +37,8 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     all_masks     = img > 0;  % Brain+skull+skin
     [kx1,ky1,kz1] = ndgrid(-1:1,-1:1,-1:1);
     se1 = (kx1.^2+ky1.^2+kz1.^2) <= 1;
-    outer_boundary = (convn(logical(all_masks), se1, 'same') > 0) - logical(all_masks);
+    % Scalp / outer boundary (shared with the 'mni' placement path)
+    [~, outer_boundary] = tp_scalp_boundary(img);
 
     skin_boundary = logical(all_masks) - (convn(logical(all_masks), se1, 'same') == nnz(se1));
     skin_coords   = gpuArray(coord_mesh.xyz(find(skin_boundary), :));
@@ -64,20 +65,12 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     trans_pos_coords = coord_mesh.xyz(close_enough_idx, :);  % [N_cand x 3]
 
     %--- Transducer axis + geometry --------------------------------------
-    norm_v = gpuArray((trans_pos_coords - target) ./ ...
-             repmat(sqrt(sum((trans_pos_coords - target).^2, 2)), [1, 3]));
-
-    max_od_mm      = max(parameters.transducer(1).(parameters.transducer(1).type).elem_od_mm);
-    dist_gf_to_ep_mm = 0.5 * sqrt(4*parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm^2 - max_od_mm^2);
-    dist_tp_to_ep_mm = parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm - dist_gf_to_ep_mm;
-
-    pos_shift_mm   = 5 + dist_tp_to_ep_mm;
-    shifted_trans_pos_coords = trans_pos_coords + norm_v * (pos_shift_mm / pixel_size);
-
-    geom_focus_pos_all = shifted_trans_pos_coords - norm_v * (parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm / pixel_size);
-    ex_plane_pos_all   = geom_focus_pos_all + norm_v * (dist_gf_to_ep_mm / pixel_size);
+    % Shared scalp-standoff geometry (skin_gap_mm = 5, the heuristic default)
+    [shifted_trans_pos_coords, geom_focus_pos_all, ex_plane_pos_all, norm_v] = ...
+        transducer_scalp_geometry(trans_pos_coords, target, parameters.transducer(1), pixel_size, 5);
 
     all_masks_indx     = find(img > 0);
+    max_od_mm          = max(parameters.transducer(1).(parameters.transducer(1).type).elem_od_mm);
     max_od_grid        = max_od_mm / pixel_size;
 
     %--- Pack outputs ----------------------------------------------------

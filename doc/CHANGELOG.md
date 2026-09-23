@@ -112,6 +112,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 
 #### Placement
 - **TUS_entry placement mode** (`placement.mode: 'tus_entry'`) — integrates the TUS_entry R toolbox (Atkinson et al.) to select a scalp entry point minimising coupling geometry error (SD of transducer-disk-edge to scalp distances); complementary to PlanTUS which optimises acoustic objectives
+- New `placement.mode = 'mni'`: specify both transducer scalp-entry point and focus directly in MNI mm, alongside the existing `manual`/`localite`/`heuristic`/`plantus` modes. The focus converts via the nonlinear SimNIBS warp (as the heuristic target does); the transducer point converts via the linear 12dof affine, since the nonlinear warp is unreliable outside the brain
+- Scalp-boundary extraction and transducer standoff-geometry math extracted into shared helpers (`tp_scalp_boundary`, `transducer_scalp_geometry`), reused by both the heuristic candidate-mesh search and the new MNI mode
 
 #### Head pipeline / grid
 - Pipeline grid, medium, and thermal grid stages extracted into standalone functions (`run_grid_stage`, `run_medium_stage`, `resolve_thermal_grid`)
@@ -121,8 +123,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Defaced regions shown transparently in placement and 3D head views
 - ⚠️ **Changed:** `smooth_img` pads by edge replication before convolution. Zero padding eroded masks and darkened property maps at the grid boundary; smoothed masks and maps now differ from earlier runs in the outermost voxels
 
-#### Transducer library
-- Scan equipment, store validated parametric models, plot and compare entries
+#### Calibration
+- Transducer library: scan equipment, store validated parametric models, plot and compare entries
 - `calibration.focal_reference` (`flhm_3db` default, `flhm_6db`, `peak`) sets which axial-profile convention a quoted focal depth refers to; used by `compute_flhm_center`/`compute_focal_metrics` and recorded in the calibration sidecar (see [doc_calibration.md](doc_calibration.md))
 - ⚠️ **Fixed:** `phase_optimization_annulus_full_curve` compared a column model profile against a row target profile, which broadcast to an N×N matrix and could accept a degenerate near-zero fit. Calibrations fitted to measured (row-vector) profiles should be re-run
 - Joint-depth phase/amplitude fit for more robust free-field characterisation
@@ -162,6 +164,12 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
 - HTML simulation report extended with BabelBrain and jwave backend sections
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
+- New global `MI` (free-water mechanical index) and `Psptp` (global peak pressure, now also written for layered runs) output columns, for consistency across media
+- Safety dashboards (per-subject and group) now flag peak pressure against a 2 MPa non-significant-risk limit
+- Safety dashboards (per-subject and group) now show both `MI` (free water) and `MItc` (transcranial) tiles side by side instead of per-tissue `MI_brain`/`MI_skull`/`MI_skin` cards; whichever variant has no data for the report's medium renders grayed out
+- Reports redesigned with a light/dark "instrument" theme, a searchable configuration dump, a sortable subject roster, and client-side distribution/correlation charts
+- New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
+- Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs

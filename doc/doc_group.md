@@ -90,11 +90,13 @@ Per-subject PNGs (positioning, intensity, and max-temperature overlays) are embe
 
 - **Header** — subject count, medium, affix, and simulation path.
 - **Subject filter** — checkboxes to toggle subjects in / out.
-- **Exposure dashboard** — per-metric mean ± SD with min–max range, colour-coded against ITRUSST non-significant-risk limits.
+- **Exposure dashboard** — per-metric mean ± SD with min–max range, colour-coded against ITRUSST non-significant-risk limits. The Mechanical sub-grid always shows both **MI (free water)** and **MItc** (transcranial) tiles, plus a **Max pressure** tile (≤ 2 MPa). Only one of the two MI tiles has real data for any given medium (free water for water/free-field runs, MItc for layered runs) — the other renders as an empty, grayed-out "N/A" tile, so MI (free water) is effectively grayed out whenever MItc is available, and vice versa. Per-tissue `MI_brain`/`MI_skull`/`MI_skin` are not shown on this board (they remain in the per-subject CSV and the Mechanical Index box plot below).
 - **Subject roster** — one row per subject with key metrics and a link to that subject's own report.
 - **Group acoustic summary** — two box plots: **Intensity** (Isppa / Ipa_target, W/cm²) and **Mechanical Index** (per tissue, unitless).
 - **Group thermal summary** *(layered medium with heating simulations only)* — three box plots: **maximum temperature**, **temperature rise**, and **CEM43 thermal dose**, each on its own scale.
 - **Per-subject cards** — collapsible panels embedding each subject's figures.
 - **Configuration summary** — the parameters used for the run.
+
+All group box plots (`render_group_boxplot` in `generate_group_report.m`) auto-scale their figure width to the number of columns being plotted (`max(600, 140 × columns)` px, fixed 420 px height) and are exported as 150 dpi PNGs into `group_plots/` alongside the HTML report.
 
 > **Note:** The subject filter updates the dashboard and per-subject cards live, but the group box plots are static images rendered over the full subject set — they do not change when subjects are toggled.
