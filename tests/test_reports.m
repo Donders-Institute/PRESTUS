@@ -88,7 +88,7 @@ classdef test_reports < matlab.unittest.TestCase
             txt = fileread(rp);
             tc.verifyEqual(numel(strfind(txt, 'Section failed')), 0, 'a section builder errored');
             for m = {'<!DOCTYPE html>', 'id="safety"', 'id="other"', 'Mechanical', 'class="verdict', ...
-                     'Cranial TI (TIC)', 'EP-to-focus', 'config-dump', 'theme-btn'}
+                     'Cranial TI (TIC)', 'exit-plane-ref.', 'config-dump', 'theme-btn'}
                 tc.verifyTrue(~isempty(strfind(txt, m{1})), sprintf('missing %s', m{1})); %#ok<STREMP>
             end
             % Structural split: an MI tile sits in the Safety section, TIC in Other.
@@ -136,7 +136,7 @@ function row = local_csv_row(id, riseT_skull)
     row = table();
     row.subject_id = id; row.freq_Hz = 5e5;
     row.Isppa = 22.1; row.Ipa_target = 19.8;
-    row.real_focal_distance_mm = 64.2; row.ep_focal_distance_mm = 12.8; row.ep_offset_mm = 51;
+    row.real_focal_distance_mm = 64.2; row.real_focal_distance_ep_mm = 12.8;
     row.MI_tc = 0.74; row.MI_brain = 0.71; row.MI_skull = 0.95; row.MI_skin = 0.42; row.TIC = 0.83;
     row.Isppa_brain = 21.4; row.Isppa_skull = 9.8; row.Isppa_skin = 9.0;
     row.maxT_skull = 38.8; row.maxT_brain = 38.2; row.maxT_skin = 37.4;
