@@ -69,14 +69,8 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     % ── Validate required fields ──────────────────────────────────────────────
 
-    required = {'script_path', 'scalp_mask', 'env_path'};
-    for i = 1:numel(required)
-        f = required{i};
-        if ~isfield(te, f) || isempty(te.(f))
-            error('PRESTUS:tus_entry:missingConfig', ...
-                'placement.tus_entry.%s must be set.', f);
-        end
-    end
+    validate_required_fields(te, {'script_path', 'scalp_mask', 'env_path'}, ...
+        'PRESTUS:tus_entry:missingConfig', 'placement.tus_entry');
 
     script_path = char(te.script_path);
     scalp_mask  = char(te.scalp_mask);

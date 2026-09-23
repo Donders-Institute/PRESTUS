@@ -79,15 +79,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 
     % ── Validate required fields ──────────────────────────────────────────
 
-    required = {'script_path', 'env_path', 'focal_distance_list', ...
-                'flhm_list', 'target_name'};
-    for i = 1:numel(required)
-        f = required{i};
-        if ~isfield(pt, f) || isempty(pt.(f))
-            error('PRESTUS:plantus:missingConfig', ...
-                'placement.plantus.%s must be set for plantus placement.', f);
-        end
-    end
+    validate_required_fields(pt, ...
+        {'script_path', 'env_path', 'focal_distance_list', 'flhm_list', 'target_name'}, ...
+        'PRESTUS:plantus:missingConfig', 'placement.plantus');
 
     script_path      = char(pt.script_path);
     env_path = char(pt.env_path);

@@ -70,22 +70,7 @@ end
 
         % ── LOCALITE ──────────────────────────────────────────────────────
         case 'localite'
-            localite_file = resolve_localite_file(parameters);
-            fprintf('Reading Localite file:\n  %s\n', localite_file);
-
-            % Load T1 header for voxel ↔ RAS coordinate transform
-            filename_t1 = fullfile(parameters.path.anat, ...
-                sprintf(parameters.path.t1_pattern, parameters.subject_id));
-            t1_header = niftiinfo(filename_t1);
-
-            [trans_pos, focus_pos] = ...
-                position_transducer_localite(localite_file, t1_header, parameters);
-
-            % Write resolved positions into every configured transducer
-            for ti = 1:numel(parameters.transducer)
-                parameters.transducer(ti).trans_pos = trans_pos;
-                parameters.transducer(ti).focus_pos = focus_pos;
-            end
+            parameters = run_localite_placement(parameters);
 
         % ── HEURISTIC ─────────────────────────────────────────────────────
         case 'heuristic'
@@ -105,6 +90,33 @@ end
                    'or ''tus_entry''.'], mode);
     end
 
+end
+
+% ── Localite placement dispatcher ────────────────────────────────────────
+function parameters = run_localite_placement(parameters)
+% Call position_transducer_localite and write results back into parameters.
+
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'localite')
+        error('PRESTUS:localite:missingConfig', ...
+            'placement.localite sub-struct is missing. See config_default.yaml for required fields.');
+    end
+
+    localite_file = resolve_localite_file(parameters);
+    fprintf('Reading Localite file:\n  %s\n', localite_file);
+
+    % Load T1 header for voxel ↔ RAS coordinate transform
+    filename_t1 = fullfile(parameters.path.anat, ...
+        sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    t1_header = niftiinfo(filename_t1);
+
+    [trans_pos, focus_pos] = ...
+        position_transducer_localite(localite_file, t1_header, parameters);
+
+    % Write resolved positions into every configured transducer
+    for ti = 1:numel(parameters.transducer)
+        parameters.transducer(ti).trans_pos = trans_pos;
+        parameters.transducer(ti).focus_pos = focus_pos;
+    end
 end
 
 % ── Localite file resolver ────────────────────────────────────────────────
@@ -145,16 +157,13 @@ function parameters = run_heuristic_placement(parameters)
 % user must re-run after the job finishes with the resolved positions).
 
     % Validate required heuristic config fields
-    if ~isfield(parameters.placement.heuristic, 'mni_target_mm') || ...
-            isempty(parameters.placement.heuristic.mni_target_mm)
-        error(['placement.heuristic.mni_target_mm must be set for heuristic placement. ' ...
-               'Provide a [1×3] MNI coordinate in mm.']);
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'heuristic')
+        error('PRESTUS:heuristic:missingConfig', ...
+            'placement.heuristic sub-struct is missing. See config_default.yaml for required fields.');
     end
-    if ~isfield(parameters.placement.heuristic, 'target_name') || ...
-            isempty(parameters.placement.heuristic.target_name)
-        error(['placement.heuristic.target_name must be set for heuristic placement. ' ...
-               'Provide a label string (e.g. ''DLPFC'').']);
-    end
+    validate_required_fields(parameters.placement.heuristic, ...
+        {'mni_target_mm', 'target_name'}, ...
+        'PRESTUS:heuristic:missingConfig', 'placement.heuristic');
 
     mni_coords  = parameters.placement.heuristic.mni_target_mm(:)';
     target_name = char(parameters.placement.heuristic.target_name);
@@ -248,7 +257,7 @@ function parameters = run_plantus_placement(parameters)
 % Call position_transducer_plantus and write results back into parameters.
 
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'plantus')
-        error('PRESTUS:placement:missingConfig', ...
+        error('PRESTUS:plantus:missingConfig', ...
             'placement.plantus sub-struct is missing. See config_default.yaml for required fields.');
     end
 
@@ -281,7 +290,7 @@ function parameters = run_tus_entry_placement(parameters)
 % Call position_transducer_tus_entry and write results back into parameters.
 
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'tus_entry')
-        error('PRESTUS:placement:missingConfig', ...
+        error('PRESTUS:tus_entry:missingConfig', ...
             'placement.tus_entry sub-struct is missing. See config_default.yaml for required fields.');
     end
 

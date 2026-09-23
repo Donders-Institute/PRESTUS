@@ -37,6 +37,15 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
         parameters   (1,1) struct
     end
 
+    % Both localite and plantus placement modes funnel through this function,
+    % and both need a calibrated focal distance to project the focus along
+    % the beam axis. Validate upfront: focal_distance_calculation cannot
+    % derive it here (its own fallback needs trans_pos/focus_pos, which are
+    % exactly what this function is computing).
+    validate_any_required_field(parameters.transducer(1), ...
+        {'focal_distance_ep', 'focal_distance_bowl'}, ...
+        'PRESTUS:localite:missingConfig', 'transducer(1)');
+
     ref_pos = coord_matrix(:, 4);   % origin / reference position in RAS mm [4×1]
     ref_vec = coord_matrix(:, 1);   % direction: coil centre → head [4×1]
 

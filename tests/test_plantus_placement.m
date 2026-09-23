@@ -53,7 +53,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             p.placement.mode = 'plantus';
             % deliberately omit placement.plantus
             tc.verifyError(@() preproc_transducer_placement(p), ...
-                'PRESTUS:placement:missingConfig');
+                'PRESTUS:plantus:missingConfig');
         end
 
         function test_missing_script_path_errors(tc)
