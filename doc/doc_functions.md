@@ -10,6 +10,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_simulation`                   | Set up acoustic simulation                                                                      |
 | `acoustic_wrapper`                      | Set up acoustic simulation                                                                      |
+| `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 
 #### CALIBRATION
 
@@ -17,12 +18,14 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `calc_virtual_elem`                     | (STANDALONE) Calculate additional virtual elements                                              |
 | `calibration_transducer`                | Run water simulations to optimize transducer source amplitude and element phases matching a target intensity profile via O’Neil analytical solution, global search, and re-simulation. |
+| `compute_flhm_center`                   | Compute the FLHM (Focal Length at Half Maximum) centre/span of an axial intensity profile at a configurable threshold fraction of peak (0.5 = −3 dB default, 0.25 = −6 dB). |
 | `compute_oneil_solution`                | Compute analytical O’Neil pressure along the beam axis for focused annular transducers in water, derives particle velocity and grid adjustment factor, and plots comparisons with simulated/desired intensities. |
 | `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
 | `export_babelbrain_weights`             | Pack PRESTUS per-element phases and particle velocity into a BabelBrain OptimizedWeightsFile (HDF5 complex64 phasors). |
 | `extract_analytical_profile`           | Compute an axial intensity profile analytically (O'Neil or Rayleigh forward model) without running a k-Wave simulation; returns the same struct layout as `extract_simulated_profile`. |
 | `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
 | `extract_simulated_profile`             | Extract and visualize simulated acoustic pressure data.                                         |
+| `focal_reference_to_frac`               | Map a `focal_reference` config value (`flhm_3db`/`flhm_6db`) to its FLHM threshold fraction of peak; errors on `peak` (no associated fraction) or an unknown value. |
 | `import_babelbrain_weights`             | Read per-element phase weights from a BabelBrain OptimizedWeightsFile (.h5), derive hardware correction relative to geometric phases, and write the correction into the transducer equipment YAML. |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |

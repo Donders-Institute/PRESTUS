@@ -16,6 +16,36 @@ Calibration in PRESTUS proceeds in two optional layers. The default library prov
 | **Multi-depth joint fit** | `calibration_setup` (`phase_mode: multi_depth`) | Joint optimisation across all depths | Analytical fit | No | Finding a single hardware correction that is consistent across all steering angles |
 | **Single-depth refinement** | `calibrate_transducer` (`single_ref`) | Per-depth global search | Simulation-corrected | Optional | Improving accuracy at a specific depth |
 
+### Focal depth convention (FLHM)
+
+A "focal depth" quoted for a real transducer (e.g. a manufacturer steering table, or
+`focal_depths_wrt_exit_plane` in a calibration config) is not the raw intensity-peak location —
+it is the centre of the **Focal Length at Half Maximum** (FLHM), the midpoint of the contiguous
+span around the peak where the axial profile stays at or above a threshold fraction of the peak.
+Manufacturers differ on what "half maximum" means:
+
+| `focal_reference` | Threshold | Convention |
+|---|---|---|
+| `flhm_3db` (default) | intensity ≥ peak / 2 | ITRUSST / Martin et al. (2025) |
+| `flhm_6db` | intensity ≥ peak / 4 (≡ pressure ≥ peak / 2) | Imasonic / IGT ("NeuroFUS") steering tables |
+| `peak` | n/a — raw intensity-peak location | No FLHM centring |
+
+Set `parameters.calibration.focal_reference` to match the convention the characterisation data
+actually uses — mismatching it produces calibrated depths that look shifted by several mm/cm even
+though the underlying phases/amplitudes are correct. The value is:
+
+- Read by `compute_flhm_center` (via `focal_reference_to_frac`) wherever a calibration or
+  post-hoc analysis needs to locate the FLHM centre of an axial profile.
+- Echoed to the console during `calibration_setup` (`Focus from exit plane: 85.00 (FLHM -6dB)`).
+- Recorded into the sidecar YAML's `meta.calibration.focal_reference` by `save_optimized_values`,
+  so calibrated outputs stay traceable to the convention they were produced under.
+- Used by `compute_focal_metrics` (and therefore `acoustic_analysis`) so post-hoc/in-pipeline
+  focal-centre reporting stays consistent with how the transducer was calibrated. This is
+  independent of the fixed ITRUSST −3 dB / −6 dB **volume** fields (`mask_3dB`/`mask_6dB`), which
+  always use both thresholds regardless of `focal_reference`.
+
+Defaults to `flhm_3db` when unset, preserving prior behaviour.
+
 ### Library baseline
 
 The default library is built by `build_transducer_library.m`. For each equipment combination that has characterisation data, it:

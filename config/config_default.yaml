@@ -93,6 +93,22 @@ calibration:
   # Setting calibration.target_isppa_wcm2 here still works but is deprecated and
   # will be removed in a future release.
 
+  # Convention used to interpret focal-depth labels in calibration source data
+  # (empirical CSV columns, manufacturer steering tables): what does e.g.
+  # "80 mm" in a steering table actually refer to on the transducer's own
+  # axial profile? Must match how the equipment vendor defines it -- verify
+  # against a vendor-provided profile/steering table before trusting a value
+  # other than the default. Written into the calibration output YAML sidecar
+  # (meta.calibration.focal_reference) so downstream consumers know how the
+  # depth label was interpreted.
+  #   'peak'      - the raw axial intensity maximum
+  #   'flhm_3db'  - full-length-at-half-maximum centre, intensity >= peak/2
+  #                 (ITRUSST / Martin et al. 2025 default)
+  #   'flhm_6db'  - full-length-at-half-maximum centre, intensity >= peak/4,
+  #                 i.e. half of peak PRESSURE amplitude (as in Imasonic/IGT
+  #                 steering tables)
+  focal_reference: flhm_3db
+
 #------------ Module execution
 
 modules:

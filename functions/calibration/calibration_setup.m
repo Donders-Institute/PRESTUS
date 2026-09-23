@@ -247,7 +247,8 @@ for i = 1:N_i
     for j = 1:N_j
 
         focal_distance_ep = round(parameters.calibration.focal_depths_wrt_exit_plane{i}{j}, 2);
-        fprintf('Focus from exit plane: %.2f \n', focal_distance_ep)
+        fprintf('Focus from exit plane: %.2f (%s) \n', focal_distance_ep, ...
+            focal_reference_label(parameters))
 
         parameters.transducer.type = 'annular';
         parameters.transducer.focal_distance_ep = focal_distance_ep;
@@ -341,4 +342,25 @@ for i = 1:N_i
             parameters,...
             sim_id)
     end
+end
+end
+
+% -------------------------------------------------------------------------
+function label = focal_reference_label(parameters)
+% Human-readable tag for the depth-setting convention, for console output.
+if isfield(parameters, 'calibration') && isfield(parameters.calibration, 'focal_reference')
+    focal_reference = parameters.calibration.focal_reference;
+else
+    focal_reference = 'flhm_3db';
+end
+switch focal_reference
+    case 'flhm_3db'
+        label = 'FLHM -3dB';
+    case 'flhm_6db'
+        label = 'FLHM -6dB';
+    case 'peak'
+        label = 'peak';
+    otherwise
+        label = focal_reference;
+end
 end

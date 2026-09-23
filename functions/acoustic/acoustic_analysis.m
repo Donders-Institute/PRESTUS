@@ -291,7 +291,8 @@ end
         %   −3 dB: I ≥ Isppa/2   (half-intensity; 10·log10(0.5) = −3 dB)
         %   −6 dB: I ≥ Isppa/4   (half-pressure; P ≥ Pmax/2; 10·log10(0.25) = −6 dB)
         fm = compute_focal_metrics(acoustic_Ipa, results.Isppa_brain, mask.brain, ...
-                                   trans_pos, parameters.grid.resolution_mm);
+                                   trans_pos, parameters.grid.resolution_mm, ...
+                                   focal_reference_from_parameters(parameters));
         results.focal_mask_3dB        = fm.mask_3dB;
         results.focal_mask_6dB        = fm.mask_6dB;
         results.focal_vol_3dB_mm3          = fm.vol_3dB_mm3;
@@ -374,7 +375,8 @@ end
         % Free-field simulation: compute ITRUSST focal metrics using after-exit-plane mask.
         % Region mask restricts the focal zone to beyond the transducer exit plane.
         fm_ff = compute_focal_metrics(acoustic_Ipa, results.Isppa_after_exit_plane, ...
-                                      after_exit_plane_mask, trans_pos, parameters.grid.resolution_mm);
+                                      after_exit_plane_mask, trans_pos, parameters.grid.resolution_mm, ...
+                                      focal_reference_from_parameters(parameters));
         results.focal_mask_3dB        = fm_ff.mask_3dB;
         results.focal_mask_6dB        = fm_ff.mask_6dB;
         results.focal_vol_3dB_mm3          = fm_ff.vol_3dB_mm3;
@@ -505,6 +507,19 @@ end
             warning('acoustic_analysis:axialProfile', ...
                 'plot_axial_profile failed: %s', ME.message);
         end
+    end
+end
+
+% -------------------------------------------------------------------------
+function focal_reference = focal_reference_from_parameters(parameters)
+% Defensive lookup of calibration.focal_reference, matching
+% COMPUTE_FLHM_CENTER's own default so callers that construct parameters
+% by hand (rather than via load_parameters, which always populates this
+% from config_default.yaml) still get sensible behaviour.
+    if isfield(parameters, 'calibration') && isfield(parameters.calibration, 'focal_reference')
+        focal_reference = parameters.calibration.focal_reference;
+    else
+        focal_reference = 'flhm_3db';
     end
 end
 

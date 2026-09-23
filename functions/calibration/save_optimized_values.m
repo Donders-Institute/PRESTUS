@@ -114,6 +114,13 @@ end
     cal = parameters.calibration;
     if isfield(cal, 'phase_mode');       data.meta.calibration.phase_mode       = cal.phase_mode;       end
     if isfield(cal, 'forward_model');    data.meta.calibration.forward_model    = cal.forward_model;    end
+    if isfield(cal, 'focal_reference')
+        data.meta.calibration.focal_reference = cal.focal_reference;
+    else
+        % Match COMPUTE_FLHM_CENTER's own default so the sidecar always
+        % records the convention actually assumed, even when unset in config.
+        data.meta.calibration.focal_reference = 'flhm_3db';
+    end
     if isfield(cal, 'opt_regularization_lambda')
         data.meta.calibration.lambda = cal.opt_regularization_lambda;
     end
