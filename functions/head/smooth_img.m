@@ -95,7 +95,9 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     g1 = exp(-0.5*(x.^2/sig(1)^2)); g1 = reshape(g1/sum(g1), [], 1, 1);
                     g2 = exp(-0.5*(x.^2/sig(2)^2)); g2 = reshape(g2/sum(g2), 1, [], 1);
                     g3 = exp(-0.5*(x.^2/sig(3)^2)); g3 = reshape(g3/sum(g3), 1, 1, []);
-                    smoothed_img = convn(convn(convn(img, g1, 'same'), g2, 'same'), g3, 'same');
+                    ip = padarray_replicate_3d(img, [hw hw hw]);
+                    smoothed_img = convn(convn(convn(ip, g1, 'same'), g2, 'same'), g3, 'same');
+                    smoothed_img = smoothed_img(hw+1:end-hw, hw+1:end-hw, hw+1:end-hw);
 
                 case "box"
                     ksz = round(fwhm_voxels(1:3));
@@ -105,7 +107,10 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     end
                     ksz = ksz + mod(ksz+1,2);
                     kernel = ones(ksz) / prod(ksz);
-                    smoothed_img = convn(img, kernel, 'same');  % Works for ksz=1 [web:21]
+                    pad = floor(ksz/2);
+                    ip = padarray_replicate_3d(img, pad);
+                    smoothed_img = convn(ip, kernel, 'same');
+                    smoothed_img = smoothed_img(pad(1)+1:end-pad(1), pad(2)+1:end-pad(2), pad(3)+1:end-pad(3));
             end
         else
             error('Supports 2D/3D only (ndims=%d)', ndims_img);
@@ -129,4 +134,12 @@ out = [repmat(img(1,:),    pr, 1);
        img;
        repmat(img(end,:),  pr, 1)];
 out = [repmat(out(:,1),   1, pc), out, repmat(out(:,end), 1, pc)];
+end
+
+function out = padarray_replicate_3d(img, pad)
+% Replicate-pad a 3-D array by pad(1)/pad(2)/pad(3) voxels along dims 1/2/3
+p1 = pad(1); p2 = pad(2); p3 = pad(3);
+out = cat(1, repmat(img(1,:,:), p1, 1), img, repmat(img(end,:,:), p1, 1));
+out = cat(2, repmat(out(:,1,:), 1, p2), out, repmat(out(:,end,:), 1, p2));
+out = cat(3, repmat(out(:,:,1), 1, 1, p3), out, repmat(out(:,:,end), 1, 1, p3));
 end

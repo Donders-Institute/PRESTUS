@@ -89,6 +89,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Grid cropping now includes the bowl geometry of every configured transducer in the crop mask (was transducer(1) only), preventing the contralateral side from being over-extended
 - Automated defacing via pydeface, with optional integration into the segmentation pipeline
 - Defaced regions shown transparently in placement and 3D head views
+- ⚠️ **Changed:** `smooth_img` pads by edge replication before convolution. Zero padding eroded masks and darkened property maps at the grid boundary; smoothed masks and maps now differ from earlier runs in the outermost voxels
 
 #### Transducer library
 - Scan equipment, store validated parametric models, plot and compare entries
