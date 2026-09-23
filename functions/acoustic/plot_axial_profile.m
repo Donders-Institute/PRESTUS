@@ -49,13 +49,19 @@ mask_profile      = squeeze(medium_masks(ix, iy, :));        % tissue label
 
 % Distance from transducer exit plane [mm].
 % exitplane_pos(3) is the exit-plane voxel (bowl apex shifted toward the focus
-% by the bowl depth); positive z goes deeper into tissue.
+% by the bowl depth). Grid z does not always increase toward the focus (the
+% transducer can sit on either the low-z or high-z face), so the sign of the
+% axis is set from the exit-plane -> focus direction rather than assumed.
+prop_dir = sign(focus_pos(3) - exitplane_pos(3));
+if prop_dir == 0
+    prop_dir = 1;
+end
 z_vox  = (1:Nz)';
-z_mm   = (z_vox - exitplane_pos(3)) * res_mm;   % mm from exit plane
+z_mm   = prop_dir * (z_vox - exitplane_pos(3)) * res_mm;   % mm from exit plane
 
 % Focus and peak markers in mm
-z_focus_mm       = (focus_pos(3)       - exitplane_pos(3)) * res_mm;
-z_highlight_mm   = (highlighted_pos(3) - exitplane_pos(3)) * res_mm;
+z_focus_mm       = prop_dir * (focus_pos(3)       - exitplane_pos(3)) * res_mm;
+z_highlight_mm   = prop_dir * (highlighted_pos(3) - exitplane_pos(3)) * res_mm;
 
 %% Save CSV
 medium_labels = fieldnames(parameters.medium_properties);
@@ -112,7 +118,7 @@ title(ax1, sprintf('Axial profile — sub-%03d  %s%s', ...
     parameters.subject_id, parameters.simulation.medium, ...
     strrep(parameters.io.output_affix, '_', ' ')));
 set(ax1, 'XTickLabel', []);
-xlim(ax1, [z_mm(1) z_mm(end)]);
+xlim(ax1, [min(z_mm) max(z_mm)]);
 grid(ax1, 'on');
 box(ax1, 'on');
 
@@ -128,7 +134,7 @@ end
 hold(ax2, 'off');
 xlabel(ax2, 'Depth from exit plane (mm)');
 ylabel(ax2, 'I_{sppa} (W/cm²)');
-xlim(ax2, [z_mm(1) z_mm(end)]);
+xlim(ax2, [min(z_mm) max(z_mm)]);
 grid(ax2, 'on');
 box(ax2, 'on');
 
