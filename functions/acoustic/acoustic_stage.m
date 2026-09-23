@@ -88,11 +88,6 @@ if has_external_acoustic
     return;
 end
 
-use_babelbrain = isfield(parameters, 'acoustic_backend') && ...
-    strcmpi(parameters.acoustic_backend, 'babelbrain');
-use_jwave = isfield(parameters, 'acoustic_backend') && ...
-    strcmpi(parameters.acoustic_backend, 'jwave');
-
 run_new_sim = isfield(parameters.modules, 'run_acoustic_sims') && ...
     parameters.modules.run_acoustic_sims && ...
     confirm_overwriting(filename_sensor_data, parameters) && ...
@@ -101,55 +96,11 @@ run_new_sim = isfield(parameters.modules, 'run_acoustic_sims') && ...
 
 if run_new_sim
 
-    if use_babelbrain
-        sensor_data = babelbrain_wrapper( ...
-            parameters, medium_masks, kwave_medium, ...
-            focus_pos, trans_pos, planimg, struct(), pseudoCT);
-        if isfield(sensor_data, 'babelbrain_version')
-            acoustic_provenance.babelbrain_version = sensor_data.babelbrain_version;
-            fprintf('[pipeline] BabelBrain %s  (%s)\n', ...
-                sensor_data.babelbrain_version.version_txt, ...
-                sensor_data.babelbrain_version.git_describe);
-        end
-        if isfield(sensor_data, 'freefield_isppa_wcm2') && isfinite(sensor_data.freefield_isppa_wcm2)
-            acoustic_provenance.freefield_isppa_wcm2             = sensor_data.freefield_isppa_wcm2;
-            acoustic_provenance.tx_calibration.isppa_wcm2        = sensor_data.freefield_isppa_wcm2;
-            acoustic_provenance.tx_calibration.isppa_source      = 'babelbrain_water_sim';
-        end
-        if should_save_output(parameters.io, 'save_acoustic_matrices')
-            cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
-                acoustic_provenance, struct('parameters', parameters, 'backend', 'babelbrain'), kwave_medium);
-            fprintf('[pipeline] babelbrain sensor_data cached: %s\n', filename_sensor_data);
-        end
-
-    elseif use_jwave
-        if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
-            error('[pipeline] jwave backend does not support axisymmetric grids.');
-        end
-        if isfield(parameters.grid, 'use_kWaveArray') && parameters.grid.use_kWaveArray
-            error('[pipeline] jwave backend requires direct source geometry (grid.use_kWaveArray: 0).');
-        end
-        sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels, sensor);
-        if should_save_output(parameters.io, 'save_acoustic_matrices')
-            jw_solver = 'helmholtz';
-            if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')
-                jw_solver = parameters.jwave.solver;
-            end
-            cache_acoustic('save', filename_sensor_data, parameters, sensor_data, kgrid, ...
-                acoustic_provenance, ...
-                struct('parameters', parameters, 'backend', 'jwave', 'solver', jw_solver), ...
-                kwave_medium);
-            fprintf('[pipeline] jwave sensor_data cached: %s\n', filename_sensor_data);
-        end
-
-    else
-        % k-Wave (default)
-        [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-            acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, ...
-                             medium_masks, filename_sensor_data, segmentation, ...
-                             source_labels, acoustic_provenance);
-    end
-
+    [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, ...
+     source, source_labels, acoustic_provenance] = run_acoustic_backend( ...
+        parameters, kgrid, kwave_medium, source, sensor, medium_masks, ...
+        segmentation, source_labels, acoustic_provenance, planimg, ...
+        trans_pos, focus_pos, pseudoCT, filename_sensor_data);
     sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
     parameters.state.acoustics_available = 1;
 
@@ -160,11 +111,16 @@ elseif exist(filename_sensor_data, 'file')
             cache_acoustic('load', filename_sensor_data, parameters);
     catch ME
         if strcmp(ME.identifier, 'cache_acoustic:staleGrid')
-            fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation.\n');
-            [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, ...
-                                 medium_masks, filename_sensor_data, segmentation, ...
-                                 source_labels, acoustic_provenance);
+            % Re-run with the configured backend (not unconditionally k-Wave),
+            % scaled exactly like a fresh run.
+            fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation (%s backend).\n', ...
+                acoustic_backend_name(parameters));
+            [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, ...
+             source, source_labels, acoustic_provenance] = run_acoustic_backend( ...
+                parameters, kgrid, kwave_medium, source, sensor, medium_masks, ...
+                segmentation, source_labels, acoustic_provenance, planimg, ...
+                trans_pos, focus_pos, pseudoCT, filename_sensor_data);
+            sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
         else
             rethrow(ME);
         end
@@ -188,4 +144,77 @@ else
     parameters.modules.run_acoustic_analysis = 0;
 end
 
+end
+
+%% ------------------------------------------------------------------------
+function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, ...
+          source, source_labels, acoustic_provenance] = run_acoustic_backend( ...
+        parameters, kgrid, kwave_medium, source, sensor, medium_masks, ...
+        segmentation, source_labels, acoustic_provenance, planimg, ...
+        trans_pos, focus_pos, pseudoCT, filename_sensor_data)
+% RUN_ACOUSTIC_BACKEND  Dispatch one acoustic simulation to the configured
+% backend (k-Wave default / jwave / BabelBrain) and cache the result.
+% Shared by the fresh-run and stale-cache re-run paths so both honour
+% parameters.acoustic_backend.
+
+use_babelbrain = strcmpi(acoustic_backend_name(parameters), 'babelbrain');
+use_jwave      = strcmpi(acoustic_backend_name(parameters), 'jwave');
+
+if use_babelbrain
+    sensor_data = babelbrain_wrapper( ...
+        parameters, medium_masks, kwave_medium, ...
+        focus_pos, trans_pos, planimg, struct(), pseudoCT);
+    if isfield(sensor_data, 'babelbrain_version')
+        acoustic_provenance.babelbrain_version = sensor_data.babelbrain_version;
+        fprintf('[pipeline] BabelBrain %s  (%s)\n', ...
+            sensor_data.babelbrain_version.version_txt, ...
+            sensor_data.babelbrain_version.git_describe);
+    end
+    if isfield(sensor_data, 'freefield_isppa_wcm2') && isfinite(sensor_data.freefield_isppa_wcm2)
+        acoustic_provenance.freefield_isppa_wcm2             = sensor_data.freefield_isppa_wcm2;
+        acoustic_provenance.tx_calibration.isppa_wcm2        = sensor_data.freefield_isppa_wcm2;
+        acoustic_provenance.tx_calibration.isppa_source      = 'babelbrain_water_sim';
+    end
+    if should_save_output(parameters.io, 'save_acoustic_matrices')
+        cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
+            acoustic_provenance, struct('parameters', parameters, 'backend', 'babelbrain'), kwave_medium);
+        fprintf('[pipeline] babelbrain sensor_data cached: %s\n', filename_sensor_data);
+    end
+
+elseif use_jwave
+    if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
+        error('[pipeline] jwave backend does not support axisymmetric grids.');
+    end
+    if isfield(parameters.grid, 'use_kWaveArray') && parameters.grid.use_kWaveArray
+        error('[pipeline] jwave backend requires direct source geometry (grid.use_kWaveArray: 0).');
+    end
+    sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels, sensor);
+    if should_save_output(parameters.io, 'save_acoustic_matrices')
+        jw_solver = 'helmholtz';
+        if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')
+            jw_solver = parameters.jwave.solver;
+        end
+        cache_acoustic('save', filename_sensor_data, parameters, sensor_data, kgrid, ...
+            acoustic_provenance, ...
+            struct('parameters', parameters, 'backend', 'jwave', 'solver', jw_solver), ...
+            kwave_medium);
+        fprintf('[pipeline] jwave sensor_data cached: %s\n', filename_sensor_data);
+    end
+
+else
+    % k-Wave (default)
+    [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+        acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, ...
+                         medium_masks, filename_sensor_data, segmentation, ...
+                         source_labels, acoustic_provenance);
+end
+
+end
+
+function name = acoustic_backend_name(parameters)
+% ACOUSTIC_BACKEND_NAME  Configured acoustic backend, defaulting to 'kwave'.
+    name = 'kwave';
+    if isfield(parameters, 'acoustic_backend') && ~isempty(parameters.acoustic_backend)
+        name = char(parameters.acoustic_backend);
+    end
 end
