@@ -26,6 +26,10 @@ function target_map = neuronav_build_target_map(coil_map)
 % Optional fields forwarded to every target_map entry they belong to:
 %   coil_map(i).localite_key          - passed to all sequences of this coil
 %   coil_map(i).sequences(j).localite_key - overrides coil-level key for seq j
+%   Each localite_key may be a single char/string, or a cell array of
+%   candidate keys when more than one EntryTarget description convention is
+%   in use (e.g. {'LEFT P', 'L_P'}) -- neuronav_match_entry_targets tries
+%   each candidate in order and uses the first that matches.
 %
 % Output:
 %   target_map - struct array with one entry per sequence, fields:
@@ -113,14 +117,29 @@ for ci = 1:numel(coil_map)
         entry.color         = colors{mod(numel(target_map), numel(colors)) + 1};
 
         % localite_key: sequence-level overrides coil-level. Falls back to
-        % the template's '' default when neither is set.
+        % the template's '' default when neither is set. May be a single
+        % char/string or a cell array of candidate keys (tried in order by
+        % neuronav_match_entry_targets) -- pass cell arrays through as-is.
         if isfield(seqs(si), 'localite_key') && ~isempty(seqs(si).localite_key)
-            entry.localite_key = char(seqs(si).localite_key);
+            entry.localite_key = normalize_localite_key(seqs(si).localite_key);
         elseif isfield(cm, 'localite_key') && ~isempty(cm.localite_key)
-            entry.localite_key = char(cm.localite_key);
+            entry.localite_key = normalize_localite_key(cm.localite_key);
         end
 
         target_map(end+1) = entry; %#ok<AGROW>
     end
 end
+end
+
+% =========================================================================
+%  LOCAL HELPER: normalize a localite_key value
+% =========================================================================
+function key = normalize_localite_key(key)
+% Pass a cell array of candidate keys through unchanged; coerce anything
+% else (char/string) to plain char, matching the rest of this file's
+% target_name handling.
+    if iscell(key)
+        return;
+    end
+    key = char(key);
 end

@@ -5,7 +5,7 @@ function neuronav_export_session_csv( ...
     trans_mm, target_projected_mm, ...
     trans_mni_vox, target_mni_vox, ...
     trans_mni_mm, target_mni_mm, ...
-    interpolated, target_localite_mm)
+    interpolated, target_localite_mm, target_source)
 % NEURONAV_EXPORT_SESSION_CSV  Export per-session coordinates to a labelled CSV file
 %
 % Assembles native voxel, native RAS mm, MNI voxel, and MNI RAS mm
@@ -15,7 +15,7 @@ function neuronav_export_session_csv( ...
 %   neuronav_export_session_csv(sub_id, session, session_target, ...
 %       outputs_folder, trans_vox, target_vox, trans_mm, target_projected_mm, ...
 %       trans_mni_vox, target_mni_vox, trans_mni_mm, target_mni_mm, ...
-%       interpolated, target_localite_mm)
+%       interpolated, target_localite_mm, target_source)
 %
 % Input:
 %   sub_id              - subject identifier string
@@ -23,9 +23,11 @@ function neuronav_export_session_csv( ...
 %   session_target      - {Nx1} cell array of target label strings
 %   outputs_folder      - path to save the output CSV
 %   trans_vox           - [Nx3] transducer voxel coordinates in native space
-%   target_vox          - [Nx3] target voxel coordinates in native space
-%                         (operator-confirmed from Localite EntryTarget XML;
-%                         written to target_native_vox_x/y/z in the CSV)
+%   target_vox          - [Nx3] target voxel coordinates in native space --
+%                         written to target_native_vox_x/y/z in the CSV, and
+%                         what downstream simulation scripts read as
+%                         focus_pos. NOT always operator-confirmed; see
+%                         target_source below for its actual provenance.
 %   trans_mm            - [Nx3] transducer RAS coordinates in native space [mm]
 %   target_projected_mm - [Nx3] target position in native mm, derived by projecting
 %                         along the transducer beam axis using the focal distance.
@@ -39,6 +41,17 @@ function neuronav_export_session_csv( ...
 %                         directly from the Localite EntryTarget XML (planning
 %                         image mm space). Independent of transducer-axis
 %                         projection. Pass [] or omit to fill with NaN.
+%   target_source       - (optional) {Nx1} cell array of strings recording
+%                         where target_vox actually came from, e.g.
+%                         'entrytarget_current' (this session's own
+%                         operator-confirmed EntryTarget), 'entrytarget:ses-03'
+%                         (borrowed from another session's EntryTarget),
+%                         'projected' (transducer-axis geometric estimate,
+%                         no operator confirmation available), or
+%                         'group_mean_mni' (interpolated from the group).
+%                         Pass [] or omit to fill with 'unknown'. Written to
+%                         the target_source column -- check this column
+%                         before trusting target_native_vox as ground truth.
 %
 % See also: NEURONAV_CONVERT_NATIVE_TO_MNI, NEURONAV_CONVERT_TRIGGER_TO_VOXELS,
 %           NEURONAV_READ_ENTRY_TARGET
@@ -62,8 +75,17 @@ if size(target_localite_mm, 1) ~= N
     target_localite_mm = nan(N,3);
 end
 
-variableTypes = [repmat({'string'},1,3), repmat({'double'},1,28)];
-T = table('Size', [0 31], ...
+if nargin < 15 || isempty(target_source)
+    target_source = repmat({'unknown'}, N, 1);
+end
+if numel(target_source) ~= N
+    warning('neuronav_export_session_csv: target_source has %d entries but N=%d; padding with ''unknown''', ...
+        numel(target_source), N);
+    target_source = repmat({'unknown'}, N, 1);
+end
+
+variableTypes = [repmat({'string'},1,3), repmat({'double'},1,28), {'string'}];
+T = table('Size', [0 32], ...
           'VariableTypes', variableTypes, ...
           'VariableNames', ...
             {'id', 'session', 'target', ...
@@ -76,7 +98,7 @@ T = table('Size', [0 31], ...
              'trans_MNI_mm_x', 'trans_MNI_mm_y', 'trans_MNI_mm_z', ...
              'target_MNI_mm_x', 'target_MNI_mm_y', 'target_MNI_mm_z', ...
              'target_localite_mm_x', 'target_localite_mm_y', 'target_localite_mm_z', ...
-             'interpolated'});
+             'interpolated', 'target_source'});
 
 for i = 1:N
     T(end+1,:) = {
@@ -92,7 +114,8 @@ for i = 1:N
         trans_mni_mm(i,1),         trans_mni_mm(i,2),         trans_mni_mm(i,3), ...
         target_mni_mm(i,1),        target_mni_mm(i,2),        target_mni_mm(i,3), ...
         target_localite_mm(i,1),   target_localite_mm(i,2),   target_localite_mm(i,3), ...
-        interpolated
+        interpolated, ...
+        string(target_source{i})
     };
 end
 

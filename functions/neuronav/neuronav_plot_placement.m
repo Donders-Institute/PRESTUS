@@ -81,7 +81,7 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
         all_trans(end+1, :)  = trans_pos(si, :);
         all_target(end+1, :) = target_pos(si, :);
         all_td{end+1}        = coerce_transducer(params_plot.transducer(ti_clamped));
-        all_names{end+1}     = name;
+        all_names{end+1}     = display_target_name(name);
     end
 
     % ------------------------------------------------------------------
@@ -148,4 +148,27 @@ function td = coerce_transducer(td)
             td.type = 'annular';  % safest default for this project
         end
     end
+end
+
+% -------------------------------------------------------------------------
+function label = display_target_name(name)
+% Convert an internal target_name (e.g. 'L_PUL', 'R_MD_2') into a more
+% readable legend label ('LEFT PUL', 'RIGHT MD (2)'). Cosmetic only -- this
+% is never fed back into EntryTarget matching or any file-naming/lookup
+% logic, which continue to use the original 'L_'/'R_'-prefixed target_name.
+    name = char(name);
+    suffix = '';
+    tok = regexp(name, '^(.*)_(\d+)$', 'tokens', 'once');
+    if ~isempty(tok)
+        name = tok{1};
+        suffix = sprintf(' (%s)', tok{2});
+    end
+    if startsWith(name, 'L_', 'IgnoreCase', true)
+        label = ['LEFT ' upper(name(3:end))];
+    elseif startsWith(name, 'R_', 'IgnoreCase', true)
+        label = ['RIGHT ' upper(name(3:end))];
+    else
+        label = upper(name);
+    end
+    label = [label suffix];
 end

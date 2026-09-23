@@ -38,6 +38,11 @@ function [localite_mm, localite_vox] = neuronav_match_entry_targets( ...
 %                                      Required when description conventions
 %                                      differ from target_name (e.g. target
 %                                      'L_MD' described as 'LEFT M Target').
+%                                      May be a single char/string, or a cell
+%                                      array of candidate keys when more than
+%                                      one description convention is in use
+%                                      (e.g. {'LEFT M', 'L_M'}); candidates
+%                                      are tried in order, first match wins.
 %   t1_header      - (optional) niftiinfo struct for the planning T1 image.
 %                    When provided, matched mm positions are converted to voxel
 %                    indices via ras_to_grid and returned in localite_vox.
@@ -62,19 +67,30 @@ for ti = 1:N
     tm = target_map(ti);
 
     if isfield(tm, 'localite_key') && ~isempty(tm.localite_key)
-        key = upper(strtrim(tm.localite_key));
+        raw_keys = tm.localite_key;
     else
         % Strip trailing numeric disambiguation suffix (e.g. 'L_MD_2' → 'L_MD')
-        key = upper(regexprep(strtrim(tm.target_name), '_\d+$', ''));
+        raw_keys = regexprep(strtrim(tm.target_name), '_\d+$', '');
     end
+    if ischar(raw_keys) || isstring(raw_keys)
+        keys = {char(raw_keys)};
+    else
+        keys = cellstr(raw_keys);
+    end
+    keys = upper(strtrim(keys));
 
     matched_description = '';
-    for ei = 1:numel(entry_targets)
-        if contains(upper(entry_targets(ei).description), key)
-            localite_mm(ti,:) = entry_targets(ei).xyz;
-            matched_description = entry_targets(ei).description;
-            break;
+    matched_key = '';
+    for ki = 1:numel(keys)
+        for ei = 1:numel(entry_targets)
+            if contains(upper(entry_targets(ei).description), keys{ki})
+                localite_mm(ti,:) = entry_targets(ei).xyz;
+                matched_description = entry_targets(ei).description;
+                matched_key = keys{ki};
+                break;
+            end
         end
+        if ~isempty(matched_description), break; end
     end
 
     if isfield(tm, 'transducer_id')
@@ -82,12 +98,13 @@ for ti = 1:N
     else
         coil_label = 'coil ?';
     end
+    keys_str = strjoin(keys, '" / "');
     if isempty(matched_description)
-        fprintf('  [entry_target] %s (%s, search key "%s"): no matching EntryTarget label\n', ...
-            tm.target_name, coil_label, key);
+        fprintf('  [entry_target] %s (%s, search keys "%s"): no matching EntryTarget label\n', ...
+            tm.target_name, coil_label, keys_str);
     else
-        fprintf('  [entry_target] %s (%s, search key "%s") -> matched label "%s"\n', ...
-            tm.target_name, coil_label, key, matched_description);
+        fprintf('  [entry_target] %s (%s, search keys "%s") -> matched label "%s" via key "%s"\n', ...
+            tm.target_name, coil_label, keys_str, matched_description, matched_key);
     end
 end
 
