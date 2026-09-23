@@ -1,4 +1,4 @@
-# BabelBrain acoustic backend
+# BabelBrain backend
 
 PRESTUS can use [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) as an alternative backend for acoustic simulation, thermal simulation, or both. By default PRESTUS uses k-Wave for both; the BabelBrain backends can be enabled independently. All pre-processing stages (segmentation, grid setup, medium masks, transducer placement) and all downstream post-processing (focal metrics, NIfTI export, HTML report) run unchanged regardless of which backend is active.
 
@@ -6,23 +6,24 @@ PRESTUS can use [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) as a
 
 The main reasons to use BabelBrain instead of (or alongside) k-Wave are:
 
-- **Shear wave physics in bone.** Mode conversion at the skull is a real effect; BabelBrain models it explicitly. k-Wave's scalar model absorbs this into an effective attenuation coefficient.
+- **Independent solver, optional viscoelastic physics.** BabelViscoFDTD can model shear waves in bone. PRESTUS runs it in **fluid-bone mode by default** (shear off, PRESTUS tissue properties injected) so results are comparable to k-Wave/jwave; see [Tissue properties](#tissue-labels-and-material-properties).
 - **Cross-validation.** Comparing results from two independent solvers is a common check for simulation-based studies.
 - **Apple Silicon GPU acceleration.** On Apple Silicon, k-Wave's fast C++ binary (`kspaceFirstOrder-CUDA`) is unavailable because it requires NVIDIA CUDA; only the slower `matlab_gpu` path works. BabelBrain has a native Metal backend that makes full use of the M-series GPU.
 
 | | PRESTUS (k-Wave) | BabelBrain |
 |---|---|---|
 | **Solver** | Pseudo-spectral FDTD | Explicit staggered-grid FDTD |
-| **Physics** | Scalar linear acoustic (pressure/density) | Full viscoelastic (longitudinal + shear stress/strain) |
-| **Skull model** | Scalar ρ, c, α | Viscoelastic: separate longitudinal and shear SoS and attenuation |
+| **Physics** | Scalar linear acoustic (pressure/density) | Viscoelastic solver; run with shear = 0 (fluid bone) in PRESTUS |
+| **Skull model** | Scalar ρ, c, α | Scalar ρ, c, α from PRESTUS `medium_properties` (or BabelBrain HU mapping via `ct_mapping`) |
 | **Rayleigh pre-step** | None | Rayleigh integral for the water coupling layer |
 | **Narrow-beam domain** | Optional (see [limited FOV](doc_limited_fov.md)) | Off by default (the pre-focal field would not be returned); enable with `babelbrain.tight_narrow_beam: true`. Always off when `grid.acoustic_fov_length_mm` is set (mask already cropped) |
 | **GPU backends** | CUDA, MATLAB GPU arrays | CUDA, OpenCL, Metal (Apple Silicon) |
 
 See [Simulation backends](doc_backend.md) for the k-Wave-only backend options.
 
-> **Important — acoustic material properties are not shared with PRESTUS.**
-> BabelBrain assigns tissue properties (speed of sound, density, attenuation, shear parameters) from its own internal frequency-fitted literature tables. It does not read `medium_properties` from the PRESTUS config. As a result, BabelBrain and k-Wave use different baseline property values (see [Tissue labels and material properties](#tissue-labels-and-material-properties) for a direct comparison), and **the liberal/conservative property variants used in uncertainty mode have no effect on BabelBrain acoustic simulations.** Results from the two backends should not be compared directly without accounting for these differences.
+> **Tissue properties and comparability.**
+> On the default label-mask path, PRESTUS writes `medium_properties` to `<target>_medium_properties.json` and the Python bridge overwrites BabelBrain's built-in acoustic table (`MatFreq`) with those values: density, longitudinal sound speed, and attenuation converted from dB/(cm·MHz^y) to Np/m. Shear is set to 0. BabelBrain therefore solves with the **same tissue acoustics as k-Wave/jwave**. Remaining differences are the solver and BabelBrain's bone Q-correction, so validate against a k-Wave run before relying on absolute values.
+> This does **not** apply to (a) the `ct_mapping` path, which uses BabelBrain's own HU models; (b) runs where writing the JSON failed, which print a warning and fall back to BabelBrain's built-in table (listed below); or (c) **thermal** properties. BabelBrain thermal uses its own table, which differs from PRESTUS in absorption fraction (see [Thermal simulation](#thermal-simulation)).
 
 ---
 
@@ -37,9 +38,9 @@ acoustic_backend: babelbrain
 
 babelbrain:
   tx_system: R15473            # BabelBrain preset name; auto-detected if empty
-  computing_backend: auto      # 'auto' | 1=CUDA  2=OpenCL  3=Metal  4=CPU
+  computing_backend: auto      # 'auto' | 'cuda' | 'opencl' | 'metal' | 'cpu'  (or 1-4)
   device_name: auto            # 'auto' selects device based on computing_backend; or set explicitly e.g. 'Apple'
-  ppw: 6                       # points-per-wavelength floor; actual PPW = max(ppw, round(c_brain / (freq × res_mm × 1e-3))). See note below.
+  ppw: 12                      # points-per-wavelength floor (default 12); actual PPW = max(ppw, round(c_brain / (freq × res_mm × 1e-3))). See note below.
   do_refocusing: false         # skull back-propagation refocusing
   z_beyond_focus_mm: 40        # axial domain truncation past the focal point [mm]
   python_env: ''               # path to conda/venv environment; empty = system python3
@@ -62,12 +63,12 @@ thermal_backend:  babelbrain   # use BabelBrain Pennes BHTE instead of k-Wave
 
 babelbrain:
   tx_system: R15473
-  computing_backend: auto      # 'auto' | 1=CUDA  2=OpenCL  3=Metal  4=CPU
+  computing_backend: auto      # 'auto' | 'cuda' | 'opencl' | 'metal'  (thermal has no CPU backend)
   device_name: auto            # 'auto' selects device based on computing_backend
-  isppa_w_per_cm2: 5.0         # ISPPA at focus [W/cm²]; default: from transducer calibration
+  # isppa_w_per_cm2: ~         # leave empty: derived from the scaled acoustic field (in-situ brain peak)
 ```
 
-> **`thermal_backend: babelbrain`** requires `acoustic_backend: babelbrain` to have run first, because BabelBrain's thermal solver operates on the `*DataForSim.h5` file produced by the acoustic stage.
+> **`thermal_backend: babelbrain`** requires `acoustic_backend: babelbrain`, because BabelBrain's thermal solver operates on the `*DataForSim.h5` file produced by the acoustic stage. Other combinations are rejected when the config is loaded.
 
 PRESTUS searches for BabelBrain at `external/BabelBrain` (git submodule) automatically. Set `babelbrain.root` explicitly to override.
 
@@ -211,7 +212,7 @@ Providing the raw UTE NIfTI directly (rather than a pre-processed pseudo-CT) is 
 
 ### BabelBrain material properties
 
-BabelBrain assigns frequency-dependent material properties internally from literature fits computed at the simulation frequency. They are tabulated every 5 kHz from 100 to 1125 kHz. You do not need to configure these; BabelBrain applies them automatically based on the tissue labels above.
+BabelBrain's built-in database holds frequency-dependent material properties from literature fits, tabulated every 5 kHz from 100 to 1125 kHz. **On the default PRESTUS path this table is overwritten with `medium_properties`**. It is listed here for reference and applies only if material injection fails.
 
 The tables below show example values at three frequencies commonly used in TUS (source: `TranscranialModeling/BabelIntegrationBASE.py`).
 
@@ -251,7 +252,7 @@ Bone longitudinal SoS is fitted as a linear function of frequency from two refer
 | Trabecular bone | 1270 | 1313 | 1345 |
 | All soft tissues | 0 | 0 | 0 |
 
-Shear SoS is only non-zero for bone. This is what enables BabelBrain to model mode conversion at the skull that k-Wave cannot capture.
+Shear SoS is only non-zero for bone. This is what would let BabelBrain model mode conversion at the skull. PRESTUS sets bone shear to 0 (the `_patch_noncat_skull_attenuation` bridge patch), both to match the fluid solvers and because the non-CT shear path otherwise realises almost no skull attenuation.
 
 #### Longitudinal attenuation [Np/m]
 
@@ -274,7 +275,9 @@ Shear SoS is only non-zero for bone. This is what enables BabelBrain to model mo
 | Trabecular bone | 99 | 164 | 214 |
 | All soft tissues | 0 | 0 | 0 |
 
-> **Comparison with PRESTUS defaults.** BabelBrain cortical bone longitudinal attenuation (81 Np/m at 500 kHz) is approximately 47% lower than the PRESTUS default (152 Np/m, derived from 13.3 dB/cm/MHz). BabelBrain cortical longitudinal SoS (2476 m/s at 500 kHz) is about 11% lower than the PRESTUS skull default (2800 m/s). Brain SoS: BabelBrain 1562 m/s vs. PRESTUS 1610 m/s (~3% difference). These differences affect absolute pressure and heating values; results from the two solvers should not be compared directly without accounting for property differences. See [Medium properties](doc_medium.md) for PRESTUS defaults.
+> **These built-in values are not used on the default path.** PRESTUS replaces them with `medium_properties` (see the note at the top of this page). They apply only when material injection fails, and they serve as a reference for how far the literature fits differ from PRESTUS defaults.
+>
+> **Comparison with PRESTUS defaults.** BabelBrain cortical bone longitudinal attenuation (81 Np/m at 500 kHz) is approximately 47% lower than the PRESTUS default (152 Np/m, derived from 13.3 dB/cm/MHz). BabelBrain cortical longitudinal SoS (2476 m/s at 500 kHz) is about 11% lower than the PRESTUS skull default (2800 m/s). Brain SoS: BabelBrain 1562 m/s vs. PRESTUS 1610 m/s (~3% difference). These differences would affect absolute pressure and heating values if the built-in table were used. See [Medium properties](doc_medium.md) for PRESTUS defaults.
 
 <span style="font-size: 12px;">
   <strong>References for BabelBrain fitting functions:</strong><br>
@@ -330,7 +333,7 @@ With `babelbrain.water_amp_calibration: true` (default) the wrapper calibrates t
 
 The water-derived scalar is valid for tissue runs because (a) the bias originates in the source-injection/FDTD-correction chain, which is identical in water-only and transcranial runs (same grid, same bone-limited timestep, same correction factor), and (b) the simulation is linear, so the entire field — including through skull — scales with the source. This is the numerical analogue of hydrophone free-water calibration of a physical transducer. A factor deviating >15% from 1 triggers a warning, since that magnitude indicates a setup mismatch (geometry/phases/source amplitude) rather than solver bias.
 
-Caveats: requires explicit element phases (skipped otherwise). The raw `DataForSim.h5` consumed by `thermal_backend: babelbrain` is not rescaled, and does not need to be: BabelBrain's Pennes BHTE renormalizes the acoustic field to the requested `Isppa` before computing heat deposition (`PressureRatio = sqrt(Isppa·2ρc)/pAmpTissue.max()` in `CalculateTemperatureEffects.py`), so any global amplitude scalar — including the bias this calibration removes — cancels there by construction. Both thermal backends are therefore amplitude-consistent: k-Wave thermal consumes the calibrated `sensor_data`, BabelBrain thermal consumes the target `Isppa` plus the field shape only.
+Caveats: requires explicit element phases (skipped otherwise). The raw `DataForSim.h5` consumed by `thermal_backend: babelbrain` is not rescaled, and does not need to be. BabelBrain's Pennes BHTE renormalizes the field so that the **peak ISPPA inside the brain** equals the `Isppa` it receives (`PressureRatio = sqrt(Isppa·2ρc)/max(p_amp[brain])` in `CalculateTemperatureEffects.py`), so any global amplitude scalar cancels there. PRESTUS passes as `Isppa` the in-brain peak `p²/(2ρc)` of the calibrated, ISPPA-scaled `sensor_data.p_max_all` (`babelbrain_insitu_isppa.m`), which is the same field k-Wave thermal consumes. The two thermal backends therefore deposit heat from the same acoustic amplitude. (Before this fix, the free-water calibration ISPPA was passed, which dropped the transcranial loss and overestimated BabelBrain heating.)
 
 ---
 
@@ -346,18 +349,37 @@ The timing parameters from `parameters.timing` are converted automatically:
 |---|---|---|---|
 | `timing.pd` / `timing.pri` | `DutyCycle` | `pd / pri` | |
 | `timing.pri` | `PRF` | `1 / pri` [Hz] | |
-| `timing.ptrd` | `DurationUS` | direct [s] | One pulse-train block; see note below |
-| `timing.ptri - timing.ptrd` | `DurationOff` | direct [s] | Inter-train cooling interval; 0 if `ptri ≤ ptrd` |
+| `timing.ptd` | `DurationUS` | direct [s] | ON duration of one pulse train |
+| `timing.ptri - timing.ptd` | `DurationOff` | direct [s] | Inter-train cooling interval; 0 if `ptri ≤ ptd` |
+| `timing.n_ptri_reps` | `Repetitions` | rounded | Number of (on + off) cycles |
+| `timing.post_ptri_dur` | — | not passed | Warning emitted; BabelBrain output ends after the last repetition |
 | `thermal.temp_0.brain` | `BaselineTemperature` | direct [°C] | |
-| `transducer.set_intensity_w_per_cm2` | `Isppa` | direct [W/cm²] | See ISPPA note below |
+| in-brain peak of `sensor_data.p_max_all` | `Isppa` | `max p²/(2ρc)` over brain [W/cm²] | Override with `babelbrain.isppa_w_per_cm2`; see ISPPA note below |
 
-> **`DurationUS` and multi-PTRI protocols.** `DurationUS` maps to `timing.ptrd` — the duration of one pulse-train repetition block. For protocols with `n_ptri_reps > 1`, BabelBrain's `Repetitions` parameter controls the number of blocks. PRESTUS emits a warning when `n_ptri_reps > 1` so you can verify the intended protocol.
+> **`DurationUS` and multi-PTRI protocols.** `DurationUS` is the ON duration of one pulse train (`timing.ptd`), not the total `ptrd`. BabelBrain runs `Repetitions = n_ptri_reps` cycles of `DurationUS` on + `DurationOff` off, so cooling between trains is modelled.
 
-> **ISPPA normalisation.** BabelBrain always rescales the entire pressure field so that ISPPA at the focal voxel equals the requested `Isppa` value (`PressureAdjust = sqrt(Isppa × 2 × ρ × c)`). When calibrated phases are provided via `OptimizedWeightsFile`, this rescaling overrides the calibrated amplitude. Set `transducer.set_intensity_w_per_cm2` (or `babelbrain.isppa_w_per_cm2`) to the intended in-situ ISPPA at the focus.
+> **ISPPA normalisation.** BabelBrain always rescales the entire pressure field so that the peak ISPPA in brain equals the requested `Isppa` (`PressureAdjust = sqrt(Isppa × 2 × ρ × c)`). This is an **in-situ** quantity, not the free-water calibration ISPPA. PRESTUS derives it automatically from the scaled acoustic field and logs it next to the free-water value and the implied transmission. Set `babelbrain.isppa_w_per_cm2` only to force a specific in-situ brain ISPPA.
 
 > **`sel_p` and refocusing.** When `babelbrain.do_refocusing: true`, the thermal simulation automatically uses the `/p_amp_refocus` pressure field (the skull-corrected map) rather than `/p_amp`. No manual configuration is needed.
 
-`babelbrain.isppa_w_per_cm2` can be set explicitly to override the transducer calibration value.
+### Thermal tissue properties
+
+!!! warning "Known limitation: BabelBrain thermal uses its own tissue thermal properties"
+    `thermal_backend: babelbrain` ignores the thermal fields of PRESTUS `medium_properties` (`thermal_conductivity`, `specific_heat_capacity`, `perfusion`, `absorption_fraction`), including uncertainty-mode variants. BabelBrain has no input for them, so PRESTUS uses BabelBrain's values unchanged. The acoustic field amplitude is matched between the thermal backends; the tissue thermal properties are not. Use `thermal_backend: kwave` when PRESTUS thermal properties must apply.
+
+BabelBrain thermal does not read PRESTUS `medium_properties`. On the label-mask path it uses a built-in table (`CalculateTemperatureEffects.py`):
+
+| Tissue | Conductivity [W/m/°C] | Specific heat [J/kg/°C] | Perfusion | Absorption fraction | PRESTUS absorption fraction |
+|---|---|---|---|---|---|
+| Water | 0.60 | 4178 | 0 | 0 | 1 |
+| Skin | 0.37 | 3391 | 106 | 0.85 | 1 |
+| Cortical bone | 0.32 | 1313 | 10 | 0.16 | 0.28 |
+| Trabecular bone | 0.31 | 2274 | 30 | 0.15 | 0.28 |
+| Brain | 0.51 | 3630 | 559 | 0.85 | 1 |
+
+Conductivity, specific heat and perfusion match the PRESTUS defaults, apart from trabecular conductivity (0.31 vs 0.32). The absorption fraction scales heat deposition in both solvers, so BabelBrain thermal deposits about 15% less heat in skin and brain and roughly 45% less in skull than k-Wave thermal for the same acoustic field. Take this into account when comparing temperature rise or CEM43 across thermal backends. BabelBrain also does not compute the ISO CEM43 fields (returned as NaN) or a focal-plane time series.
+
+On the CT path (`ct_mapping`), BabelBrain uses the same soft-tissue values and assigns all bone voxels the mean of the cortical and trabecular values (specific heat 1793.5, conductivity 0.315, perfusion 20, absorption fraction 0.155).
 
 ### Post-processing with PRESTUS
 
@@ -377,7 +399,6 @@ The acoustic and thermal backends can be mixed independently:
 |---|---|---|
 | `kwave` (default) | `kwave` (default) | Standard PRESTUS, no BabelBrain |
 | `babelbrain` | `kwave` | BabelBrain acoustics, PRESTUS thermal |
-| `kwave` | `babelbrain` | PRESTUS acoustics, BabelBrain thermal (via `external_acoustic_nifti` handoff) |
 | `babelbrain` | `babelbrain` | Full BabelBrain pipeline, PRESTUS post-processing |
 
 ---
@@ -393,12 +414,13 @@ Not all PRESTUS pipeline features are currently compatible with the BabelBrain b
 | **Multi-transducer — coherent** (`simulation.transducer_coupling: coherent`) | ✓ Supported | `babelbrain_wrapper` detects `numel(parameters.transducer) > 1` and recurses once per transducer with a unique `output_affix` (`_t01`, `_t02`, …). Each sub-run reads `/p_complex` (the complex Fourier pressure field stored by BabelBrain alongside `/p_amp`) from its `DataForSim.h5`. The complex fields are summed coherently; `p_max_all = abs(Σ p_complex_i)`. Unlike k-Wave's native coherent mode (all transducers in one simulation), this treats transducer interactions as independent and ignores mutual acoustic coupling between transducers. |
 | **Limited acoustic FOV** (`grid.acoustic_fov_*`) | ✓ Supported | The NIfTI passed to BabelBrain is the same beam-centred, FOV-cropped box used for k-Wave/jwave (`acoustic_fov_crop.m`/`acoustic_grid_fov.m`). BabelBrain's own narrow-beam domain cropping (`bTightNarrowBeamDomain`) is disabled in this case — it would crop the already-cropped box a second time, and its ray-traced lateral footprint estimate has been found to under-shoot the true beam width near the skull. BabelBrain simulates the full FOV-cropped box with no further internal shrink, so its domain matches the other backends' voxel-for-voxel. |
 | **Axisymmetric 2D** (`simulation.axisymmetric: 1`) | ✗ Not supported | BabelBrain is always a 3D solver. Axisymmetric mode must use the k-Wave backend. |
-| **`multi_isppa` mode** | ✗ Not supported | `multi_isppa_pipeline` dispatches internally without propagating `acoustic_backend`, so all ISPPA sweep runs silently use k-Wave. |
+| **`multi_isppa` mode** | ⚠ Untested | `multi_isppa_pipeline` derives each acoustic/thermal job from the full parameter struct, so `acoustic_backend`/`thermal_backend` carry over. Not yet validated end-to-end with BabelBrain. |
 | **`phantom` / `water` test medium** | ⚠ Untested | BabelBrain expects a realistic segmented NIfTI. Purely water or phantom media are geometrically valid but BabelBrain's material property tables will apply skull properties to any non-background label, which may produce unexpected results. |
-| **Post-hoc water simulation** | ⚠ Untested | The free-field water reference loop at the end of the pipeline always calls the k-Wave path and bypasses `use_babelbrain`. The reference field will be from k-Wave regardless of the acoustic backend setting. |
+| **Post-hoc water simulation** | ⚠ Untested | The post-hoc water loop re-enters the pipeline with `simulation.medium: water` and inherits `acoustic_backend`, so with BabelBrain it runs a BabelBrain water-only simulation. |
+| **Thermal tissue properties** | ⚠ Known limitation | BabelBrain thermal uses its built-in conductivity, specific heat, perfusion and absorption fraction; PRESTUS `medium_properties` thermal fields (and their uncertainty variants) are not applied. The absorption fraction differs most (skin/brain 0.85 vs 1.0, skull ≈0.15 vs 0.28), so BabelBrain heating is lower than k-Wave's for the same field, mostly in skull. See [Thermal tissue properties](#thermal-tissue-properties). |
 | **BabelBrain thermal without BabelBrain acoustic** | ✗ Not supported | `thermal_backend: babelbrain` requires the `*DataForSim.h5` file produced by `acoustic_backend: babelbrain`. It cannot consume a k-Wave acoustic result. |
 | **CT-based skull properties into BabelBrain** | ✓ Supported (via `ct_mapping`) | Set `babelbrain.ct_mapping` to a non-empty mapping method (e.g. `'Webb-Marsac'`) and pass the pseudoCT HU volume as the 8th argument to `babelbrain_wrapper`. `babelbrain_wrapper` writes a `CT.nii.gz` alongside `BabelViscoInput.nii.gz` and passes `--use_ct`, `--ct_mapping`, and (optionally) `--use_petra` flags to `run_babelbrain_case.py`, which forwards them to BabelBrain's `RUN_SIM().RunCases()`. BabelBrain then performs its own HU→property conversion internally. **Note:** use this path only when passing raw HU values from a UTE/PETRA scan. If PRESTUS's pCT pipeline (`pct.enabled: 1`) has already converted HU to acoustic properties, use the default label-based path (`ct_mapping` empty) — the per-voxel acoustic properties k-Wave uses cannot be passed to BabelBrain. See [CT-based skull properties](#ct-based-skull-properties-ct_mapping) for available mapping methods. |
-| **Uncertainty mode** | ✗ Not supported | BabelBrain does not accept different acoustic medium property variations. The liberal and conservative configs vary `medium_properties` (skull/brain sound speed, density, attenuation coefficient). k-Wave reads these directly when building the simulation medium. BabelBrain does not: it assigns material properties internally from frequency-fitted literature tables (see [Tissue labels and material properties](#tissue-labels-and-material-properties)), and `babelbrain_wrapper` never forwards `medium_properties` to the Python bridge. The only use of `medium_properties.brain.sound_speed` inside `babelbrain_wrapper` is to compute the minimum required PPW — it does not affect the BabelBrain simulation itself. |
+| **Uncertainty mode** | ⚠ Untested | The liberal/conservative configs vary `medium_properties`. These are forwarded to BabelBrain through the material-injection JSON (density, sound speed, attenuation), so variants should reach the acoustic solve on the label-mask path. They have no effect with `ct_mapping`, and never on BabelBrain **thermal** properties. Not yet validated end-to-end. |
 
 ---
 
@@ -409,8 +431,8 @@ Not all PRESTUS pipeline features are currently compatible with the BabelBrain b
 ### Call chain
 
 ```
-single_subject_pipeline.m
-  └─ acoustic_wrapper.m          ← dispatches on parameters.acoustic_backend
+prestus_pipeline.m
+  └─ acoustic_stage.m            ← dispatches on parameters.acoustic_backend (run_acoustic_backend)
        └─ babelbrain_wrapper.m   ← MATLAB orchestrator
             ├─ babelbrain_transducer_map.m   (preset resolution)
             ├─ write_babelbrain_input.m       (NIfTI label mask)

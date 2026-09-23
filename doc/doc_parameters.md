@@ -25,6 +25,48 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 
 ---
 
+### Simulation backends (`acoustic_backend`, `thermal_backend`)
+
+Top-level keys (not nested under `simulation`). Pre-processing (segmentation, medium, grid, placement) and post-processing (analysis, NIfTI export, report) are shared by all backends. See [Simulation backends](doc_backend.md) for how the backends compare and when results are directly comparable.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `babelbrain` / `jwave`. Validated in `load_parameters`. |
+| `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain` and no `io.external_acoustic_nifti`; invalid combinations error at config load. jwave has no thermal solver — pair it with `kwave`. |
+
+#### BabelBrain settings (`babelbrain`)
+
+Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.export_babelbrain: true`. Full explanation in [BabelBrain](doc_babelbrain.md).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `python_env` | BabelBrain conda env (directory containing `bin/python`) or Python executable. | `''` | Must be set; system `python3` lacks `BabelViscoFDTD`. |
+| `root` | BabelBrain source tree. | `''` | Empty = `external/BabelBrain` submodule. |
+| `computing_backend` | GPU/CPU backend. | `'auto'` | `auto` / `cuda` / `opencl` / `metal` / `cpu` (or `1`–`4`). `auto`: Metal on macOS, else CUDA if `nvidia-smi` finds a GPU, else CPU. The thermal engine has no CPU backend. |
+| `device_name` | Device name. | `'auto'` | Set explicitly when several GPUs are present. |
+| `tx_system` | BabelBrain transducer preset. | `''` | Empty = auto-detect from serial/geometry. See [Transducer mapping](doc_babelbrain.md#transducer-mapping). |
+| `ppw` | Points-per-wavelength floor for BabelBrain's own FDTD grid. | `12` | Lower = faster, more numerical dispersion. |
+| `do_refocusing` | Apply BabelBrain's refocusing step. | `false` | Thermal then uses `/p_amp_refocus`. |
+| `z_beyond_focus_mm` | Domain extent past the focus [mm]. | `40` | |
+| `tight_narrow_beam` | BabelBrain's own lateral domain shrink. | `false` | Always off when `grid.acoustic_fov_*` is set. |
+| `focal_calibration` | Geometric-fallback steering calibration. | `true` | Locate-only when explicit element phases exist. |
+| `focal_calibration_target` | Quantity placed at `focal_distance_ep`. | `'flhm_center'` | `flhm_center` / `peak` |
+| `profile_calibration` | Refit drive phases to the continuous-bowl ideal. | `false` | BabelBrain only; moves it away from the k-Wave/jwave phases. Leave off for cross-backend comparison. |
+| `water_amp_calibration` | Scale output so its free-water peak matches the analytic Rayleigh peak. | `true` | Removes BabelBrain's CFL-correction amplitude bias; requires explicit element phases. |
+| `use_rayleigh_for_water` | Water-only solver. | `false` | `false` = FDTD (like-for-like with k-Wave/jwave). |
+| `ct_mapping` | BabelBrain HU→property mapping. | `''` | Empty = label mask with PRESTUS `medium_properties`. See [CT-based skull properties](doc_babelbrain.md#ct-based-skull-properties-ct_mapping). |
+| `ct_use_petra` | PETRA density formula for `Webb-Marsac`. | `false` | |
+| `tx_mech_adjust_z_m` | Additional transducer standoff [m]. | `0` | Added to the automatic placement correction. |
+| `z_steering_m` | Pin BabelBrain `ZSteering` [m]. | `~` | Empty = auto-derived. |
+| `isppa_w_per_cm2` | Override the Isppa given to BabelBrain thermal [W/cm²]. | `~` | Interpreted as the **in-situ peak ISPPA in brain**. Empty = derived from the scaled acoustic field (recommended; matches k-Wave thermal). |
+| `cleanup_cache` | Delete the per-subject BabelBrain cache after reading. | `true` | Result HDF5s are moved out first. |
+
+#### jwave settings (`jwave`)
+
+Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `pml_size: auto`, `gmres_restart: 40`, `gmres_maxiter: 300`, `precision: single`; `solver` defaults to `helmholtz`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+
+---
+
 ### Data paths (`path`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |

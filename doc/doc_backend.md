@@ -1,9 +1,37 @@
-# Simulation backend
+# Simulation backends
 
-PRESTUS supports three acoustic backends: **k-Wave** (default), **BabelBrain**, and **jwave**. The backend is selected via `parameters.acoustic_backend` (`'kwave'` / `'babelbrain'` / `'jwave'`). All pre- and post-processing stages are backend-agnostic.
+PRESTUS runs the acoustic and the thermal simulation through interchangeable backends. Pre-processing (segmentation, medium mapping, grid, transducer placement) and post-processing (focal metrics, CEM43, NIfTI export, HTML report) are shared, so switching backend is a config change:
 
-- [BabelBrain backend](doc_babelbrain.md) — viscoelastic solver with shear waves; CUDA/OpenCL/Metal GPU support
-- [jwave backend](doc_jwave.md) — JAX-based scalar solver; Helmholtz frequency-domain option; fully differentiable
+```yaml
+acoustic_backend: kwave    # 'kwave' (default) | 'babelbrain' | 'jwave'
+thermal_backend:  kwave    # 'kwave' (default) | 'babelbrain'
+```
+
+| | k-Wave (default) | [BabelBrain](doc_babelbrain.md) | [jwave](doc_jwave.md) |
+|---|---|---|---|
+| **Acoustic solver** | Pseudo-spectral time domain | Staggered-grid FDTD (BabelViscoFDTD) | Helmholtz (frequency domain) or pseudo-spectral, in JAX |
+| **Thermal solver** | k-Wave `kWaveDiffusion` (Pennes) | BabelBrain Pennes BHTE | — (use k-Wave thermal) |
+| **Tissue acoustics** | PRESTUS `medium_properties` | PRESTUS `medium_properties` (injected; fluid bone) — or BabelBrain's own HU mapping via `babelbrain.ct_mapping` | PRESTUS `medium_properties` |
+| **Tissue thermal properties** | PRESTUS `medium_properties` | BabelBrain's built-in table (differs in absorption fraction, see below) | — |
+| **GPU** | CUDA (C++ binary), MATLAB GPU arrays | CUDA, OpenCL, Metal | CUDA (JAX) |
+| **Not supported** | — | Axisymmetric grids | Axisymmetric grids, `kWaveArray` sources |
+| **Extra install** | k-Wave submodule (+ binaries for `cpp_*`) | BabelBrain submodule + conda env | Python env with jwave/JAX |
+
+Valid combinations:
+
+| `acoustic_backend` | `thermal_backend` | |
+|---|---|---|
+| `kwave` / `jwave` | `kwave` | Supported |
+| `babelbrain` | `kwave` | Supported |
+| `babelbrain` | `babelbrain` | Supported |
+| `kwave` / `jwave` / external NIfTI | `babelbrain` | Rejected at config load (BabelBrain thermal needs BabelBrain's `DataForSim.h5`) |
+
+### Are results comparable across backends?
+
+- **Acoustics — designed to be comparable.** All three backends use the same drive phases and the same PRESTUS tissue properties. BabelBrain models bone as a fluid, like k-Wave and jwave (shear waves off), and its output is calibrated against the analytic free-water field (`babelbrain.water_amp_calibration`). What remains is solver discretisation and BabelBrain's bone-attenuation Q-correction. Compare against a k-Wave run before relying on absolute BabelBrain values. Setting `babelbrain.ct_mapping` switches BabelBrain to its own HU→property models, and the backends then no longer share tissue acoustics.
+- **Thermal — same acoustic amplitude, different tissue table (known limitation).** BabelBrain thermal receives the in-brain peak ISPPA of the same scaled field that k-Wave thermal consumes, so the heat source amplitude matches. BabelBrain's built-in thermal table matches the PRESTUS defaults for conductivity, specific heat and perfusion, but uses a different **absorption fraction**: skin/brain 0.85 (PRESTUS 1.0), skull 0.15–0.16 (PRESTUS 0.28). Expect lower BabelBrain heating, particularly in skull. PRESTUS thermal `medium_properties` (and uncertainty variants) cannot currently be passed to BabelBrain thermal; use `thermal_backend: kwave` where they must apply. It also does not apply `timing.post_ptri_dur` and does not compute ISO CEM43. Details: [BabelBrain thermal](doc_babelbrain.md#thermal-simulation).
+
+After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`) for a quick check of imports, dependencies and bridge scripts.
 
 ---
 

@@ -2,6 +2,8 @@
 
 Thermal simulations depend on the output of the acoustic simulations. As such, running thermal simulations without first running acoustic simulations is not an option.
 
+Thermal simulations run in k-Wave by default. With `acoustic_backend: babelbrain`, BabelBrain's own Pennes solver can be used instead (`thermal_backend: babelbrain`). See [Simulation backends](doc_backend.md) for valid combinations and how the results compare, and [BabelBrain thermal](doc_babelbrain.md#thermal-simulation) for the timing mapping and tissue-property differences. **Known limitation:** BabelBrain thermal uses its own built-in tissue thermal properties, so the thermal fields in `medium_properties` apply only to the k-Wave thermal backend.
+
 Protocol timing is oriented after the nomencalture in the [TUS Calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/). You can use this tool to specify the desired protocol. Note that all three levels of the nesting (pulse, pule train, pulse train, pulse train repetition) have to be specified. If you only want to simulate a pulse train without repetitions, set PTRI and PTRD to be equal to the PTD.
 
 For protocols with long intervals between successive pulse trains, a coarser temporal sampling resolution may be suffient. This can be specified with `post_pt_timestep`.

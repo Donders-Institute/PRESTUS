@@ -13,7 +13,7 @@ Key features include:
 - Virtual multi-element transducer calibration (free-water profile emulation).
 - Estimation of entry-target coordinates.
 - Flexible temporal protocol specification (e.g., including session breaks).
-- k-Wave integration for robust acoustic and heating simulations.
+- k-Wave integration for robust acoustic and heating simulations, with [BabelBrain and jwave as alternative backends](https://donders-institute.github.io/PRESTUS/doc_backend/).
 - Support for high-performance computing.
 - 3D NifTI outputs for major reporting metrics (in subject- & MNI-space).
 

@@ -62,6 +62,7 @@ nav:
     - Outputs: doc_outputs.md
     - Backend: doc_backend.md
     - BabelBrain: doc_babelbrain.md
+    - jwave: doc_jwave.md
     - HPC: doc_hpc.md
   - 📊 Advanced Pipelines:
     - Overview: doc_advanced.md
