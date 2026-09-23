@@ -1,5 +1,5 @@
 function results_heating = babelbrain_thermal_wrapper( ...
-        parameters, sensor_data, planimg, kwave_medium)
+        parameters, sensor_data, planimg, kwave_medium, medium_masks)
 % BABELBRAIN_THERMAL_WRAPPER  Run BabelBrain thermal simulation and read results
 %
 % Calls BabelBrain's CalculateThermalProcess via the Python bridge, reads the
@@ -25,14 +25,28 @@ function results_heating = babelbrain_thermal_wrapper( ...
 % Use as:
 %   results_heating = babelbrain_thermal_wrapper(parameters, sensor_data, planimg)
 %   results_heating = babelbrain_thermal_wrapper(..., kwave_medium)
+%   results_heating = babelbrain_thermal_wrapper(..., kwave_medium, medium_masks)
 %
 % Input:
 %   parameters    - PRESTUS config; uses .timing, .thermal, .babelbrain
 %   sensor_data   - struct from babelbrain_wrapper; must contain
 %                   .babelbrain_source (path to *DataForSim.h5)
 %   planimg       - planimg struct (affine; used for NIfTI resampling)
-%   kwave_medium  - (optional) PRESTUS medium struct; unused here but kept
-%                   for interface compatibility with thermal_simulation
+%   kwave_medium  - (optional) PRESTUS medium struct on the ACOUSTIC grid
+%                   (same grid as sensor_data.p_max_all); its sound_speed and
+%                   density give the rho*c used for the in-situ ISPPA
+%   medium_masks  - (optional) PRESTUS label volume on the acoustic grid; used
+%                   for the brain mask when sensor_data carries no
+%                   babelbrain_material_map
+%
+% ISPPA semantics: BabelBrain's BHTE rescales the field so that the peak
+% ISPPA INSIDE THE BRAIN equals the Isppa it receives
+% (PressureRatio = sqrt(Isppa*2*rho*c) / max(p_amp(brain)) in
+% CalculateTemperatureEffects.py). Unless babelbrain.isppa_w_per_cm2 is set
+% explicitly, this wrapper therefore passes the in-brain peak Isptp of
+% sensor_data.p_max_all (the same calibrated/scaled field k-Wave thermal
+% consumes) -- NOT the free-water calibration ISPPA, which would drop the
+% transcranial loss and overestimate heating.
 %
 % Output:
 %   results_heating - struct with fields matching thermal_simulation output:
@@ -54,7 +68,8 @@ arguments
     parameters   (1,1) struct
     sensor_data  (1,1) struct
     planimg      (1,1) struct
-    kwave_medium (1,1) struct = struct()  %#ok<INUSA>
+    kwave_medium (1,1) struct = struct()
+    medium_masks = []
 end
 
 %% Validate acoustic source
@@ -79,7 +94,21 @@ bb = apply_default(bb, 'computing_backend',  'auto');
 bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'python_env',         '');
 bb = apply_default(bb, 'root',               '');
-bb = apply_default(bb, 'isppa_w_per_cm2',    get_tx_isppa(parameters.transducer(1)));
+if isfield(bb, 'isppa_w_per_cm2') && ~isempty(bb.isppa_w_per_cm2)
+    fprintf(['[babelbrain_thermal_wrapper] Using explicit babelbrain.isppa_w_per_cm2 = %.2f W/cm² ' ...
+        '(interpreted by BabelBrain as the in-situ peak ISPPA in brain).\n'], bb.isppa_w_per_cm2);
+else
+    bb.isppa_w_per_cm2 = babelbrain_insitu_isppa(parameters, sensor_data, kwave_medium, medium_masks);
+    ff_isppa = get_tx_isppa(parameters.transducer(1));
+    if isfinite(ff_isppa) && ff_isppa > 0
+        fprintf(['[babelbrain_thermal_wrapper] In-situ brain peak ISPPA = %.2f W/cm² ' ...
+            '(free-water %.2f W/cm²; transmission %.1f%%) -> BabelBrain Isppa.\n'], ...
+            bb.isppa_w_per_cm2, ff_isppa, 100 * bb.isppa_w_per_cm2 / ff_isppa);
+    else
+        fprintf('[babelbrain_thermal_wrapper] In-situ brain peak ISPPA = %.2f W/cm² -> BabelBrain Isppa.\n', ...
+            bb.isppa_w_per_cm2);
+    end
+end
 
 [bb.computing_backend, bb.device_name] = resolve_backend(bb.computing_backend, bb.device_name);
 
@@ -129,7 +158,7 @@ if duration_s <= 0
 end
 if ~isfinite(bb.isppa_w_per_cm2) || bb.isppa_w_per_cm2 <= 0
     error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is invalid (<= 0 or non-finite).\n' ...
-        'Check transducer(1).tx_calibration.isppa_wcm2.'], bb.isppa_w_per_cm2);
+        'Check sensor_data.p_max_all or set babelbrain.isppa_w_per_cm2.'], bb.isppa_w_per_cm2);
 end
 
 % Cooling interval between repetitions (BabelBrain DurationOff).

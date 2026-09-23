@@ -170,7 +170,10 @@ if run_new_sim
         strcmpi(parameters.thermal_backend, 'babelbrain');
 
     if use_bb_thermal
-        % Propagate free-water ISPPA so babelbrain_thermal_wrapper can scale.
+        % Propagate free-water ISPPA for the wrapper's transmission log line.
+        % The Isppa actually passed to BabelBrain is the in-brain peak of
+        % sensor_data (see babelbrain_thermal_wrapper), so pass the medium and
+        % masks on the ACOUSTIC grid (same grid as sensor_data), not *_th.
         if ~isfield(parameters_th.transducer(1), 'tx_calibration') || ...
                 ~isfield(parameters_th.transducer(1).tx_calibration, 'isppa_wcm2') || ...
                 ~isfinite(parameters_th.transducer(1).tx_calibration.isppa_wcm2)
@@ -184,7 +187,8 @@ if run_new_sim
                 parameters_th.transducer(1).tx_calibration = acoustic_provenance.tx_calibration;
             end
         end
-        results_heating = babelbrain_thermal_wrapper(parameters_th, sensor_data, planimg, kwave_medium_th);
+        results_heating = babelbrain_thermal_wrapper(parameters_th, sensor_data, planimg, ...
+            kwave_medium, medium_masks);
         kwaveDiffusion  = [];
         % Build k-Wave-compatible time_status_seq from protocol timing so
         % thermal_plot_sim can shade on/off periods on the temperature curve.
