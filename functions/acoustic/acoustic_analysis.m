@@ -50,7 +50,7 @@ function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoust
 %   acoustic_pressure- temporal peak pressure map [Pa]
 %   highlighted_pos  - [1x3] grid coordinates of peak intensity for plots [voxels]
 %
-% See also: ACOUSTIC_WRAPPER, ACOUSTIC_SIMULATION, SIMULATION_NIFTI, MASKED_MAX_3D
+% See also: ACOUSTIC_WRAPPER, ACOUSTIC_SIMULATION, NIFTI_ACOUSTIC, MASKED_MAX_3D
 
 arguments
     parameters   (1,1) struct
@@ -222,8 +222,20 @@ end
     results.Ipa_target  = acoustic_Ipa(idx{:});
     results.Ptp_target  = acoustic_pressure(idx{:}); % temporal peak pressure at target
 
-    % Get tissue-specific masks
-    mask = tissuemask_binary(parameters, medium_masks);
+    % Get tissue-specific masks. For BabelBrain runs, prefer BabelBrain's own
+    % material map when it was carried through (read_babelbrain_output): it
+    % matches medium_masks except at tissue boundaries, where it attributes
+    % voxels (e.g. the skull-brain reflection hotspot) the way the solver did.
+    if isstruct(sensor_data) && isfield(sensor_data, 'babelbrain_material_map') ...
+            && ~isempty(sensor_data.babelbrain_material_map) ...
+            && isequal(size(sensor_data.babelbrain_material_map), size(acoustic_Ipa))
+        mask = bb_tissuemask_binary(sensor_data.babelbrain_material_map);
+        fprintf(['[acoustic_analysis] Tissue masks from BabelBrain material map ' ...
+            '(the exact mask the field was solved on; matches medium_masks to ' ...
+            'within the label-resample round-trip).\n']);
+    else
+        mask = tissuemask_binary(parameters, medium_masks);
+    end
 
     % calculate X, Y and Z coordinates of max. intensity 
     % if medium includes brain, consider only intensities within the brain
@@ -275,17 +287,26 @@ end
     % Layer-specific outcomes (in case a layered simulation)
     if contains(parameters.simulation.medium, {'layered'; 'phantom'})
 
-        % calculate max. isppa and location across full space
-        [~, Ix, Iy, Iz] = masked_max_3d(acoustic_Ipa, ones(size(medium_masks)));
-
-        % highlight this position in the future
-        highlighted_pos = [Ix, Iy, Iz];
-        highlighted_pos = highlighted_pos(1:numel(parameters.grid.dims));
-        
         % extract indices in brain medium
         [results.Isppa_brain, Ix_brain, Iy_brain, Iz_brain] = ...
             masked_max_3d(acoustic_Ipa, mask.brain);
         [results.min_Isppa_brain] = min(acoustic_Ipa(mask.brain));
+
+        % Position highlighted in plots (blue marker): the BRAIN-masked peak
+        % when brain tissue exists, consistent with Isppa_after_exit_plane /
+        % real_focal_distance above (both already brain-masked) and with the
+        % Isppa_brain value reported alongside the plots. The unmasked global
+        % peak is NOT used: for elastic-skull solvers (BabelBrain) it lands in
+        % the skull-brain interface reflection hotspot, not at the focal spot
+        % of interest, and would drag the marker (and, below, the colour
+        % scale) off the brain target.
+        if any(mask.brain(:))
+            highlighted_pos = [Ix_brain, Iy_brain, Iz_brain];
+        else
+            [~, Ix, Iy, Iz] = masked_max_3d(acoustic_Ipa, ones(size(medium_masks)));
+            highlighted_pos = [Ix, Iy, Iz];
+        end
+        highlighted_pos = highlighted_pos(1:numel(parameters.grid.dims));
 
         % ITRUSST focal metrics (Martin et al., 2025, Brain Stimulation):
         %   −3 dB: I ≥ Isppa/2   (half-intensity; 10·log10(0.5) = −3 dB)
@@ -434,6 +455,20 @@ end
     sync_mode = n_plots > 1 && ~is_async_mode(parameters);
     n_iters   = 1 + (~sync_mode) * (n_plots - 1);  % 1 for sync, n_plots for async/single
 
+    % Colour range for the intensity overlays: cap at the brain-masked peak
+    % (Isppa_brain) rather than the unmasked global max. For elastic-skull
+    % solvers (BabelBrain) the global max sits in the skull-brain interface
+    % reflection hotspot — several times the brain focal value — which would
+    % compress the entire brain field into the bottom of the colour scale.
+    % Matches the convention already used by plot_intensity_t1_overlay.
+    overlay_cmax = [];
+    if isfield(results, 'Isppa_brain') && ~isempty(results.Isppa_brain) ...
+            && isfinite(results.Isppa_brain) && results.Isppa_brain > 0
+        overlay_cmax = results.Isppa_brain;
+    elseif isfield(results, 'Isppa') && isfinite(results.Isppa) && results.Isppa > 0
+        overlay_cmax = results.Isppa;
+    end
+
     for ti = 1:n_iters
 
         fpos_sim = parameters.transducer(ti).focus_pos;
@@ -449,6 +484,13 @@ end
             for i_slice = 1:numel(slices)
                 slice = slices(i_slice);
 
+                overlay_opts = {};
+                if ~isempty(overlay_cmax)
+                    overlay_opts = {'overlay_color_range', [0 overlay_cmax], ...
+                                    'overlay_threshold_low', 0, ...
+                                    'overlay_threshold_high', overlay_cmax};
+                end
+
                 [~,~,~,~,~,~,~,h]=plot_overlay(...
                     acoustic_Ipa, ...
                     segmentation, ...
@@ -457,7 +499,8 @@ end
                     {slice.dim, slice.pos}, ...
                     all_tpos, ...
                     all_fpos, ...
-                    highlighted_pos);
+                    highlighted_pos, ...
+                    overlay_opts{:});
 
                 % Construct output filename
                 output_plot = fullfile( ...
