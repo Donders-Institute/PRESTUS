@@ -353,6 +353,15 @@ grid:
   min_ppw: 6          # Minimum acceptable PPW at the fundamental frequency; triggers a warning if violated
   source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction
   source_limit_fraction: 0.9 # Fraction of the stability limit to use for time step (0 = do not use stability limit)
+  # steady_state_transits: 1       # Number of domain-diagonal one-way transits (at min. sound speed) before
+  #                                 # recording starts. Default 1. Compact, highly reflective domains (e.g. a
+  #                                 # partial-FOV crop with a high skull/water impedance mismatch) may need more
+  #                                 # transits for multiply-reflected energy to decay to true periodic steady
+  #                                 # state — jwave's own cross-validation test uses roundtrips=20.
+  # steady_state_num_periods: 3    # Number of trailing wave periods recorded as the steady-state window.
+  #                                 # Default 3. Increase together with steady_state_transits if Isppa/focal
+  #                                 # depth are still drifting as either is increased (a converged setup should
+  #                                 # stop changing further).
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?

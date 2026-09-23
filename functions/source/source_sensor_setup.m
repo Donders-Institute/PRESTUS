@@ -54,6 +54,14 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %                     Used for (1) the PPW spatial-sampling check and (2) computing t_end so
 %                     the simulation runs long enough for waves in slow media to reach steady state.
 %
+% parameters.grid.steady_state_transits (optional, default: 1) and
+% parameters.grid.steady_state_num_periods (optional, default: 3) set the
+% simulated duration (in domain-diagonal transits at the slowest sound speed)
+% and the number of trailing periods recorded as steady state. Compact,
+% strongly reflective domains (e.g. a skull partial-FOV crop) may need more;
+% increase both until Isppa and focal depth stop changing. See
+% doc_parameters.md.
+%
 % Output:
 %   kgrid         - kWaveGrid with time axis set
 %   source        - struct with source.p_mask and source.p
@@ -188,7 +196,12 @@ end
     else
         t_end_speed = max_sound_speed;
     end
-    t_end = sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / t_end_speed;    % [s]
+    if isfield(parameters.grid, 'steady_state_transits') && ~isempty(parameters.grid.steady_state_transits)
+        steady_state_transits = parameters.grid.steady_state_transits;
+    else
+        steady_state_transits = 1;
+    end
+    t_end = steady_state_transits * sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / t_end_speed;    % [s]
 
     % jwave steady-state safety margin.
     % jwave's PML sits INSIDE the declared grid (k-Wave's sits outside), so
@@ -290,8 +303,12 @@ end
     sensor.mask = ones(parameters.grid.dims);
     sensor.record = {'p_max_all','p_min_all','p_final'};
 
-    % Record the last 3 cycles in steady state (when sonic waves have traversed the entire medium)
-    num_periods = 3;
+    % Record the last num_periods cycles in steady state (when sonic waves have traversed the entire medium)
+    if isfield(parameters.grid, 'steady_state_num_periods') && ~isempty(parameters.grid.steady_state_num_periods)
+        num_periods = parameters.grid.steady_state_num_periods;
+    else
+        num_periods = 3;
+    end
     time_points_to_record = round(num_periods * wave_period / kgrid.dt);
     sensor.record_start_index = simulation_time_points - time_points_to_record + 1;
     % alternative (EM): sensor.record_start_index = simulation_time_points - 3*points_per_period;
@@ -310,6 +327,8 @@ end
     fprintf('[source_sensor_setup] Nt                : %d\n', simulation_time_points);
     fprintf('[source_sensor_setup] t_end             : %.4f ms\n', simulation_time_points * kgrid.dt * 1e3);
     fprintf('[source_sensor_setup] Record start idx  : %d  (steady-state window: last %d periods)\n', sensor.record_start_index, num_periods);
+    fprintf('[source_sensor_setup] Steady-state margin: %d domain-diagonal transit(s) + %d recorded periods\n', ...
+        steady_state_transits, num_periods);
     fprintf('[source_sensor_setup] ------------------------------------\n');
 
 end
