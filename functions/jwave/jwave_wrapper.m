@@ -190,11 +190,10 @@ output_h5 = fullfile(out_dir, sprintf('sub-%03d_%s_jwave_output%s.h5', subj_id, 
 % jwave's PML has none of k-Wave's FFT-prime-factorization sensitivity and
 % only supports a single scalar thickness (jwave.geometry.Medium.pml_size),
 % so 'auto' is resolved from a wavelength-based target instead of reusing
-% k-Wave's getOptimalPMLSize (which optimizes for k-Wave's own backend and
-% searches a fixed absolute point range with no wavelength awareness at all).
-% See resolve_jwave_pml_size.m for the rationale.
+% k-Wave's getOptimalPMLSize. Sized from max(sound_speed): see
+% resolve_jwave_pml_size.m.
 pml_size = resolve_jwave_pml_size(pml_size, parameters.transducer(1).freq_hz, ...
-    min(medium.sound_speed(:)), parameters.grid.resolution_mm / 1e3);
+    max(medium.sound_speed(:)), parameters.grid.resolution_mm / 1e3);
 
 % jwave applies PML inside the declared grid (PMLInside is not configurable),
 % so voxels within pml_size of any face are absorbing layers.  run_jwave_sim.py

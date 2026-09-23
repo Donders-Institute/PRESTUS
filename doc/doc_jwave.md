@@ -185,7 +185,7 @@ Frequency-domain GMRES solver. Computes the complex pressure field `P(r)` at the
 
 Significantly faster than `pseudo_spectral` for CW simulations because the steady-state is reached in a single linear solve rather than thousands of time steps. Equivalent accuracy for monochromatic excitation in lossy tissue media. GMRES convergence is controlled by `jwave.gmres_restart` and `jwave.gmres_maxiter`.
 
-> **Convergence is checked and enforced.** After every Helmholtz solve, `jwave_wrapper` compares the relative GMRES residual (see `/diagnostics/residual_norm`) against `jwave.convergence_threshold` (default `0.05`). This residual is computed *exactly*, by re-evaluating jwave's own `helmholtz` operator and `scale_source_helmholtz` on the solved field (`compute_helmholtz_residual` in `run_jwave_sim.py`) — an earlier version approximated it with a hand-rolled NumPy Laplacian that omitted jwave's internal source scaling and the `u = P/(-iω)` relation, which could report a residual off by orders of magnitude (~10⁶ for a typical 300 kHz / 0.75 mm grid) independent of whether GMRES had actually converged. If the (now-exact) residual exceeds the threshold, **the pipeline errors**, since a genuinely unconverged GMRES iterate is dominated by solver noise rather than physics. The error message gives concrete, ranked fixes (revert `gmres_restart`/`gmres_maxiter` to jwave's own defaults rather than enlarging them — a larger restart in single precision can destabilize GMRES instead of helping; try `precision: double`; check the PML fraction of the domain via `--debug`; only then loosen `gmres_tol`). If you have reviewed the field and diagnostics and accept the residual anyway, set `jwave.ignore_convergence_threshold: true` to downgrade this back to a warning and keep the result.
+> **Convergence is checked and enforced.** After every Helmholtz solve, `jwave_wrapper` compares the relative GMRES residual (see `/diagnostics/residual_norm`) against `jwave.convergence_threshold` (default `0.05`). This residual is computed exactly, by re-evaluating jwave's own `helmholtz` operator and `scale_source_helmholtz` on the solved field (`compute_helmholtz_residual` in `run_jwave_sim.py`), so it reflects the true solver error rather than an approximation. If the residual exceeds the threshold, **the pipeline errors**, since a genuinely unconverged GMRES iterate is dominated by solver noise rather than physics. The error message gives concrete, ranked fixes (revert `gmres_restart`/`gmres_maxiter` to jwave's own defaults rather than enlarging them — a larger restart in single precision can destabilize GMRES instead of helping; try `precision: double`; check the PML fraction of the domain via `--debug`; only then loosen `gmres_tol`). If you have reviewed the field and diagnostics and accept the residual anyway, set `jwave.ignore_convergence_threshold: true` to downgrade this back to a warning and keep the result.
 
 > **Lossless water note.** Setting `alpha_coeff = 0` makes the Helmholtz operator near-singular (purely real wavenumber in the bulk), which causes GMRES to stall and underestimate peak pressure by ~18%. `run_jwave_sim.py` automatically floors `alpha_coeff` to 0.002 dB/(cm·MHz²) — the physical value for distilled water — before building the medium. This regularises GMRES convergence with negligible effect on the acoustic field (< 0.006 % attenuation over 100 mm at 500 kHz).
 
@@ -234,6 +234,20 @@ Finite-difference time-domain solver. Use `jwave.fd_accuracy` to set the spatial
 | `convergence_threshold` | float | `0.05` | Relative spectral residual above which the result is rejected. Helmholtz solver only. By default this **errors**; see `ignore_convergence_threshold`. |
 | `ignore_convergence_threshold` | bool | `false` | If true, exceeding `convergence_threshold` only warns (and returns the unconverged result) instead of erroring. Helmholtz solver only. |
 | `grid.pml_size` | int/`'auto'` | `'auto'` | PML thickness in grid points (set under `grid:`, not `jwave:`, so both backends read the same field — but `'auto'` resolves *differently* per backend: jwave uses a wavelength-based target of ~2.5λ, not k-Wave's FFT-prime-factorization heuristic; see `resolve_jwave_pml_size.m`). |
+
+### PML thickness
+
+With `grid.pml_size: auto`, jwave's PML is sized to about 2.5 wavelengths (clipped to
+[10, 40] grid points), in line with jwave's own example notebooks. The wavelength is taken at
+the **fastest** sound speed in the medium (`max(medium.sound_speed)`), not the slowest. jwave's
+Helmholtz PML (`complex_pml_on_grid`) is a fixed function of voxel position: it does not scale
+with frequency or with the local sound speed, so a given thickness absorbs fewer wavelengths
+where it borders a fast medium such as skull. On a head-model partial-FOV crop, a 20-voxel
+(15 mm) PML sized from water (1500 m/s) covered 3.0 wavelengths in water but only 1.8 in skull,
+and skull bordered most of the transverse boundary. Smoothing the skull/water interface did not
+reduce the Helmholtz-vs-k-Wave gap, which points to PML coverage rather than interface
+discontinuities. Sizing from the fastest medium gives every bordering tissue the full target
+thickness.
 
 ---
 
