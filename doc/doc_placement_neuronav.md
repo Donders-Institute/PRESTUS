@@ -24,11 +24,22 @@ These files contain one or more static marker positions. Each `Element` in the f
 
 Static instrument positions stored as full 4×4 matrices in an `InstrumentMarkerList` file. Each `InstrumentMarker` entry contains a `Marker/Matrix4D` block with the same `data{row}{col}` field layout as TriggerMarkers. Set `placement.localite.markertype = 'InstrumentMarker'` to use this format.
 
-### Unsupported: `EntryTarget`
+### `EntryTarget` (not for position/angle -- see the multi-target toolkit)
 
-Some Localite versions export an `EntryTargetList` XML containing flat `Target/Marker/ColVec3D` and `Rotation/RotationReference/ColVec3D` entries at the top level (not wrapped in `GUMMarkerList/Element`). This format is not currently handled by `neuronav_compute_series_statistics`. To use it, manually read the target position and rotation reference vector, construct a synthetic 4×4 matrix (as in the GUMMarkers branch of `neuronav_compute_series_statistics`), and pass it to `localite_matrix_to_positions`.
+Some Localite versions export an `EntryTargetList` XML containing flat `Target/Marker/ColVec3D` and `Rotation/RotationReference/ColVec3D` entries at the top level (not wrapped in `GUMMarkerList/Element`). This format is **not** handled by `neuronav_compute_series_statistics` and is never used for position/angle computation in the placement pipeline below -- that restriction is deliberate, not a gap; see "Choosing a file" below for why.
+
+It **is** read by a separate function, `neuronav_read_entry_target`, for exactly one purpose: matching a static, operator-confirmed brain-target label against a `target_map` in multi-target studies (e.g. "does this subject's EntryTarget export confirm a 'PUL' target, and if so, where?"). If you need that -- naming multiple targets per session and resolving each one's confirmed coordinate with source-tracked fallbacks -- see [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md), a toolkit layered on top of everything in this document rather than a replacement for it.
 
 </details>
+
+### Choosing a file: realized angle vs. planned trajectory
+
+The file types above answer different questions. Picking the wrong one will silently mismatch your reported angle and your reported target — read this before choosing `markertype`.
+
+- **The realized angle at the moment of stimulation** is only available from `TriggerMarkers` (the tracked pose during the actual pulses, averaged per series) or `InstrumentMarker` (a static saved pose). Both store a genuine, measured rotation. Use one of these if you need "the angle at which we stimulated."
+- **`GUMMarkers` (`EntryTargetPair`) does not carry a measured angle.** Its 4×4 matrix is *synthesized* from the static `Target` point plus a `RotationReference` vector — and that reference is frequently left unset in the source file (`<Rotation angle="0.0" used="false">`). When `used="false"`, the "angle" `neuronav_compute_series_statistics` produces from it is a placeholder, not captured stimulation data. Only treat it as a real angle if the source XML has `Rotation used="true"`.
+- **Static planned Entry/Target coordinates are never read by the placement pipeline below.** This includes the `Target` field inside a `GUMMarkers` `EntryTargetPair`, and a standalone `EntryTarget.xml` read via `neuronav_read_entry_target`. `position_transducer_localite` → `localite_matrix_to_positions` never reads them, and never will — see the axis-projection point below for why. **If you are only running single-target placement, these static coordinates are entirely optional** — TriggerMarkers or InstrumentMarker alone is sufficient; no GUMMarkers or EntryTarget export is required. They matter only for the separate multi-target extraction toolkit ([doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)), which uses them for two things: identifying which planned target a given coil's series corresponds to (`neuronav_match_entry_targets`), and, for studies that supply pre-hoc planned coordinates, as an independent cross-check against those (`neuronav_resolve_target`).
+- **The reported focus position is axis-projected, not a stored coordinate.** `localite_matrix_to_positions` computes it as `focus_pos = ref_pos + focal_distance_ep * ref_vec` — projecting forward from the *tracked* position along the *tracked* beam axis by the transducer's calibrated focal distance. This keeps the reported target self-consistent with the reported angle. A separately-clicked static Target point would not necessarily lie on the tracked beam axis at all, and could silently disagree with the reported angle if used instead.
 
 ### Pipeline entry point
 
@@ -68,6 +79,8 @@ This mode is appropriate when TriggerMarkers files contain repeated acquisitions
 For multi-position or multi-session workflows outside the pipeline, use `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m`).
 
 All paths share the same XML parser and position math (`localite_matrix_to_positions`). The reference distance from the IR tracker attachment point to the transducer exit plane is derived automatically from transducer geometry (`curv_radius_mm − dist_geom_ep_mm`) when defined, with fallback to `parameters.placement.localite.reference_distance_mm`.
+
+> **`transducer.focal_distance_ep` (or `focal_distance_bowl`) must be set explicitly for Localite placement — there is no default.** `config_default.yaml` ships it as `[]`, and unlike other placement modes it cannot be derived automatically here: the usual fallback computes it from `trans_pos`/`focus_pos`, but in Localite mode those positions are exactly what this step is trying to produce, so the fallback never has anything to work from. `localite_matrix_to_positions` validates this upfront and raises a clear `PRESTUS:localite:missingConfig` error naming the missing field if neither is set — this same check also covers `placement.mode = 'plantus'`, since PlanTUS placement resolves its final position through the same function.
 
 Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). The functions also facilitate standard-space definitions (experimental), e.g., to plot average transducer positions in standard space.
 
