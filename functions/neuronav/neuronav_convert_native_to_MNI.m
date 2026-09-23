@@ -10,9 +10,10 @@ function [trans_ras_seg, ...
 % NEURONAV_CONVERT_NATIVE_TO_MNI  Convert native RAS coordinates to MNI space
 %
 % Transforms transducer and target coordinates from native subject RAS
-% space to standardised MNI space via SimNIBS nonlinear warp fields.
-% Clamps coordinates to valid overlapping bounds and optionally adjusts
-% for stimulation laterality.
+% space to standardised MNI space by sampling SimNIBS's nonlinear
+% coordinate field directly (see NEURONAV_APPLY_DEFORMATION), redirecting
+% positions outside its defined domain to the nearest valid voxel, and
+% optionally adjusts for stimulation laterality.
 %
 % Use as:
 %   [trans_ras_seg, target_ras_seg, trans_mni_pos, target_mni_pos, ...
@@ -36,7 +37,8 @@ function [trans_ras_seg, ...
 %   trans_mni_ras  - [Nx3] transducer RAS coordinates in MNI space [mm]
 %   targ_mni_ras   - [Nx3] target RAS coordinates in MNI space [mm]
 %
-% See also: NEURONAV_CONVERT_MNI_TO_NATIVE, NEURONAV_GET_GROUP_MEAN_MNI
+% See also: NEURONAV_APPLY_DEFORMATION, NEURONAV_BUILD_DEFORMATION_CACHE,
+%           NEURONAV_CONVERT_MNI_TO_NATIVE, NEURONAV_GET_GROUP_MEAN_MNI
 
     % Number of positions
     Npos = size(trans_ras,1);
@@ -65,44 +67,22 @@ function [trans_ras_seg, ...
     mni_info = niftiinfo(fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'toMNI', 'final_tissues_MNI.nii.gz'));
 
     warp_file = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'toMNI', 'Conform2MNI_nonl.nii.gz');
-    warp_field = niftiread(warp_file);     % [X Y Z 3] nonlinear field: native→MNI displacement (mm)
+    warp_field = niftiread(warp_file);     % [X Y Z 3] nonlinear field: native voxel -> MNI RAS coordinate (mm)
     warp_info  = niftiinfo(warp_file);     % Contains the affine
-    
+
     plan_affine = t1plan_info.Transform.T;
     seg_affine = t1seg_info.Transform.T;
     warp_affine = warp_info.Transform.T;
     mni_affine = mni_info.Transform.T;
 
-    m2m_folder = fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id));
-    transformation_type = 'nonl';
-
-    % Intermission: ensure that segmentation coordinates map onto MNI
-    % Use the following logic: identify segmentation space mm bounds
-    % based on maximum MNI voxels; clamp segmentation coordinates by
-    % those bounds.
-
-    % --- 1. Compute min/max voxel for the target MNI image ---
+    % --- Min/max voxel for the target MNI image (used for the side_order clamp below) ---
     min_voxel_mni = [1 1 1 1]';                   % 1-based indexing (MATLAB convention)
     max_voxel_mni = [mni_info.ImageSize(1:3),1]';      % Make sure to make it a column 4-vector
-    
-    % --- 2. Convert voxel bounds to RAS (mm) bounds in MNI space ---
-    min_ras_mni = mni_affine' * min_voxel_mni;
-    max_ras_mni = mni_affine' * max_voxel_mni;
-    
-    % --- 3. Convert those RAS bounds into segmentation RAS space ---
-    
-    min_ras_seg = mni2subject_coords_LDfix(min_ras_mni(1:3)', m2m_folder, parameters, transformation_type);
-    max_ras_seg = mni2subject_coords_LDfix(max_ras_mni(1:3)', m2m_folder, parameters, transformation_type);
-    
-    % Take the (x,y,z) coordinates:
-    min_ras_seg_coords = min(min_ras_seg(1:3), max_ras_seg(1:3));  % Account for potential axis flip
-    max_ras_seg_coords = max(min_ras_seg(1:3), max_ras_seg(1:3));
-    
-    % --- 4. Regularize/clamp all segmentation-space coordinates to that intersection ---
-    clip_to_bounds = @(coord, min_val, max_val) ...
-        max(min(coord, max_val), min_val);
-    
-    % This ensures trans_ras_seg are always valid for subsequent mapping to MNI and stay inside the overlap volume.
+
+    % Nearest-valid-voxel lookup for the native->MNI coordinate field, so
+    % positions falling outside its defined domain resolve directly
+    % instead of via a per-point CLI retry.
+    nearest_idx = neuronav_build_deformation_cache(warp_field);
 
     for i = 1:max(Npos)
         if any(isnan(trans_ras(i,:))) || any(isnan(target_ras(i,:)))
@@ -124,31 +104,10 @@ function [trans_ras_seg, ...
         ras_seg = (vox_plan(1:3) * R) + T';
         trans_ras_seg(i,:) = ras_seg(1:3);
 
-        % clamp transducer values to min/max MNI space
-        orig_coord = trans_ras_seg(i,1:3);
-        regularized_coord = clip_to_bounds(orig_coord, min_ras_seg_coords, max_ras_seg_coords);
-        trans_ras_seg(i,:) = regularized_coord;
-
-        % [2] transform from warp RAS to MNI RAS (use dedicated SimNIBS function)
-        % Note: the FOV of the MNI image seems very limited for the
-        % transducer location. So we'll adjust it laterally until it
-        % fits.
-
-        targ_mni_mm = subject2mni_coords_LDfix(target_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
-        trans_mni_mm = [0 0 0];
-        trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
-        while all(trans_mni_mm==0)
-            warn('MNI space too contrained for original segmentation-space locations ... adjusting')
-            trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
-            if trans_ras_seg(i,1)>0
-                trans_ras_seg(i,1) = trans_ras_seg(i,1)-1; % change the right-left location to fall within the frame
-            elseif trans_ras_seg(i,1)<0
-                trans_ras_seg(i,1) = trans_ras_seg(i,1)+1;
-            end
-        end
-        % alternative: try to transform manually with matrices
-%             targ_mni_mm  = neuronav_apply_deformation(target_ras_seg(1:3), warp_field, warp_affine);
-%             trans_mni_mm = neuronav_apply_deformation(trans_ras_seg(1:3), warp_field, warp_affine);
+        % [2] transform from segmentation RAS to MNI RAS by sampling the
+        % SimNIBS coordinate field directly (see NEURONAV_APPLY_DEFORMATION).
+        targ_mni_mm  = neuronav_apply_deformation(target_ras_seg(i,1:3), warp_field, warp_affine, nearest_idx);
+        trans_mni_mm = neuronav_apply_deformation(trans_ras_seg(i,1:3), warp_field, warp_affine, nearest_idx);
         targ_mni_ras(i,:)  = round(targ_mni_mm);
         trans_mni_ras(i,:) = round(trans_mni_mm);
 
