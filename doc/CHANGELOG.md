@@ -48,6 +48,7 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - Large-aperture transducers and high-resolution grids no longer cause out-of-memory errors during source construction; source weights are now computed one element at a time rather than all at once
 - `matlab_cpu` simulations with CW sources use substantially less RAM for the source signal, making CPU-based runs feasible for large arrays that would otherwise require many GB of storage
 - GPU out-of-memory errors during source setup are now caught and handled gracefully; simulations fall back to CPU automatically with a warning
+- ⚠️ **Fixed:** the lazy CW source (`CWSourceMatrix`, `matlab_cpu`/`matlab_gpu`) now supports k-Wave's source scaling (`source.p .* s` and the per-voxel loop for heterogeneous media); previously these runs errored before the time loop. Row index 58 was also misread as `:` (its character code), and single-element transducers produced a sparse source that could not be cast to single. Results match the dense source matrix
 
 #### Acoustic simulation
 - `resolve_acoustic_fov_params` resolves `'auto'` sentinel values for `grid.acoustic_fov_length_mm` and `grid.acoustic_fov_diameter_mm` from focal geometry; `has_acoustic_fov` flag gates all downstream crop/restore logic

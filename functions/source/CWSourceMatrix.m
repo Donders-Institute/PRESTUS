@@ -13,6 +13,12 @@ classdef CWSourceMatrix
 %   columns on demand in subsref, so k-Wave's time loop accesses
 %   source.p(:, t) without ever materialising the full matrix.
 %
+%   k-Wave's source scaling (kspaceFirstOrder_scaleSourceTerms) is also
+%   supported without materialising the matrix: whole-matrix scaling
+%   (source.p .* s, source.p ./ s) and the per-row loop used for
+%   heterogeneous media, source.p(i,:) = source.p(i,:) .* s_i, both reduce
+%   to scaling Re_C/Im_C.
+%
 %   single() and double() are overloaded to return `this` unchanged, so
 %   k-Wave's kspaceFirstOrder_dataCast CPU-cast step passes through
 %   harmlessly. gpuArray() is overloaded to upload Re_C/Im_C to the GPU,
@@ -40,6 +46,8 @@ classdef CWSourceMatrix
         dt      % scalar double  [s]
         n_src   % scalar int32
         Nt_     % scalar int32  (private; public Nt clashes with kWave vars)
+        cs_     % 1 x Nt single, cos(omega*t) (cached for full-row access)
+        sn_     % 1 x Nt single, sin(omega*t)
     end
 
     methods
@@ -51,6 +59,9 @@ classdef CWSourceMatrix
             obj.dt    = double(dt);
             obj.n_src = int32(numel(Re_C));
             obj.Nt_   = int32(Nt);
+            t_vec     = (0 : double(Nt)-1) * obj.dt;
+            obj.cs_   = single(cos(obj.omega * t_vec));
+            obj.sn_   = single(sin(obj.omega * t_vec));
         end
 
         % ----------------------------------------------------------------
@@ -65,19 +76,16 @@ classdef CWSourceMatrix
             elseif strcmp(s(1).type, '()') && numel(s) == 1 && numel(s.subs) == 2
                 row_sub = s.subs{1};
                 col_sub = s.subs{2};
-                if ischar(col_sub) || isstring(col_sub)
+                if CWSourceMatrix.is_colon(col_sub)
                     % source.p(rows, ':') — return full time series for
                     % selected rows. k-Wave calls source.p(1,:) in input
                     % checking to determine Nt via length(); returning the
                     % correct 1×Nt vector ensures flags.source_p = Nt so
                     % the source is applied at every time step.
-                    t_vec = (0 : double(obj.Nt_)-1) * obj.dt;   % 1 × Nt
-                    cs    = cos(obj.omega * t_vec);
-                    sn    = sin(obj.omega * t_vec);
-                    if isequal(row_sub, ':')
-                        varargout{1} = obj.Re_C * cs - obj.Im_C * sn;   % num_src × Nt
+                    if CWSourceMatrix.is_colon(row_sub)
+                        varargout{1} = obj.Re_C * obj.cs_ - obj.Im_C * obj.sn_;   % num_src × Nt
                     else
-                        varargout{1} = obj.Re_C(row_sub) * cs - obj.Im_C(row_sub) * sn;
+                        varargout{1} = obj.Re_C(row_sub) * obj.cs_ - obj.Im_C(row_sub) * obj.sn_;
                     end
                 else
                     % source.p(:, t_index) or source.p(rows, t_index) —
@@ -87,7 +95,7 @@ classdef CWSourceMatrix
                     t  = (col_sub - 1) * obj.dt;
                     cs = cos(obj.omega * t);
                     sn = sin(obj.omega * t);
-                    if isequal(row_sub, ':')
+                    if CWSourceMatrix.is_colon(row_sub)
                         varargout{1} = obj.Re_C * cs - obj.Im_C * sn;
                     else
                         varargout{1} = obj.Re_C(row_sub) * cs - obj.Im_C(row_sub) * sn;
@@ -98,6 +106,78 @@ classdef CWSourceMatrix
                     'CWSourceMatrix only supports (rows, col) indexing; got %s.', ...
                     strjoin(cellfun(@(s_) s_.type, num2cell(s), 'UniformOutput', false)));
             end
+        end
+
+        % ----------------------------------------------------------------
+        % Row assignment: k-Wave's per-row source scaling for heterogeneous
+        % media, source.p(i,:) = source.p(i,:) .* s_i. The assigned rows must
+        % be scaled copies of the current rows; the factor is recovered by
+        % least squares and applied to Re_C/Im_C. Anything else errors.
+        % ----------------------------------------------------------------
+        function obj = subsasgn(obj, s, val)
+            if strcmp(s(1).type, '.')
+                obj = builtin('subsasgn', obj, s, val);
+                return
+            end
+            if ~(strcmp(s(1).type, '()') && numel(s) == 1 && numel(s.subs) == 2 ...
+                    && CWSourceMatrix.is_colon(s.subs{2}))
+                error('CWSourceMatrix:unsupportedAssign', ...
+                    'CWSourceMatrix only supports row assignment source.p(rows, :) = value.');
+            end
+            rows = s.subs{1};
+            if CWSourceMatrix.is_colon(rows)
+                rows = 1:double(obj.n_src);
+            end
+            rows = double(rows(:));
+            val  = double(gather(val));
+            if ~isequal(size(val), [numel(rows), double(obj.Nt_)])
+                error('CWSourceMatrix:unsupportedAssign', ...
+                    'Assigned value must be %d x %d.', numel(rows), double(obj.Nt_));
+            end
+
+            orig = double(gather(obj.Re_C(rows))) * double(obj.cs_) ...
+                 - double(gather(obj.Im_C(rows))) * double(obj.sn_);
+            nrm  = sum(orig.^2, 2);
+            k    = ones(numel(rows), 1);
+            nz   = nrm > 0;
+            k(nz) = sum(val(nz, :) .* orig(nz, :), 2) ./ nrm(nz);
+
+            resid = sqrt(sum((val - k .* orig).^2, 2));
+            tol   = 1e-4 * sqrt(sum(val.^2, 2)) + 1e-6 * max(abs(val(:)));
+            if any(resid > tol) || any(~nz & any(val ~= 0, 2))
+                error('CWSourceMatrix:notAScaling', ...
+                    ['CWSourceMatrix row assignment must scale existing rows ' ...
+                     '(as k-Wave''s source scaling does); got a different signal.']);
+            end
+            obj.Re_C(rows) = obj.Re_C(rows) .* cast(k, 'like', obj.Re_C);
+            obj.Im_C(rows) = obj.Im_C(rows) .* cast(k, 'like', obj.Im_C);
+        end
+
+        % ----------------------------------------------------------------
+        % Scaling: source.p .* s and source.p ./ s with a scalar or a
+        % num_src x 1 column (per-row factor), as used by k-Wave's
+        % kspaceFirstOrder_scaleSourceTerms for homogeneous media.
+        % ----------------------------------------------------------------
+        function obj = times(a, b)
+            [obj, k] = CWSourceMatrix.scale_operands(a, b);
+            obj = obj.scale_rows(k);
+        end
+
+        function obj = mtimes(a, b)
+            [obj, k] = CWSourceMatrix.scale_operands(a, b);
+            if ~isscalar(k)
+                error('CWSourceMatrix:unsupportedOperation', ...
+                    'CWSourceMatrix * X is only supported for scalar X.');
+            end
+            obj = obj.scale_rows(k);
+        end
+
+        function obj = rdivide(a, b)
+            if ~isa(a, 'CWSourceMatrix')
+                error('CWSourceMatrix:unsupportedOperation', ...
+                    'X ./ CWSourceMatrix is not supported.');
+            end
+            obj = a.scale_rows(1 ./ CWSourceMatrix.check_factor(a, b));
         end
 
         % ----------------------------------------------------------------
@@ -167,11 +247,46 @@ classdef CWSourceMatrix
         % Materialise (for debugging or cpp fallback)
         % ----------------------------------------------------------------
         function M = full(obj)
-            t_vec = (0 : double(obj.Nt_)-1) * obj.dt;          % 1 x Nt
-            Re = gather(obj.Re_C);
-            Im = gather(obj.Im_C);
-            M = Re * cos(obj.omega * t_vec) ...
-              - Im * sin(obj.omega * t_vec);              % num_src x Nt
+            M = gather(obj.Re_C) * obj.cs_ - gather(obj.Im_C) * obj.sn_;   % num_src x Nt
+        end
+
+    end
+
+    methods (Access = private)
+
+        function obj = scale_rows(obj, k)
+            k = cast(k(:), 'like', obj.Re_C);
+            obj.Re_C = obj.Re_C .* k;
+            obj.Im_C = obj.Im_C .* k;
+        end
+
+    end
+
+    methods (Static, Access = private)
+
+        function tf = is_colon(sub)
+            % A literal ':' subscript. Not isequal(sub, ':'), which is also
+            % true for the numeric index 58 (the character code of ':').
+            tf = (ischar(sub) || isstring(sub)) && strcmp(sub, ':');
+        end
+
+        function [obj, k] = scale_operands(a, b)
+            if isa(a, 'CWSourceMatrix') && ~isa(b, 'CWSourceMatrix')
+                obj = a; k = CWSourceMatrix.check_factor(a, b);
+            elseif isa(b, 'CWSourceMatrix') && ~isa(a, 'CWSourceMatrix')
+                obj = b; k = CWSourceMatrix.check_factor(b, a);
+            else
+                error('CWSourceMatrix:unsupportedOperation', ...
+                    'CWSourceMatrix can only be scaled by a numeric factor.');
+            end
+        end
+
+        function k = check_factor(obj, k)
+            if ~isnumeric(k) || ~isreal(k) || ~(isscalar(k) || isequal(size(k), [double(obj.n_src), 1]))
+                error('CWSourceMatrix:unsupportedOperation', ...
+                    'Scale factor must be a real scalar or a %d x 1 column.', double(obj.n_src));
+            end
+            k = double(gather(k));
         end
 
     end

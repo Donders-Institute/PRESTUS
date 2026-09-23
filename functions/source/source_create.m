@@ -440,8 +440,10 @@ end
                     C_elem(r) = tr_arr(it).(tr_arr(it).type).elem_p_amp(:) .* ...
                                  exp(1i * tr_arr(it).(tr_arr(it).type).elem_phase_rad(:));
                 end
-                % Per-voxel complex amplitude: sparse matrix multiply (negligible cost)
-                C_src = W_src * C_elem;   % num_src x 1 complex
+                % Per-voxel complex amplitude: sparse matrix multiply (negligible cost).
+                % full(): with a single element C_elem is a scalar and the product
+                % stays sparse, which CWSourceMatrix cannot cast to single.
+                C_src = full(W_src * C_elem);   % num_src x 1 complex
                 distributed_source_signal = CWSourceMatrix( ...
                     real(C_src), imag(C_src), omega_cw, kgrid.dt, Nt);
                 fprintf('[source_create] %s: using lazy CWSourceMatrix (%d src x %d steps, %.1f MB saved)\n', ...

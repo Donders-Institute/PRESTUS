@@ -123,7 +123,7 @@ The source signal matrix has size `num_source_voxels × Nt`. For a kHz-range ape
 
 PRESTUS applies different compression strategies depending on the backend:
 
-**`matlab_cpu` — lazy rank-2 factorisation for CW sources.**
+**`matlab_cpu` / `matlab_gpu` — lazy rank-2 factorisation for CW sources.**
 For continuous-wave (CW) stimulation, every source voxel's time signal has the form
 
 ```
@@ -132,10 +132,7 @@ p(voxel, t) = A_voxel · cos(ω t + φ_voxel)
 
 which can be parameterised by two real numbers per voxel (amplitude and phase, or equivalently the real and imaginary part of a complex amplitude). PRESTUS constructs a compact representation storing only those two numbers per voxel and evaluates each time column on demand during the simulation. Memory scales with `num_source_voxels` only, not `num_source_voxels × Nt`. For typical parameters this reduces source memory by a factor of ~2 000–5 000 compared to the dense matrix.
 
-This path is activated automatically when `code_type = matlab_cpu` and all transducer elements share a single frequency.
-
-**`matlab_gpu` — dense matrix in GPU memory.**
-The full source matrix is allocated as a dense single-precision array and transferred to the GPU before the simulation loop. No compression is applied. GPU memory must accommodate both the grid fields and the full source matrix.
+This path (`CWSourceMatrix.m`) is activated automatically when `code_type` is `matlab_cpu` or `matlab_gpu` and all transducer elements share a single frequency; otherwise the dense matrix is used. k-Wave's own source scaling (`kspaceFirstOrder_scaleSourceTerms`), including the per-voxel loop for heterogeneous media, is applied to the stored amplitudes, so no dense matrix is built at any point.
 
 **`cpp_cpu` / `cpp_gpu` — HDF5 streaming from disk.**
 The source matrix is written to an HDF5 file before the simulation and the C++ binary reads it in blocks during execution. Peak memory is bounded by the block size rather than the full matrix, at the cost of I/O throughput.
@@ -144,8 +141,8 @@ The source matrix is written to an HDF5 file before the simulation and the C++ b
 
 | Backend | Simulation device | Source signal representation | Peak additional RAM / VRAM |
 |---|---|---|---|
-| `matlab_gpu` | GPU | Dense single, full matrix in VRAM | `num_src × Nt × 4 B` on GPU |
-| `matlab_cpu` | CPU | Lazy rank-2 (CW) or dense single | `2 × num_src × 4 B` (CW) |
+| `matlab_gpu` | GPU | Lazy rank-2 (CW) or dense single | `2 × (num_src + Nt) × 4 B` (CW) |
+| `matlab_cpu` | CPU | Lazy rank-2 (CW) or dense single | `2 × (num_src + Nt) × 4 B` (CW) |
 | `cpp_cpu` / `cpp_gpu` | CPU / GPU | HDF5 file, streamed | Bounded by I/O block size |
 
 For a 10 000-voxel source at Nt = 9 000 time steps: dense = **360 MB**; CW lazy = **0.08 MB**.
