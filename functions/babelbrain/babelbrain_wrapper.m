@@ -890,7 +890,7 @@ fprintf('[babelbrain_wrapper] Command:\n  %s\n', strjoin(babelbrain_argv, ' '));
 % DataForSim.h5 already exists. Delete it when overwrite_files='always' so that
 % changed parameters (source_amp_pa, z_steering, etc.) actually take effect.
 if isfield(parameters, 'io') && isfield(parameters.io, 'overwrite_files') && ...
-        strcmp(parameters.io.overwrite_files, 'always')
+        any(strcmp(parameters.io.overwrite_files, {'always', 'force'}))
     freq_kHz_pre = round(freq_hz / 1e3);
     if is_water_medium
         h5_pre = sprintf('%s_%dkHz_%dPPW_Water_DataForSim.h5', target, freq_kHz_pre, ppw_use);
@@ -1008,7 +1008,7 @@ else
     % normalization used for the skull-attenuation ratio and downstream thermal
     % calibration.
     if isfile(water_h5) && isfield(parameters, 'io') && isfield(parameters.io, 'overwrite_files') && ...
-            strcmp(parameters.io.overwrite_files, 'always')
+            any(strcmp(parameters.io.overwrite_files, {'always', 'force'}))
         delete(water_h5);
         fprintf('[babelbrain_wrapper] Deleted stale Water_DataForSim.h5 cache (overwrite_files=always):\n  %s\n', water_h5);
     end

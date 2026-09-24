@@ -295,7 +295,7 @@ options.combine_partition    = 'cpu';        % combine stage needs no GPU
 
 ### Resumption
 
-Each stage checks for its sentinel output file before submitting or running. Re-running `prestus_pipeline_start` with the same config resumes from the last incomplete stage.
+Each stage checks for its sentinel output file before submitting or running. Re-running `prestus_pipeline_start` with the same config resumes from the last incomplete stage. With `io.overwrite_files: always` (default), the preproc, acoustic and combine stages resume from their caches while the joint and water-validation stages always re-run; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
 ### Provenance
 

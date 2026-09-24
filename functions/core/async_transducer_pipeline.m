@@ -40,6 +40,18 @@ function async_transducer_pipeline(parameters, options)
 %                  Uses the same driving parameters as Stage 1…N but with
 %                  simulation.medium = 'water'.  Affixes match Stage 1…N.
 %
+% Overwrite semantics (see RESOLVE_CHAINED_OVERWRITE):
+%   io.overwrite_files = 'never'   intermediate stages (preproc, acoustic,
+%                                  combine) resume from existing caches;
+%                                  output stages (joint, water validation)
+%                                  are skipped when their CSV exists.
+%   io.overwrite_files = 'always'  intermediates resume; output stages always
+%                                  re-run and overwrite CSV/NIfTI/report.
+%   io.overwrite_files = 'force'   every stage re-runs.
+%   Acoustic and joint sub-jobs always load the shared head/grid/medium
+%   caches built by Stage 0 (io.reuse_upstream_caches), so parallel jobs
+%   never rebuild them.
+%
 % Use as:
 %   async_transducer_pipeline(parameters)
 %   async_transducer_pipeline(parameters, options)
@@ -203,10 +215,12 @@ end
 %% Build parameter structs
 % =========================================================================
 
+ow = resolve_chained_overwrite(parameters);
+
 p_acoustic = cell(1, N);
 for ti = 1:N
     p_acoustic{ti} = make_acoustic_params(parameters, ti, affix_per_t{ti}, ...
-        preproc_affix_for(affix_preproc, ti));
+        preproc_affix_for(affix_preproc, ti), ow);
 end
 
 % Thermal always keys off transducer(1)'s grid — matches the reference frame
@@ -214,7 +228,7 @@ end
 p_thermal = cell(1, n_points);
 for j = 1:n_points
     p_thermal{j} = make_thermal_params(parameters, affix_combined{j}, affix_thermal{j}, ...
-        preproc_affix_for(affix_preproc, 1));
+        preproc_affix_for(affix_preproc, 1), ow);
 end
 
 % =========================================================================
@@ -295,11 +309,11 @@ switch platform
         if per_transducer_grid
             for ti = 1:N
                 run_stage(ti, sprintf('Preproc — transducer %d/%d (own grid)', ti, N), ...
-                          @() prestus_pipeline(make_preproc_params(parameters, affix_preproc{ti}, ti)));
+                          @() prestus_pipeline(make_preproc_params(parameters, affix_preproc{ti}, ti, ow)));
             end
         else
             run_stage(0, 'Preproc — shared grid for all transducers', ...
-                      @() prestus_pipeline(make_preproc_params(parameters, affix_preproc)));
+                      @() prestus_pipeline(make_preproc_params(parameters, affix_preproc, [], ow)));
         end
 
         for ti = 1:N
@@ -326,7 +340,7 @@ switch platform
             for ti = 1:N
                 run_stage(N + 2*n_points + ti, ...
                     sprintf('Water validation — transducer %d/%d', ti, N), ...
-                    @() prestus_pipeline(make_water_params(parameters, ti, affix_per_t{ti})));
+                    @() prestus_pipeline(make_water_params(parameters, ti, affix_per_t{ti}, ow)));
             end
         end
 
@@ -343,10 +357,10 @@ switch platform
         if per_transducer_grid
             for ti = 1:N
                 fprintf('[Stage 0.%d] Preproc — transducer %d/%d (own grid)\n', ti, ti, N);
-                if isfile(files_preproc{ti})
+                if isfile(files_preproc{ti}) && ~ow.rerun_intermediates
                     fprintf('             Cache exists — skipping.\n');
                 else
-                    p_prep = make_preproc_params(parameters, affix_preproc{ti}, ti);
+                    p_prep = make_preproc_params(parameters, affix_preproc{ti}, ti, ow);
                     p_prep.hpc.timelimit = options.preproc_timelimit;
                     p_prep.hpc.job_name  = sprintf('PRESTUS-at%02d-pp_%s', ti, subj);
                     p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
@@ -358,10 +372,10 @@ switch platform
             end
         else
             fprintf('[Stage 0] Preproc — shared grid\n');
-            if isfile(files_preproc{1})
+            if isfile(files_preproc{1}) && ~ow.rerun_intermediates
                 fprintf('           Cache exists — skipping.\n');
             else
-                p_prep = make_preproc_params(parameters, affix_preproc);
+                p_prep = make_preproc_params(parameters, affix_preproc, [], ow);
                 p_prep.hpc.timelimit = options.preproc_timelimit;
                 p_prep.hpc.job_name  = sprintf('PRESTUS-at-pp_%s', subj);
                 p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
@@ -380,7 +394,7 @@ switch platform
 
         for ti = 1:N
             fprintf('[Stage %d/%d] Acoustic — transducer %d\n', ti, N, ti);
-            if isfile(files_acoustic{ti})
+            if isfile(files_acoustic{ti}) && ~ow.rerun_intermediates
                 fprintf('             Cache exists — skipping.\n');
             else
                 pa = p_acoustic{ti};
@@ -411,7 +425,7 @@ switch platform
             else
                 fprintf('[%s] Combine\n', stage_label);
             end
-            if isfile(files_combined{j})
+            if isfile(files_combined{j}) && ~ow.rerun_intermediates
                 fprintf('           Cache exists — skipping.\n');
             else
                 p_comb = make_combine_params(parameters, files_acoustic, ...
@@ -438,7 +452,7 @@ switch platform
             else
                 fprintf('[%s] Thermal\n', stage_label);
             end
-            if isfile(files_thermal{j})
+            if isfile(files_thermal{j}) && ~ow.rerun_outputs
                 fprintf('           Output exists — skipping.\n');
             else
                 pt = p_thermal{j};
@@ -463,10 +477,10 @@ switch platform
             for ti = 1:N
                 stage_label = sprintf('Stage %d', N + 2*n_points + ti);
                 fprintf('[%s] Water validation — transducer %d/%d\n', stage_label, ti, N);
-                if isfile(files_water{ti})
+                if isfile(files_water{ti}) && ~ow.rerun_outputs
                     fprintf('           Output exists — skipping.\n');
                 else
-                    pw = make_water_params(parameters, ti, affix_per_t{ti});
+                    pw = make_water_params(parameters, ti, affix_per_t{ti}, ow);
                     pw.hpc.timelimit = options.water_timelimit;
                     pw.hpc.job_name  = sprintf('PRESTUS-at%02d-wv_%s', ti, subj);
                     pw = apply_memorylimit(pw, options.water_memorylimit);
@@ -507,7 +521,7 @@ end
 %% Parameter builders
 % =========================================================================
 
-function p = make_preproc_params(base, affix_preproc, transducer_idx)
+function p = make_preproc_params(base, affix_preproc, transducer_idx, ow)
     p = base;
     if nargin >= 3 && ~isempty(transducer_idx)
         % Per-transducer grid: align/crop to this transducer alone, reusing
@@ -523,7 +537,7 @@ function p = make_preproc_params(base, affix_preproc, transducer_idx)
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 0;
     p.io.output_affix                = affix_preproc;
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.intermediates;
     p.io.overwrite_simnibs           = 0;
     p.io.save_grid_cache             = 1;  % override save_matrices: 0 from config
     p.io.save_medium_cache           = 1;  % cache medium too for acoustic sub-runs
@@ -531,7 +545,7 @@ function p = make_preproc_params(base, affix_preproc, transducer_idx)
     p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
 end
 
-function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc)
+function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow)
     p = base;
     p.transducer                     = base.transducer(transducer_idx);
     % Clear target so the acoustic stage does not trigger multi-ISPPA mode.
@@ -554,7 +568,8 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc)
     % (set by grid_transducer_location during Stage 0) instead of leaving the
     % caller's input-space (e.g. T1-voxel) positions in place.
     p.io.async_transducer_idx        = transducer_idx;
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.intermediates;
+    p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};  % built by Stage 0
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 1;
     p.io.save_kwave_medium           = 1;  % combine_async_intensity needs per-voxel rho/c
@@ -582,7 +597,7 @@ function p = make_combine_params(base, files_in, file_out, targets_wcm2)
     p.simulation.transducer_coupling = 'coherent';
 end
 
-function p = make_thermal_params(base, affix_combined, affix_thermal, affix_preproc)
+function p = make_thermal_params(base, affix_combined, affix_thermal, affix_preproc, ow)
     p = base;
     % Clear all per-transducer targets — scaling was already done in combine.
     for ti = 1:numel(p.transducer)
@@ -598,7 +613,8 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.io.acoustic_cache_affix        = affix_combined;
     p.io.output_affix                = affix_thermal;
     p.io.preproc_affix               = affix_preproc;  % reuse trans-01 preproc cache
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.outputs;
+    p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};  % the combined field was computed on these
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 0;
     p.io.save_thermal_matrices       = 1;
@@ -606,7 +622,7 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.simulation.transducer_coupling = 'coherent';
 end
 
-function p = make_water_params(base, transducer_idx, affix)
+function p = make_water_params(base, transducer_idx, affix, ow)
     p = base;
     p.transducer                      = base.transducer(transducer_idx);
     p.transducer.target_isppa_wcm2    = NaN;   % no scaling; raw drive level
@@ -620,7 +636,7 @@ function p = make_water_params(base, transducer_idx, affix)
     p.modules.run_posthoc_water_sims  = 0;   % prevent recursive call
     p.modules.generate_report         = 1;
     p.io.output_affix                 = affix;
-    p.io.overwrite_files              = 'never';
+    p.io.overwrite_files              = ow.outputs;
     p.io.overwrite_simnibs            = 0;
     p.io.save_acoustic_matrices       = 0;
     p.io.save_kwave_medium            = 0;

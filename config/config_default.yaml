@@ -63,7 +63,7 @@ startup:
 
 io:
   output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
-  overwrite_files: always   # 'never' to never overwrite, 'always' to always overwrite, any other value to ask for confirmation
+  overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs.md#overwrite-behaviour
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
   # Intermediate matrix saving
   # save_matrices is the global fallback: set to 0 to suppress all saves,

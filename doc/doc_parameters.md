@@ -98,7 +98,7 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
-| `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `ask`. Does NOT apply to SimNIBS segmentations. |
+| `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour). |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
 | `save_source_matrices` | Save the transducer source matrix to `.mat`? | `0` | `1 = yes`, `0 = no`. Needed by multi-stage pipelines (e.g. uncertainty). |

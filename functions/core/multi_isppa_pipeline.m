@@ -24,6 +24,16 @@ function multi_isppa_pipeline(parameters, options)
 %              on stage 1; stage N+1 depends on all thermal jobs.
 %              All jobs are submitted immediately without blocking.
 %
+% Overwrite semantics (see RESOLVE_CHAINED_OVERWRITE):
+%   io.overwrite_files = 'never'   Stage 1 resumes from its acoustic cache;
+%                                  thermal/summary stages are skipped when
+%                                  their outputs exist.
+%   io.overwrite_files = 'always'  Stage 1 resumes; thermal/summary stages
+%                                  always re-run and overwrite their outputs.
+%   io.overwrite_files = 'force'   every stage re-runs.
+%   Thermal/summary sub-jobs always load the Stage-1 head/grid/medium caches
+%   (io.reuse_upstream_caches).
+%
 % Use as:
 %   multi_isppa_pipeline(parameters)
 %   multi_isppa_pipeline(parameters, options)
@@ -121,16 +131,18 @@ if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') && ...
     base_affix = parameters.io.output_affix;
 end
 
-p_acoustic = make_acoustic_params(parameters, base_affix);
+ow = resolve_chained_overwrite(parameters);
+
+p_acoustic = make_acoustic_params(parameters, base_affix, ow);
 
 p_thermal  = cell(1, numel(targets));
 affixes    = cell(1, numel(targets));
 for ti = 1:numel(targets)
     affixes{ti}   = sprintf('%s_desc-isppa%03d', base_affix, round(targets(ti)));
-    p_thermal{ti} = make_thermal_params(parameters, targets(ti), affixes{ti}, base_affix);
+    p_thermal{ti} = make_thermal_params(parameters, targets(ti), affixes{ti}, base_affix, ow);
 end
 
-p_summary = make_summary_params(parameters, targets, affixes, base_affix);
+p_summary = make_summary_params(parameters, targets, affixes, base_affix, ow);
 
 % =========================================================================
 %% Execute
@@ -175,7 +187,7 @@ switch platform
         p_acoustic               = apply_memorylimit(p_acoustic, options.acoustic_memorylimit);
         p_acoustic               = apply_partition(p_acoustic, options.acoustic_partition);
 
-        if isfile(acoustic_sentinel)
+        if isfile(acoustic_sentinel) && ~ow.rerun_intermediates
             fprintf('[Stage 1] Acoustic cache exists — skipping submission.\n');
             job_id_acoustic = [];
         else
@@ -196,7 +208,7 @@ switch platform
             stage_label = sprintf('Stage %d', ti + 1);
             fprintf('[%s] Submitting thermal job (%.0f W/cm²)  ', stage_label, targets(ti));
 
-            if isfile(csv_file)
+            if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
             else
                 pt = p_thermal{ti};
@@ -219,7 +231,7 @@ switch platform
             summary_file = fullfile(output_dir, ...
                 sprintf('sub-%03d_%s_desc-multiIsppa_report%s.html', subject_id, medium, base_affix));
             fprintf('[Stage %d] Submitting summary report  ', numel(targets) + 2);
-            if isfile(summary_file)
+            if isfile(summary_file) && ~ow.rerun_outputs
                 fprintf('— report exists, skipping.\n');
             else
                 p_summary.hpc.timelimit = options.summary_timelimit;
@@ -283,7 +295,7 @@ function p = clear_multi_isppa_targets(p)
     end
 end
 
-function p = make_acoustic_params(base, base_affix)
+function p = make_acoustic_params(base, base_affix, ow)
 % Stage 1: run the full acoustic simulation and free-water baseline.
 % Thermal simulation is disabled — each thermal job runs separately.
     p = clear_multi_isppa_targets(base);
@@ -295,14 +307,14 @@ function p = make_acoustic_params(base, base_affix)
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 0;
     p.io.output_affix                = base_affix;
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.intermediates;
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 1;   % cache must persist for thermal jobs
     p.io.save_thermal_matrices       = 0;
     p.simulation.interactive         = 0;
 end
 
-function p = make_thermal_params(base, target_isppa, affix, base_affix)
+function p = make_thermal_params(base, target_isppa, affix, base_affix, ow)
 % Stages 2…N: load cached acoustic results, apply pressure scaling to
 % target_isppa, run thermal simulation and analysis, generate HTML report.
     p = clear_multi_isppa_targets(base);
@@ -319,7 +331,8 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix)
     p.modules.generate_report        = 1;
     p.io.output_affix                = affix;
     p.io.preproc_affix               = base_affix;   % point at stage-1 preprocessing cache
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.outputs;
+    p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 0;
     p.io.save_thermal_matrices       = isfield(base.modules, 'run_heating_sims') && ...
@@ -327,7 +340,7 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix)
     p.simulation.interactive         = 0;
 end
 
-function p = make_summary_params(base, targets, affixes, base_affix)
+function p = make_summary_params(base, targets, affixes, base_affix, ow)
 % Stage N+1: generate a summary report comparing all ISPPA variants.
     p = clear_multi_isppa_targets(base);
     p.modules.run_source_setup       = 0;
@@ -339,7 +352,8 @@ function p = make_summary_params(base, targets, affixes, base_affix)
     p.modules.generate_report        = 0;
     p.modules.multi_isppa_report     = 1;
     p.io.output_affix                = base_affix;
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.outputs;
+    p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};
     p.simulation.interactive         = 0;
     p.multi_isppa.targets_wcm2       = targets;
     p.multi_isppa.affixes            = affixes;

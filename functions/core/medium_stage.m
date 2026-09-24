@@ -34,7 +34,8 @@ filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
     parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
 if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup == 1
-    if ~confirm_overwriting(filename_medium_cache, parameters)
+    if reuse_upstream_cache(filename_medium_cache, parameters, 'medium') || ...
+            ~confirm_overwriting(filename_medium_cache, parameters)
         disp('Loading medium cache - skipping medium property mapping.')
         loaded = load(filename_medium_cache);
         kwave_medium = loaded.kwave_medium;

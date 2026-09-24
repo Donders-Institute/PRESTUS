@@ -119,9 +119,15 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %                       computes its own source using io.output_affix so that
 %                       the time axis matches the variant's medium sound speed.
 %
-%   io.overwrite_files  Hardcoded to 'never' so a restarted pipeline resumes
-%                       from where it left off rather than re-running finished
-%                       variants from scratch.
+%   io.overwrite_files  Mapped per stage by RESOLVE_CHAINED_OVERWRITE:
+%                       'never'  stage 1 resumes from its preprocessing cache;
+%                                variants/reports are skipped when their
+%                                outputs exist (a restarted pipeline resumes).
+%                       'always' stage 1 resumes; variants/reports always
+%                                re-run and overwrite their outputs.
+%                       'force'  every stage re-runs.
+%                       Variants always load the stage-1 head/grid caches
+%                       (io.reuse_upstream_caches).
 %
 %   io.overwrite_simnibs  Hardcoded to 0 for the same reason.
 %
@@ -174,14 +180,16 @@ fprintf('╚══════════════════════�
 %   and prestus_pipeline runs normally on the compute node (no recursion).
 % =========================================================================
 
-p_stage1       = make_stage1_params(parameters);
+ow = resolve_chained_overwrite(parameters);
+
+p_stage1       = make_stage1_params(parameters, ow);
 
 p_default      = make_sim_params(parameters, ...
-                     options.affixes.default, []);
+                     options.affixes.default, [], ow);
 p_liberal      = make_sim_params(parameters, ...
-                     options.affixes.liberal, options.liberal_config);
+                     options.affixes.liberal, options.liberal_config, ow);
 p_conservative = make_sim_params(parameters, ...
-                     options.affixes.conservative, options.conservative_config);
+                     options.affixes.conservative, options.conservative_config, ow);
 
 % Pre-assign deterministic log file paths for all five stages so that
 % generate_uncertainty_report can locate each stage's timing data.
@@ -205,7 +213,7 @@ p_default.io.log_file      = log_files.default;
 p_liberal.io.log_file      = log_files.liberal;
 p_conservative.io.log_file = log_files.conservative;
 
-p_report       = make_report_params(parameters, options.affixes, log_files);
+p_report       = make_report_params(parameters, options.affixes, log_files, ow);
 
 % =========================================================================
 %% Sequential config pre-processing
@@ -300,7 +308,7 @@ switch platform
         p_stage1.hpc.job_name  = sprintf('PRESTUS-%su1-preproc_%s', run_prefix, subj);
         p_stage1               = apply_memorylimit(p_stage1, options.stage1_memorylimit);
         p_stage1               = strip_gpu_requirements(p_stage1, options.stage1_partition);
-        if isfile(preproc_sentinel)
+        if isfile(preproc_sentinel) && ~ow.rerun_intermediates
             fprintf('[Stage 1] Preprocessing cache exists — skipping submission.\n');
             job_id_stage1 = [];
         else
@@ -334,7 +342,7 @@ switch platform
             csv_file    = fullfile(output_dir, ...
                 sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, affix));
             fprintf('[%s] Submitting %s simulation    ', stage_label, variant);
-            if isfile(csv_file)
+            if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
             else
                 p_sim.hpc.timelimit = options.sim_timelimit;
@@ -360,7 +368,7 @@ switch platform
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s_uncertainty_report.html', subject_id, medium));
         fprintf('[Stage 5] Submitting uncertainty report      ');
-        if isfile(report_file)
+        if isfile(report_file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
             job_id_report = [];
         else
@@ -461,6 +469,7 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
     logs_dir   = fullfile(get_output_dir(base_parameters), 'log');
 
     [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
+    ow = resolve_chained_overwrite(base_parameters);
 
     seq_run_params = struct('default', {{}}, 'liberal', {{}}, 'conservative', {{}});
     prior_affixes  = options.affixes;
@@ -481,7 +490,7 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
             prior_affix = prior_affixes.(vname);
             med_cfg     = get_variant_medium_config(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, ow);
             p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
 
             % Assign log file
@@ -498,7 +507,7 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
         seq_log_files.conservative = p_variants{3}.io.log_file;
         seq_log_files.report       = fullfile(logs_dir, ...
             sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
-        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files);
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow);
 
         % Run
         run_stage(2, sprintf('Default simulation (r%d)', run_idx), ...
@@ -535,6 +544,7 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
     output_dir = get_output_dir(base_parameters);
 
     [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
+    ow = resolve_chained_overwrite(base_parameters);
 
     all_ids            = [];
     prior_job_id_report = initial_report_job_id;
@@ -559,7 +569,7 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
             prior_affix = prior_affixes.(vname);
             med_cfg     = get_variant_medium_config(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, ow);
             p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
             p_v.io.log_file = fullfile(logs_dir, ...
                 sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, cur_affix, run_idx, run_ts));
@@ -569,7 +579,7 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
 
             stage_label = sprintf('[r%d-u%d]', run_idx, stage_nums(vi));
             fprintf('%s Submitting %s simulation    ', stage_label, vname);
-            if isfile(csv_file)
+            if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
             else
                 p_v.hpc.timelimit = options.sim_timelimit;
@@ -597,12 +607,12 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         seq_log_files.report       = fullfile(logs_dir, ...
             sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
 
-        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files);
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow);
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s%s_uncertainty_report.html', subject_id, medium, seq_aff.default));
 
         fprintf('[r%d-u5] Submitting uncertainty report    ', run_idx);
-        if isfile(report_file)
+        if isfile(report_file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
             prior_job_id_report = [];
         else
@@ -651,7 +661,7 @@ function p = clear_uncertainty_flag(p)
     end
 end
 
-function p = make_stage1_params(base)
+function p = make_stage1_params(base, ow)
 % Stage 1: preprocessing and source setup only — no simulation.
 %
 % Produces the shared head-preprocessing cache used by all three simulation
@@ -668,7 +678,7 @@ function p = make_stage1_params(base)
     p.modules.run_posthoc_water_sims   = 0;
     p.modules.generate_report          = 0;
     p.io.output_affix                  = '';
-    p.io.overwrite_files               = 'never';
+    p.io.overwrite_files               = ow.intermediates;
     p.io.overwrite_simnibs             = 0;
     p.io.save_source_matrices          = 0;   % source is recomputed per variant; no need to cache here
     p.io.save_acoustic_matrices        = 0;   % no acoustic sim in stage 1
@@ -677,7 +687,7 @@ function p = make_stage1_params(base)
     p                                  = strip_gpu_requirements(p);
 end
 
-function p = make_sim_params(base, affix, medium_config)
+function p = make_sim_params(base, affix, medium_config, ow)
 % Stages 2–4: full acoustic + thermal simulation.
 %
 % If medium_config is a valid YAML path, its properties are merged on top
@@ -685,7 +695,7 @@ function p = make_sim_params(base, affix, medium_config)
 % grid, and path settings are inherited).
 %
 % run_source_setup = 1 is intentional: each variant checks for cached source
-% files from stage 1 and skips recomputation (overwrite_files = 'never').
+% files from stage 1 and skips recomputation unless overwrite_files = 'always'.
     p = clear_uncertainty_flag(base);
 
     if ~isempty(medium_config)
@@ -713,7 +723,9 @@ function p = make_sim_params(base, affix, medium_config)
     % Both the grid cache and kwave source were written by stage 1 with
     % affix ''. Point lookups at those files rather than recomputing.
     p.io.preproc_affix                 = '';
-    p.io.overwrite_files               = 'never';
+    p.io.overwrite_files               = ow.outputs;
+    % Medium is variant-specific, so only the stage-1 head/grid caches are reused.
+    p.io.reuse_upstream_caches         = {'head', 'grid'};
     p.io.overwrite_simnibs             = 0;
     p.io.save_source_matrices          = 0;   % source is recomputed at the start of each variant; no benefit to caching
     p.io.save_acoustic_matrices        = 0;   % large; not needed after analysis
@@ -721,7 +733,7 @@ function p = make_sim_params(base, affix, medium_config)
     p.simulation.interactive           = 0;
 end
 
-function p = make_report_params(base, affixes, log_files)
+function p = make_report_params(base, affixes, log_files, ow)
 % Stage 5: generate the uncertainty report only — no simulation.
 %
 % The affixes struct is passed through parameters.uncertainty.affixes so
@@ -738,7 +750,8 @@ function p = make_report_params(base, affixes, log_files)
     p.modules.uncertainty_report     = 1;
     p.io.output_affix                = '';
     p.io.log_file                    = log_files.report;
-    p.io.overwrite_files             = 'never';
+    p.io.overwrite_files             = ow.outputs;
+    p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};
     p.simulation.interactive         = 0;
     p.uncertainty.affixes            = affixes;
     p.uncertainty.log_files          = log_files;

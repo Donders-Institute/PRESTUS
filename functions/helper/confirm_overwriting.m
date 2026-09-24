@@ -2,25 +2,29 @@ function overwrite = confirm_overwriting(filename, parameters)
 % CONFIRM_OVERWRITING  Decide whether an existing file should be overwritten
 %
 %   Returns 1 (overwrite) if the file does not exist or if
-%   parameters.io.overwrite_files is 'always'. Returns 0 if it is 'never'.
-%   In interactive mode, prompts the user via a dialog. Raises an error in
-%   non-interactive mode if overwrite_files is neither 'always' nor 'never'.
+%   parameters.io.overwrite_files is 'always' or 'force'. Returns 0 if it is
+%   'never'. In interactive mode, prompts the user via a dialog. Raises an
+%   error in non-interactive mode for any other value.
+%
+%   'always' and 'force' differ only in chained pipelines (async, multi-ISPPA,
+%   uncertainty), where 'force' also re-runs cached intermediate stages; see
+%   RESOLVE_CHAINED_OVERWRITE.
 %
 % Use as:
 %   overwrite = confirm_overwriting(filename, parameters)
 %
 % Input:
 %   filename   - path of the file to check
-%   parameters - PRESTUS config with io.overwrite_files ('always'|'never'|'')
+%   parameters - PRESTUS config with io.overwrite_files
+%                ('always'|'force'|'never'|'ask')
 %                and simulation.interactive
 %
 % Output:
 %   overwrite  - [1x1] 1 = proceed with writing, 0 = skip
 %
-% See also: CONFIRMATION_DLG
+% See also: CONFIRMATION_DLG, RESOLVE_CHAINED_OVERWRITE
 
-    % Check if the file does not exist or if overwriting is set to 'always'
-    if ~exist(filename, 'file') || strcmp(parameters.io.overwrite_files, 'always')
+    if ~exist(filename, 'file') || any(strcmp(parameters.io.overwrite_files, {'always', 'force'}))
         overwrite = 1; % Overwrite allowed
         return;
     % If overwriting is set to 'never', do not overwrite
@@ -31,7 +35,7 @@ function overwrite = confirm_overwriting(filename, parameters)
 
     % Ensure valid behavior in non-interactive mode
     if parameters.simulation.interactive == 0
-        error("In non-interactive mode, parameters.io.overwrite_files should be 'always' or 'never'");
+        error("In non-interactive mode, parameters.io.overwrite_files should be 'always', 'force' or 'never'");
     end
 
     % Interactive mode: Prompt user for confirmation to overwrite the file

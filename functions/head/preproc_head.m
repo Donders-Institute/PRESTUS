@@ -218,7 +218,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         sprintf('sub-%03d_%s_rotated_scaled%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
-    if confirm_overwriting(filename_reoriented_scaled_data, parameters)
+    if ~reuse_upstream_cache(filename_reoriented_scaled_data, parameters, 'head') && ...
+            confirm_overwriting(filename_reoriented_scaled_data, parameters)
 
         log_timer('start','preproc_rotscale', parameters.io.dir_output);
 
@@ -438,7 +439,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         sprintf('sub-%03d_%s_cropped_smoothed%s.mat',...
         parameters.subject_id, parameters.simulation.medium, preproc_affix));
     
-   if confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
+   if ~reuse_upstream_cache(filename_cropped_smoothed_skull_data, parameters, 'head') && ...
+            confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.io.dir_output);
 
         % Transform all transducer positions to the rotated/rescaled grid space so

@@ -106,9 +106,11 @@ if run_new_sim
 
 elseif exist(filename_sensor_data, 'file')
     disp('Skipping acoustic simulation, loading existing output file.')
+    live_provenance = acoustic_provenance;
     try
         [sensor_data, kgrid, acoustic_provenance, ~, parameters] = ...
             cache_acoustic('load', filename_sensor_data, parameters);
+        acoustic_provenance = fill_baseline_from_live(acoustic_provenance, live_provenance);
     catch ME
         if strcmp(ME.identifier, 'cache_acoustic:staleGrid')
             % Re-run with the configured backend (not unconditionally k-Wave),
@@ -217,4 +219,23 @@ function name = acoustic_backend_name(parameters)
     if isfield(parameters, 'acoustic_backend') && ~isempty(parameters.acoustic_backend)
         name = char(parameters.acoustic_backend);
     end
+end
+
+%% ------------------------------------------------------------------------
+function provenance = fill_baseline_from_live(provenance, live)
+% The cached free-field ISPPA describes the drive level of the cached field and
+% takes precedence. When it is missing or unreadable, fall back to the baseline
+% computed in the current run (acoustic_water_baseline, same source and grid).
+cached_ok = isfield(provenance, 'freefield_isppa_wcm2') && ...
+    isscalar(provenance.freefield_isppa_wcm2) && isfinite(provenance.freefield_isppa_wcm2);
+live_ok = isfield(live, 'freefield_isppa_wcm2') && ...
+    isscalar(live.freefield_isppa_wcm2) && isfinite(live.freefield_isppa_wcm2);
+if ~cached_ok && live_ok
+    fprintf('[acoustic_stage] Using free-water baseline from this run (%.2f W/cm²); cached value unavailable.\n', ...
+        live.freefield_isppa_wcm2);
+    provenance.freefield_isppa_wcm2 = live.freefield_isppa_wcm2;
+    if isfield(live, 'tx_calibration')
+        provenance.tx_calibration = live.tx_calibration;
+    end
+end
 end

@@ -227,7 +227,7 @@ end
         edt(gl, 22, 2, 'io.output_affix', '', 0);
 
         lbl(gl, 23, 1, 'Overwrite files');
-        drp(gl, 23, 2, 'io.overwrite_files', {'always','never','ask'}, 'always');
+        drp(gl, 23, 2, 'io.overwrite_files', {'always','force','never','ask'}, 'always');
 
         lbl(gl, 24, 1, 'Overwrite SimNIBS');
         chk(gl, 24, 2, 'io.overwrite_simnibs', false, 'Re-run SimNIBS segmentation');

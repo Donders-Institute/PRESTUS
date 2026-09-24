@@ -85,9 +85,16 @@ end
     end
 
     %% Compute ISPPA from peak pressure
+    % gather() first: p_max_all is a gpuArray under GPU backends, and double()
+    % alone casts its element type without moving it off the device. Leaving
+    % freefield_isppa_wcm2 as a gpuArray means it gets cached in
+    % acoustic_provenance and later reloaded across MATLAB sessions
+    % (cache_acoustic), where the orphaned device handle throws an opaque
+    % "Unrecognized field name gpuArrayReal" the next time it's touched
+    % (e.g. acoustic_analysis's isfinite(provenance.freefield_isppa_wcm2)).
     rho = wp.density;
     c   = wp.sound_speed;
-    peak_pa = double(max(sensor_data_baseline.p_max_all(:)));
+    peak_pa = double(gather(max(sensor_data_baseline.p_max_all(:))));
 
     if peak_pa <= 0
         error(['water_baseline: water simulation returned zero or negative peak ' ...

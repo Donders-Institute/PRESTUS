@@ -58,7 +58,7 @@ class TabIO(BaseTab):
         self._add_row("Output affix",
                       TextEdit("io.output_affix", "", registry=r))
         self._add_row("Overwrite files",
-                      Dropdown("io.overwrite_files", ["always", "never", "ask"],
+                      Dropdown("io.overwrite_files", ["always", "force", "never", "ask"],
                                "always", registry=r))
         self._add_row("Overwrite SimNIBS",
                       Checkbox("io.overwrite_simnibs", "Re-run SimNIBS segmentation",

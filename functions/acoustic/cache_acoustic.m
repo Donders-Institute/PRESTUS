@@ -123,6 +123,23 @@ kgrid               = cached.kgrid;
 acoustic_provenance = cached.acoustic_provenance;
 acoustic_info       = cached.acoustic_info;
 
+% Legacy caches may hold acoustic_provenance.freefield_isppa_wcm2 (and its
+% copy in tx_calibration.isppa_wcm2) as a serialized scalar gpuArray
+% (water_baseline previously cast with double() alone, which does not move
+% data off the device). Such a scalar can fail to deserialize, and the first
+% touch (isa, gather, isfinite) throws an opaque "Unrecognized field name
+% gpuArrayReal". Coerce to host doubles; unreadable values become NaN so the
+% caller can substitute the baseline computed in the current run.
+if isfield(acoustic_provenance, 'freefield_isppa_wcm2')
+    acoustic_provenance.freefield_isppa_wcm2 = ...
+        host_scalar(acoustic_provenance.freefield_isppa_wcm2, 'freefield_isppa_wcm2');
+end
+if isfield(acoustic_provenance, 'tx_calibration') && ...
+        isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2')
+    acoustic_provenance.tx_calibration.isppa_wcm2 = ...
+        host_scalar(acoustic_provenance.tx_calibration.isppa_wcm2, 'tx_calibration.isppa_wcm2');
+end
+
 % Grid compatibility check.
 % If acoustic_grid_dims was recorded at save time, compare it against the
 % current grid.  A mismatch means the cache was produced on a different grid —
@@ -177,3 +194,14 @@ sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
 
 end
 
+%% ------------------------------------------------------------------------
+function v = host_scalar(v, name)
+try
+    v = double(gather(v));
+catch ME
+    warning('cache_acoustic:unreadableProvenance', ...
+        'Cached acoustic_provenance.%s is unreadable (%s); treating it as missing.', ...
+        name, ME.message);
+    v = NaN;
+end
+end

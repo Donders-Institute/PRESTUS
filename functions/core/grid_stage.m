@@ -30,7 +30,8 @@ filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
     parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
 if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup == 1
-    if ~confirm_overwriting(filename_grid_cache, parameters)
+    if reuse_upstream_cache(filename_grid_cache, parameters, 'grid') || ...
+            ~confirm_overwriting(filename_grid_cache, parameters)
         disp('Loading grid cache - skipping head preprocessing.')
         [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, ...
          trans_pos, focus_pos] = load_grid_cache_file(filename_grid_cache, parameters);

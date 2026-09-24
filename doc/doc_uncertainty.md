@@ -207,9 +207,9 @@ The uncertainty pipeline supports automatic resumption on both platforms.
 | 4 — Conservative sim | `sub-NNN_<medium>_output_table_conservative.csv` | `<output_dir>/` |
 | 5 — Report | `sub-NNN_<medium>_uncertainty_report.html` | `<output_dir>/` |
 
-To rerun a stage, delete its sentinel file before resubmitting.
+To rerun a stage, delete its sentinel file before resubmitting. With `io.overwrite_files: 'always'`, stages 2–5 are always resubmitted (stage 1 still resumes from its cache); with `'force'`, stage 1 is resubmitted too. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
-**MATLAB platform.** There is no stage-level skip logic. Instead, resumability relies on `io.overwrite_files = 'never'` being set for all variant stages: each individual file write inside the pipeline is skipped if the file already exists. This means a restarted MATLAB run will fast-forward through completed steps file-by-file rather than stage-by-stage.
+**MATLAB platform.** There is no stage-level skip logic. Instead, resumability relies on `io.overwrite_files = 'never'` (the default for variant stages unless the base config sets `'always'`): each individual file write inside the pipeline is skipped if the file already exists. This means a restarted MATLAB run will fast-forward through completed steps file-by-file rather than stage-by-stage.
 
 ---
 

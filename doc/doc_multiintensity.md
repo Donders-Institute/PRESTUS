@@ -98,7 +98,7 @@ options.generate_summary_report = false;     % skip summary stage
 
 ## Resumption
 
-Each stage checks for its sentinel output file before submitting (HPC) or running (MATLAB). A partially completed multi-ISPPA run can be resumed by re-running `prestus_pipeline_start` with the same config — completed stages are skipped automatically.
+Each stage checks for its sentinel output file before submitting (HPC) or running (MATLAB). A partially completed multi-ISPPA run can be resumed by re-running `prestus_pipeline_start` with the same config — completed stages are skipped automatically. With `io.overwrite_files: always` (default), only Stage 1 (acoustic) resumes from its cache; thermal and summary stages always re-run. `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
 ---
 

@@ -191,9 +191,34 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
     source/         source/transducer setup (element distribution plots)
 ```
 
-**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving matrices (cache files will not be written).
+**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving matrices (cache files will not be written). See [Overwrite behaviour](#overwrite-behaviour) below.
 
 **Debug files** are only written when `parameters.simulation.debug = 1`.
+
+### Overwrite behaviour
+
+`io.overwrite_files` controls whether existing files are reused or recomputed.
+
+| Value | Single run | Chained pipelines: intermediate stages | Chained pipelines: output stages |
+|---|---|---|---|
+| `never` | Reuse every existing file | Resume from cache | Skip if the output exists |
+| `always` (default) | Recompute everything | Resume from cache | Always re-run, overwrite outputs |
+| `force` | Same as `always` | Always re-run | Always re-run, overwrite outputs |
+| `ask` | Prompt per file (interactive only) | Resume from cache | Skip if the output exists |
+
+SimNIBS segmentations are governed separately by `io.overwrite_simnibs`.
+
+**Chained pipelines** split one run into separate jobs, each of which reuses what the previous stage wrote:
+
+| Pipeline | Intermediate stages | Output stages |
+|---|---|---|
+| Async multi-transducer ([doc](doc_multitransducer.md)) | Stage-0 preproc, per-transducer acoustic, combine | Joint thermal + report, water validation |
+| Multi-ISPPA ([doc](doc_multiintensity.md)) | Stage-1 acoustic | Per-ISPPA thermal + report, summary report |
+| Uncertainty ([doc](doc_uncertainty.md)) | Stage-1 preprocessing | Variant simulations + reports, uncertainty report |
+
+So with the default `always`, resubmitting a finished chained run reuses the expensive acoustic simulations and regenerates the CSV, NIfTI and HTML outputs. Use `force` when an input that feeds the intermediate caches has changed — transducer placement, transducer or source parameters, grid, segmentation, or medium properties — because intermediate caches are **not** invalidated automatically. The alternative is to delete the relevant `cache/` files before resubmitting.
+
+Within a chained run, sub-jobs that consume a shared cache (e.g. per-transducer acoustic jobs loading the Stage-0 grid) always load it rather than rebuilding it, even under `force`; the stage that owns the cache is the one that rebuilds it. Internally this is signalled by `io.reuse_upstream_caches` (set by the pipelines; not a user setting).
 
 ---
 
