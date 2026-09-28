@@ -352,11 +352,11 @@ The timing parameters from `parameters.timing` are converted automatically:
 | `timing.ptd` | `DurationUS` | direct [s] | ON duration of one pulse train |
 | `timing.ptri - timing.ptd` | `DurationOff` | direct [s] | Inter-train cooling interval; 0 if `ptri ≤ ptd` |
 | `timing.n_ptri_reps` | `Repetitions` | rounded | Number of (on + off) cycles |
-| `timing.post_ptri_dur` | — | not passed | Warning emitted; BabelBrain output ends after the last repetition |
+| `timing.post_ptri_dur` | `PauseBetweenGroupedSonications` | direct [s]; 0 if unset/NaN | Cooldown after the last repetition (`NumberGroupedSonications = 1`) |
 | `thermal.temp_0.brain` | `BaselineTemperature` | direct [°C] | |
 | in-brain peak of `sensor_data.p_max_all` | `Isppa` | `max p²/(2ρc)` over brain [W/cm²] | Override with `babelbrain.isppa_w_per_cm2`; see ISPPA note below |
 
-> **`DurationUS` and multi-PTRI protocols.** `DurationUS` is the ON duration of one pulse train (`timing.ptd`), not the total `ptrd`. BabelBrain runs `Repetitions = n_ptri_reps` cycles of `DurationUS` on + `DurationOff` off, so cooling between trains is modelled.
+> **`DurationUS` and multi-PTRI protocols.** `DurationUS` is the ON duration of one pulse train (`timing.ptd`), not the total `ptrd`. BabelBrain runs `Repetitions = n_ptri_reps` cycles of `DurationUS` on + `DurationOff` off, so cooling between trains is modelled. With a single sonication group, BabelBrain then runs `PauseBetweenGroupedSonications` once more with no heat source, starting at `ptrd` — the same point where the k-Wave thermal path starts `post_ptri_dur`. `TempEndFUS`/`DoseEndFUS` (end of the last ON period) and `FinalTemp`/`FinalDose` (after the cooldown) are read into the end-of-sonication and final maps respectively. BabelBrain's thermal step is fixed at 10 ms, so run time scales with the total simulated duration including the cooldown.
 
 > **ISPPA normalisation.** BabelBrain always rescales the entire pressure field so that the peak ISPPA in brain equals the requested `Isppa` (`PressureAdjust = sqrt(Isppa × 2 × ρ × c)`). This is an **in-situ** quantity, not the free-water calibration ISPPA. PRESTUS derives it automatically from the scaled acoustic field and logs it next to the free-water value and the implied transmission. Set `babelbrain.isppa_w_per_cm2` only to force a specific in-situ brain ISPPA.
 

@@ -71,6 +71,9 @@ def parse_args():
                    help='Off duration per cycle [s] (default 0)')
     p.add_argument('--repetitions',        default=1, type=int,
                    help='Number of sonication repetitions (default 1)')
+    p.add_argument('--pause_after_s',      default=0.0, type=float,
+                   help='Cooldown after the last repetition [s] (default 0); passed as '
+                        'PauseBetweenGroupedSonications with a single sonication group')
     p.add_argument('--frequency',          default=7e5, type=float,
                    help='Transducer centre frequency [Hz] (default 700000)')
     p.add_argument('--tx_system',          default='',
@@ -157,14 +160,17 @@ def main():
         'Duration':                     args.duration_s,
         'DurationOff':                  args.duration_off_s,
         'Repetitions':                  args.repetitions,
+        # One group: BabelBrain runs the pause once, after the last repetition's
+        # DurationOff (RunBHTECycles), i.e. a post-sequence cooldown.
         'NumberGroupedSonications':     1,
-        'PauseBetweenGroupedSonications': 0.0,
+        'PauseBetweenGroupedSonications': args.pause_after_s,
     }]
 
     print(f'[run_babelbrain_thermal] Acoustic: {args.acoustic_h5}')
     print(f'[run_babelbrain_thermal] ISPPA={args.isppa} W/cm²  '
           f'DC={args.duty_cycle:.3f}  PRF={args.prf:.0f} Hz  '
-          f'Duration={args.duration_s} s')
+          f'Duration={args.duration_s} s  DurationOff={args.duration_off_s} s  '
+          f'Repetitions={args.repetitions}  PauseAfter={args.pause_after_s} s')
 
     try:
         CalculateThermalProcess(

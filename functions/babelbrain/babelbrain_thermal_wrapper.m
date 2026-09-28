@@ -13,9 +13,14 @@ function results_heating = babelbrain_thermal_wrapper( ...
 %
 % Timing parameters are read from parameters.timing and converted to the
 % BabelBrain convention:
-%   DutyCycle = pd / pri
-%   PRF       = 1  / pri   [Hz]
-%   DurationUS = ptrd       [s]  (pulse train repetition duration)
+%   DutyCycle   = pd / pri
+%   PRF         = 1  / pri        [Hz]
+%   DurationUS  = ptd             [s]  (ON duration of one pulse train)
+%   DurationOff = ptri - ptd      [s]  (gap after each train)
+%   Repetitions = n_ptri_reps
+%   PauseBetweenGroupedSonications = post_ptri_dur [s] (cooldown after the
+%                 last train; NumberGroupedSonications = 1)
+% See babelbrain_thermal_timing.
 %
 % After the simulation, the 3D temperature and CEM43 maps are resampled from
 % BabelBrain's simulation grid back into the PRESTUS grid space using the
@@ -126,70 +131,14 @@ if ~isfile(bb_runner)
 end
 
 %% Convert PRESTUS timing → BabelBrain convention
-% PRESTUS timing hierarchy (see thermal_parameters.m): pd/pri (single pulse
-% within a train) -> ptd (ON duration of ONE pulse train) -> ptri (period of
-% one pulse-train repetition, ON+OFF) -> ptrd (TOTAL span across ALL
-% repetitions, = n_ptri_reps * ptri) -> post_ptri_dur (extra cooldown after
-% the whole repeated sequence, not currently threaded through to BabelBrain
-% -- see warning below).
-t = parameters.timing;
-if ~isfield(t,'pd') || ~isfield(t,'pri') || t.pri <= 0
-    error('babelbrain_thermal_wrapper: parameters.timing.pd and .pri must be set (pri > 0).');
-end
-if ~isfield(t, 'ptd')
-    error('babelbrain_thermal_wrapper: parameters.timing.ptd must be set (single pulse-train ON duration).');
-end
-duty_cycle = t.pd / t.pri;
-prf_hz     = 1 / t.pri;
-duration_s = t.ptd;   % ON duration of a single pulse-train repetition (NOT ptrd, the total across all reps)
+% ptd -> DurationUS, ptri-ptd -> DurationOff, n_ptri_reps -> Repetitions,
+% post_ptri_dur -> PauseBetweenGroupedSonications (single group); see
+% babelbrain_thermal_timing.
+bt = babelbrain_thermal_timing(parameters.timing);
 
-% Validate converted timing parameters before passing to BabelBrain
-if duty_cycle <= 0 || duty_cycle > 1
-    error(['babelbrain_thermal_wrapper: duty_cycle=%.4f is outside (0, 1].\n' ...
-        'Check parameters.timing.pd=%.4f s and .pri=%.4f s.'], duty_cycle, t.pd, t.pri);
-end
-if prf_hz <= 0 || ~isfinite(prf_hz)
-    error(['babelbrain_thermal_wrapper: PRF=%.2f Hz is invalid (<= 0 or non-finite).\n' ...
-        'Check parameters.timing.pri=%.4f s.'], prf_hz, t.pri);
-end
-if duration_s <= 0
-    error(['babelbrain_thermal_wrapper: duration=%.4f s is <= 0.\n' ...
-        'Check parameters.timing.ptd.'], duration_s);
-end
 if ~isfinite(bb.isppa_w_per_cm2) || bb.isppa_w_per_cm2 <= 0
     error(['babelbrain_thermal_wrapper: ISPPA=%.4f W/cm² is invalid (<= 0 or non-finite).\n' ...
         'Check sensor_data.p_max_all or set babelbrain.isppa_w_per_cm2.'], bb.isppa_w_per_cm2);
-end
-
-% Cooling interval between repetitions (BabelBrain DurationOff).
-% In PRESTUS, ptri is the period of one pulse-train repetition (ON+OFF); the
-% off-time is the remainder after the ON duration (ptd). If ptri is not set
-% or is not longer than ptd, there is no inter-train gap.
-if isfield(t, 'ptri') && t.ptri > t.ptd
-    duration_off_s = t.ptri - t.ptd;
-else
-    duration_off_s = 0.0;
-end
-
-% Number of pulse-train repetitions: PRESTUS computes this as
-% n_ptri_reps = round(ptrd / ptri) (thermal_parameters.m). BabelBrain's
-% Repetitions parameter runs this many (DurationUS on / DurationOff off) cycles,
-% so cooling between trains is modelled.
-repetitions = 1;
-if isfield(t, 'n_ptri_reps') && t.n_ptri_reps > 1
-    repetitions = round(t.n_ptri_reps);
-end
-
-% NOTE: parameters.timing.post_ptri_dur (cooldown after the whole sequence in
-% the native thermal path) is not passed to BabelBrain. The candidate options,
-% NumberGroupedSonications/PauseBetweenGroupedSonications, are left at their
-% defaults (1, 0.0) until their semantics are confirmed, so FinalTemp/FinalDose
-% reflect the end of the last repetition only.
-if isfield(t, 'post_ptri_dur') && t.post_ptri_dur > 0
-    warning('PRESTUS:BabelBrain:postPtriDurNotApplied', ...
-        ['parameters.timing.post_ptri_dur (%.1f s) is set but not currently passed to BabelBrain -- ' ...
-         'its thermal output reflects cooldown only up to the end of the last repetition, not the ' ...
-         'full post_ptri_dur cooldown window the native thermal path would track.'], t.post_ptri_dur);
 end
 
 % Select pressure field: use refocused map when refocusing was requested.
@@ -219,11 +168,12 @@ fprintf('[babelbrain_thermal_wrapper] Log file: %s\n', log_file);
 thermal_argv = {python_bin, bb_runner, ...
     '--acoustic_h5', acoustic_h5, ...
     '--isppa', sprintf('%.4f', bb.isppa_w_per_cm2), ...
-    '--duty_cycle', sprintf('%.6f', duty_cycle), ...
-    '--prf', sprintf('%.2f', prf_hz), ...
-    '--duration_s', sprintf('%.4f', duration_s), ...
-    '--duration_off_s', sprintf('%.4f', duration_off_s), ...
-    '--repetitions', num2str(repetitions), ...
+    '--duty_cycle', sprintf('%.6f', bt.duty_cycle), ...
+    '--prf', sprintf('%.2f', bt.prf_hz), ...
+    '--duration_s', sprintf('%.4f', bt.duration_s), ...
+    '--duration_off_s', sprintf('%.4f', bt.duration_off_s), ...
+    '--repetitions', num2str(bt.repetitions), ...
+    '--pause_after_s', sprintf('%.4f', bt.pause_after_s), ...
     '--sel_p', sel_p, ...
     '--computing_backend', num2str(bb.computing_backend), ...
     '--device_name', bb.device_name, ...
@@ -239,8 +189,9 @@ if isfield(parameters, 'transducer') && ~isempty(parameters.transducer) && ...
     thermal_argv = [thermal_argv, {'--frequency', sprintf('%.0f', parameters.transducer(1).freq_hz)}];
 end
 
-fprintf('[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  duration_off=%.1f s  repetitions=%d\n', ...
-    duty_cycle, prf_hz, duration_s, duration_off_s, repetitions);
+fprintf(['[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.1f s  ' ...
+    'duration_off=%.1f s  repetitions=%d  pause_after=%.1f s\n'], ...
+    bt.duty_cycle, bt.prf_hz, bt.duration_s, bt.duration_off_s, bt.repetitions, bt.pause_after_s);
 fprintf('[babelbrain_thermal_wrapper] ISPPA: %.2f W/cm²\n', bb.isppa_w_per_cm2);
 fprintf('[babelbrain_thermal_wrapper] Command:\n  %s\n', strjoin(thermal_argv, ' '));
 
