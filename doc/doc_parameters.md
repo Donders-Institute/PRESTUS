@@ -149,6 +149,8 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `run_nifti_creation` | Export results as NIfTI files. | `1` | |
 | `run_posthoc_water_sims` | Run free-water reference simulations after head simulations. | `1` | |
 | `generate_report` | Generate self-contained HTML simulation report. | `1` | |
+| `report_style` | Visual skin of the HTML report: `instrument`, `classic` (pre-v0.6.1 look), `compact`, `paper`. Changes presentation only, not content. | `'instrument'` | Try skins on an existing output folder with `preview_report_styles(<subject dir>)`. |
+| `report_style_switcher` | Embed all skins plus a dropdown to switch between them in the report. | `0` | |
 | `generate_group_report` | Aggregate completed subjects into a group HTML report at the end of the run. | `1` | Best-effort; auto-discovers subjects. Or run `prestus_group_report_start` manually. |
 | `segmentation_only` | Stop after segmentation; skip grid setup and all simulations. | `0` | Only has effect when `simulation.medium = 'layered'`. |
 

@@ -34,6 +34,9 @@ try
         affix = parameters.io.output_affix;
     end
 
+    % Visual skin (modules.report_style / report_style_switcher)
+    style_opts = report_styles.options(parameters);
+
     report_filename = sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix);
     report_path = fullfile(parameters.io.dir_reports, report_filename);
 
@@ -51,7 +54,7 @@ try
     html_parts = {};
 
     html_parts{end+1} = '<!DOCTYPE html>';
-    html_parts{end+1} = '<html lang="en" data-theme="light">';
+    html_parts{end+1} = sprintf('<html lang="en" data-theme="light" data-style="%s">', style_opts.name);
     html_parts{end+1} = '<head>';
     html_parts{end+1} = '<meta charset="UTF-8">';
     html_parts{end+1} = '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
@@ -62,6 +65,7 @@ try
     html_parts{end+1} = sprintf('<title>PRESTUS Report — sub-%03d %s%s</title>', subject_id, medium, affix);
     html_parts{end+1} = '<style>';
     html_parts{end+1} = css_styles();
+    html_parts{end+1} = report_styles.css(style_opts);
     html_parts{end+1} = '</style>';
     html_parts{end+1} = '</head>';
     html_parts{end+1} = '<body>';
@@ -69,7 +73,7 @@ try
 
     % Table of contents (sticky nav bar)
     try
-        html_parts{end+1} = build_toc(parameters, is_layered);
+        html_parts{end+1} = build_toc(parameters, is_layered, report_styles.switcher(style_opts));
     catch ME
         html_parts{end+1} = html_utils.section_error('Table of Contents', ME);
     end
@@ -218,6 +222,7 @@ try
     % scroll-spy, meter fill, lightbox zoom/compare)
     html_parts{end+1} = html_utils.lightbox();
     html_parts{end+1} = report_scripts.common();
+    html_parts{end+1} = report_styles.script(style_opts);
 
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
@@ -2126,8 +2131,10 @@ end
 %  UTILITY FUNCTIONS
 %  ========================================================================
 
-function html = build_toc(parameters, is_layered)
+function html = build_toc(parameters, is_layered, extra_html)
 % Build a sticky top bar: brand, status dot, nav links, search, theme toggle.
+% extra_html (optional) is placed before the theme toggle (e.g. style switcher).
+    if nargin < 3; extra_html = ''; end
     html = '<nav class="toc" id="toc">';
     logo = html_utils.report_logo(26);
     if ~isempty(logo)
@@ -2214,6 +2221,7 @@ function html = build_toc(parameters, is_layered)
     html = [html '<label class="report-search hide-sm">' ...
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' ...
         '<input id="report-search" type="search" placeholder="Search&hellip;" autocomplete="off"></label>'];
+    html = [html extra_html];
     html = [html '<button class="theme-btn" id="theme-btn" type="button" title="Toggle dark mode" aria-label="Toggle theme">' ...
         '<svg id="theme-sun" width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' ...
         '<svg id="theme-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" style="display:none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>' ...

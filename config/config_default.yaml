@@ -124,6 +124,8 @@ modules:
   run_nifti_creation: 1       # Run nifti creation?
   run_posthoc_water_sims: 1   # Run simulations in free water with identical setup?
   generate_report: 1          # Generate a self-contained HTML simulation report at the end of the pipeline?
+  report_style: 'instrument'  # Report skin: instrument (default) | classic (pre-v0.6.1 look) | compact (dense) | paper (print). Presentation only.
+  report_style_switcher: 0    # Embed all skins plus a style dropdown in the report? 1=yes, 0=no. Test styles on existing outputs: preview_report_styles(<subject dir>)
   generate_group_report: 1    # Auto-generate the group HTML report after each per-subject run? 0=manual (call prestus_group_report_start), 1=auto.
   segmentation_only: 0        # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
 

@@ -386,6 +386,14 @@ function [parameters] = prestus_pipeline(parameters, options)
     disp('Pipeline finished successfully');
 
     if isfield(parameters.modules, 'generate_report') && parameters.modules.generate_report
+        % Final parameter state as seen by the report, so the report can be
+        % re-rendered later without re-running (see preview_report_styles).
+        try
+            save(fullfile(parameters.io.dir_cache, sprintf('sub-%03d_%s_report_parameters%s.mat', ...
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix)), 'parameters');
+        catch ME
+            warning('prestus_pipeline:reportParams', 'Could not save report parameters: %s', ME.message);
+        end
         generate_simulation_report(parameters);
     end
 

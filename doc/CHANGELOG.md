@@ -172,6 +172,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Safety dashboards (per-subject and group) now flag peak pressure against a 2 MPa non-significant-risk limit
 - Safety dashboards (per-subject and group) now show both `MI` (free water) and `MItc` (transcranial) tiles side by side instead of per-tissue `MI_brain`/`MI_skull`/`MI_skin` cards; whichever variant has no data for the report's medium renders grayed out
 - Reports redesigned with a light/dark "instrument" theme, a searchable configuration dump, a sortable subject roster, and client-side distribution/correlation charts
+- Selectable simulation-report skins via `modules.report_style` (`instrument` default, `classic` pre-redesign look, `compact`, `paper`); `modules.report_style_switcher: 1` embeds all skins with a live dropdown. Skins change presentation only
+- New `preview_report_styles(<subject dir>)` "report test mode": re-renders an existing output folder in every skin without re-simulating (re-pointing HPC paths), into `report_preview/` with a side-by-side `index.html`. The pipeline now saves `cache/sub-XXX_<medium>_report_parameters<affix>.mat` right before report generation so re-renders are exact
 - New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
 - Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
 

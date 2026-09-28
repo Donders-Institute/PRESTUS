@@ -54,6 +54,8 @@ The following documents the functions provided in PRESTUS.
 | `create_group_MNI_plots`                | Generate group-level plots in MNI space for multiple subjects.                                  |
 | `prestus_group_report_start`            | Entry point for the group HTML report; auto-discovers (or accepts) subjects and aggregates their per-subject outputs into one HTML file. |
 | `generate_group_report`                 | Assemble the self-contained group HTML report (exposure dashboard, subject roster, split acoustic/thermal box plots, per-subject cards). |
+| `report_styles`                         | Alternative visual skins for the HTML reports (instrument / classic / compact / paper), selected via `modules.report_style`. |
+| `preview_report_styles`                 | Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html. |
 | `discover_group_subjects`               | Auto-discover completed subjects by scanning `path.sim` for folders with a matching per-subject CSV. |
 
 #### HEAD
