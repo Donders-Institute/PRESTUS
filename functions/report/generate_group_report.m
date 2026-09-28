@@ -557,10 +557,12 @@ function html = build_group_safety_banner(subjects_meta, group_table, limits) %#
         sub = 'No subject exceeds any ITRUSST non-significant-risk limit.';
         badges = '';
     else
-        cls = 'fail';
-        glyph = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.3" fill="currentColor"/><path d="M10.3 3.8 2.5 18a1.9 1.9 0 0 0 1.7 2.9h15.6A1.9 1.9 0 0 0 21.5 18L13.7 3.8a1.9 1.9 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
-        title = sprintf('%d of %d subjects exceed an NSR limit', nOver, n);
-        sub = 'Flagged below and in the roster. Click a subject to jump to its row.';
+        cls = 'review';
+        glyph = '<svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M10.5 7.5v3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="13.4" r="1.1" fill="currentColor"/></svg>';
+        title = sprintf('%d of %d subjects above an ITRUSST NSR reference level: inspect NSR adherence', nOver, n);
+        sub = ['This is not by itself a failed safety check. Some ITRUSST criteria are alternatives ' ...
+            '(e.g. temperature rise or thermal dose), and study-specific NSR criteria may apply. ' ...
+            'Click a subject to jump to its row and inspect it against the criteria that govern your protocol.'];
         b = '';
         for i = 1:numel(exceed_info)
             b = [b sprintf('<a class="exbadge" href="#row-%d">%s</a>', exceed_ids(i), exceed_info{i})]; %#ok<AGROW>
@@ -572,7 +574,7 @@ function html = build_group_safety_banner(subjects_meta, group_table, limits) %#
     html = [html sprintf('<div><h2>%s</h2><p>%s</p>%s</div>', html_utils.escape(title), sub, badges)];
     html = [html '<div class="tally">'];
     html = [html sprintf('<div class="t g"><div class="n">%d</div><div class="l">Within</div></div>', n - nOver)];
-    html = [html sprintf('<div class="t r"><div class="n">%d</div><div class="l">Over</div></div>', nOver)];
+    html = [html sprintf('<div class="t r"><div class="n">%d</div><div class="l">Review</div></div>', nOver)];
     html = [html '</div></section>'];
 end
 

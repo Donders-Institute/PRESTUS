@@ -426,7 +426,9 @@ function s = metric_tooltip(name, info)
 end
 
 function html = build_safety_banner(csv_table, parameters, is_layered)
-% Overall pass/fail verdict against the finite NSR limits, with tallies.
+% Overall verdict against the finite ITRUSST NSR reference levels, with tallies.
+% Metrics above a reference level trigger a 'review' state (inspect adherence to
+% the applicable NSR criteria), not a hard fail.
     limits = get_risk_limits(is_layered);
     use_iso = isfield(parameters, 'thermal') && isfield(parameters.thermal, 'cem43_iso') ...
         && parameters.thermal.cem43_iso == 1;
@@ -455,14 +457,18 @@ function html = build_safety_banner(csv_table, parameters, is_layered)
         title = 'Within ITRUSST non-significant-risk limits';
         sub = 'All evaluated exposure metrics are at or below their NSR limits.';
     else
-        cls = 'fail';
-        glyph = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.3" fill="currentColor"/><path d="M10.3 3.8 2.5 18a1.9 1.9 0 0 0 1.7 2.9h15.6A1.9 1.9 0 0 0 21.5 18L13.7 3.8a1.9 1.9 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+        cls = 'review';
+        glyph = '<svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M10.5 7.5v3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="13.4" r="1.1" fill="currentColor"/></svg>';
         if nRed == 1
-            title = '1 metric exceeds an NSR limit';
+            title = '1 metric above its ITRUSST NSR reference level: inspect NSR adherence';
         else
-            title = sprintf('%d metrics exceed an NSR limit', nRed);
+            title = sprintf('%d metrics above their ITRUSST NSR reference levels: inspect NSR adherence', nRed);
         end
-        sub = ['Exceeded: ' html_utils.escape(strjoin(over_labels, ', ')) '. Review the flagged tiles below.'];
+        sub = ['Above reference: ' html_utils.escape(strjoin(over_labels, ', ')) '. ' ...
+            'This is not by itself a failed safety check. Some ITRUSST criteria are alternatives ' ...
+            '(e.g. a thermal exposure can qualify via temperature rise or thermal dose), and ' ...
+            'study-specific NSR criteria may apply. Inspect the flagged tiles against the criteria ' ...
+            'that govern your protocol.'];
     end
     html = sprintf('<div class="verdict %s">', cls);
     html = [html sprintf('<div class="glyph">%s</div>', glyph)];
@@ -470,7 +476,7 @@ function html = build_safety_banner(csv_table, parameters, is_layered)
     html = [html '<div class="tally">'];
     html = [html sprintf('<div class="t g"><div class="n">%d</div><div class="l">Within</div></div>', nGreen)];
     html = [html sprintf('<div class="t a"><div class="n">%d</div><div class="l">Near</div></div>', nAmber)];
-    html = [html sprintf('<div class="t r"><div class="n">%d</div><div class="l">Over</div></div>', nRed)];
+    html = [html sprintf('<div class="t r"><div class="n">%d</div><div class="l">Above</div></div>', nRed)];
     html = [html '</div></div>'];
 end
 
