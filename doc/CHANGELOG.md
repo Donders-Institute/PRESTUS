@@ -178,6 +178,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - New `preview_report_styles(<subject dir>)` "report test mode": re-renders an existing output folder in every skin without re-simulating (re-pointing HPC paths), into `report_preview/` with a side-by-side `index.html`. The pipeline now saves `cache/sub-XXX_<medium>_report_parameters<affix>.mat` right before report generation so re-renders are exact
 - New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
 - Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
+- Simulation-report Methods section made manuscript-ready: *Copy methods text* / *Copy text + references* buttons (formatted HTML with a plain-text fallback); per-tissue acoustic and thermal properties stated inline instead of linking to the Medium Properties section; new *Simulation software* (PRESTUS version + citation) and *Simulated exposure* (in situ ISPPA, MItc, focal distance, temperature rise, peak temperature, CEM43 from the report CSV) paragraphs
+- ⚠️ **Fixed:** wrong methods references — Martin et al. (2024) and Pichardo et al. (2017) had incorrect titles, authors and DOIs, and the Aubry et al. (2025) DOI disagreed with the safety-dashboard footnote (now 10.1016/j.brs.2025.10.007 in both)
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs

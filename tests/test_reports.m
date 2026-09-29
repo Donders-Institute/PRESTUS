@@ -98,6 +98,27 @@ classdef test_reports < matlab.unittest.TestCase
             tc.verifyTrue(iTIC(1) > iOther(1), 'TIC should be in the Other section');
         end
 
+        function test_methods_text_is_manuscript_ready(tc)
+            p = local_make_subject_params(tc.tmp);
+            txt = fileread(generate_simulation_report(p));
+            tc.verifyEqual(numel(strfind(txt, 'class="filter-btn methods-copy"')), 2, 'expected two copy buttons');
+            iStart = strfind(txt, 'id="methods-text"');
+            iRefs  = strfind(txt, 'id="methods-refs"');
+            tc.verifyNotEmpty(iStart, 'methods text container missing');
+            tc.verifyNotEmpty(iRefs, 'methods references block missing');
+            methods = txt(iStart(1):iRefs(1));
+            % Self-contained: no links back into the report.
+            tc.verifyEmpty(strfind(methods, 'href="#'), 'methods text should not link to report sections');
+            % Values stated inline (tissue properties, simulated exposure, software).
+            for m = {'Simulation software.', 'c&#8201;=&#8201;1560&#8201;m/s', ...
+                     'k&#8201;=&#8201;0.51', 'Simulated exposure.', '21.4&#8201;W/cm', ...
+                     'MI<sub>tc</sub> was 0.74', 'CEM43, ISO form', '0.9&#8201;min (brain)'}
+                tc.verifyNotEmpty(strfind(methods, m{1}), sprintf('methods text missing %s', m{1}));
+            end
+            tc.verifyNotEmpty(strfind(txt, '10.5281/zenodo.15095860'), 'PRESTUS reference missing');
+            tc.verifyNotEmpty(strfind(txt, '10.1016/j.brs.2024.04.013'), 'Martin et al. 2024 DOI wrong');
+        end
+
         function test_group_report_generates_and_flags(tc)
             ids = local_make_group_dir(tc.tmp);
             p = struct('path', struct('sim', tc.tmp), ...

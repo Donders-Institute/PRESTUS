@@ -619,7 +619,9 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
     end
     function s = fmt_pml(val)
         % Format PML size for report: scalar → '%d', vector → '[a b c]', non-numeric → as-is
-        if isnumeric(val) && ~any(isnan(val))
+        if isnumeric(val) && isscalar(val) && ~isnan(val)
+            s = sprintf('%d', val);
+        elseif isnumeric(val) && ~any(isnan(val))
             s = ['[' strtrim(num2str(val)) ']'];
         elseif ischar(val) || isstring(val)
             s = char(val);
@@ -845,13 +847,21 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             html_utils.escape(pct_method));
     end
 
-    % Tissue properties sentence — refer to the Medium Properties table in the report
-    if is_layered
-        props_sentence = [' Tissue acoustic properties (sound speed, density, ' ...
-            'and power-law attenuation coefficient) are listed in the '         ...
-            '<a href="#medium">Medium Properties</a> section.'];
-    else
-        props_sentence = '';
+    % Tissue properties sentence — state the values inline so the text stands
+    % on its own when copied out of the report. BabelBrain states its own
+    % material properties (mat_prop_str below) instead.
+    props_sentence = '';
+    if is_layered && ~use_babelbrain_acoustic
+        props_sentence = tissue_props_sentence(parameters, ...
+            {'sound_speed', 'c',  '%.0f', '&#8201;m/s'; ...
+             'density',     '&#961;', '%.0f', '&#8201;kg/m<sup>3</sup>'; ...
+             'alpha_coeff', '&#945;<sub>0</sub>', '%.3g', '&#8201;dB/(MHz<sup>y</sup>&#8201;cm)'; ...
+             'alpha_power', 'y',  '%.3g', ''}, ...
+            'Tissue acoustic properties (sound speed c, density &#961;, and power-law attenuation &#945; = &#945;<sub>0</sub>f<sup>y</sup>) were');
+        if isempty(props_sentence)
+            props_sentence = [' Tissue acoustic properties (sound speed, density, ' ...
+                'and power-law attenuation coefficient) were assigned per tissue compartment.'];
+        end
     end
 
     if use_babelbrain_acoustic
@@ -992,7 +1002,7 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
 
     dc_str = '';
     if ~strcmp(dc_pct, '?')
-        dc_str = sprintf(' (duty cycle: %s&#37;)', dc_pct);
+        dc_str = sprintf('; duty cycle: %s&#37;', dc_pct);
     end
 
     if ~strcmp(pd_ms, '?') && ~strcmp(pri_ms, '?')
@@ -1072,18 +1082,54 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
                 ' Temperature elevation and cumulative thermal dose (CEM43) '      ...
                 'were estimated by solving the Pennes bioheat equation '           ...
                 '(Pennes, 1948) over the full sonication protocol described above.'];
+            if is_layered
+                thermal_props = tissue_props_sentence(parameters, ...
+                    {'thermal_conductivity',   'k',         '%.3g', '&#8201;W/(m&#8201;K)'; ...
+                     'specific_heat_capacity', 'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
+                     'specific_heat',          'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
+                     'perfusion',              'w<sub>b</sub>', '%.3g', '&#8201;kg/(m<sup>3</sup>&#8201;s)'; ...
+                     'absorption_fraction',    'a',         '%.2g', ''}, ...
+                    ['Tissue thermal properties (thermal conductivity k, specific heat C, ' ...
+                     'blood perfusion w<sub>b</sub>, and fraction of acoustic absorption converted to heat a) were']);
+                thermal_solver_str = [thermal_solver_str thermal_props];
+            end
         end
         para5 = [b('Thermal simulations.') thermal_solver_str ' ' cem43_formula];
     end
 
     % ------------------------------------------------------------------ %
+    %  0. Software (leads the block so the tool and version are cited)
+    % ------------------------------------------------------------------ %
+    prestus_ver_txt = iff(~isempty(prestus_ver), [html_utils.escape(prestus_ver) ' '], '');
+    para0 = sprintf([...
+        '%s Acoustic%s simulations were set up and run with PRESTUS %s'          ...
+        '(PREprocessing &amp; Simulations for Transcranial Ultrasound Stimulation; ' ...
+        'Kosciessa et al., 2026), an open-source MATLAB toolbox for '             ...
+        'imaging-informed transcranial ultrasound simulation.'],                  ...
+        b('Simulation software.'), iff(run_thermal, ' and thermal', ''), prestus_ver_txt);
+
+    % ------------------------------------------------------------------ %
+    %  6. Simulated exposure values (same CSV columns as the dashboard)
+    % ------------------------------------------------------------------ %
+    para6 = build_exposure_results_sentence(csv_table, is_layered, run_thermal, use_cem43_iso);
+
+    % ------------------------------------------------------------------ %
     %  Assemble single text block
     % ------------------------------------------------------------------ %
-    paras = {para1, para2, para3, para4};
+    paras = {para0, para1, para2, para3, para4};
     if run_thermal
         paras{end+1} = para5;
     end
+    if ~isempty(para6)
+        paras{end+1} = [b('Simulated exposure.') ' ' para6];
+    end
     txt = strjoin(cellfun(@(s) p(s), paras, 'UniformOutput', false), '');
+    txt = ['<div class="methods-toolbar">' ...
+           '<button type="button" class="filter-btn methods-copy" data-refs="0">Copy methods text</button>' ...
+           '<button type="button" class="filter-btn methods-copy" data-refs="1">Copy text + references</button>' ...
+           '<span class="methods-copy-status" aria-live="polite"></span>' ...
+           '</div>' ...
+           '<div class="boilerplate-text" id="methods-text">' txt '</div>'];
 
     % ------------------------------------------------------------------ %
     %  References block (expandable) + CC0 notice
@@ -1124,6 +1170,13 @@ function html = build_references_block(f)
     % Always-present references
     refs = {};
 
+    % PRESTUS itself (always cited; citation as given in README.md)
+    refs{end+1} = ref( ...
+        'Kosciessa et al., 2026', ...
+        ['Kosciessa, J. Q., Chetverikov, A., Cornelissen, M., van der Zee, K., Carpino, E., Wimmers, M., Adelh&ouml;fer, N., Meijer, S., &amp; Verhagen, L. (2026). PRESTUS. ' ...
+        '<em>Zenodo</em>. ' ...
+        '<a href="https://doi.org/10.5281/zenodo.15095860" target="_blank" rel="noopener">https://doi.org/10.5281/zenodo.15095860</a>']);
+
     % --- Acoustic solver ---
     if f.use_babelbrain_acoustic
         refs{end+1} = ref( ...
@@ -1138,9 +1191,9 @@ function html = build_references_block(f)
             '<a href="https://doi.org/10.1088/0031-9155/56/1/014" target="_blank" rel="noopener">https://doi.org/10.1088/0031-9155/56/1/014</a>']);
         refs{end+1} = ref( ...
             'Pichardo et al., 2017', ...
-            ['Pichardo, S., Bhatt, C., Huang, Y., &amp; Hynynen, K. (2017). Treatment of the skull in transcranial focused ultrasound. ' ...
-            '<em>Phys Med Biol</em>, <strong>62</strong>, 7834&#8211;7857. ' ...
-            '<a href="https://doi.org/10.1088/1361-6560/aa8d6c" target="_blank" rel="noopener">https://doi.org/10.1088/1361-6560/aa8d6c</a>']);
+            ['Pichardo, S., Moreno-Hern&aacute;ndez, C., Drainville, R. A., Sin, V., Curiel, L., &amp; Hynynen, K. (2017). A viscoelastic model for the prediction of transcranial ultrasound propagation: application for the estimation of shear acoustic properties in the human skull. ' ...
+            '<em>Phys Med Biol</em>, <strong>62</strong>, 6938&#8211;6962. ' ...
+            '<a href="https://doi.org/10.1088/1361-6560/aa7ccc" target="_blank" rel="noopener">https://doi.org/10.1088/1361-6560/aa7ccc</a>']);
         refs{end+1} = ref( ...
             'Goss et al., 1978', ...
             ['Goss, S. A., Johnston, R. L., &amp; Dunn, F. (1978). Comprehensive compilation of empirical ultrasonic properties of mammalian tissues. ' ...
@@ -1200,17 +1253,17 @@ function html = build_references_block(f)
     % ITRUSST (always cited)
     refs{end+1} = ref( ...
         'Martin et al., 2024', ...
-        ['Martin, E., Treeby, B. E., Bhatt, M., et al. (2024). Recommendations for standardised reporting of focused ultrasound neuromodulation studies. ' ...
-        '<em>Brain Stimul</em>, <strong>17</strong>, 140&#8211;151. ' ...
-        '<a href="https://doi.org/10.1016/j.brs.2024.01.007" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2024.01.007</a>']);
+        ['Martin, E., Aubry, J.-F., Schafer, M., Verhagen, L., Treeby, B., &amp; Pauly, K. B. (2024). ITRUSST consensus on standardised reporting for transcranial ultrasound stimulation. ' ...
+        '<em>Brain Stimul</em>, <strong>17</strong>, 607&#8211;615. ' ...
+        '<a href="https://doi.org/10.1016/j.brs.2024.04.013" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2024.04.013</a>']);
     refs{end+1} = ref( ...
         'Aubry et al., 2025', ...
-        ['Aubry, J.-F., et al. (2025). ITRUSST consensus on biophysical safety for low-intensity transcranial ultrasound stimulation. ' ...
-        '<em>Brain Stimul</em>. ' ...
-        '<a href="https://doi.org/10.1016/j.brs.2024.11.012" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2024.11.012</a>']);
+        ['Aubry, J.-F., Attali, D., et al. (2025). ITRUSST consensus on biophysical safety for transcranial ultrasound stimulation. ' ...
+        '<em>Brain Stimul</em>, <strong>18</strong>(6). ' ...
+        '<a href="https://doi.org/10.1016/j.brs.2025.10.007" target="_blank" rel="noopener">https://doi.org/10.1016/j.brs.2025.10.007</a>']);
 
     items_html = strjoin(refs, '');
-    html = ['<details class="boilerplate-refs">' ...
+    html = ['<details class="boilerplate-refs" id="methods-refs">' ...
             '<summary class="boilerplate-refs-toggle">References</summary>' ...
             '<ol class="boilerplate-ref-list">' items_html '</ol>' ...
             '</details>'];
@@ -1219,6 +1272,113 @@ end
 function s = ref(tag, text_html)
 % Format a single reference list item.
     s = sprintf('<li>%s</li>', text_html);
+end
+
+function s = tissue_props_sentence(parameters, props, lead)
+% Inline per-tissue property values for the methods text, e.g.
+% " <lead>: brain, c = 1546 m/s, rho = 1046 kg/m3; skin, ...".
+% props rows: {field, symbol_html, fmt, unit_html}. Rows whose symbol was
+% already emitted for a tissue are skipped (alias fields such as
+% specific_heat / specific_heat_capacity). Returns '' when nothing is known.
+    s = '';
+    if ~isfield(parameters, 'medium_properties') || ~isfield(parameters, 'layers')
+        return
+    end
+    med = parameters.medium_properties;
+    layer_names = fieldnames(parameters.layers);
+    tissue_strs = {};
+    for i = 1:numel(layer_names)
+        name = layer_names{i};
+        if ~isfield(med, name) || ~isstruct(med.(name)); continue; end
+        vals = {}; seen = {};
+        for r = 1:size(props, 1)
+            [field, sym, fmtstr, unit] = props{r, :};
+            if ismember(sym, seen) || ~isfield(med.(name), field); continue; end
+            v = med.(name).(field);
+            if isnumeric(v) && isscalar(v) && ~isnan(v)
+                vals{end+1} = sprintf(['%s&#8201;=&#8201;' fmtstr '%s'], sym, v, unit); %#ok<AGROW>
+                seen{end+1} = sym; %#ok<AGROW>
+            end
+        end
+        if ~isempty(vals)
+            tissue_strs{end+1} = [html_utils.escape(strrep(name, '_', ' ')) ', ' strjoin(vals, ', ')]; %#ok<AGROW>
+        end
+    end
+    if ~isempty(tissue_strs)
+        s = [' ' lead ': ' strjoin(tissue_strs, '; ') '.'];
+    end
+end
+
+function s = build_exposure_results_sentence(csv_table, is_layered, run_thermal, use_cem43_iso)
+% Simulated exposure values for the methods text, read from the same CSV
+% columns as the safety dashboard. Values that are unavailable are omitted;
+% returns '' when none are available.
+    s = '';
+    deg = '&#8201;&#176;C';
+    function out = join_tissues(prefix, fmtstr, unit)
+        % "X (brain), Y (skull), Z (skin)" for the available columns.
+        % (tp, not parts: nested-function variables are shared with the parent)
+        tp = {};
+        for t = {'brain', 'skull', 'skin'}
+            v = csv_value(csv_table, [prefix '_' t{1}]);
+            if ~isnan(v)
+                tp{end+1} = sprintf([fmtstr '%s (%s)'], v, unit, t{1}); %#ok<AGROW>
+            end
+        end
+        out = strjoin(tp, ', ');
+    end
+
+    parts = {};
+    if is_layered
+        isppa_b = csv_value(csv_table, 'Isppa_brain');
+        if ~isnan(isppa_b)
+            parts{end+1} = sprintf(['the peak <em>in situ</em> I<sub>SPPA</sub> ' ...
+                'in the brain was %.3g&#8201;W/cm<sup>2</sup>'], isppa_b);
+        end
+        ipa_t = csv_value(csv_table, 'Ipa_target');
+        if ~isnan(ipa_t)
+            parts{end+1} = sprintf('the pulse-average intensity at the nominal target was %.3g&#8201;W/cm<sup>2</sup>', ipa_t);
+        end
+        mi_tc = csv_value(csv_table, 'MI_tc');
+        if ~isnan(mi_tc)
+            parts{end+1} = sprintf('MI<sub>tc</sub> was %.2f', mi_tc);
+        end
+    else
+        isppa = csv_value(csv_table, 'Isppa');
+        if ~isnan(isppa)
+            parts{end+1} = sprintf('the free-field I<sub>SPPA</sub> was %.3g&#8201;W/cm<sup>2</sup>', isppa);
+        end
+        mi = csv_value(csv_table, 'MI');
+        if ~isnan(mi)
+            parts{end+1} = sprintf('the free-field MI was %.2f', mi);
+        end
+        [pv, pu] = scale_pressure(csv_value(csv_table, 'Psptp'));
+        if ~isnan(pv)
+            parts{end+1} = sprintf('the spatial-peak temporal-peak pressure was %.3g&#8201;%s', pv, pu);
+        end
+    end
+    fd = csv_value(csv_table, 'real_focal_distance_ep_mm');
+    if ~isnan(fd)
+        parts{end+1} = sprintf(['the intensity peak lay %.1f&#8201;mm from the ' ...
+            'transducer exit plane'], fd);
+    end
+
+    if run_thermal && is_layered
+        rise = join_tissues('riseT', '%.2f', deg);
+        if ~isempty(rise); parts{end+1} = ['the peak temperature rise was ' rise]; end
+        maxt = join_tissues('maxT', '%.2f', deg);
+        if ~isempty(maxt); parts{end+1} = ['the peak absolute temperature was ' maxt]; end
+        cem = join_tissues(iff(use_cem43_iso, 'CEM43iso', 'CEM43'), '%.3g', '&#8201;min');
+        if ~isempty(cem)
+            parts{end+1} = sprintf('the thermal dose (CEM43%s) was %s', ...
+                iff(use_cem43_iso, ', ISO form', ''), cem);
+        end
+    end
+
+    if isempty(parts); return; end
+    % Capitalise the first clause and join with semicolons.
+    parts{1}(1) = upper(parts{1}(1));
+    s = [strjoin(parts, '; ') '.'];
 end
 
 

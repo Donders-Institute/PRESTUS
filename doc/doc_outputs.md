@@ -236,6 +236,7 @@ A self-contained HTML report is written to the output directory (`sub-XXX_<mediu
 
 - **Safety dashboard** — color-coded cards for all ITRUSST-limited metrics (green / amber / red)
 - **Simulation summary** — key acoustic and thermal values at a glance
+- **Methods** — auto-generated, ITRUSST-aligned methods text (CC0) covering software, transducer, simulation grid, tissue properties, pulse timing, thermal model and the simulated exposure values, with a matching reference list. *Copy methods text* / *Copy text + references* put it on the clipboard as formatted text (sub-/superscripts kept) with a plain-text fallback, ready to paste into a manuscript. Check it against your study before use.
 - **Configuration summary** — parameters used for the run
 - **Medium properties** — per-tissue acoustic and thermal properties (layered only)
 - **Acoustic results** — intensity overlay images and the full acoustic metrics table
