@@ -103,6 +103,13 @@ function job_id = prestus_pipeline_start(parameters, options)
             [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters);
 
+            % Fix the pipeline log path now, so the post-job report can read
+            % the job's [memory]/[memory_bb] lines from it.
+            if ~isfield(parameters.io, 'log_file') || isempty(parameters.io.log_file)
+                parameters.io.log_file = default_log_file(parameters, ...
+                    fullfile(get_output_dir(parameters), 'log'));
+            end
+
             % Create job files
             save(temp_data_path, 'parameters');
 

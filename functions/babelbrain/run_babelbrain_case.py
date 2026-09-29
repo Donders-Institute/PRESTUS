@@ -36,6 +36,86 @@ import yaml
 import numpy as np
 
 
+def _read_proc_status_kb(key):
+    with open('/proc/self/status') as f:
+        for line in f:
+            if line.startswith(key + ':'):
+                return int(line.split()[1])
+    return None
+
+
+def _cgroup_memory_files():
+    """Return (current, peak) file paths of this process's memory cgroup, or (None, None).
+
+    Under SLURM the cgroup also holds the parent MATLAB process, so its usage
+    is the figure the OOM handler acts on.
+    """
+    try:
+        with open('/proc/self/cgroup') as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None, None
+    for line in lines:                        # cgroup v1 memory controller
+        _, ctrls, rel = line.split(':', 2)
+        if 'memory' in ctrls.split(',') and os.path.isdir('/sys/fs/cgroup/memory'):
+            d = '/sys/fs/cgroup/memory' + rel
+            return (os.path.join(d, 'memory.usage_in_bytes'),
+                    os.path.join(d, 'memory.max_usage_in_bytes'))
+    for line in lines:                        # cgroup v2 unified hierarchy
+        if line.startswith('0::'):
+            d = '/sys/fs/cgroup' + line[3:]
+            return os.path.join(d, 'memory.current'), os.path.join(d, 'memory.peak')
+    return None, None
+
+
+def _read_bytes_gb(path):
+    try:
+        with open(path) as f:
+            return int(f.read().strip()) / 1024**3
+    except (OSError, ValueError, TypeError):
+        return float('nan')
+
+
+def _start_memory_monitor(interval_s=5.0, step_gb=0.5):
+    """Log this process's peak RSS and the cgroup usage whenever the peak grows.
+
+    An OOM kill (SIGKILL) skips atexit handlers, so the monitor prints
+    incrementally: the last '[memory_bb]' line before a kill is the high-water
+    mark. The tag keeps these lines distinct from MATLAB's '[memory]' lines in
+    the pipeline/SLURM logs (parsed by parse_memory_tags.m). Linux only;
+    silently does nothing elsewhere.
+    """
+    if not os.path.isfile('/proc/self/status'):
+        return
+    import atexit
+    import threading
+    import time
+    cg_cur, cg_peak = _cgroup_memory_files()
+    state = {'last_logged_gb': 0.0}
+
+    def _line(tag):
+        rss = (_read_proc_status_kb('VmRSS') or 0) / 1024**2
+        hwm = (_read_proc_status_kb('VmHWM') or 0) / 1024**2
+        return hwm, (f'[memory_bb] {tag}: python rss={rss:.1f} GB (peak {hwm:.1f} GB) | '
+                     f'cgroup current={_read_bytes_gb(cg_cur):.1f} GB, '
+                     f'peak={_read_bytes_gb(cg_peak):.1f} GB')
+
+    def _loop():
+        t0 = time.time()
+        while True:
+            try:
+                hwm, msg = _line(f't={time.time() - t0:.0f}s')
+                if hwm - state['last_logged_gb'] >= step_gb:
+                    state['last_logged_gb'] = hwm
+                    print(msg, flush=True)
+            except Exception:
+                return                       # diagnostics must never break the run
+            time.sleep(interval_s)
+
+    threading.Thread(target=_loop, name='memory-monitor', daemon=True).start()
+    atexit.register(lambda: print(_line('exit')[1], flush=True))
+
+
 class _TeeStream:
     """Write to multiple streams simultaneously (console + log file)."""
     def __init__(self, *streams):
@@ -1350,6 +1430,7 @@ def main():
           f'{"Rayleigh-Sommerfeld (analytic)" if not args.no_rayleigh_for_water else "full-wave FDTD"} '
           f'(bUseRayleighForWater={not args.no_rayleigh_for_water})')
 
+    _start_memory_monitor()
     try:
         output_files = R.RunCases(**kw)
     except Exception as e:

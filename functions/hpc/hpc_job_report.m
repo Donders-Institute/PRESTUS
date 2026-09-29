@@ -19,7 +19,9 @@ function report = hpc_job_report(job_id, hpc_type, parameters, log_dir, carbon_p
 %                     .hpc.memorylimit  — requested memory in GB
 %                     .hpc.timelimit    — requested wall time string
 %                     .subject_id       — used in report file name
-%   log_dir       - directory where the report file is written
+%                     .io.log_file      — pipeline log, parsed for memory lines
+%   log_dir       - directory where the report file is written; also searched
+%                   for the job's <subj>_slurm_output_<job_id>.log
 %   carbon_params - (optional) struct overriding emission constants:
 %                     .pue                  — Power Usage Effectiveness (default 1.67)
 %                     .carbon_intensity     — gCO2e/kWh (default 270, Netherlands)
@@ -50,6 +52,13 @@ function report = hpc_job_report(job_id, hpc_type, parameters, log_dir, carbon_p
 %       .alloc_cpus      — number of allocated CPU cores
 %       .max_rss_gb      — peak memory in GB (from MaxRSS across all steps)
 %       .n_gpus          — number of GPUs allocated (0 if none)
+%     Memory from job logs ([memory] / [memory_bb] lines, see parse_memory_tags):
+%       .log_cgroup_peak_gb — peak of the job's memory cgroup (MATLAB + children)
+%       .bb_peak_gb         — peak RSS of the BabelBrain Python process
+%       .matlab_peak_gb     — peak RSS of the MATLAB process
+%       .peak_mem_gb        — max(log_cgroup_peak_gb, max_rss_gb): job peak used
+%                             for memory_efficiency
+%       .peak_mem_source    — 'job log (cgroup)', 'sacct MaxRSS', or '' if neither
 %     Requested resources:
 %       .requested_mem_gb   — memory requested (GB)
 %       .requested_timelimit — wall time limit string
@@ -67,7 +76,7 @@ function report = hpc_job_report(job_id, hpc_type, parameters, log_dir, carbon_p
 %       .cost_eur           — estimated cost in EUR (NaN if rates unknown)
 %       .billing_profile    — label identifying the billing profile used
 %     Resource efficiency:
-%       .memory_efficiency  — max_rss / requested_mem (NaN if MaxRSS unavailable)
+%       .memory_efficiency  — peak_mem / requested_mem (NaN if no peak available)
 %       .time_efficiency    — elapsed / requested wall time (NaN if unavailable)
 %
 % Notes:
@@ -75,6 +84,12 @@ function report = hpc_job_report(job_id, hpc_type, parameters, log_dir, carbon_p
 %     For qsub, usage fields are set to NaN with a warning.
 %   - MaxRSS is taken as the maximum across all job steps (batch, extern, etc.)
 %     to capture peak memory reliably.
+%   - MaxRSS is sampled (JobAcctGatherFrequency, default 30 s) and can miss
+%     short spikes; the cgroup peak in the job logs is the kernel's continuous
+%     high-water mark but is only as recent as the last logged line (e.g.
+%     BabelBrain exit). Both are lower bounds, so peak_mem_gb takes the larger.
+%     The log lines exist on Linux runs with BabelBrain; the pipeline log is
+%     read for any scheduler, the SLURM output log only when log_dir is given.
 %   - Carbon defaults match the Donders/DCCN cluster (Netherlands grid, 2026).
 %     Override via carbon_params for other sites.
 %   - Snellius billing rates (SURF 2025): CPU 1 SBU/core-hour, A100 128 SBU/GPU-hour,
@@ -160,6 +175,11 @@ report.energy_mem_kwh   = NaN;
 report.energy_total_kwh = NaN;
 report.co2e_g           = NaN;
 report.co2e_kg          = NaN;
+report.log_cgroup_peak_gb = NaN;
+report.bb_peak_gb        = NaN;
+report.matlab_peak_gb    = NaN;
+report.peak_mem_gb       = NaN;
+report.peak_mem_source   = '';
 report.memory_efficiency = NaN;
 report.time_efficiency   = NaN;
 report.cpu_sbu           = NaN;
@@ -187,9 +207,24 @@ switch lower(hpc_type)
             'hpc_job_report: post-job metrics not available for %s (only SLURM/sacct supported).', hpc_type);
 end
 
+% ---- Memory from job logs, combined with sacct ----
+if nargin < 4, log_dir = ''; end
+mem = parse_memory_tags(read_job_logs(parameters, log_dir, job_id_str));
+report.log_cgroup_peak_gb = mem.cgroup_peak_gb;
+report.bb_peak_gb         = mem.bb_peak_gb;
+report.matlab_peak_gb     = mem.matlab_peak_gb;
+if report.log_cgroup_peak_gb >= report.max_rss_gb || ...
+        (isnan(report.max_rss_gb) && ~isnan(report.log_cgroup_peak_gb))
+    report.peak_mem_gb     = report.log_cgroup_peak_gb;
+    report.peak_mem_source = 'job log (cgroup)';
+elseif ~isnan(report.max_rss_gb)
+    report.peak_mem_gb     = report.max_rss_gb;
+    report.peak_mem_source = 'sacct MaxRSS';
+end
+
 % ---- Compute efficiency ratios ----
-if ~isnan(report.max_rss_gb) && ~isnan(report.requested_mem_gb) && report.requested_mem_gb > 0
-    report.memory_efficiency = report.max_rss_gb / report.requested_mem_gb;
+if ~isnan(report.peak_mem_gb) && ~isnan(report.requested_mem_gb) && report.requested_mem_gb > 0
+    report.memory_efficiency = report.peak_mem_gb / report.requested_mem_gb;
 end
 
 if ~isnan(report.elapsed_s) && ~isempty(report.requested_timelimit)
@@ -289,6 +324,32 @@ end
 end
 
 % --------------------------------------------------------------------------
+function text = read_job_logs(parameters, log_dir, job_id_str)
+% Concatenate the pipeline log and the job's SLURM output log. Both carry the
+% same console lines; parse_memory_tags takes maxima, so the overlap is harmless
+% and whichever file exists (or is more complete after a kill) is enough.
+files = {};
+if isfield(parameters, 'io') && isfield(parameters.io, 'log_file') && ...
+        ~isempty(parameters.io.log_file)
+    files{end+1} = char(parameters.io.log_file);
+end
+if ~isempty(log_dir)
+    d = dir(fullfile(log_dir, sprintf('*_slurm_output_%s.log', job_id_str)));
+    files = [files, fullfile({d.folder}, {d.name})];
+end
+text = '';
+for i = 1:numel(files)
+    if isfile(files{i})
+        try
+            text = [text, newline, fileread(files{i})]; %#ok<AGROW>
+        catch
+            % An unreadable log only costs the log-based memory fields.
+        end
+    end
+end
+end
+
+% --------------------------------------------------------------------------
 function n = parse_gpu_count(tres_str)
 % Parse GPU count from AllocTRES string, e.g. "cpu=16,gres/gpu=1,mem=128G"
 n = 0;
@@ -371,14 +432,18 @@ if r.n_gpus > 0
 end
 
 % Memory
-if ~isnan(r.max_rss_gb)
-    fprintf('  Peak memory:    %.2f GB  (of %.0f GB requested)\n', ...
-        r.max_rss_gb, r.requested_mem_gb);
+if ~isnan(r.peak_mem_gb)
+    fprintf('  Peak memory:    %.2f GB  (of %.0f GB requested; %s)\n', ...
+        r.peak_mem_gb, r.requested_mem_gb, r.peak_mem_source);
+    if ~isnan(r.bb_peak_gb) || ~isnan(r.matlab_peak_gb)
+        fprintf('    BabelBrain:   %.2f GB   MATLAB: %.2f GB  (process peaks)\n', ...
+            r.bb_peak_gb, r.matlab_peak_gb);
+    end
     if ~isnan(r.memory_efficiency)
         fprintf('  Memory used:    %.1f%%', r.memory_efficiency * 100);
         if r.memory_efficiency < 0.2
             fprintf('  ← consider reducing --mem to ~%.0f GB', ...
-                ceil(r.max_rss_gb * 1.5));
+                ceil(r.peak_mem_gb * 1.5));
         end
         fprintf('\n');
     end
@@ -451,6 +516,11 @@ fprintf(fid, 'cpu_core_s: %.0f\n',   report.cpu_core_s);
 fprintf(fid, 'alloc_cpus: %.0f\n',   report.alloc_cpus);
 fprintf(fid, 'n_gpus: %.0f\n',       report.n_gpus);
 fprintf(fid, 'max_rss_gb: %.4f\n',   report.max_rss_gb);
+fprintf(fid, 'log_cgroup_peak_gb: %.4f\n', report.log_cgroup_peak_gb);
+fprintf(fid, 'bb_peak_gb: %.4f\n',   report.bb_peak_gb);
+fprintf(fid, 'matlab_peak_gb: %.4f\n', report.matlab_peak_gb);
+fprintf(fid, 'peak_mem_gb: %.4f\n',  report.peak_mem_gb);
+fprintf(fid, 'peak_mem_source: %s\n', report.peak_mem_source);
 
 fprintf(fid, '\n# Requested resources\n');
 fprintf(fid, 'requested_mem_gb: %.0f\n',    report.requested_mem_gb);

@@ -66,6 +66,24 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
             system(sprintf('chmod +x %s', mock_path));
         end
 
+        function write_log(~, path, cgroup_peak_gb)
+            % Console lines as they appear in the pipeline / SLURM logs:
+            % MATLAB [memory] before/after, BabelBrain [memory_bb] samples.
+            fid = fopen(path, 'w');
+            fprintf(fid, 'Starting processing for subject 1\n');
+            fprintf(fid, ['[memory] before BabelBrain launch: MATLAB rss=2.0 GB (peak 2.5 GB) | ' ...
+                          'cgroup current=2.0 GB, peak=2.6 GB, limit=64.0 GB\n']);
+            fprintf(fid, ['[memory_bb] t=5s: python rss=3.0 GB (peak 3.0 GB) | ' ...
+                          'cgroup current=5.0 GB, peak=5.1 GB\n']);
+            fprintf(fid, ['[memory_bb] exit: python rss=1.0 GB (peak 7.2 GB) | ' ...
+                          'cgroup current=4.0 GB, peak=%.2f GB\n'], cgroup_peak_gb);
+            fprintf(fid, ['[memory] after BabelBrain exit: MATLAB rss=2.9 GB (peak 3.1 GB) | ' ...
+                          'cgroup current=3.0 GB, peak=%.2f GB, limit=64.0 GB\n'], cgroup_peak_gb);
+            fprintf(fid, ['[memory_summary] BabelBrain: BabelBrain peak=99.0 GB | MATLAB peak=99.0 GB | ' ...
+                          'cgroup peak=99.0 GB, limit=64.0 GB\n']);
+            fclose(fid);
+        end
+
     end
 
     % ------------------------------------------------------------------ %
@@ -330,6 +348,79 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
 
             % Pass empty log_dir — should not error and should not create a file
             tc.verifyWarningFree(@() hpc_job_report(44, 'slurm', tc.Parameters, []));
+        end
+
+    end
+
+    % ------------------------------------------------------------------ %
+    %% Memory from job logs ([memory] / [memory_bb] lines)
+    % ------------------------------------------------------------------ %
+    methods (Test, TestTags = {'hpc_job_report', 'memory_log'})
+
+        function test_log_cgroup_peak_preferred_when_larger(tc)
+            % cgroup peak 10.5 GB in the SLURM log > sacct MaxRSS 4 GB
+            tc.write_mock_sacct( ...
+                'COMPLETED|0:0|3600|7200|2|cpu=2,mem=64G', ...
+                '4194304K');
+            tc.write_log(fullfile(tc.TmpDir, 'sub-001_slurm_output_71.log'), 10.5);
+
+            report = hpc_job_report(71, 'slurm', tc.Parameters, tc.TmpDir);
+
+            tc.verifyEqual(report.max_rss_gb, 4, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.log_cgroup_peak_gb, 10.5, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.bb_peak_gb, 7.2, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.matlab_peak_gb, 3.1, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.peak_mem_gb, 10.5, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.peak_mem_source, 'job log (cgroup)');
+            tc.verifyEqual(report.memory_efficiency, 10.5/64, 'AbsTol', 1e-6);
+
+            content = fileread(fullfile(tc.TmpDir, 'sub-001_job71_report.txt'));
+            for field = {'log_cgroup_peak_gb', 'bb_peak_gb', 'matlab_peak_gb', 'peak_mem_gb'}
+                tc.verifyTrue(contains(content, field{1}), ...
+                    sprintf('Report file missing field: %s', field{1}));
+            end
+        end
+
+        function test_sacct_wins_when_larger(tc)
+            % Logs stop at BabelBrain exit; a later stage can exceed them
+            tc.write_mock_sacct( ...
+                'COMPLETED|0:0|3600|7200|2|cpu=2,mem=64G', ...
+                '16777216K');   % 16 GB
+            tc.write_log(fullfile(tc.TmpDir, 'sub-001_slurm_output_72.log'), 10.5);
+
+            report = hpc_job_report(72, 'slurm', tc.Parameters, tc.TmpDir);
+
+            tc.verifyEqual(report.peak_mem_gb, 16, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.peak_mem_source, 'sacct MaxRSS');
+            tc.verifyEqual(report.bb_peak_gb, 7.2, 'AbsTol', 1e-6);
+        end
+
+        function test_pipeline_log_read_without_log_dir(tc)
+            % io.log_file alone is enough (no log_dir, no sacct data)
+            tc.write_mock_sacct('COMPLETED|0:0|3600|7200|2|cpu=2,mem=64G', '0');
+            log_file = fullfile(tc.TmpDir, 'sub-001_layered_260929_1200.txt');
+            tc.write_log(log_file, 12.25);
+            p = tc.Parameters;
+            p.io.log_file = log_file;
+
+            report = hpc_job_report(73, 'slurm', p, []);
+
+            tc.verifyTrue(isnan(report.max_rss_gb));
+            tc.verifyEqual(report.peak_mem_gb, 12.25, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.peak_mem_source, 'job log (cgroup)');
+        end
+
+        function test_no_logs_leaves_fields_nan(tc)
+            tc.write_mock_sacct( ...
+                'COMPLETED|0:0|3600|7200|2|cpu=2,mem=64G', ...
+                '8388608K');
+
+            report = hpc_job_report(74, 'slurm', tc.Parameters, tc.TmpDir);
+
+            tc.verifyTrue(isnan(report.log_cgroup_peak_gb));
+            tc.verifyTrue(isnan(report.bb_peak_gb));
+            tc.verifyEqual(report.peak_mem_gb, 8, 'AbsTol', 1e-6);
+            tc.verifyEqual(report.peak_mem_source, 'sacct MaxRSS');
         end
 
     end

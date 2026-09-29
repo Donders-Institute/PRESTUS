@@ -67,6 +67,22 @@ matlab
 
 </details>
 
+### Post-job resource report
+
+After a SLURM job finishes, `hpc_job_report` writes `log_hpc/sub-XXX_job<ID>_report.txt` with wall time, CPU/GPU allocation, peak memory, a CO₂e estimate and, where billing rates are known, the cost. The report runs from `hpc_wait_for_completion` when `hpc.wait_for_job` is set, and otherwise as a small dependent job.
+
+Peak memory comes from two sources:
+
+- `max_rss_gb`: SLURM's `sacct MaxRSS`, the maximum over job steps. SLURM samples it (every 30 s by default), so it can miss short spikes.
+- The job logs: on Linux, BabelBrain runs print memory lines to the console. MATLAB writes `[memory]` lines (from `log_memory_usage`) before and after the BabelBrain launch. The BabelBrain Python process writes `[memory_bb]` lines whenever its peak grows by 0.5 GB or more, plus one at exit. The report reads these lines from the pipeline log (`io.log_file`, fixed at submission) and from `log_hpc/<subj>_slurm_output_<ID>.log`:
+    - `log_cgroup_peak_gb`: peak usage of the job's memory cgroup (MATLAB plus BabelBrain). This is the figure the out-of-memory killer acts on, and it includes page cache.
+    - `bb_peak_gb` and `matlab_peak_gb`: the peak resident memory of each process.
+
+`peak_mem_gb` is the larger of `log_cgroup_peak_gb` and `max_rss_gb`, and `peak_mem_source` names the source it came from. Both are lower bounds: the log lines stop at BabelBrain exit, so a later stage can go above them. `memory_efficiency` and the `--mem` suggestion use `peak_mem_gb`.
+
+For local runs, each BabelBrain run also prints one summary line to the pipeline log, e.g.
+`[memory_summary] BabelBrain: BabelBrain peak=7.2 GB | MATLAB peak=3.1 GB | cgroup peak=10.5 GB, limit=64.0 GB`.
+
 ### GPU support
 
 TUS simulations are accelerated by GPUs, but requesting GPUs can lead to longer wait times as the current concurrent GPU limit per user is 4. To reduce wait times, it is possible to run acoustic simulations first (to confirm targeting) because these require less RAM) and then run thermal simulations with the final protocol. Avoid blanket simulations (e.g., circling through all participants with all permutations) especially for thermal simulations.

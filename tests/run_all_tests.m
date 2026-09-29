@@ -58,6 +58,7 @@ function run_all_tests(level)
         testsuite(fullfile(here, 'test_head_preprocessing.m')), ...
         testsuite(fullfile(here, 'test_deface_m2m.m')), ...
         testsuite(fullfile(here, 'test_hpc_job_report.m')), ...
+        testsuite(fullfile(here, 'test_parse_memory_tags.m')), ...
         testsuite(fullfile(here, 'test_shell_quote_arg.m')), ...
         testsuite(fullfile(here, 'test_r_quote_string.m')), ...
         testsuite(fullfile(here, 'test_run_command.m')), ...
@@ -284,6 +285,18 @@ function m = build_descriptions()
         'test_no_report_file_when_log_dir_empty',   'hpc_job_report: empty log_dir skips file write without error'
         'test_failed_job_does_not_error',           'hpc_job_report: FAILED job state does not throw an error'
         'test_qsub_produces_nan_metrics_with_warning','hpc_job_report: qsub path warns and returns NaN metrics'
+        'test_log_cgroup_peak_preferred_when_larger','hpc_job_report: job-log cgroup peak used when above sacct MaxRSS'
+        'test_sacct_wins_when_larger',              'hpc_job_report: sacct MaxRSS used when above the logged cgroup peak'
+        'test_pipeline_log_read_without_log_dir',   'hpc_job_report: io.log_file alone supplies the memory fields'
+        'test_no_logs_leaves_fields_nan',           'hpc_job_report: no memory lines leaves log fields NaN, falls back to sacct'
+        % --- test_parse_memory_tags ---
+        'test_empty_text_returns_nan',              'parse_memory_tags: empty text gives NaN fields'
+        'test_tags_are_kept_apart',                 'parse_memory_tags: [memory] and [memory_bb] peaks parsed separately'
+        'test_cgroup_peak_is_max_over_both_tags',   'parse_memory_tags: cgroup peak is the max over both tags'
+        'test_duplicate_sources_are_idempotent',    'parse_memory_tags: repeated lines (pipeline + SLURM log) change nothing'
+        'test_nan_values_are_skipped',              'parse_memory_tags: NaN/nan values are ignored'
+        'test_summary_and_unrelated_lines_ignored', 'parse_memory_tags: [memory_summary] and other lines are not parsed'
+        'test_string_input',                        'parse_memory_tags: accepts string input'
         'test_live_slurm_job_report',               'hpc_job_report (live): submits real sleep job, waits, checks sacct metrics and report file'
         % --- test_reports ---
         'test_risk_limits_has_new_metrics',         'get_risk_limits: includes riseT37_* and TIC'

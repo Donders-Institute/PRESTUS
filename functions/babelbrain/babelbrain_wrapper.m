@@ -904,12 +904,18 @@ if isfield(parameters, 'io') && isfield(parameters.io, 'overwrite_files') && ...
     end
 end
 
+% MATLAB and the BabelBrain child share one SLURM cgroup memory limit; log
+% MATLAB's share so an OOM kill can be attributed (the child logs its own).
+log_memory_usage('before BabelBrain launch');
+
 t0     = tic;
 % Echo=true streams output live to the console, matching the original
 % single-output `status = system(cmd_args)` (which prints stdout/stderr to
 % the Command Window in real time when its output isn't captured).
 [status, cmd_out] = run_command(babelbrain_argv, 'Echo', true);
 elapsed = toc(t0);
+mem_after = log_memory_usage('after BabelBrain exit');
+log_memory_summary('BabelBrain', cmd_out, mem_after);
 
 if status ~= 0
     error('babelbrain_wrapper: BabelBrain Python process exited with status %d.\nCommand was:\n  %s\nOutput:\n%s', ...
@@ -1046,6 +1052,8 @@ else
         t0_w = tic;
         [status_w, water_out] = run_command(water_argv, 'Echo', true);
         elapsed_w = toc(t0_w);
+        log_memory_summary('BabelBrain water-only', water_out, ...
+            log_memory_usage('after BabelBrain water-only exit'));
         if status_w ~= 0
             warning('babelbrain_wrapper:waterSimFailed', ...
                 'Water-only simulation exited with status %d (%.1f s). ISPPA normalization may be inaccurate.\nOutput:\n%s', ...
@@ -1393,6 +1401,19 @@ function folder = bb_preset_folder(preset_name)
     else
         folder = preset_name;   % most presets use the preset name directly
     end
+end
+
+function log_memory_summary(label, child_out, mem_matlab)
+% One [memory_summary] line per BabelBrain run, so the pipeline log states the
+% split without reading the per-sample [memory_bb]/[memory] lines. Prints
+% nothing where neither side could measure (non-Linux).
+bb = parse_memory_tags(child_out);
+cg_peak = max([bb.cgroup_peak_gb, mem_matlab.cg_peak_gb]);   % max ignores NaN
+if all(isnan([bb.bb_peak_gb, mem_matlab.hwm_gb, cg_peak]))
+    return
+end
+fprintf('[memory_summary] %s: BabelBrain peak=%.1f GB | MATLAB peak=%.1f GB | cgroup peak=%.1f GB, limit=%.1f GB\n', ...
+    label, bb.bb_peak_gb, mem_matlab.hwm_gb, cg_peak, mem_matlab.cg_limit_gb);
 end
 
 function rewrite_hdf5_no_blosc(h5_path, python_bin, this_dir)

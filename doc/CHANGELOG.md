@@ -166,6 +166,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - HTML simulation report shows a per-transducer Ipa table for `asyncJoint` runs, listing each transducer's Isppa at its own focus sampled from the joint combined intensity map
 - Run labels derived automatically from output affixes in consolidated reports
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
+- Post-job report reads BabelBrain memory from the job logs: the BabelBrain monitor now tags its lines `[memory_bb]` (MATLAB keeps `[memory]`), and `hpc_job_report` parses both from the pipeline log and the SLURM output log into `log_cgroup_peak_gb`, `bb_peak_gb`, `matlab_peak_gb` and `peak_mem_gb` (max of the logged cgroup peak and `sacct MaxRSS`; `memory_efficiency` now uses it). The pipeline log path is fixed at HPC submission so the report can find it, and each BabelBrain run prints a `[memory_summary]` line (see [doc_hpc.md](doc_hpc.md#post-job-resource-report))
 - HTML simulation report extended with BabelBrain and jwave backend sections
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
 - New global `MI` (free-water mechanical index) and `Psptp` (global peak pressure, now also written for layered runs) output columns, for consistency across media

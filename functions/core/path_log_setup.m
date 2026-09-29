@@ -190,16 +190,14 @@ end
         end
 
         % Create a log.
-        % Use a pre-assigned path if uncertainty_pipeline set one (so all
-        % five stage logs have known, deterministic paths); otherwise fall
-        % back to a timestamp-based name.
+        % Use a pre-assigned path if one was set -- by uncertainty_pipeline
+        % (so all five stage logs have known, deterministic paths) or at HPC
+        % submission (so hpc_job_report can parse it); otherwise fall back to
+        % a timestamp-based name.
         if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
             filename_log = parameters.io.log_file;
         else
-            filename_log = fullfile(parameters.io.dir_logs, ...
-                sprintf('sub-%03d_%s_%s%s.txt', ...
-                subject_id, parameters.simulation.medium, ...
-                string(datetime('now'), 'yyMMdd_HHmm'), parameters.io.output_affix));
+            filename_log = default_log_file(parameters, parameters.io.dir_logs);
         end
         parameters.io.log_file = filename_log;
         diary(filename_log);
