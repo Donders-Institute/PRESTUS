@@ -432,6 +432,23 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
         'skull_thickness',           get_weight(pt, 'weight_skull_thickness',           0.2)  ...
     );
 
+    % Older GUI versions saved the weights as placement.plantus.weights.<name>,
+    % which was never read. Honour them, since they are what the user set.
+    if isfield(pt, 'weights') && isstruct(pt.weights)
+        legacy = intersect(fieldnames(pt.weights), fieldnames(weights));
+        for k = 1:numel(legacy)
+            v = pt.weights.(legacy{k});
+            if ~isempty(v)
+                weights.(legacy{k}) = v;
+            end
+        end
+        if ~isempty(legacy)
+            warning('position_transducer_plantus:legacyWeights', ...
+                ['Using placement.plantus.weights.* (saved by an older GUI) over ', ...
+                 'placement.plantus.weight_*. Rename them to weight_<name> in the config.']);
+        end
+    end
+
     % min_distance: allow up to max(flhm_list) below the closest focal depth so
     % that the min_distance filter does not exclude all vertices when focal depths
     % are tightly clustered (e.g. single-element transducer with one focal depth).

@@ -211,6 +211,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs
 - Stand-alone Localite ingest GUI (`neuronav_gui`, with PRESTUS logo header): detect and review marker series (QC table, 3-D pulse positions, per-pulse deviation, raw-file list) before writing the `InstrumentMarker` XML/JSON; supports single- and multi-coil ingestion and pre-filling from a config. See [doc_gui.md](doc_gui.md#localite-ingest-gui)
+- ⚠️ **Fixed:** PlanTUS weights set in `prestus_gui` and the Python GUI were saved as `placement.plantus.weights.<name>`, which nothing read (the 0.2 defaults were used). Both GUIs now write `placement.plantus.weight_<name>`; `position_transducer_plantus` applies `weights.<name>` from older configs with a warning (`position_transducer_plantus:legacyWeights`)
 - Transducer library browser tab
 - Lazy tab initialisation (tabs load on first selection, reducing startup time)
 - Parameter values seeded into unbuilt tabs on config load

@@ -243,11 +243,11 @@ class TabPlacement(BaseTab):
 
         vl.addWidget(make_section("Optimisation Weights (must sum to 1.0)"))
         weights = [
-            ("placement.plantus.weights.skin_target_distances",     "Skin-target distance",      0.2),
-            ("placement.plantus.weights.skin_target_angles",        "Skin-target angle",         0.2),
-            ("placement.plantus.weights.skin_target_intersections", "Skin-target intersection",  0.2),
-            ("placement.plantus.weights.skin_skull_angles",         "Skin-skull angle",          0.2),
-            ("placement.plantus.weights.skull_thickness",           "Skull thickness",           0.2),
+            ("placement.plantus.weight_skin_target_distances",     "Skin-target distance",      0.2),
+            ("placement.plantus.weight_skin_target_angles",        "Skin-target angle",         0.2),
+            ("placement.plantus.weight_skin_target_intersections", "Skin-target intersection",  0.2),
+            ("placement.plantus.weight_skin_skull_angles",         "Skin-skull angle",          0.2),
+            ("placement.plantus.weight_skull_thickness",           "Skull thickness",           0.2),
         ]
         for tag, label, default in weights:
             _row(label, FloatEdit(tag, default, registry=r))

@@ -977,15 +977,15 @@ end
         sp(gl_ptu, 15);
         sec(gl_ptu, 16, 'Optimisation Weights (must sum to 1.0)');
         lbl(gl_ptu, 17, 1, 'Skin-target distance');
-        nedt(gl_ptu, 17, 2, 'placement.plantus.weights.skin_target_distances', 0.2);
+        nedt(gl_ptu, 17, 2, 'placement.plantus.weight_skin_target_distances', 0.2);
         lbl(gl_ptu, 18, 1, 'Skin-target angle');
-        nedt(gl_ptu, 18, 2, 'placement.plantus.weights.skin_target_angles', 0.2);
+        nedt(gl_ptu, 18, 2, 'placement.plantus.weight_skin_target_angles', 0.2);
         lbl(gl_ptu, 19, 1, 'Skin-target intersection');
-        nedt(gl_ptu, 19, 2, 'placement.plantus.weights.skin_target_intersections', 0.2);
+        nedt(gl_ptu, 19, 2, 'placement.plantus.weight_skin_target_intersections', 0.2);
         lbl(gl_ptu, 20, 1, 'Skin-skull angle');
-        nedt(gl_ptu, 20, 2, 'placement.plantus.weights.skin_skull_angles', 0.2);
+        nedt(gl_ptu, 20, 2, 'placement.plantus.weight_skin_skull_angles', 0.2);
         lbl(gl_ptu, 21, 1, 'Skull thickness');
-        nedt(gl_ptu, 21, 2, 'placement.plantus.weights.skull_thickness', 0.2);
+        nedt(gl_ptu, 21, 2, 'placement.plantus.weight_skull_thickness', 0.2);
 
         % Wire placement mode dropdown to show/hide sub-panels
         h_placement_mode.ValueChangedFcn = @(dd,~) cb_placement_mode(dd.Value);
