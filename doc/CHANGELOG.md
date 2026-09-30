@@ -231,6 +231,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` updated to use `parameters.path.seg` (was `parameters.seg_path`)
 
 #### Sequential / Reporting
+- HTML reports use a brand colour (`--brand`) for links, navigation and toggles, and smaller corner radii
 - Position labels in the overlay plots (`plot_overlay`, `plot_transducer_overlay`) show mm to one decimal instead of rounded integers
 - ⚠️ **Fixed:** `multi_isppa_pipeline` checked for `sub-XXX_<medium>_output_table<affix>.csv`, which no stage writes, so it warned about missing thermal output for every intensity; it now expects the per-subject CSV name `sub-XXX_<medium><affix>.csv`
 - Limited-FOV runs outline the acoustic FOV box (dashed red) on the whole-brain intensity-on-T1w overlay (`plot_intensity_t1_overlay`; `prestus_pipeline` passes the box in full-grid voxels as `grid.acoustic_fov_offset_vox` / `acoustic_fov_dims_vox` to the NIfTI export); the report caption reads "Whole-brain intensity overlay with FOV"
