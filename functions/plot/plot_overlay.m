@@ -348,7 +348,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
             rectangle('Position', [focus_pos(ti_rect,2)-rect_size/2 focus_pos(ti_rect,1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'r', 'LineWidth',1,'LineStyle','-')
         end
         rectangle('Position', [max_data_pos(2)-rect_size/2 max_data_pos(1)-rect_size/2 rect_size*2+1 rect_size*2+1], 'EdgeColor', 'b', 'LineWidth',1,'LineStyle','-')
-        text(max_data_pos(2), max_data_pos(1)+10, [num2str(round(max_data_pos(2)*parameters.grid.resolution_mm)), 'mm'], 'Color', 'w')
+        text(max_data_pos(2), max_data_pos(1)+10, sprintf('%.1f mm', max_data_pos(2)*parameters.grid.resolution_mm), 'Color', 'w')
     end
 
     linkaxes([ax1, ax2], 'xy'); % Synchronize both axes to avoid shifts
