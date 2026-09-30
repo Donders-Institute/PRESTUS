@@ -1,8 +1,9 @@
 function report = validate_transducer_library(library_path, equipment_path)
 % VALIDATE_TRANSDUCER_LIBRARY  Validate calibration library against equipment configs
 %
-% For each YAML in library_path: checks consistency with equipment config
-% (element count, depth coverage, phase monotonicity). For each YAML in
+% For each YAML in library_path: checks consistency with the equipment config
+% (static offset and refinement element counts against the current geometry,
+% amplitude, recorded forward model, legacy per-depth forms). For each YAML in
 % equipment_path: reports whether a library entry exists.
 %
 % Use as:
@@ -21,10 +22,10 @@ function report = validate_transducer_library(library_path, equipment_path)
 %     .serial       - equipment serial
 %     .combo        - combo_name (library filename without .yaml)
 %     .lib_file     - full path to library YAML, or '' if missing
-%     .n_depths     - number of calibrated depths (0 if no library)
-%     .depth_range  - [min max] mm, or [] if no depths
-%     .monotonic    - logical; true if all element phases monotone across depths
-%     .status       - 'ok' | 'no_library' | 'error'
+%     .n_depths     - number of refined depths (0 for a static-only entry)
+%     .depth_range  - [min max] mm of refined depths, or []
+%     .monotonic    - kept for compatibility (always true)
+%     .status       - 'ok' | 'warning' | 'no_library' | 'error'
 %     .issues       - cell array of issue strings
 %
 % See also: UPDATE_TRANSDUCER_LIBRARY, CHECK_EQUIPMENT_CONFIG
@@ -101,73 +102,62 @@ function report = validate_transducer_library(library_path, equipment_path)
             rec.issues{end+1} = sprintf('Equipment entry for ''%s'' not found', tran_serial);
         end
 
-        %% Analyse calibrated depths
-        depths_cal = [];
-        if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')
-            depths_cal = lib.global_model.depths_ep_mm(:)';
-        elseif isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
-            dk = fieldnames(lib.calibration.focal_depths);
-            depths_cal = sort(cellfun(@(k) str2double(strrep(strrep(k,'f',''),'p','.')), dk));
+        %% Static offset --------------------------------------------------
+        gm = struct();
+        if isfield(lib, 'global_model') && isstruct(lib.global_model); gm = lib.global_model; end
+        has_static = isfield(gm, 'elem_phase_correction_deg') && ~isempty(gm.elem_phase_correction_deg);
+        is_error   = false;
+        if has_static && ~isnan(n_elem_equip) && numel(gm.elem_phase_correction_deg) ~= n_elem_equip
+            rec.issues{end+1} = sprintf(['global_model.elem_phase_correction_deg has %d elements but ' ...
+                'equipment has %d — entry is stale for the current geometry, rebuild it'], ...
+                numel(gm.elem_phase_correction_deg), n_elem_equip);
+            is_error = true;
+        end
+        if ~isfield(gm, 'amplitude_scaling') || isempty(gm.amplitude_scaling)
+            rec.issues{end+1} = 'No global_model.amplitude_scaling';
+        end
+        if ~isfield(gm, 'forward_model') && has_static
+            rec.issues{end+1} = 'Forward model used for the fit not recorded (global_model.forward_model)';
         end
 
+        %% Refinements (optional) -----------------------------------------
+        depths_cal = [];
+        if isfield(lib, 'refinement') && isstruct(lib.refinement) && isfield(lib.refinement, 'depths_ep_mm')
+            depths_cal = double(lib.refinement.depths_ep_mm(:)');
+            offs = lib.refinement.elem_phase_correction_deg;
+            if ~iscell(offs)
+                if numel(depths_cal) == 1; offs = {offs}; else; offs = num2cell(offs, 2); end
+            end
+            if numel(offs) ~= numel(depths_cal)
+                rec.issues{end+1} = sprintf('refinement: %d depths but %d offset rows', numel(depths_cal), numel(offs));
+                is_error = true;
+            elseif ~isnan(n_elem_equip) && any(cellfun(@numel, offs) ~= n_elem_equip)
+                rec.issues{end+1} = sprintf('refinement offsets do not have %d elements', n_elem_equip);
+                is_error = true;
+            end
+        end
+        if isfield(gm, 'depths_ep_mm') && ~isempty(gm.depths_ep_mm)
+            rec.issues{end+1} = 'Legacy per-depth phase table in global_model (read as refinement)';
+            depths_cal = [depths_cal, double(gm.depths_ep_mm(:)')];
+        end
+        if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
+            rec.issues{end+1} = 'Legacy calibration.focal_depths entries (read as refinement)';
+        end
+        if ~has_static && isempty(depths_cal)
+            rec.issues{end+1} = 'No offset stored — geometric steering only';
+        end
+
+        depths_cal      = unique(depths_cal);
         rec.n_depths    = numel(depths_cal);
         rec.depth_range = [];
-        rec.monotonic   = true;
+        if ~isempty(depths_cal); rec.depth_range = [min(depths_cal) max(depths_cal)]; end
+        rec.monotonic   = true;   % offsets are not expected to be monotonic in depth
 
-        if rec.n_depths > 0
-            rec.depth_range = [min(depths_cal) max(depths_cal)];
-
-            % Check gaps > 10 mm
-            if rec.n_depths > 1
-                gaps = diff(sort(depths_cal));
-                big_gaps = gaps(gaps > 10);
-                if ~isempty(big_gaps)
-                    rec.issues{end+1} = sprintf('Depth gaps > 10 mm: [%s] mm', num2str(big_gaps, '%.1f '));
-                end
-            end
-
-            % Check global_model element count and monotonicity
-            if isfield(lib, 'global_model') && isfield(lib.global_model, 'elem_phase_deg')
-                phase_cell = lib.global_model.elem_phase_deg;
-                if ~iscell(phase_cell)
-                    phase_cell = num2cell(phase_cell, 2);
-                end
-                phase_mat = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
-
-                % Check depth vs phase_mat row count
-                if size(phase_mat, 1) ~= rec.n_depths
-                    rec.issues{end+1} = sprintf( ...
-                        'global_model: depths_ep_mm has %d entries but elem_phase_deg has %d rows', ...
-                        rec.n_depths, size(phase_mat, 1));
-                end
-
-                % Check n_elem matches equipment
-                if ~isnan(n_elem_equip) && size(phase_mat, 2) ~= n_elem_equip
-                    rec.issues{end+1} = sprintf( ...
-                        'global_model: %d phase columns but equipment has %d elements', ...
-                        size(phase_mat, 2), n_elem_equip);
-                end
-
-                % Monotonicity check per element
-                if size(phase_mat, 1) > 1
-                    for el = 1:size(phase_mat, 2)
-                        diffs = diff(phase_mat(:, el));
-                        if ~all(diffs >= 0) && ~all(diffs <= 0)
-                            rec.monotonic = false;
-                            break;
-                        end
-                    end
-                    if ~rec.monotonic
-                        rec.issues{end+1} = 'Non-monotonic phase progression in global_model';
-                    end
-                end
-            end
+        if is_error
+            rec.status = 'error';
+        elseif isempty(rec.issues)
+            rec.status = 'ok';
         else
-            rec.issues{end+1} = 'No calibrated depths found';
-        end
-
-        rec.status = 'ok';
-        if ~isempty(rec.issues)
             rec.status = 'warning';
         end
         report(end+1) = rec; %#ok<AGROW>
@@ -175,7 +165,7 @@ function report = validate_transducer_library(library_path, equipment_path)
 
     %% Print formatted table
     fprintf('\n%-40s %-8s %-8s %-14s %-10s %s\n', ...
-        'Serial/Combo', 'N_depths', 'Range(mm)', 'Monotonic', 'Status', 'Issues');
+        'Serial/Combo', 'N_refine', 'Range(mm)', 'Monotonic', 'Status', 'Issues');
     fprintf('%s\n', repmat('-', 1, 100));
     for ri = 1:numel(report)
         r = report(ri);

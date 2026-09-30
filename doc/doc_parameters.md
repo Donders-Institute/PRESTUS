@@ -174,6 +174,9 @@ All fields are mandatory and have no defaults — they must be set in the study 
 |---|---|---|
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
+| `serial` | Equipment serial; geometry, phases and drive come from the equipment config and transducer library. | See [doc_transducer_library.md](doc_transducer_library.md). Values set in the study config take precedence. |
+| `combo.ds_serial` | Driving-system serial. | Selects `<serial>_<ds_serial>.yaml`; without it only `<serial>.yaml` is looked up. |
+| `library_path` | Folder with your own library entries. | Used when it holds an entry for this combo, otherwise the shipped `config/calibration/` (with a warning). |
 | `trans_pos` | Transducer position (XYZ, bowl apex). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focus_pos` | Focus (target) position (XYZ). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focal_distance_ep` | Expected focal distance from transducer exit plane [mm]. | Alternative to `trans_pos`/`focus_pos`. Either `focal_distance_ep`, `focal_distance_bowl`, or both must be set. |

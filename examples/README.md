@@ -3,6 +3,7 @@
 This folder contains example scripts that interact with the PRESTUS pipeline
 
 - `calibration_standalone` initiates the calibration of transducer phases and amplitudes for equipment at the Donders institute.
+- `demo_transducer_refinement` refines the shipped transducer library to your own hydrophone axial profiles (one call, writes a user library entry; runs out of the box on demonstration profiles).
 - `example_uncertainty` runs the uncertainty quantification pipeline (three-variant simulation + combined report); see [Uncertainty](doc_uncertainty.md).
 - `createPhantom` can be used to generate 2D phantoms
 - `createPseudoCT` can be used to start pseuodCT generation from UTE images

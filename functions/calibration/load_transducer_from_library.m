@@ -2,15 +2,29 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % LOAD_TRANSDUCER_FROM_LIBRARY  Load calibrated transducer parameters from library
 %
 % Reads the calibration library YAML for the given equipment combination and
-% the geometry from equip_param (load_equipment_config). Reconstructs per-
-% element phases from the fitted parametric model and looks up (or scales)
-% the amplitude for the desired intensity.
+% the geometry from equip_param (load_equipment_config), and returns element
+% phases and amplitude for the requested focal depth and intensity.
 %
+% Phases are always geometric steering plus a per-element offset:
 %
-% When the library YAML contains a global_model section (phases calibrated
-% across all depths simultaneously), phases are interpolated linearly at the
-% requested depth. Per-depth entries with is_refinement:true override the
-% global model when the requested depth is within 1 mm of that entry.
+%   phase(d) = set_real_phases(d) + offset(d)
+%
+%   offset(d) = static offset  (global_model.elem_phase_correction_deg;
+%                               depth-independent, shipped default)
+%               blended towards
+%               refinement offsets (refinement.elem_phase_correction_deg at
+%                               refinement.depths_ep_mm; optional,
+%                               depth-specific fits to hydrophone data)
+%
+% Within the span of refined depths the refinement offsets are interpolated
+% (per element, on the unit circle). Outside it the nearest refinement offset
+% fades back to the static offset over refinement.blend_mm (default 5 mm),
+% so phases are continuous in depth.
+%
+% Legacy per-depth forms are read as refinements: global_model.depths_ep_mm +
+% elem_phase_deg (absolute phases) and calibration.focal_depths.f* entries
+% (linear/monotonic parametric phases). Their absolute phases are converted
+% to offsets relative to geometric steering at each depth.
 %
 % Use as:
 %   parameters = load_transducer_from_library(combo_name, focal_distance_ep, ...
@@ -31,13 +45,43 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %   parameters - struct with:
 %     .transducer              — geometry + calibrated phases and amplitude
 %     .transducer.tx_calibration.isppa_wcm2        — ISPPA the elem_p_amp produces [W/cm²]
-%     .transducer.tx_calibration.focal_depth_ep_mm — calibrated depth used [mm]
+%     .transducer.tx_calibration.focal_depth_ep_mm — requested depth [mm]
 %     .transducer.tx_calibration.phase_source      — 'library'
+%     .transducer.tx_calibration.phase_model       — 'geometric' | 'static' | 'refined' | 'blend'
+%     .transducer.tx_calibration.refinement_weight — 0 (static) … 1 (refined)
 %     .transducer.tx_calibration.isppa_source      — 'library'
+%     .transducer.tx_calibration.amp_kwave_verified — true iff elem_p_amp at this depth
+%                                                     was validated by KWAVE_CHECK_REFINEMENT
+%                                                     against a free-water k-Wave simulation,
+%                                                     rather than being analytical-only
+%     .transducer.tx_calibration.amp_kwave_ref_depth_mm/.amp_kwave_r2/.amp_kwave_focal_err_mm
+%                                                   — nearest k-Wave check, for context even
+%                                                     when amp_kwave_verified is false
 %     .transducer.tx_calibration.library_key       — combo name used for lookup
 %     .transducer.tx_calibration.library_meta      — provenance from the library YAML
 %
-% See also: UPDATE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER
+% A warning (load_transducer_from_library:unverifiedAmplitude) is issued when an
+% amplitude is resolved but was never k-Wave-checked — see KWAVE_CHECK_REFINEMENT.
+%
+% Static-model fields written by FIT_TRANSDUCER_MODEL (all optional):
+%   global_model.steering_sound_speed — sound speed of the steering law [m/s]
+%                                       (geometric delays; default 1500)
+%   global_model.elem_amp_weight      — per-element gain (mean 1) applied to elem_p_amp
+%   refinement.elem_p_amp, .isppa_wcm2 — per-depth drive of the refinements
+%                                       (LIBRARY_ADD_REFINEMENTS); interpolated in
+%                                       depth and blended with the global amplitude
+%                                       by the phase weight (tx_calibration.amplitude_source)
+%   global_model.amplitude_by_depth   — {depths_ep_mm, elem_p_amp, isppa_wcm2}:
+%                                       drive that gave isppa_wcm2 in water at each
+%                                       measured depth; interpolated in depth and
+%                                       scaled as sqrt(I). Without it, the
+%                                       depth-independent amplitude_scaling is used.
+%
+% The depth logic itself is LIBRARY_MODEL_AT_DEPTH (in-memory entry, no file
+% lookup); this function adds the file lookup, validation and bookkeeping.
+%
+% See also: LIBRARY_MODEL_AT_DEPTH, SET_REAL_PHASES, UPDATE_TRANSDUCER_LIBRARY,
+%           REFINE_TRANSDUCER_LIBRARY, BUILD_TRANSDUCER_LIBRARY
 
     if nargin < 5 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
@@ -63,241 +107,65 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     if ~isfield(equip_param.trans, tran_serial)
         error('load_transducer_from_library: transducer ''%s'' not found in equip_param.', tran_serial);
     end
-    tran = equip_param.trans.(tran_serial);
+    tran        = equip_param.trans.(tran_serial);
+    n_elem      = tran.transducer.annular.elem_n;
+    tran.n_elem = n_elem;
     parameters.transducer = tran.transducer;
 
-    %% Reconstruct phases — global model takes precedence when present
-    if isfield(lib, 'global_model') && ~isempty(lib.global_model) && isstruct(lib.global_model)
-
-        gm     = lib.global_model;
-        n_elem = tran.transducer.annular.elem_n;
-
-        % A global model stores phases in one of two forms:
-        %   (a) correction-only — a single depth-independent
-        %       elem_phase_correction_deg added on top of geometric phases
-        %       (written by build_transducer_library and the multi_depth path);
-        %   (b) legacy per-depth phase tables depths_ep_mm + elem_phase_deg,
-        %       interpolated at the requested depth.
-        % An empty/absent elem_phase_correction_deg with no per-depth tables is
-        % a pure geometric entry (zero correction).
-        has_perdepth = isfield(gm, 'depths_ep_mm') && isfield(gm, 'elem_phase_deg') && ...
-            ~isempty(gm.depths_ep_mm) && ~isempty(gm.elem_phase_deg);
-
-        use_refinement = false;
-
-        if has_perdepth
-            depths = gm.depths_ep_mm(:)';
-
-            % elem_phase_deg is stored as a cell array of per-depth row vectors
-            phase_cell = gm.elem_phase_deg;
-            if ~iscell(phase_cell)
-                phase_cell = num2cell(phase_cell, 2);
-            end
-            phase_mat = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
-
-            % Check if a per-depth refinement overrides the global model
-            [dist, idx]   = min(abs(depths - focal_distance_ep));
-            used_depth_gm = depths(idx);
-
-            if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
-                fkey = sprintf('f%s', strrep(num2str(used_depth_gm), '.', 'p'));
-                if dist < 1 && isfield(lib.calibration.focal_depths, fkey) && ...
-                        isfield(lib.calibration.focal_depths.(fkey), 'is_refinement') && ...
-                        lib.calibration.focal_depths.(fkey).is_refinement
-                    use_refinement = true;
-                end
-            end
-
-            if ~use_refinement
-                % Interpolate phases from global model
-                if numel(depths) == 1
-                    base_phases_deg = phase_mat(1, :);
-                else
-                    base_phases_deg = interp1(depths, phase_mat, focal_distance_ep, 'linear', 'extrap');
-                end
-                if dist > 5
-                    warning(['load_transducer_from_library: closest global-model depth is %.1f mm ' ...
-                        '(requested %.1f mm). Consider running calibration at this depth.'], ...
-                        used_depth_gm, focal_distance_ep);
-                end
-            end
-        else
-            % Correction-only / geometric entry: compute geometric steering
-            % phases at the requested depth directly from ring geometry.
-            geo_params = struct();
-            geo_params.medium_properties.water.sound_speed = 1500;  % water [m/s]
-            geo_params.transducer        = tran.transducer;
-            geo_params.transducer.n_elem = n_elem;
-            base_phases_deg = set_real_phases(tran, focal_distance_ep, geo_params);
-            used_depth_gm   = focal_distance_ep;
-        end
-
-        if ~use_refinement
-            elem_phase_rad = base_phases_deg(:)' / 180 * pi;
-
-            % Apply per-element phase correction.
-            % Library YAML takes precedence (written by build_transducer_library
-            % and the multi_depth path). Falls back to equipment YAML for
-            % backward compatibility with calibrations written by save_elem_correction.
-            if isfield(gm, 'elem_phase_correction_deg') && ~isempty(gm.elem_phase_correction_deg)
-                correction_rad = gm.elem_phase_correction_deg(:)' * pi/180;
-                if numel(correction_rad) ~= n_elem
-                    warning(['load_transducer_from_library: library elem_phase_correction_deg has ' ...
-                        '%d elements but transducer has %d — correction skipped.'], ...
-                        numel(correction_rad), n_elem);
-                else
-                    elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
-                    fprintf('Applied per-element phase correction from library.\n');
-                end
-            elseif isfield(tran, 'elem_phase_correction') && ~isempty(tran.elem_phase_correction)
-                correction_rad = tran.elem_phase_correction.deg(:)' * pi/180;
-                if numel(correction_rad) ~= n_elem
-                    warning(['load_transducer_from_library: equipment elem_phase_correction has ' ...
-                        '%d elements but transducer has %d — correction skipped.'], ...
-                        numel(correction_rad), n_elem);
-                else
-                    elem_phase_rad = mod(elem_phase_rad + correction_rad, 2*pi);
-                    fprintf('Applied phase correction from equipment YAML (legacy).\n');
-                end
-            end
-
-            parameters.transducer.annular.elem_phase_rad = elem_phase_rad;
-            parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
-
-            % Amplitude from global_model.amplitude_scaling
-            elem_p_amp = [];
-            if isfield(gm, 'amplitude_scaling')
-                amp_map    = gm.amplitude_scaling;
-                int_keys   = fieldnames(amp_map);
-                int_values = cellfun(@(k) str2double(strrep(strrep(k, 'i', ''), 'p', '.')), int_keys);
-
-                [int_dist, amp_idx] = min(abs(int_values - desired_intensity));
-                int_used            = int_values(amp_idx);
-
-                if int_dist / desired_intensity > 0.05
-                    base_amp = amp_map.(int_keys{amp_idx});
-                    elem_p_amp = round(base_amp * sqrt(desired_intensity / int_used));
-                    warning(['load_transducer_from_library: scaling amplitude from %.1f to %.1f W/cm² ' ...
-                        '(%.0f -> %d). Run calibration at this intensity for an exact value.'], ...
-                        int_used, desired_intensity, base_amp, elem_p_amp);
-                else
-                    elem_p_amp = amp_map.(int_keys{amp_idx});
-                end
-                parameters.transducer.annular.elem_p_amp = repmat(elem_p_amp, 1, n_elem);
-            end
-
-            %% Focal distance bookkeeping
-            parameters.transducer.focal_distance_ep   = focal_distance_ep;
-            parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
-                (tran.transducer.annular.curv_radius_mm - ...
-                 tran.transducer.annular.dist_geom_ep_mm);
-            parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
-            parameters.transducer.tx_calibration.focal_depth_ep_mm = used_depth_gm;
-            parameters.transducer.tx_calibration.phase_source       = 'library';
-            parameters.transducer.tx_calibration.isppa_source       = 'library';
-            parameters.transducer.tx_calibration.library_key        = combo_name;
-            parameters.transducer.tx_calibration.library_meta       = lib.meta;
-
-            cal_type = '';
-            if isfield(lib.meta, 'calibration_type'), cal_type = lib.meta.calibration_type; end
-            if has_perdepth
-                src_str = sprintf('interp from %.1f mm', used_depth_gm);
-            else
-                src_str = 'geometric + correction';
-            end
-            if isempty(elem_p_amp)
-                fprintf('Library loaded (global model, %s): %s | focal %.1f mm (%s) | no amplitude calibration\n', ...
-                    cal_type, combo_name, focal_distance_ep, src_str);
-            else
-                fprintf('Library loaded (global model, %s): %s | focal %.1f mm (%s) | amp %d @ %.1f W/cm²\n', ...
-                    cal_type, combo_name, focal_distance_ep, src_str, elem_p_amp(1), desired_intensity);
-            end
-            return;
-        end
-        % fall through to per-depth if use_refinement == true
+    %% Phases, gains and drive at the requested depth
+    m = library_model_at_depth(lib, tran, focal_distance_ep, desired_intensity, yaml_path);
+    parameters.transducer.annular.elem_phase_rad = m.elem_phase_rad;
+    parameters.transducer.annular.elem_phase_deg = m.elem_phase_deg;
+    if ~isempty(m.elem_p_amp)
+        parameters.transducer.annular.elem_p_amp = m.elem_p_amp;
     end
-
-    %% Find closest calibrated focal depth (refinement override or legacy per-depth)
-    cal = lib.calibration.focal_depths;
-    if isempty(fieldnames(cal))
-        error(['load_transducer_from_library: no calibrated focal depths in library ' ...
-            'for combo ''%s''. Run calibration_standalone first.'], combo_name);
-    end
-
-    depth_keys   = fieldnames(cal);
-    depth_values = cellfun(@(k) str2double(strrep(strrep(k, 'f', ''), 'p', '.')), depth_keys);
-
-    [dist, idx]    = min(abs(depth_values - focal_distance_ep));
-    used_key       = depth_keys{idx};
-    focal_used     = depth_values(idx);
-
-    if dist > 5
-        warning(['load_transducer_from_library: closest calibrated depth is %.1f mm ' ...
-            '(requested %.1f mm). Consider running calibration at this depth.'], ...
-            focal_used, focal_distance_ep);
-    end
-
-    entry  = cal.(used_key);
-    n_elem = tran.transducer.annular.elem_n;
-
-    %% Reconstruct per-element phases from parametric model
-    phase_start_rad = entry.phase_start_deg / 180 * pi;
-
-    switch entry.precession_mode
-        case 'linear'
-            phase_step_rad = entry.phase_step_deg / 180 * pi;
-            elem_phase_rad = mod(phase_start_rad + (0:n_elem-1) * phase_step_rad, 2*pi);
-        case 'monotonic'
-            increments_rad = entry.phase_increments_deg / 180 * pi;
-            elem_phase_rad = mod(phase_start_rad + [0, cumsum(increments_rad)], 2*pi);
-        otherwise
-            error('load_transducer_from_library: unknown precession_mode ''%s''.', ...
-                entry.precession_mode);
-    end
-
-    % Per-depth refinement entries store phases from a single-depth global search
-    % which already incorporates any correction — do not apply again.
-
-    parameters.transducer.annular.elem_phase_rad = elem_phase_rad;
-    parameters.transducer.annular.elem_phase_deg = elem_phase_rad / pi * 180;
-
-    %% Look up amplitude for desired intensity
-    amp_map     = entry.amplitude_scaling;
-    int_keys    = fieldnames(amp_map);
-    int_values  = cellfun(@(k) str2double(strrep(strrep(k, 'i', ''), 'p', '.')), int_keys);
-
-    [int_dist, amp_idx] = min(abs(int_values - desired_intensity));
-    int_used            = int_values(amp_idx);
-
-    if int_dist / desired_intensity > 0.05
-        % Scale analytically: amp ∝ sqrt(I) since I ∝ v² ∝ amp²
-        base_amp = amp_map.(int_keys{amp_idx});
-        elem_p_amp = round(base_amp * sqrt(desired_intensity / int_used));
-        warning(['load_transducer_from_library: scaling amplitude from %.1f to %.1f W/cm² ' ...
-            '(%.0f -> %d). Run calibration at this intensity for an exact value.'], ...
-            int_used, desired_intensity, base_amp, elem_p_amp);
-    else
-        elem_p_amp = amp_map.(int_keys{amp_idx});
-    end
-
-    parameters.transducer.annular.elem_p_amp = repmat(elem_p_amp, 1, n_elem);
+    phase_model = m.phase_model;
+    w           = m.refinement_weight;
+    amp_source  = m.amplitude_source;
+    elem_p_amp  = m.drive_pa;
+    amp_kwave_verified = m.amp_kwave_verified;
 
     %% Focal distance bookkeeping
     parameters.transducer.focal_distance_ep   = focal_distance_ep;
     parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
-        (tran.transducer.annular.curv_radius_mm - ...
-         tran.transducer.annular.dist_geom_ep_mm);
+        (tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm);
     parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
-    parameters.transducer.tx_calibration.focal_depth_ep_mm = focal_used;
-    parameters.transducer.tx_calibration.phase_source       = 'library';
-    parameters.transducer.tx_calibration.isppa_source       = 'library';
-    parameters.transducer.tx_calibration.library_key        = combo_name;
-    parameters.transducer.tx_calibration.library_meta       = lib.meta;
+    parameters.transducer.tx_calibration.focal_depth_ep_mm = focal_distance_ep;
+    parameters.transducer.tx_calibration.phase_source      = 'library';
+    parameters.transducer.tx_calibration.phase_model       = phase_model;
+    parameters.transducer.tx_calibration.refinement_weight = w;
+    parameters.transducer.tx_calibration.isppa_source      = 'library';
+    parameters.transducer.tx_calibration.amplitude_source  = amp_source;   % 'global' | 'refinement' | 'blend'
+    parameters.transducer.tx_calibration.amp_kwave_verified = amp_kwave_verified;
+    parameters.transducer.tx_calibration.amp_kwave_ref_depth_mm = m.amp_kwave_ref_depth_mm;
+    parameters.transducer.tx_calibration.amp_kwave_r2           = m.amp_kwave_r2;
+    parameters.transducer.tx_calibration.amp_kwave_focal_err_mm = m.amp_kwave_focal_err_mm;
+    parameters.transducer.tx_calibration.library_key       = combo_name;
+    parameters.transducer.tx_calibration.library_meta      = lib.meta;
 
-    tier = 'per-depth';
-    if use_refinement, tier = 'refinement override'; end
+    if ~isempty(elem_p_amp) && ~amp_kwave_verified
+        if isfinite(m.amp_kwave_ref_depth_mm)
+            nearest_str = sprintf(['nearest k-Wave check is at %.1f mm from the exit plane ' ...
+                '(R²=%.3f, focal error %.2f mm) but does not cover the requested depth'], ...
+                m.amp_kwave_ref_depth_mm, m.amp_kwave_r2, m.amp_kwave_focal_err_mm);
+        else
+            nearest_str = 'no depth in this entry has been k-Wave-checked at all';
+        end
+        warning('load_transducer_from_library:unverifiedAmplitude', ...
+            ['%s @ %.1f mm: elem_p_amp is analytical only — it was fit to the O''Neil/Rayleigh ' ...
+             'model and measured hydrophone profile but never validated against a free-water ' ...
+             'k-Wave simulation, so its absolute intensity may be biased by the analytical-vs-' ...
+             'simulation offset (%s). Run KWAVE_CHECK_REFINEMENT on this entry to close the gap.'], ...
+            combo_name, focal_distance_ep, nearest_str);
+    end
+
     cal_type = '';
-    if isfield(lib.meta, 'calibration_type'), cal_type = lib.meta.calibration_type; end
-    fprintf('Library loaded (%s, %s): %s | focal %.1f mm (calibrated %.1f mm) | amp %d @ %.1f W/cm²\n', ...
-        tier, cal_type, combo_name, focal_distance_ep, focal_used, elem_p_amp(1), desired_intensity);
+    if isfield(lib.meta, 'calibration_type'), cal_type = char(lib.meta.calibration_type); end
+    if isempty(elem_p_amp)
+        amp_str = 'no amplitude calibration';
+    else
+        amp_str = sprintf('amp %d @ %.1f W/cm²', round(elem_p_amp), desired_intensity);
+    end
+    fprintf('Library loaded (%s, %s): %s | focal %.1f mm | %s (w=%.2f) | %s\n', ...
+        phase_model, cal_type, combo_name, focal_distance_ep, phase_model, w, amp_str);
 end

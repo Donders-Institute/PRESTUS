@@ -181,6 +181,9 @@ transducer:
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
   target_isppa_wcm2: 30 # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
+  # serial: ''            # Equipment serial (config/equipment/<serial>.yaml); fills in geometry and library phases/drive
+  # combo: {ds_serial: ''} # Driving-system serial; selects config/calibration/<serial>_<ds_serial>.yaml
+  # library_path: ''      # Folder with your own library entries (refine_transducer_library / calibration_gui); used when it holds this combo
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
   focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]

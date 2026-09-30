@@ -97,6 +97,19 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
     % Determine combo name (transducer + driving system).
     combo_name = resolve_combo_name(serial, tr, equip_param, t_i);
 
+    % A user library (transducer.library_path, e.g. written by
+    % refine_transducer_library) takes precedence over the shipped one.
+    if isfield(tr, 'library_path') && ~isempty(tr.library_path)
+        user_path = char(tr.library_path);
+        if isfile(fullfile(user_path, [combo_name, '.yaml'])) || isfile(fullfile(user_path, [serial, '.yaml']))
+            library_path = user_path;
+        else
+            warning('resolve_transducer_from_serial:userLibraryMiss', ...
+                'Transducer %d: no entry for ''%s'' in transducer.library_path (%s); using the shipped library.', ...
+                t_i, combo_name, user_path);
+        end
+    end
+
     % Resolve library key: prefer DS-specific, fall back to DS-agnostic ({serial}.yaml).
     yaml_path_combo   = fullfile(library_path, [combo_name, '.yaml']);
     yaml_path_generic = fullfile(library_path, [serial, '.yaml']);

@@ -21,7 +21,7 @@ function result = fit_source_parameters(parameters, charac_data, ...
 %     simultaneously. A single depth-independent delta phase and velocity
 %     are fitted jointly to all empirical profiles. Uses Rayleigh forward
 %     model by default.
-%     Requires PhaseTable and Tran. Lambda (L2 regularisation on delta
+%     Requires Tran. Lambda (L2 regularisation on delta
 %     phases) defaults to 0; set options.Lambda to a small positive value
 %     (e.g. 1e-3) to penalise large phase corrections.
 %
@@ -55,8 +55,6 @@ function result = fit_source_parameters(parameters, charac_data, ...
 %                         (default: 'oneil' for single_ref, 'rayleigh' for multi_depth)
 %     .RefDepth         - reference depth [mm] for result packaging and export
 %                         (default: median of available_depths_ep)
-%     .PhaseTable       - phase table struct for SET_REAL_PHASES, or [] for
-%                         geometry-only mode (default: [])
 %     .Tran             - transducer struct from load_equipment_config (required)
 %     .Lambda           - L2 regularisation weight on delta phases for multi_depth
 %                         (default: 0)

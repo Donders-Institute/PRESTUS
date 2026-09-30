@@ -1,16 +1,18 @@
 %% build_transducer_library  Build or refresh the full transducer calibration library
 %
 % For each equipment combo in config/equipment/ this script either:
-%   - Runs an empirical geometric-baseline build (geometric phases + velocity fit)
-%     when axial characterisation data (char_data_path) is available, or
+%   - Builds an empirical entry when axial characterisation data
+%     (char_data_path) is available: per-depth refinements by default
+%     (LIBRARY_MODE = 'per_depth'), or the static model ('static', debugging), or
 %   - Computes a pure geometry-only entry from ring dimensions alone.
 %
 % Both paths produce a global_model section in config/calibration/{combo}.yaml
 % that load_transducer_from_library can interpolate at any focal depth.
 %
 % QUICK START
-%   1. Set CHAR_DATA_ROOT to the folder that contains your axial profile CSVs
-%      (or leave '' if char_data_path entries in the equipment YAML are absolute).
+%   1. Put your axial profile CSVs in local/profiles/ (default CHAR_DATA_ROOT;
+%      layout in doc_transducer_library.md, Appendix), or set CHAR_DATA_ROOT to
+%      another folder ('' if char_data_path entries are absolute).
 %   2. Optionally restrict processing with COMBOS_TO_RUN.
 %   3. Run the script. Results are written to config/calibration/ inside the repo.
 %
@@ -30,7 +32,8 @@ close all;
 %% ── Paths ────────────────────────────────────────────────────────────────────
 repo_root    = fullfile(fileparts(mfilename('fullpath')), '..', '..');
 equip_path   = fullfile(repo_root, 'config', 'equipment');
-library_path = fullfile(repo_root, 'config', 'calibration');
+if ~exist('LIBRARY_PATH', 'var'); LIBRARY_PATH = fullfile(repo_root, 'config', 'calibration'); end
+library_path = LIBRARY_PATH;   % output folder (default: the shipped library)
 
 addpath(genpath(fullfile(repo_root, 'functions')));
 addpath(genpath(fullfile(repo_root, 'external')));
@@ -46,12 +49,9 @@ addpath(genpath(fullfile(repo_root, 'external')));
 if ~exist('COMBOS_TO_RUN',      'var'); COMBOS_TO_RUN      = 'all'; end
 
 % Root folder for axial-profile CSVs referenced by char_data_path in the
-% equipment YAML. Set to '' if those paths are already absolute.
-if ~exist('CHAR_DATA_ROOT',     'var'); CHAR_DATA_ROOT     = ''; end
-
-% Root folder for manufacturer phase table files referenced by phase_table in
-% the equipment YAML. Set to '' if those paths are already absolute.
-if ~exist('PHASE_TABLE_ROOT',   'var'); PHASE_TABLE_ROOT   = ''; end
+% equipment YAML (default: local/profiles/ in the repo, git-ignored). Set to
+% '' if those paths are already absolute.
+if ~exist('CHAR_DATA_ROOT',     'var'); CHAR_DATA_ROOT     = fullfile(repo_root, 'local', 'profiles'); end
 
 % Intensities [W/cm²] to calibrate amplitude for (empirical combos only).
 if ~exist('DESIRED_INTENSITIES','var'); DESIRED_INTENSITIES = [30]; end
@@ -67,6 +67,34 @@ if ~exist('OPT_UPPER_VELOCITY', 'var'); OPT_UPPER_VELOCITY = 0.2;  end
 if ~exist('OPT_WEIGHTS',        'var'); OPT_WEIGHTS        = 0;    end
 if ~exist('SKIP_FRONT_PEAK_MM', 'var'); SKIP_FRONT_PEAK_MM = 10;   end
 if ~exist('INITIAL_VELOCITY',   'var'); INITIAL_VELOCITY   = 0.05; end
+
+% Library model:
+%   'per_depth' (default) — one refinement per measured depth (phases, gains,
+%                 drive; FIT_TRANSDUCER_MODEL with PER_DEPTH_FIT_OPTIONS) on a
+%                 geometric global model; interpolated between measured depths.
+%                 Quality: held-out interpolation (each interior depth predicted
+%                 from its neighbours) vs geometric, in meta.quality.
+%   'static'    — (debugging) one depth-independent model over all depths
+%                 (FIT_OPTIONS), accepted only through the held-out gate below.
+if ~exist('LIBRARY_MODE',       'var'); LIBRARY_MODE       = 'per_depth'; end
+
+% Options for FIT_TRANSDUCER_MODEL (FreeParams, ForwardModel, NearFieldSkipMm,
+% HuberDelta, NStarts, ...). Static library model: per-ring phase offset + gain.
+if ~exist('FIT_OPTIONS',        'var'); FIT_OPTIONS        = struct('FreeParams', {{'phase', 'amp'}}); end
+% Per-depth fits (as CALIBRATION_GUI / REFINE_TRANSDUCER_LIBRARY): phase and gain,
+% intensity-domain loss, z shift fixed at 0 (a fitted shift is not applied at run
+% time; diagnostics/calib_ship_strategy). Settings tuned on held-out depths by
+% diagnostics/calib_ship_strategy/run_calib_refine_hpo.
+if ~exist('PER_DEPTH_FIT_OPTIONS', 'var')
+    PER_DEPTH_FIT_OPTIONS = struct('FreeParams', {{'phase', 'amp'}}, ...
+        'Domain', 'intensity', 'HuberDelta', 0.8, 'Lambda', 1e-3, 'NearFieldSkipMm', 10);
+end
+
+% Acceptance gate: an empirical entry is written only if, on held-out depths
+% (leave-one-depth-out), its median R² is at least the geometric median and no
+% depth is worse than geometric by more than GATE_WORST. Otherwise the entry is
+% geometric, with the reason in meta.quality.
+if ~exist('GATE_WORST',         'var'); GATE_WORST         = 0.05; end
 
 % Water sound speed [m/s] used for geometric phase computation.
 if ~exist('SOUND_SPEED',        'var'); SOUND_SPEED        = 1500; end
@@ -98,7 +126,7 @@ for si = 1:numel(all_serials)
 
     if ~isfield(tran, 'combos') || isempty(tran.combos)
         combo_name = tran_serial;
-        if ~strcmp(COMBOS_TO_RUN, 'all') && ~any(strcmp(COMBOS_TO_RUN, combo_name))
+        if ~isequal(COMBOS_TO_RUN, 'all') && ~any(strcmp(COMBOS_TO_RUN, combo_name))
             continue;
         end
         combo_list(end+1,:) = {combo_name, tran_serial, '', false}; %#ok<AGROW>
@@ -110,7 +138,7 @@ for si = 1:numel(all_serials)
         ds_serial  = ds_keys{di};
         combo_name = [tran_serial '_' ds_serial];
 
-        if ~strcmp(COMBOS_TO_RUN, 'all') && ~any(strcmp(COMBOS_TO_RUN, combo_name))
+        if ~isequal(COMBOS_TO_RUN, 'all') && ~any(strcmp(COMBOS_TO_RUN, combo_name))
             continue;
         end
 
@@ -153,12 +181,13 @@ for ci = 1:n_total
             build_geometric_entry(tran_serial, ds_serial, tran, library_path, SOUND_SPEED);
         else
             combo_entry = tran.combos.(ds_serial);
-            build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_entry, ...
-                equip_param, parameters, ...
-                CHAR_DATA_ROOT, PHASE_TABLE_ROOT, ...
-                DESIRED_INTENSITIES, OPT_UPPER_VELOCITY, OPT_WEIGHTS, ...
-                SKIP_FRONT_PEAK_MM, INITIAL_VELOCITY, ...
-                OUTPUT_YAML_FOLDER, library_path);
+            if strcmp(LIBRARY_MODE, 'static')
+                build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_entry, ...
+                    CHAR_DATA_ROOT, DESIRED_INTENSITIES(1), FIT_OPTIONS, GATE_WORST, library_path);
+            else
+                build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_entry, ...
+                    CHAR_DATA_ROOT, DESIRED_INTENSITIES(1), PER_DEPTH_FIT_OPTIONS, library_path);
+            end
         end
         rec.status = 'ok';
         fprintf('  [OK]\n');
@@ -262,112 +291,185 @@ end
 
 
 function build_empirical_entry(combo_name, tran_serial, ds_serial, tran, combo_entry, ...
-        equip_param, parameters, ...
-        char_data_root, phase_table_root, ...
-        desired_intensities, opt_upper_velocity, opt_weights, ...
-        skip_front_peak_mm, initial_velocity, ...
-        output_yaml_folder, library_path) %#ok<INUSD>
-% Joint multi-depth phase correction + amplitude scaling from axial profiles.
-%
-% Fits a single depth-independent per-element phase correction
-% (elem_phase_correction_deg) jointly across all characterisation depths
-% via perform_joint_depth_fit, then derives a source amplitude per requested
-% intensity. Only the correction and amplitude scaling are written to the
-% library; geometric phases are reconstructed at load time by
-% load_transducer_from_library.
+        char_data_root, ref_intensity, fit_options, gate_worst, library_path)
+% Static model fitted jointly across all characterisation depths
+% (FIT_TRANSDUCER_MODEL), accepted only if it beats geometric steering on
+% held-out depths. A missing profile CSV is an error: a silent geometry-only
+% entry would be indistinguishable from a calibrated one downstream.
 
-    parameters.transducer = tran.transducer;
-    parameters.transducer.annular.elem_phase_deg = zeros(1, tran.transducer.annular.elem_n);
-    parameters.transducer.annular.elem_p_amp       = repmat(200000, 1, tran.transducer.annular.elem_n);
-    parameters.medium_properties.water.sound_speed = 1500;
-    parameters.medium_properties.water.density     = 1000;
-    if ~isstruct(parameters.calibration); parameters.calibration = struct(); end
-    parameters.calibration.opt_upper_velocity  = opt_upper_velocity;
-    parameters.calibration.opt_weights         = opt_weights;
-    parameters.calibration.skip_front_peak_mm  = skip_front_peak_mm;
-    parameters.calibration.initial_velocity    = initial_velocity;
-    parameters.calibration.forward_model       = 'rayleigh';
+    LIBRARY_MODEL_VERSION = 2;   % 2: per-ring phase + gain, per-depth drive (2026-09)
 
-    tmp_out = fullfile(tempdir, ['prestus_calib_' combo_name]);
-    if ~exist(tmp_out, 'dir'); mkdir(tmp_out); end
-    parameters.io.outputs_folder = tmp_out;
-
-    % Resolve char data path
     char_rel = combo_entry.char_data_path;
-    if isempty(char_data_root)
-        char_path = char_rel;
-    else
-        char_path = fullfile(char_data_root, char_rel);
-    end
+    if isempty(char_data_root); char_path = char_rel; else; char_path = fullfile(char_data_root, char_rel); end
     if ~isfile(char_path)
-        warning('build_transducer_library:missingCharData', ...
-            'Characterisation data not found: %s\nFalling back to geometry-only entry.\n(Set CHAR_DATA_ROOT if paths are relative.)', char_path);
-        build_geometric_entry(tran_serial, ds_serial, tran, library_path, 1500);
-        return;
+        error('build_transducer_library:missingCharData', ...
+            ['Characterisation data not found: %s\n' ...
+             'Set CHAR_DATA_ROOT (paths in the equipment YAML are relative), or remove ' ...
+             'char_data_path to build a geometric entry on purpose.'], char_path);
     end
 
-    charac_data         = readmatrix(char_path, 'NumHeaderLines', 1);
-    available_depths_ep = round(charac_data(1, 2:end), 2);
-    dist_ep             = charac_data(2:end, 1);
-    intens_data         = charac_data(2:end, 2:end);
-    fprintf('  Depths: %s mm\n', mat2str(available_depths_ep));
+    prof  = read_axial_profiles(char_path);
+    n_d   = numel(prof.depths_ep_mm);
+    fprintf('  Depths: %s mm\n', mat2str(prof.depths_ep_mm));
+    model = fit_transducer_model(tran, prof, fit_options);
+    geo   = fit_transducer_model(tran, prof, struct('EvaluateOnly', true));
 
-    dist_bowl_offset = tran.transducer.annular.curv_radius_mm - ...
-                       tran.transducer.annular.dist_geom_ep_mm;
-    dist_bowl        = dist_ep + dist_bowl_offset;
-
-    % --- Joint multi-depth phase correction (depth-independent) ---
-    ref_intensity = desired_intensities(1);
-    fit_opts = struct('ForwardModel', parameters.calibration.forward_model);
-    fprintf('  Fitting joint phase correction across %d depths...\n', numel(available_depths_ep));
-    [opt_delta_rad, opt_velocity_ref, ~] = perform_joint_depth_fit( ...
-        parameters, intens_data, available_depths_ep, dist_bowl, dist_bowl_offset, ...
-        ref_intensity, tran, fit_opts);
-    elem_phase_correction_deg = mod(opt_delta_rad(:)' * 180/pi, 360);
-
-    % --- Amplitude scaling per intensity ---
-    % Source amplitude = particle velocity x water impedance; velocity scales
-    % as sqrt(I) since I ∝ v². Anchored on the joint-fit reference velocity.
-    water_Z    = parameters.medium_properties.water.density * ...
-                 parameters.medium_properties.water.sound_speed;
-    amp_struct = struct();
-    for ii = 1:numel(desired_intensities)
-        isppa = desired_intensities(ii);
-        vel_i = opt_velocity_ref * sqrt(isppa / ref_intensity);
-        amp_i = round(vel_i * water_Z);
-        key   = sprintf('i%s', strrep(num2str(isppa), '.', 'p'));
-        amp_struct.(key) = amp_i;
-        fprintf('  I=%g W/cm² -> amp=%d\n', isppa, amp_i);
+    % Held-out acceptance gate
+    q = struct('n_depths', n_d, 'geometric_r2_median', median(geo.metrics.r2), ...
+               'in_sample_r2_median', median(model.metrics.r2), 'loo_r2_median', NaN, ...
+               'loo_worst_delta_r2', NaN, 'flags', {model.flags}, 'gate_worst', gate_worst);
+    if n_d >= 3
+        r2_loo = nan(1, n_d);
+        for j = 1:n_d
+            ptr = prof; ptr.depths_ep_mm(j) = []; ptr.I(:, j) = [];
+            m_tr = fit_transducer_model(tran, ptr, fit_options);
+            pte = prof; pte.depths_ep_mm = prof.depths_ep_mm(j); pte.I = prof.I(:, j);
+            sc = struct('EvaluateOnly', true, 'Prior', m_tr);
+            if isfield(fit_options, 'ForwardModel'); sc.ForwardModel = fit_options.ForwardModel; end
+            r2_loo(j) = fit_transducer_model(tran, pte, sc).metrics.r2;
+        end
+        q.loo_r2_median      = median(r2_loo);
+        q.loo_worst_delta_r2 = min(r2_loo - geo.metrics.r2(:)');
+        accept = q.loo_r2_median >= q.geometric_r2_median && q.loo_worst_delta_r2 >= -gate_worst;
+        if accept
+            q.decision = 'empirical';
+        else
+            q.decision = 'geometric';
+            q.reason = sprintf('held-out median R² %.3f vs geometric %.3f; worst depth %+.3f', ...
+                q.loo_r2_median, q.geometric_r2_median, q.loo_worst_delta_r2);
+        end
+    else
+        accept = true;
+        q.decision = 'empirical';
+        q.reason = sprintf('only %d depths — held-out gate not applicable', n_d);
     end
+    % Diagnostic: axial registration (not applied; persistent offsets point to a
+    % geometry / exit-plane error in the equipment YAML)
+    fo_dz = fit_options; fo_dz.FreeParams = union(fit_options_free(fit_options), {'z_shift'}, 'stable');
+    q.z_shift_mm = fit_transducer_model(tran, prof, fo_dz).z_shift_mm;
+    fprintf('  Fit: in-sample %.3f | held-out %.3f | geometric %.3f → %s | dz %+.2f mm | flags: %s\n', ...
+        q.in_sample_r2_median, q.loo_r2_median, q.geometric_r2_median, q.decision, q.z_shift_mm, ...
+        strjoin(model.flags, ','));
 
-    % --- Write library YAML (correction-only global model) ---
     out_file = fullfile(library_path, [combo_name '.yaml']);
     if isfile(out_file)
         lib = yaml.loadFile(out_file, 'ConvertToArray', true);
     else
         lib = struct();
     end
-
+    if isfield(lib, 'global_model'); lib = rmfield(lib, 'global_model'); end
     lib.meta.tran_serial = tran_serial;
     if ~isempty(ds_serial); lib.meta.driving_system = ds_serial; end
-    if ~isfield(lib, 'meta') || ~isfield(lib.meta, 'created_at') || isempty(lib.meta.created_at)
+    if ~isfield(lib.meta, 'created_at') || isempty(lib.meta.created_at)
         lib.meta.created_at = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
     end
     lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
-    lib.meta.calibration_type = 'empirical';
+    lib.meta.library_model_version = LIBRARY_MODEL_VERSION;
+    lib.meta.char_data        = char_rel;
+    lib.meta.quality          = q;
     try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
 
-    % Drop any legacy per-depth phase tables so the entry is correction-only.
-    if isfield(lib, 'global_model')
-        for legacy = {'depths_ep_mm', 'elem_phase_deg'}
-            if isfield(lib.global_model, legacy{1})
-                lib.global_model = rmfield(lib.global_model, legacy{1});
-            end
-        end
+    if accept
+        lib.meta.calibration_type = 'empirical';
+        lib = library_entry_from_model(lib, model, ref_intensity);
+    else
+        lib.meta.calibration_type = 'geometric';
+        lib = library_entry_from_model(lib, geo, ref_intensity);   % zero offsets, unit gains, measured drive
     end
-    lib.global_model.elem_phase_correction_deg = elem_phase_correction_deg;
-    lib.global_model.amplitude_scaling         = amp_struct;
-
     yaml.dumpFile(out_file, lib);
-    fprintf('  Written (correction-only): %s\n', out_file);
+    fprintf('  Written: %s\n', out_file);
+end
+
+function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_entry, ...
+        char_data_root, ref_intensity, fit_options, library_path)
+% One refinement per measured depth on a geometric global model. The global
+% model (zero offsets, unit gains, measured drive per depth) applies outside
+% the measured span; within it, LOAD_TRANSDUCER_FROM_LIBRARY interpolates the
+% per-depth phases, gains and drives.
+
+    LIBRARY_MODEL_VERSION = 3;   % 3: per-depth refinements with drive and gains (2026-09)
+
+    char_rel = combo_entry.char_data_path;
+    if isempty(char_data_root); char_path = char_rel; else; char_path = fullfile(char_data_root, char_rel); end
+    if ~isfile(char_path)
+        error('build_transducer_library:missingCharData', ...
+            ['Characterisation data not found: %s\n' ...
+             'Set CHAR_DATA_ROOT (paths in the equipment YAML are relative), or remove ' ...
+             'char_data_path to build a geometric entry on purpose.'], char_path);
+    end
+    prof = read_axial_profiles(char_path);
+    n_d  = numel(prof.depths_ep_mm);
+    fprintf('  Depths: %s mm\n', mat2str(prof.depths_ep_mm));
+
+    ev  = struct('EvaluateOnly', true);
+    for f = {'ForwardModel', 'Domain', 'NearFieldSkipMm'}
+        if isfield(fit_options, f{1}); ev.(f{1}) = fit_options.(f{1}); end
+    end
+    geo  = fit_transducer_model(tran, prof, ev);
+    fits = cell(1, n_d);
+    for j = 1:n_d
+        pj = prof; pj.depths_ep_mm = prof.depths_ep_mm(j); pj.I = prof.I(:, j);
+        fits{j} = fit_transducer_model(tran, pj, fit_options);
+    end
+    r2_fit = cellfun(@(f) f.metrics.r2, fits);
+    dz     = cellfun(@(f) f.z_shift_mm, fits);
+
+    % Held-out interpolation: interior depth j predicted from j-1 and j+1
+    % (phases on the unit circle, gains linearly), without z shift as at run time
+    r2_int = nan(1, n_d);
+    for j = 2:n_d - 1
+        a = fits{j - 1}; b = fits{j + 1};
+        t = (prof.depths_ep_mm(j) - a.fit_depths_ep_mm) / (b.fit_depths_ep_mm - a.fit_depths_ep_mm);
+        u = unwrap([a.elem_phase_correction_deg; b.elem_phase_correction_deg] * pi/180, [], 1);
+        pr = struct('elem_phase_correction_deg', mod(((1 - t) * u(1, :) + t * u(2, :)) * 180/pi, 360), ...
+                    'elem_amp_weight', (1 - t) * a.elem_amp_weight + t * b.elem_amp_weight);
+        pj = prof; pj.depths_ep_mm = prof.depths_ep_mm(j); pj.I = prof.I(:, j);
+        sc = ev; sc.Prior = pr;
+        r2_int(j) = fit_transducer_model(tran, pj, sc).metrics.r2;
+    end
+    r2_geo = geo.metrics.r2(:)';
+    q = struct('mode', 'per_depth', 'n_depths', n_d, ...
+        'geometric_r2_median', median(r2_geo), 'in_sample_r2_median', median(r2_fit), ...
+        'in_sample_r2_min', min(r2_fit), ...
+        'interp_r2_median', median(r2_int, 'omitnan'), ...
+        'interp_worst_delta_r2', min(r2_int - r2_geo, [], 'omitnan'), ...
+        'z_shift_mm', dz, 'flags', {flags_of(fits)});
+    fprintf(['  Per-depth: in-sample median %.3f (min %.3f) | held-out interpolation %.3f ' ...
+        '(worst vs geometric %+.3f) | geometric %.3f | dz %s mm\n'], q.in_sample_r2_median, ...
+        q.in_sample_r2_min, q.interp_r2_median, q.interp_worst_delta_r2, q.geometric_r2_median, ...
+        mat2str(round(dz, 1)));
+
+    out_file = fullfile(library_path, [combo_name '.yaml']);
+    if isfile(out_file); lib = yaml.loadFile(out_file, 'ConvertToArray', true); else; lib = struct(); end
+    for f = {'global_model', 'refinement'}
+        if isfield(lib, f{1}); lib = rmfield(lib, f{1}); end
+    end
+    lib.meta.tran_serial = tran_serial;
+    if ~isempty(ds_serial); lib.meta.driving_system = ds_serial; end
+    if ~isfield(lib.meta, 'created_at') || isempty(lib.meta.created_at)
+        lib.meta.created_at = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    end
+    lib.meta.last_updated          = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
+    lib.meta.library_model_version = LIBRARY_MODEL_VERSION;
+    lib.meta.calibration_type      = 'empirical';
+    lib.meta.library_mode          = 'per_depth';
+    lib.meta.char_data             = char_rel;
+    lib.meta.quality               = q;
+    try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+
+    lib = library_entry_from_model(lib, geo, ref_intensity);   % geometric global model, measured drive
+    lib.global_model.elem_phase_correction_deg = [];           % pure geometric steering outside the refinements
+    lib.global_model = rmfield(lib.global_model, {'elem_amp_weight', 'free_params', 'fit_z_shift_mm'});
+    lib = library_refinement_from_fits(lib, fits, ref_intensity, [], char_rel);
+    yaml.dumpFile(out_file, lib);
+    fprintf('  Written: %s\n', out_file);
+end
+
+function fl = flags_of(fits)
+    fl = cellfun(@(f) reshape(cellstr(f.flags), 1, []), fits, 'UniformOutput', false);
+    fl = unique([fl{:}]);
+end
+
+function f = fit_options_free(fo)
+    if isfield(fo, 'FreeParams'); f = fo.FreeParams; else; f = {'phase', 'amp', 'z_shift'}; end
 end

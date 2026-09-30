@@ -1,9 +1,16 @@
 function update_transducer_library(combo_name, calibration_output_folder, library_path)
-% UPDATE_TRANSDUCER_LIBRARY  Build or update the global model in the library YAML
+% UPDATE_TRANSDUCER_LIBRARY  Add depth-specific refinements to a library YAML
 %
 % Scans calibration_output_folder for per-run YAML files matching
-% {combo_name}-F*mm-I*wpercm2.yaml, groups them by depth, and builds or
-% updates the global_model entry in the library YAML for this combo.
+% {combo_name}-F*mm-I*wpercm2.yaml (single-depth calibrations against
+% hydrophone profiles), converts their absolute element phases into offsets
+% relative to geometric steering at each depth, and merges them into the
+% optional 'refinement' section of the library YAML. The static model
+% (global_model.elem_phase_correction_deg) is left untouched;
+% load_transducer_from_library blends the two continuously in depth.
+%
+% Point library_path at a user folder to keep refinements out of the
+% shipped library (set transducer.library_path in the study config).
 %
 % Use as:
 %   update_transducer_library(combo_name)
@@ -137,19 +144,26 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         amp_struct.(key) = amp_val;
     end
 
-    %% Monotonicity check
-    if numel(unique_depths) > 1
-        n_elem = numel(depth_phase_map{1});
-        for elem_i = 1:n_elem
-            elem_phases = cellfun(@(p) p(elem_i), depth_phase_map);
-            diffs = diff(elem_phases);
-            if ~all(diffs >= 0) && ~all(diffs <= 0)
-                warning('update_transducer_library:nonMonotonic', ...
-                    ['Element %d phases are non-monotonic across depths [%s] deg. ' ...
-                    'Check calibration quality.'], ...
-                    elem_i, num2str(elem_phases, '%.1f '));
-            end
+    %% Offsets relative to geometric steering ----------------------------
+    equip = load_equipment_config();
+    if ~isfield(equip.trans, tran_serial_found)
+        error('update_transducer_library: transducer ''%s'' not in equipment config.', tran_serial_found);
+    end
+    tran        = equip.trans.(tran_serial_found);
+    tran.n_elem = tran.transducer.annular.elem_n;
+    geo_params  = struct();
+    geo_params.medium_properties.water.sound_speed = 1500;
+    geo_params.transducer        = tran.transducer;
+    geo_params.transducer.n_elem = tran.n_elem;
+    offset_map = cell(1, n_depths);
+    for di = 1:n_depths
+        ph = depth_phase_map{di};
+        if numel(ph) ~= tran.n_elem
+            error('update_transducer_library: %d phases at %.1f mm but geometry has %d elements.', ...
+                numel(ph), unique_depths(di), tran.n_elem);
         end
+        geo = set_real_phases(tran, unique_depths(di), geo_params);
+        offset_map{di} = mod(ph(:)' - geo(:)', 360);
     end
 
     %% Load existing library YAML (if present), merge
@@ -184,56 +198,46 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         lib.meta.prestus_version = 'unknown';
     end
 
-    %% Merge depths into existing global_model (if any)
-    if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm') && ...
-            ~isempty(lib.global_model.depths_ep_mm)
-        existing_depths  = lib.global_model.depths_ep_mm(:)';
-        existing_phases  = lib.global_model.elem_phase_deg;  % cell array
-        if ~iscell(existing_phases)
-            existing_phases = num2cell(existing_phases, 2);
-        end
-
-        % Merge: update existing depths, append new ones
-        all_depths   = existing_depths;
-        all_phases   = existing_phases;
-        for di = 1:n_depths
-            d_val = unique_depths(di);
-            [~, match] = min(abs(all_depths - d_val));
-            if abs(all_depths(match) - d_val) < 0.5
-                all_phases{match} = depth_phase_map{di};
-            else
-                all_depths(end+1)   = d_val; %#ok<AGROW>
-                all_phases{end+1}   = depth_phase_map{di}; %#ok<AGROW>
-            end
-        end
-        % Sort by depth
-        [all_depths, sort_idx] = sort(all_depths);
-        all_phases = all_phases(sort_idx);
-
-        lib.global_model.depths_ep_mm  = all_depths;
-        lib.global_model.elem_phase_deg = all_phases;
-
-        % Merge amplitude_scaling
-        if isfield(lib.global_model, 'amplitude_scaling')
-            existing_amp = lib.global_model.amplitude_scaling;
-            new_keys = fieldnames(amp_struct);
-            for ki = 1:numel(new_keys)
-                existing_amp.(new_keys{ki}) = amp_struct.(new_keys{ki});
-            end
-            lib.global_model.amplitude_scaling = existing_amp;
-        else
-            lib.global_model.amplitude_scaling = amp_struct;
+    %% Merge into the refinement section --------------------------------
+    if isfield(lib, 'refinement') && isstruct(lib.refinement) && ...
+            isfield(lib.refinement, 'depths_ep_mm') && ~isempty(lib.refinement.depths_ep_mm)
+        all_depths = double(lib.refinement.depths_ep_mm(:)');
+        all_offs   = lib.refinement.elem_phase_correction_deg;
+        if ~iscell(all_offs)
+            if numel(all_depths) == 1; all_offs = {all_offs}; else; all_offs = num2cell(all_offs, 2); end
         end
     else
-        % Build fresh global_model
-        lib.global_model.depths_ep_mm   = unique_depths;
-        lib.global_model.elem_phase_deg = depth_phase_map;
+        lib.refinement = struct();
+        all_depths = []; all_offs = {};
+    end
+    for di = 1:n_depths
+        d_val = unique_depths(di);
+        match = find(abs(all_depths - d_val) < 0.5, 1);
+        if isempty(match)
+            all_depths(end+1) = d_val;          %#ok<AGROW>
+            all_offs{end+1}   = offset_map{di}; %#ok<AGROW>
+        else
+            all_offs{match}   = offset_map{di};
+        end
+    end
+    [all_depths, sort_idx] = sort(all_depths);
+    lib.refinement.depths_ep_mm              = all_depths;
+    lib.refinement.elem_phase_correction_deg = all_offs(sort_idx);
+    if ~isfield(lib.refinement, 'blend_mm'); lib.refinement.blend_mm = 5; end
+    lib.refinement.source       = 'update_transducer_library';
+    lib.refinement.last_updated = today_str;
+
+    % Amplitude: keep the static value when present; otherwise adopt these
+    if ~isfield(lib, 'global_model') || ~isstruct(lib.global_model) || ...
+            ~isfield(lib.global_model, 'amplitude_scaling') || isempty(lib.global_model.amplitude_scaling)
         lib.global_model.amplitude_scaling = amp_struct;
+    else
+        lib.refinement.amplitude_scaling = amp_struct;   % informational
     end
 
     %% Write updated YAML
     yaml.dumpFile(lib_yaml, lib);
-    fprintf('Library updated: %s\n  %d depths: [%s] mm\n', ...
-        lib_yaml, numel(lib.global_model.depths_ep_mm), ...
-        num2str(lib.global_model.depths_ep_mm(:)', '%.1f '));
+    fprintf('Library refinement updated: %s\n  %d refined depths: [%s] mm\n', ...
+        lib_yaml, numel(lib.refinement.depths_ep_mm), ...
+        num2str(lib.refinement.depths_ep_mm(:)', '%.1f '));
 end
