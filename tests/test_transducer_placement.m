@@ -125,13 +125,16 @@ classdef test_transducer_placement < matlab.unittest.TestCase
             % RAS mm ≈ voxel index (modulo offset from image origin).
 
             p = make_placement_parameters();
-            p.placement.localite.reference_distance_mm = 0;  % no offset
+            % Matrix origin = bowl rear centre. tracker_to_bowl_mm is the
+            % highest-priority offset; reference_distance_mm (legacy) is only
+            % used when the transducer geometry cannot give one.
+            p.placement.localite.tracker_to_bowl_mm = 0;
 
             % Build a minimal synthetic NIfTI header: 1 mm iso, no rotation
             t1_header          = struct();
             t1_header.ImageSize = [200, 200, 200];
             t1_header.Transform = struct();
-            % affine: RAS = vox - [100 100 100]  →  vox = RAS + [100 100 100]
+            % affine: RAS = vox0 - [100 100 100] (0-based) → 1-based vox = RAS + 101
             T = eye(4);
             T(1:3, 4) = -[100; 100; 100];
             t1_header.Transform.T = T';   % niftiinfo stores T transposed
@@ -145,20 +148,20 @@ classdef test_transducer_placement < matlab.unittest.TestCase
             [trans_pos, focus_pos, trans_pos_ras, ~] = ...
                 localite_matrix_to_positions(coord_matrix, t1_header, p);
 
-            % With reference_dist = 0: trans_pos_ras = [10 20 30]
+            % With tracker_to_bowl_mm = 0: trans_pos_ras = [10 20 30]
             tc.verifyEqual(trans_pos_ras, [10, 20, 30], 'AbsTol', 1e-6, ...
                 'RAS position should match matrix translation column');
 
-            % Voxel position = RAS + [100 100 100] = [110 120 130]
-            tc.verifyEqual(trans_pos, [110, 120, 130], 'AbsTol', 0.5, ...
-                'Voxel position should be RAS + image origin offset');
+            % 1-based voxel = RAS + [101 101 101] = [111 121 131]
+            tc.verifyEqual(trans_pos, [111, 121, 131], 'AbsTol', 0.5, ...
+                'Voxel position should be RAS + image origin offset (1-based)');
 
             % Focus is offset along direction by focal_distance_bowl
             focal_dist = p.transducer(1).focal_distance_bowl;
             expected_focus_ras = [10, 20, 30 + focal_dist];
-            tc.verifyEqual(double(focus_pos(3)), expected_focus_ras(3) + 100, ...
+            tc.verifyEqual(double(focus_pos(3)), expected_focus_ras(3) + 101, ...
                 'AbsTol', 1.5, ...
-                'Focus z-voxel should equal (focus z-RAS + 100) to within 1.5 vox');
+                'Focus z-voxel should equal (focus z-RAS + 101) to within 1.5 vox');
         end
 
         function test_localite_xml_parse_returns_valid_positions(tc)

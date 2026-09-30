@@ -279,7 +279,8 @@ See [doc_placement_neuronav.md](doc_placement_neuronav.md).
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `enabled` | Load transducer position from Localite neuronavigation files? | `0` | `1 = yes`, `0 = no` |
-| `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Corrects for varying tracker-to-exit-plane distances. Only applies when `enabled=1`. |
+| `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Fallback when transducer geometry and `tracker_to_bowl_mm` are absent. |
+| `tracker_to_bowl_mm` | Measured offset from the Localite matrix origin to the bowl rear centre [mm]. | `[]` | Overrides geometry and `reference_distance_mm`. |
 
 #### `placement.heuristic`
 

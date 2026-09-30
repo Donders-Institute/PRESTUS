@@ -102,13 +102,17 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
 
     % --- Focal distance (exit plane → acoustic focus, along beam axis) ---
     parameters = focal_distance_calculation(parameters);
-    focal_dist = parameters.transducer(1).focal_distance_ep;
+    focal_dist = parameters.transducer(1).focal_distance_bowl;
 
     % --- Compute positions in RAS space ---
-    % reference_dist (negative) shifts ref_pos back to the bowl rear centre.
-    % focal_dist (positive, ~85 mm) moves ref_pos to the acoustic focus.
+    % reference_dist shifts ref_pos to the bowl rear centre (trans_pos); the
+    % focus lies focal_distance_bowl beyond that along the beam axis. With
+    % the geometry-derived default (origin = exit plane) this equals
+    % ref_pos + focal_distance_ep * ref_vec; for any other origin (e.g.
+    % tracker_to_bowl_mm = 0, as PlanTUS sets) only the bowl-referenced form
+    % is correct.
     trans_pos_ras = (ref_pos + reference_dist * ref_vec)';   % [1×4] homogeneous
-    focus_pos_ras = (ref_pos + focal_dist     * ref_vec)';
+    focus_pos_ras = (ref_pos + (reference_dist + focal_dist) * ref_vec)';
 
     % --- Convert RAS to voxel space ---
     trans_pos = ras_to_grid(trans_pos_ras(1:3)', t1_header);  % [1×3]
