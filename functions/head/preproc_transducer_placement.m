@@ -5,7 +5,11 @@ function parameters = preproc_transducer_placement(parameters)
 % parameters.placement.mode:
 %
 %   'manual'    Use trans_pos / focus_pos already in parameters (default).
-%               Coordinates must be in voxel space relative to the planning image.
+%               placement.manual.coordinate_space sets their space:
+%               'voxel' (default; 1-based T1 voxel indices), 'ras' (subject
+%               RAS+ mm of the T1) or 'mni' (MNI mm; transducer via the 12dof
+%               transform, focus via the nonlinear warp, no scalp snapping).
+%               ras/mni are converted to T1 voxels here, per transducer.
 %
 %   'localite'  Parse a Localite XML file (TriggerMarkers or GUMMarkers)
 %               and derive trans_pos / focus_pos from the recorded instrument
@@ -76,7 +80,7 @@ end
 
         % ── MANUAL ────────────────────────────────────────────────────────
         case 'manual'
-            disp('Using manually specified transducer / focus positions.');
+            parameters = run_manual_placement(parameters);
 
         % ── LOCALITE ──────────────────────────────────────────────────────
         case 'localite'
@@ -104,6 +108,73 @@ end
                    'or ''tus_entry''.'], mode);
     end
 
+end
+
+% ── Manual placement dispatcher ──────────────────────────────────────────
+function parameters = run_manual_placement(parameters)
+% Convert manually specified positions to T1 voxel indices if they were
+% given in RAS+ or MNI mm. Each transducer keeps its own positions (unlike
+% the other modes, which write one resolved pair into all transducers).
+
+    cs = manual_coordinate_space(parameters);
+    if strcmp(cs, 'voxel')
+        disp('Using manually specified transducer / focus positions (T1 voxels).');
+        return;
+    end
+
+    % Voxel indices refer to the T1 grid, so convert via the T1 affine
+    t1_glob = fullfile(parameters.path.anat, ...
+        sprintf(parameters.path.t1_pattern, parameters.subject_id));
+    t1_hits = dir(t1_glob);
+    if isempty(t1_hits)
+        error('PRESTUS:placement:t1NotFound', 'T1 file not found matching: %s', t1_glob);
+    end
+    t1_header = niftiinfo(fullfile(t1_hits(1).folder, t1_hits(1).name));
+
+    if strcmp(cs, 'mni')
+        m2m = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+    end
+
+    n_tr = numel(parameters.transducer);
+    input_trans = nan(n_tr, 3);
+    input_focus = nan(n_tr, 3);
+    for ti = 1:n_tr
+        tr = parameters.transducer(ti);
+        if ~isfield(tr, 'trans_pos') || numel(tr.trans_pos) ~= 3 || ...
+                ~isfield(tr, 'focus_pos') || numel(tr.focus_pos) ~= 3
+            error('PRESTUS:placement:missingPositions', ...
+                ['Transducer %d: trans_pos and focus_pos must be [1x3] ' ...
+                 'for placement.manual.coordinate_space = ''%s''.'], ti, cs);
+        end
+        input_trans(ti,:) = tr.trans_pos(:)';
+        input_focus(ti,:) = tr.focus_pos(:)';
+
+        if strcmp(cs, 'mni')
+            % Transducer lies outside the brain: linear 12dof (nonl unreliable).
+            % Focus lies inside the brain: nonlinear warp, as the heuristic.
+            trans_ras = mni2subject_coords_LDfix(input_trans(ti,:), m2m, parameters, '12dof');
+            focus_ras = mni2subject_coords_LDfix(input_focus(ti,:), m2m, parameters, 'nonl');
+        else
+            trans_ras = input_trans(ti,:);
+            focus_ras = input_focus(ti,:);
+        end
+
+        parameters.transducer(ti).trans_pos = ras_to_grid(trans_ras, t1_header);
+        parameters.transducer(ti).focus_pos = ras_to_grid(focus_ras, t1_header);
+
+        fprintf('Transducer %d (%s mm -> T1 voxels):\n', ti, upper(cs));
+        fprintf('  trans_pos = [%g %g %g] -> [%d %d %d]\n', input_trans(ti,:), parameters.transducer(ti).trans_pos);
+        fprintf('  focus_pos = [%g %g %g] -> [%d %d %d]\n', input_focus(ti,:), parameters.transducer(ti).focus_pos);
+    end
+
+    % Positions are voxel indices from here on; keep the inputs for the record
+    parameters.placement.manual.input_trans_pos = input_trans;
+    parameters.placement.manual.input_focus_pos = input_focus;
+    parameters.placement.manual.coordinate_space = 'voxel';
+
+    % The distance fallback was skipped at load time (positions were mm);
+    % fill any missing focal distances now that positions are voxels
+    parameters = focal_distance_calculation(parameters);
 end
 
 % ── Localite placement dispatcher ────────────────────────────────────────

@@ -130,6 +130,13 @@ function [parameters] = prestus_pipeline(parameters, options)
             parameters.modules.run_transducer_placement == 1
         parameters = preproc_transducer_placement(parameters);
     else
+        % Without the placement stage RAS/MNI mm would be read as voxels
+        if ~strcmp(manual_coordinate_space(parameters), 'voxel')
+            error('PRESTUS:placement:unconvertedPositions', ...
+                ['placement.manual.coordinate_space = ''%s'' requires ' ...
+                 'modules.run_transducer_placement = 1 (positions are converted there).'], ...
+                manual_coordinate_space(parameters));
+        end
         disp('Transducer placement stage skipped.');
     end
     log_timer('stop','placement');

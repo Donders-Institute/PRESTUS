@@ -49,6 +49,61 @@ classdef test_transducer_placement < matlab.unittest.TestCase
             tc.verifyError(@() preproc_transducer_placement(p), '');
         end
 
+        function test_manual_explicit_voxel_is_passthrough(tc)
+            p = make_placement_parameters();
+            p.placement.manual.coordinate_space = 'voxel';
+            p_out = preproc_transducer_placement(p);
+            tc.verifyEqual(p_out.transducer(1).trans_pos, p.transducer(1).trans_pos);
+            tc.verifyEqual(p_out.transducer(1).focus_pos, p.transducer(1).focus_pos);
+        end
+
+        function test_manual_unknown_coordinate_space_errors(tc)
+            p = make_placement_parameters();
+            p.placement.manual.coordinate_space = 'lps';
+            tc.verifyError(@() preproc_transducer_placement(p), ...
+                'PRESTUS:placement:badCoordinateSpace');
+        end
+
+        function test_manual_ras_converts_per_transducer(tc)
+            % RAS+ mm positions are converted via the T1 affine, per transducer
+            [p, A] = make_ras_placement_parameters(tc);
+            ras_trans = [p.transducer(1).trans_pos; p.transducer(2).trans_pos];
+            ras_focus = [p.transducer(1).focus_pos; p.transducer(2).focus_pos];
+
+            p_out = preproc_transducer_placement(p);
+
+            for ti = 1:2
+                exp_trans = round(A \ [ras_trans(ti,:) 1]') + 1;   % 1-based voxel
+                exp_focus = round(A \ [ras_focus(ti,:) 1]') + 1;
+                tc.verifyEqual(p_out.transducer(ti).trans_pos, exp_trans(1:3)', ...
+                    sprintf('Transducer %d trans_pos', ti));
+                tc.verifyEqual(p_out.transducer(ti).focus_pos, exp_focus(1:3)', ...
+                    sprintf('Transducer %d focus_pos', ti));
+            end
+            tc.verifyEqual(p_out.placement.manual.coordinate_space, 'voxel', ...
+                'Positions are voxels after conversion');
+            tc.verifyEqual(p_out.placement.manual.input_trans_pos, ras_trans);
+            tc.verifyEqual(p_out.placement.manual.input_focus_pos, ras_focus);
+        end
+
+        function test_manual_ras_defers_focal_distance_fallback(tc)
+            % The distance fallback must not run on mm positions at load time,
+            % but must be filled once positions are voxels
+            [p, ~] = make_ras_placement_parameters(tc);
+            % As after load_parameters: fields present but empty
+            [p.transducer.focal_distance_bowl]   = deal([]);
+            [p.transducer.focal_distance_ep]     = deal([]);
+            [p.transducer.focal_distance_offset] = deal([]);
+
+            p_loaded = focal_distance_calculation(p);
+            tc.verifyEmpty(p_loaded.transducer(1).focal_distance_bowl, ...
+                'Fallback must be skipped while positions are RAS mm');
+
+            p_out = preproc_transducer_placement(p_loaded);
+            tc.verifyNotEmpty(p_out.transducer(1).focal_distance_bowl, ...
+                'Fallback must be filled after conversion to voxels');
+        end
+
         function test_localite_missing_file_errors(tc)
             % Localite mode with no file and no path.localite must raise an error
             p = make_placement_parameters();
@@ -166,4 +221,30 @@ function p = make_placement_parameters()
     % without running the full focal_distance_calculation step.
     p.transducer(1).focal_distance_bowl = ...
         p.transducer(1).annular.curv_radius_mm;  % simplified: bowl depth ≈ radius
+end
+
+function [p, A] = make_ras_placement_parameters(tc)
+% Two transducers in RAS+ mm, plus a synthetic T1 with a non-trivial affine
+% (2 mm voxels, shifted origin) written to a temporary folder.
+    tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+    A = [2 0 0 -40; 0 2 0 -50; 0 0 2 -30; 0 0 0 1];   % voxel -> RAS+ (column form)
+    t1_file = fullfile(tmp, 'sub-001_T1w.nii');
+    niftiwrite(zeros(40, 50, 40, 'single'), t1_file);
+    info = niftiinfo(t1_file);
+    info.Transform = affine3d(A');
+    info.TransformName = 'Sform';
+    niftiwrite(zeros(40, 50, 40, 'single'), t1_file, info);
+
+    p = make_placement_parameters();
+    p.path.anat = tmp;
+    p.path.t1_pattern = 'sub-%1$03d_T1w.nii*';
+    p.grid.resolution_mm = 1;
+    p.placement.manual.coordinate_space = 'ras';
+    p.transducer(1).focal_distance_ep     = [];   % as after load_parameters
+    p.transducer(1).focal_distance_offset = [];
+    p.transducer(2) = p.transducer(1);
+    p.transducer(1).trans_pos = [-20.3, 10.1, 30.0];
+    p.transducer(1).focus_pos = [-5.0, 12.2, 8.9];
+    p.transducer(2).trans_pos = [15.0, -20.4, 25.2];
+    p.transducer(2).focus_pos = [4.1, -3.0, 6.0];
 end

@@ -176,8 +176,8 @@ transducer:
   freq_hz: []           # Fundamental frequency [Hz]
   target_isppa_wcm2: 30 # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
 
-  trans_pos: []              # Transducer position [T1 grid space]
-  focus_pos: []              # Stimulation target position [T1 grid space]
+  trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
+  focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]
   focal_distance_ep: []      # Expected focal distance from transducer exit plane [mm]
   focal_distance_bowl: []    # Expected focal distance from transducer bowl [mm]
   focal_distance_offset: []  # Offset between bowl and exit plane [mm] [DERIVED]
@@ -263,6 +263,13 @@ placement:
                     #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
                     #   'mni'       (define trans/focus directly in MNI mm; snapped to scalp + gap; set placement.mni.*) |
                     #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
+  manual:
+    coordinate_space: 'voxel' # Space of transducer.trans_pos / focus_pos in mode='manual':
+                              #   'voxel' (1-based T1 voxel indices) |
+                              #   'ras'   (subject RAS+ mm of the T1; converted with ras_to_grid) |
+                              #   'mni'   (MNI mm; transducer via the 12dof transform, focus via the
+                              #            nonlinear warp; no scalp snapping, unlike mode='mni').
+                              # ras/mni are converted to T1 voxels in the placement stage, per transducer.
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer?
     # --- Simple mode: provide a direct path to a single Localite XML file ---

@@ -168,8 +168,8 @@ All fields are mandatory and have no defaults — they must be set in the study 
 |---|---|---|
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
-| `trans_pos` | Transducer position (XYZ, T1 grid). | |
-| `focus_pos` | Focus (target) position (XYZ, T1 grid). | |
+| `trans_pos` | Transducer position (XYZ, bowl apex). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
+| `focus_pos` | Focus (target) position (XYZ). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focal_distance_ep` | Expected focal distance from transducer exit plane [mm]. | Alternative to `trans_pos`/`focus_pos`. Either `focal_distance_ep`, `focal_distance_bowl`, or both must be set. |
 | `focal_distance_bowl` | Expected focal distance from transducer bowl [mm]. | |
 | `focal_distance_offset` | Offset between transducer bowl and exit plane [mm]. | **Derived** from `curv_radius_mm − dist_geom_ep_mm`. Not set by user. |
@@ -259,6 +259,18 @@ Warning: The `define_here` options are experimental and may contain bugs due to 
 ### Transducer placement (`placement`)
 
 See [doc_placement.md](doc_placement.md).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `mode` | Placement mode. | `'manual'` | `'manual'`, `'localite'`, `'heuristic'`, `'mni'`, `'plantus'` or `'tus_entry'`. |
+
+#### `placement.manual`
+
+See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `coordinate_space` | Space of `transducer.trans_pos` / `focus_pos` in `mode='manual'`. | `'voxel'` | `'voxel'` (1-based T1 voxels), `'ras'` (subject RAS+ mm), `'mni'` (MNI mm; transducer via 12dof, focus via nonlinear warp, no scalp snapping). Converted per transducer in the placement stage, which must be enabled. |
 
 #### `placement.localite`
 

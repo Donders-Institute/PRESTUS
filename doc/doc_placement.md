@@ -6,7 +6,24 @@ PRESTUS expects coordinates of both the transducer (`transducer.trans_pos`) and 
 
 ## Manual coordinate selection
 
-Suitable coordinates (x/y/z) may be identified in preferred imaging software based on e.g. an fMRI hotspot, anatomical marker. 
+Suitable coordinates (x/y/z) may be identified in preferred imaging software based on e.g. an fMRI hotspot, anatomical marker.
+
+By default the coordinates are 1-based T1 voxel indices. Set `placement.manual.coordinate_space` to enter them in millimetres instead:
+
+```yaml
+placement:
+  mode: 'manual'
+  manual:
+    coordinate_space: 'ras'   # 'voxel' (default) | 'ras' | 'mni'
+transducer:
+  trans_pos: [-62.1, 12.4, 48.0]   # bowl apex, subject RAS+ mm
+  focus_pos: [-21.5, 10.2, 2.3]
+```
+
+- `ras` — subject RAS+ mm of the T1 (e.g. read from a viewer or neuronavigation), converted with `ras_to_grid()` via the T1 affine.
+- `mni` — MNI mm. The transducer point is converted with the linear (12dof) transform and the focus with the nonlinear warp, as in [MNI placement](doc_placement_mni.md), but the transducer is **not** snapped to the scalp: the points are used exactly as given. Requires the SimNIBS `m2m_sub-XXX` folder.
+
+Conversion happens once, per transducer, in the placement stage (so `modules.run_transducer_placement` must be `1`). Afterwards the positions are voxel indices, `coordinate_space` is set to `'voxel'`, and the original inputs are kept in `placement.manual.input_trans_pos` / `input_focus_pos`. If neither `focal_distance_ep` nor `focal_distance_bowl` is set, the distance fallback from the positions is computed after conversion.
 
 ## MNI coordinate selection
 
@@ -159,7 +176,7 @@ All outputs are written to `path.seg/TUS_entry/sub-<ID>/<target_name>/`:
 
 | Mode | Primary objective | Requires |
 |------|------------------|----------|
-| `manual` | User-specified | Coordinates in config |
+| `manual` | User-specified | Coordinates in config (T1 voxels, RAS+ mm or MNI mm) |
 | `localite` | Recorded neuronavigation pose | Localite XML |
 | `heuristic` | Skull-surface proximity to MNI target | SimNIBS segmentation |
 | `plantus` | Beam–target overlap + skull acoustics | SimNIBS mesh + PlanTUS install |

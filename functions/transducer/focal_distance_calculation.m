@@ -69,6 +69,10 @@ for ti = 1:numel(parameters.transducer)
 
         if ~has_pos
             warn('Transducer %d: trans_pos or focus_pos missing; cannot compute expected focal distance.', ti);
+        elseif ~strcmp(manual_coordinate_space(parameters), 'voxel')
+            % Positions are still RAS/MNI mm; preproc_transducer_placement
+            % converts them to voxels and calls this function again
+            disp('Positions not yet in T1 voxels; focal distance will be derived after placement.');
         else
             focal_distance = norm(tr.focus_pos - tr.trans_pos);
 
