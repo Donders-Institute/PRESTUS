@@ -363,6 +363,16 @@ neuronav:
                     #     target: 'L_MD'          # one recorded block, or:
                     #     sequences: [{target: 'R_MD'}, {target: 'R_MD'}]   # several blocks
                     # [] = single-coil ingestion (Coil0, GUMMarkers fallback)
+  # --- Target naming (neuronav_name_series; same rule in neuronav_gui and neuronav_ingest_batch) ---
+  suggest_names: true       # Name series after the planned target (EntryTarget / GUMMarkers) nearest their beam axis
+  axis_tolerance_mm: 10     # Max. distance of that target from the beam axis [mm]
+  target_depth_mm: [0, 150] # Accepted target depth along the beam axis [mm]
+  target_labels: []         # Label map: planned-target labels as recorded -> study target names, e.g.
+                            #   - target: 'L_PUL'
+                            #     labels: ['LEFT PUL', 'L_P*']   # wildcards * ?, case-insensitive
+                            # [] = use the labels as found (list them with neuronav_scan_sessions)
+  batch_write: 'all'        # neuronav_ingest_batch: 'all' tracked series, or only 'named' ones
+
 #------------ Simulation grid
 
 grid:

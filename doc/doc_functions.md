@@ -58,6 +58,13 @@ The following documents the functions provided in PRESTUS.
 | `preview_report_styles`                 | Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html. |
 | `discover_group_subjects`               | Auto-discover completed subjects by scanning `path.sim` for folders with a matching per-subject CSV. |
 
+#### GUI
+
+| **Function Name**                       | **Description**                                                                                 |
+|-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `neuronav_gui`                          | Stand-alone GUI for Localite marker ingestion: detect and review series, QC, name targets, batch ingestion, MNI view. |
+| `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs.                         |
+
 #### HEAD
 
 | **Function Name**                       | **Description**                                                                                 |
@@ -133,12 +140,21 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_convert_MNI_to_native`        | Transform coordinates from MNI space to native subject space                                    |
 | `neuronav_convert_native_to_MNI`        | Convert native RAS coordinates to MNI space                                                     |
 | `neuronav_convert_trigger_to_voxels`    | Convert Localite trigger positions to voxel (image) coordinates.                                |
+| `neuronav_detect_series`                | Detect the recorded series of one session (QC, suggested names) without writing.                |
 | `neuronav_export_session_csv`           | Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions.          |
 | `neuronav_find_planning_t1`             | Find the planning T1 loaded into Localite (`path.localite_t1`, else `path.localite_raw`).       |
 | `neuronav_get_group_mean_mni`           | Compute group-level average MNI coordinates (both mm and voxel).                                |
+| `neuronav_ingest_batch`                 | Ingest and export Localite targets for many subjects/sessions; writes `neuronav_ingest_summary.csv`. |
+| `neuronav_label_map_from_scan`          | Build a `neuronav.target_labels` map from a label scan.                                         |
 | `neuronav_localite_pose`                | Resolve the recorded Localite instrument pose for placement (file mode, or ingested markers; ingests on first use). |
+| `neuronav_map_label`                    | Map a Localite target label to the study target name (`neuronav.target_labels`).                |
+| `neuronav_name_series`                  | Name the detected series of a session (coil table, planned target, default; shared GUI/script rule). |
+| `neuronav_read_label_candidates`        | Collect the named planned targets of a session (EntryTarget, GUMMarkers).                       |
 | `neuronav_resolve_paths`                | Resolve the Localite raw/ingested/T1/export folders from `path.localite_*` (with `path.localite` fallback). |
+| `neuronav_scan_sessions`                | Inventory raw Localite data and planned-target labels.                                          |
 | `neuronav_select_localite`              | Select most recent Localite XML for a session.                                                  |
+| `neuronav_suggest_target_names`         | Heuristic target names for ingested series (planned target nearest the beam axis).              |
+| `neuronav_summary_to_mni`               | Add MNI coordinates to a neuronav ingest summary.                                               |
 | `position_transducer_localite`          | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
 
 #### PSEUDO-CT

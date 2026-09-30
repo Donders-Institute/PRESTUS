@@ -304,6 +304,11 @@ See [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.m
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `coil_map` | Multi-coil ingestion: one entry per coil with `.coil` (index of `TriggerMarkers_Coil<N>`) and `.target` or `.sequences(:).target`. | `[]` | `[]` = single-coil ingestion (Coil0, GUMMarkers fallback). |
+| `suggest_names` | Name series after the planned target nearest their beam axis. | `true` | See [naming](doc_placement_neuronav_workflows.md#how-series-are-named). |
+| `axis_tolerance_mm` | Max. distance of that target from the beam axis [mm]. | `10` | |
+| `target_depth_mm` | Accepted target depth along the beam axis [mm]. | `[0, 150]` | Narrow around the focal distance to reject far matches. |
+| `target_labels` | Label map: entries `.target` + `.labels` (patterns with `*`/`?`, case-insensitive). | `[]` | `[]` = labels used as recorded; list them with `neuronav_scan_sessions`. |
+| `batch_write` | Series written by `neuronav_ingest_batch`: `'all'` tracked series or only `'named'` ones. | `'all'` | |
 
 #### `placement.heuristic`
 

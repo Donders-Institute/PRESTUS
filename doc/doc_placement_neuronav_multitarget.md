@@ -112,6 +112,9 @@ lookup table (tier 1) for those subjects rather than trust the estimate.
 | Function | Role |
 |---|---|
 | `neuronav_ingest_markers` | Stage 1: reads raw markers (any format), writes normalized `InstrumentMarker` XML + a QC JSON sidecar (pulse count, position deviation in mm, rotation deviation in rad, source file) per subject/session |
+| `neuronav_gui` | Stand-alone GUI for the ingest step: preview detected series and QC, name targets, write the XML/JSON (see [doc_gui.md](doc_gui.md#localite-ingest-gui)) |
+| `neuronav_ingest_batch` / `neuronav_scan_sessions` | Batch ingestion and inventory of many subjects/sessions, with a summary CSV of coordinates — see [GUI and script workflows](doc_placement_neuronav_workflows.md) |
+| `neuronav_read_label_candidates` / `neuronav_suggest_target_names` | Heuristic naming: collects named planned targets (EntryTarget, GUMMarkers pairs) and names each ingested series after the one nearest its beam axis, with distance/depth for QC |
 | `neuronav_build_target_map` | Expands your `coil_map` into the flat `target_map` every other function here consumes |
 | `neuronav_convert_trigger_to_voxels` | Converts ingested marker positions to native voxel/mm space; also computes the tier-4 axis-projected target |
 | `neuronav_read_entry_target` | Reads the latest `EntryTarget*.xml` snapshot for one subject/session |

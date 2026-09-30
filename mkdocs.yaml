@@ -49,6 +49,8 @@ nav:
     - Transducer Placement Overview: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
     - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
+    - Neuronavigation Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
+    - Neuronavigation Multi-Target Toolkit: doc_placement_neuronav_multitarget.md
     - Transducer Placement (PLANTUS): doc_placement_plantus.md
     - Coordinate Systems: doc_coordinate_systems.md
   - 🧠 Tissue Modeling:
