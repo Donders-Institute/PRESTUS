@@ -238,7 +238,7 @@ end
             % Add arc to main karray (not used below but keeps object consistent)
             pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
             focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
-            karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, tr.annular.elem_od_mm * 1e-3, focus_vec);
+            karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, max(tr.annular.elem_od_mm) * 1e-3, focus_vec);   % full aperture (addArcElement takes one diameter)
 
             cw_signal = createCWSignals(kgrid.t_array, tr.freq_hz, ...
                 tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
