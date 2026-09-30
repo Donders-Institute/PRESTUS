@@ -141,6 +141,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop','placement');
 
+    % Planned positions in T1 voxels, kept for the targeting analysis: the
+    % grid stage replaces transducer(i).trans_pos/focus_pos with grid indices.
+    parameters.state.planned_trans_t1_vox = planned_positions(parameters, 'trans_pos');
+    parameters.state.planned_focus_t1_vox = planned_positions(parameters, 'focus_pos');
+
     % ====================================================================
     %% STAGE 3 — GRID SETUP & HEAD PREPROCESSING
     % ====================================================================
@@ -325,6 +330,17 @@ function [parameters] = prestus_pipeline(parameters, options)
                 acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos);
         end
         log_timer('stop', 'nifti_acoustic');
+
+        % Targeting accuracy from the focal-mask NIfTIs just written
+        if (~isfield(parameters.modules, 'run_targeting_analysis') || parameters.modules.run_targeting_analysis) && ...
+                (~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation) && ...
+                contains(parameters.simulation.medium, {'layered', 'phantom'})
+            try
+                targeting_analysis(parameters);
+            catch ME
+                warning('prestus_pipeline:targeting', 'Targeting analysis failed: %s', ME.message);
+            end
+        end
     end
 
     if isfield(parameters, 'modules') && isfield(parameters.modules, 'store_acoustic_results') && ...
@@ -498,4 +514,20 @@ function [parameters] = prestus_pipeline(parameters, options)
         rethrow(me_);
     end
 
+end
+
+function pos = planned_positions(parameters, field)
+% [N×3] transducer(i).<field> for all transducers; [] when any is unset.
+    pos = [];
+    if ~isfield(parameters, 'transducer') || ~isfield(parameters.transducer, field)
+        return
+    end
+    for ti = 1:numel(parameters.transducer)
+        v = parameters.transducer(ti).(field);
+        if ~isnumeric(v) || numel(v) ~= 3
+            pos = [];
+            return
+        end
+        pos(ti, :) = double(v(:)'); %#ok<AGROW>
+    end
 end

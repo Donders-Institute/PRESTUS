@@ -7,6 +7,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `acoustic_analysis`                     | Compute acoustic safety metrics (Isppa, MI, max pressure) from sensor data, extract tissue-specific maxima, focal distances, and generate overlaid ISPPA plots on segmentation. |
+| `targeting_analysis`                    | Targeting accuracy of one run from its focal-mask NIfTIs: simulated focus vs planned focus (axial/lateral), vs MNI target and ROI; writes `sub-XXX_<medium><affix>_targeting.csv`. |
 | `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_simulation`                   | Set up acoustic simulation                                                                      |
 | `acoustic_wrapper`                      | Set up acoustic simulation                                                                      |
@@ -54,6 +55,7 @@ The following documents the functions provided in PRESTUS.
 | `create_group_MNI_plots`                | Generate group-level plots in MNI space for multiple subjects.                                  |
 | `prestus_group_report_start`            | Entry point for the group HTML report; auto-discovers (or accepts) subjects and aggregates their per-subject outputs into one HTML file. |
 | `generate_group_report`                 | Assemble the self-contained group HTML report (exposure dashboard, subject roster, split acoustic/thermal box plots, per-subject cards). |
+| `study_run_descriptors`                 | Per-run settings that differ between subjects (placement mode, target, transducer, depth, target intensity). |
 | `report_styles`                         | Alternative visual skins for the HTML reports (instrument / classic / compact / paper), selected via `modules.report_style`. |
 | `preview_report_styles`                 | Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html. |
 | `discover_group_subjects`               | Auto-discover completed subjects by scanning `path.sim` for folders with a matching per-subject CSV. |
@@ -229,6 +231,7 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `sample_volume_at_world`                | Nearest-neighbour values of a NIfTI volume at world (RAS/MNI mm) positions; NaN outside. |
 | `convert_2d_to_axisymmetric`            | Converts 2D k-Wave simulation grid, medium properties, and source to axisymmetric form by halving the shorter dimension (right half from center). |
 | `convert_axisymmetric_to_2d`            | Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions. |
 | `convert_axisymmetric_to_3d`            | Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry. |

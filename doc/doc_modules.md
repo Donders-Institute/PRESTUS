@@ -44,6 +44,9 @@ load_parameters
 [NIfTI export — acoustic] modules.run_nifti_creation
       │                 Write intensity, MI, pressure maps
       ▼
+[targeting analysis]    modules.run_targeting_analysis
+      │                 Focus vs planned focus / MNI target / ROI; *_targeting.csv (layered/phantom)
+      ▼
 [thermal simulation]    modules.run_heating_sims
       │                 k-Wave heat diffusion; requires acoustic results
       ▼

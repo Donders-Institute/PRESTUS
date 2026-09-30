@@ -6,7 +6,9 @@ PRESTUS provides multiple outputs. Some of these outputs are optional (or can be
 
 ## Summary table
 
-Filename: `sub-XXX_<simulation_medium>_output_table<affix>.csv`
+Filename: `sub-XXX_<simulation_medium><affix>.csv`
+
+Targeting accuracy (`modules.run_targeting_analysis`, layered or phantom media) goes to a sidecar, `sub-XXX_<simulation_medium><affix>_targeting.csv`; see [Targeting accuracy](doc_group.md#targeting-accuracy).
 
 All quantitative metrics are written to a single CSV file. Acoustic metrics are written first; thermal metrics are appended if heating simulations were run. Tissue-specific columns are only present for layered simulations.
 
@@ -174,7 +176,8 @@ Filename patterns:
 
 ```
 sub-XXX_<medium>_report<affix>.html       ← self-contained HTML report
-sub-XXX_<medium>_output_table<affix>.csv  ← quantitative metrics
+sub-XXX_<medium><affix>.csv               ← quantitative metrics
+sub-XXX_<medium><affix>_targeting.csv     ← targeting accuracy (layered or phantom)
 
 cache/                                     ← regenerable intermediates
     sub-XXX_<medium>_parameters_<ts>.mat     parameters snapshot

@@ -133,6 +133,7 @@ modules:
   report_style: 'instrument'  # Report skin: instrument (default) | classic (pre-v0.6.1 look) | compact (dense) | paper (print). Presentation only.
   report_style_switcher: 0    # Embed all skins plus a style dropdown in the report? 1=yes, 0=no. Test styles on existing outputs: preview_report_styles(<subject dir>)
   generate_group_report: 1    # Auto-generate the group HTML report after each per-subject run? 0=manual (call prestus_group_report_start), 1=auto.
+  run_targeting_analysis: 1   # Measure targeting accuracy from the focal-mask NIfTIs (simulated focus vs planned focus, MNI target / ROI)? Writes sub-XXX_<medium><affix>_targeting.csv. Layered or phantom media; needs run_nifti_creation.
   segmentation_only: 0        # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
 
 #------------ High-performance computing
@@ -164,6 +165,10 @@ snellius:
 #------------ Target analysis
 analysis:
   focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+  target_mni_mm: []     # [x y z] intended target in MNI mm for targeting accuracy (modules.run_targeting_analysis).
+                        #   [] = the MNI target of the placement mode (heuristic/plantus mni_target_mm, mni focus_pos_mm), if any.
+  target_roi_mni: ''    # Target ROI mask in MNI space (NIfTI) for targeting accuracy: overlap with the -3 dB focal volume,
+                        #   ROI coverage, Ipa in the ROI. '' = none.
 
 #------------ Transducer specification  (no defaults)
 #

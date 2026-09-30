@@ -13,6 +13,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 Multi-subject studies whose runs differ in placement, target, depth, intensity or transducer, with group-level results (see [doc_group.md](doc_group.md)).
 
 - **`load_parameters` overrides**: a trailing `{key, value}` cell is applied after all merges and before validation/derivation (`apply_config_overrides`; indexed struct-array keys, unknown-key warning). `sanitize_output_affix` is now the single affix rule
+- **Targeting accuracy** (`modules.run_targeting_analysis`, `analysis.target_mni_mm`, `analysis.target_roi_mni`): `targeting_analysis` writes `sub-XXX_<medium><affix>_targeting.csv`, with the focal centroid and peak vs the planned focus (distance, axial/lateral split), vs an MNI target, and ROI overlap/coverage/intensity. The pipeline now records the planned T1 positions before the grid stage (`parameters.state.planned_*_t1_vox`)
 #### BabelBrain acoustic and thermal backend
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).
