@@ -12,6 +12,7 @@ function parameters = load_parameters(varargin)
 %   parameters = load_parameters(extra_config_file)
 %   parameters = load_parameters(extra_config_file, extra_config_location)
 %   parameters = load_parameters(file1, loc1, file2, loc2, ...)
+%   parameters = load_parameters(..., {'subject_id', 3; 'io.output_affix', 'M1'})
 %
 % Input:
 %   varargin - (optional) variable-length argument list:
@@ -19,11 +20,23 @@ function parameters = load_parameters(varargin)
 %              * 1 arg:   path to an extra YAML file, or a parameter struct to merge
 %              * 2 args:  (filename, folder) pair for one extra YAML file
 %              * 2N args: N (filename, folder) pairs, merged left-to-right
+%              * a trailing N×2 cell {'dotted.key', value; ...} of overrides,
+%                applied after all merges and before validation/derivation
+%                (keys may index struct arrays, e.g. 'transducer(2).serial';
+%                see APPLY_CONFIG_OVERRIDES)
 %
 % Output:
 %   parameters - merged and validated PRESTUS simulation parameters
 %
 % See also: LOAD_TRANSDUCER_PARAMETERS, PRINT_PARAMETER_SUMMARY, PATH_LOG_SETUP
+
+    % Trailing cell = key/value overrides (applied after all merges)
+    overrides = {};
+    if ~isempty(varargin) && iscell(varargin{end})
+        overrides = varargin{end};
+        varargin(end) = [];
+    end
+    nargs = numel(varargin);
 
     %% Load default configuration file
     % Use an absolute path derived from this file's location so that
@@ -48,14 +61,14 @@ function parameters = load_parameters(varargin)
     default_config_path = toolbox_default;
     using_toolbox_default = true;
 
-    if nargin >= 2 && ischar(varargin{2})
+    if nargs >= 2 && ischar(varargin{2})
         % (filename, location) form — look for config_default in that location
         candidate = fullfile(varargin{2}, 'config_default.yaml');
         if exist(candidate, 'file')
             default_config_path = candidate;
             using_toolbox_default = false;
         end
-    elseif nargin >= 1 && ischar(varargin{1})
+    elseif nargs >= 1 && ischar(varargin{1})
         % Single full-path argument — check the file's own directory
         candidate = fullfile(fileparts(varargin{1}), 'config_default.yaml');
         if exist(candidate, 'file')
@@ -86,7 +99,7 @@ function parameters = load_parameters(varargin)
 
     %% Merge with additional configuration files or structures
 
-    if nargin == 1
+    if nargs == 1
         extra_config_file = varargin{1};
         if isstruct(extra_config_file)
             extra_parameters = extra_config_file; % Use provided struct directly
@@ -95,13 +108,13 @@ function parameters = load_parameters(varargin)
         end
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
-    elseif nargin == 2
+    elseif nargs == 2
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
         extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
-    elseif nargin > 2
+    elseif nargs > 2
         % Check that extra inputs come in pairs (filename, location)
         if mod(numel(varargin), 2) ~= 0
             error('Extra parameters must be provided as name/value pairs.');
@@ -114,6 +127,11 @@ function parameters = load_parameters(varargin)
             parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
         end
+    end
+
+    %% Key/value overrides (e.g. one row of a study manifest)
+    if ~isempty(overrides)
+        parameters = apply_config_overrides(parameters, overrides);
     end
 
     %% Backwards compatibility: migrate calibration.target_isppa_wcm2 → transducer(i).target_isppa_wcm2
@@ -171,13 +189,8 @@ function parameters = load_parameters(varargin)
                 sanitized_affix, parameters.io.output_affix);
     end
     % Wrap user-supplied label in the BIDS desc entity (_desc-<label>).
-    % Strip any leading underscore before wrapping so users can write either
-    % 'myRun' or '_myRun' in the config.
-    if ~isempty(sanitized_affix) && ~startsWith(sanitized_affix, '_desc-')
-        label = regexprep(sanitized_affix, '^_+', '');
-        sanitized_affix = ['_desc-' label];
-    end
-    parameters.io.output_affix = sanitized_affix;
+    % Users can write either 'myRun' or '_myRun' in the config.
+    parameters.io.output_affix = sanitize_output_affix(sanitized_affix);
 
     %% Validate paths for required libraries and binaries
 

@@ -8,6 +8,11 @@ Notable changes to this project are documented here.
 
 Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI updates for Placement, Multi-Transducer, and Calibration tabs, and a standalone PyQt6-based Python GUI. Introduces BabelBrain and jwave as selectable acoustic solver backends; BabelBrain also contains a CT path for HU-based skull property mapping, and a thermal wrapper. Principal-axis grid alignment becomes the new default for multi-transducer setups. Three additional pCT skull-property algorithms are added (Webb, Pichardo, McDannold). The transducer calibration library moves to `config/calibration/` and gains a version manifest, geometric-baseline entry generation, and geometry-only calibration mode. HPC post-run reporting is automated via a lightweight dependent SLURM job. Several fixes address MI computation, thermal crashes, multi-frequency transducer handling, and path-rename regressions across NeuroNav and calibration workflows. Async multi-transducer simulations are stabilised with a shared grid preproc stage, ras_plus enforcement, and a fix for a coordinate-space bug that could corrupt per-transducer positions when resuming against a cached grid. Pulse amplitude ramping is modelled in thermal simulation. TUS_entry is added as a new transducer placement mode. The multi-target NeuroNav extraction toolkit gains a documented, tiered target-resolution module (`neuronav_resolve_target`) supporting study-supplied pre-hoc target lookups and multi-convention `EntryTarget` label matching.
 
+#### Study setup and group analysis
+
+Multi-subject studies whose runs differ in placement, target, depth, intensity or transducer, with group-level results (see [doc_group.md](doc_group.md)).
+
+- **`load_parameters` overrides**: a trailing `{key, value}` cell is applied after all merges and before validation/derivation (`apply_config_overrides`; indexed struct-array keys, unknown-key warning). `sanitize_output_affix` is now the single affix rule
 #### BabelBrain acoustic and thermal backend
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).

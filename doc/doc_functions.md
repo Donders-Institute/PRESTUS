@@ -41,7 +41,7 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
-| `load_parameters`                       | Loads and merges configuration files for simulation parameters.                                 |
+| `load_parameters`                       | Loads and merges configuration files for simulation parameters; a trailing `{key, value}` cell applies overrides before validation. |
 | `path_log_setup`                        | Set up internal paths and logging, filename for output table                                    |
 | `simulation_nifti`                      | Save key outputs as 3D Niftis                                                                   |
 
@@ -98,6 +98,8 @@ The following documents the functions provided in PRESTUS.
 | `get_xyz_mesh`                          | Generates a mesh of 3D coordinates for a given image.                                           |
 | `getidx`                                | Retrieves indices for requested tissues from a parameter structure.                             |
 | `kwave_version`                         | Display k-Wave version number and (if available) git hash.                                      |
+| `apply_config_overrides`                | Set config values by dotted key (`placement.localite.target`, `transducer(2).serial`); warns on unknown keys. |
+| `sanitize_output_affix`                 | Normalise `io.output_affix` to the BIDS `_desc-<label>` form. |
 | `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
 | `log_timer`                             | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region.                                       |
