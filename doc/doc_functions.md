@@ -110,6 +110,8 @@ The following documents the functions provided in PRESTUS.
 | `kwave_version`                         | Display k-Wave version number and (if available) git hash.                                      |
 | `apply_config_overrides`                | Set config values by dotted key (`placement.localite.target`, `transducer(2).serial`); warns on unknown keys. |
 | `sanitize_output_affix`                 | Normalise `io.output_affix` to the BIDS `_desc-<label>` form. |
+| `predict_outputs`                       | Predict the pipeline mode and the CSV/HTML files a run will write, before submission (read-only). |
+| `print_predicted_outputs`               | Print `predict_outputs`' plan to the console. |
 | `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
 | `log_timer`                             | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region.                                       |
