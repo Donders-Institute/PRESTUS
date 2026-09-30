@@ -254,9 +254,14 @@ function m = build_descriptions()
         'test_on_off_steps_sum_to_pri',             'thermal_parameters: ON + OFF step durations sum to PRI'
         'test_non_integer_pulses_per_train_errors', 'thermal_parameters: non-integer pulse count raises an error'
         % --- test_transform ---
-        'test_ras_to_grid_identity_affine',         'ras_to_grid: identity affine leaves RAS coords unchanged'
+        'test_ras_to_grid_identity_affine',         'ras_to_grid: identity affine gives the 1-based index RAS + 1'
         'test_ras_to_grid_translation',             'ras_to_grid: translation affine applies correct grid offset'
         'test_ras_to_grid_column_input',            'ras_to_grid: column-vector RAS input returns row output'
+        'test_grid_to_ras_inverts_ras_to_grid',     'grid_to_ras: inverse of ras_to_grid (1-based voxels)'
+        'test_convention_matches_niftiread',        'RAS <-> voxel matches the niftiread array (bright-voxel check)'
+        'test_nifti_affine_from_1based',            'nifti_affine_from_1based: 1-based grid affine -> NIfTI header affine'
+        'test_ensure_ras_plus_keeps_world_position','ensure_ras_plus: reorientation keeps voxels at their RAS position'
+        'test_ensure_ras_plus_vox_map',             'ensure_ras_plus: vox_map carries input voxel indices to the RAS+ grid'
         'test_radial_expand_output_size',           'radialExpand2DTo3D: output volume is [2Nr x 2Nr x C]'
         'test_radial_expand_symmetry',              'radialExpand2DTo3D: output is symmetric (transposition invariant)'
         % --- test_transducer_placement ---

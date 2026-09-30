@@ -103,11 +103,12 @@ function [trans_ras_seg, ...
         % reuses transform_coordinates per doc_coordinate_systems.md's rule
         % against re-implementing affine application elsewhere.
 
-        vox_plan = [target_ras(i,1:3) 1] * inv(plan_affine);            % Planning voxel (not rounded) = target_pos(i,:)
-        target_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
+        % inv(plan_affine) gives the 0-based voxel; 'grid' is 1-based (+1)
+        vox_plan = [target_ras(i,1:3) 1] * inv(plan_affine);            % Planning voxel (not rounded)
+        target_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3) + 1, 'grid', 'ras_plus', t1seg_info);
 
         vox_plan = [trans_ras(i,1:3) 1] * inv(plan_affine);
-        trans_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3), 'grid', 'ras_plus', t1seg_info);
+        trans_ras_seg(i,:) = transform_coordinates(parameters, vox_plan(1:3) + 1, 'grid', 'ras_plus', t1seg_info);
 
         % [2] transform from segmentation RAS to MNI RAS by sampling the
         % SimNIBS coordinate field directly (see NEURONAV_APPLY_DEFORMATION).

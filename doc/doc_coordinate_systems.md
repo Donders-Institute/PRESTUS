@@ -35,7 +35,7 @@ Localite XML
   → nifti_to_mni                         [MNI voxels]   ← SimNIBS warp
 ```
 
-**Key rule:** `ras_to_grid()` is the sole boundary between RAS mm and T1 voxel indices. Downstream of that call, everything is voxels. Do not replicate affine inversion elsewhere.
+**Key rule:** `ras_to_grid()` / `grid_to_ras()` are the sole boundary between RAS mm and T1 voxel indices (1-based). Downstream of that call, everything is voxels. Do not replicate affine inversion elsewhere.
 
 ---
 
@@ -126,9 +126,11 @@ For point (coordinate) transforms, `mni2subject_coords_LDfix` / `subject2mni_coo
 
 ## NIfTI affine convention (MATLAB)
 
-`niftiinfo()` stores the voxel-to-world affine in `Transform.T` (column-major).
+`niftiinfo()` stores the NIfTI voxel-to-world affine in `Transform.T` (transposed, row-vector convention). Like the NIfTI standard, it takes **0-based** voxel indices, whereas PRESTUS voxels are **1-based** MATLAB indices into the `niftiread` array:
 
-- World from voxel: `world = T' * [vox; 1]`
-- Voxel from world: `vox   = T' \ [world; 1]`  (used in `ras_to_grid`)
+- World from PRESTUS voxel: `world = T' * [vox - 1; 1]`  (`grid_to_ras`)
+- PRESTUS voxel from world: `vox = round(T' \ [world; 1]) + 1`  (`ras_to_grid`)
 
-Always use `ras_to_grid()` rather than calling `T' \` directly.
+Always use `ras_to_grid()` / `grid_to_ras()` rather than applying `Transform.T` to voxel indices directly. Affines composed on 1-based grids (e.g. `grid_to_ras_affine`) must include the 1-based → 0-based shift before `Transform.T`. Such an affine becomes a NIfTI header via `nifti_affine_from_1based`.
+
+> Before v0.7, `ras_to_grid` and `transform_coordinates` omitted the ±1, so RAS inputs (Localite, MNI, PlanTUS, TUS_entry, `coordinate_space: ras`) landed one voxel off along each array axis. Round trips RAS → voxel → RAS were unaffected, which hid the offset.

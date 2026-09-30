@@ -214,6 +214,8 @@ The following documents the functions provided in PRESTUS.
 | `convert_final_to_MNI_simnibs`          | Converts an image to MNI space using SimNIBS.                                                   |
 | `mni2subject_coords_LDfix`              | Transforms a set of coordinates in MNI space to subject space.                                  |
 | `radialExpand2DTo3D`                    | Radially expands 2D axisymmetric data into 3D Cartesian volume.                                 |
-| `ras_to_grid`                           | Converts RAS coordinates to voxel (grid) coordinates using NIfTI header transformation matrix.  |
+| `grid_to_ras`                           | Converts 1-based voxel indices to RAS coordinates (inverse of `ras_to_grid`).                   |
+| `nifti_affine_from_1based`              | Turns an affine on 1-based voxel indices into a NIfTI header affine (0-based indices).          |
+| `ras_to_grid`                           | Converts RAS coordinates to 1-based voxel (grid) indices using the NIfTI header affine.         |
 | `subject2mni_coords_LDfix`              | Transforms a set of coordinates in MNI space to subject space.                                  |
 | `transform_coordinates`                 | Transform input coordinates between coordinate systems (wrapper) space.                         |

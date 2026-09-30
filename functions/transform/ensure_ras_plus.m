@@ -1,4 +1,4 @@
-function [img_out, hdr_out] = ensure_ras_plus(img_in, hdr_in)
+function [img_out, hdr_out, vox_map] = ensure_ras_plus(img_in, hdr_in)
 % ENSURE_RAS_PLUS  Reorient a NIfTI volume to RAS+ if needed
 %
 % Inspects the NIfTI affine (hdr_in.Transform.T) and, when the image is not
@@ -17,7 +17,7 @@ function [img_out, hdr_out] = ensure_ras_plus(img_in, hdr_in)
 % shear terms beyond axis permutation).
 %
 % Use as:
-%   [img_out, hdr_out] = ensure_ras_plus(img_in, hdr_in)
+%   [img_out, hdr_out, vox_map] = ensure_ras_plus(img_in, hdr_in)
 %
 % Input:
 %   img_in  - [Nx x Ny x Nz] or [Nx x Ny x Nz x ...] numeric/logical array
@@ -28,6 +28,11 @@ function [img_out, hdr_out] = ensure_ras_plus(img_in, hdr_in)
 %   img_out - reoriented image (same data, possibly different axis order/direction)
 %   hdr_out - updated header: Transform.T and ImageSize updated to match img_out;
 %             PixelDimensions updated if axes were permuted
+%   vox_map - [4x4] affine (row-vector convention, see AFFINE_APPLY_PTS)
+%             mapping 1-based voxel indices of img_in to the corresponding
+%             1-based voxel indices of img_out; eye(4) if nothing changed.
+%             Use it to carry voxel coordinates defined on the input grid
+%             (e.g. configured transducer positions) into the RAS+ grid.
 %
 % See also: NIFTIINFO, NIFTIREAD, RAS_TO_GRID
 
@@ -55,6 +60,7 @@ end
         % Already RAS+, nothing to do
         img_out = img_in;
         hdr_out = hdr_in;
+        vox_map = eye(4);
         return
     end
 
@@ -92,19 +98,33 @@ end
     % canonical_affine_transform.
     new_R = diag(new_pixdims);   % 3x3 diagonal, always positive after flips
 
-    % Translate origin: old voxel (1,1,1) → RAS mm.
-    % After flips the corner that maps to RAS origin may have moved; compute it.
-    orig_corner = ones(1,3);
+    % Origin: RAS of the new array's first voxel. The NIfTI affine takes
+    % 0-based indices, so find that voxel's 0-based index in the old array.
+    corner_new = zeros(1,3);
     for d = flip_dims(:)'
-        orig_corner(d) = sz(d);   % flipped axis: voxel 1 was formerly voxel N
+        corner_new(d) = sz(d) - 1;   % flipped axis: first voxel was the last one
     end
-    % Map original corner through original R (before permutation reorder)
+    corner_old = zeros(1,3);
+    corner_old(perm) = corner_new;   % new axis n is old axis perm(n)
     R_orig = T(1:3, 1:3)';
-    origin_ras = R_orig * orig_corner(perm)' + T(4, 1:3)';
+    origin_ras = R_orig * corner_old' + T(4, 1:3)';
 
     new_T        = eye(4);
     new_T(1:3,1:3) = new_R';    % MATLAB convention: row-vector * T
     new_T(4, 1:3)  = origin_ras';
+
+    % Voxel-index map (1-based): new axis d reads old axis perm(d), reversed
+    % when flipped, i.e. new_d = old_perm(d) or sz(d) + 1 - old_perm(d).
+    vox_map = zeros(4);
+    vox_map(4,4) = 1;
+    for d = 1:3
+        if ismember(d, flip_dims)
+            vox_map(perm(d), d) = -1;
+            vox_map(4, d)       = size(img_out, d) + 1;
+        else
+            vox_map(perm(d), d) = 1;
+        end
+    end
 
     hdr_out = hdr_in;
     hdr_out.Transform        = affine3d(new_T);

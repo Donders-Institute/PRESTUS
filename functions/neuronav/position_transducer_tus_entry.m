@@ -386,9 +386,3 @@ function standoff_mm = get_standoff(parameters)
         standoff_mm = td.annular.curv_radius_mm - td.annular.dist_geom_ep_mm;
     end
 end
-
-function ras = grid_to_ras(vox, t1_header)
-% Convert 1-based voxel indices to RAS mm using the NIfTI affine.
-    ras = (t1_header.Transform.T' * [vox(:); 1]);
-    ras = ras(1:3)';
-end

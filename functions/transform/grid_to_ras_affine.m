@@ -8,7 +8,9 @@ function T = grid_to_ras_affine(planimg, fov_offset_1based)
 % than the full simulation grid (e.g. acoustic_fov_crop.m's fov_offset_ac).
 %
 % Row-vector convention throughout (matching affine_resample_3d /
-% affine_apply_pts): [ras_mm 1] = [grid_vox 1] * T.
+% affine_apply_pts): [ras_mm 1] = [grid_vox 1] * T, with grid_vox 1-based.
+% A NIfTI header for an array on this grid needs 0-based indices: use
+% NIFTI_AFFINE_FROM_1BASED(T).
 %
 % Use as:
 %   T = grid_to_ras_affine(planimg)                    % full simulation grid
@@ -35,7 +37,11 @@ end
 M_crop_to_full = eye(4);
 M_crop_to_full(4, 1:3) = fov_offset_1based(:)' - 1;
 
-T = M_crop_to_full * planimg.inv_transf * planimg.t1_header.Transform.T;
+% inv_transf yields 1-based T1 voxels; the NIfTI affine takes 0-based ones
+M_1based_to_0based = eye(4);
+M_1based_to_0based(4, 1:3) = -1;
+
+T = M_crop_to_full * planimg.inv_transf * M_1based_to_0based * planimg.t1_header.Transform.T;
 
 % Chaining matrix products (incl. an inv() inside planimg.inv_transf) leaves
 % floating-point noise (~1e-14) in what must be an exact [0;0;0;1] last

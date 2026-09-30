@@ -286,9 +286,9 @@ if ~isempty(planimg) && isfield(planimg, 't1_header') && ~isempty(planimg.t1_hea
         M_flip3 = eye(4);
         M_flip3(3,3) = -1;
         M_flip3(4,3) = Nz + 1;
-        hdr.Transform = affine3d(M_flip3 * T_grid_to_ras);
+        hdr.Transform = affine3d(nifti_affine_from_1based(M_flip3 * T_grid_to_ras));
     else
-        hdr.Transform = affine3d(T_grid_to_ras);
+        hdr.Transform = affine3d(nifti_affine_from_1based(T_grid_to_ras));
     end
 elseif ~isempty(planimg) && isfield(planimg, 't1_header') && ~isempty(planimg.t1_header)
     % Fallback (inv_transf unavailable): origin-only, no rotation — better

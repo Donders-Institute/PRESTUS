@@ -5,7 +5,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
 % 'ras_plus' (subject T1 RAS+ world space, mm), and 'grid' (PRESTUS
 % simulation voxel indices). MNI→subject conversion calls
 % mni2subject_coords_LDfix (SimNIBS CLI); RAS+↔grid conversion uses
-% the NIfTI affine via transformPointsInverse/Forward.
+% RAS_TO_GRID / GRID_TO_RAS (1-based voxel indices, NIfTI affine).
 %
 % Use as:
 %   output_pos = transform_coordinates(parameters, input_pos, input_cs, output_cs)
@@ -16,6 +16,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
 %                startup.simnibs_bin_path, hpc.ld_library_path)
 %   input_pos  - [1x3] position in the input coordinate system [mm or voxels]
 %   input_cs   - input coordinate system: 'mni' | 'ras_plus' | 'grid'
+%                ('grid' = 1-based voxel index into the niftiread array)
 %   output_cs  - target coordinate system: 'ras_plus' | 'grid'
 %   nii_hdr    - niftiinfo header for RAS+↔grid conversions
 %                (optional; mandatory when input_cs or output_cs is 'ras_plus'/'grid')
@@ -23,7 +24,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
 % Output:
 %   output_pos - [1x3] position in the output coordinate system [mm or voxels]
 %
-% See also: MNI2SUBJECT_COORDS_LDFIX, RAS_TO_GRID, NIFTIINFO
+% See also: MNI2SUBJECT_COORDS_LDFIX, RAS_TO_GRID, GRID_TO_RAS, NIFTIINFO
 
     arguments
         parameters struct
@@ -55,9 +56,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
 
             if strcmp(output_cs, 'grid')
                 fprintf('[transform_coordinates] %s\n', 'Mapping RAS+ to subject grid...')
-                output_pos = round(transformPointsInverse(nii_hdr.Transform, input_pos));
-                % alternative:
-                % output_pos = ras_to_grid(input_pos, nii_hdr);
+                output_pos = ras_to_grid(input_pos, nii_hdr);   % 1-based voxel
             else
                 error('RAS+ input, output_cs: ''grid'' only');
             end
@@ -67,10 +66,7 @@ function output_pos = transform_coordinates(parameters, input_pos, input_cs, out
             if strcmp(output_cs, 'ras_plus')
                 % Voxel -> RAS+ (forward affine)
                 fprintf('[transform_coordinates] %s\n', 'Mapping subject grid to subject RAS+...')
-                output_pos = transformPointsForward(nii_hdr.Transform, input_pos);
-                % alternative:
-                % tmp = nii_hdr.Transform.T * [input_pos(:); 1];
-                % output_pos = tmp(1:3)';
+                output_pos = grid_to_ras(input_pos(:)', nii_hdr); % from 1-based voxel
             else
                 error('grid voxel input, output_cs: ''ras_plus'' only');
             end

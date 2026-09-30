@@ -71,7 +71,12 @@ function [img_mni, final_to_mni_affine, mni_header] = convert_final_to_MNI_matla
     subj2mni = inv(mni2subj); % Compute inverse transformation matrix
 
     % Compute affine transformation matrix from final space to MNI space
-    final_to_mni_affine = inv(mni_header.Transform.T') * subj2mni * t1_orig_hdr.Transform.T' * inv_final_transformation_matrix';
+    % Column-vector convention; the NIfTI affines take 0-based indices, while
+    % inv_final_transformation_matrix and affine_resample_3d use 1-based ones
+    to_0based = [eye(3), -ones(3, 1); 0 0 0 1];
+    to_1based = [eye(3),  ones(3, 1); 0 0 0 1];
+    final_to_mni_affine = to_1based * inv(mni_header.Transform.T') * subj2mni * ...
+        t1_orig_hdr.Transform.T' * to_0based * inv_final_transformation_matrix';
 
     % Check if output NIfTI file exists and handle accordingly
     if options.check_nifti_on_disk
