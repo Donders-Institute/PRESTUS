@@ -298,6 +298,9 @@ function [parameters] = prestus_pipeline(parameters, options)
             if isfield(params_nii.transducer(1), 'focus_pos')
                 params_nii.transducer(1).focus_pos = fov_state.focus_pos_full;
             end
+            % FOV box in full-grid voxels, outlined on the T1 overlay.
+            params_nii.grid.acoustic_fov_offset_vox = fov_state.offset;
+            params_nii.grid.acoustic_fov_dims_vox   = parameters.grid.dims;
             for fmf = {'focal_mask_3dB', 'focal_mask_6dB'}
                 fn = fmf{1};
                 if isfield(results_acoustic, fn) && ~isempty(results_acoustic.(fn))

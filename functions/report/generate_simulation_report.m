@@ -1939,6 +1939,17 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         n_int_imgs = 1;
     end
 
+    has_acoustic_fov = isfield(parameters, 'grid') && ...
+        isfield(parameters.grid, 'acoustic_fov_diameter_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_diameter_mm) && ...
+        isfield(parameters.grid, 'acoustic_fov_length_mm') && ...
+        ~isempty(parameters.grid.acoustic_fov_length_mm);
+    if has_acoustic_fov
+        t1w_caption = 'Whole-brain intensity overlay with FOV';
+    else
+        t1w_caption = 'Whole-brain intensity overlay';
+    end
+
     html = [html '<div class="image-grid">'];
     for t = 1:n_int_imgs
         t_suffix = trans_suffix(t, n_int_imgs);
@@ -1952,11 +1963,11 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             sprintf('Intensity on segmentation%s', t_suffix), ...
             sprintf('Intensity overlay (segmentation)%s', t_suffix))];
 
-        % Intensity on T1w
+        % Intensity on T1w (limited-FOV runs draw the FOV box as a dashed outline)
         img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s_intensity_t1w%s%s.png', subject_id, medium, t_suffix, affix));
         img_html = html_utils.embed_image(img_path, sprintf('Intensity on T1w%s', t_suffix), ...
-            sprintf('Intensity overlay (T1w)%s', t_suffix));
+            sprintf('%s%s', t1w_caption, t_suffix));
         if ~isempty(img_html)
             html = [html img_html];
         end

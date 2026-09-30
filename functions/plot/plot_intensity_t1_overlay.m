@@ -71,7 +71,7 @@ if sync_mode
     end
 
     try
-        [~,~,~,~,~,~,~,h] = plot_overlay( ...
+        [~,~,~,~,ax_ov,~,~,h] = plot_overlay( ...
             intensity_t1, planimg.t1_image_orig, source_labels, parameters, ...
             {'y', ref_btc(2,2)}, ...
             all_tpos_t1, all_fpos_t1, ref_btc(3,:), ...
@@ -82,6 +82,7 @@ if sync_mode
             'overlay_threshold_high', max_val, ...
             'rotation', 0, ...
             'do_transpose', do_t, 'flip_rows', flip_r, 'flip_cols', flip_c);
+        draw_fov_outline(ax_ov, parameters, planimg, ref_btc(2,2), do_t, flip_r, flip_c);
 
         output_plot_filename = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s_intensity_t1w%s.png', ...
@@ -120,7 +121,7 @@ else
         end
 
         try
-            [~,~,~,~,~,~,~,h] = plot_overlay( ...
+            [~,~,~,~,ax_ov,~,~,h] = plot_overlay( ...
                 intensity_t1, planimg.t1_image_orig, source_labels, parameters, ...
                 {'y', backtransf_coordinates(2,2)}, ...
                 backtransf_coordinates(1,:), backtransf_coordinates(2,:), backtransf_coordinates(3,:), ...
@@ -131,6 +132,7 @@ else
                 'overlay_threshold_high', max_val, ...
                 'rotation', 0, ...
                 'do_transpose', do_t, 'flip_rows', flip_r, 'flip_cols', flip_c);
+            draw_fov_outline(ax_ov, parameters, planimg, backtransf_coordinates(2,2), do_t, flip_r, flip_c);
 
             t_suffix = trans_suffix(ti, max_plots);
             output_plot_filename = fullfile(parameters.io.dir_img, ...
@@ -144,4 +146,41 @@ else
         end
     end
 end
+end
+
+function draw_fov_outline(ax, parameters, planimg, y_slice, do_t, flip_r, flip_c)
+% Limited-FOV mode: outline the acoustic FOV box on the displayed coronal slice.
+if ~isfield(parameters.grid, 'acoustic_fov_offset_vox') || ...
+        isempty(parameters.grid.acoustic_fov_offset_vox)
+    return
+end
+fov_mask = fov_box_slice(parameters.grid.acoustic_fov_offset_vox, ...
+    parameters.grid.acoustic_fov_dims_vox, planimg.inv_transf, ...
+    size(planimg.t1_image_orig), y_slice);
+if do_t;   fov_mask = fov_mask';        end
+if flip_r; fov_mask = flipud(fov_mask); end
+if flip_c; fov_mask = fliplr(fov_mask); end
+if ~any(fov_mask(:)); return; end
+% draw on the top (intensity) layer so the outline stays visible;
+% zero-pad so the outline also closes along the image border
+[nr, nc] = size(fov_mask);
+padded = zeros(nr + 2, nc + 2);
+padded(2:end-1, 2:end-1) = fov_mask;
+hold(ax, 'on');
+contour(ax, 0:nc+1, 0:nr+1, padded, [0.5 0.5], ...
+    'LineColor', [1 0.3 0.3], 'LineStyle', '--', 'LineWidth', 1.2);
+hold(ax, 'off');
+end
+
+function mask = fov_box_slice(fov_offset, fov_dims, inv_transf, t1_dims, y_slice)
+% Coronal (dim-2) T1 slice of the acoustic FOV box. Each T1 voxel is mapped
+% into full-grid voxels and tested against the box [offset, offset+dims-1].
+if isstruct(inv_transf) && isfield(inv_transf, 'tdata')
+    inv_transf = inv_transf.tdata.T;
+end
+[xi, zi] = ndgrid(1:t1_dims(1), 1:t1_dims(3));
+sim_pts  = affine_apply_pts([xi(:), repmat(y_slice, numel(xi), 1), zi(:)], inv(inv_transf));
+lo = fov_offset - 0.5;
+hi = fov_offset + fov_dims - 0.5;
+mask = reshape(all(sim_pts >= lo & sim_pts <= hi, 2), t1_dims([1 3]));
 end
