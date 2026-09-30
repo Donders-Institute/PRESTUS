@@ -108,6 +108,12 @@ end
                    'or ''tus_entry''.'], mode);
     end
 
+    % Stand-alone placement report (never errors; see generate_placement_report)
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'report') ...
+            || isempty(parameters.placement.report) || logical(parameters.placement.report)
+        generate_placement_report(parameters, mode);
+    end
+
 end
 
 % ── Manual placement dispatcher ──────────────────────────────────────────

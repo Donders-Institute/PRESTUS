@@ -274,6 +274,7 @@ See [doc_placement.md](doc_placement.md).
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `mode` | Placement mode. | `'manual'` | `'manual'`, `'localite'`, `'heuristic'`, `'mni'`, `'plantus'` or `'tus_entry'`. |
+| `report` | Write the stand-alone placement report `sub-XXX_placement_<mode>.html` to `io.dir_reports`. | `true` | See [placement report](doc_placement.md#placement-report). |
 
 #### `placement.manual`
 

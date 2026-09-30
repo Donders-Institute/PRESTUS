@@ -285,6 +285,9 @@ placement:
                     #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
                     #   'mni'       (define trans/focus directly in MNI mm; snapped to scalp + gap; set placement.mni.*) |
                     #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
+  report: true      # Write a stand-alone placement report (sub-XXX_placement_<mode>.html in
+                    #   io.dir_reports) after placement: target, positions, T1 overlay and, for
+                    #   'plantus', the criteria evaluation (placement.plantus.evaluate).
   manual:
     coordinate_space: 'voxel' # Space of transducer.trans_pos / focus_pos in mode='manual':
                               #   'voxel' (1-based T1 voxel indices) |

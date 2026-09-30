@@ -4,6 +4,19 @@ Simulations in free water will place the transducer in a homogeneous water mediu
 
 PRESTUS expects coordinates of both the transducer (`transducer.trans_pos`) and target (`transducer.focus_pos`) to be specified as voxels in the T1w grid. The transducer coordinate describes the bowl of the transducer (i.e., not the exit plane in the case of curved transducers). Both coordinates need to be reported in the space of the planning image.
 
+## Placement report
+
+After placement, `preproc_transducer_placement` writes a stand-alone HTML
+report, `sub-XXX_placement_<mode><affix>.html` in `io.dir_reports`
+(`placement.report`, default `true`). It holds the target, the transducer and
+focus positions (T1 voxels and subject RAS mm, with transducer–focus and
+focus–target distances), the T1 overlay figure (drawn for every mode) and the
+placement configuration. For `placement.mode: 'plantus'` it adds the
+[criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum):
+diagnostics, each criterion at the placed spot, the criterion maps and the
+weight sweep. The report never stops the pipeline: failures are warnings, and
+it is skipped when no output directory is known.
+
 ## Manual coordinate selection
 
 Suitable coordinates (x/y/z) may be identified in preferred imaging software based on e.g. an fMRI hotspot, anatomical marker.

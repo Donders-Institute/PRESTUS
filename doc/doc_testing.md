@@ -18,6 +18,7 @@ Unit tests cover pure, deterministic functions — no external tools, no file I/
 | `test_neuronav_io.m` | Localite I/O on synthetic exports in a temp folder: `neuronav_localite_pose` file/automatic mode (pose column 4 = position; ingestion on first use; with and without `loc_folder`), `position_transducer_localite`, `neuronav_resolve_paths` deprecation alias |
 | `test_neuronav_batch.m` | Multi-subject ingestion on a synthetic 2×2 study: `neuronav_map_label`, `neuronav_scan_sessions` (labels, stems), `neuronav_ingest_batch` naming via the label map, summary merge, `batch_write`, coil-table precedence in `neuronav_name_series` |
 | `test_study.m` | Study manifests: parsing (.tsv/.csv, reserved and dotted-key columns), `apply_config_overrides` / `load_parameters` overrides, run-table affixes and duplicate rejection, dry run, merge order, synthetic `targeting_analysis`, group maps and study report, legacy subject list |
+| `test_placement_report.m` | `generate_placement_report`: report written / skipped / disabled, PlanTUS section without an evaluation (`report`); `plantus_evaluation.py` on a synthetic head rendered in the report (`evaluation`; needs Python 3 with numpy, scipy, matplotlib via `PRESTUS_TEST_PYTHON` or the PATH, skipped otherwise) |
 | `test_deface_m2m.m` | `preproc_deface_m2m` — folder creation, sentinel, idempotency, skip paths (uses a stub binary; no real pydeface required) |
 
 Run all unit tests from MATLAB:
