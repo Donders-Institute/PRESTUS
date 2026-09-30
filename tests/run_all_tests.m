@@ -313,6 +313,9 @@ function m = build_descriptions()
         'test_embed_image_dims_no_dim_file',        'embed_image_dims: embeds the single no-dim image (2D)'
         'test_config_dump_prunes_large_arrays',     'build_config_dump: prunes large numeric arrays'
         'test_subject_report_generates',            'generate_simulation_report: builds HTML with new sections, no failures'
+        'test_methods_text_is_manuscript_ready',    'generate_simulation_report: Methods text has copy buttons, inline values, references'
+        'test_methods_text_babelbrain_matches_bridge', 'generate_simulation_report: BabelBrain Methods text states fluid bone, PRESTUS properties, Q correction'
+        'test_methods_text_jwave_states_resolved_pml', 'generate_simulation_report: jwave Methods text states the resolved PML thickness'
         'test_group_report_generates_and_flags',    'generate_group_report: analysis panel + flags one over-limit subject'
         % --- test_integration_demo (demo_inputs) ---
         'test_t1_exists',                           'demo inputs: sub-009 T1w NIfTI is present in BIDS folder'

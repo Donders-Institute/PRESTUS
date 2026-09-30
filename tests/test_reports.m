@@ -119,6 +119,40 @@ classdef test_reports < matlab.unittest.TestCase
             tc.verifyNotEmpty(strfind(txt, '10.1016/j.brs.2024.04.013'), 'Martin et al. 2024 DOI wrong');
         end
 
+        function test_methods_text_babelbrain_matches_bridge(tc)
+            % BabelBrain runs fluid bone with PRESTUS properties injected
+            % (run_babelbrain_case.py), so the text must not claim shear waves
+            % and must state the PRESTUS tissue values.
+            p = local_make_subject_params(tc.tmp);
+            p.acoustic_backend = 'babelbrain';
+            p.babelbrain = struct('ppw', 12, 'tx_system', 'CTX_500', 'computing_backend', 'metal', ...
+                'ct_mapping', '', 'q_correction', [], 'water_amp_calibration', true);
+            p.transducer.annular.elem_phase_rad = [0 0.4 0.9 1.5];
+            txt = fileread(generate_simulation_report(p));
+            iStart = strfind(txt, 'id="methods-text"');
+            iRefs  = strfind(txt, 'id="methods-refs"');
+            methods = txt(iStart(1):iRefs(1));
+            tc.verifyEmpty(strfind(methods, 'mode conversion'), 'fluid-bone run must not claim mode conversion');
+            tc.verifyEmpty(strfind(methods, 'viscoelastic'), 'fluid-bone run must not claim a viscoelastic model');
+            for m = {'shear wave speed set to zero', 'c&#8201;=&#8201;1560&#8201;m/s', ...
+                     'quality-factor correction 1)', 'Rayleigh&#8211;Sommerfeld', ...
+                     'at least 12 points per wavelength', 'Metal (Apple Silicon)'}
+                tc.verifyNotEmpty(strfind(methods, m{1}), sprintf('methods text missing %s', m{1}));
+            end
+            tc.verifyEmpty(strfind(txt, 'Goss, S. A.'), 'uncited BabelBrain table reference listed');
+        end
+
+        function test_methods_text_jwave_states_resolved_pml(tc)
+            p = local_make_subject_params(tc.tmp);
+            p.acoustic_backend = 'jwave';
+            p.jwave = struct('solver', 'helmholtz', 'precision', 'single', 'pml_size', 'auto');
+            p.grid.pml_size = 'auto';
+            p.grid.pml_size_effective = 24;
+            txt = fileread(generate_simulation_report(p));
+            tc.verifyNotEmpty(strfind(txt, 'perfectly matched layer thickness: 24 grid points'), ...
+                'jwave methods text should state the resolved PML');
+        end
+
         function test_group_report_generates_and_flags(tc)
             ids = local_make_group_dir(tc.tmp);
             p = struct('path', struct('sim', tc.tmp), ...

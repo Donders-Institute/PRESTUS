@@ -87,6 +87,7 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %   sensor_data.p_final     [grid_dims] double [Pa]  pressure at final time step
 %   sensor_data.jwave_input_h5   char  path to HDF5 input written
 %   sensor_data.jwave_output_h5  char  path to HDF5 output read
+%   sensor_data.jwave_pml_size   double  resolved PML thickness [grid points] (scalar or per-axis)
 %
 % See also: BABELBRAIN_WRAPPER, ACOUSTIC_SIMULATION, PRESTUS_PIPELINE
 
@@ -360,6 +361,7 @@ if dry_run
     sensor_data.p_final        = [];
     sensor_data.jwave_input_h5 = input_h5;
     sensor_data.jwave_output_h5 = '';
+    sensor_data.jwave_pml_size  = pml_size;
     return;
 end
 
@@ -439,6 +441,7 @@ sensor_data = read_jwave_output(output_h5, parameters);
 
 sensor_data.jwave_input_h5  = input_h5;
 sensor_data.jwave_output_h5 = output_h5;
+sensor_data.jwave_pml_size  = pml_size;   % resolved grid.pml_size (reported as grid.pml_size_effective)
 
 % -------------------------------------------------------------------------
 % 5b. Read convergence diagnostics

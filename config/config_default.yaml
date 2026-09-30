@@ -523,9 +523,9 @@ jwave:
   python_env: ''            # Path to Python environment or executable; empty = system python
   python_env_gpu: ''        # Path to GPU-capable Python environment; empty = same as python_env
   use_gpu: ~                # Use GPU acceleration: true | false | ~ (auto-detect)
-  pml_size: auto            # Perfectly matched layer size in grid points: integer or 'auto'
-  gmres_restart: 40         # GMRES restart parameter (Krylov subspace size)
-  gmres_maxiter: 300        # Maximum GMRES iterations
+  # PML thickness is set by grid.pml_size (shared with k-Wave; jwave resolves 'auto' to ~2.5 wavelengths)
+  gmres_restart: 10         # GMRES restart parameter (Krylov subspace size); jwave's own default. Larger values can destabilise GMRES in single precision
+  gmres_maxiter: 1000       # Maximum GMRES iterations; jwave's own default
   precision: single         # Computational precision: 'single' | 'double'
 
 #------------ BabelBrain solver settings (used when acoustic_backend / thermal_backend = 'babelbrain'; see doc_babelbrain.md)

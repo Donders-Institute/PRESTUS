@@ -191,6 +191,11 @@ elseif use_jwave
         error('[pipeline] jwave backend requires direct source geometry (grid.use_kWaveArray: 0).');
     end
     sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels, sensor);
+    % Record the PML jwave actually used (its 'auto' differs from k-Wave's) so the
+    % report states it, mirroring acoustic_wrapper for the k-Wave path.
+    if isfield(sensor_data, 'jwave_pml_size')
+        parameters.grid.pml_size_effective = sensor_data.jwave_pml_size;
+    end
     if should_save_output(parameters.io, 'save_acoustic_matrices')
         jw_solver = 'helmholtz';
         if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')

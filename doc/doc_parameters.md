@@ -64,7 +64,7 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 
 #### jwave settings (`jwave`)
 
-Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `pml_size: auto`, `gmres_restart: 40`, `gmres_maxiter: 300`, `precision: single`; `solver` defaults to `helmholtz`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `gmres_restart: 10`, `gmres_maxiter: 1000`, `precision: single`; `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
 
 ---
 
