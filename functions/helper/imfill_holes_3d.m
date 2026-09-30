@@ -19,53 +19,34 @@ function out = imfill_holes_3d(BW)
     BW  = logical(BW);
     sz  = size(BW);
     if numel(sz) < 3; sz(end+1:3) = 1; end
-    N   = prod(sz);
 
-    bg  = ~BW;
+    % Pad with a one-voxel background shell: every background voxel on the
+    % image boundary is then face-connected to the shell, so seeding the
+    % shell is equivalent to seeding the boundary background voxels, and
+    % interior neighbour offsets can never leave the array or wrap.
+    psz = sz + 2;
+    bg  = true(psz);
+    bg(2:end-1, 2:end-1, 2:end-1) = ~BW;
 
-    % Seed: all background voxels on the 6-face boundary
-    face_mask = false(sz);
-    face_mask(1,:,:)   = true; face_mask(end,:,:) = true;
-    face_mask(:,1,:)   = true; face_mask(:,end,:) = true;
-    face_mask(:,:,1)   = true; face_mask(:,:,end) = true;
+    visited = true(psz);
+    visited(2:end-1, 2:end-1, 2:end-1) = false;
+    frontier = find(visited);
 
-    seeds = uint32(find(bg & face_mask));
-    if isempty(seeds)
-        out = true(sz);
-        return
-    end
+    % Vectorised BFS with 6-connectivity (faces only) — holes use
+    % 6-conn background. Each wavefront is expanded as one array operation,
+    % so the loop runs once per BFS depth rather than once per voxel.
+    offsets = [1, -1, psz(1), -psz(1), psz(1)*psz(2), -psz(1)*psz(2)];
+    N = prod(psz);
 
-    visited       = false(sz);
-    visited(seeds) = true;
-
-    % BFS with 6-connectivity (faces only) — holes use 6-conn background
-    queue  = zeros(N, 1, 'uint32');
-    queue(1:numel(seeds)) = seeds;
-    head   = uint32(1);
-    tail   = uint32(numel(seeds));
-
-    offsets_d  = [1 -1 0  0  0  0];
-    offsets_ri = [0  0 1 -1  0  0];
-    offsets_c  = [0  0 0  0  1 -1];
-
-    while head <= tail
-        curr = queue(head); head = head + uint32(1);
-        [cx,cy,cz] = ind2sub(sz, double(curr));
-
-        for d = 1:6
-            nx = cx + offsets_d(d);
-            ny = cy + offsets_ri(d);
-            nz = cz + offsets_c(d);
-            if nx<1||nx>sz(1)||ny<1||ny>sz(2)||nz<1||nz>sz(3); continue; end
-            ni = uint32(sub2ind(sz, nx, ny, nz));
-            if bg(ni) && ~visited(ni)
-                visited(ni)     = true;
-                tail            = tail + uint32(1);
-                queue(tail)     = ni;
-            end
-        end
+    while ~isempty(frontier)
+        nb = frontier(:) + offsets;          % [n x 6] linear neighbours
+        nb = nb(:);
+        nb = nb(nb >= 1 & nb <= N);          % shell seeds only
+        nb = nb(bg(nb) & ~visited(nb));
+        visited(nb) = true;
+        frontier = unique(nb);
     end
 
     % Holes = unreachable background
-    out = BW | ~visited;
+    out = BW | ~visited(2:end-1, 2:end-1, 2:end-1);
 end

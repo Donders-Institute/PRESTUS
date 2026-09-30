@@ -149,6 +149,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Scalp-boundary extraction and transducer standoff-geometry math extracted into shared helpers (`tp_scalp_boundary`, `transducer_scalp_geometry`), reused by both the heuristic candidate-mesh search and the new MNI mode
 
 #### Head pipeline / grid
+- `imfill_holes_3d` (skull rubber wrap, heuristic candidate mesh) is vectorised: the flood fill grows one wavefront per step on a one-voxel padded volume instead of one voxel per step; results are unchanged
 - Pipeline grid, medium, and thermal grid stages extracted into standalone functions (`run_grid_stage`, `run_medium_stage`, `resolve_thermal_grid`)
 - **Focal-axis alignment** is now the default grid orientation (`grid.mode: focal_axis`): rotates the grid so the mean focal unit vector of all transducers aligns with z; for bilateral setups this equals the inter-transducer axis (identical to the old `principal_axis` result); for angled multi-transducer setups z correctly points toward the beam convergence zone rather than the inter-transducer axis. `principal_axis` is retained as a deprecated alias and emits a warning
 - Grid cropping now includes the bowl geometry of every configured transducer in the crop mask (was transducer(1) only), preventing the contralateral side from being over-extended
