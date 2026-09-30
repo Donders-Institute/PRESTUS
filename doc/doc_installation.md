@@ -58,6 +58,20 @@ For the `cpp_cpu` and `cpp_gpu` modes, download the C++ binaries from the [k-Wav
 
 For more information on installing, (potentially) compiling, and specifying C++ binaries, see [the backend documentation](doc_backend.md).
 
+## Python and conda environments
+
+PRESTUS itself is MATLAB, but several optional parts run in their own Python (or R) environment. Keep them separate: their dependencies conflict, and most are only needed on the machine that runs that part.
+
+| Environment | Needed for | Create with | Where PRESTUS finds it |
+|---|---|---|---|
+| SimNIBS (e.g. `simnibs_v4.6.0`, or `PRESTUS_env_4.6.0` incl. PlanTUS and Workbench) | Head segmentation (`charm`), PlanTUS placement | `examples/setup_PRESTUS_env.sh` or the SimNIBS `environment_linux.yml` (see [below](#simnibs-installation)) | `simnibs_bin_path` |
+| BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([doc_babelbrain.md](doc_babelbrain.md)) | `babelbrain.python_env` |
+| jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([doc_jwave.md](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
+| `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([doc_placement.md](doc_placement.md)) | `placement.tus_entry.env_path` |
+| `prestus-planner` | PRESTUS Planner (config builder GUI) | `conda env create -f planner/environment.yml` ([doc_planner.md](doc_planner.md)) | `prestus_planner(Python='<env>/bin/python')`; default `python3` |
+
+The Planner runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
+
 ## SimNIBS installation
 
 You additionally need to install [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4). We recommend installing SimNIBS within an **anaconda environment** (especially on HPC clusters that often constrict individual user permissions). This allows for the flexible installation of multiple SimNIBS versions.

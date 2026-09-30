@@ -284,6 +284,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** thermal timing enable state re-synced on config load
 
 #### Infrastructure
+- `doc_installation.md`: new *Python and conda environments* table (SimNIBS/PlanTUS, BabelBrain, jwave, TUS_entry, Planner): what each is for, how to create it and which config key points to it
 - New `predict_outputs` / `print_predicted_outputs`: predict, before submission, which pipeline mode `prestus_pipeline_start` will dispatch to (single, async, multi-ISPPA, uncertainty) and which CSV/HTML files it writes; read-only, uses the same mode predicates as the dispatcher
 - `print_parameter_summary` formats vector entries one by one, so unit suffixes no longer run together
 - `doc_limited_fov.md` — user guide for the acoustic FOV crop feature
