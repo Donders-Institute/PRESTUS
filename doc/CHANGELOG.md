@@ -230,6 +230,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
 - Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
 - Simulation-report Methods section made manuscript-ready: *Copy methods text* / *Copy text + references* buttons (formatted HTML with a plain-text fallback); per-tissue acoustic and thermal properties stated inline instead of linking to the Medium Properties section; new *Simulation software* (PRESTUS version + citation) and *Simulated exposure* (in situ ISPPA, MItc, focal distance, temperature rise, peak temperature, CEM43 from the report CSV) paragraphs
+- `doc_babelbrain.md`: corrected the PRESTUS brain sound speed (1546, not 1610 m/s) and the 500 kHz skull attenuation (≈77, not 152 Np/m; BabelBrain's table is ~6% higher, not 47% lower), and removed the statement that the label-mask path uses BabelBrain's built-in `MatFreq` values
+- `doc_babelbrain.md`: documented which BabelBrain acoustic properties PRESTUS replaces (skin, bone, brain) and which it does not: water (by design; BabelBrain's water also sets its source pressure-to-velocity factor), voxel-wise pCT, the `ct_mapping` skull, silent fallbacks, and all thermal properties.
 - ⚠️ **Fixed:** wrong methods references — Martin et al. (2024) and Pichardo et al. (2017) had incorrect titles, authors and DOIs, and the Aubry et al. (2025) DOI disagreed with the safety-dashboard footnote (now 10.1016/j.brs.2025.10.007 in both)
 
 #### GUI

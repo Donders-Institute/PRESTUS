@@ -1100,6 +1100,11 @@ _DB_CM_TO_NP_M = 100.0 / 8.685889638
 # PRESTUS medium_properties field → BabelBrain MatFreq material key. The generic
 # 'skull' is listed first so that, when a config also defines the split
 # cortical/trabecular tissues, those specific entries overwrite it.
+# 'Water' here only updates MatFreq[f]['Water'], which BabelBrain reads in
+# GetSmallestSOS (grid spacing). The simulated water material comes from the
+# module-level Material (1120 kHz loop leftover) and stays at 1000 kg/m³ /
+# 1500 m/s. Deliberately not patched: water also sets FactorConvPtoU, so
+# changing it would shift the source amplitude (see doc_babelbrain.md).
 _PRESTUS_TO_BB_MATERIAL = [
     ('water',            'Water'),
     ('skin',             'Skin'),
