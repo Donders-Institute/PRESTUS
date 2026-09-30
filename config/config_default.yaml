@@ -132,9 +132,17 @@ modules:
   generate_report: 1          # Generate a self-contained HTML simulation report at the end of the pipeline?
   report_style: 'instrument'  # Report skin: instrument (default) | classic (pre-v0.6.1 look) | compact (dense) | paper (print). Presentation only.
   report_style_switcher: 0    # Embed all skins plus a style dropdown in the report? 1=yes, 0=no. Test styles on existing outputs: preview_report_styles(<subject dir>)
-  generate_group_report: 1    # Auto-generate the group HTML report after each per-subject run? 0=manual (call prestus_group_report_start), 1=auto.
   run_targeting_analysis: 1   # Measure targeting accuracy from the focal-mask NIfTIs (simulated focus vs planned focus, MNI target / ROI)? Writes sub-XXX_<medium><affix>_targeting.csv. Layered or phantom media; needs run_nifti_creation.
+  generate_group_report: 1    # Auto-generate the group HTML report after each per-subject run? 0=manual (call prestus_group_report_start), 1=auto. Off for runs started by prestus_study_start (the study report is built once at the end).
   segmentation_only: 0        # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
+
+#------------ Study (multi-subject setup; see doc_group.md)
+
+study:
+  manifest: ''  # Study manifest (.tsv/.csv): one row per run (subject_id [, condition, include, config]) plus
+                #   any per-run config keys as columns (e.g. placement.localite.target, transducer.target_isppa_wcm2).
+                #   Relative paths are resolved against this config's folder. Run all rows with prestus_study_start(<this config>).
+  name: ''      # Study name for the group outputs in <path.sim>/group/<name>/; '' = manifest file name
 
 #------------ High-performance computing
 hpc:

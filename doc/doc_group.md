@@ -1,102 +1,155 @@
 # Group analysis
 
-To facilitate group analysis, PRESTUS automatically outputs key results as Nifti images in MNI space. Projection to MNI space can be done either using SimNIBS’ subject2mni command, or in MATLAB by reading in MNI2conform_12DOF.txt. 
+PRESTUS supports multi-subject studies end to end:
 
-PRESTUS provides two complementary group-level workflows:
+- **[Study setup](#study-setup)**: a *study manifest* lists every run (a subject, optionally under a named condition) with its own settings: placement, target, depth, intensity, transducer, … `prestus_study_start` runs all rows locally or on HPC.
+- **[Targeting accuracy](#targeting-accuracy)**: each run measures how well the simulated focus hits the planned focus, an MNI target and an MNI ROI (`modules.run_targeting_analysis`).
+- **[Group MNI maps](#group-mni-maps)**: focal-volume overlap, mean/SD intensity and mean heating per condition in MNI space (`create_group_maps`).
+- **[Group HTML report](#group-html-report)**: one self-contained, interactive report across runs: safety dashboard, study design, condition comparison, targeting accuracy, group maps, outliers, and a tidy one-row-per-run CSV (`prestus_group_report_start`).
 
-- **MNI-space group plots** — `create_group_MNI_plots` (via the `prestus_group_start` entry point) render per-metric maps in MNI space with a shared colour scale and optional ROI overlays. Documented immediately below.
-- **Group HTML report** — `prestus_group_report_start` aggregates the per-subject CSV/PNG outputs into a single self-contained, interactive HTML file. See [Group HTML report](#group-html-report).
+The report and the maps never run simulations; they read the per-run outputs that already exist on disk.
 
-Neither workflow runs simulations; both read existing per-subject outputs.
+## Study setup
 
-## MNI-space group plots
+A study is a normal PRESTUS config (the *study config*) whose `study.manifest` names a table with one row per run. The study config holds everything the runs share. The manifest holds what differs between runs.
 
-### create_group_MNI_plots
+```yaml
+# config_amythal.yaml (study config)
+path:
+  sim: /project/sims
+  seg: /project/simnibs
+  anat: /project/simnibs
+  t1_pattern: 'm2m_sub-%1$03d/T1.nii.gz'
+simulation:
+  medium: layered
+transducer:
+  serial: CTX_500_026
+  target_isppa_wcm2: 30
+placement:
+  mode: localite
+study:
+  manifest: study.tsv      # relative to this config's folder
+  name: amythal            # outputs in <path.sim>/group/amythal/
+```
 
-#### Rationale
-- This will ensure that all figures will use the same scale
-- Allows one to add a ROI MNI mask to visualise targeting accuracy
-- Adds additional columns to each csv with information about intensity in the ROI mask, percentage of fwhm voxels within ROI etc.
-- When using structural MRI's, it also allows one to normalise the brightness so the discrepancy in average brightness between individual T1's is reduced.
+```text
+# study.tsv — one row per run; tab-separated (.tsv) or comma-separated (.csv)
+subject_id  condition  placement.localite.session  placement.localite.target  transducer.target_isppa_wcm2  analysis.target_mni_mm
+1           L_MD       ses-02                      L_MD                                                     [-8, -16, 6]
+1           R_MD       ses-02                      R_MD                                                     [8, -16, 6]
+2           L_MD       ses-02                      L_MD                       20                            [-8, -16, 6]
+```
 
-#### Necessary input:
-- subject_list: list of all subjects that you want to include in the figures.
-- parameters: load the '.yaml' file using 'load_parameters.m' just as you would do in a pipeline.
-- options: a structure similar to 'parameters'. Most of these are (as the name would suggest) optional. only one of the two following parameters needs to be selected:
-	- options.slice_to_plot = 0 (give the number of the slice)
-	- options.plot_max_intensity = 0 (turn on by changing to 1)
+### Manifest columns
 
-#### Plotting a ROI mask
-- Use a mask saved in MNI space
-- Load it into the function under the option 'ROI_MNI_mask'
+| Column | Meaning |
+|---|---|
+| `subject_id` | Required. Integer, `003` or `sub-003`. |
+| `condition` | Optional run label (target, protocol, session, …). Becomes the run's output affix and the grouping variable in the group report. |
+| `include` | Optional `1`/`0`, `true`/`false`, `yes`/`no`; default `1`. |
+| `config` | Optional per-row YAML merged over the study config. The path is relative to the manifest. |
+| `notes` | Ignored free text (also `note`, `comment`). |
+| any dotted config key | A per-run value, e.g. `placement.localite.target`, `transducer.focal_distance_ep`, `grid.resolution_mm`. Struct arrays take an index: `transducer(2).trans_pos` for the second transducer of a multi-transducer setup. A plain `transducer.x` is only allowed while the config defines one transducer. |
 
-##### Optional parameters:
-    options.ROI_MNI_mask (:,:,:) # Loads in a 3d matrix of your ROI mask (in MNI space)
-    options.slice_label = 'y' # Selects the axis along which your slice is made
-    options.rotation = 90;  # Rotates your structural background figure
-    options.plot_heating = 1 # Binary option to enable or disable heating plots
-    options.outputs_suffix = '' # Allows you to add a string at the end of the name of your output to say, differentiate between plots of maximum intensity and a given slice
-    options.isppa_thresholds = [] # Manually set the Ipa range that is to be plotted
-    options.add_FWHM_boundary = 0 # Binary option to add a dotted boundary around the FWHM of intensity
-    options.add_ROI_boundary = 1 # Binary option to add a red boundary around your ROI mask
-    options.skip_missing = 0 # Binary option to skip subjects with missing files
-    options.brightness_correction = 0 # Binary option to normalise the brightness between structural T1's
-    options.average_target_brightness = 100 # Average targetted brightness, only used when brightness correction is enabled
+Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_MD`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
+
+### Merge order
+
+For each row, later sources win:
+
+`config_default.yaml` < study config < row `config` YAML < manifest columns < `Overrides` of `prestus_study_start` < the run's `subject_id` and output affix
+
+All of this goes through one `load_parameters` call. Derived values (transducer geometry, thermal timing, …) are therefore computed from the row's own settings. `load_parameters` accepts the same kind of overrides directly: `load_parameters('config.yaml', dir, {'subject_id', 3; 'placement.localite.target', 'L_MD'})`.
+
+### Output names
+
+Each run writes the usual per-subject outputs to `<path.sim>/sub-XXX/`, distinguished by its output affix:
+
+- An explicit `io.output_affix` column (or row-config value) is used as is.
+- Otherwise the condition is appended to the study affix with `-`. For example, study affix `liberal` with condition `M1` gives `_desc-liberal-M1`; without a study affix, condition `M1` gives `_desc-M1`.
+- The result is sanitised like any `io.output_affix`.
+
+Two included rows that would write to the same files (same subject, affix, medium and `path.sim`) are rejected before anything runs. Give them distinct conditions.
+
+### Running a study
+
+```matlab
+prestus_study_start('config/config_amythal.yaml', 'DryRun', true)   % load + check every row, print the plan
+prestus_study_start('config/config_amythal.yaml')                   % run / submit all included rows
+prestus_study_start(cfg, 'Subjects', [1 3], 'Conditions', "L_MD")   % a subset
+prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
+    'Overrides', {'grid.resolution_mm', 2})                         % quick debug run of one row
+```
+
+- **Config errors surface first.** All selected rows are loaded before anything runs. The dry run prints each row's placement mode, target, transducer, planned depth, target intensity and platform, and writes `<path.sim>/group/<name>/log/plan_<time>.tsv`. A real launch writes `launch_<time>.tsv`, with the job ID and status per row.
+- **Platform.** Each run is started with `prestus_pipeline_start` and its own `platform`. On `matlab` the rows run one after another in the current session; a failing row is logged and the others continue (unless `'StopOnError', true`). On `slurm`/`qsub` there is one job per row, or a job graph for uncertainty, multi-ISPPA and async rows.
+- **One report at the end.** The per-subject automatic group report is switched off for study runs (`modules.generate_group_report = 0`, unless the manifest sets it). The study report is built once at the end instead: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail).
+- **Job graphs.** Rows that submit a job graph (uncertainty, multi-ISPPA, async multi-transducer) return no single final job ID. For those, run `prestus_group_report_start(cfg)` once their jobs have finished.
+
+## Targeting accuracy
+
+With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `run_nifti_creation` on), each run writes `sub-XXX_<medium><affix>_targeting.csv` next to its per-subject CSV. The analysis reads the focal-mask NIfTIs and never fails the pipeline; unavailable measures are `NaN`. The same function can be run post hoc: `targeting_analysis(parameters, 'PlannedFocus', f, 'PlannedTrans', t)` with T1 voxel positions.
+
+| Columns | Meaning |
+|---|---|
+| `condition`, `placement_mode`, `target_label`, `transducer_name`, `n_transducers`, `focal_distance_ep_planned_mm`, `target_isppa_wcm2` | The run's settings, shown in the report's study design table. |
+| `focal_centroid_ras_*`, `peak_ras_*` | Centroid of the −3 dB focal volume (brain-masked) and the intensity peak inside it, in T1 RAS mm. |
+| `planned_focus_ras_*`, `planned_trans_ras_*` | Focus and transducer positions resolved by placement, recorded before the grid stage, in RAS mm. |
+| `focus_error_mm` | Distance between the focal centroid and the planned focus. |
+| `focus_error_axial_mm`, `focus_error_lateral_mm` | That error along and across the planned beam axis (transducer → planned focus); axial `> 0` means the simulated focus is deeper than planned. |
+| `peak_error_mm` | Distance between the peak and the planned focus. |
+| `focal_centroid_mni_*`, `peak_mni_*` | The same positions in MNI mm (needs `io.save_MNI`). |
+| `target_mni_*`, `target_mni_source` | The intended MNI target: `analysis.target_mni_mm`, else the MNI target of the placement mode (`placement.heuristic` / `placement.plantus` `.mni_target_mm`, `placement.mni.focus_pos_mm`). |
+| `target_error_mni_mm`, `peak_target_error_mni_mm` | Distance from the MNI focal centroid (or peak) to the MNI target. |
+| `roi_volume_mm3`, `roi_overlap_mm3`, `roi_focal_fraction`, `roi_coverage`, `roi_mean_intensity`, `roi_max_intensity`, `roi_centroid_dist_mm` | With `analysis.target_roi_mni` (an MNI NIfTI mask, any grid): ROI volume, overlap with the focal volume, fraction of the focal volume inside the ROI, fraction of the ROI covered, intensity in the ROI (`intensity_quantity` = Ipa, else Itp), and the distance between the centroids. |
+
+With several transducers, the planned focus and beam axis of `transducer(1)` are used. Targets and ROIs can differ per run: set `analysis.target_mni_mm` or `analysis.target_roi_mni` as manifest columns.
+
+## Group MNI maps
+
+`prestus_group_report_start` builds these by default (`'Maps', false` to skip). They come from `create_group_maps` and use each run's MNI NIfTIs. The maps are computed per condition, or across all runs when there are no conditions:
+
+| File in `<out>/maps/` | Content |
+|---|---|
+| `group_<cond>_focal_overlap_3dB.nii.gz` | Fraction of runs whose −3 dB focal volume covers each voxel (0–1). |
+| `group_<cond>_<Ipa\|Itp>_mean.nii.gz`, `…_sd.nii.gz` | Voxelwise mean and SD intensity (Ipa when every run has it, else Itp when every run has that; no intensity maps otherwise). |
+| `group_<cond>_heatrise_mean.nii.gz` | Mean temperature rise (when every run has heating maps). |
+
+`<out>/plots/group_<cond>_focal_overlap.png` shows three orthogonal MNI slices through the overlap peak. The background is the mean MNI-space T1 of the subjects (`<path.seg>/m2m_sub-XXX/toMNI/T1_to_MNI_post-hoc.nii.gz`, when present). The figure also shows the ROI outline, the per-run focal centroids and the targets. Runs whose MNI grid differs from the first run's are skipped with a warning. `<out>` is `<path.sim>/group/<study.name>/` for a study and `<path.sim>/group/<medium><affix>/` otherwise.
 
 ## Group HTML report
 
-`prestus_group_report_start` aggregates the per-subject outputs (CSV tables and PNG figures) of every subject sharing the same `simulation.medium` and `io.output_affix` into one **self-contained, interactive HTML report**. It runs no simulations — it only reads outputs that already exist on disk.
-
-The report is written to:
-
-```
-<path.sim>/group_<medium>_report<affix>.html
-```
-
-with its box-plot images saved alongside in `<path.sim>/group_plots/`. See [Outputs](doc_outputs.md#group-outputs) for the full file listing.
-
-### Running the report
-
-**Manually**, point it at your project config (a YAML path or a loaded `parameters` struct). Subjects are auto-discovered, or you can pass an explicit list:
-
 ```matlab
-% Auto-discover all completed subjects under path.sim
-prestus_group_report_start('config/config_study.yaml');
-
-% Restrict to an explicit subject list
-prestus_group_report_start('config/config_study.yaml', [1 2 3 5 7]);
+prestus_group_report_start('config/config_amythal.yaml');           % study: runs from the manifest
+prestus_group_report_start('config/config_single.yaml');            % no manifest: auto-discover subjects
+prestus_group_report_start('config/config_single.yaml', [1 2 3 5]); % explicit subject list
+prestus_group_report_start(cfg, [], 'Maps', false);                 % report only
 ```
 
-**Automatically**, set the module flag so the report is regenerated at the end of every per-subject pipeline run:
+| Mode | Runs | Written to |
+|---|---|---|
+| Study (`study.manifest` set) | Included manifest rows | `<path.sim>/group/<name>/group_<name>_report.html`, `group_<name>_runs.csv`, `plots/`, `maps/` |
+| Subjects | All subjects in `path.sim` with `sub-XXX_<medium><affix>.csv` (or the given list) | `<path.sim>/group_<medium>_report<affix>.html`, `group_<medium>_runs<affix>.csv`, `group_plots/` |
 
-```yaml
-modules:
-  generate_group_report: 1   # regenerate the group report after each subject
-```
+**Automatically**, with `modules.generate_group_report: 1`, `prestus_pipeline` rebuilds the subject-mode report after each subject (best-effort, wrapped in `try`/`catch`, without group maps). Runs started by `prestus_study_start` skip this and build one study report at the end.
 
-When enabled, `prestus_pipeline` calls `discover_group_subjects` and rebuilds the report over all subjects completed so far. The call is best-effort (wrapped in `try`/`catch`): a group-report problem never aborts the subject's own pipeline. See [Modules](doc_modules.md).
+The report reads each run's `sub-XXX_<medium><affix>.csv` (last row) and, when present, the targeting sidecar and the per-subject PNGs. Runs without a CSV are listed as missing. Report contents:
 
-### Requirements
+- **Header**: study, manifest, runs, subjects, conditions, missing runs, medium, and a link to the one-row-per-run CSV.
+- **Safety banner**: runs above any ITRUSST non-significant-risk reference level, with links to their rows.
+- **Filter**: checkboxes per run and per-condition buttons. The dashboard, roster and cards update live; box plots and figures show the full set.
+- **Group safety dashboard and other metrics**: mean ± SD, range and N per ITRUSST metric, coloured by the worst run against the NSR limit. The Mechanical sub-grid shows both MI (free water) and MItc tiles plus Max pressure; the tile that does not apply to the medium is greyed out.
+- **Study design** (study, or more than one condition): runs per condition, the manifest keys and how many values each takes, and each run's placement mode, target, transducer, planned depth, target intensity and manifest settings.
+- **Condition comparison** (more than one condition): mean ± SD (n) of the key metrics per condition, plus box plots. It is descriptive only: runs of one subject under several conditions are not independent.
+- **Targeting accuracy** (targeting sidecars present): focus and MNI-target errors, ROI measures per condition and per run, and a figure of the MNI centroids and the axial/lateral error.
+- **Group MNI maps** (when built): overlap figures and links to the NIfTIs.
+- **Outliers**: runs whose value lies far from their condition's median (modified z-score 0.6745·(x − median)/MAD, |z| > 3.5; Iglewicz & Hoaglin, 1993), for conditions with at least 5 runs. They are also flagged in the roster.
+- **Data analysis**: client-side distribution, correlation, and by-group views (group by subject, condition, placement mode, target or transducer when they vary).
+- **Roster**: one sortable row per run with key metrics, NSR and outlier flags, and a link to the run's own report.
+- **Group acoustic and thermal summaries**: box plots (Isppa per tissue, MI per tissue; maximum temperature, temperature rise and CEM43 when thermal results exist).
+- **Per-run cards**: the run's settings and figures.
+- **Configuration summary**: of the loaded (study) config. Per-run settings are in the study design table.
 
-Each included subject must already have its per-subject output table on disk:
+## Deprecated: `prestus_group_start` / `create_group_MNI_plots`
 
-```
-<path.sim>/sub-NNN/sub-NNN_<medium><affix>.csv
-```
-
-Per-subject PNGs (positioning, intensity, and max-temperature overlays) are embedded when present. The report reads `path.sim`, `simulation.medium`, `io.output_affix`, and `modules.run_heating_sims` (the latter gates the thermal plots).
-
-### Report contents
-
-- **Header** — subject count, medium, affix, and simulation path.
-- **Subject filter** — checkboxes to toggle subjects in / out.
-- **Exposure dashboard** — per-metric mean ± SD with min–max range, colour-coded against ITRUSST non-significant-risk limits. The Mechanical sub-grid always shows both **MI (free water)** and **MItc** (transcranial) tiles, plus a **Max pressure** tile (≤ 2 MPa). Only one of the two MI tiles has real data for any given medium (free water for water/free-field runs, MItc for layered runs) — the other renders as an empty, grayed-out "N/A" tile, so MI (free water) is effectively grayed out whenever MItc is available, and vice versa. Per-tissue `MI_brain`/`MI_skull`/`MI_skin` are not shown on this board (they remain in the per-subject CSV and the Mechanical Index box plot below).
-- **Subject roster** — one row per subject with key metrics and a link to that subject's own report.
-- **Group acoustic summary** — two box plots: **Intensity** (Isppa / Ipa_target, W/cm²) and **Mechanical Index** (per tissue, unitless).
-- **Group thermal summary** *(layered medium with heating simulations only)* — three box plots: **maximum temperature**, **temperature rise**, and **CEM43 thermal dose**, each on its own scale.
-- **Per-subject cards** — collapsible panels embedding each subject's figures.
-- **Configuration summary** — the parameters used for the run.
-
-All group box plots (`render_group_boxplot` in `generate_group_report.m`) auto-scale their figure width to the number of columns being plotted (`max(600, 140 × columns)` px, fixed 420 px height) and are exported as 150 dpi PNGs into `group_plots/` alongside the HTML report.
-
-> **Note:** The subject filter updates the dashboard and per-subject cards live, but the group box plots are static images rendered over the full subject set — they do not change when subjects are toggled.
+`create_group_MNI_plots` expects an older output layout (`parameters.temp_output_dir`, `*_final_intensity_MNI*.nii.gz`, `*_output_table*.csv`) and no longer finds the files the pipeline writes. `prestus_group_start` now warns and runs `prestus_group_report_start` (group MNI maps + report) instead. Its plot options are ignored; for an ROI, set `analysis.target_roi_mni`. The ROI statistics of the old function (intensity in the ROI, overlap, centroid distance) are now part of the [targeting analysis](#targeting-accuracy), in mm rather than voxels.

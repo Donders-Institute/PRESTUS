@@ -1,5 +1,9 @@
 function create_group_MNI_plots(subject_list, parameters, options)
-% CREATE_GROUP_MNI_PLOTS  Generate group-level simulation plots in MNI space
+% CREATE_GROUP_MNI_PLOTS  Generate group-level simulation plots in MNI space  [DEPRECATED]
+%
+% DEPRECATED: expects an older output layout (parameters.temp_output_dir,
+% *_final_intensity_MNI*.nii.gz, *_output_table*.csv) and no longer finds the
+% files the pipeline writes. Use CREATE_GROUP_MAPS / PRESTUS_GROUP_REPORT_START.
 %
 % Processes per-subject ISPPA, pressure, and heating maps, extracts
 % orthogonal slices or peak-intensity slices, and generates composite
@@ -63,6 +67,8 @@ arguments
     options.brightness_correction = 0
     options.average_target_brightness = 100
 end
+    warning('create_group_MNI_plots:deprecated', ...
+        'create_group_MNI_plots is deprecated and expects an outdated output layout; use create_group_maps.');
 
 assert(xor(options.plot_max_intensity, options.slice_to_plot), ...
     "You should indicate either the slice number to plot ('slice_to_plot') or ask for a max intensity plot ('plot_max_intensity')");

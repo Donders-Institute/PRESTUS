@@ -12,8 +12,14 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 Multi-subject studies whose runs differ in placement, target, depth, intensity or transducer, with group-level results (see [doc_group.md](doc_group.md)).
 
+- **Study manifest** (`study.manifest`, `study.name`): one row per run: `subject_id`, optional `condition` / `include` / per-row `config`, plus any dotted config key as a column (`placement.localite.target`, `transducer(2).trans_pos`, …). Read by `study_read_manifest`; rows resolved to output affixes (condition → `_desc-<study affix>-<condition>`) by `study_run_table`, which rejects rows that would overwrite each other
+- **`prestus_study_start`**: loads every row first (config errors before anything runs), prints the per-run plan (`DryRun`), selects by `Subjects` / `Conditions` / `Rows`, applies `Overrides` to all rows, runs locally or submits one job per row, logs to `<path.sim>/group/<name>/log/`, and builds one study report at the end (on HPC a dependent `afterany` job; new `hpc.depend_type`)
 - **`load_parameters` overrides**: a trailing `{key, value}` cell is applied after all merges and before validation/derivation (`apply_config_overrides`; indexed struct-array keys, unknown-key warning). `sanitize_output_affix` is now the single affix rule
 - **Targeting accuracy** (`modules.run_targeting_analysis`, `analysis.target_mni_mm`, `analysis.target_roi_mni`): `targeting_analysis` writes `sub-XXX_<medium><affix>_targeting.csv`, with the focal centroid and peak vs the planned focus (distance, axial/lateral split), vs an MNI target, and ROI overlap/coverage/intensity. The pipeline now records the planned T1 positions before the grid stage (`parameters.state.planned_*_t1_vox`)
+- **Group MNI maps** (`create_group_maps`): per-condition focal-volume overlap, mean/SD intensity and mean heating NIfTIs, plus overlap figures over the mean MNI T1 with ROI outline, focal centroids and targets
+- **Group report**: runs (subject × condition) instead of subjects; new Study design, Condition comparison, Targeting accuracy, Group MNI maps and Outliers (robust z within condition) sections; per-condition filter buttons; group-by condition / placement / target / transducer; a one-row-per-run CSV; relative links that work from the study folder. `prestus_group_report_start` switches to study mode when the config has a manifest and builds the maps
+- **Deprecated**: `prestus_group_start` / `create_group_MNI_plots` (older output layout); `prestus_group_start` now runs `prestus_group_report_start`
+- **Docs**: `doc_group.md` rewritten; `doc_outputs.md` now gives the actual per-subject CSV name (`sub-XXX_<medium><affix>.csv`, not `…_output_table…`)
 #### BabelBrain acoustic and thermal backend
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).

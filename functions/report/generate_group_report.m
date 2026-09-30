@@ -1,16 +1,27 @@
-function report_path = generate_group_report(parameters, subject_list)
+function report_path = generate_group_report(parameters, runs, options)
 % GENERATE_GROUP_REPORT  Generate a self-contained group-level HTML report
 %
-% Aggregates per-subject PRESTUS outputs (CSV tables and PNG images) across
-% all subjects sharing the current simulation.medium and io.output_affix,
-% and assembles a single portable HTML file with:
-%   - a cross-subject Exposure Dashboard (min / median / mean / max / SD,
+% Aggregates per-run PRESTUS outputs (CSV tables, targeting sidecars, PNG
+% images, group MNI maps) and assembles a single portable HTML file with:
+%   - a cross-run Exposure Dashboard (min / median / mean / max / SD,
 %     colour-coded against ITRUSST consensus limits)
-%   - a subject roster table
-%   - group-level box plots of acoustic and (if available) thermal metrics
-%   - one collapsible card per subject embedding their key images
-%   - an interactive filter bar (JavaScript) that toggles subjects in/out
-%     and recomputes dashboard stats client-side
+%   - study design: conditions and the per-run settings (placement, target,
+%     transducer, depth, intensity, manifest overrides)      [study mode]
+%   - condition comparison: per-condition statistics and box plots
+%                                                        [> 1 condition]
+%   - targeting accuracy: simulated focus vs planned focus / MNI target / ROI
+%                                         [targeting sidecars present]
+%   - group MNI maps: focal-volume overlap per condition     [maps given]
+%   - outlier flags: robust z-score within each condition
+%   - a run roster, group box plots, and one card per run
+%   - an interactive filter bar (JavaScript) that toggles runs in/out and
+%     recomputes dashboard stats client-side
+%
+% A run is one subject simulated with one set of settings (medium + output
+% affix). Without a study, each subject is one run and the report covers all
+% subjects sharing simulation.medium and io.output_affix. With a study
+% (PRESTUS_GROUP_REPORT_START on a study config), runs come from the
+% manifest and may differ in any setting; conditions group them.
 %
 % Mirrors the look-and-feel of GENERATE_SIMULATION_REPORT and reuses its
 % HTML utilities (html_utils, table2html, css_styles_base, risk_color,
@@ -19,39 +30,57 @@ function report_path = generate_group_report(parameters, subject_list)
 % Use as:
 %   report_path = generate_group_report(parameters)
 %   report_path = generate_group_report(parameters, subject_list)
+%   report_path = generate_group_report(parameters, runs, options)
 %
 % Input:
 %   parameters   - PRESTUS parameters struct (path.sim, simulation.medium,
 %                  and io.output_affix are required)
-%   subject_list - (optional) numeric array of subject IDs. If omitted or
-%                  empty, DISCOVER_GROUP_SUBJECTS is used to auto-scan
-%                  path.sim for subjects sharing the medium / affix.
+%   runs         - (optional) numeric array of subject IDs, or a run table
+%                  from STUDY_RUN_TABLE (included rows are reported). If
+%                  omitted or empty, DISCOVER_GROUP_SUBJECTS is used to
+%                  auto-scan path.sim for subjects sharing the medium / affix.
+%   options      - (optional) struct, study mode:
+%                    .name      study name (report file name)
+%                    .out_dir   output folder (default path.sim)
+%                    .maps      struct array from CREATE_GROUP_MAPS
+%                    .manifest  manifest path (shown in the header)
 %
 % Output:
 %   report_path - path to the generated HTML file, or '' if generation
-%                 failed or no subjects were found.
+%                 failed or no runs were found.
 %
 % Naming convention:
-%   <path.sim>/group_<medium>_report<affix>.html
+%   <path.sim>/group_<medium>_report<affix>.html        (subject list)
+%   <out_dir>/group_<name>_report.html                  (study)
+% Box plots go to <path.sim>/group_plots/ or <out_dir>/plots/; a tidy table
+% with one row per run is written next to the report (…_runs.csv).
 %
 % See also: GENERATE_SIMULATION_REPORT, DISCOVER_GROUP_SUBJECTS,
-%           PRESTUS_GROUP_REPORT_START, HTML_UTILS, TABLE2HTML
+%           PRESTUS_GROUP_REPORT_START, CREATE_GROUP_MAPS, STUDY_RUN_TABLE,
+%           TARGETING_ANALYSIS, HTML_UTILS, TABLE2HTML
 
 arguments
     parameters   (1,1) struct
-    subject_list       = []
+    runs               = []
+    options      (1,1) struct = struct()
 end
 
 report_path = '';
 
 try
-    %% Resolve subject list (auto-discover if not provided)
-    if isempty(subject_list)
-        subject_list = discover_group_subjects(parameters);
+    %% Resolve runs (auto-discover subjects if not provided)
+    if ~istable(runs)
+        subject_list = runs;
+        if isempty(subject_list)
+            subject_list = discover_group_subjects(parameters);
+        end
+        subject_list = unique(subject_list(:).');  % dedup + row vector
+        runs = legacy_run_table(parameters, subject_list);
+    elseif ismember('include', runs.Properties.VariableNames)
+        runs = runs(runs.include, :);
     end
-    subject_list = unique(subject_list(:).');  % dedup + row vector
 
-    if isempty(subject_list)
+    if isempty(runs)
         fprintf('generate_group_report: no subjects found for medium=%s, affix=%s in %s — skipping.\n', ...
             parameters.simulation.medium, get_affix(parameters), parameters.path.sim);
         return
@@ -61,25 +90,52 @@ try
     medium = parameters.simulation.medium;
     is_layered = contains(medium, {'layered', 'phantom'});
     affix = get_affix(parameters);
+    study_mode = isfield(options, 'name') && ~isempty(options.name);
 
-    report_filename = sprintf('group_%s_report%s.html', medium, affix);
-    report_path = fullfile(parameters.path.sim, report_filename);
+    if study_mode
+        name = char(options.name);
+        out_dir = char(parameters.path.sim);
+        if isfield(options, 'out_dir') && ~isempty(options.out_dir); out_dir = char(options.out_dir); end
+        report_path = fullfile(out_dir, sprintf('group_%s_report.html', name));
+        group_plots_dir = fullfile(out_dir, 'plots');
+        plot_suffix = ['_' name];
+        export_path = fullfile(out_dir, sprintf('group_%s_runs.csv', name));
+    else
+        out_dir = char(parameters.path.sim);
+        report_path = fullfile(out_dir, sprintf('group_%s_report%s.html', medium, affix));
+        group_plots_dir = fullfile(out_dir, 'group_plots');
+        plot_suffix = affix;
+        export_path = fullfile(out_dir, sprintf('group_%s_runs%s.csv', medium, affix));
+    end
+    if ~exist(out_dir, 'dir'); mkdir(out_dir); end
+    maps = struct([]);
+    if isfield(options, 'maps'); maps = options.maps; end
 
-    %% Aggregate per-subject data
-    [group_table, subjects_meta] = aggregate_subjects(parameters, subject_list, medium, affix);
+    %% Aggregate per-run data
+    [group_table, subjects_meta, missing] = aggregate_runs(runs);
 
     if isempty(group_table)
         fprintf('generate_group_report: no per-subject CSVs could be read — skipping.\n');
         report_path = '';
         return
     end
+    conds = unique(string(group_table.condition), 'stable');
+    multi_cond = numel(conds) > 1;
+    [outliers, subjects_meta] = find_outliers(group_table, subjects_meta);
+
+    %% Tidy export: one row per run
+    try
+        writetable(group_table, export_path);
+    catch ME
+        warning('generate_group_report:export', 'Could not write %s: %s', export_path, ME.message);
+        export_path = '';
+    end
 
     %% Render group-level box plots (best-effort)
-    group_plots_dir = fullfile(parameters.path.sim, 'group_plots');
     if ~exist(group_plots_dir, 'dir'); mkdir(group_plots_dir); end
 
     plot_path = @(tag) fullfile(group_plots_dir, ...
-        sprintf('group_%s_%s%s.png', medium, tag, affix));
+        sprintf('group_%s_%s%s.png', medium, tag, plot_suffix));
 
     acoustic_specs = struct('path', {}, 'caption', {}, 'alt', {});
     acoustic_specs(end+1) = struct( ...
@@ -95,8 +151,11 @@ try
             'alt',     'Mechanical Index box plot across subjects');
     end
 
+    has_thermal = is_layered && ((isfield(parameters.modules, 'run_heating_sims') && ...
+        parameters.modules.run_heating_sims) || any(ismember({'maxT_brain', 'maxT_skull'}, ...
+        group_table.Properties.VariableNames)));
     thermal_specs = struct('path', {}, 'caption', {}, 'alt', {});
-    if is_layered && isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
+    if has_thermal
         thermal_specs(end+1) = struct( ...
             'path',    render_group_boxplot(group_table, get_maxT_plot_cols(), ...
                            'Maximum temperature (^\circC)', plot_path('maxT')), ...
@@ -114,9 +173,37 @@ try
             'alt',     'CEM43 box plot across subjects');
     end
 
+    cond_plot = '';
+    if multi_cond
+        cond_plot = render_condition_boxplot(group_table, comparison_metrics(group_table), ...
+            plot_path('conditions'));
+    end
+    has_targeting = any(ismember(targeting_cols(), group_table.Properties.VariableNames));
+    targeting_plot = '';
+    if has_targeting
+        targeting_plot = render_targeting_scatter(group_table, plot_path('targeting'));
+    end
+
     %% Build HTML
     limits = get_risk_limits(is_layered);
-    n_subjects = numel(subject_list);
+    n_runs = numel(subjects_meta);
+    report_dir = fileparts(report_path);
+
+    sections = {'header', 'Header'; 'filter', 'Filter'; 'dashboard', 'Safety'; 'other-group', 'Other'};
+    if study_mode || multi_cond; sections(end+1, :) = {'design', 'Design'}; end
+    if multi_cond;               sections(end+1, :) = {'compare', 'Compare'}; end
+    if has_targeting;            sections(end+1, :) = {'targeting', 'Targeting'}; end
+    if ~isempty(maps);           sections(end+1, :) = {'maps', 'Maps'}; end
+    sections = [sections; {'outliers', 'Outliers'; 'analysis', 'Analysis'; 'roster', 'Roster'; ...
+        'group-acoustic', 'Acoustic'}];
+    if has_thermal; sections(end+1, :) = {'group-thermal', 'Thermal'}; end
+    sections = [sections; {'subjects', 'Runs'; 'config', 'Config'}];
+
+    if study_mode
+        title_str = sprintf('PRESTUS Group Report — %s (N=%d)', name, n_runs);
+    else
+        title_str = sprintf('PRESTUS Group Report — %s%s (N=%d)', medium, affix, n_runs);
+    end
 
     html_parts = {};
     html_parts{end+1} = '<!DOCTYPE html>';
@@ -127,8 +214,7 @@ try
     html_parts{end+1} = ['<script>try{var t=localStorage.getItem("prestus-theme")||' ...
         '((window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light");' ...
         'document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'];
-    html_parts{end+1} = sprintf('<title>PRESTUS Group Report — %s%s (N=%d)</title>', ...
-        medium, affix, n_subjects);
+    html_parts{end+1} = sprintf('<title>%s</title>', html_utils.escape(title_str));
     html_parts{end+1} = '<style>';
     html_parts{end+1} = css_styles_base();
     html_parts{end+1} = group_css_extra();
@@ -139,28 +225,29 @@ try
 
     % Table of contents (sticky)
     try
-        html_parts{end+1} = build_toc();
+        html_parts{end+1} = build_toc(sections);
     catch ME
         html_parts{end+1} = html_utils.section_error('Table of Contents', ME);
     end
 
     % Section 1: Header
     try
-        html_parts{end+1} = build_group_header(parameters, subject_list, medium, affix, is_layered);
+        html_parts{end+1} = build_group_header(parameters, subjects_meta, missing, medium, affix, ...
+            is_layered, options, conds, report_dir, export_path);
     catch ME
         html_parts{end+1} = html_utils.section_error('Header', ME);
     end
 
-    % Group verdict banner + subjects exceeding NSR limits
+    % Group verdict banner + runs exceeding NSR limits
     try
         html_parts{end+1} = build_group_safety_banner(subjects_meta, group_table, limits);
     catch ME
         html_parts{end+1} = html_utils.section_error('Group verdict', ME);
     end
 
-    % Section 2: Filter bar (subject checkboxes)
+    % Section 2: Filter bar (run checkboxes)
     try
-        html_parts{end+1} = build_filter_bar(subjects_meta);
+        html_parts{end+1} = build_filter_bar(subjects_meta, conds);
     catch ME
         html_parts{end+1} = html_utils.section_error('Filter', ME);
     end
@@ -179,17 +266,65 @@ try
         html_parts{end+1} = html_utils.section_error('Other exposure metrics', ME);
     end
 
-    % Section 3b: Data analysis (client-side distribution / correlation / by-condition)
+    % Section 3b: Study design (conditions, per-run settings)
+    if study_mode || multi_cond
+        try
+            html_parts{end+1} = html_utils.collapsible('Study Design', ...
+                build_study_design(runs, subjects_meta, missing, conds), true, 'design');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Study Design', ME);
+        end
+    end
+
+    % Section 3c: Condition comparison
+    if multi_cond
+        try
+            html_parts{end+1} = html_utils.collapsible('Condition Comparison', ...
+                build_condition_comparison(group_table, conds, cond_plot, limits), true, 'compare');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Condition Comparison', ME);
+        end
+    end
+
+    % Section 3d: Targeting accuracy
+    if has_targeting
+        try
+            html_parts{end+1} = html_utils.collapsible('Targeting Accuracy', ...
+                build_targeting_section(group_table, subjects_meta, conds, targeting_plot), true, 'targeting');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Targeting Accuracy', ME);
+        end
+    end
+
+    % Section 3e: Group MNI maps
+    if ~isempty(maps)
+        try
+            html_parts{end+1} = html_utils.collapsible('Group MNI Maps', ...
+                build_maps_section(maps, report_dir), true, 'maps');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Group MNI Maps', ME);
+        end
+    end
+
+    % Section 3f: Outliers
+    try
+        html_parts{end+1} = html_utils.collapsible('Outliers', ...
+            build_outlier_section(outliers, subjects_meta), true, 'outliers');
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Outliers', ME);
+    end
+
+    % Section 3g: Data analysis (client-side distribution / correlation / by-group)
     try
         html_parts{end+1} = build_analysis_section(subjects_meta, limits);
     catch ME
         html_parts{end+1} = html_utils.section_error('Data Analysis', ME);
     end
 
-    % Section 4: Subject roster table
+    % Section 4: Run roster table
     try
         html_parts{end+1} = html_utils.collapsible('Subject Roster', ...
-            build_subject_roster(group_table, subjects_meta, parameters, medium, affix, limits, is_layered), ...
+            build_subject_roster(group_table, subjects_meta, report_dir, limits, is_layered, multi_cond), ...
             true, 'roster');
     catch ME
         html_parts{end+1} = html_utils.section_error('Subject Roster', ME);
@@ -205,7 +340,7 @@ try
     end
 
     % Section 6: Group thermal plots (conditional)
-    if is_layered && isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
+    if has_thermal
         try
             html_parts{end+1} = html_utils.collapsible('Group Thermal Summary', ...
                 build_group_plot_section(thermal_specs, 'No thermal columns available for plotting.'), ...
@@ -215,10 +350,10 @@ try
         end
     end
 
-    % Section 7: Per-subject cards
+    % Section 7: Per-run cards
     try
         html_parts{end+1} = html_utils.collapsible('Per-Subject Details', ...
-            build_subject_cards(subjects_meta, parameters, medium, affix, is_layered), ...
+            build_subject_cards(subjects_meta, report_dir, is_layered), ...
             true, 'subjects');
     catch ME
         html_parts{end+1} = html_utils.section_error('Per-Subject Details', ME);
@@ -280,32 +415,47 @@ end
 %  AGGREGATION
 %  =========================================================================
 
-function [group_table, subjects_meta] = aggregate_subjects(parameters, subject_list, medium, affix)
-% Read each subject's CSV, vertically concatenate, and build a per-subject
-% struct array with the metrics needed for the dashboard and JS filter.
+function runs = legacy_run_table(parameters, subject_list)
+% One run per subject, all with the medium and affix of parameters.
+    n = numel(subject_list);
+    subject_id = subject_list(:);
+    runs = table((1:n)', subject_id, strings(n, 1), true(n, 1), ...
+        repmat(string(get_affix(parameters)), n, 1), ...
+        repmat(string(parameters.simulation.medium), n, 1), ...
+        repmat(string(parameters.path.sim), n, 1), ...
+        compose("sub-%03d", subject_id), ...
+        'VariableNames', {'row', 'subject_id', 'condition', 'include', 'affix', 'medium', ...
+                          'sim_dir', 'label'});
+end
+
+function [group_table, subjects_meta, missing] = aggregate_runs(runs)
+% Read each run's CSV (+ targeting sidecar), vertically concatenate, and
+% build a per-run struct array with the metrics needed for the dashboard
+% and JS filter. Runs without a CSV are returned in `missing`.
 
     group_table = table();
-    subjects_meta = struct('subject_id', {}, 'csv_path', {}, 'row_index', {}, ...
+    subjects_meta = struct('run_id', {}, 'subject_id', {}, 'label', {}, 'condition', {}, ...
+                           'affix', {}, 'medium', {}, 'csv_path', {}, 'row_index', {}, ...
                            'sub_dir', {}, 'img_dir', {}, 'report_path', {}, ...
-                           'metrics', {});
+                           'descriptors', {}, 'overrides', {}, 'outlier', {}, 'metrics', {});
+    missing = runs([], :);
+    text_cols = {'placement_mode', 'target_label', 'transducer_name', 'intensity_quantity', ...
+                 'target_mni_source'};
 
-    for k = 1:numel(subject_list)
-        id = subject_list(k);
-        sub_dir  = fullfile(parameters.path.sim, sprintf('sub-%03d', id));
-        img_dir  = fullfile(sub_dir, 'img');
-        csv_path = fullfile(sub_dir, sprintf('sub-%03d_%s%s.csv', id, medium, affix));
-        rpt_path = fullfile(sub_dir, sprintf('sub-%03d_%s_report%s.html', id, medium, affix));
+    for k = 1:height(runs)
+        id = runs.subject_id(k);
+        f = study_run_files(id, runs.medium(k), runs.affix(k), runs.sim_dir(k));
 
-        if ~isfile(csv_path)
-            continue
-        end
-
-        try
-            t = readtable(csv_path, 'VariableNamingRule', 'preserve');
-        catch
-            continue
+        t = [];
+        if isfile(f.csv)
+            try
+                t = readtable(f.csv, 'VariableNamingRule', 'preserve');
+            catch
+                t = [];
+            end
         end
         if isempty(t)
+            missing(end+1, :) = runs(k, :); %#ok<AGROW>
             continue
         end
 
@@ -315,11 +465,46 @@ function [group_table, subjects_meta] = aggregate_subjects(parameters, subject_l
         if ~ismember('subject_id', row.Properties.VariableNames)
             row = addvars(row, id, 'Before', 1, 'NewVariableNames', {'subject_id'});
         end
+        row.subject_id = id;
+
+        % Targeting sidecar: numeric columns joined, descriptors kept as text
+        desc = struct('placement_mode', "", 'target_label', "", 'transducer_name', "", ...
+                      'intensity_quantity', "", 'target_mni_source', "");
+        if isfile(f.targeting_csv)
+            try
+                opts = detectImportOptions(f.targeting_csv, 'VariableNamingRule', 'preserve');
+                tv = intersect([text_cols, {'condition', 'affix'}], opts.VariableNames);
+                opts = setvartype(opts, tv, 'string');
+                tt = readtable(f.targeting_csv, opts);
+                tt = tt(end, :);
+                for c = 1:numel(text_cols)
+                    if ismember(text_cols{c}, tt.Properties.VariableNames)
+                        v = tt.(text_cols{c});
+                        if ~ismissing(v); desc.(text_cols{c}) = v; end
+                    end
+                end
+                for c = tt.Properties.VariableNames
+                    v = tt.(c{1});
+                    if isnumeric(v) && isscalar(v) && ~ismember(c{1}, row.Properties.VariableNames)
+                        row.(c{1}) = double(v);
+                    end
+                end
+            catch ME
+                warning('generate_group_report:targetingRead', ...
+                    'sub-%03d: could not read %s (%s).', id, f.targeting_csv, ME.message);
+            end
+        end
+
+        run_id = numel(subjects_meta) + 1;
+        row = addvars(row, run_id, string(runs.label(k)), string(runs.condition(k)), ...
+            string(runs.affix(k)), desc.placement_mode, desc.target_label, desc.transducer_name, ...
+            'After', 'subject_id', 'NewVariableNames', {'run_id', 'run_label', 'condition', ...
+            'affix', 'placement_mode', 'target_label', 'transducer_name'});
 
         % Append to combined table (outer-join semantics — union columns,
         % missing values become NaN/empty). If a per-subject row has an
         % incompatible column type (rare — schemas should match), skip the
-        % table append for this subject but keep its struct so it still
+        % table append for this run but keep its struct so it still
         % appears in subjects_meta / the JSON payload.
         try
             if isempty(group_table)
@@ -329,12 +514,12 @@ function [group_table, subjects_meta] = aggregate_subjects(parameters, subject_l
             end
         catch ME
             warning('generate_group_report:tableAppend', ...
-                ['sub-%03d: CSV row could not be merged into group table (%s); ' ...
-                 'subject still included in JSON / dashboard.'], id, ME.message);
+                ['%s: CSV row could not be merged into group table (%s); ' ...
+                 'run still included in JSON / dashboard.'], runs.label(k), ME.message);
         end
 
-        % Build per-subject metrics struct for JSON payload
-        metrics = struct('subject_id', id);
+        % Build per-run metrics struct for JSON payload
+        metrics = struct('subject_id', id, 'run_id', run_id);
         cols = row.Properties.VariableNames;
         for c = 1:numel(cols)
             v = row{1, c};
@@ -342,14 +527,32 @@ function [group_table, subjects_meta] = aggregate_subjects(parameters, subject_l
                 metrics.(matlab.lang.makeValidName(cols{c})) = v;
             end
         end
+        metrics.subject_id = id;
+        metrics.run_id = run_id;
+        metrics.id = char(runs.label(k));
+        metrics.subject = sprintf('sub-%03d', id);
+        metrics.condition = char(runs.condition(k));
+        metrics.placement_mode = char(desc.placement_mode);
+        metrics.target_label = char(desc.target_label);
+        metrics.transducer_name = char(desc.transducer_name);
 
+        ov = {};
+        if ismember('overrides', runs.Properties.VariableNames); ov = runs.overrides{k}; end
         subjects_meta(end+1) = struct( ...
+            'run_id',     run_id, ...
             'subject_id', id, ...
-            'csv_path',   csv_path, ...
+            'label',      char(runs.label(k)), ...
+            'condition',  char(runs.condition(k)), ...
+            'affix',      char(runs.affix(k)), ...
+            'medium',     char(runs.medium(k)), ...
+            'csv_path',   f.csv, ...
             'row_index',  height(t), ...
-            'sub_dir',    sub_dir, ...
-            'img_dir',    img_dir, ...
-            'report_path', rpt_path, ...
+            'sub_dir',    f.sub_dir, ...
+            'img_dir',    f.img_dir, ...
+            'report_path', f.report, ...
+            'descriptors', desc, ...
+            'overrides',  {ov}, ...
+            'outlier',    {{}}, ...
             'metrics',    metrics); %#ok<AGROW>
     end
 end
@@ -394,7 +597,6 @@ function T = outerjoin_tables(A, B)
     B = B(:, A.Properties.VariableNames);
     T = [A; B];
 end
-
 function m = missing_like(v)
     if isnumeric(v)
         m = NaN;
@@ -411,7 +613,6 @@ end
 %% =========================================================================
 %  GROUP BOX-PLOT RENDERING
 %  =========================================================================
-
 function plot_path = render_group_boxplot(group_table, cols, title_str, out_path)
 % Render a multi-panel box plot of the requested columns and save as PNG.
 % Returns the saved path on success or '' on failure / no usable columns.
@@ -463,27 +664,22 @@ function plot_path = render_group_boxplot(group_table, cols, title_str, out_path
             'Box plot rendering failed: %s', ME.message);
     end
 end
-
 function cols = get_intensity_plot_cols(is_layered)
     cols = {'Isppa', 'Ipa_target'};
     if is_layered
         cols = [cols, {'Isppa_brain', 'Isppa_skull', 'Isppa_skin'}];
     end
 end
-
 function cols = get_mi_plot_cols()
     cols = {'MI_tc', 'MI_brain', 'MI_skull', 'MI_skin'};
 end
-
 function cols = get_maxT_plot_cols()
     cols = {'maxT', 'maxT_brain', 'maxT_skull', 'maxT_skin'};
 end
-
 function cols = get_riseT_plot_cols()
     cols = {'riseT_brain', 'riseT_skull', 'riseT_skin', ...
             'riseT37_brain', 'riseT37_skull', 'riseT37_skin'};
 end
-
 function cols = get_cem43_plot_cols()
     cols = {'CEM43_brain', 'CEM43_skull', 'CEM43_skin', ...
             'CEM43iso_brain', 'CEM43iso_skull', 'CEM43iso_skin'};
@@ -493,25 +689,18 @@ end
 %% =========================================================================
 %  SECTION BUILDERS
 %  =========================================================================
-
-function html = build_toc()
+function html = build_toc(sections)
     logo = html_utils.report_logo(26);
     if ~isempty(logo)
         brand = ['<a class="brand" href="#top">' logo '</a>'];
     else
         brand = '<a class="brand" href="#top"><span class="wm">PRE<b>STUS</b></span></a>';
     end
-    html = ['<nav class="toc">' brand ...
-        '<a href="#header">Header</a>' ...
-        '<a href="#filter">Filter</a>' ...
-        '<a href="#dashboard">Safety</a>' ...
-        '<a href="#other-group">Other</a>' ...
-        '<a href="#analysis">Analysis</a>' ...
-        '<a href="#roster">Roster</a>' ...
-        '<a href="#group-acoustic">Acoustic</a>' ...
-        '<a href="#group-thermal">Thermal</a>' ...
-        '<a href="#subjects">Subjects</a>' ...
-        '<a href="#config">Config</a>' ...
+    links = '';
+    for i = 1:size(sections, 1)
+        links = [links sprintf('<a href="#%s">%s</a>', sections{i, 1}, sections{i, 2})]; %#ok<AGROW>
+    end
+    html = ['<nav class="toc">' brand links ...
         '<span class="toc-spacer"></span>' ...
         '<label class="report-search hide-sm">' ...
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' ...
@@ -524,7 +713,7 @@ function html = build_toc()
 end
 
 function html = build_group_safety_banner(subjects_meta, group_table, limits) %#ok<INUSL>
-% Group verdict: how many subjects exceed any finite NSR limit, with a
+% Group verdict: how many runs exceed any finite NSR limit, with a
 % clickable list of the offenders (the participant-level flagging).
     names = fieldnames(limits);
     lim_names = {};
@@ -544,25 +733,26 @@ function html = build_group_safety_banner(subjects_meta, group_table, limits) %#
             end
         end
         if ~isempty(over)
-            exceed_ids(end+1) = subjects_meta(k).subject_id; %#ok<AGROW>
-            exceed_info{end+1} = sprintf('sub-%03d &middot; %s', ...
-                subjects_meta(k).subject_id, html_utils.escape(strjoin(over, ', '))); %#ok<AGROW>
+            exceed_ids(end+1) = subjects_meta(k).run_id; %#ok<AGROW>
+            exceed_info{end+1} = sprintf('%s &middot; %s', ...
+                html_utils.escape(subjects_meta(k).label), html_utils.escape(strjoin(over, ', '))); %#ok<AGROW>
         end
     end
     nOver = numel(exceed_ids);
     if nOver == 0
         cls = 'pass';
         glyph = '<svg viewBox="0 0 24 24" fill="none"><path d="m5 13 4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        title = sprintf('All %d subjects within NSR limits', n);
-        sub = 'No subject exceeds any ITRUSST non-significant-risk limit.';
+        title = sprintf('All %d %s within NSR limits', n, run_noun(subjects_meta));
+        sub = 'None exceeds any ITRUSST non-significant-risk limit.';
         badges = '';
     else
         cls = 'review';
         glyph = '<svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M10.5 7.5v3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="13.4" r="1.1" fill="currentColor"/></svg>';
-        title = sprintf('%d of %d subjects above an ITRUSST NSR reference level: inspect NSR adherence', nOver, n);
+        title = sprintf('%d of %d %s above an ITRUSST NSR reference level: inspect NSR adherence', ...
+            nOver, n, run_noun(subjects_meta));
         sub = ['This is not by itself a failed safety check. Some ITRUSST criteria are alternatives ' ...
             '(e.g. temperature rise or thermal dose), and study-specific NSR criteria may apply. ' ...
-            'Click a subject to jump to its row and inspect it against the criteria that govern your protocol.'];
+            'Click an entry to jump to its row and inspect it against the criteria that govern your protocol.'];
         b = '';
         for i = 1:numel(exceed_info)
             b = [b sprintf('<a class="exbadge" href="#row-%d">%s</a>', exceed_ids(i), exceed_info{i})]; %#ok<AGROW>
@@ -578,14 +768,18 @@ function html = build_group_safety_banner(subjects_meta, group_table, limits) %#
     html = [html '</div></section>'];
 end
 
+function s = run_noun(subjects_meta)
+% 'subjects' when every subject appears once, else 'runs'.
+    ids = [subjects_meta.subject_id];
+    if numel(unique(ids)) == numel(ids); s = 'subjects'; else, s = 'runs'; end
+end
+
 function html = build_analysis_section(subjects_meta, limits)
-% Client-side analysis panel: distribution / correlation / by-condition,
+% Client-side analysis panel: distribution / correlation / by-group,
 % rendered from an embedded JSON payload by report_scripts.group_runtime().
     subs = cell(1, numel(subjects_meta));
     for k = 1:numel(subjects_meta)
-        m = subjects_meta(k).metrics;
-        m.id = subjects_meta(k).subject_id;
-        subs{k} = m;
+        subs{k} = subjects_meta(k).metrics;
     end
     if isempty(subs)
         subjects_json = '[]';
@@ -606,7 +800,18 @@ function html = build_analysis_section(subjects_meta, limits)
         'riseT37_skull','dT from 37 skull','C','th'; ...
         'CEM43_skull','CEM43 skull','min','th'; ...
         'maxT_brain','Max temp brain','C','th'; ...
-        'CEM43_brain','CEM43 brain','min','th'};
+        'CEM43_brain','CEM43 brain','min','th'; ...
+        'focus_error_mm','Focus error (vs planned)','mm','tg'; ...
+        'focus_error_axial_mm','Focus error, axial','mm','tg'; ...
+        'focus_error_lateral_mm','Focus error, lateral','mm','tg'; ...
+        'target_error_mni_mm','MNI target error','mm','tg'; ...
+        'roi_coverage','ROI coverage','','tg'; ...
+        'roi_focal_fraction','Focal volume in ROI','','tg'};
+    present = false(size(specs, 1), 1);
+    for i = 1:size(specs, 1)
+        present(i) = ~isempty(collect_metric(subjects_meta, specs{i, 1}));
+    end
+    specs = specs(present | ~strcmp(specs(:, 4), 'tg'), :);
     met = {};
     for i = 1:size(specs, 1)
         key = specs{i, 1};
@@ -625,30 +830,60 @@ function html = build_analysis_section(subjects_meta, limits)
         opts = [opts sprintf('<option value="%s">%s</option>', specs{i,1}, specs{i,2})]; %#ok<AGROW>
     end
 
+    % Group-by choices: always subject; condition / placement / target /
+    % transducer when they differ between runs.
+    by_opts = '<option value="subject">subject</option>';
+    by_keys = {'condition', 'placement_mode', 'target_label', 'transducer_name'};
+    by_lbls = {'condition', 'placement mode', 'target', 'transducer'};
+    for b = 1:numel(by_keys)
+        vals = arrayfun(@(s) string(s.metrics.(by_keys{b})), subjects_meta);
+        if numel(unique(vals)) > 1
+            sel = '';
+            if strcmp(by_keys{b}, 'condition'); sel = ' selected'; end
+            by_opts = [by_opts sprintf('<option value="%s"%s>%s</option>', by_keys{b}, sel, by_lbls{b})]; %#ok<AGROW>
+        end
+    end
+
     html = '<section class="report-section" id="analysis">';
     html = [html '<h2>Data Analysis</h2>'];
-    html = [html '<p class="note">Explore the group distribution of each metric and correlations between metrics; the dashed red line marks the NSR limit. Points are individual subjects.</p>'];
+    html = [html '<p class="note">Explore the group distribution of each metric and correlations between metrics; the dashed red line marks the NSR limit. Points are individual runs.</p>'];
     html = [html '<div class="an-tabs">' ...
         '<div class="an-tab on" data-view="dist">Distribution</div>' ...
         '<div class="an-tab" data-view="corr">Correlation</div>' ...
-        '<div class="an-tab" data-view="cond">By subject</div></div>'];
+        '<div class="an-tab" data-view="cond">By group</div></div>'];
     html = [html sprintf('<div class="an-ctrls" id="an-c-dist"><label>Metric <select id="an-dist">%s</select></label></div>', opts)];
     html = [html sprintf('<div class="an-ctrls" id="an-c-corr" style="display:none"><label>X <select id="an-x">%s</select></label><label>Y <select id="an-y">%s</select></label></div>', opts, opts)];
-    html = [html sprintf('<div class="an-ctrls" id="an-c-cond" style="display:none"><label>Metric <select id="an-cond">%s</select></label><label>Group by <select id="an-by"><option value="id">subject</option></select></label></div>', opts)];
+    html = [html sprintf('<div class="an-ctrls" id="an-c-cond" style="display:none"><label>Metric <select id="an-cond">%s</select></label><label>Group by <select id="an-by">%s</select></label></div>', opts, by_opts)];
     html = [html '<div class="an-plot"><svg id="an-plot" viewBox="0 0 760 320" preserveAspectRatio="xMidYMid meet"></svg></div>'];
     html = [html '<div class="an-legend" id="an-legend"></div>'];
     html = [html '<script>window.PRESTUS_SUBJECTS=' subjects_json ';window.PRESTUS_METRICS=' metrics_json ';</script>'];
     html = [html '</section>'];
 end
 
-function html = build_group_header(parameters, subject_list, medium, affix, is_layered)
-    n = numel(subject_list);
+function html = build_group_header(parameters, subjects_meta, missing, medium, affix, is_layered, ...
+        options, conds, report_dir, export_path)
+    n = numel(subjects_meta);
+    ids = unique([subjects_meta.subject_id]);
     html = '<section class="report-section" id="header">';
     html = [html '<h1>PRESTUS Group Report</h1>'];
     html = [html '<table class="info-table">'];
-    html = [html sprintf('<tr><th>Subjects</th><td><span id="n-active">%d</span> of %d active</td></tr>', n, n)];
-    html = [html sprintf('<tr><th>Subject IDs</th><td>%s</td></tr>', ...
-        html_utils.escape(strtrim(sprintf('%d ', subject_list))))];
+    if isfield(options, 'name') && ~isempty(options.name)
+        html = [html sprintf('<tr><th>Study</th><td>%s</td></tr>', html_utils.escape(options.name))];
+        if isfield(options, 'manifest') && ~isempty(options.manifest)
+            html = [html sprintf('<tr><th>Manifest</th><td>%s</td></tr>', html_utils.escape(options.manifest))];
+        end
+    end
+    html = [html sprintf('<tr><th>Runs</th><td><span id="n-active">%d</span> of %d active</td></tr>', n, n)];
+    html = [html sprintf('<tr><th>Subjects</th><td>%d: %s</td></tr>', numel(ids), ...
+        html_utils.escape(strtrim(sprintf('%d ', ids))))];
+    if numel(conds) > 1 || (numel(conds) == 1 && conds ~= "")
+        html = [html sprintf('<tr><th>Conditions</th><td>%s</td></tr>', ...
+            html_utils.escape(strjoin(cellstr(conds), ', ')))];
+    end
+    if ~isempty(missing)
+        html = [html sprintf('<tr><th>Missing</th><td>%d run(s) without outputs: %s</td></tr>', ...
+            height(missing), html_utils.escape(strjoin(cellstr(missing.label), ', ')))];
+    end
     if is_layered
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered</span></td></tr>', ...
             html_utils.escape(medium))];
@@ -660,27 +895,41 @@ function html = build_group_header(parameters, subject_list, medium, affix, is_l
         html = [html sprintf('<tr><th>Affix</th><td>%s</td></tr>', html_utils.escape(affix))];
     end
     html = [html sprintf('<tr><th>Sim path</th><td>%s</td></tr>', html_utils.escape(parameters.path.sim))];
+    if ~isempty(export_path) && isfile(export_path)
+        html = [html sprintf('<tr><th>Data table</th><td><a href="%s">%s</a> (one row per run)</td></tr>', ...
+            html_utils.escape(rel_link(report_dir, export_path)), html_utils.escape(rel_link(report_dir, export_path)))];
+    end
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     html = [html '</table>'];
-    html = [html '<p class="note">Use the filter bar below to toggle subjects in/out. ' ...
-        'Dashboard statistics and per-subject cards update live; group box plots reflect the full set.</p>'];
+    html = [html '<p class="note">Use the filter bar below to toggle runs in/out. ' ...
+        'Dashboard statistics and per-run cards update live; group box plots reflect the full set.</p>'];
     html = [html '</section>'];
 end
 
-function html = build_filter_bar(subjects_meta)
+function html = build_filter_bar(subjects_meta, conds)
     html = '<section class="report-section filter-bar" id="filter">';
-    html = [html '<h2>Subject Filter</h2>'];
+    html = [html '<h2>Filter</h2>'];
     html = [html '<div class="filter-controls">'];
     html = [html '<button type="button" class="filter-btn" onclick="setAllSubjects(true)">All</button>'];
     html = [html '<button type="button" class="filter-btn" onclick="setAllSubjects(false)">None</button>'];
-    html = [html '<span class="filter-hint">Toggle subjects to update dashboard and per-subject cards.</span>'];
+    if numel(conds) > 1
+        for c = 1:numel(conds)
+            lbl = char(conds(c)); if isempty(lbl); lbl = '(none)'; end
+            html = [html sprintf('<button type="button" class="filter-btn" onclick="onlyCondition(''%s'')">%s</button>', ...
+                html_utils.escape(strrep(char(conds(c)), '''', '')), html_utils.escape(lbl))]; %#ok<AGROW>
+        end
+    end
+    html = [html '<span class="filter-hint">Toggle runs to update dashboard and per-run cards.</span>'];
     html = [html '</div>'];
     html = [html '<div class="filter-checkboxes">'];
     for k = 1:numel(subjects_meta)
-        id = subjects_meta(k).subject_id;
+        s = subjects_meta(k);
+        flag = '';
+        if ~isempty(s.outlier); flag = ' <span class="roster-flag">outlier</span>'; end
         html = [html sprintf( ...
             ['<label class="filter-chk"><input type="checkbox" class="subj-toggle" ' ...
-             'value="%d" checked> sub-%03d</label>'], id, id)];
+             'value="%d" data-cond="%s" checked> %s%s</label>'], s.run_id, ...
+             html_utils.escape(strrep(s.condition, '''', '')), html_utils.escape(s.label), flag)]; %#ok<AGROW>
     end
     html = [html '</div>'];
     html = [html '</section>'];
@@ -733,7 +982,6 @@ function html = build_group_dashboard(subjects_meta, limits, is_layered)
         'green &lt;50% of limit, amber 50&ndash;100%, red exceeds.</p>'];
     html = [html '</section>'];
 end
-
 function html = build_group_other_metrics(subjects_meta, limits)
 % Informational group metrics (no ITRUSST limit): TIC, ISPPA, peak pressure.
     metric_names = fieldnames(limits);
@@ -754,7 +1002,6 @@ function html = build_group_other_metrics(subjects_meta, limits)
         'no ITRUSST non-significant-risk limit and are shown for reference only.</p>'];
     html = [html '</section>'];
 end
-
 function g = metric_group(name, info)
 % Classify a metric: 'other' (informational / Inf limit), 'mechanical' (MI*
 % or peak pressure), else 'thermal'. Mirrors the per-subject report split.
@@ -766,7 +1013,6 @@ function g = metric_group(name, info)
         g = 'thermal';
     end
 end
-
 function html = render_group_grid(keys, dom_class, title, subtitle, limits, subjects_meta)
 % A labelled sub-grid of group cards (skips the label when title is empty).
     html = '';
@@ -781,7 +1027,6 @@ function html = render_group_grid(keys, dom_class, title, subtitle, limits, subj
     end
     html = [html '</div>'];
 end
-
 function html = render_group_card(name, info, subjects_meta)
 % One group dashboard tile: mean / SD / range with a min-max bar, mean marker
 % and NSR limit line. Carries data-* attributes for the JS filter recompute.
@@ -870,16 +1115,13 @@ function html = render_group_card(name, info, subjects_meta)
 
     html = [html '</div>'];
 end
-
 function y = clamp(x, lo, hi)
     if isnan(x), y = lo; return; end
     y = min(hi, max(lo, x));
 end
-
 function s = iff(cond, a, b)
     if cond, s = a; else, s = b; end
 end
-
 function vals = collect_metric(subjects_meta, key)
     vals = [];
     for k = 1:numel(subjects_meta)
@@ -889,7 +1131,6 @@ function vals = collect_metric(subjects_meta, key)
         end
     end
 end
-
 function s = stat_summary(v)
     v = v(~isnan(v));
     if isempty(v)
@@ -899,45 +1140,54 @@ function s = stat_summary(v)
                    'max', max(v), 'sd', std(v), 'n', numel(v));
     end
 end
-
-function html = build_subject_roster(group_table, subjects_meta, parameters, medium, affix, limits, is_layered) %#ok<INUSL>
-% One row per subject with key metrics + a link to the per-subject report
-% (if present). Each row carries data-subject-id so the JS filter hides/shows.
+function html = build_subject_roster(group_table, subjects_meta, report_dir, limits, is_layered, multi_cond)
+% One row per run with key metrics + a link to the per-subject report
+% (if present). Each row carries data-subject-id (the run id) so the JS
+% filter hides/shows it.
     if isempty(group_table)
         html = '<p class="placeholder">No subject data.</p>';
         return
     end
 
     % Headline columns: ITRUSST-relevant metrics first (MI, then thermal NSR
-    % metrics), then the informational intensity / pressure / distance columns.
-    headline = {'subject_id', 'MI_tc'};
+    % metrics), then the informational intensity / pressure / distance and
+    % targeting columns.
+    headline = {'MI_tc'};
     if is_layered && any(ismember({'maxT_skull'}, group_table.Properties.VariableNames))
         headline = [headline, {'maxT_skull', 'riseT_skull', 'riseT37_skull', 'CEM43_skull'}];
     end
-    headline = [headline, {'Isppa', 'Ipa_target', 'real_focal_distance_mm', 'real_focal_distance_ep_mm', 'TIC'}];
+    headline = [headline, {'Isppa', 'Ipa_target', 'real_focal_distance_mm', 'real_focal_distance_ep_mm', ...
+        'TIC', 'focus_error_mm', 'target_error_mni_mm'}];
     avail = intersect(headline, group_table.Properties.VariableNames, 'stable');
+    keep = true(size(avail));
+    for c = 1:numel(avail)
+        v = group_table.(avail{c});
+        keep(c) = ~(isnumeric(v) && all(isnan(v)));
+    end
+    avail = avail(keep);
     lim_names = fieldnames(limits);
 
     % Sortable header; each numeric <td> carries data-col + data-value so the
     % shared roster script can sort, and rows exceeding any NSR limit are flagged.
-    html = '<p class="note">Click a column header to sort. Rows for subjects exceeding any NSR limit are flagged.</p>';
+    html = ['<p class="note">Click a column header to sort. Rows exceeding any NSR limit are flagged ' ...
+        '<em>over</em>; statistical outliers within their condition <em>outlier</em> (see Outliers).</p>'];
     html = [html '<div class="table-wrapper"><table class="data-table roster" id="roster-table"><thead><tr>'];
-    html = [html '<th>Subject</th>'];
+    html = [html '<th>Run</th>'];
+    if multi_cond; html = [html '<th>Condition</th>']; end
     for c = 1:numel(avail)
-        if strcmp(avail{c}, 'subject_id'), continue; end
-        html = [html sprintf('<th data-col="%s">%s</th>', avail{c}, html_utils.escape(avail{c}))];
+        html = [html sprintf('<th data-col="%s">%s</th>', avail{c}, html_utils.escape(avail{c}))]; %#ok<AGROW>
     end
     html = [html '<th>Report</th>'];
     html = [html '</tr></thead><tbody>'];
 
     for k = 1:numel(subjects_meta)
-        id = subjects_meta(k).subject_id;
-        row_idx = find(group_table.subject_id == id, 1, 'last');
+        rid = subjects_meta(k).run_id;
+        row_idx = find(group_table.run_id == rid, 1, 'last');
         if isempty(row_idx)
             continue
         end
 
-        % Flag: does this subject exceed any finite-limit metric in its row?
+        % Flag: does this run exceed any finite-limit metric in its row?
         is_exceed = false;
         for i = 1:numel(lim_names)
             ln = lim_names{i};
@@ -951,18 +1201,24 @@ function html = build_subject_roster(group_table, subjects_meta, parameters, med
             end
         end
 
+        flag = '';
         if is_exceed
-            html = [html sprintf('<tr data-subject-id="%d" class="exceed" id="row-%d">', id, id)];
+            html = [html sprintf('<tr data-subject-id="%d" class="exceed" id="row-%d">', rid, rid)]; %#ok<AGROW>
             flag = '<span class="roster-flag">over</span>';
         else
-            html = [html sprintf('<tr data-subject-id="%d" id="row-%d">', id, id)];
-            flag = '';
+            html = [html sprintf('<tr data-subject-id="%d" id="row-%d">', rid, rid)]; %#ok<AGROW>
         end
-        html = [html sprintf('<td>%ssub-%03d</td>', flag, id)];
+        if ~isempty(subjects_meta(k).outlier)
+            flag = [flag '<span class="roster-flag" title="' ...
+                html_utils.escape(strjoin(subjects_meta(k).outlier, ', ')) '">outlier</span>']; %#ok<AGROW>
+        end
+        html = [html sprintf('<td>%s%s</td>', flag, html_utils.escape(sprintf('sub-%03d', subjects_meta(k).subject_id)))]; %#ok<AGROW>
+        if multi_cond
+            html = [html sprintf('<td>%s</td>', html_utils.escape(subjects_meta(k).condition))]; %#ok<AGROW>
+        end
 
         for c = 1:numel(avail)
             col = avail{c};
-            if strcmp(col, 'subject_id'), continue; end
             val = group_table{row_idx, col};
             if iscell(val); val = val{1}; end
             val_str = html_utils.format_cell(val);
@@ -976,17 +1232,17 @@ function html = build_subject_roster(group_table, subjects_meta, parameters, med
                     elseif strcmp(color, 'amber'); cell_class = ' near'; end
                 end
             end
-            html = [html sprintf('<td data-col="%s"%s class="num%s">%s</td>', col, dval, cell_class, val_str)];
+            html = [html sprintf('<td data-col="%s"%s class="num%s">%s</td>', col, dval, cell_class, val_str)]; %#ok<AGROW>
         end
 
         rpt = subjects_meta(k).report_path;
         if isfile(rpt)
             html = [html sprintf('<td><a href="%s" target="_blank">open</a></td>', ...
-                html_utils.escape(relative_path(parameters.path.sim, rpt)))];
+                html_utils.escape(rel_link(report_dir, rpt)))]; %#ok<AGROW>
         else
-            html = [html '<td><span class="placeholder">&mdash;</span></td>'];
+            html = [html '<td><span class="placeholder">&mdash;</span></td>']; %#ok<AGROW>
         end
-        html = [html '</tr>'];
+        html = [html '</tr>']; %#ok<AGROW>
     end
     html = [html '</tbody></table></div>'];
 end
@@ -1016,41 +1272,51 @@ function html = build_group_plot_section(plot_specs, fallback_msg)
     html = [html '</div>'];
     html = [html '<p class="note">Group box plots reflect the full subject set; the JS filter only updates the dashboard and per-subject cards.</p>'];
 end
-
-function html = build_subject_cards(subjects_meta, parameters, medium, affix, is_layered) %#ok<INUSL>
-% One collapsible card per subject, embedding key per-subject images. Each
-% card has data-subject-id so the JS filter can hide/show them.
+function html = build_subject_cards(subjects_meta, report_dir, is_layered)
+% One collapsible card per run, embedding key per-subject images. Each
+% card has data-subject-id (the run id) so the JS filter can hide/show them.
     html = '';
     for k = 1:numel(subjects_meta)
-        id = subjects_meta(k).subject_id;
-        img_dir = subjects_meta(k).img_dir;
+        s = subjects_meta(k);
+        id = s.subject_id; medium = s.medium; affix = s.affix;
+        img_dir = s.img_dir;
 
-        body = '<div class="image-grid">';
+        body = '';
+        d = s.descriptors;
+        facts = {};
+        if d.placement_mode ~= "";  facts{end+1} = sprintf('placement %s', d.placement_mode); end %#ok<AGROW>
+        if d.target_label ~= "";    facts{end+1} = sprintf('target %s', d.target_label); end %#ok<AGROW>
+        if d.transducer_name ~= ""; facts{end+1} = sprintf('transducer %s', d.transducer_name); end %#ok<AGROW>
+        if ~isempty(s.affix);       facts{end+1} = sprintf('affix %s', s.affix); end %#ok<AGROW>
+        if ~isempty(facts)
+            body = sprintf('<p class="note">%s</p>', html_utils.escape(strjoin(facts, ' · ')));
+        end
+        body = [body '<div class="image-grid">']; %#ok<AGROW>
         body = [body try_embed(fullfile(img_dir, ...
-            sprintf('sub-%03d_positioning%s.png', id, affix)), 'Positioning', 'Transducer positioning')];
+            sprintf('sub-%03d_positioning%s.png', id, affix)), 'Positioning', 'Transducer positioning')]; %#ok<AGROW>
         body = [body try_embed(fullfile(img_dir, ...
-            sprintf('sub-%03d_%s_intensity%s.png', id, medium, affix)), 'Intensity', 'Intensity overlay (segmentation)')];
+            sprintf('sub-%03d_%s_intensity%s.png', id, medium, affix)), 'Intensity', 'Intensity overlay (segmentation)')]; %#ok<AGROW>
         body = [body try_embed(fullfile(img_dir, ...
-            sprintf('sub-%03d_%s_intensity_t1%s.png', id, medium, affix)), 'Intensity T1', 'Intensity overlay (T1)')];
+            sprintf('sub-%03d_%s_intensity_t1%s.png', id, medium, affix)), 'Intensity T1', 'Intensity overlay (T1)')]; %#ok<AGROW>
         if is_layered
             body = [body try_embed(fullfile(img_dir, ...
-                sprintf('sub-%03d_%s_maxT%s.png', id, medium, affix)), 'maxT', 'Max temperature overlay')];
+                sprintf('sub-%03d_%s_maxT%s.png', id, medium, affix)), 'maxT', 'Max temperature overlay')]; %#ok<AGROW>
         end
-        body = [body '</div>'];
+        body = [body '</div>']; %#ok<AGROW>
 
         % Per-subject report link
-        rpt = subjects_meta(k).report_path;
+        rpt = s.report_path;
         if isfile(rpt)
             body = [body sprintf('<p class="note">Per-subject report: <a href="%s" target="_blank">%s</a></p>', ...
-                html_utils.escape(relative_path(parameters.path.sim, rpt)), ...
-                html_utils.escape(relative_path(parameters.path.sim, rpt)))];
+                html_utils.escape(rel_link(report_dir, rpt)), ...
+                html_utils.escape(rel_link(report_dir, rpt)))]; %#ok<AGROW>
         end
 
-        html = [html sprintf('<details class="subject-card" data-subject-id="%d" open>', id)];
-        html = [html sprintf('<summary><strong>sub-%03d</strong></summary>', id)];
-        html = [html '<div class="section-content">'];
-        html = [html body];
-        html = [html '</div></details>'];
+        html = [html sprintf('<details class="subject-card" data-subject-id="%d" open>', s.run_id)]; %#ok<AGROW>
+        html = [html sprintf('<summary><strong>%s</strong></summary>', html_utils.escape(s.label))]; %#ok<AGROW>
+        html = [html '<div class="section-content">']; %#ok<AGROW>
+        html = [html body]; %#ok<AGROW>
+        html = [html '</div></details>']; %#ok<AGROW>
     end
 
     if isempty(html)
@@ -1065,7 +1331,6 @@ function s = try_embed(path, alt, cap)
             html_utils.escape(alt), html_utils.escape(cap));
     end
 end
-
 function html = build_group_config_summary(parameters)
     rows = {};
     rows{end+1} = {'path.sim',           parameters.path.sim};
@@ -1092,7 +1357,6 @@ function html = build_group_config_summary(parameters)
     html = [html '</table>'];
     html = [html '<p class="note">Shown for the loaded parameters struct. Per-subject configs may differ; consult each subject''s own report for authoritative settings.</p>'];
 end
-
 function html = build_filter_script(subjects_meta, limits)
 % Embed a JSON payload of per-subject metrics and a JS filter that
 % recomputes dashboard stats / shows/hides subject cards and roster rows.
@@ -1127,6 +1391,11 @@ function html = build_filter_script(subjects_meta, limits)
         '              .map(cb => parseInt(cb.value, 10));' newline ...
         '}' newline ...
         '' newline ...
+        'function onlyCondition(c) {' newline ...
+        '  document.querySelectorAll(".subj-toggle").forEach(cb => cb.checked = (cb.dataset.cond === c));' newline ...
+        '  recompute();' newline ...
+        '}' newline ...
+        '' newline ...
         'function setAllSubjects(on) {' newline ...
         '  document.querySelectorAll(".subj-toggle").forEach(cb => cb.checked = on);' newline ...
         '  recompute();' newline ...
@@ -1157,7 +1426,7 @@ function html = build_filter_script(subjects_meta, limits)
         '    el.style.display = enabledSet.has(id) ? "" : "none";' newline ...
         '  });' newline ...
         '' newline ...
-        '  const active = SUBJECTS.filter(s => enabledSet.has(s.subject_id));' newline ...
+        '  const active = SUBJECTS.filter(s => enabledSet.has(s.run_id));' newline ...
         '  const nActive = document.getElementById("n-active");' newline ...
         '  if (nActive) nActive.textContent = active.length;' newline ...
         '' newline ...
@@ -1232,7 +1501,6 @@ end
 %% =========================================================================
 %  CSS (extends css_styles_base)
 %  =========================================================================
-
 function css = group_css_extra()
     % Consolidated into css_styles_base(); kept unreachable for reference.
     css = '';
@@ -1291,7 +1559,6 @@ end
 %% =========================================================================
 %  MISC HELPERS
 %  =========================================================================
-
 function affix = get_affix(parameters)
     if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') ...
             && ~isempty(parameters.io.output_affix)
@@ -1300,16 +1567,445 @@ function affix = get_affix(parameters)
         affix = '';
     end
 end
+function rel = rel_link(from_dir, target)
+% Relative link from the report folder to target, so links keep working
+% when the whole simulation folder is moved. Falls back to the absolute
+% path when the two share no common root.
+    a = strsplit(strrep(char(from_dir), '\', '/'), '/');
+    b = strsplit(strrep(char(target), '\', '/'), '/');
+    a = a(~cellfun(@isempty, a)); b = b(~cellfun(@isempty, b));
+    k = 0;
+    while k < min(numel(a), numel(b)) && strcmp(a{k+1}, b{k+1})
+        k = k + 1;
+    end
+    if k == 0
+        rel = strrep(char(target), '\', '/');
+        return
+    end
+    rel = strjoin([repmat({'..'}, 1, numel(a) - k), b(k+1:end)], '/');
+end
 
-function rel = relative_path(base, target)
-% Best-effort relative path so HTML links resolve when the report is opened
-% under <sim>/. Falls back to the absolute path on any mismatch.
-    base = char(base);
-    target = char(target);
-    if startsWith(target, base)
-        rel = strrep(target(numel(base)+1:end), '\', '/');
-        if startsWith(rel, '/'); rel = rel(2:end); end
+
+%% =========================================================================
+%  STUDY / CONDITION / TARGETING SECTIONS
+%  =========================================================================
+
+function cols = comparison_metrics(group_table)
+% Key metrics compared between conditions (those present with data).
+    cols = {'Isppa_brain', 'Ipa_target', 'MI_tc', 'real_focal_distance_ep_mm', 'focal_vol_3dB_mm3', ...
+            'maxT_brain', 'maxT_skull', 'riseT_skull', 'CEM43_skull', ...
+            'focus_error_mm', 'target_error_mni_mm', 'roi_coverage'};
+    cols = cols(ismember(cols, group_table.Properties.VariableNames));
+    keep = cellfun(@(c) isnumeric(group_table.(c)) && any(isfinite(group_table.(c))), cols);
+    cols = cols(keep);
+end
+
+function cols = targeting_cols()
+    cols = {'focus_error_mm', 'focus_error_axial_mm', 'focus_error_lateral_mm', 'peak_error_mm', ...
+            'target_error_mni_mm', 'roi_focal_fraction', 'roi_coverage', 'roi_mean_intensity'};
+end
+
+function [outliers, subjects_meta] = find_outliers(group_table, subjects_meta)
+% Robust outliers within each condition: modified z-score
+% 0.6745 (x - median) / MAD, |z| > 3.5 (Iglewicz & Hoaglin, 1993), for
+% conditions with at least 5 runs.
+    outliers = table('Size', [0 7], ...
+        'VariableTypes', {'double', 'string', 'string', 'string', 'double', 'double', 'double'}, ...
+        'VariableNames', {'run_id', 'label', 'condition', 'metric', 'value', 'median', 'z'});
+    metrics = comparison_metrics(group_table);
+    conds = unique(string(group_table.condition), 'stable');
+    for c = 1:numel(conds)
+        in = string(group_table.condition) == conds(c);
+        if nnz(in) < 5; continue; end
+        for m = 1:numel(metrics)
+            x = group_table.(metrics{m})(in);
+            ok = isfinite(x);
+            if nnz(ok) < 5; continue; end
+            med = median(x(ok));
+            mad = median(abs(x(ok) - med));
+            if mad <= 0; continue; end
+            z = 0.6745 * (x - med) / mad;
+            rid = group_table.run_id(in);
+            lbl = string(group_table.run_label(in));
+            for i = find(abs(z) > 3.5 & ok)'
+                outliers(end+1, :) = {rid(i), lbl(i), conds(c), string(metrics{m}), x(i), med, z(i)}; %#ok<AGROW>
+                k = find([subjects_meta.run_id] == rid(i), 1);
+                if ~isempty(k)
+                    subjects_meta(k).outlier{end+1} = metrics{m};
+                end
+            end
+        end
+    end
+end
+
+function html = build_study_design(runs, subjects_meta, missing, conds)
+% Conditions, the settings that vary, and every run's own settings.
+    html = '<h3>Conditions</h3><div class="table-wrapper"><table class="data-table"><thead><tr>';
+    html = [html '<th>Condition</th><th>Runs with outputs</th><th>Subjects</th><th>Missing</th></tr></thead><tbody>'];
+    all_conds = unique([string(runs.condition); conds], 'stable');
+    for c = 1:numel(all_conds)
+        sm = subjects_meta(arrayfun(@(s) string(s.condition) == all_conds(c), subjects_meta));
+        nm = 0;
+        if ~isempty(missing); nm = nnz(string(missing.condition) == all_conds(c)); end
+        lbl = char(all_conds(c)); if isempty(lbl); lbl = '(none)'; end
+        html = [html sprintf('<tr><td>%s</td><td class="num">%d</td><td>%s</td><td class="num">%d</td></tr>', ...
+            html_utils.escape(lbl), numel(sm), ...
+            html_utils.escape(strtrim(sprintf('%d ', unique([sm.subject_id])))), nm)]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+
+    % Manifest keys and how many distinct values each takes
+    if ismember('overrides', runs.Properties.VariableNames)
+        keys = {};
+        for r = 1:height(runs)
+            ov = runs.overrides{r};
+            if ~isempty(ov); keys = [keys; ov(:, 1)]; end %#ok<AGROW>
+        end
+        keys = unique(keys, 'stable');
+        if ~isempty(keys)
+            parts = {};
+            for k = 1:numel(keys)
+                vals = strings(0, 1);
+                for r = 1:height(runs)
+                    ov = runs.overrides{r};
+                    if isempty(ov); continue; end
+                    hit = find(strcmp(ov(:, 1), keys{k}), 1, 'last');
+                    if ~isempty(hit); vals(end+1) = string(value_text(ov{hit, 2})); end %#ok<AGROW>
+                end
+                parts{end+1} = sprintf('<code>%s</code> (%d value%s)', html_utils.escape(keys{k}), ...
+                    numel(unique(vals)), iff(numel(unique(vals)) == 1, '', 's')); %#ok<AGROW>
+            end
+            html = [html '<p class="note"><strong>Per-run settings from the manifest:</strong> ' ...
+                strjoin(parts, ', ') '</p>'];
+        end
+    end
+
+    html = [html '<h3>Runs</h3><div class="table-wrapper"><table class="data-table"><thead><tr>'];
+    html = [html '<th>Run</th><th>Affix</th><th>Placement</th><th>Target</th><th>Transducer</th>' ...
+        '<th>Planned depth (mm)</th><th>Target Isppa (W/cm²)</th><th>Manifest settings</th><th>Outputs</th></tr></thead><tbody>'];
+    for k = 1:numel(subjects_meta)
+        s = subjects_meta(k); d = s.descriptors; m = s.metrics;
+        html = [html sprintf('<tr data-subject-id="%d"><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td class="num">%s</td><td class="num">%s</td><td>%s</td><td>%s</td></tr>', ...
+            s.run_id, html_utils.escape(s.label), html_utils.escape(s.affix), ...
+            html_utils.escape(char(d.placement_mode)), html_utils.escape(char(d.target_label)), ...
+            html_utils.escape(char(d.transducer_name)), num_field(m, 'focal_distance_ep_planned_mm'), ...
+            num_field(m, 'target_isppa_wcm2'), overrides_text(s.overrides), ...
+            iff(isfield(m, 'focus_error_mm'), 'results + targeting', 'results'))]; %#ok<AGROW>
+    end
+    for k = 1:height(missing)
+        ov = {};
+        if ismember('overrides', missing.Properties.VariableNames); ov = missing.overrides{k}; end
+        html = [html sprintf(['<tr class="exceed"><td>%s</td><td><code>%s</code></td><td></td><td></td><td></td>' ...
+            '<td></td><td></td><td>%s</td><td><span class="roster-flag">missing</span></td></tr>'], ...
+            html_utils.escape(char(missing.label(k))), html_utils.escape(char(missing.affix(k))), ...
+            overrides_text(ov))]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+    html = [html '<p class="note">Placement, target, transducer, planned depth and target intensity come from ' ...
+        'each run''s targeting sidecar (written by the pipeline); runs simulated before it existed show blanks.</p>'];
+end
+
+function html = build_condition_comparison(group_table, conds, plot_file, limits)
+    metrics = comparison_metrics(group_table);
+    html = '<div class="table-wrapper"><table class="data-table"><thead><tr><th>Metric</th>';
+    for c = 1:numel(conds)
+        lbl = char(conds(c)); if isempty(lbl); lbl = '(none)'; end
+        html = [html sprintf('<th>%s</th>', html_utils.escape(lbl))]; %#ok<AGROW>
+    end
+    html = [html '</tr></thead><tbody>'];
+    for m = 1:numel(metrics)
+        label = metrics{m};
+        if isfield(limits, label); label = sprintf('%s (%s)', limits.(label).label, limits.(label).unit); end
+        html = [html sprintf('<tr><td>%s</td>', html_utils.escape(label))]; %#ok<AGROW>
+        for c = 1:numel(conds)
+            v = group_table.(metrics{m})(string(group_table.condition) == conds(c));
+            html = [html sprintf('<td class="num">%s</td>', msd(v))]; %#ok<AGROW>
+        end
+        html = [html '</tr>']; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+    html = [html '<p class="note">Mean &plusmn; SD (n runs) per condition. Descriptive only: runs of one ' ...
+        'subject under several conditions are not independent.</p>'];
+    if ~isempty(plot_file) && isfile(plot_file)
+        html = [html '<div class="image-grid--wide">' html_utils.embed_image(plot_file, ...
+            'Metrics by condition', 'Key metrics by condition (box = IQR, points = runs).') '</div>'];
+    end
+end
+
+function html = build_targeting_section(group_table, subjects_meta, conds, plot_file)
+    cols = targeting_cols();
+    cols = cols(ismember(cols, group_table.Properties.VariableNames));
+    names = struct('focus_error_mm', 'Focus error (centroid vs planned focus)', ...
+        'focus_error_axial_mm', 'Axial component (+ = deeper)', ...
+        'focus_error_lateral_mm', 'Lateral component', ...
+        'peak_error_mm', 'Peak vs planned focus', ...
+        'target_error_mni_mm', 'MNI centroid vs MNI target', ...
+        'roi_focal_fraction', 'Focal volume inside ROI (fraction)', ...
+        'roi_coverage', 'ROI covered by focal volume (fraction)', ...
+        'roi_mean_intensity', 'Mean intensity in ROI (W/cm²)');
+
+    html = '<div class="table-wrapper"><table class="data-table"><thead><tr><th>Measure</th>';
+    for c = 1:numel(conds)
+        lbl = char(conds(c)); if isempty(lbl); lbl = 'all runs'; end
+        html = [html sprintf('<th>%s</th>', html_utils.escape(lbl))]; %#ok<AGROW>
+    end
+    html = [html '</tr></thead><tbody>'];
+    for m = 1:numel(cols)
+        v_all = group_table.(cols{m});
+        if ~any(isfinite(v_all)); continue; end
+        html = [html sprintf('<tr><td>%s</td>', html_utils.escape(names.(cols{m})))]; %#ok<AGROW>
+        for c = 1:numel(conds)
+            v = v_all(string(group_table.condition) == conds(c));
+            html = [html sprintf('<td class="num">%s</td>', msd(v))]; %#ok<AGROW>
+        end
+        html = [html '</tr>']; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+    html = [html '<p class="note">Mean &plusmn; SD (n runs); distances in mm. The simulated focus is the ' ...
+        'centroid of the &minus;3 dB focal volume (brain-masked); the planned focus is the focus position ' ...
+        'resolved by placement; axial/lateral split the error along/across the planned beam axis of ' ...
+        'transducer 1. MNI targets come from <code>analysis.target_mni_mm</code> or the placement mode; ' ...
+        'ROI measures need <code>analysis.target_roi_mni</code>.</p>'];
+
+    % Per-run table
+    per = {'focus_error_mm', 'focus_error_axial_mm', 'focus_error_lateral_mm', 'target_error_mni_mm', ...
+           'roi_focal_fraction', 'roi_coverage'};
+    per = per(ismember(per, group_table.Properties.VariableNames));
+    html = [html '<div class="table-wrapper"><table class="data-table roster"><thead><tr><th>Run</th><th>Target</th>' ...
+        '<th>MNI centroid (mm)</th><th>MNI target (mm)</th>'];
+    for p = 1:numel(per)
+        html = [html sprintf('<th>%s</th>', html_utils.escape(per{p}))]; %#ok<AGROW>
+    end
+    html = [html '</tr></thead><tbody>'];
+    for k = 1:numel(subjects_meta)
+        s = subjects_meta(k);
+        i = find(group_table.run_id == s.run_id, 1);
+        if isempty(i); continue; end
+        html = [html sprintf('<tr data-subject-id="%d"><td>%s</td><td>%s</td><td>%s</td><td>%s</td>', ...
+            s.run_id, html_utils.escape(s.label), html_utils.escape(char(s.descriptors.target_label)), ...
+            xyz_text(group_table, i, 'focal_centroid_mni'), xyz_text(group_table, i, 'target_mni'))]; %#ok<AGROW>
+        for p = 1:numel(per)
+            html = [html sprintf('<td class="num">%s</td>', html_utils.format_cell(group_table.(per{p})(i)))]; %#ok<AGROW>
+        end
+        html = [html '</tr>']; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+
+    if ~isempty(plot_file) && isfile(plot_file)
+        html = [html '<div class="image-grid--wide">' html_utils.embed_image(plot_file, 'Targeting', ...
+            'MNI focal centroids per run (colour = condition, + = MNI targets) and the axial/lateral focus error.') '</div>'];
+    end
+end
+
+function html = build_maps_section(maps, report_dir)
+    html = ['<p class="note">Voxelwise group maps in MNI space from the per-run MNI NIfTIs ' ...
+        '(<code>io.save_MNI</code>). The overlap map gives, per voxel, the fraction of runs whose ' ...
+        '&minus;3 dB focal volume covers it.</p>'];
+    for k = 1:numel(maps)
+        m = maps(k);
+        lbl = m.condition; if isempty(lbl); lbl = 'all runs'; end
+        html = [html sprintf('<h3>%s <span class="badge badge-gray">N = %d</span></h3>', ...
+            html_utils.escape(lbl), m.n)]; %#ok<AGROW>
+        if m.n_missing > 0
+            html = [html sprintf('<p class="note">%d run(s) without MNI focal masks are not included.</p>', m.n_missing)]; %#ok<AGROW>
+        end
+        if ~isempty(m.figure) && isfile(m.figure)
+            html = [html '<div class="image-grid--wide">' html_utils.embed_image(m.figure, ...
+                sprintf('Focal overlap %s', lbl), sprintf('Focal-volume overlap, %s.', lbl)) '</div>']; %#ok<AGROW>
+        end
+        fn = fieldnames(m.files);
+        links = cell(1, numel(fn));
+        for f = 1:numel(fn)
+            p = m.files.(fn{f});
+            links{f} = sprintf('<a href="%s">%s</a>', html_utils.escape(rel_link(report_dir, p)), ...
+                html_utils.escape(regexprep(p, '^.*[\\/]', '')));
+        end
+        html = [html '<p class="note">NIfTI: ' strjoin(links, ' &middot; ') '</p>']; %#ok<AGROW>
+    end
+end
+
+function html = build_outlier_section(outliers, subjects_meta)
+    if isempty(outliers)
+        conds = unique(string({subjects_meta.condition}));
+        n_min = min(arrayfun(@(c) nnz(string({subjects_meta.condition}) == c), conds));
+        if n_min < 5
+            html = '<p class="placeholder">Outlier screening needs at least 5 runs per condition.</p>';
+        else
+            html = '<p class="placeholder">No run deviates strongly from its condition (|robust z| &le; 3.5).</p>';
+        end
+        return
+    end
+    html = ['<p class="note">Runs whose value lies far from their condition''s median: modified z-score ' ...
+        '0.6745&middot;(x &minus; median)/MAD with |z| &gt; 3.5 (Iglewicz &amp; Hoaglin, 1993). Check the ' ...
+        'run''s placement and inputs before interpreting it.</p>'];
+    html = [html '<div class="table-wrapper"><table class="data-table"><thead><tr><th>Run</th><th>Condition</th>' ...
+        '<th>Metric</th><th>Value</th><th>Condition median</th><th>z</th></tr></thead><tbody>'];
+    for i = 1:height(outliers)
+        html = [html sprintf(['<tr data-subject-id="%d"><td><a href="#row-%d">%s</a></td><td>%s</td>' ...
+            '<td>%s</td><td class="num">%.4g</td><td class="num">%.4g</td><td class="num">%+.1f</td></tr>'], ...
+            outliers.run_id(i), outliers.run_id(i), html_utils.escape(char(outliers.label(i))), ...
+            html_utils.escape(char(outliers.condition(i))), html_utils.escape(char(outliers.metric(i))), ...
+            outliers.value(i), outliers.median(i), outliers.z(i))]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+end
+
+function plot_path = render_condition_boxplot(group_table, metrics, out_path)
+% One panel per metric, one box per condition.
+    plot_path = '';
+    if isempty(metrics); return; end
+    try
+        conds = unique(string(group_table.condition), 'stable');
+        lbls = cellstr(conds); lbls(conds == "") = {'(none)'};
+        nm = numel(metrics);
+        ncol = min(4, nm); nrow = ceil(nm / ncol);
+        fig = figure('Visible', 'off', 'Color', 'w', ...
+            'Position', [100 100 max(700, 260 * ncol) 260 * nrow]);
+        tl = tiledlayout(fig, nrow, ncol, 'TileSpacing', 'compact', 'Padding', 'compact');
+        for m = 1:nm
+            ax = nexttile(tl);
+            v = group_table.(metrics{m});
+            g = zeros(size(v));
+            for c = 1:numel(conds); g(string(group_table.condition) == conds(c)) = c; end
+            ok = isfinite(v);
+            if exist('boxchart', 'file') == 2 || exist('boxchart', 'builtin') == 5
+                boxchart(ax, g(ok), v(ok));
+            else
+                boxplot(ax, v(ok), g(ok));
+            end
+            hold(ax, 'on');
+            jitter = (mod((1:nnz(ok))', 7) - 3) * 0.05;
+            plot(ax, g(ok) + jitter, v(ok), '.', 'Color', [0.2 0.2 0.2], 'MarkerSize', 10);
+            set(ax, 'XTick', 1:numel(conds), 'XTickLabel', lbls, 'XLim', [0.4 numel(conds) + 0.6], ...
+                'TickLabelInterpreter', 'none', 'FontSize', 8);
+            title(ax, metrics{m}, 'Interpreter', 'none', 'FontSize', 9, 'FontWeight', 'normal');
+            grid(ax, 'on');
+        end
+        export_figure(fig, out_path);
+        plot_path = out_path;
+    catch ME
+        warning('generate_group_report:plotFailed', 'Condition plot failed: %s', ME.message);
+    end
+end
+
+function plot_path = render_targeting_scatter(group_table, out_path)
+% MNI centroid projections (colour = condition, + = targets) and the
+% axial vs lateral focus error.
+    plot_path = '';
+    try
+        cols = group_table.Properties.VariableNames;
+        has_mni = all(ismember({'focal_centroid_mni_x', 'focal_centroid_mni_y', 'focal_centroid_mni_z'}, cols)) && ...
+            any(isfinite(group_table.focal_centroid_mni_x));
+        has_err = all(ismember({'focus_error_axial_mm', 'focus_error_lateral_mm'}, cols)) && ...
+            any(isfinite(group_table.focus_error_axial_mm));
+        if ~has_mni && ~has_err; return; end
+        conds = unique(string(group_table.condition), 'stable');
+        colors = lines(max(1, numel(conds)));
+        nt = 3 * has_mni + has_err;
+        fig = figure('Visible', 'off', 'Color', 'w', 'Position', [100 100 300 * nt 320]);
+        tl = tiledlayout(fig, 1, nt, 'TileSpacing', 'compact', 'Padding', 'compact');
+        if has_mni
+            C = [group_table.focal_centroid_mni_x, group_table.focal_centroid_mni_y, group_table.focal_centroid_mni_z];
+            G = nan(height(group_table), 3);
+            if all(ismember({'target_mni_x', 'target_mni_y', 'target_mni_z'}, cols))
+                G = [group_table.target_mni_x, group_table.target_mni_y, group_table.target_mni_z];
+            end
+            planes = {[2 3], 'Sagittal', 'y (mm)', 'z (mm)'; [1 3], 'Coronal', 'x (mm)', 'z (mm)'; ...
+                      [1 2], 'Axial', 'x (mm)', 'y (mm)'};
+            for p = 1:3
+                ax = nexttile(tl); hold(ax, 'on');
+                d = planes{p, 1};
+                for c = 1:numel(conds)
+                    in = string(group_table.condition) == conds(c);
+                    lbl = char(conds(c)); if isempty(lbl); lbl = 'runs'; end
+                    scatter(ax, C(in, d(1)), C(in, d(2)), 28, colors(c, :), 'filled', ...
+                        'MarkerFaceAlpha', 0.75, 'DisplayName', lbl);
+                end
+                ok = all(isfinite(G), 2);
+                if any(ok)
+                    Gu = unique(round(G(ok, :), 2), 'rows');
+                    plot(ax, Gu(:, d(1)), Gu(:, d(2)), 'k+', 'MarkerSize', 12, 'LineWidth', 1.8, ...
+                        'DisplayName', 'target');
+                end
+                axis(ax, 'equal'); grid(ax, 'on');
+                title(ax, planes{p, 2}, 'FontWeight', 'normal', 'FontSize', 9);
+                xlabel(ax, planes{p, 3}); ylabel(ax, planes{p, 4}); set(ax, 'FontSize', 8);
+                if p == 1 && numel(conds) > 1; legend(ax, 'Location', 'best', 'Interpreter', 'none', 'FontSize', 7); end
+            end
+        end
+        if has_err
+            ax = nexttile(tl); hold(ax, 'on');
+            for c = 1:numel(conds)
+                in = string(group_table.condition) == conds(c);
+                scatter(ax, group_table.focus_error_lateral_mm(in), group_table.focus_error_axial_mm(in), ...
+                    28, colors(c, :), 'filled', 'MarkerFaceAlpha', 0.75);
+            end
+            yline(ax, 0, 'k:');
+            grid(ax, 'on'); set(ax, 'FontSize', 8);
+            xlabel(ax, 'lateral error (mm)'); ylabel(ax, 'axial error (mm, + = deeper)');
+            title(ax, 'Focus vs planned focus', 'FontWeight', 'normal', 'FontSize', 9);
+        end
+        export_figure(fig, out_path);
+        plot_path = out_path;
+    catch ME
+        warning('generate_group_report:plotFailed', 'Targeting plot failed: %s', ME.message);
+    end
+end
+
+function export_figure(fig, out_path)
+    if exist('exportgraphics', 'file') == 2 || exist('exportgraphics', 'builtin') == 5
+        exportgraphics(fig, out_path, 'Resolution', 150);
     else
-        rel = strrep(target, '\', '/');
+        print(fig, out_path, '-dpng', '-r150');
+    end
+    close(fig);
+end
+
+function s = msd(v)
+    v = v(isfinite(v));
+    if isempty(v)
+        s = '&mdash;';
+    elseif numel(v) == 1
+        s = sprintf('%.3g (n=1)', v);
+    else
+        s = sprintf('%.3g &plusmn; %.2g (n=%d)', mean(v), std(v), numel(v));
+    end
+end
+
+function s = num_field(m, f)
+    if isfield(m, f) && isnumeric(m.(f)) && isfinite(m.(f))
+        s = sprintf('%.4g', m.(f));
+    else
+        s = '';
+    end
+end
+
+function s = xyz_text(t, i, name)
+    cols = {[name '_x'], [name '_y'], [name '_z']};
+    if ~all(ismember(cols, t.Properties.VariableNames)); s = ''; return; end
+    v = [t.(cols{1})(i), t.(cols{2})(i), t.(cols{3})(i)];
+    if all(isfinite(v)); s = sprintf('[%.1f, %.1f, %.1f]', v); else, s = ''; end
+end
+
+function s = overrides_text(ov)
+    if isempty(ov); s = ''; return; end
+    parts = cell(1, size(ov, 1));
+    for i = 1:size(ov, 1)
+        parts{i} = sprintf('<code>%s</code> = %s', html_utils.escape(ov{i, 1}), ...
+            html_utils.escape(value_text(ov{i, 2})));
+    end
+    s = strjoin(parts, '<br>');
+end
+
+function s = value_text(v)
+    if ischar(v) || (isstring(v) && isscalar(v))
+        s = char(v);
+    elseif isnumeric(v) || islogical(v)
+        if isempty(v); s = '[]';
+        elseif isscalar(v); s = sprintf('%g', v);
+        else, s = ['[' strjoin(compose('%g', double(v(:)')), ', ') ']'];
+        end
+    else
+        s = class(v);
     end
 end

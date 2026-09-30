@@ -43,6 +43,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `load_parameters`                       | Loads and merges configuration files for simulation parameters; a trailing `{key, value}` cell applies overrides before validation. |
+| `prestus_study_start`                   | Run the pipeline for every row of a study manifest (subjects × conditions with per-run settings), locally or on HPC, then build the study report; `DryRun` checks all rows without running. |
 | `path_log_setup`                        | Set up internal paths and logging, filename for output table                                    |
 | `simulation_nifti`                      | Save key outputs as 3D Niftis                                                                   |
 
@@ -52,10 +53,16 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `changem_vectorized`                    | Replace multiple old values in array A with corresponding new values.                           |
 | `combine_plots_by_suffix`               | Combines subject-specific plots into a single montage image.                                    |
-| `create_group_MNI_plots`                | Generate group-level plots in MNI space for multiple subjects.                                  |
-| `prestus_group_report_start`            | Entry point for the group HTML report; auto-discovers (or accepts) subjects and aggregates their per-subject outputs into one HTML file. |
-| `generate_group_report`                 | Assemble the self-contained group HTML report (exposure dashboard, subject roster, split acoustic/thermal box plots, per-subject cards). |
+| `create_group_MNI_plots`                | Deprecated (older output layout): group plots in MNI space; use `create_group_maps`.            |
+| `create_group_maps`                     | Group MNI maps per condition from the per-run MNI NIfTIs: −3 dB focal-volume overlap, mean/SD intensity, mean heating, plus overlap figures. |
+| `study_read_manifest`                   | Read a study manifest (.tsv/.csv): one row per run with reserved columns and dotted config-key columns. |
+| `study_run_table`                       | Resolve manifest rows to output locations (subject, affix from condition, medium, path.sim); rejects rows that would overwrite each other. |
+| `study_row_parameters`                  | Load the full config of one study run (study config < row config < manifest columns < overrides). |
+| `study_setup`                           | Load a study config, read its manifest and resolve the runs and study output folder. |
 | `study_run_descriptors`                 | Per-run settings that differ between subjects (placement mode, target, transducer, depth, target intensity). |
+| `study_run_files`                       | Output file names of one run (CSV, targeting sidecar, report, NIfTIs) for the group tools. |
+| `prestus_group_report_start`            | Entry point for the group HTML report and group MNI maps: study mode (runs from `study.manifest`) or subject mode (auto-discovered / listed subjects). |
+| `generate_group_report`                 | Assemble the self-contained group HTML report (exposure dashboard, study design, condition comparison, targeting accuracy, group maps, outliers, roster, box plots, per-run cards) and a one-row-per-run CSV. |
 | `report_styles`                         | Alternative visual skins for the HTML reports (instrument / classic / compact / paper), selected via `modules.report_style`. |
 | `preview_report_styles`                 | Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html. |
 | `discover_group_subjects`               | Auto-discover completed subjects by scanning `path.sim` for folders with a matching per-subject CSV. |

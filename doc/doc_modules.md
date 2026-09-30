@@ -61,6 +61,7 @@ load_parameters
       ▼
 [group report]          modules.generate_group_report
       │                 Aggregate completed subjects into a group HTML report
+      │                 (off for prestus_study_start runs: one study report at the end)
       ▼
 [free-water reference]  modules.run_posthoc_water_sims
                         Re-run acoustics in water for Isppa normalisation
@@ -82,6 +83,7 @@ load_parameters
 | Simulate two or more transducers asynchronously | `simulation.transducer_coupling: async` with multiple `transducer` entries; see [doc_multitransducer.md](doc_multitransducer.md) |
 | Enable the water baseline measurement | `modules.run_water_baseline: 1` (required for ISPPA scaling) |
 | Generate a cross-subject group report | `modules.generate_group_report = 1` (or run `prestus_group_report_start` manually); see [doc_group.md](doc_group.md#group-html-report) |
+| Run many subjects with per-subject settings | `study.manifest` + `prestus_study_start(config)`; see [doc_group.md](doc_group.md#study-setup) |
 
 > **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`. If they do not exist, disabling an upstream module while enabling a downstream one will error.
 

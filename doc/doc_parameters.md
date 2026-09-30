@@ -158,8 +158,8 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `generate_report` | Generate self-contained HTML simulation report. | `1` | |
 | `report_style` | Visual skin of the HTML report: `instrument`, `classic` (pre-v0.6.1 look), `compact`, `paper`. Changes presentation only, not content. | `'instrument'` | Try skins on an existing output folder with `preview_report_styles(<subject dir>)`. |
 | `report_style_switcher` | Embed all skins plus a dropdown to switch between them in the report. | `0` | |
-| `generate_group_report` | Aggregate completed subjects into a group HTML report at the end of the run. | `1` | Best-effort; auto-discovers subjects. Or run `prestus_group_report_start` manually. |
 | `run_targeting_analysis` | Measure targeting accuracy from the focal-mask NIfTIs: simulated focus vs planned focus (native), vs MNI target / ROI (MNI). Writes `sub-XXX_<medium><affix>_targeting.csv`. | `1` | Layered or phantom media; needs `run_nifti_creation`. See [Targeting accuracy](doc_group.md#targeting-accuracy). |
+| `generate_group_report` | Aggregate completed subjects into a group HTML report at the end of the run. | `1` | Best-effort; auto-discovers subjects. Or run `prestus_group_report_start` manually. Switched off for runs started by `prestus_study_start`, which builds one study report at the end. |
 | `segmentation_only` | Stop after segmentation; skip grid setup and all simulations. | `0` | Only has effect when `simulation.medium = 'layered'`. |
 
 All flags: `1 = yes`, `0 = no`.
@@ -512,6 +512,17 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 | `focus_area_radius` | Radius around the focus in which IPA is averaged for outputs [mm]. | `5` | |
 | `target_mni_mm` | Intended target `[x y z]` in MNI mm for the targeting analysis. | `[]` | `[]` = the MNI target of the placement mode (`placement.heuristic`/`plantus.mni_target_mm`, `placement.mni.focus_pos_mm`), if any. Can differ per run (study manifest column). |
 | `target_roi_mni` | Target ROI mask in MNI space (NIfTI) for the targeting analysis and the group maps. | `''` | Overlap with the −3 dB focal volume, ROI coverage, intensity in the ROI; outlined on the group overlap figures. |
+
+---
+
+### Study setup (`study`)
+
+Multi-subject studies with per-run settings; see [Group analysis](doc_group.md#study-setup).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `manifest` | Study manifest (`.tsv`/`.csv`): one row per run (`subject_id`, optional `condition`, `include`, `config`) plus any config key as a column. | `''` | Relative paths resolve against the study config's folder. Run with `prestus_study_start(<config>)`; report with `prestus_group_report_start(<config>)`. |
+| `name` | Name of the study outputs folder `<path.sim>/group/<name>/`. | `''` | `''` = manifest file name without extension. |
 
 ---
 

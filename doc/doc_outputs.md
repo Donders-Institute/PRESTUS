@@ -255,16 +255,38 @@ A full example report on a phantom can be found here: [🔗 Download Example HTM
 
 ## Group outputs
 
-When several subjects are simulated under the same `simulation.medium` and `io.output_affix`, the group report (`prestus_group_report_start`, or `modules.generate_group_report = 1`) aggregates them into a self-contained HTML file plus its box-plot images, written to `path.sim` (one level above the per-subject `sub-NNN/` folders):
+The group tools read existing per-run outputs and never simulate; see [Group analysis](doc_group.md).
+
+**Study** (`prestus_group_report_start` on a config with `study.manifest`, or the end of `prestus_study_start`): everything goes to `<path.sim>/group/<study.name>/`:
+
+```
+group_<name>_report.html                  ← self-contained group HTML report
+group_<name>_runs.csv                     ← one row per run: settings, metrics, targeting
+plots/
+    group_<medium>_<metric>_<name>.png      box plots (intensity, mi, conditions, targeting, maxT, riseT, cem43)
+    group_<cond>_focal_overlap.png          MNI overlap figure per condition
+maps/
+    group_<cond>_focal_overlap_3dB.nii.gz   fraction of runs covering each voxel
+    group_<cond>_<Ipa|Itp>_mean.nii.gz      mean intensity (and _sd)
+    group_<cond>_heatrise_mean.nii.gz       mean temperature rise (heating runs)
+log/
+    plan_<time>.tsv / launch_<time>.tsv     study dry-run plan / launch log
+log_hpc/                                  ← dependent study-report job (HPC)
+```
+
+**Subjects** (no manifest: all subjects under the same `simulation.medium` and `io.output_affix`; `prestus_group_report_start`, or `modules.generate_group_report = 1` after each subject), written to `path.sim`:
 
 ```
 group_<medium>_report<affix>.html         ← self-contained group HTML report
+group_<medium>_runs<affix>.csv            ← one row per subject
 group_plots/                              ← group-level box-plot images
     group_<medium>_intensity<affix>.png     Isppa / Ipa_target across subjects
     group_<medium>_mi<affix>.png            Mechanical Index per tissue
+    group_<medium>_targeting<affix>.png     MNI centroids and focus error (targeting sidecars)
     group_<medium>_maxT<affix>.png          maximum temperature  (heating runs)
     group_<medium>_riseT<affix>.png         temperature rise     (heating runs)
     group_<medium>_cem43<affix>.png         CEM43 thermal dose   (heating runs)
+group/<medium><affix>/maps/, plots/       ← group MNI maps (manual prestus_group_report_start only)
 ```
 
-The thermal plots are produced only for layered media with heating simulations. The HTML aggregates each subject's existing CSV metrics and PNG overlays; it is regenerable at any time and runs no simulations. Box plots auto-scale their figure size to the number of plotted columns and are exported as PNGs (see [Group analysis](doc_group.md#group-html-report)). The group Safety dashboard's Mechanical grid always shows both `MI` (free water) and `MItc` tiles plus Max pressure; whichever MI variant has no data for the report's medium renders grayed out ("N/A") — see [Group HTML report](doc_group.md#group-html-report) for details.
+Thermal plots need a layered medium with heating results. Box plots auto-scale to the number of plotted columns. The Safety dashboard's Mechanical grid always shows both `MI` (free water) and `MItc` tiles plus Max pressure; whichever MI variant has no data for the medium renders greyed out ("N/A"). See [Group HTML report](doc_group.md#group-html-report) for details.
