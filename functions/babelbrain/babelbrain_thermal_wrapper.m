@@ -205,12 +205,13 @@ end
 fprintf('[babelbrain_thermal_wrapper] BabelBrain thermal finished in %.1f s.\n', elapsed);
 
 %% Locate thermal output HDF5
-% BabelBrain names the thermal file by replacing the DataForSim suffix with
-% -ThermalField_AllCombinations.h5.  Try an exact stem match first; fall back
-% to a glob + newest-by-mtime if the convention has changed.
+% BabelBrain names the thermal file <acoustic stem>-ThermalField_AllCombinations.h5
+% (the _DataForSim part is kept, e.g. x_300kHz_6PPW_DataForSim-ThermalField_...).
+% Try that exact name first; fall back to a glob + newest-by-mtime if the
+% convention has changed.
 [acous_dir_, acous_stem_] = fileparts(acoustic_h5);
 stem_prefix_ = regexprep(acous_stem_, '_DataForSim$', '');
-stem_match_  = fullfile(acous_dir_, [stem_prefix_ '-ThermalField_AllCombinations.h5']);
+stem_match_  = fullfile(acous_dir_, [acous_stem_ '-ThermalField_AllCombinations.h5']);
 thermal_h5   = '';
 if isfile(stem_match_)
     thermal_h5 = stem_match_;
@@ -251,24 +252,56 @@ if isfile(rewriter)
 end
 
 %% Read thermal output and resample to PRESTUS grid
-% focus_pos and focal_length_mm are stored in sensor_data by babelbrain_wrapper
-% so that the thermal reader can anchor BB's internal coordinate system.
-if isfield(sensor_data, 'focus_pos') && isfield(sensor_data, 'focal_length_mm')
-    thermal_focus_pos       = sensor_data.focus_pos;
+% The thermal volumes are resampled onto the THERMAL grid (parameters =
+% parameters_th from thermal_stage), so the anchor positions and step must be
+% in thermal-grid coordinates. sensor_data.focus_pos / trans_pos are on the
+% ACOUSTIC grid (acoustic-FOV crop coordinates when an acoustic FOV was used,
+% which thermal_stage restores to the full grid for the thermal run; a separate
+% thermal grid may also be offset / at a different step), so they are used only
+% as a fallback. focal_length_mm (fallback z anchor) comes from sensor_data.
+if isfield(sensor_data, 'focal_length_mm')
     thermal_focal_length_mm = sensor_data.focal_length_mm;
 else
-    error(['babelbrain_thermal_wrapper: sensor_data is missing focus_pos or focal_length_mm.\n' ...
-        'These are set by babelbrain_wrapper — re-run babelbrain_wrapper to refresh sensor_data.']);
+    error(['babelbrain_thermal_wrapper: sensor_data is missing focal_length_mm.\n' ...
+        'It is set by babelbrain_wrapper — re-run babelbrain_wrapper to refresh sensor_data.']);
 end
-thermal_trans_pos = [];
-if isfield(sensor_data, 'trans_pos')
-    thermal_trans_pos = sensor_data.trans_pos;   % beam-axis direction for the depth resample
-end
-results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg, thermal_focus_pos, thermal_focal_length_mm, thermal_trans_pos);
+[thermal_focus_pos, thermal_trans_pos, params_rd] = thermal_grid_anchor(parameters, sensor_data);
+results_heating = read_babelbrain_thermal(thermal_h5, params_rd, planimg, thermal_focus_pos, thermal_focal_length_mm, thermal_trans_pos);
 
 end
 
 %% Helpers
+
+function [focus_pos, trans_pos, params_rd] = thermal_grid_anchor(parameters, sensor_data)
+% Focus / transducer positions and grid step of the thermal grid.
+% thermal_grid_setup stores the unrounded positions for a separate thermal grid
+% (grid.thermal_focus_pos_exact / thermal_trans_pos_exact); otherwise the
+% thermal grid is the acoustic grid in thermal_stage's coordinates, whose
+% transducer(1).focus_pos / trans_pos are the right ones.
+params_rd = parameters;
+g = parameters.grid;
+if isfield(g, 'thermal_focus_pos_exact') && ~isempty(g.thermal_focus_pos_exact)
+    focus_pos = g.thermal_focus_pos_exact;
+    trans_pos = g.thermal_trans_pos_exact;
+    if isfield(g, 'thermal_resolution_mm') && ~isempty(g.thermal_resolution_mm)
+        params_rd.grid.resolution_mm = g.thermal_resolution_mm;
+    end
+elseif isfield(parameters.transducer(1), 'focus_pos') && ~isempty(parameters.transducer(1).focus_pos)
+    focus_pos = parameters.transducer(1).focus_pos;
+    trans_pos = parameters.transducer(1).trans_pos;
+elseif isfield(sensor_data, 'focus_pos')
+    warning('babelbrain_thermal_wrapper:acousticAnchor', ...
+        ['No thermal-grid focus_pos; anchoring on the acoustic-grid sensor_data.focus_pos. ' ...
+         'Correct only when the thermal grid equals the acoustic grid.']);
+    focus_pos = sensor_data.focus_pos;
+    trans_pos = [];
+    if isfield(sensor_data, 'trans_pos'); trans_pos = sensor_data.trans_pos; end
+else
+    error('babelbrain_thermal_wrapper:noAnchor', 'No focus position available for the thermal resample.');
+end
+focus_pos = double(focus_pos(:)');
+trans_pos = double(trans_pos(:)');
+end
 
 function [backend, device] = resolve_backend(backend, device)
 % Resolve 'auto' computing_backend / device_name to concrete integers/strings.

@@ -69,17 +69,23 @@ cem_final  = perm321(read_field('FinalDose'))  / 60;   % final CEM43 [min]
 p_map      = perm321(read_field('p_map'));        % peak pressure [Pa]
 
 % Coordinate vectors [mm] for the thermal output domain.
-% BabelBrain thermal also applies np.flip on load (axis=2); z_vec is NOT flipped
-% → flip z_vec here.  After permute([3,2,1]):
+% Unlike the acoustic DataForSim.h5 (whose arrays are stored depth-flipped
+% relative to z_vec, see read_babelbrain_output), the thermal arrays are in
+% z_vec order: CalculateTemperatureEffects np.flip()s p_amp / MaterialMap on
+% load (axis 2) and saves its results without flipping back. Verified on
+% sub-602: thermal MaterialMap == flip(acoustic MaterialMap, 3) and the thermal
+% p_map peak sits at N+1-k of the acoustic p_amp peak. So z_vec is used as is.
+% (Reversing it here, as before, mirrored the heating about the focal marker:
+% skull heating landed distal of the target.) After permute([3,2,1]):
 %   dim 1 = BB x (lateral X), 0 at focal spot
 %   dim 2 = BB y (lateral Y), 0 at focal spot
-%   dim 3 = BB z (depth, flip-corrected), FocalLength at focal spot
+%   dim 3 = BB z (depth), FocalLength at focal spot
 x_vec_raw = read_field('x_vec');   % BB x [mm]
 y_vec_raw = read_field('y_vec');   % BB y [mm]
-z_vec_raw = read_field('z_vec');   % BB z [mm], un-flipped
+z_vec_raw = read_field('z_vec');   % BB z [mm]
 x_mm = x_vec_raw;                 % PRESTUS dim 1: lateral X, 0 at focal spot [mm]
 y_mm = y_vec_raw;                 % PRESTUS dim 2: lateral Y, 0 at focal spot [mm]
-z_mm = z_vec_raw(end:-1:1);      % PRESTUS dim 3: depth (flip-corrected), FocalLength at focal [mm]
+z_mm = z_vec_raw;                 % PRESTUS dim 3: depth, FocalLength at focal [mm]
 
 % Inventory root-level datasets once; some fields may only exist nested under
 % AllData/item_0 depending on the BabelBrain version.
@@ -139,15 +145,14 @@ fprintf('[read_babelbrain_thermal] Peak T rise: %.2f °C  MaxIsppa: %.2f W/cm²\
 % label-5 voxel written at focus_pos) is mapped back onto focus_pos, so the
 % thermal volumes align with medium_masks exactly as the acoustic field does.
 % focal_length_mm is only a FALLBACK for files without /TargetLocation.
-% /TargetLocation indexes the RAW z_vec_raw read from the file (pre-flip), not
-% the flip-corrected z_mm.
+% /TargetLocation indexes z_vec_raw (= z_mm here).
 focal_length_mm_effective = focal_length_mm;
 if any(strcmp(root_names_, 'TargetLocation')) || any(strcmp(nested_names_, 'TargetLocation'))
     try
         target_loc_bb = double(read_any_('TargetLocation')) + 1;   % 0-based (numpy) -> 1-based (MATLAB)
         z_vec_raw_col = z_vec_raw(:)';
         if numel(z_vec_raw_col) >= target_loc_bb(3)
-            z_mm_at_target = z_vec_raw_col(target_loc_bb(3));   % raw z_vec_raw, NOT z_mm — see comment above
+            z_mm_at_target = z_vec_raw_col(target_loc_bb(3));   % marker z
             focal_length_mm_effective = z_mm_at_target;
             if isnan(focal_length_mm) || abs(z_mm_at_target - focal_length_mm) > 1e-6
                 fprintf(['[read_babelbrain_thermal] Anchor: /TargetLocation tissue marker at %.2f mm ' ...
@@ -192,8 +197,16 @@ end
 resample_vol = @(vol) resample_bb_to_prestus( ...
     vol, x_mm(:)', y_mm(:)', z_mm(:)', planimg, prestus_dims, res_mm, focus_pos, focal_length_mm_effective, beam_sign);
 
-T_end_fus_g = resample_vol(T_end_fus);
-T_final_g   = resample_vol(T_final);
+% Temperatures are resampled as rises over the baseline, so voxels outside
+% BabelBrain's thermal domain (zero-filled by the resampler) read the baseline
+% temperature, not 0 degC (which appeared as a -37 degC "heatrise").
+T_base = 37;
+if any(strcmp(root_names_, 'BaselineTemperature')) || any(strcmp(nested_names_, 'BaselineTemperature'))
+    T_base = read_any_('BaselineTemperature');
+    T_base = T_base(1);
+end
+T_end_fus_g = resample_vol(T_end_fus - T_base) + T_base;
+T_final_g   = resample_vol(T_final   - T_base) + T_base;
 cem_end_g   = resample_vol(cem_end);
 cem_final_g = resample_vol(cem_final);
 p_map_g     = resample_vol(p_map);

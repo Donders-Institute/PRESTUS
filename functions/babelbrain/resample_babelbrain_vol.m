@@ -39,7 +39,8 @@ function vol_out = resample_babelbrain_vol(vol_bb, x_mm, y_mm, z_mm, planimg, pr
 %   x_mm            - [1 x Nx] lateral-X coords (PRESTUS dim 1), [mm], 0 at focal spot
 %   y_mm            - [1 x Ny] lateral-Y coords (PRESTUS dim 2), [mm], 0 at focal spot
 %   z_mm            - [1 x Nz] depth coords    (PRESTUS dim 3), [mm], FocalLength at focal spot
-%                     Decreasing (flip-corrected BabelBrain z_vec).
+%                     Any monotonic spacing: decreasing for acoustic output
+%                     (flip-corrected z_vec), increasing for thermal output (z_vec as stored).
 %   planimg         - planimg struct (kept for signature compatibility; unused)
 %   prestus_dims    - [1 x 3] output grid dimensions
 %   res_mm          - PRESTUS acoustic grid resolution [mm]
@@ -72,7 +73,7 @@ function vol_out = resample_babelbrain_vol(vol_bb, x_mm, y_mm, z_mm, planimg, pr
 
     dx_bb = mean(diff(x_mm));   % lateral X step, positive
     dy_bb = mean(diff(y_mm));   % lateral Y step, positive
-    dz_bb = mean(diff(z_mm));   % depth step, negative (flip-corrected z_vec decreases)
+    dz_bb = mean(diff(z_mm));   % depth step (negative for acoustic, positive for thermal output)
 
     % Row-vector affine [in_vox 1] * M = [out_vox 1].
     % Anchor: focal-spot voxel (x_mm=0, y_mm=0, z_mm=focal_length_mm) → focus_pos.

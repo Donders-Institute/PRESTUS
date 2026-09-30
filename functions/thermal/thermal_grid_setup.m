@@ -229,5 +229,12 @@ parameters_th.transducer(1).trans_pos = trans_pos_th;
 if isfield(parameters_th.transducer(1), 'focus_pos')
     parameters_th.transducer(1).focus_pos = focus_pos_th;
 end
+% Unrounded positions and the thermal step, for readers that resample external
+% fields onto the thermal grid (read_babelbrain_thermal via
+% babelbrain_thermal_wrapper); the rounded voxel positions above are off by up
+% to half a thermal voxel.
+parameters_th.grid.thermal_focus_pos_exact = ((focus_pos - 1) * ac_dx_mm - fov_origin_mm) / th_dx_mm + 1;
+parameters_th.grid.thermal_trans_pos_exact = ((trans_pos - 1) * ac_dx_mm - fov_origin_mm) / th_dx_mm + 1;
+parameters_th.grid.thermal_resolution_mm   = th_dx_mm;
 
 end
