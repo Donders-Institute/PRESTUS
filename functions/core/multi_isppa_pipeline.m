@@ -2,7 +2,7 @@ function multi_isppa_pipeline(parameters, options)
 % MULTI_ISPPA_PIPELINE  Run acoustic simulation once, then thermal analysis at
 %                       multiple free-water target intensities in parallel
 %
-% When calibration.target_isppa_wcm2 contains more than one value, the
+% When transducer(1).target_isppa_wcm2 contains more than one value, the
 % pipeline automatically splits into:
 %
 %   Stage 1  Acoustic simulation + free-water baseline measurement
@@ -13,7 +13,7 @@ function multi_isppa_pipeline(parameters, options)
 %               Each job loads the cached acoustic result, scales
 %               sensor_data.p_max_all by sqrt(target/baseline), runs the
 %               thermal simulation and analysis, and generates an HTML report.
-%               Output files carry an affix _isppaNNN (NNN = integer W/cm²).
+%               Output files carry an affix _desc-isppaNNN (NNN = integer W/cm²).
 %
 %   Stage N+1   (optional) Summary report aggregating all ISPPA variants.
 %               Active when options.generate_summary_report = true (default).
@@ -39,7 +39,7 @@ function multi_isppa_pipeline(parameters, options)
 %   multi_isppa_pipeline(parameters, options)
 %
 % Input:
-%   parameters - base PRESTUS config; calibration.target_isppa_wcm2 must be
+%   parameters - base PRESTUS config; transducer(1).target_isppa_wcm2 must be
 %                a numeric vector with at least two elements [W/cm²];
 %                do NOT set io.output_affix — this function manages it
 %   options    - pipeline knobs (optional, default: struct()):
@@ -364,12 +364,16 @@ end
 % =========================================================================
 
 function assert_thermal_outputs_exist(parameters, affixes)
+    % Filename must match the thermal stage's actual output (see the csv_file
+    % built in the slurm/qsub branch above, and resolve_io_dirs.m's
+    % io.filename_table derivation) — not '_output_table', which no stage
+    % here ever writes.
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
     output_dir = get_output_dir(parameters);
     for ti = 1:numel(affixes)
         csv = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, affixes{ti}));
+            sprintf('sub-%03d_%s%s.csv', subject_id, medium, affixes{ti}));
         if ~isfile(csv)
             warn('multi_isppa_pipeline:missingOutput', ...
                 'Thermal output not found for affix ''%s'' — summary will be incomplete.\n  Expected: %s', ...

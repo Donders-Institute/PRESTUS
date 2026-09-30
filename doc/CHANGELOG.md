@@ -230,6 +230,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` updated to use `parameters.path.seg` (was `parameters.seg_path`)
 
 #### Sequential / Reporting
+- ⚠️ **Fixed:** `multi_isppa_pipeline` checked for `sub-XXX_<medium>_output_table<affix>.csv`, which no stage writes, so it warned about missing thermal output for every intensity; it now expects the per-subject CSV name `sub-XXX_<medium><affix>.csv`
 - Limited-FOV runs outline the acoustic FOV box (dashed red) on the whole-brain intensity-on-T1w overlay (`plot_intensity_t1_overlay`; `prestus_pipeline` passes the box in full-grid voxels as `grid.acoustic_fov_offset_vox` / `acoustic_fov_dims_vox` to the NIfTI export); the report caption reads "Whole-brain intensity overlay with FOV"
 - Subject report: the transducer config summary shows the calibration library entry, whether the element drive is **k-Wave-verified** (free-water check by `kwave_check_refinement`, with R² and focal error) or **analytical only** (with the nearest checked depth, if any), and the measured free-water I<sub>sppa</sub>; the Methods text states the same calibration provenance
 - HTML simulation report shows a per-transducer Ipa table for `asyncJoint` runs, listing each transducer's Isppa at its own focus sampled from the joint combined intensity map
