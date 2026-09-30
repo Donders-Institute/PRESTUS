@@ -230,6 +230,61 @@ if do_flip
     label_map = flip(label_map, 3);
 end
 
+% Keep the whole bowl behind BabelBrain's source plane. BabelBrain injects the
+% Rayleigh field on the FIRST domain slice on the transducer side (the high-k
+% end of this array, after its load flip = its z=0), and requires every source
+% element to lie behind that plane: if the bowl rim protrudes into the domain it
+% silently snaps the transducer back in whole voxels ("Need to apply correction
+% to reposition Tx"), which moves the source off trans_pos (observed: -5.5 mm
+% for a pFOV crop that starts at the apex). The slab between the transducer-side
+% face and the rim is water inside the bowl concavity, so trim it: the source
+% then sits exactly where PRESTUS placed it, and the trimmed slab is simply
+% zero-filled on the way back (read_babelbrain_output). The high-k end is
+% trimmed, so voxel indices 1..Nz-n (marker, affine) are unchanged.
+Nz_full = size(label_map, 3);
+n_trim  = 0;
+bowl_depth_mm = [];
+if isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'annular') && ...
+        all(isfield(parameters.transducer(1).annular, {'curv_radius_mm', 'elem_od_mm'}))
+    an = parameters.transducer(1).annular;
+    R_mm = an.curv_radius_mm;
+    a_mm = max(an.elem_od_mm(:)) / 2;
+    if a_mm < R_mm
+        bowl_depth_mm = R_mm - sqrt(R_mm^2 - a_mm^2);
+    end
+end
+if ~isempty(trans_pos) && numel(trans_pos) >= 3 && ~isempty(bowl_depth_mm)
+    kt = (trans_pos(3) - 1) * resample_factor + 1;           % apex index, native grid, pre-flip
+    if do_flip
+        d_apex_mm = (kt - 1) * bb_native_res_mm;             % apex -> transducer-side face
+    else
+        d_apex_mm = (Nz_full - kt) * bb_native_res_mm;
+    end
+    % The rim lies bowl_depth on the TARGET side of the apex, so the bowl spans
+    % d_apex .. d_apex + bowl_depth into the domain (d_apex < 0: apex outside the
+    % face). Trim past the rim; +1 voxel margin since BabelBrain tests
+    % max(element z) >= source-plane z.
+    n_trim = max(0, ceil((d_apex_mm + bowl_depth_mm) / bb_native_res_mm) + 1);
+    if n_trim > 0
+        slab = label_map(:, :, Nz_full-n_trim+1:Nz_full);
+        if any(slab(:) ~= 0)
+            warning('write_babelbrain_input:tissueInBowl', ...
+                ['%d non-water voxel(s) in the %.1f mm slab between the transducer apex and the bowl rim; ' ...
+                 'they are dropped from the BabelBrain domain (BabelBrain cannot model tissue inside the bowl).'], ...
+                nnz(slab), n_trim * bb_native_res_mm);
+        end
+        if do_flip; k_marker = Nz_full + 1 - fp(3); else; k_marker = fp(3); end
+        if k_marker > Nz_full - n_trim
+            error('write_babelbrain_input:trimTooDeep', ...
+                'Bowl-rim trim (%d slices) would remove the focal marker; check trans_pos/focus_pos.', n_trim);
+        end
+        label_map = label_map(:, :, 1:Nz_full-n_trim);
+        fprintf(['[write_babelbrain_input] Trimmed %d transducer-side slice(s) (%.2f mm) so the bowl rim ' ...
+            '(depth %.2f mm, apex %.2f mm from the domain face) lies behind BabelBrain''s source plane.\n'], ...
+            n_trim, n_trim * bb_native_res_mm, bowl_depth_mm, d_apex_mm);
+    end
+end
+
 fprintf('[write_babelbrain_input] Label counts:\n');
 for lbl = [0 1 2 3 4 5]
     n = sum(label_map(:) == lbl);
@@ -322,7 +377,10 @@ if ~isempty(pseudoCT)
     if abs(resample_factor - 1) > 1e-6
         ct_vol = affine_resample_3d(ct_vol, M_old_to_new, new_dims, 'linear', 0);
     end
-    ct_vol = flip(ct_vol, 3);   % same load-time-flip pre-compensation as label_map
+    if do_flip
+        ct_vol = flip(ct_vol, 3);   % same load-time-flip pre-compensation as label_map
+    end
+    ct_vol = ct_vol(:, :, 1:Nz_full-n_trim);   % same bowl-rim trim as label_map
 
     ct_fname    = strrep(fname, 'BabelViscoInput', 'CT');
     ct_out_path = fullfile(sub_dir, ct_fname);

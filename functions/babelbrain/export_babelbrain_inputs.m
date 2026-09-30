@@ -110,6 +110,9 @@ if isempty(bb.tx_system)
     [bb.tx_system, ~] = babelbrain_transducer_map(parameters, equip_param, out_dir);
 end
 
+% 'auto' / named backends -> BabelBrain integer (RunCases and the YAML need a number)
+[bb.computing_backend, bb.device_name] = resolve_bb_backend(bb.computing_backend, bb.device_name);
+
 %% Compute PPW
 freq_hz  = parameters.transducer(1).freq_hz;
 freq_kHz = round(freq_hz / 1e3);
@@ -210,6 +213,34 @@ for k = 1:numel(bb_root_candidates)
     end
 end
 
+% Preset geometry (default.yaml) — FocalLength also drives the placement correction
+cfg = struct();
+yaml_path = fullfile(bb_root_py, 'BabelBrain', ...
+    ['Babel_' get_babel_folder(bb.tx_system)], 'default.yaml');
+yaml_path = strrep(yaml_path, '/', filesep);
+if isfile(yaml_path)
+    cfg = yaml.loadFile(yaml_path, 'ConvertToArray', true);
+end
+preset_focal_length_m = [];
+if isfield(cfg, 'FocalLength')
+    preset_focal_length_m = cfg.FocalLength;
+end
+
+% Mechanical placement correction so BabelBrain's apex lands on trans_pos
+% (same rule as babelbrain_wrapper; see babelbrain_placement_correction).
+[geom_corr_m, apex_to_target_mm, placement_src] = babelbrain_placement_correction( ...
+    parameters.transducer(1), focus_pos, trans_pos_export, res_mm, preset_focal_length_m);
+tx_mech_adjust_total_m = bb.tx_mech_adjust_z_m + geom_corr_m;
+if ~strcmp(placement_src, 'none')
+    fprintf(['[export_babelbrain_inputs] Tx placement correction: %+.1f mm ' ...
+        '(preset FL %.1f mm - apex-to-target %.2f mm from %s)\n'], ...
+        geom_corr_m*1e3, preset_focal_length_m*1e3, apex_to_target_mm, placement_src);
+else
+    warning('export_babelbrain_inputs:noPlacementCorr', ...
+        ['Preset FocalLength or apex-to-target distance unavailable; TxMechanicalAdjustmentZ ' ...
+         'omits the placement correction and the BabelBrain field may be shifted axially.']);
+end
+
 fid = fopen(run_script_path, 'w');
 fprintf(fid, '#!/usr/bin/env python3\n');
 fprintf(fid, '"""\n');
@@ -238,7 +269,8 @@ fprintf(fid, '    Frequencies    = [%g],\n', freq_hz);
 fprintf(fid, '    basePPW        = [%d],\n', ppw_use);
 fprintf(fid, '    COMPUTING_BACKEND           = %d,\n', bb.computing_backend);
 fprintf(fid, '    deviceName                  = r''%s'',\n', bb.device_name);
-fprintf(fid, '    TxMechanicalAdjustmentZ     = %.6f,\n', bb.tx_mech_adjust_z_m);
+fprintf(fid, '    TxMechanicalAdjustmentZ     = %.6f,  # m: %.1f mm placement corr + %.1f mm user\n', ...
+    tx_mech_adjust_total_m, geom_corr_m*1e3, bb.tx_mech_adjust_z_m*1e3);
 if isfield(bb, 'use_rayleigh_for_water') && ~isempty(bb.use_rayleigh_for_water)
     use_rayleigh_water = logical(bb.use_rayleigh_for_water);
 else
@@ -252,12 +284,7 @@ fprintf(fid, '    bDisplay                    = False,\n');
 fprintf(fid, '%s', weights_arg);
 
 % Geometry kwargs (from preset default.yaml if available)
-prestus_root_str = get_prestus_path();
-yaml_path = fullfile(bb_root_py, 'BabelBrain', ...
-    ['Babel_' get_babel_folder(bb.tx_system)], 'default.yaml');
-yaml_path = strrep(yaml_path, '/', filesep);
-if isfile(yaml_path)
-    cfg = yaml.loadFile(yaml_path, 'ConvertToArray', true);
+if ~isempty(fieldnames(cfg))
     if isfield(cfg, 'TxDiam')
         fprintf(fid, '    Aperture       = %.6f,  # m\n', cfg.TxDiam);
     end
@@ -295,7 +322,8 @@ fprintf(fid, 'ppw:          %d\n', ppw_use);
 fprintf(fid, 'res_mm:       %g\n', res_mm);
 fprintf(fid, 'computing_backend: %d\n', bb.computing_backend);
 fprintf(fid, 'device_name:  %s\n', bb.device_name);
-fprintf(fid, 'tx_mech_adjust_z_m: %.6f\n', bb.tx_mech_adjust_z_m);
+fprintf(fid, 'tx_mech_adjust_z_m: %.6f  # total = %.1f mm placement corr (%s) + %.1f mm user\n', ...
+    tx_mech_adjust_total_m, geom_corr_m*1e3, placement_src, bb.tx_mech_adjust_z_m*1e3);
 fprintf(fid, 'z_beyond_focus_mm: %.1f\n', z_beyond_focus_mm);
 fprintf(fid, 'do_refocusing: %s\n', mat2pyb(bb.do_refocusing));
 fprintf(fid, '\nfiles:\n');

@@ -46,7 +46,7 @@ babelbrain:
   python_env: ''               # path to conda/venv environment; empty = system python3
   root: ''                     # path to BabelBrain source; auto-detected if empty
   tx_mech_adjust_z_m: 0.0      # ADDITIONAL transducer z offset into skin [m]; a placement
-                               # correction (preset FL − focal_distance_bowl) is always added (see below)
+                               # correction (preset FL − |focus_pos − trans_pos|) is always added (see below)
   z_steering_m: ~              # ZSteering [m]; null = auto-derived (0 with explicit phases; see below)
   focal_calibration: true              # geometric fallback only: steer so the achieved FWHM-centre lands at focal_distance_ep;
                                        # locate-only (report) when explicit element phases exist (see below)
@@ -478,13 +478,15 @@ Set `device_name` explicitly to target a specific GPU when multiple are present.
 
 ### Transducer placement, ZSteering, and the drive phases
 
-BabelBrain builds its simulation domain with the transducer apex at `z_mm ≈ 0` and the **FocalSpot (target) voxel at `z_mm = ` preset `FocalLength`** (read from `Babel_{tx_system}/default.yaml`) — i.e. it assumes the transducer sits at its *natural* focal distance from the target. PRESTUS's geometry instead places the apex `focal_distance_bowl` from the target. On the way back, [`resample_babelbrain_vol.m`](../functions/babelbrain/resample_babelbrain_vol.m) anchors the `z_mm = FocalLength` plane onto PRESTUS's `focus_pos` (`prestus_dim3 = (z_mm − focal_length_mm)/res + focus_pos`), so any difference between the two distances **rigidly translates the pasted field by `focal_distance_bowl − FocalLength`** along the beam axis (−7.7 mm for R15473 at 85 mm EP). Electronic steering cannot compensate for that translation: a translated field of a differently-steered transducer is not the true field — the near-field lobe structure shifts with the translation while the drive physics differ.
+BabelBrain builds its simulation domain with the transducer apex at `z_mm ≈ 0` and the **FocalSpot (target) voxel at `z_mm = ` preset `FocalLength`** (read from `Babel_{tx_system}/default.yaml`) — i.e. it assumes the transducer sits at its *natural* focal distance from the target. PRESTUS's geometry instead places the apex at `trans_pos` (bowl rear centre), i.e. `|focus_pos − trans_pos|` from the target. That distance equals `focal_distance_bowl` only when the target sits at the nominal focal depth; planned/pFOV placements generally differ (e.g. 71 mm vs 92 mm for R15473 at 85 mm EP with a 64 mm-deep target). On the way back, [`resample_babelbrain_vol.m`](../functions/babelbrain/resample_babelbrain_vol.m) anchors the `z_mm = FocalLength` plane onto PRESTUS's `focus_pos` (`prestus_dim3 = (z_mm − focal_length_mm)/res + focus_pos`), so any difference between the two distances **rigidly translates the pasted field by `|focus_pos − trans_pos| − FocalLength`** along the beam axis (−7.7 mm for R15473 with the target at 85 mm EP; −28.75 mm with the target at 64 mm EP). Electronic steering cannot compensate for that translation: a translated field of a differently-steered transducer is not the true field — the near-field lobe structure shifts with the translation while the drive physics differ.
 
 The wrapper therefore corrects the geometry **mechanically**:
 
 ```
-TxMechanicalAdjustmentZ = preset_FocalLength − focal_distance_bowl   (+ any user standoff)
+TxMechanicalAdjustmentZ = preset_FocalLength − |focus_pos − trans_pos| · res_mm   (+ any user standoff)
 ```
+
+It is computed by [`babelbrain_placement_correction.m`](../functions/babelbrain/babelbrain_placement_correction.m) (shared with `export_babelbrain_inputs`). Only when `trans_pos` is unavailable does it fall back to `preset_FocalLength − focal_distance_bowl`, which assumes the target sits at the nominal focal depth. Using `focal_distance_bowl` for a target at a different depth places BabelBrain's transducer too far from (or too close to) the head, shifting the whole field — skull incidence, near-field lobes and focus — relative to the anatomy.
 
 This shifts the Tx *inside BabelBrain's domain* (`BabelIntegrationANNULAR_ARRAY`, `CalculateRayleighFieldsForward`) so the apex sits at its true distance from the target; the focus-anchored resample is then also apex-aligned (distance-preserving). BabelBrain's internal Rayleigh phase reference aims at `center_z = ZDim[FocalSpot] + ZSteering + TxMechanicalAdjustmentZ`, so the mechanical adjustment shifts Tx and aim together — with `ZSteering = 0` the aim is always the **natural focus relative to the apex**.
 
@@ -501,7 +503,9 @@ On top of the corrected geometry, the drive is set in one of two modes:
 
 Pin `babelbrain.z_steering_m` to override the auto-derivation entirely (also bypasses calibration; the weight-delta reference follows the pinned aim `FocalLength + ZSteering`).
 
-**Free-water cross-check.** With explicit phases, the BabelBrain axial profile must overlay the analytic Rayleigh profile of the same phases in *both* the near-field lobes and the focal lobe. A rigid axial offset of ≈ `FocalLength − focal_distance_bowl` (near-field lobes shifted by the same amount as the peak) indicates the mechanical placement correction is missing; a *shape* mismatch of the near-field lobes indicates the effective drive phases differ (e.g. weights delta referenced to the wrong aim).
+**Free-water cross-check.** With explicit phases, the BabelBrain axial profile must overlay the analytic Rayleigh profile of the same phases in *both* the near-field lobes and the focal lobe. A rigid axial offset of ≈ `FocalLength − |focus_pos − trans_pos|` (near-field lobes shifted by the same amount as the peak) indicates the mechanical placement correction is missing; a *shape* mismatch of the near-field lobes indicates the effective drive phases differ (e.g. weights delta referenced to the wrong aim).
+
+**Bowl rim vs. the source plane.** BabelBrain injects the Rayleigh field on the first domain slice on the transducer side and requires every source element to lie behind it; if the bowl rim protrudes into the domain it snaps the transducer back in whole voxels (`Warning: Need to apply correction to reposition Tx for …` in the BabelBrain log, and a non-zero `source_residual_mm` in the `_prestus_anchor.json` sidecar). This happens whenever any part of the bowl lies inside the grid: the rim sits one bowl depth (5.4 mm for R15473) on the target side of the apex, so the bowl spans `d_apex … d_apex + bowl_depth` from the transducer-side face (`d_apex` = apex distance into the grid, negative if the apex is outside). Examples: a pFOV crop that starts at `trans_pos` (source pushed 5.5 mm too far back), or the bone-slab phantom with the apex 7.5 mm inside the grid (13.5 mm, which shifted the BabelBrain focus ~14 mm proximally). [`write_babelbrain_input.m`](../functions/babelbrain/write_babelbrain_input.m) therefore trims `ceil((d_apex + bowl_depth)/dx) + 1` transducer-side slices from the BabelBrain mask (it is water inside the bowl concavity; a warning is raised if it contains tissue). The trimmed slab is zero-filled when the field is pasted back.
 
 ### Output alignment: tissue-marker anchoring and the ZDomainStart fix
 
@@ -679,8 +683,13 @@ babelbrain_wrapper.m             Free-water ISPPA baseline (separate --water_onl
   The water-only baseline run is only regenerated if its Water_DataForSim.h5 doesn't
   already exist in the cache dir (is_water_medium branch) — a stale Water_DataForSim.h5
   left over from an earlier run (different transducer config, different geometry) will
-  be silently reused for ISPPA calibration. If the ISPPA-normalized field looks wrong,
-  check the Water_DataForSim.h5's mtime against the main DataForSim.h5's.
+  be silently reused for ISPPA calibration (unless io.overwrite_files is 'always'/'force',
+  which deletes it first). If the ISPPA-normalized field looks wrong, check the
+  Water_DataForSim.h5's mtime against the main DataForSim.h5's.
+  The water-only run must receive the same --source_amp_pa as the transcranial run;
+  without it BabelBrain drives at its ~50 kPa default and freefield_isppa_wcm2 comes out
+  ~(156.6/50)^2 ≈ 10x too low for R15473 (the wrapper passes it since this fix — water
+  baselines cached from before it are wrong and must be regenerated).
 ```
 
 ---

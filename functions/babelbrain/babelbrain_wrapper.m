@@ -40,11 +40,12 @@ function sensor_data = babelbrain_wrapper( ...
 %   .python_env         - path to Python venv/conda env with BabelBrain installed;
 %                         empty string = use system Python
 %   .tx_mech_adjust_z_m - additional transducer mechanical Z offset into skin [m] (default 0).
-%                         A placement correction of (preset FocalLength - focal_distance_bowl)
+%                         A placement correction of (preset FocalLength - |focus_pos - trans_pos|)
 %                         is ALWAYS added on top of this value: BabelBrain builds its domain
 %                         with the apex at preset-FL distance from the target voxel, whereas
-%                         PRESTUS places it at focal_distance_bowl — without the correction the
-%                         resampled field is rigidly shifted by the difference.
+%                         PRESTUS places it at trans_pos — without the correction the
+%                         resampled field is rigidly shifted by the difference. Falls back to
+%                         focal_distance_bowl when trans_pos is unavailable.
 %   .z_steering_m       - ZSteering [m]: axial offset of the electronic aim from the preset
 %                         FocalLength (i.e. aim_from_apex = preset_FL + ZSteering).
 %                         Empty (default): auto-derived — 0 when explicit element phases exist
@@ -98,7 +99,8 @@ function sensor_data = babelbrain_wrapper( ...
 %   kwave_medium - k-Wave medium struct (not used for simulation; kept for
 %                  interface compatibility with acoustic_wrapper)
 %   focus_pos    - [1x3] focus voxel in grid coordinates
-%   trans_pos    - [1x3] transducer voxel in grid coordinates (for provenance)
+%   trans_pos    - [1x3] transducer (bowl rear-centre / apex) voxel in grid coordinates;
+%                  sets BabelBrain's Tx placement and the beam direction
 %   planimg      - planimg struct from grid_tissue_setup (affine info)
 %   equip_param  - (optional) equipment config struct for transducer lookup
 %   pseudoCT     - (optional) [Nx x Ny x Nz] Hounsfield-unit pseudo-CT in
@@ -117,7 +119,7 @@ arguments
     medium_masks (:,:,:) {mustBeNumeric}
     kwave_medium (1,1) struct  %#ok<INUSA>  kept for interface symmetry
     focus_pos    (1,3) {mustBeNumeric}
-    trans_pos    (1,3) {mustBeNumeric}  %#ok<INUSA>
+    trans_pos    (1,3) {mustBeNumeric}
     planimg      (1,1) struct
     equip_param        struct  = struct()
     pseudoCT           {mustBeNumeric} = []
@@ -442,10 +444,15 @@ end
 
 %% Transducer placement (TxMechanicalAdjustmentZ) and electronic aim (ZSteering)
 % BabelBrain places the transducer apex at its natural focal distance (preset
-% FocalLength) from the target, whereas PRESTUS places it focal_distance_bowl
-% away. Electronic steering cannot make up for that offset, so correct it
-% mechanically:
-%   TxMechanicalAdjustmentZ = preset_FL - focal_distance_bowl
+% FocalLength) from the target, whereas PRESTUS places it at trans_pos, i.e.
+% |focus_pos - trans_pos| away (trans_pos is the bowl rear centre = apex).
+% That distance equals focal_distance_bowl only when the target sits at the
+% nominal focal depth; with planned/pFOV placements it generally does not (e.g.
+% 71 mm vs 92 mm), and using focal_distance_bowl then shifts the whole
+% BabelBrain field axially relative to the head. Electronic steering cannot
+% make up for that offset, so correct it mechanically:
+%   TxMechanicalAdjustmentZ = preset_FL - |focus_pos - trans_pos| * res_mm
+% (fallback without a valid trans_pos: preset_FL - focal_distance_bowl).
 % This moves the transducer and BabelBrain's phase-reference aim together, so
 % with ZSteering = 0 the aim stays at the natural focus. Then:
 %   explicit per-element phases -> ZSteering = 0; the weights file carries the
@@ -490,12 +497,23 @@ end
 
 % Mechanical placement correction (see block comment above), composed with any
 % user-requested standoff.
-geom_corr_m = 0.0;
-if ~isempty(preset_focal_length_m) && ~isempty(focal_distance_bowl_mm)
-    geom_corr_m = preset_focal_length_m - focal_distance_bowl_mm / 1000;
-    fprintf(['[babelbrain_wrapper] Tx placement correction: %+.1f mm ' ...
-        '(preset FL %.1f mm - focal_distance_bowl %.1f mm)\n'], ...
-        geom_corr_m*1e3, preset_focal_length_m*1e3, focal_distance_bowl_mm);
+[geom_corr_m, apex_to_target_mm, placement_src] = babelbrain_placement_correction( ...
+    tr, focus_pos, trans_pos, res_mm, preset_focal_length_m);
+switch placement_src
+    case 'trans_pos'
+        fprintf(['[babelbrain_wrapper] Tx placement correction: %+.1f mm ' ...
+            '(preset FL %.1f mm - apex-to-target |focus_pos - trans_pos| %.2f mm)\n'], ...
+            geom_corr_m*1e3, preset_focal_length_m*1e3, apex_to_target_mm);
+        if ~isempty(focal_distance_bowl_mm) && abs(apex_to_target_mm - focal_distance_bowl_mm) > 1
+            fprintf(['[babelbrain_wrapper]   note: target is %+.1f mm from the nominal focal depth ' ...
+                '(focal_distance_bowl %.1f mm); BabelBrain apex placed at trans_pos.\n'], ...
+                apex_to_target_mm - focal_distance_bowl_mm, focal_distance_bowl_mm);
+        end
+    case 'focal_distance_bowl'
+        fprintf(['[babelbrain_wrapper] Tx placement correction: %+.1f mm ' ...
+            '(preset FL %.1f mm - focal_distance_bowl %.1f mm; trans_pos unavailable, ' ...
+            'assuming the target sits at the nominal focal depth)\n'], ...
+            geom_corr_m*1e3, preset_focal_length_m*1e3, apex_to_target_mm);
 end
 tx_mech_adjust_total_m = bb.tx_mech_adjust_z_m + geom_corr_m;
 
@@ -653,8 +671,8 @@ if ~isempty(fov_len_mm) && isfield(tr, 'focal_distance_ep')
 end
 
 % CHECK: ZSteering consistency.  With the mechanical placement correction the
-% geometry inside BabelBrain is physical (apex at focal_distance_bowl from the
-% target), so the auto-derived invariant is (aim measured from the apex):
+% geometry inside BabelBrain is physical (apex at trans_pos, |focus_pos -
+% trans_pos| from the target), so the auto-derived invariant is (aim measured from the apex):
 %   explicit phases -> ZSteering = 0 (drive carried by the weights file)
 %   calibrated      -> ZSteering = calib.steer_bowl_mm/1e3 - preset_FL
 %   uncalibrated    -> ZSteering = focal_distance_bowl/1e3 - preset_FL
@@ -1041,6 +1059,7 @@ else
             '--water_only'}, ...
             bb_root_flag(bb_root), ...
             bb_weights_flag(weights_path), ...  % needed for z-steering geometry match
+            source_amp_pa_flag, ...             % same drive as the transcranial run, else BabelBrain's ~50 kPa default
             bb_refocus_flag(bb.do_refocusing), ...
             bb_no_tight_flag(tight_narrow_beam), ...
             bb_usect_flag(~isempty(bb.ct_mapping)), ...
@@ -1225,52 +1244,6 @@ function flag = bb_refocus_flag(do_refocus)
         flag = {'--do_refocusing'};
     else
         flag = {};
-    end
-end
-
-function [backend, device] = resolve_bb_backend(backend, device)
-% Resolve 'auto' computing_backend / device_name to concrete values.
-% Priority: Metal (macOS) > CUDA (nvidia-smi) > CPU.
-    if ~(ischar(backend) && strcmp(backend, 'auto'))
-        % Already a numeric backend — only resolve device if still 'auto'
-        if ischar(device) && strcmp(device, 'auto')
-            device = default_device_for_backend(backend);
-        end
-        return
-    end
-
-    if ismac
-        backend = 3;   % Metal
-        device  = 'Apple';
-        fprintf('[babelbrain_wrapper] Auto-detected backend: Metal (macOS)\n');
-        return
-    end
-
-    % Linux/Windows: probe for CUDA
-    [status, out] = run_command({'nvidia-smi', '--query-gpu=name', '--format=csv,noheader'});
-    if status == 0
-        lines = strtrim(strsplit(strtrim(out), newline));
-        lines = lines(~cellfun(@isempty, lines));
-        if ~isempty(lines)
-            backend = 1;   % CUDA
-            device  = lines{1};
-            fprintf('[babelbrain_wrapper] Auto-detected backend: CUDA, device="%s"\n', device);
-            return
-        end
-    end
-
-    % Fallback: CPU — warn so users on GPU machines notice driver/detection issues
-    backend = 4;
-    device  = 'CPU';
-    warning('babelbrain_wrapper:cpuFallback', ...
-        '[babelbrain_wrapper] No GPU detected (nvidia-smi failed or returned no devices); falling back to CPU. Simulation may be slow.');
-end
-
-function device = default_device_for_backend(backend)
-% Return a safe default device string for a known numeric backend.
-    switch backend
-        case 3;  device = 'Apple';
-        otherwise; device = 'CPU';
     end
 end
 
