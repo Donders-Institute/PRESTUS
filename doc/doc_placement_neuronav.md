@@ -18,7 +18,7 @@ Multiple triggers can be sent during stimulation to acquire updates to the trans
 
 These files contain one or more static marker positions. Each `Element` in the file is expected to be of type `EntryTargetPair` (with a `Target/Marker/ColVec3D` position and a `Rotation/RotationReference/ColVec3D` beam direction), from which a synthetic 4×4 matrix is constructed.
 
-> **Mixed-type GUMMarkers files.** Some Localite versions write a `GUMMarkerList` file that contains a mix of `EntryTargetPair` and `InstrumentMarker` elements (the latter identified by `type="InstrumentMarker"` on the `Element` tag). `neuronav_compute_series_statistics` will fail on the `InstrumentMarker` elements when called with `markertype='GUMMarkers'`. Inspect the file first and, if an `InstrumentMarker` element with `set=true` is present, extract its `Matrix4D` directly and pass it to `localite_matrix_to_positions`. See `code/debug_localite_inputs.m` for an example.
+> **Mixed-type GUMMarkers files.** Some Localite versions write a `GUMMarkerList` file that mixes `EntryTargetPair` and `InstrumentMarker` elements (`type="InstrumentMarker"` on the `Element` tag). Each element becomes its own series: `InstrumentMarker` elements keep their recorded 4×4 pose, `EntryTargetPair` elements the synthesized matrix. Only the former are instrument poses; placement refuses an `EntryTargetPair` series (`PRESTUS:localite:notAPose`).
 
 ### `InstrumentMarker`
 

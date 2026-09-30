@@ -13,7 +13,7 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %
 % Input:
 %   localite                - struct from neuronav_select_localite or readstruct
-%   voxel_size              - voxel size for converting distances to voxels [mm]
+%   voxel_size              - voxel size [mm]; used for position_dev_vox
 %   expected_segment_length - expected pulses per series ([] = accept all)
 %   markertype              - 'TriggerMarkers' (default), 'GUMMarkers', or 'InstrumentMarker'
 %   gap_threshold_s         - minimum gap, IN SECONDS, that must separate two
@@ -29,7 +29,12 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %   stats - 1×N cell array; each cell is a struct with fields:
 %           series_id, N_pulses, voxel_size, position_mean [1×3],
 %           matrix4d_mean [1×4×4], matrix4d_all [N×4×4],
-%           position_dev_mm, rotation_dev_rad, markers
+%           position_dev_mm   - distance of each pulse from the series mean
+%                               position [mm] (.mean, .std, .all)
+%           position_dev_vox  - the same distances divided by voxel_size
+%           rotation_dev_rad  - rotation angle of each pulse relative to the
+%                               mean orientation [rad] (.mean, .std, .all)
+%           markers
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
@@ -244,13 +249,14 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
             rotations(:, f) = [stim_data.(rot_fields{f})];
         end
         rotations = reshape(rotations, N, 3, 3);
-        mean_rotation = mean(rotations, 1);
+        R_mean = mean_orientation(squeeze(mean(rotations, 1)));
 
-        euclideanDists = sqrt(sum((coords - mean_coords).^2, 2)) / voxel_size;
+        euclideanDists = sqrt(sum((coords - mean_coords).^2, 2));   % mm
         rot_deviations = zeros(N, 1);
         for i = 1:N
-            R_dev = squeeze(rotations(i,:,:)) - mean_rotation;
-            rot_deviations(i) = sqrt(sum(R_dev(:).^2));
+            % Recorded matrices are not exactly orthonormal: project each too.
+            rot_deviations(i) = rotation_angle(R_mean, ...
+                mean_orientation(reshape(rotations(i,:,:), 3, 3)));
         end
 
         % CREATE COMPLETE SERIES CELL
@@ -265,6 +271,10 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
                 'mean', mean(euclideanDists), ...
                 'std', std(euclideanDists), ...
                 'all', euclideanDists'), ...
+            'position_dev_vox', struct(...
+                'mean', mean(euclideanDists) / voxel_size, ...
+                'std', std(euclideanDists) / voxel_size, ...
+                'all', euclideanDists' / voxel_size), ...
             'rotation_dev_rad', struct(...
                 'mean', mean(rot_deviations), ...
                 'std', std(rot_deviations), ...
@@ -273,4 +283,23 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
     end
 
     fprintf('Created %d series cells (%s)\n', numel(stats), markertype);
+end
+
+
+function R = mean_orientation(M)
+% Nearest proper rotation to the element-wise mean of rotation matrices.
+% Degenerate input (e.g. an all-zero rotation block) is returned as-is.
+    [U, ~, V] = svd(M);
+    D = eye(3);
+    D(3,3) = sign(det(U * V'));
+    if D(3,3) == 0, R = M; return; end
+    R = U * D * V';
+end
+
+
+function theta = rotation_angle(R_ref, R)
+% Angle [rad] of the relative rotation R_ref' * R (0 for identical poses).
+% Chord form ||R_ref - R||_F = 2*sqrt(2)*sin(theta/2); unlike acos of the
+% trace it stays accurate for small angles.
+    theta = 2 * asin(min(norm(R_ref - R, 'fro') / (2 * sqrt(2)), 1));
 end

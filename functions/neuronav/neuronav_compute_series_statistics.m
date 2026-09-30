@@ -11,7 +11,7 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %
 % Input:
 %   localite                - struct from neuronav_select_localite or readstruct
-%   voxel_size              - voxel size for converting distances to voxels [mm]
+%   voxel_size              - voxel size [mm]; used for position_dev_vox
 %   expected_segment_length - expected pulses per series ([] = accept all)
 %   markertype              - 'TriggerMarkers' (default), 'GUMMarkers', or 'InstrumentMarker'
 %
@@ -19,7 +19,12 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %   stats - 1×N cell array; each cell is a struct with fields:
 %           series_id, N_pulses, voxel_size, position_mean [1×3],
 %           matrix4d_mean [1×4×4], matrix4d_all [N×4×4],
-%           position_dev_mm, rotation_dev_rad, markers
+%           position_dev_mm   - distance of each pulse from the series mean
+%                               position [mm] (.mean, .std, .all)
+%           position_dev_vox  - the same distances divided by voxel_size
+%           rotation_dev_rad  - rotation angle of each pulse relative to the
+%                               mean orientation [rad] (.mean, .std, .all)
+%           markers
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
@@ -50,6 +55,8 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
         %                                           → Rotation → RotationReference → ColVec3D
         % No full 4×4 matrix is stored; we synthesise one from the target
         % position and the rotation reference axis.
+        % Some Localite versions mix in Element → InstrumentMarker → Matrix4D
+        % entries (a recorded instrument pose); those carry a full 4×4 matrix.
         if ~isfield(localite, 'Element')
             error('GUMMarkers expected but localite.Element not found');
         end
@@ -59,7 +66,30 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
         triggerMarkers(elem_n) = struct();
 
         for i = 1:elem_n
+            % readstruct gives every Element both fields in a mixed file and
+            % fills the absent one with <missing>, so test for a struct.
+            if has_struct(elements{i}, 'InstrumentMarker')
+                im = elements{i}.InstrumentMarker;
+                matrix_data = matrix4d_to_full(im.Matrix4D);
+                triggerMarkers(i).Matrix4D_full = matrix_data;
+                for f = 1:3
+                    triggerMarkers(i).(coord_fields{f}) = matrix_data(f, 4);
+                end
+                rot_flat = reshape(matrix_data(1:3, 1:3), 1, 9);
+                for f = 1:9
+                    triggerMarkers(i).(rot_fields{f}) = rot_flat(f);
+                end
+                if isfield(im, 'descriptionAttribute')
+                    triggerMarkers(i).description = im.descriptionAttribute;
+                end
+                triggerMarkers(i).element_type = 'InstrumentMarker';
+                continue;
+            end
+            if ~has_struct(elements{i}, 'EntryTargetPair')
+                error('GUMMarkers Element %d is neither an EntryTargetPair nor an InstrumentMarker', i);
+            end
             etp = elements{i}.EntryTargetPair;
+            triggerMarkers(i).element_type = 'EntryTargetPair';
 
             % Target position (ColVec3D data0/1/2 = X/Y/Z in RAS mm)
             tgt_vec = etp.Target.Marker.ColVec3D;
@@ -128,20 +158,7 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
     % so isfield returns true for elements that were never actually populated.
     for i = 1:length(triggerMarkers)
         if isfield(triggerMarkers(i), 'Matrix4D')
-            matrix4d = triggerMarkers(i).Matrix4D;
-            matrix_data = zeros(4,4);
-            all_fields = fieldnames(matrix4d);
-            for row = 0:3
-                for col = 0:3
-                    fieldname = sprintf('data%d%dAttribute', row, col);
-                    if ismember(fieldname, all_fields)
-                        val = matrix4d.(fieldname);
-                        if isnumeric(val)
-                            matrix_data(row+1, col+1) = val(1);
-                        end
-                    end
-                end
-            end
+            matrix_data = matrix4d_to_full(triggerMarkers(i).Matrix4D);
             triggerMarkers(i).Matrix4D_full = matrix_data;
             for f = 1:3
                 triggerMarkers(i).(coord_fields{f}) = matrix_data(f,4);
@@ -212,13 +229,14 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
             rotations(:, f) = [stim_data.(rot_fields{f})];
         end
         rotations = reshape(rotations, N, 3, 3);
-        mean_rotation = mean(rotations, 1);
-        
-        euclideanDists = sqrt(sum((coords - mean_coords).^2, 2)) / voxel_size;
+        R_mean = mean_orientation(squeeze(mean(rotations, 1)));
+
+        euclideanDists = sqrt(sum((coords - mean_coords).^2, 2));   % mm
         rot_deviations = zeros(N, 1);
         for i = 1:N
-            R_dev = squeeze(rotations(i,:,:)) - mean_rotation;
-            rot_deviations(i) = sqrt(sum(R_dev(:).^2));
+            % Recorded matrices are not exactly orthonormal: project each too.
+            rot_deviations(i) = rotation_angle(R_mean, ...
+                mean_orientation(reshape(rotations(i,:,:), 3, 3)));
         end
         
         % CREATE COMPLETE SERIES CELL
@@ -233,6 +251,10 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
                 'mean', mean(euclideanDists), ...
                 'std', std(euclideanDists), ...
                 'all', euclideanDists'), ...
+            'position_dev_vox', struct(...
+                'mean', mean(euclideanDists) / voxel_size, ...
+                'std', std(euclideanDists) / voxel_size, ...
+                'all', euclideanDists' / voxel_size), ...
             'rotation_dev_rad', struct(...
                 'mean', mean(rot_deviations), ...
                 'std', std(rot_deviations), ...
@@ -241,4 +263,46 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
     end
     
     fprintf('Created %d series cells (%s)\n', length(stats), markertype);
+end
+
+
+function matrix_data = matrix4d_to_full(matrix4d)
+% Parsed <Matrix4D data00=… data33=…> attributes → 4×4 double.
+    matrix_data = zeros(4,4);
+    all_fields = fieldnames(matrix4d);
+    for row = 0:3
+        for col = 0:3
+            fieldname = sprintf('data%d%dAttribute', row, col);
+            if ismember(fieldname, all_fields)
+                val = matrix4d.(fieldname);
+                if isnumeric(val)
+                    matrix_data(row+1, col+1) = val(1);
+                end
+            end
+        end
+    end
+end
+
+
+function R = mean_orientation(M)
+% Nearest proper rotation to the element-wise mean of rotation matrices.
+% Degenerate input (e.g. an all-zero rotation block) is returned as-is.
+    [U, ~, V] = svd(M);
+    D = eye(3);
+    D(3,3) = sign(det(U * V'));
+    if D(3,3) == 0, R = M; return; end
+    R = U * D * V';
+end
+
+
+function theta = rotation_angle(R_ref, R)
+% Angle [rad] of the relative rotation R_ref' * R (0 for identical poses).
+% Chord form ||R_ref - R||_F = 2*sqrt(2)*sin(theta/2); unlike acos of the
+% trace it stays accurate for small angles.
+    theta = 2 * asin(min(norm(R_ref - R, 'fro') / (2 * sqrt(2)), 1));
+end
+
+
+function tf = has_struct(s, field)
+    tf = isfield(s, field) && isstruct(s.(field));
 end
