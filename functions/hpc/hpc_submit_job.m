@@ -103,13 +103,16 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     % --kill-on-invalid-dep=yes ensures that if the predecessor fails or is
     % cancelled, all dependent jobs are automatically cancelled rather than
     % remaining stuck as DependencyNeverSatisfied indefinitely.
+    % hpc.depend_type: 'afterok' (default) or 'afterany' (e.g. a study's group
+    % report, which should run even when some subject jobs failed).
+    dep_type = dependency_type(parameters);
     if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
         dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
             'UniformOutput', false), ':');
-        fprintf(fid, '#SBATCH --dependency=afterok:%s\n', dep_str);
+        fprintf(fid, '#SBATCH --dependency=%s:%s\n', dep_type, dep_str);
         fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
     elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
-        fprintf(fid, '#SBATCH --dependency=afterok:%d\n', parameters.hpc.depend_job_id);
+        fprintf(fid, '#SBATCH --dependency=%s:%d\n', dep_type, parameters.hpc.depend_job_id);
         fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
     end
     
@@ -174,12 +177,13 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#PBS -d %s\n', log_dir);
 
     % Job dependencies (used by uncertainty pipeline for stage chaining)
+    dep_type = dependency_type(parameters);
     if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
         dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
             'UniformOutput', false), ':');
-        fprintf(fid, '#PBS -W depend=afterok:%s\n', dep_str);
+        fprintf(fid, '#PBS -W depend=%s:%s\n', dep_type, dep_str);
     elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
-        fprintf(fid, '#PBS -W depend=afterok:%d\n', parameters.hpc.depend_job_id);
+        fprintf(fid, '#PBS -W depend=%s:%d\n', dep_type, parameters.hpc.depend_job_id);
     end
 	fprintf(fid, 'module load matlab/R2023b\n');
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
@@ -193,4 +197,15 @@ function job_id = submit_qsub_job(temp_qsub_path, log_dir)
     if status ~= 0, error('qsub submission failed: %s', out); end
     job_id = strtrim(out);
 end
+end
+
+function dep_type = dependency_type(parameters)
+% Scheduler dependency type for depend_job_id(s): 'afterok' unless
+% parameters.hpc.depend_type says 'afterany'.
+    dep_type = 'afterok';
+    if isfield(parameters.hpc, 'depend_type') && ~isempty(parameters.hpc.depend_type)
+        dep_type = char(parameters.hpc.depend_type);
+        assert(any(strcmp(dep_type, {'afterok', 'afterany'})), ...
+            'hpc.depend_type must be ''afterok'' or ''afterany'' (got ''%s'').', dep_type);
+    end
 end

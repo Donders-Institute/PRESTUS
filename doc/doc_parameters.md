@@ -527,6 +527,7 @@ See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 | `ld_library_path` | LD_LIBRARY path for SimNIBS installation. | `''` | Set if you see `undefined symbol` errors. e.g. `/opt/gcc/7.2.0/lib64` |
 | `job_prefix` | Prefix string for HPC job names. | `'PRESTUS'` | Overridden to `'TP'` for transducer positioning jobs. |
 | `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
+| `depend_type` | Scheduler dependency type for `depend_job_id(s)`. | `'afterok'` | `'afterok'` or `'afterany'`. Internal (not in `config_default.yaml`); `prestus_study_start` uses `'afterany'` for the study-report job. |
 
 ---
 
