@@ -8,13 +8,17 @@ Transducer calibration relies on an additional config (`calibration_config`) tha
 
 ## Calibration levels
 
-Calibration in PRESTUS proceeds in two optional layers. The default library provides a geometry-based baseline that covers all measured depths analytically. Users can optionally layer per-depth refinements on top.
+The transducer library stores, for each measured depth, per-ring phase offsets, gains and the drive that reproduce the hydrophone profile (per-depth refinement, the default). Between measured depths they are interpolated; beyond them, geometric steering is used. See [doc_transducer_library.md](doc_transducer_library.md) for the model, the schema and the entry points.
 
 | Level | Entry point | Phase source | Amplitude | k-Wave needed | Typical use |
 |---|---|---|---|---|---|
-| **Library baseline** | `build_transducer_library` | Ring geometry (path-length) | Analytical fit per depth | No | Building the shipped library; starting point for any setup |
-| **Multi-depth joint fit** | `calibration_setup` (`phase_mode: multi_depth`) | Joint optimisation across all depths | Analytical fit | No | Finding a single hardware correction that is consistent across all steering angles |
-| **Single-depth refinement** | `calibrate_transducer` (`single_ref`) | Per-depth global search | Simulation-corrected | Optional | Improving accuracy at a specific depth |
+| **Per-depth refinement** (default) | `build_transducer_library`, `refine_transducer_library`, `calibration_gui` | Analytical fit per measured depth (`fit_transducer_model`) | Analytical, per depth | No | Library entries from hydrophone profiles |
+| **k-Wave check** (optional) | `kwave_check_refinement` (`KWave` option / GUI checkbox) | Unchanged | Corrected to free-water k-Wave ISPPA | Yes | Simulation-consistent drive at the refined depths |
+| **Static joint model** (debugging) | `LIBRARY_MODE = 'static'`, `Mode = 'static'` | One depth-independent offset over all depths | Analytical fit per depth | No | Comparison with per-depth refinement |
+| **Multi-depth joint fit** (legacy) | `calibration_setup` (`phase_mode: multi_depth`) | Joint optimisation across all depths | Analytical fit | No | Superseded by the static joint model |
+| **Single-depth refinement** (legacy) | `calibrate_transducer` (`single_ref`) | Per-depth global search | Simulation-corrected | Optional | Older k-Wave calibration pipeline; results can be ingested with `update_transducer_library` |
+
+Because the k-Wave check is optional, most entries stay at the "Analytical" amplitude level unless someone deliberately runs it. `load_transducer_from_library` does not assume that step happened: it resolves `tx_calibration.amp_kwave_verified` per requested depth and warns (`load_transducer_from_library:unverifiedAmplitude`) whenever the driven amplitude has not been checked — see [doc_transducer_library.md](doc_transducer_library.md#optional-free-water-k-wave-check).
 
 ### Focal depth convention (FLHM)
 
@@ -26,8 +30,8 @@ Manufacturers differ on what "half maximum" means:
 
 | `focal_reference` | Threshold | Convention |
 |---|---|---|
-| `flhm_3db` (default) | intensity ≥ peak / 2 | ITRUSST / Martin et al. (2025) |
-| `flhm_6db` | intensity ≥ peak / 4 (≡ pressure ≥ peak / 2) | Imasonic / IGT ("NeuroFUS") steering tables |
+| `flhm_3db` (default) | intensity ≥ peak / 2 | ITRUSST / Martin et al. (2025); Sonic Concepts CTX + TPO ("NeuroFUS") steering tables |
+| `flhm_6db` | intensity ≥ peak / 4 (≡ pressure ≥ peak / 2) | Imasonic / IGT steering tables |
 | `peak` | n/a — raw intensity-peak location | No FLHM centring |
 
 Set `parameters.calibration.focal_reference` to match the convention the characterisation data
@@ -46,30 +50,26 @@ though the underlying phases/amplitudes are correct. The value is:
 
 Defaults to `flhm_3db` when unset, preserving prior behaviour.
 
-### Library baseline
+### Library build (per-depth refinement)
 
-The default library is built by `build_transducer_library.m`. For each equipment combination that has characterisation data, it:
-
-1. Computes **geometric steering phases** at every measured depth using `set_real_phases([], ...)` — path-length geometry only, no manufacturer phase table, no hardware correction. This matches BabelBrain's internal phase model (Rayleigh-Sommerfeld in water), ensuring consistent defaults across standalone PRESTUS and BabelBrain-coupled workflows.
-2. Fits **particle velocity** at each depth × intensity analytically via `fit_velocity_to_intensity` (I ∝ v², so no optimisation is needed).
-3. Writes per-run YAMLs and ingests them into the library via `update_transducer_library`.
-
-The result is a `global_model` entry in `config/transducer/{combo_name}.yaml` whose phases and amplitudes interpolate linearly to any requested depth.
+The library is built by `build_transducer_library.m` from the profiles in `local/profiles/`. By default (`LIBRARY_MODE = 'per_depth'`), every measured depth becomes a refinement fitted by `fit_transducer_model`: phase offsets and gains on top of geometric steering (`set_real_phases`, path-length geometry from the ring dimensions), plus the drive that reproduces the measured peak. The global model is geometric steering with the measured drive per depth. `meta.quality` records in-sample, held-out interpolation and geometric R². The result is written to `config/calibration/{combo_name}.yaml` (`LIBRARY_PATH`).
 
 At runtime, load calibrated parameters with:
 ```matlab
 parameters = load_transducer_from_library(combo_name, focal_depth_ep, isppa, equip_param);
 ```
 
-### Single-depth refinement (optional)
+### Single-depth refinement (legacy)
 
 When the geometric baseline is insufficient at a specific depth — for example, due to systematic hardware delays — run `calibrate_transducer` in `single_ref` mode. This performs a global search at one reference depth to find optimised absolute phases and velocity, optionally followed by a k-Wave free-water simulation that corrects the analytical-to-simulation amplitude ratio.
 
-The result is stored as a `calibration.focal_depths` entry with `is_refinement: true` in the library YAML. `load_transducer_from_library` prefers the refinement over the global model when the requested depth is within 1 mm of the stored entry.
+The result is stored as a `calibration.focal_depths` entry with `is_refinement: true` in the library YAML. `load_transducer_from_library` reads it as a refinement knot (offset relative to geometric steering at that depth), interpolated and blended like any other refinement. For new entries, prefer per-depth refinement with the optional k-Wave check (see the levels table).
 
 ---
 
-### Multi-depth joint fit (optional)
+### Multi-depth joint fit (legacy)
+
+Superseded by the static joint model of `fit_transducer_model` (`LIBRARY_MODE = 'static'`), which is itself kept only for debugging; per-depth refinement is the default.
 
 When the hardware phase correction is expected to be **depth-independent** — i.e. the same per-element offset applies at every steering angle — the `multi_depth` mode finds a single correction vector by fitting all characterisation depths simultaneously.
 
@@ -128,14 +128,15 @@ This script is the entry point for **single-depth refinements** — it runs `cal
 #### Use cases
 
 - Refine calibration at specific focal depths where the geometric baseline is insufficient
-- Incorporate manufacturer phase information or hardware-specific corrections
+- Incorporate hardware-specific phase corrections
 - Template to generate calibrated profiles for transducer equipment at the Donders Institute
 
 #### Prerequisites
 
-- Measured/estimated axial profiles (`path_input_axial`)
-- Manufacturer-provided phase tables (`path_input_phase`)
-- Entries in the equipment configuration (`PRESTUS/config/equipment/config_equipment.yaml`)
+- Measured/estimated axial profiles (`path_input_axial`, usually `local/profiles/`; see [doc_transducer_library.md](doc_transducer_library.md#profile-folder-and-file-naming))
+- Entries in the equipment configuration (one `<SERIAL>.yaml` per transducer in `PRESTUS/config/equipment/`)
+
+Manufacturer phase tables are not needed: steering phases are always derived from ring geometry.
 
 For the Donders, the empirical profiles (steering tables) can be found on the [FUSInitiative OneDrive](https://radbouduniversiteit.sharepoint.com/:f:/r/sites/FUSInitiative-SHAREDResearchinformation/Shared%20Documents/Software/PRESTUS/Acoustic%20profiling/)
 
@@ -180,7 +181,7 @@ desired_intensities:
 
 **Function: `calibration_transducer`**
 
-This function implements the single-depth refinement pipeline. It is called by `calibration_standalone` and produces per-depth library entries that override the geometric baseline. For building the default library across all depths, use `build_transducer_library.m` instead.
+This function implements the single-depth refinement pipeline. It is called by `calibration_standalone` and produces single-depth calibrations that `update_transducer_library` ingests as refinements. For building the default library across all depths, use `build_transducer_library.m` instead.
 
 #### Use cases
 
@@ -336,80 +337,7 @@ After all simulations complete, k-Wave `.mat` result files written to the cache 
 
 ## Library YAML format
 
-Each combo has one YAML file at `config/calibration/{combo_name}.yaml`. The file has three top-level sections.
-
-### `meta`
-
-Provenance fields written by `build_transducer_library` or `update_transducer_library`:
-
-| Field | Description |
-|---|---|
-| `tran_serial` | Transducer serial — must match an entry in `config/equipment/` |
-| `created_at` | ISO date the file was first written |
-| `calibration_type` | `geometric` or `empirical` |
-| `prestus_version` | Git commit hash at build time |
-| `note` | Free-text description of the build method |
-
-### `global_model`
-
-Stores phases (and optionally amplitudes) across all characterised depths. Written by `build_transducer_library` / `update_transducer_library`; read and interpolated by `load_transducer_from_library`.
-
-| Field | Type | Description |
-|---|---|---|
-| `depths_ep_mm` | `[1 × N]` | Focal depths from the exit plane [mm] in ascending order |
-| `elem_phase_deg` | `N`-element cell array, each `[1 × n_elem]` | Per-element phases [°] at each depth |
-| `amplitude_scaling` | struct, keys `i{int}` or `i{int}p{frac}` | Scalar `elem_amp` value per calibrated intensity [W/cm²]. Keys use integer or decimal notation with `p` replacing `.` (e.g. `i30`, `i32p5`). |
-| `elem_phase_correction_deg` | `[1 × n_elem]` *(optional)* | Depth-independent per-element hardware delta [°] applied on top of interpolated phases |
-| `source` | string *(optional)* | Provenance tag, e.g. `update_transducer_library` |
-
-At runtime, `load_transducer_from_library` linearly interpolates `elem_phase_deg` at the requested focal depth. If the requested intensity differs from a stored key by more than 5 %, amplitude is scaled analytically via $\text{amp} \propto \sqrt{I}$ with a warning.
-
-**Example (geometric-only, 10-element transducer, 2 depths shown):**
-
-```yaml
-meta: {tran_serial: IS_PCD15473_01001, calibration_type: geometric, ...}
-global_model:
-  depths_ep_mm: [44.9, 54.4, 64.0, ...]
-  elem_phase_deg:
-  - [178.3, 211.6, 244.5, 277.9, 312.0, 346.4, 21.2, 56.6, 91.7, 127.4]  # 44.9 mm
-  - [135.9, 158.6, 181.1, 203.9, 227.4, 251.2, 275.3, 299.9, 324.4, 349.4]  # 54.4 mm
-  - ...
-  amplitude_scaling:
-    i30: 14200    # elem_amp for 30 W/cm²
-```
-
-### `calibration.focal_depths` *(optional)*
-
-Per-depth refinement entries added by `calibrate_transducer` (single-depth mode) and stored via `update_transducer_library`. When `is_refinement: true` and the requested depth is within 1 mm of the stored entry, `load_transducer_from_library` uses the refinement instead of the interpolated global model.
-
-Keys are formatted as `f{depth_ep_mm}` with `.` replaced by `p` (e.g. `f44p9` for 44.9 mm).
-
-| Field | Type | Description |
-|---|---|---|
-| `is_refinement` | bool | `true` → overrides global model at this depth |
-| `precession_mode` | `linear` \| `monotonic` | Phase parametrisation |
-| `phase_start_deg` | scalar | Phase of element 0 [°] |
-| `phase_step_deg` | scalar | Constant step between elements [°] (`linear` only) |
-| `phase_increments_deg` | `[1 × (n_elem-1)]` | Per-element increments [°] (`monotonic` only) |
-| `amplitude_scaling` | struct | Same format as `global_model.amplitude_scaling` |
-
-**Example:**
-
-```yaml
-calibration:
-  focal_depths:
-    f44p9:
-      is_refinement: true
-      precession_mode: linear
-      phase_start_deg: 178.3
-      phase_step_deg: 33.4
-      amplitude_scaling:
-        i30: 14200
-```
-
-### `library_version.yaml`
-
-A manifest at `config/calibration/library_version.yaml` lists every combo, its depth range, calibrated intensities, and calibration type. Bump the version field when adding or changing entries — patch for new depths in an existing combo, minor for a new combo, major for schema changes.
+The library YAML schema (`meta`, `global_model`, `refinement`, and the legacy forms that are still read) is documented in [doc_transducer_library.md](doc_transducer_library.md#library-yaml-schema).
 
 ---
 
