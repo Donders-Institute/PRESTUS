@@ -6,4 +6,8 @@ dependencies:
   - r-base>=4.2
   - r-oro.nifti
   - r-cowplot
+  # 'Recommended' R packages are not part of conda's r-base; TUS_entry.R
+  # loads both.
+  - r-cluster
+  - r-lattice
   - pip
