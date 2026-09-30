@@ -284,7 +284,10 @@ function print_if_field(s, field, fmt, alternate_name)
         % OTHER VECTORS/ARRAYS
         if isvector(val)
             if length(val) > 0 && all(isfinite(val)) && ~any(isnan(val))
-                fprintf('  %-30s %s\n', [display_name ':'], sprintf(fmt, val));
+                % Format each element separately so unit suffixes in fmt
+                % ("%.1f deg.") do not run together across elements.
+                elems = arrayfun(@(v) sprintf(fmt, v), val, 'UniformOutput', false);
+                fprintf('  %-30s %s\n', [display_name ':'], strjoin(elems, ', '));
             else
                 fprintf('  ⚠️  %-30s [EMPTY/NaN VECTOR]\n', [display_name ':']);
             end
