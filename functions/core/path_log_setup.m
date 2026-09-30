@@ -86,12 +86,24 @@ end
         if ~isfolder(parameters.io.dir_output); mkdir(parameters.io.dir_output); end
     end
 
-    % [LOCALITE OUTPUT] Make subfolder (if enabled) and check if directory exists
-    if isfield(parameters.path, 'localite') && ...
-            (isstring(parameters.path.localite) || ischar(parameters.path.localite)) && ...
-            ~any(strcmp(parameters.path.localite, {"", ''}))
-        parameters.path.localite = fullfile(parameters.path.localite, sprintf('sub-%03d', subject_id));
-        if ~exist(parameters.path.localite); mkdir(parameters.path.localite); end
+    % [LOCALITE EXPORT] Per-subject folder for files meant for import into
+    % Localite (heuristic placement: position table, plot, Localite-ready T1).
+    % path.localite_export; path.localite is the deprecated fallback. The
+    % path.* values are left untouched (path.localite may also be the
+    % deprecated alias of path.localite_raw, see neuronav_resolve_paths).
+    parameters.io.dir_localite_export = '';
+    export_root = '';
+    for key = {'localite_export', 'localite'}
+        if isfield(parameters.path, key{1}) && ...
+                (isstring(parameters.path.(key{1})) || ischar(parameters.path.(key{1}))) && ...
+                strlength(string(parameters.path.(key{1}))) > 0
+            export_root = char(parameters.path.(key{1}));
+            break;
+        end
+    end
+    if ~isempty(export_root)
+        parameters.io.dir_localite_export = fullfile(export_root, sprintf('sub-%03d', subject_id));
+        if ~isfolder(parameters.io.dir_localite_export); mkdir(parameters.io.dir_localite_export); end
     end
 
     % Output subdirectories

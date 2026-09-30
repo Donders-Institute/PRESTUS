@@ -36,7 +36,8 @@ function localite = neuronav_select_localite(parameters, sub_id, ses_id, target_
 
     % Locate the normalised XML
     stem     = sprintf('InstrumentMarker_%s_%s', sub_id, session);
-    xml_path = fullfile(parameters.path.localite_post, sub_id, session, [stem '.xml']);
+    paths    = neuronav_resolve_paths(parameters);
+    xml_path = fullfile(paths.post, sub_id, session, [stem '.xml']);
 
     if ~isfile(xml_path)
         warning('neuronav_select_localite: XML not found: %s\n  Run neuronav_ingest_markers first.', xml_path);

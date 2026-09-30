@@ -11,11 +11,11 @@ function parameters = preproc_transducer_placement(parameters)
 %               transform, focus via the nonlinear warp, no scalp snapping).
 %               ras/mni are converted to T1 voxels here, per transducer.
 %
-%   'localite'  Parse a Localite XML file (TriggerMarkers or GUMMarkers)
-%               and derive trans_pos / focus_pos from the recorded instrument
-%               matrix. Requires placement.localite.file (direct path) or a
-%               Localite session under path.localite (automatic selection via
-%               neuronav_select_localite).
+%   'localite'  Derive trans_pos / focus_pos from a recorded Localite
+%               instrument pose (NEURONAV_LOCALITE_POSE): either
+%               placement.localite.file (single XML), or the ingested
+%               markers under path.localite_post (ingested from
+%               path.localite_raw on first use).
 %
 %   'heuristic' Run the sphere-expansion heuristic search to find the optimal
 %               transducer position on the skull surface for a specified MNI
@@ -62,7 +62,7 @@ function parameters = preproc_transducer_placement(parameters)
 %                return (pipeline exits after job submission)
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, POSITION_TRANSDUCER_PLANTUS,
-%           TRANSDUCER_POSITIONING_START, NEURONAV_SELECT_LOCALITE
+%           TRANSDUCER_POSITIONING_START, NEURONAV_LOCALITE_POSE
 
 arguments
     parameters (1,1) struct
@@ -179,59 +179,71 @@ end
 
 % ── Localite placement dispatcher ────────────────────────────────────────
 function parameters = run_localite_placement(parameters)
-% Call position_transducer_localite and write results back into parameters.
+% Resolve the recorded Localite pose(s) and write positions back into parameters.
+%
+% placement.localite.target / .position may list one entry per transducer
+% (e.g. target: [L_MD, R_MD] for a bilateral setup): transducer i then uses
+% entry i. A single entry is used for every transducer.
 
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'localite')
         error('PRESTUS:localite:missingConfig', ...
             'placement.localite sub-struct is missing. See config_default.yaml for required fields.');
     end
 
-    localite_file = resolve_localite_file(parameters);
-    fprintf('Reading Localite file:\n  %s\n', localite_file);
+    n_tr = numel(parameters.transducer);
+    lc = parameters.placement.localite;
+    targets = per_transducer_list(lc, 'target', n_tr);
+    positions = per_transducer_list(lc, 'position', n_tr);
+
+    % Resolve every pose first (a missing recording fails before the T1 is read)
+    poses = cell(1, n_tr);
+    params_ti = cell(1, n_tr);
+    for ti = 1:n_tr
+        p = parameters;
+        if ~isempty(targets);   p.placement.localite.target   = targets{ti};   end
+        if ~isempty(positions); p.placement.localite.position = positions{ti}; end
+        [poses{ti}, info] = neuronav_localite_pose(p);
+        params_ti{ti} = p;
+        fprintf('Localite pose for transducer %d (%s mode) from:\n  %s\n', ti, info.mode, info.source);
+    end
 
     % Load T1 header for voxel ↔ RAS coordinate transform
     filename_t1 = fullfile(parameters.path.anat, ...
         sprintf(parameters.path.t1_pattern, parameters.subject_id));
     t1_header = niftiinfo(filename_t1);
 
-    [trans_pos, focus_pos] = ...
-        position_transducer_localite(localite_file, t1_header, parameters);
-
-    % Write resolved positions into every configured transducer
-    for ti = 1:numel(parameters.transducer)
+    for ti = 1:n_tr
+        [trans_pos, focus_pos] = localite_matrix_to_positions(poses{ti}, t1_header, params_ti{ti});
         parameters.transducer(ti).trans_pos = trans_pos;
         parameters.transducer(ti).focus_pos = focus_pos;
     end
 end
 
-% ── Localite file resolver ────────────────────────────────────────────────
-function localite_file = resolve_localite_file(parameters)
-% Return path to Localite XML, either from placement.localite.file
-% (direct path) or via neuronav_select_localite (session-based search).
-
-    lc = parameters.placement.localite;
-
-    if isfield(lc, 'file') && ~isempty(lc.file) && isfile(lc.file)
-        localite_file = char(lc.file);
-        return;
+function vals = per_transducer_list(lc, field, n_tr)
+% {} when the field holds one value (use it as is for all transducers),
+% else one cell per transducer.
+    vals = {};
+    if ~isfield(lc, field); return; end
+    v = lc.(field);
+    if iscell(v)
+        items = v(:)';
+    elseif isstring(v) && numel(v) > 1
+        items = cellstr(v(:)');
+    elseif isnumeric(v) && numel(v) > 1
+        items = num2cell(v(:)');
+    else
+        return
     end
-
-    % Fall back to automatic session selection
-    if ~isfield(parameters, 'path') || ~isfield(parameters.path, 'localite') || isempty(parameters.path.localite)
-        error(['placement.localite.file is empty and path.localite is not set. ' ...
-               'Provide one of these to use Localite placement.']);
+    if numel(items) ~= n_tr
+        error('PRESTUS:localite:listLength', ...
+            'placement.localite.%s lists %d entries but %d transducer(s) are configured.', ...
+            field, numel(items), n_tr);
     end
+    vals = cellfun(@(x) char_or_num(x), items, 'UniformOutput', false);
+end
 
-    session  = 1;
-    if isfield(lc, 'session') && ~isempty(lc.session), session = lc.session; end
-    markertype = 'TriggerMarkers';
-    if isfield(lc, 'markertype') && ~isempty(lc.markertype), markertype = char(lc.markertype); end
-    position = 1;
-    if isfield(lc, 'position') && ~isempty(lc.position), position = lc.position; end
-
-    localite_file = neuronav_select_localite( ...
-        parameters.path.localite, parameters.subject_id, ...
-        session, markertype, position);
+function x = char_or_num(x)
+    if isstring(x); x = char(x); end
 end
 
 % ── Heuristic placement dispatcher ───────────────────────────────────────

@@ -95,7 +95,7 @@ PRESTUS generates an overview of the selected transducer placement:
 
 ![ex_heuristic_placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ex_heuristic_placement.png)
 
-If `parameters.localite_path` is specified, it will also deposit a copy of the plot there.
+If `path.localite_export` is set, a copy of the plot and the position table is also written to `<path.localite_export>/sub-XXX/` (`io.dir_localite_export`).
 
 A T1 overlay plot (`plot_placement_t1_overlay`) is generated automatically after the heuristic position is selected. It shows the transducer position and target overlaid on orthogonal T1 slices and is written to the subject output folder alongside the standard placement figure.
 
@@ -103,4 +103,4 @@ A T1 overlay plot (`plot_placement_t1_overlay`) is generated automatically after
 
 **[Optional]**  
 
- Localite can struggle with images that contain affine matrices in the image header. PRESTUS offers the optional step (`tp_save_localiteT1`) of depositing a header-adjusted T1 planning image for Localite (based on the `T1.nii.gz` in the SimNIBS output m2m directory). For this, `parameters.localite_path` has to be specified.
+ Localite can struggle with images that contain affine matrices in the image header. PRESTUS offers the optional step (`placement.heuristic.save_localite_t1: true`) of depositing a header-adjusted T1 planning image for Localite (based on the `T1.nii.gz` in the SimNIBS output m2m directory). For this, `path.localite_export` has to be set; the image is written as `<path.localite_export>/sub-XXX/sub-XXX_T1_forneuronav.nii`.

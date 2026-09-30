@@ -109,7 +109,7 @@ classdef test_transducer_placement < matlab.unittest.TestCase
             p = make_placement_parameters();
             p.placement.mode = 'localite';
             p.placement.localite = struct();   % empty — no file, no path.localite
-            tc.verifyError(@() preproc_transducer_placement(p), '');
+            tc.verifyError(@() preproc_transducer_placement(p), 'PRESTUS:localite:noSource');
         end
 
     end

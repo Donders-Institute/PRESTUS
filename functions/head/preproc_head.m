@@ -124,56 +124,11 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     if isfield(parameters.placement,'localite') && isfield(parameters.placement.localite,'enabled') && parameters.placement.localite.enabled
 
-        lc = parameters.placement.localite;
-        use_file = isfield(lc, 'file') && ~isempty(lc.file);
-        use_neuronav = ~use_file && isfield(parameters, 'path') && ...
-                       isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite);
-
-        if use_file
-            % --- Simple mode: single XML file specified directly ---
-            check_availability({lc.file})
-            [trans_pos_grid, focus_pos_grid, ~, ~] = ...
-                position_transducer_localite(lc.file, t1_header, parameters);
-
-        elseif use_neuronav
-            % --- Full neuronav mode: automatic file selection + series averaging ---
-            % Required: parameters.path.localite (data folder)
-            % Optional: placement.localite.session   (e.g., 'ses-01' or 1; default: 1)
-            %           placement.localite.markertype (default: 'TriggerMarkers')
-            %           placement.localite.position   (series index to use; default: 1)
-            pn.data_postlocalite = parameters.path.localite;
-            sub_id  = sprintf('sub-%03d', parameters.subject_id);
-            ses_id  = 1;
-            if isfield(lc, 'session') && ~isempty(lc.session), ses_id = lc.session; end
-            markertype = 'TriggerMarkers';
-            if isfield(lc, 'markertype') && ~isempty(lc.markertype), markertype = lc.markertype; end
-            position = 1;
-            if isfield(lc, 'position') && ~isempty(lc.position), position = lc.position; end
-
-            localite = neuronav_select_localite(pn, sub_id, ses_id, markertype);
-            if isempty(localite)
-                error('PRESTUS:localite:noFile', ...
-                    'neuronav_select_localite found no valid %s file for %s session %s in:\n  %s', ...
-                    markertype, sub_id, num2str(ses_id), parameters.path.localite);
-            end
-
-            stats = neuronav_compute_series_statistics(localite, 1, [], markertype);
-            if isempty(stats) || position > numel(stats)
-                error('PRESTUS:localite:noSeries', ...
-                    'Requested position index %d not found in Localite data (%d series detected).', ...
-                    position, numel(stats));
-            end
-
-            coord_matrix = reshape(squeeze(stats{position}.matrix4d_mean), [4, 4])';
-            [trans_pos_grid, focus_pos_grid] = ...
-                localite_matrix_to_positions(coord_matrix, t1_header, parameters);
-
-        else
-            error('PRESTUS:localite:noSource', ...
-                ['placement.localite.enabled = 1 but no Localite source is configured. ' ...
-                 'Set placement.localite.file (single XML) or path.localite (folder for ' ...
-                 'automatic file selection).']);
-        end
+        % File mode (placement.localite.file) or automatic mode (ingested
+        % markers under path.localite_post) — see neuronav_localite_pose.
+        coord_matrix = neuronav_localite_pose(parameters);
+        [trans_pos_grid, focus_pos_grid] = ...
+            localite_matrix_to_positions(coord_matrix, t1_header, parameters);
     else
         trans_pos_grid = parameters.transducer(1).trans_pos;
         focus_pos_grid = parameters.transducer(1).focus_pos;

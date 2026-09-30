@@ -16,7 +16,8 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 %   positions    - array of series indices to process
 %   outputStruct - cell array of series structs from NEURONAV_COMPUTE_SERIES_STATISTICS
 %   parameters   - PRESTUS config struct with transducer geometry and
-%                  parameters.path.localite (preferred) or localite_raw for the T1 MRI location
+%                  path.localite_t1 (or localite_raw) for the planning T1
+%                  (see NEURONAV_FIND_PLANNING_T1)
 %
 % Output:
 %   transducer_ras - [Nx3] transducer positions in native RAS space [mm]
@@ -27,28 +28,10 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 %
 % See also: NEURONAV_COMPUTE_SERIES_STATISTICS, LOCALITE_MATRIX_TO_POSITIONS
 
-    % --- Load T1 MRI ---
-    % Prefer parameters.path.localite (pre-nav T1 folder) if set; fall back to localite_raw
-    if isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
-        t1_root = parameters.path.localite;
-    else
-        t1_root = parameters.path.localite_raw;
-    end
-    if isfield(parameters.path, 'neuronav_t1_pattern') && ~isempty(parameters.path.neuronav_t1_pattern)
-        t1_pat = sprintf(parameters.path.neuronav_t1_pattern, sub_id);
-    else
-        t1_pat = sprintf('%s_*T1*.nii*', sub_id);
-    end
-    t1_file = dir(fullfile(t1_root, sub_id, t1_pat));
-    if isempty(t1_file)
-        t1_file = dir(fullfile(t1_root, t1_pat));
-    end
-    if isempty(t1_file)
-        error('neuronav_convert_trigger_to_voxels: no T1 NIfTI found for %s.\nSearched:\n  %s\n  %s\nExpected pattern: %s', ...
-            sub_id, fullfile(t1_root, sub_id), t1_root, t1_pat);
-    end
-    t1_header = niftiinfo(fullfile(t1_file(1).folder, t1_file(1).name));
-    t1_image  = niftiread(fullfile(t1_file(1).folder, t1_file(1).name));
+    % --- Load the neuronavigation planning T1 ---
+    t1_path   = neuronav_find_planning_t1(sub_id, parameters);
+    t1_header = niftiinfo(t1_path);
+    t1_image  = niftiread(t1_path);
 
     % --- Pre-allocate outputs ---
     transducer_ras = zeros(max(positions), 3);

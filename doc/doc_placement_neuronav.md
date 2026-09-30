@@ -22,7 +22,7 @@ These files contain one or more static marker positions. Each `Element` in the f
 
 ### `InstrumentMarker`
 
-Static instrument positions stored as full 4×4 matrices in an `InstrumentMarkerList` file. Each `InstrumentMarker` entry contains a `Marker/Matrix4D` block with the same `data{row}{col}` field layout as TriggerMarkers. Set `placement.localite.markertype = 'InstrumentMarker'` to use this format.
+Static instrument positions stored as full 4×4 matrices in an `InstrumentMarkerList` file. Each `InstrumentMarker` entry contains a `Marker/Matrix4D` block with the same `data{row}{col}` field layout as TriggerMarkers. The ingested output of `neuronav_ingest_markers` uses this format.
 
 ### `EntryTarget` (not for position/angle -- see the multi-target toolkit)
 
@@ -34,49 +34,127 @@ It **is** read by a separate function, `neuronav_read_entry_target`, for exactly
 
 ### Choosing a file: realized angle vs. planned trajectory
 
-The file types above answer different questions. Picking the wrong one will silently mismatch your reported angle and your reported target — read this before choosing `markertype`.
+The file types above answer different questions. Picking the wrong one will silently mismatch your reported angle and your reported target — read this before choosing which file to use.
 
 - **The realized angle at the moment of stimulation** is only available from `TriggerMarkers` (the tracked pose during the actual pulses, averaged per series) or `InstrumentMarker` (a static saved pose). Both store a genuine, measured rotation. Use one of these if you need "the angle at which we stimulated."
 - **`GUMMarkers` (`EntryTargetPair`) does not carry a measured angle.** Its 4×4 matrix is *synthesized* from the static `Target` point plus a `RotationReference` vector — and that reference is frequently left unset in the source file (`<Rotation angle="0.0" used="false">`). When `used="false"`, the "angle" `neuronav_compute_series_statistics` produces from it is a placeholder, not captured stimulation data. Only treat it as a real angle if the source XML has `Rotation used="true"`.
 - **Static planned Entry/Target coordinates are never read by the placement pipeline below.** This includes the `Target` field inside a `GUMMarkers` `EntryTargetPair`, and a standalone `EntryTarget.xml` read via `neuronav_read_entry_target`. `position_transducer_localite` → `localite_matrix_to_positions` never reads them, and never will — see the axis-projection point below for why. **If you are only running single-target placement, these static coordinates are entirely optional** — TriggerMarkers or InstrumentMarker alone is sufficient; no GUMMarkers or EntryTarget export is required. They matter only for the separate multi-target extraction toolkit ([doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)), which uses them for two things: identifying which planned target a given coil's series corresponds to (`neuronav_match_entry_targets`), and, for studies that supply pre-hoc planned coordinates, as an independent cross-check against those (`neuronav_resolve_target`).
 - **The reported focus position is axis-projected, not a stored coordinate.** `localite_matrix_to_positions` computes it as `focus_pos = trans_pos + focal_distance_bowl * ref_vec`, where `trans_pos = ref_pos + tracker_to_bowl_mm * ref_vec` is the bowl rear centre (with the default exit-plane origin this equals `ref_pos + focal_distance_ep * ref_vec`) — projecting forward from the *tracked* position along the *tracked* beam axis by the transducer's calibrated focal distance. This keeps the reported target self-consistent with the reported angle. A separately-clicked static Target point would not necessarily lie on the tracked beam axis at all, and could silently disagree with the reported angle if used instead.
 
+### Localite I/O
+
+Localite data pass through two stages (run them from the GUI or a script — see [GUI and script workflows](doc_placement_neuronav_workflows.md)). **Ingestion** (`neuronav_ingest_markers`, or the `neuronav_gui` front-end) reads the raw exports of one subject/session, averages each recorded series and writes one normalized file pair. **Placement** (`placement.mode: 'localite'`) and the multi-target toolkit read that pair — or, in file mode, a single XML you point to.
+
+#### Input layout
+
+```
+<path.localite_raw>/
+└── sub-XXX/                          subject folder (pipeline: sub-%03d of subject_id)
+    └── ses-XX/                       session (a number n in the config means ses-0n)
+        └── <placement.localite.loc_folder>/     default 'loc'; '' = no such level
+            └── …any depth…           e.g. Session_<ts>/ or <patient>/Sessions/Session_<ts>/
+                │                     (optionally restricted by placement.localite.session_folder_pattern)
+                ├── TMSTrigger/TriggerMarkers_Coil<N>_<yyyyMMddHHmmssSSS>.xml
+                ├── GUMMarkers<yyyyMMddHHmmssSSS>.xml       any depth
+                └── EntryTarget<yyyyMMddHHmmssSSS>.xml      any depth; planned targets, used for naming only
+```
+
+This is Localite's own export structure placed below a `sub-XXX/ses-XX/` pair; nothing inside the export needs renaming. Selection rules:
+
+| Rule | Detail |
+|---|---|
+| Marker type | TriggerMarkers first; GUMMarkers only if no usable TriggerMarkers file exists |
+| Newest wins | Files are ordered by the 17-digit timestamp in the file name (file dates change on copying) |
+| Size | TriggerMarkers files ≤ 10 kB (no or few pulses) are skipped |
+| De-duplication | A file byte-identical to one in the previous session (`ses-(XX-1)`) is skipped — Localite re-exports older sessions |
+| Series | TriggerMarkers pulses are split into series at time gaps > 3× the median interval; series whose pulse count differs from `expected_segment_length` (default 80) by more than 20 are dropped (`[]` keeps all) |
+| Coils | Without `neuronav.coil_map`: Coil0 only. With it: one `TriggerMarkers_Coil<N>` file per entry; each coil contributes one series per configured sequence; untracked blocks (all positions at 0) are skipped |
+
+The planning T1 that Localite coordinates refer to (see below) is looked up as `<path.localite_t1>/[sub-XXX/]<path.localite_t1_pattern>` (default pattern `sub-XXX_*T1*.nii*`; `path.localite_t1` defaults to `path.localite_raw`).
+
+#### Output layout
+
+```
+<path.localite_post>/sub-XXX/ses-XX/
+├── InstrumentMarker_sub-XXX_ses-XX.xml    InstrumentMarkerList, one entry per target:
+│                                          Marker description = target name, Matrix4D = mean pose of the series
+└── InstrumentMarker_sub-XXX_ses-XX.json   QC sidecar, one object per target (key = target name)
+```
+
+| JSON field | Meaning |
+|---|---|
+| `series_index` | Index of the detected series (after the pulse-count filter; as used by `placement.localite.position`) |
+| `transducer_id` | Coil index |
+| `markertype` | `TriggerMarkers` or `GUMMarkers` |
+| `source_file` | Raw file the series came from |
+| `N_pulses` | Pulses averaged |
+| `position_dev_mm.mean/std` | Distance of the pulses from the series mean position [mm] |
+| `rotation_dev_rad.mean/std` | Angle of the pulses from the mean orientation [rad] |
+
+With `io.overwrite_files: 'never'`, an existing pair is kept.
+
+#### Path keys
+
+| Key | Meaning |
+|---|---|
+| `path.localite_raw` | Raw Localite exports (read-only) |
+| `path.localite_post` | Ingested outputs (written by ingestion, read by placement) |
+| `path.localite_t1` | Planning T1s; empty = `path.localite_raw` |
+| `path.localite_t1_pattern` | File-name template of the planning T1 (`%s` = `sub-XXX`) |
+| `path.localite_export` | Outputs meant for import into Localite (heuristic placement: position table, plot, Localite-ready T1), per subject in `sub-XXX/` |
+| `path.localite` | **Deprecated.** Read as `path.localite_raw` and as `path.localite_export` when those are empty (with a warning for the former) |
+
 ### Pipeline entry point
 
-Set `parameters.placement.localite.enabled = 1` to use Localite positioning in the PRESTUS pipeline (`prestus_pipeline` → `preproc_head`). Two modes are supported:
+Set `placement.mode: 'localite'` to place the transducer from a recorded Localite pose (`preproc_transducer_placement`; the older `placement.localite.enabled = 1` switch in `preproc_head` uses the same code). Both modes go through `neuronav_localite_pose`, and the pose's column 4 (position) and column 1 (beam direction) go to `localite_matrix_to_positions`.
 
-#### Simple mode — single XML file
+#### File mode — single XML file
 
-Set `placement.localite.file` to the path of a specific Localite XML file. The file is parsed directly via `position_transducer_localite`.
+Set `placement.localite.file`. TriggerMarkers, GUMMarkers and InstrumentMarker files are accepted; the type is detected from the content.
 
 ```yaml
 placement:
+  mode: 'localite'
   localite:
-    enabled: 1
-    file: '/path/to/GUMMarkers_sub-001.xml'
+    file: '/path/to/TriggerMarkers_Coil0_20240820122011842.xml'
+    position: 2        # detected series in the file (1-based, after the pulse-count filter), or:
+    target: ''         # description of an InstrumentMarker / GUMMarkers entry
 ```
 
-#### Full neuronav mode — automatic file selection
+#### Automatic mode — ingested markers
 
-Leave `placement.localite.file` empty and set `path.localite` to the Localite data folder. The pipeline automatically selects the most recent valid file for the subject and session using `neuronav_select_localite`, averages markers across triggers using `neuronav_compute_series_statistics`, and resolves positions via `localite_matrix_to_positions`.
+Leave `placement.localite.file` empty. The ingested pair under `path.localite_post` is read; if it does not exist yet and `path.localite_raw` is set, ingestion runs first (with `neuronav.coil_map` if configured, otherwise for the requested series only, named `series_<position>` or `target`).
 
 ```yaml
 path:
-  localite: '/path/to/localite/data/'
-
+  localite_raw:  '/data/localite_raw'
+  localite_post: '/data/derivatives/localite'
 placement:
+  mode: 'localite'
   localite:
-    enabled: 1
-    session: 1              # Session number or 'ses-01'
-    markertype: 'TriggerMarkers'  # or 'GUMMarkers' or 'InstrumentMarker'
-    position: 1             # Series index when multiple positions are recorded
+    session: 2          # -> ses-02
+    target: 'L_MD'      # ingested target name, or leave '' and use:
+    position: 2         # detected-series index, matched against series_index in the JSON sidecar
 ```
 
-This mode is appropriate when TriggerMarkers files contain repeated acquisitions per position that need to be averaged, or when automatic session-based file deduplication is required.
+To choose series and names interactively, ingest with `neuronav_gui` first; placement then only reads the result. A raw series that was not ingested is an error (`PRESTUS:localite:noSeries`) rather than a silent fallback, and an untracked series (position at the origin) is refused.
+
+#### Several transducers (bilateral setups)
+
+`target` and `position` take one entry per transducer; transducer *i* uses entry *i*, and each gets its own pose. A single value still applies to every transducer, and a list of the wrong length is an error (`PRESTUS:localite:listLength`).
+
+```yaml
+placement:
+  mode: 'localite'
+  localite:
+    session: 2
+    target: [L_MD, R_MD]   # transducer(1) -> L_MD, transducer(2) -> R_MD
+```
+
 
 #### Standalone / batch use
 
-For multi-position or multi-session workflows outside the pipeline, use `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m`).
+For multi-position or multi-session workflows outside the pipeline, use `neuronav_ingest_markers` → `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m` and [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)).
 
 All paths share the same XML parser and position math (`localite_matrix_to_positions`). The reference distance from the IR tracker attachment point to the transducer exit plane is derived automatically from transducer geometry (`curv_radius_mm − dist_geom_ep_mm`) when defined, with fallback to `parameters.placement.localite.reference_distance_mm`.
 

@@ -23,8 +23,8 @@ class TabIO(BaseTab):
                       BrowseEdit("path.sim", "dir", registry=r, mandatory=True))
         self._add_row("* Segmentation path",
                       BrowseEdit("path.seg", "dir", registry=r, mandatory=True))
-        self._add_row("Localite path",
-                      BrowseEdit("path.localite", "dir", registry=r))
+        self._add_row("Localite raw path",
+                      BrowseEdit("path.localite_raw", "dir", registry=r))
         self._add_row("T1 filename pattern",
                       TextEdit("path.t1_pattern", "sub-%1$03d_T1w.nii*", registry=r),
                       note="Relative to path.anat. Use %1$03d for subject ID substitution.")

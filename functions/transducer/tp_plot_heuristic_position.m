@@ -94,8 +94,8 @@ output_plot = fullfile(parameters.io.dir_img,...
 saveas(h, output_plot, 'png')
 
 %% [Optional] Save copy in localite directory
-if isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
-    saveas(h, fullfile(parameters.path.localite, ...
+if isfield(parameters, 'io') && isfield(parameters.io, 'dir_localite_export') && ~isempty(parameters.io.dir_localite_export)
+    saveas(h, fullfile(parameters.io.dir_localite_export, ...
         sprintf("sub-%03.0f_%s", subject_id, target_name)), 'png');
 end
 

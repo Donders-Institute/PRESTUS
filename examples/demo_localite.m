@@ -17,10 +17,9 @@ clc;                 % Clear the command window
 
 % --- Hard-coded demo inputs ---
 demo_sub_id = 'sub-003';                         % Subject identifier for demo processing
-demo_session = 'ses-01';                         % Session identifier to process (localite files are expected to follow a sub-xxx/ses-xx organization)
+demo_session = 'ses-01';                         % Session identifier (inputs follow sub-XXX/ses-XX, see below)
 demo_setup = 'CTX500-026-010_79.6mm';            % Transducer/setup configuration name (suffix of 'config_XXX')
-demo_positions = {'lVS', 'rVS'};                 % Labels for multiple positions (left and right hemisphere)
-demo_markertype = 'GUMMarkers';                  % TriggerMarkers/GUMMarkers
+demo_positions = {'lVS', 'rVS'};                 % Target names of the recorded series 1 and 2
 
 rootpath = '/project/2425122.01/kplan_example/';  % Root directory of data and tools, adjust to your environment
 
@@ -35,54 +34,48 @@ addpath(genpath(pn.tuSIM_fun));
 pn.tuSIM_tools = fullfile(pn.tuSIM, 'external');            % PRESTUS external path
 addpath(genpath(pn.tuSIM_tools));
 
-% [Optional, MNI transform] Set user/environment-specific paths and parameters
-% parameters.io.simnibs_bin_path = fullfile('/home', 'neuromod', 'julkos', '.conda', 'envs', 'simnibs_env', 'bin');
-% parameters.io.data_path = fullfile(pn.data_seg, sprintf('m2m_%s', demo_sub_id));
-% parameters.io.seg_path = pn.data_seg;
-% parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";
-
-% The expected folder structure for key data and intermediate files is:
-% (1a) [TriggerMarkers] Localite trigger position files in: 
-%     <pn.data_postlocalite>/sub-XXX/ses-XX/localite/Session_XXXX/TMSTrigger
-% (1b) [GUMMarkers] Localite General positioning markers in:
-%     <pn.data_postlocalite>/sub-XXX/ses-XX/localite/
-% (2) A planning image aligned with localite coordinate expectations:
-%     <pn.data_prelocalite>/sub-XXX_T1(_forneuronav).nii(.gz)
-% (3) SIMNIBS segmentation folder for the subject:
-%     <pn.data_seg>/m2m_sub-XXX/
+% The expected folder structure (see doc_placement_neuronav.md, "Localite I/O"):
+% (1) Raw Localite exports, the Localite folder structure below sub/ses:
+%     <path.localite_raw>/sub-XXX/ses-XX/<loc_folder>/Session_XXXX/TMSTrigger/TriggerMarkers_Coil0_<ts>.xml
+%     <path.localite_raw>/sub-XXX/ses-XX/<loc_folder>/GUMMarkers<ts>.xml
+% (2) The planning image loaded into Localite:
+%     <path.localite_t1>/[sub-XXX/]sub-XXX_*T1*.nii(.gz)   (path.localite_t1 defaults to path.localite_raw)
+% (3) SimNIBS segmentation folder for the subject (MNI step only):
+%     <path.seg>/m2m_sub-XXX/
 % (4) PRESTUS config files, for example in:
 %     <pn.configs>/
+% Ingestion writes <path.localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json
 
 pn.data_path = fullfile(rootpath, 'data');                      % Base data path
-pn.data_postlocalite = fullfile(pn.data_path, 'localite');      % Folder [1] where localite XML are stored
-pn.data_prelocalite = fullfile(pn.data_path, 'localite');       % Folder [2] containing T1 planning images
-pn.data_seg = fullfile(pn.data_path, 'simnibs');                % Folder [3] Segmentation files for SIMNIBS
 pn.configs = fullfile(pn.data_path, 'config');                 % Folder [4] containing config YAMLs
 
 % Load stimulation parameters from the transducer YAML config
 cd(pn.configs);
-parameters = load_parameters(['config_', demo_setup, '.yaml']); 
+parameters = load_parameters(['config_', demo_setup, '.yaml']);
+parameters.path.localite_raw  = fullfile(pn.data_path, 'localite');            % [1]
+parameters.path.localite_t1   = fullfile(pn.data_path, 'localite');            % [2]
+parameters.path.localite_post = fullfile(pn.data_path, 'localite_ingested');   % outputs
+parameters.path.seg           = fullfile(pn.data_path, 'simnibs');             % [3]
+parameters.placement.localite.loc_folder = 'localite';
 
-% Select the latest valid Localite XML file for the subject and session
-localite = neuronav_select_localite(pn, demo_sub_id, demo_session, demo_markertype);
-
-% Calculate statistics over stimulus series (e.g., average position, variability)
-% Parameters: voxel size of planning image  (1 mm), expected localite trigger train length (2)
-[results] = neuronav_compute_series_statistics(localite, 1, 2, demo_markertype);
-
-% Fix demo position indices as 1 (left) and 2 (right), matching demo_positions
+% Stage 1: select the newest valid export, average each series and write the
+% named targets (series 1 -> lVS, series 2 -> rVS). neuronav_gui does the same
+% interactively, with QC plots and suggested names.
 positions = 1:numel(demo_positions);
+target_map = struct('series_index', num2cell(positions), 'transducer_id', 0, ...
+    'target_name', demo_positions);
+[~, ~, results] = neuronav_ingest_markers(parameters, demo_sub_id, demo_session, target_map);
 
-% Convert averaged triggers to voxel indices and RAS coordinates in native space
+% Convert averaged series to voxel indices and RAS coordinates in native space
 [trans_ras, trans_pos, target_ras, target_pos, ~] = ...
-    neuronav_convert_trigger_to_voxels(demo_sub_id, positions, results, parameters, pn);
+    neuronav_convert_trigger_to_voxels(demo_sub_id, positions, results, parameters);
 
 clear results;
 
 % Conditional logic to convert native space coordinates to MNI space
 if mni_coords_requested == 1
     [trans_ras_seg, target_ras_seg, trans_mni_pos, target_mni_pos, trans_mni_ras, targ_mni_ras] = ...
-        neuronav_convert_native_to_MNI(demo_sub_id, parameters, pn, trans_ras, target_ras, demo_positions);
+        neuronav_convert_native_to_MNI(demo_sub_id, parameters, trans_ras, target_ras, demo_positions);
 else
     % If MNI coordinates not requested, fill outputs with NaNs to maintain output shape consistency
     trans_ras_seg(positions, 1:3) = NaN;
@@ -101,7 +94,7 @@ neuronav_export_session_csv(...
     demo_sub_id, ...
     demo_session, ...
     demo_positions, ...
-    pn.data_postlocalite, ...
+    parameters.path.localite_post, ...
     trans_pos, ...
     target_pos, ...
     trans_ras_seg, ...
@@ -113,7 +106,7 @@ neuronav_export_session_csv(...
     interpolated);
 
 % Inform user of processing completion and output location
-fprintf('Demo processing completed. CSV saved to:\n%s\n', pn.data_postlocalite);
+fprintf('Demo processing completed. CSV saved to:\n%s\n', parameters.path.localite_post);
 
 % If interpolation across a group of subjects would be desirable, the
 % following additional steps could be used:
@@ -121,7 +114,7 @@ fprintf('Demo processing completed. CSV saved to:\n%s\n', pn.data_postlocalite);
 % [trans_mni_ras, targ_mni_ras, trans_mni_pos, target_mni_pos] = neuronav_get_group_mean_mni(session_target, parameters);
 % [INT2] TRANSFORM MNI averages to subject space
 % [target_ras_seg, trans_ras_seg, target_pos, trans_pos] = ...
-%             neuronav_convert_MNI_to_native(sub_id, parameters, pn, trans_mni_ras, targ_mni_ras);
+%             neuronav_convert_MNI_to_native(sub_id, parameters, trans_mni_ras, targ_mni_ras);
 % [INT3] Write output CSV
 % interpolated = 1;
 % neuronav_export_session_csv(...)

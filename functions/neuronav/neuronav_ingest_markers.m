@@ -23,10 +23,20 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
 %
 % Required inputs:
 %   parameters - PRESTUS config struct.  Relevant fields:
-%                  parameters.path.localite_raw          raw input root  (<sub>/<ses>/loc/…)
+%                  parameters.path.localite_raw          raw input root  (<sub>/<ses>/[loc/]…)
 %                  parameters.path.localite_post         derived output root (created if absent)
-%                  parameters.placement.localite.loc_folder           (default: 'loc')
+%                      (both via NEURONAV_RESOLVE_PATHS; path.localite is the
+%                      deprecated alias of path.localite_raw)
+%                  parameters.placement.localite.loc_folder           (default: 'loc';
+%                      '' = marker folders directly under <sub>/<ses>/)
 %                  parameters.placement.localite.session_folder_pattern (default: '*')
+%                      wildcard a folder between the loc folder and the marker
+%                      file must match (e.g. 'Session_2024*'); '*' = any
+%                  parameters.neuronav.coil_map  (optional) multi-coil mode:
+%                      one TriggerMarkers_Coil<N> file per coil_map entry;
+%                      each coil contributes numel(.sequences) series (1 if
+%                      only .target is set), in coil_map order — the same
+%                      order neuronav_build_target_map assigns series_index
 %                  parameters.io.overwrite_files                      ('always'/'never'/other)
 %   sub_id     - subject string, e.g. 'sub-020'
 %   ses_id     - session string or number, e.g. 'ses-02' or 2
@@ -74,7 +84,12 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     % ------------------------------------------------------------------
     % Output paths
     % ------------------------------------------------------------------
-    out_dir  = fullfile(parameters.path.localite_post, sub_id, session);
+    paths = neuronav_resolve_paths(parameters);
+    if isempty(paths.raw) || isempty(paths.post)
+        error('neuronav_ingest_markers:paths', ...
+            'Set path.localite_raw (raw exports) and path.localite_post (outputs).');
+    end
+    out_dir  = fullfile(paths.post, sub_id, session);
     stem     = sprintf('InstrumentMarker_%s_%s', sub_id, session);
     xml_path = fullfile(out_dir, [stem '.xml']);
     json_path= fullfile(out_dir, [stem '.json']);
@@ -90,33 +105,53 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     % ------------------------------------------------------------------
     % Select raw marker file(s) and compute per-series statistics
     % ------------------------------------------------------------------
-    raw_root = fullfile(parameters.path.localite_raw, sub_id, session, loc_folder);
+    raw_root = fullfile(paths.raw, sub_id, session, loc_folder);
 
     if ~isempty(coil_map)
         % --- Multi-coil path: one file per coil in coil_map --------------
         results    = {};
         markertype = 'TriggerMarkers';
-        source_file = {};
+        source_file = {};   % one entry per series
         for c = 1:numel(coil_map)
             coil_idx = coil_map(c).coil;
-            [localite_c, src_c] = select_coil_file(raw_root, coil_idx, sub_id, session);
+            n_seq = 1;
+            if isfield(coil_map, 'sequences') && ~isempty(coil_map(c).sequences)
+                n_seq = numel(coil_map(c).sequences);
+            end
+            series_c = cell(1, n_seq);   % empty = dropout for that sequence
+
+            [localite_c, src_c] = select_coil_file(raw_root, coil_idx, sub_id, session, ...
+                session_folder_pattern);
             if isempty(localite_c)
                 warning('neuronav_ingest_markers: no usable file for coil %d (%s %s)', ...
                     coil_idx, sub_id, session);
-                results{end+1} = []; %#ok<AGROW>
-                source_file{end+1} = ''; %#ok<AGROW>
-                continue;
-            end
-            stats_c = neuronav_compute_series_statistics(localite_c, voxel_size, ...
-                expected_segment_length, markertype);
-            if isempty(stats_c)
-                warning('neuronav_ingest_markers: no valid series for coil %d (%s %s)', ...
-                    coil_idx, sub_id, session);
-                results{end+1} = []; %#ok<AGROW>
+                src_c = '';
             else
-                results{end+1} = stats_c{1}; %#ok<AGROW>
+                stats_c = neuronav_compute_series_statistics(localite_c, voxel_size, ...
+                    expected_segment_length, markertype);
+                % Untracked blocks (every pulse at the origin) carry no pose;
+                % drop them so they cannot take a sequence's slot.
+                tracked = cellfun(@(r) any(abs(r.position_mean) > 0) || ...
+                    any(abs(r.matrix4d_all(:, 1:3, 4)) > 0, 'all'), stats_c);
+                if any(~tracked)
+                    warning('neuronav_ingest_markers: coil %d — ignoring %d untracked series (all positions 0) (%s %s)', ...
+                        coil_idx, sum(~tracked), sub_id, session);
+                end
+                stats_c = stats_c(tracked);
+                if isempty(stats_c)
+                    warning('neuronav_ingest_markers: no valid series for coil %d (%s %s)', ...
+                        coil_idx, sub_id, session);
+                elseif numel(stats_c) ~= n_seq
+                    warning(['neuronav_ingest_markers: coil %d has %d valid series but %d ' ...
+                        'sequence(s) configured (%s %s) — using the first %d'], ...
+                        coil_idx, numel(stats_c), n_seq, sub_id, session, ...
+                        min(n_seq, numel(stats_c)));
+                end
+                n_use = min(n_seq, numel(stats_c));
+                series_c(1:n_use) = stats_c(1:n_use);
             end
-            source_file{end+1} = src_c; %#ok<AGROW>
+            results = [results, series_c]; %#ok<AGROW>
+            source_file = [source_file, repmat({src_c}, 1, n_seq)]; %#ok<AGROW>
         end
         if all(cellfun(@isempty, results))
             warning('neuronav_ingest_markers: all coils empty for %s %s', sub_id, session);
@@ -124,8 +159,8 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
         end
     else
         % --- Legacy single-coil path (Coil0) -----------------------------
-        [localite, markertype, source_file] = select_raw_file(raw_root, sub_id, session, ...
-            session_prev, parameters.path.localite_raw, loc_folder, session_folder_pattern);
+        [localite, markertype, src] = select_raw_file(raw_root, sub_id, session, ...
+            session_prev, paths.raw, loc_folder, session_folder_pattern);
 
         if isempty(localite)
             warning('neuronav_ingest_markers: no usable marker file for %s %s', sub_id, session);
@@ -139,6 +174,7 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
             warning('neuronav_ingest_markers: no valid series for %s %s', sub_id, session);
             xml_path = ''; json_path = ''; results = {}; return;
         end
+        source_file = repmat({src}, 1, numel(results));
     end
 
     % ------------------------------------------------------------------
@@ -166,13 +202,6 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
         xml_path = ''; json_path = ''; return;
     end
 
-    % Resolve source_file to a single string for JSON sidecar
-    if iscell(source_file)
-        src_str = strjoin(source_file(~cellfun(@isempty, source_file)), '; ');
-    else
-        src_str = source_file;
-    end
-
     % ------------------------------------------------------------------
     % Write InstrumentMarker XML
     % ------------------------------------------------------------------
@@ -181,7 +210,7 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
     % ------------------------------------------------------------------
     % Write JSON sidecar
     % ------------------------------------------------------------------
-    write_json_sidecar(json_path, target_map, results, markertype, src_str);
+    write_json_sidecar(json_path, target_map, results, markertype, source_file);
 
     fprintf('  [ingest] %s %s → %s\n', sub_id, session, xml_path);
     fprintf('  [ingest] %s %s → %s\n', sub_id, session, json_path);
@@ -208,21 +237,22 @@ function [localite, markertype, source_name] = select_raw_file( ...
             if ~isempty(files)
                 files = files([files.bytes] > 10000);
             end
+            files = filter_session_folder(files, raw_root, ses_pat);
             for i = 1:numel(files)
-                tok = regexp(files(i).name, '_(\d{17})', 'tokens', 'once');
-                if ~isempty(tok)
-                    try, files(i).dt = datetime(tok{1}, 'InputFormat', 'yyyyMMddHHmmssSSS');
-                    catch, files(i).dt = NaT; end
-                else
-                    files(i).dt = NaT;
-                end
+                files(i).dt = name_timestamp(files(i).name, NaT);
             end
         else
             mt      = 'GUMMarkers';
             pattern = 'GUMMarkers*.xml';
-            files = dir(fullfile(raw_root, '**', 'GUMMarkers', pattern));
+            % Localite writes these into a GUMMarkers/ folder, but exports
+            % are often copied flat into the loc folder — search any depth.
+            files = dir(fullfile(raw_root, '**', pattern));
+            files = filter_session_folder(files, raw_root, ses_pat);
             for i = 1:numel(files)
-                files(i).dt = datetime(files(i).datenum, 'ConvertFrom', 'datenum');
+                % Timestamp from the file name (GUMMarkers<yyyyMMddHHmmssSSS>.xml);
+                % file mtime only as a fallback, since copying resets it.
+                files(i).dt = name_timestamp(files(i).name, ...
+                    datetime(files(i).datenum, 'ConvertFrom', 'datenum'));
             end
         end
 
@@ -246,7 +276,7 @@ function [localite, markertype, source_name] = select_raw_file( ...
                     prev_files = prev_files([prev_files.bytes] > 10000);
                 end
             else
-                prev_files = dir(fullfile(prev_root, '**', 'GUMMarkers', pattern));
+                prev_files = dir(fullfile(prev_root, '**', pattern));
             end
         end
 
@@ -343,6 +373,7 @@ end
 %  LOCAL HELPER: write JSON sidecar
 % ======================================================================
 function write_json_sidecar(json_path, target_map, results, markertype, source_file)
+% source_file: cell array, one raw file name per series (indexed like results).
 
     entries = struct();
     for t = 1:numel(target_map)
@@ -352,7 +383,7 @@ function write_json_sidecar(json_path, target_map, results, markertype, source_f
         s.series_index   = tm.series_index;
         s.transducer_id  = tm.transducer_id;
         s.markertype     = markertype;
-        s.source_file    = source_file;
+        s.source_file    = source_file{tm.series_index};
         s.N_pulses       = res.N_pulses;
         s.position_dev_mm = struct( ...
             'mean', res.position_dev_mm.mean, ...
@@ -378,7 +409,7 @@ end
 % ======================================================================
 %  LOCAL HELPER: select file for a specific coil index
 % ======================================================================
-function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, session)
+function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, session, ses_pat)
 % Returns the localite struct for a given coil index, checking for
 % all-zero positions and falling back to other timestamps if needed.
 
@@ -388,6 +419,7 @@ function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, 
     pattern = sprintf('TriggerMarkers_Coil%d_*.xml', coil_idx);
     files   = dir(fullfile(raw_root, '**', 'TMSTrigger', pattern));
     files   = files([files.bytes] > 10000);
+    files   = filter_session_folder(files, raw_root, ses_pat);
 
     if isempty(files)
         warning('neuronav_ingest_markers: no TriggerMarkers files found for Coil%d (%s %s)', ...
@@ -397,13 +429,7 @@ function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, 
 
     % Sort newest first
     for i = 1:numel(files)
-        tok = regexp(files(i).name, '_(\d{17})', 'tokens', 'once');
-        if ~isempty(tok)
-            try, files(i).dt = datetime(tok{1}, 'InputFormat', 'yyyyMMddHHmmssSSS');
-            catch, files(i).dt = NaT; end
-        else
-            files(i).dt = NaT;
-        end
+        files(i).dt = name_timestamp(files(i).name, NaT);
     end
     valid = ~arrayfun(@(f) isnat(f.dt), files);
     files = files(valid);
@@ -441,6 +467,35 @@ function [localite, source_name] = select_coil_file(raw_root, coil_idx, sub_id, 
 
     warning('neuronav_ingest_markers: no non-zero file found for Coil%d (%s %s)', ...
         coil_idx, sub_id, session);
+end
+
+
+% ======================================================================
+%  LOCAL HELPER: session-folder filter and file-name timestamps
+% ======================================================================
+function files = filter_session_folder(files, raw_root, ses_pat)
+% Keep files with at least one folder between raw_root and the file that
+% matches the wildcard ses_pat. '*' (the default) keeps everything.
+    if isempty(files) || isempty(ses_pat) || strcmp(ses_pat, '*')
+        return;
+    end
+    rx = ['^' regexptranslate('wildcard', ses_pat) '$'];
+    keep = false(size(files));
+    for i = 1:numel(files)
+        rel = extractAfter(files(i).folder, strlength(raw_root));
+        parts = strsplit(rel, {'/', '\\'});
+        keep(i) = any(~cellfun(@isempty, regexp(parts, rx, 'once')));
+    end
+    files = files(keep);
+end
+
+function dt = name_timestamp(name, fallback)
+% 17-digit yyyyMMddHHmmssSSS stamp in a Localite file name, else fallback.
+    tok = regexp(name, '(\d{17})', 'tokens', 'once');
+    dt = fallback;
+    if ~isempty(tok)
+        try, dt = datetime(tok{1}, 'InputFormat', 'yyyyMMddHHmmssSSS'); catch, end
+    end
 end
 
 

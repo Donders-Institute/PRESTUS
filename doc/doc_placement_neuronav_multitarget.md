@@ -54,7 +54,13 @@ Minimum to use this toolkit at all:
    coil_map(2).coil   = 1;
    coil_map(2).target = 'R_PUL';
    target_map = neuronav_build_target_map(coil_map);
+   parameters.neuronav.coil_map = coil_map;   % ingest reads one file per coil
    ```
+   A coil that records several position blocks in one session lists them
+   as `coil_map(i).sequences(j).target`; ingest then takes that many
+   series from the coil's file, in order (untracked blocks with every
+   pulse at the origin are skipped), matching the `series_index` that
+   `neuronav_build_target_map` assigns.
 
 Everything below is optional and additive — each one you provide moves
 more targets up the confidence ranking (see "Resolution order").
@@ -105,7 +111,7 @@ lookup table (tier 1) for those subjects rather than trust the estimate.
 
 | Function | Role |
 |---|---|
-| `neuronav_ingest_markers` | Stage 1: reads raw markers (any format), writes normalized `InstrumentMarker` XML + a QC JSON sidecar (pulse count, position/rotation deviation) per subject/session |
+| `neuronav_ingest_markers` | Stage 1: reads raw markers (any format), writes normalized `InstrumentMarker` XML + a QC JSON sidecar (pulse count, position deviation in mm, rotation deviation in rad, source file) per subject/session |
 | `neuronav_build_target_map` | Expands your `coil_map` into the flat `target_map` every other function here consumes |
 | `neuronav_convert_trigger_to_voxels` | Converts ingested marker positions to native voxel/mm space; also computes the tier-4 axis-projected target |
 | `neuronav_read_entry_target` | Reads the latest `EntryTarget*.xml` snapshot for one subject/session |
@@ -126,6 +132,7 @@ for i_sub = 1:numel(all_subjects)
 
         coil_map = build_my_coil_map(sub_id, session);   % your own logic
         target_map = neuronav_build_target_map(coil_map);
+        parameters.neuronav.coil_map = coil_map;
 
         [xml_path, ~, results] = neuronav_ingest_markers(parameters, sub_id, session, target_map);
         active_sides = find(~cellfun(@isempty, results));

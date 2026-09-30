@@ -196,9 +196,9 @@ end
         edt(gl, 7, 2, 'path.seg', '', 1);
         brw(gl, 7, 4, 'path.seg', 'dir');
 
-        lbl(gl, 8, 1, 'Localite path');
-        edt(gl, 8, 2, 'path.localite', '', 0);
-        brw(gl, 8, 4, 'path.localite', 'dir');
+        lbl(gl, 8, 1, 'Localite raw path');
+        edt(gl, 8, 2, 'path.localite_raw', '', 0);
+        brw(gl, 8, 4, 'path.localite_raw', 'dir');
 
         lbl(gl, 9, 1, 'T1 filename pattern');
         edt(gl, 10, 2, 'path.t1_pattern', 'sub-%1$03d_T1w.nii*', 0);

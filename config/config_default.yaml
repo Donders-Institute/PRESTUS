@@ -42,7 +42,13 @@ path:
   seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
   t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
   t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
-  localite: ''          # Path to Localite neuronavigation output folder
+  # Localite neuronavigation (see doc_placement_neuronav.md, "Localite I/O")
+  localite_raw: ''      # Raw Localite exports: <localite_raw>/sub-XXX/ses-XX/[<placement.localite.loc_folder>/]...
+  localite_post: ''     # Ingested markers (neuronav_ingest_markers): <localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json
+  localite_t1: ''       # Planning T1s loaded into Localite: <localite_t1>/[sub-XXX/]<localite_t1_pattern>; empty = localite_raw
+  localite_t1_pattern: '%s_*T1*.nii*' # sprintf template for the planning T1 file name; %s = 'sub-XXX'
+  localite_export: ''   # Output folder for files to import into Localite (heuristic placement); per subject: <localite_export>/sub-XXX/
+  localite: ''          # DEPRECATED: read as localite_raw when that is empty, and as localite_export when that is empty
   pct: ''               # Base output directory for pseudoCT files. Leave empty to write pseudoCT
                         # outputs into the SimNIBS m2m folder (path.seg/m2m_sub-NNN/). When set,
                         # outputs go to path.pct/sub-NNN/ using the PRESTUS subject naming.
@@ -259,7 +265,7 @@ transducer:
 
 placement:
   mode: 'manual'    # Placement mode: 'manual' (use trans_pos/focus_pos as provided) |
-                    #   'localite' (derive from Localite XML; set placement.localite.file or path.localite) |
+                    #   'localite' (derive from a recorded Localite pose; set placement.localite.file or path.localite_post/_raw) |
                     #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
                     #   'mni'       (define trans/focus directly in MNI mm; snapped to scalp + gap; set placement.mni.*) |
                     #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
@@ -272,13 +278,19 @@ placement:
                               # ras/mni are converted to T1 voxels in the placement stage, per transducer.
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer?
-    # --- Simple mode: provide a direct path to a single Localite XML file ---
-    file: ''          # Path to a single Localite XML file (TriggerMarkers or GUMMarkers)
-    # --- Full neuronav mode: automatic file selection from path.localite folder ---
-    # Used when placement.localite.file is empty and path.localite is set.
-    session: 1        # Session identifier for file selection (integer or 'ses-XX')
-    markertype: 'TriggerMarkers'  # 'TriggerMarkers' or 'GUMMarkers'
-    position: 1       # Series index to use when multiple positions are in the file
+    # --- File mode: a single Localite XML file (TriggerMarkers, GUMMarkers or InstrumentMarker; type detected) ---
+    file: ''          # Path to a single Localite XML file; leave empty for automatic mode
+    # --- Automatic mode: ingested markers under path.localite_post (ingested from path.localite_raw on first use) ---
+    session: 1        # Session: integer n (-> ses-0n) or 'ses-XX'
+    target: ''        # Pick the series by target name (ingested name, or the XML description in file mode); '' = use position.
+                      #   Multi-transducer: one name per transducer, e.g. [L_MD, R_MD] (transducer i uses entry i)
+    position: 1       # Otherwise: index of the detected series (1-based, after the expected_segment_length filter); one per transducer allowed
+    markertype: 'TriggerMarkers'  # DEPRECATED, ignored: the marker type is detected from the files
+    # --- Ingestion (neuronav_ingest_markers / neuronav_gui) ---
+    loc_folder: 'loc' # Folder between ses-XX/ and the Localite export; '' = export directly under ses-XX/
+    session_folder_pattern: '*' # Wildcard a folder between loc_folder and the marker files must match (e.g. 'Session_2024*')
+    expected_segment_length: 80 # Pulses per TriggerMarkers series; series off by more than 20 are dropped ([] = keep all)
+    voxel_size: 0.9   # Only scales position_dev_vox in the series statistics [mm]
     # --- Shared ---
     reference_distance_mm: 15 # Fallback offset (mm) from Localite matrix origin to bowl rear centre (used by k-Wave makeBowl).
                               # Negative = bowl rear centre is on the housing side relative to the matrix origin.
@@ -343,6 +355,14 @@ placement:
     connectome_wb_path: ''    # Path to Connectome Workbench bin/ directory.
                               # Leave empty to skip (--skip_wb_view is always passed).
 
+#------------ Neuronavigation (Localite ingestion)
+
+neuronav:
+  coil_map: []      # Multi-coil ingestion: one entry per coil, e.g.
+                    #   - coil: 0                 # hardware coil index (TriggerMarkers_Coil<N>)
+                    #     target: 'L_MD'          # one recorded block, or:
+                    #     sequences: [{target: 'R_MD'}, {target: 'R_MD'}]   # several blocks
+                    # [] = single-coil ingestion (Coil0, GUMMarkers fallback)
 #------------ Simulation grid
 
 grid:

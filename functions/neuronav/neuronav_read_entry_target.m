@@ -15,7 +15,7 @@ function targets = neuronav_read_entry_target(raw_root, sub_id, session, loc_fol
 %   raw_root   - root folder containing <sub_id>/<session>/<loc_folder>/...
 %   sub_id     - subject identifier, e.g. 'sub-001'
 %   session    - session identifier, e.g. 'ses-02'
-%   loc_folder - (optional) subfolder name, default 'loc'
+%   loc_folder - (optional) subfolder name, default 'loc'; '' = none
 %
 % Output:
 %   targets    - struct array, one entry per set Target, with fields:
@@ -29,14 +29,14 @@ function targets = neuronav_read_entry_target(raw_root, sub_id, session, loc_fol
 %   They are NOT in physical scanner RAS space. Use the planning T1 header
 %   and ras_to_grid to convert to voxel indices if needed.
 
-    if nargin < 4 || isempty(loc_folder)
-        loc_folder = 'loc';
-    end
+    if nargin < 4, loc_folder = 'loc'; end   % '' = markers directly under ses-XX/
 
     targets = struct('index', {}, 'description', {}, 'xyz', {});
 
     loc_root = fullfile(raw_root, sub_id, session, loc_folder);
-    et_files = dir(fullfile(loc_root, '**', 'EntryTarget', 'EntryTarget*.xml'));
+    % Localite writes these into an EntryTarget/ folder; exports are also
+    % copied flat into the loc folder, so search any depth.
+    et_files = dir(fullfile(loc_root, '**', 'EntryTarget*.xml'));
 
     if isempty(et_files)
         warning('neuronav_read_entry_target: no EntryTarget files for %s %s in\n  %s', ...

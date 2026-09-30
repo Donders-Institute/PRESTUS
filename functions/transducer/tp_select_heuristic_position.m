@@ -172,8 +172,8 @@ writetable(table_formatted, table_path, 'Delimiter', 'tab', 'WriteVariableNames'
 fprintf('[TP_HEURISTIC] Saved heuristic position: %s\n', table_path);
 
 %% [Optional] Save copy in localite directory
-if isfield(parameters.path, 'localite') && ~isempty(parameters.path.localite)
-    localite_path = fullfile(parameters.path.localite,...
+if isfield(parameters, 'io') && isfield(parameters.io, 'dir_localite_export') && ~isempty(parameters.io.dir_localite_export)
+    localite_path = fullfile(parameters.io.dir_localite_export,...
         sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
     writetable(table_formatted, localite_path, 'Delimiter', 'tab', 'WriteVariableNames', false);
     fprintf('[TP_HEURISTIC] Additional Localite copy saved: %s\n', localite_path);

@@ -47,7 +47,7 @@ function [target_vox, target_mm, target_source] = neuronav_resolve_target( ...
 %       target_pos_projected, target_lookup_csv)
 %
 % Input:
-%   parameters      - PRESTUS config struct; uses parameters.path.localite_raw
+%   parameters      - PRESTUS config struct; uses path.localite_raw (NEURONAV_RESOLVE_PATHS)
 %                      and parameters.placement.localite.loc_folder (default 'loc')
 %   sub_id          - subject identifier, e.g. 'sub-003'
 %   session         - current session identifier, e.g. 'ses-04'
@@ -93,6 +93,7 @@ arguments
     target_lookup_csv (1,:) char = ''
 end
 
+paths = neuronav_resolve_paths(parameters);
 loc_folder_name = 'loc';
 if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite') && ...
         isfield(parameters.placement.localite, 'loc_folder')
@@ -102,7 +103,7 @@ end
 % ---- Tiers 2-3: EntryTarget, current session then walking back ----------
 entry_target_session = session;
 entry_targets = neuronav_read_entry_target( ...
-    parameters.path.localite_raw, sub_id, session, loc_folder_name);
+    paths.raw, sub_id, session, loc_folder_name);
 
 if isempty(entry_targets)
     this_idx = find(strcmp(sessions, session), 1);
@@ -111,7 +112,7 @@ if isempty(entry_targets)
         fprintf('  [entry_target] %s %s: no local EntryTarget export, trying %s ...\n', ...
             sub_id, session, fb_session);
         entry_targets = neuronav_read_entry_target( ...
-            parameters.path.localite_raw, sub_id, fb_session, loc_folder_name);
+            paths.raw, sub_id, fb_session, loc_folder_name);
         if ~isempty(entry_targets)
             fprintf('  [entry_target] %s %s: using target confirmation from %s\n', ...
                 sub_id, session, fb_session);

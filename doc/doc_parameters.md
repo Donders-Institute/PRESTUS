@@ -74,7 +74,12 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `anat` | Absolute path to structural input data. | — | Mandatory |
 | `sim` | Absolute path to simulation outputs. | — | Mandatory |
 | `seg` | Absolute path to SimNIBS segmentations (m2m folders). | — | Mandatory |
-| `localite` | Path to Localite neuronavigation output folder. | — | Optional |
+| `localite_raw` | Raw Localite exports, `<localite_raw>/sub-XXX/ses-XX/[<loc_folder>/]…`. | `''` | See [Localite I/O](doc_placement_neuronav.md#localite-io). |
+| `localite_post` | Ingested Localite markers, `<localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json`. | `''` | Written by `neuronav_ingest_markers` / `neuronav_gui`; read by `placement.mode: 'localite'` (automatic mode). |
+| `localite_t1` | Folder with the planning T1s loaded into Localite (`[sub-XXX/]<localite_t1_pattern>`). | `''` | Empty = `localite_raw`. |
+| `localite_t1_pattern` | File-name template of the planning T1; `%s` = `sub-XXX`. | `'%s_*T1*.nii*'` | Replaces `neuronav_t1_pattern` (still read). |
+| `localite_export` | Output folder for files to import into Localite (heuristic placement), per subject `sub-XXX/`. | `''` | Resolved into `io.dir_localite_export`. |
+| `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `'sub-%1$03d_T2w.nii*'` | Optional |
 
@@ -130,6 +135,7 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `dir_debug_medium` | Debug subfolder for medium setup (`debug/medium/`). |
 | `dir_debug_source` | Debug subfolder for source setup (`debug/source/`). |
 | `dir_pct` | Resolved subject pCT directory. Set from `path.seg` or `path.pct`. |
+| `dir_localite_export` | Per-subject Localite export folder (`<path.localite_export>/sub-XXX/`, fallback `path.localite`); `''` if unset. |
 | `filename_table` | Path to the per-subject CSV results table. |
 | `filename_kwave_source` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
 
@@ -278,9 +284,26 @@ See [doc_placement_neuronav.md](doc_placement_neuronav.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `enabled` | Load transducer position from Localite neuronavigation files? | `0` | `1 = yes`, `0 = no` |
+| `enabled` | Load transducer position from Localite neuronavigation files in head preprocessing? | `0` | `1 = yes`, `0 = no`. Older switch; `placement.mode: 'localite'` is the placement-stage equivalent. Both use `neuronav_localite_pose`. |
+| `file` | Single Localite XML (TriggerMarkers, GUMMarkers or InstrumentMarker; type detected). | `''` | File mode. Empty = automatic mode (ingested markers under `path.localite_post`). |
+| `session` | Session of the automatic mode. | `1` | Integer `n` → `ses-0n`, or `'ses-XX'`. |
+| `target` | Select the series by name. | `''` | Ingested target name (automatic mode) or entry description (file mode). Several transducers: one name per transducer, e.g. `[L_MD, R_MD]` (transducer *i* uses entry *i*); a single name applies to all. |
+| `position` | Otherwise: index of the detected series (1-based, after the `expected_segment_length` filter). | `1` | Automatic mode matches it against `series_index` in the JSON sidecar. Several transducers: one index per transducer, e.g. `[1, 2]`. |
+| `markertype` | **Deprecated, ignored.** | `'TriggerMarkers'` | The marker type is detected from the files. |
+| `loc_folder` | Folder between `ses-XX/` and the Localite export. | `'loc'` | `''` = the export sits directly under `ses-XX/`. |
+| `session_folder_pattern` | Wildcard that a folder between `loc_folder` and the marker files must match. | `'*'` | e.g. `'Session_2024*'`. |
+| `expected_segment_length` | Pulses per TriggerMarkers series. | `80` | Series off by more than 20 pulses are dropped; `[]` keeps all. |
+| `voxel_size` | Voxel size for `position_dev_vox` in the series statistics [mm]. | `0.9` | Does not affect positions. |
 | `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Fallback when transducer geometry and `tracker_to_bowl_mm` are absent. |
 | `tracker_to_bowl_mm` | Measured offset from the Localite matrix origin to the bowl rear centre [mm]. | `[]` | Overrides geometry and `reference_distance_mm`. |
+
+#### `neuronav`
+
+See [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `coil_map` | Multi-coil ingestion: one entry per coil with `.coil` (index of `TriggerMarkers_Coil<N>`) and `.target` or `.sequences(:).target`. | `[]` | `[]` = single-coil ingestion (Coil0, GUMMarkers fallback). |
 
 #### `placement.heuristic`
 

@@ -134,7 +134,10 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_convert_native_to_MNI`        | Convert native RAS coordinates to MNI space                                                     |
 | `neuronav_convert_trigger_to_voxels`    | Convert Localite trigger positions to voxel (image) coordinates.                                |
 | `neuronav_export_session_csv`           | Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions.          |
+| `neuronav_find_planning_t1`             | Find the planning T1 loaded into Localite (`path.localite_t1`, else `path.localite_raw`).       |
 | `neuronav_get_group_mean_mni`           | Compute group-level average MNI coordinates (both mm and voxel).                                |
+| `neuronav_localite_pose`                | Resolve the recorded Localite instrument pose for placement (file mode, or ingested markers; ingests on first use). |
+| `neuronav_resolve_paths`                | Resolve the Localite raw/ingested/T1/export folders from `path.localite_*` (with `path.localite` fallback). |
 | `neuronav_select_localite`              | Select most recent Localite XML for a session.                                                  |
 | `position_transducer_localite`          | Determines transducer and focus positions in voxel space using Localite data and MRI header.    |
 

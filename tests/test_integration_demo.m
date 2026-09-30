@@ -252,12 +252,20 @@ classdef test_integration_demo < matlab.unittest.TestCase
         end
 
         function test_neuronav_select_finds_session(tc)
+            % Ingest the demo session, then read it back (Stage 1 -> Stage 2)
             p = tc.load_localite_config();
-            pn.data_postlocalite = p.path.localite;
+            p.path.localite_raw  = p.path.localite;
+            p.path.localite_post = tempname;
+            tc.addTeardown(@() rmdir(p.path.localite_post, 's'));
+            p.placement.localite.loc_folder = 'localite';
             sub_id = sprintf('sub-%03d', tc.SUBJECT_ID);
             ses_id = p.placement.localite.session;
 
-            localite = neuronav_select_localite(pn, sub_id, ses_id, 'TriggerMarkers');
+            tm = struct('series_index', 1, 'transducer_id', 0, 'target_name', 'series_1');
+            xml_path = neuronav_ingest_markers(p, sub_id, ses_id, tm);
+            tc.verifyTrue(isfile(xml_path), 'Ingestion wrote no InstrumentMarker XML.');
+
+            localite = neuronav_select_localite(p, sub_id, ses_id, 'series_1');
             tc.verifyFalse(isempty(localite), ...
                 'neuronav_select_localite returned empty — session not found.');
         end
