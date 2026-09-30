@@ -169,7 +169,7 @@ desired_intensities:
 - Define and initialize the simulation environment by setting paths and loading configuration files with equipment and user calibration data.
 - Automatically load Donders-specific transducer information: Identify specific equipment combinations and extract associated transducer and driving system parameters, setting default initial amplitudes and phases.
 - Set initial simulation to manufacturer data: Load measured characterization data of the actual transducer's acoustic field including axial intensity profiles and phase information provided by manufacturers.
-- Interpolate requested distance from multiple empirically measured distances.
+- Interpolate requested distance from multiple empirically measured distances (`interpolate_axial_profiles`): the two neighbouring profiles are aligned on their focus (`calibration.profile_align`, default the column focal-depth labels) and blended linearly; outside the measured range only up to `calibration.max_extrapolation_mm` (default 0: error). The derived profile is saved as `Profile_<type>_at_F_<depth>_<equipment>.csv` (+ sidecar) and plotted to `path_output_profiles`.
 - Add Focal Distance Offset (FDO; via `add_FDO`): Translate measured focal depths relative to the transducer exit plane into simulation-relevant coordinates centered on the transducer's mid-bowl. Missing distances are zero-interpolated.
 - Select or interpolate the axial intensity profiles for the specified focal depth.
 - Call `calibration_transducer`.

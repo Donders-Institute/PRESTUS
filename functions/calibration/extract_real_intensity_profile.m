@@ -9,8 +9,13 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 % EXTRACT_REAL_INTENSITY_PROFILE  Extract or interpolate an empirical axial intensity profile
 %
 % Selects the intensity profile for the desired focal depth from the
-% available measured profiles, interpolating linearly between the two
-% nearest depths when an exact match is not found.
+% available measured profiles. At an unmeasured depth the two neighbouring
+% profiles are aligned on their focus and blended (INTERPOLATE_AXIAL_PROFILES);
+% outside the measured range the nearest profile is shifted, up to
+% calibration.max_extrapolation_mm (default 0: error). The profile is
+% plotted and saved as a PNG, and a derived (interpolated/extrapolated)
+% profile is also written as a profile CSV + sidecar (WRITE_AXIAL_PROFILES),
+% both to calibration.path_output_profiles.
 %
 % Use as:
 %   [norm_profile_focus, max_intens] = extract_real_intensity_profile( ...
@@ -18,8 +23,10 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 %       intens_data, equipment_name, dist_from_exit_plane)
 %
 % Input:
-%   parameters                  - PRESTUS config; uses calibration.skip_front_peak_mm [mm]
-%                                 and calibration.path_output_profiles
+%   parameters                  - PRESTUS config; uses calibration.skip_front_peak_mm [mm],
+%                                 calibration.path_output_profiles and optionally
+%                                 calibration.profile_align ('label' | 'peak') and
+%                                 calibration.max_extrapolation_mm [mm]
 %   available_foci_wrt_exit_plane - available focal depths relative to exit plane [mm]
 %   desired_focal_distance_ep   - desired focal depth relative to exit plane [mm]
 %   intens_data                 - matrix of intensity profiles per focal depth [W/cm²]
@@ -27,108 +34,63 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 %   dist_from_exit_plane        - distance vector from transducer [mm]
 %
 % Output:
-%   norm_profile_focus - extracted or interpolated intensity profile [W/cm²]
+%   norm_profile_focus - [1 x N_z] extracted or interpolated intensity profile [W/cm²]
+%                        on dist_from_exit_plane
 %   max_intens         - maximum intensity beyond the skip-front-peak distance [W/cm²]
 %
-% See also: SCALE_REAL_INTENSITY_PROFILE, EXTRACT_SIMULATED_PROFILE, CALIBRATION_TRANSDUCER
+% See also: INTERPOLATE_AXIAL_PROFILES, WRITE_AXIAL_PROFILES, SCALE_REAL_INTENSITY_PROFILE,
+%           CALIBRATION_TRANSDUCER
 
-    % Check if the exact focal depth is available
-    col_index = find(available_foci_wrt_exit_plane == desired_focal_distance_ep);
-
-    if isempty(col_index)
-        % Perform linear interpolation if the exact focus is not available
-        [~, closestIndex] = min(abs(available_foci_wrt_exit_plane - desired_focal_distance_ep));
-        closest_foci_wrt_exit_plane = available_foci_wrt_exit_plane(closestIndex);
-
-        % Determine neighboring focal depths for interpolation
-        if closest_foci_wrt_exit_plane > desired_focal_distance_ep
-            closestIndex2 = closestIndex; % Higher focus
-            closestIndex1 = closestIndex2 - 1; % Lower focus
-        else
-            closestIndex1 = closestIndex; % Lower focus
-            closestIndex2 = closestIndex1 + 1; % Higher focus
-        end
-
-        % Validate indices for interpolation boundaries
-        if closestIndex1 < 1 || closestIndex2 > length(available_foci_wrt_exit_plane)
-            error('Focus is outside the range of available axial profiles. Interpolation not possible.')
-        end
-
-        % Retrieve intensity profiles for the neighboring focal depths
-        focus_wrt_exit_plane_1 = round(available_foci_wrt_exit_plane(closestIndex1), 2);
-        focus_wrt_exit_plane_2 = round(available_foci_wrt_exit_plane(closestIndex2), 2);
-        profile_1 = intens_data(:, closestIndex1)';
-        profile_2 = intens_data(:, closestIndex2)';
-
-        % Normalize profiles by aligning their peaks to 0 (max of profile 1 and profile 2)
-        [~, idx1] = max(profile_1);
-        [~, idx2] = max(profile_2);
-
-        x1_norm = dist_from_exit_plane - dist_from_exit_plane(idx1); % Align peak of profile 1 to 0
-        x2_norm = dist_from_exit_plane - dist_from_exit_plane(idx2); % Align peak of profile 2 to 0
-
-        % Define normalized common x-array
-        x_common_norm = linspace(min(min(x1_norm), min(x2_norm)), ...
-                                 max(max(x1_norm), max(x2_norm)), length(dist_from_exit_plane));
-     
-        % Interpolate profiles in normalized space
-        y1_interp_norm = interp1(x1_norm, profile_1, x_common_norm, 'spline', 'extrap');
-        y2_interp_norm = interp1(x2_norm, profile_2, x_common_norm, 'spline', 'extrap');
-        
-        % Calculate weight (alpha) for interpolation based on the relative focal depths
-        alpha = (desired_focal_distance_ep - focus_wrt_exit_plane_1) / ...
-                (focus_wrt_exit_plane_2 - focus_wrt_exit_plane_1);
-
-        % Interpolate the profiles with the weight alpha
-        norm_profile_focus  = (1-alpha) * y1_interp_norm + alpha * y2_interp_norm;
-
-        % Map back to the original dist_from_exit_plane
-        x1_2_norm = x_common_norm + (alpha * x2_norm(idx2) + (1-alpha) * x1_norm(idx1));
-
-        % Interpolate the final focused profile in the normalized space back to the original space
-        mapped_profile_focus = interp1(x_common_norm, norm_profile_focus, x1_2_norm, 'spline', 0);
-
-        % Calculate the offset (max_loc) to align the profile focus with dist_from_exit_plane
-        max_loc = abs(mean(x1_2_norm - dist_from_exit_plane'));
-
-        profile_focus = interp1(x1_2_norm + max_loc, mapped_profile_focus, dist_from_exit_plane, 'spline', 0);
-
-        % Plot the profiles and the interpolated result
-        figure;
-        plot(dist_from_exit_plane, profile_1, '-x', 'DisplayName', ...
-            ['Measurement 1, focus at ' num2str(focus_wrt_exit_plane_1)]);
-        hold on;
-        plot(dist_from_exit_plane, profile_2, '-x', 'DisplayName', ...
-            ['Measurement 2, focus at ' num2str(focus_wrt_exit_plane_2)]);
-        plot(dist_from_exit_plane, profile_focus, '-x', 'DisplayName', ...
-            ['Interpolated, focus at ' num2str(desired_focal_distance_ep)]);
-        legend;
-        xlabel('Distance wrt exit plane [mm]');
-        ylabel('Intensity [W/cm^2]');
-        title('Interpolation Input and Results');
-    
-    else
-        % Use the exact profile if the focus matches an available value
-        norm_profile_focus = intens_data(:, col_index)';
-
-        % Plot the exact profile
-        figure;
-        plot(dist_from_exit_plane, norm_profile_focus, '-o');
-        xlabel('Distance wrt exit plane [mm]');
-        ylabel('Intensity [W/cm^2]');
-        title(['Axial Profile at Focus wrt Exit Plane: ' num2str(desired_focal_distance_ep) ' [mm]']);
+    cal = parameters.calibration;
+    io  = struct('Align', get_or(cal, 'profile_align', 'label'), ...
+                 'MaxExtrapolationMm', get_or(cal, 'max_extrapolation_mm', 0), ...
+                 'NearFieldSkipMm', get_or(cal, 'skip_front_peak_mm', 10));
+    measured = struct('depths_ep_mm', available_foci_wrt_exit_plane(:)', ...
+                      'z_ep_mm', dist_from_exit_plane(:), 'I', intens_data);
+    prof = interpolate_axial_profiles(measured, desired_focal_distance_ep, io);
+    type = prof.profile_type{1};
+    if strcmp(type, 'unavailable')
+        error(['Focus %.2f mm is outside the range of available axial profiles [%.2f, %.2f] mm ' ...
+            '(calibration.max_extrapolation_mm = %g). Interpolation not possible.'], ...
+            desired_focal_distance_ep, min(available_foci_wrt_exit_plane), ...
+            max(available_foci_wrt_exit_plane), io.MaxExtrapolationMm);
     end
-    % Create output profile if it does not yet exist
-    if ~exist(parameters.calibration.path_output_profiles); mkdir(parameters.calibration.path_output_profiles); end
-    % Save the plot to the specified directory
-    fig_path = fullfile(parameters.calibration.path_output_profiles, ...
-        strcat('Interpolation_at_F_', num2str(desired_focal_distance_ep), '_', equipment_name, '.png'));
-    saveas(gcf, fig_path);
-    close(gcf);
+    norm_profile_focus = prof.I(:, 1)';
 
-    % Determine the maximum intensity beyond the specified skip distance 
+    if ~exist(cal.path_output_profiles, 'dir'); mkdir(cal.path_output_profiles); end
+    name = char(string(equipment_name));
+    stem = strcat('F_', num2str(desired_focal_distance_ep), '_', name);
+
+    % Plot the profile (and its sources, if derived) and save it
+    fh = figure('Visible', 'off');
+    hold on;
+    if ~strcmp(type, 'measured')
+        ok = find(isfinite(prof.source_depths(1, :)));
+        for k = ok
+            j = find(abs(available_foci_wrt_exit_plane - prof.source_depths(1, k)) < 1e-6, 1);
+            plot(dist_from_exit_plane, intens_data(:, j), '-x', 'DisplayName', ...
+                sprintf('Measurement, focus at %g (weight %.2f)', prof.source_depths(1, k), prof.weights(1, k)));
+        end
+    end
+    plot(dist_from_exit_plane, norm_profile_focus, '-o', 'DisplayName', ...
+        sprintf('%s, focus at %g', [upper(type(1)) type(2:end)], desired_focal_distance_ep));
+    legend; xlabel('Distance wrt exit plane [mm]'); ylabel('Intensity [W/cm^2]');
+    title(sprintf('Axial profile at %g mm from the exit plane (%s)', desired_focal_distance_ep, type));
+    saveas(fh, fullfile(cal.path_output_profiles, ['Interpolation_at_' stem '.png']));
+    close(fh);
+
+    % A derived profile is what the calibration is fitted to: keep it
+    if ~strcmp(type, 'measured')
+        write_axial_profiles(prof, fullfile(cal.path_output_profiles, ['Profile_' type '_at_' stem '.csv']), ...
+            struct('equipment', name));
+    end
+
+    % Determine the maximum intensity beyond the specified skip distance
     % for scaling to prevent catching max peak in near field peak.
-    [~, closestIndex] = min(abs(dist_from_exit_plane - parameters.calibration.skip_front_peak_mm));
+    [~, closestIndex] = min(abs(dist_from_exit_plane - cal.skip_front_peak_mm));
     max_intens = max(norm_profile_focus(closestIndex:end));
-    
+end
+
+function v = get_or(s, f, d)
+    if isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
 end
