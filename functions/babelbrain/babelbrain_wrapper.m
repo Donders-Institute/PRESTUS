@@ -70,6 +70,11 @@ function sensor_data = babelbrain_wrapper( ...
 %   .use_rayleigh_for_water - logical (default false). true: compute water-only runs with
 %                         BabelBrain's Rayleigh integral (faster); false: full-wave FDTD, which
 %                         is comparable to k-Wave/jwave. Tissue runs always use FDTD.
+%   .q_correction       - bone Q-factor correction of BabelBrain's relaxation attenuation
+%                         model (its QCorrection). [] (default) = 1.0 on the non-CT path
+%                         (realises the specified bone alpha_coeff; 91% in the bone-slab
+%                         phantom, as k-Wave) and BabelBrain's 3.0 on the CT path. Realised
+%                         bone attenuation scales ~1/Q. Values > 0 override both paths.
 %   .focal_calibration  - logical (default true). Without explicit element phases, choose the
 %                         geometric steer so the achieved focus lands at focal_distance_ep
 %                         (CALIBRATE_FOCAL_STEERING); with explicit phases, only report it.
@@ -207,6 +212,7 @@ bb = apply_default(bb, 'water_amp_calibration', true);  % scale output to the in
 % vs the other backends). Only affects water-only runs; the transcranial field
 % always uses FDTD.
 bb = apply_default(bb, 'use_rayleigh_for_water', false);
+bb = apply_default(bb, 'q_correction', []);   % [] = 1.0 non-CT / BabelBrain 3.0 CT
 
 % Water-medium mode: run BabelBrain's --water_only path as the primary simulation.
 % medium_masks will be all-water (zeros in BabelBrain label space); the NIfTI is
@@ -897,6 +903,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     bb_medium_json_flag(medium_json_path), ...
     bb_wateronly_flag(is_water_medium), ...
     bb_rayleigh_water_flag(bb.use_rayleigh_for_water), ...
+    bb_qcorr_flag(bb.q_correction), ...
     bb_debug_flag(parameters)];
 
 if is_water_medium
@@ -1307,6 +1314,14 @@ end
 function flag = bb_medium_json_flag(json_path)
     if ~isempty(json_path)
         flag = {'--medium_properties_json', json_path};
+    else
+        flag = {};
+    end
+end
+
+function flag = bb_qcorr_flag(q)
+    if ~isempty(q) && isscalar(q) && q > 0
+        flag = {'--q_correction', sprintf('%.6g', q)};
     else
         flag = {};
     end

@@ -54,6 +54,7 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 | `profile_calibration` | Refit drive phases to the continuous-bowl ideal. | `false` | BabelBrain only; moves it away from the k-Wave/jwave phases. Leave off for cross-backend comparison. |
 | `water_amp_calibration` | Scale output so its free-water peak matches the analytic Rayleigh peak. | `true` | Removes BabelBrain's CFL-correction amplitude bias; requires explicit element phases. |
 | `use_rayleigh_for_water` | Water-only solver. | `false` | `false` = FDTD (like-for-like with k-Wave/jwave). |
+| `q_correction` | Bone Q-factor correction (BabelBrain `QCorrection`) of the relaxation attenuation model. | `[]` | `[]` = 1.0 on the non-CT path (realises the specified bone `alpha_coeff`), BabelBrain's 3.0 on the CT path. Realised bone attenuation scales ~1/Q; values > 0 override both paths. |
 | `ct_mapping` | BabelBrain HU→property mapping. | `''` | Empty = label mask with PRESTUS `medium_properties`. See [CT-based skull properties](doc_babelbrain.md#ct-based-skull-properties-ct_mapping). |
 | `ct_use_petra` | PETRA density formula for `Webb-Marsac`. | `false` | |
 | `tx_mech_adjust_z_m` | Additional transducer standoff [m]. | `0` | Added to the automatic placement correction. |

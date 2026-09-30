@@ -241,8 +241,8 @@ def parse_args():
     p.add_argument('--no_skull_atten_fix',  action='store_true',
                    help='Disable the non-CT skull-attenuation fix. By default, on the non-CT '
                         '(binary mask) path PRESTUS reproduces BabelBrain CT-mode bone treatment '
-                        '(ShearSoS=0, QCorrArr[bone]=QCorrection) so the skull actually attenuates; '
-                        'without it BabelBrain applies ~zero skull attenuation (ISPPA far too high). '
+                        '(ShearSoS=0) and sets the bone Q correction (default 1.0, see --q_correction) '
+                        'so the injected bone attenuation is realised as specified. '
                         'Set this flag only to reproduce the un-patched BabelBrain behaviour.')
     p.add_argument('--no_zdomain_fix',      action='store_true',
                    help='Disable the ZDomainStart neutralization fix. By default '
@@ -265,6 +265,12 @@ def parse_args():
                    help='Source pressure amplitude [Pa] derived from calibrated particle velocity '
                         '(velocity_m_s * rho_water * c_water). When provided, overrides '
                         "BabelBrain's default of 50 kPa so simulated ISPPA matches calibration.")
+    p.add_argument('--q_correction',        default=0.0, type=float,
+                   help='Bone Q-factor correction for the relaxation attenuation model '
+                        '(default 0 = 1.0 on the non-CT path, BabelBrain default 3.0 on the CT path). '
+                        'Realised bone attenuation scales ~1/Q: the bone-slab phantom (6 mm cortical, '
+                        '300 kHz, PPW 6) realises 91%% of the injected alpha at Q=1 (k-Wave: 91%%) and '
+                        "29%% at BabelBrain's CT-mode 3.0. Values > 0 override both paths.")
     p.add_argument('--debug',               action='store_true',
                    help='Keep BabelBrain debug-only outputs that PRESTUS itself does not read, e.g. '
                         '*_Sub_NORM.nii.gz (brain-masked, normalized FullElasticSolution — useful to '
@@ -675,7 +681,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
           f'for per-ring weight expansion.')
 
 
-def _patch_noncat_skull_attenuation(bb_root):
+def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
     """Make the non-CT (binary-mask) path attenuate through the skull correctly
     by reproducing BabelBrain's *CT-mode* bone treatment.
 
@@ -684,23 +690,25 @@ def _patch_noncat_skull_attenuation(bb_root):
     On the non-CT path, BabelIntegrationBASE.Step1_InitializeConditions builds the
     per-material Q-correction array as ``QCorrArr = np.ones(5)`` (or ``np.ones(8)``
     with brain segmentation) — i.e. it applies *no* Q correction to cortical or
-    trabecular bone. In BabelBrain's relaxation FDTD model, at the small
-    water-referenced CFL that the bone *shear* speed forces, a correction factor of
-    1.0 drives the model's target Q for bone towards infinity → essentially *zero*
-    skull attenuation. The transcranial field then comes out almost identical to
-    the water-only field (observed ISPPA ~30 W/cm² vs ~11 W/cm² for k-Wave / jwave
-    with identical settings).
+    trabecular bone. Historically the
+    transcranial field then came out almost identical to the water-only field
+    (observed ISPPA ~30 W/cm² vs ~11 W/cm² for k-Wave / jwave with identical
+    settings), which was attributed to the missing bone Q correction.
 
-    The CT path does not have this problem: it adds bone with ``ShearSoS = 0`` and
-    sets ``QCorrArr[bone] = self._QCorrection`` (default 3.0). This routine
-    reproduces exactly that configuration on the non-CT path:
+    The CT path adds bone with ``ShearSoS = 0`` and ``QCorrArr[bone] =
+    self._QCorrection`` (default 3.0). This routine sets on the non-CT path:
 
       * ``self._Shear = 0``  → bone modelled as a fluid (no shear / mode
         conversion), matching the CT path and the fluid solvers (k-Wave, jwave).
         Set *before* Step1 runs so the bone AddMaterial() calls and the CFL /
         temporal-step calculation in UpdateConditions both see shear = 0.
-      * ``QCorrArr[bone] = self._QCorrection``  → the same Q correction the CT path
-        applies, so the specified bone attenuation is actually realised. Set
+      * ``QCorrArr[bone] = bone_q`` (default 1.0; ``--q_correction`` overrides).
+        Realised bone attenuation scales ~1/Q. Bone-slab phantom (6 mm cortical,
+        78.5 Np/m, 300 kHz, PPW 6; abs/noabs ratio): Q=1 realises 91% of the
+        injected alpha (k-Wave 91%), Q=3 29%, Q=6 14%, Q=10 8.7%, Q=14 6.3%. The
+        CT-mode 3.0 is BabelBrain's calibration for its own CT-derived bone
+        attenuation and must not be applied to PRESTUS-specified alpha; the
+        shear-speed setting is the operative part of the fix. Set
         *after* Step1 runs: the QCorr array is only consumed by the FDTD
         propagation (Step2+), never by the temporal-step calc, so overwriting it
         post-setup is safe.
@@ -759,10 +767,10 @@ def _patch_noncat_skull_attenuation(bb_root):
                 qc = qc.copy()
                 for idx in BONE_IDX:
                     if idx < qc.size:
-                        qc[idx] = self._QCorrection
+                        qc[idx] = bone_q
                 ss._QCorrection = qc
                 print('[run_babelbrain_case] Non-CT skull-attenuation fix applied: '
-                      f'ShearSoS(bone)=0, QCorrArr[bone]→{self._QCorrection} '
+                      f'ShearSoS(bone)=0, QCorrArr[bone]→{bone_q:g} '
                       f'(QCorrArr now {qc.tolist()}).')
             else:
                 print('[run_babelbrain_case] Warning: unexpected non-CT QCorrArr '
@@ -1301,7 +1309,8 @@ def main():
         print('[run_babelbrain_case] --no_skull_atten_fix set: leaving BabelBrain non-CT '
               'skull attenuation UN-patched (expect inflated ISPPA).')
     else:
-        _patch_noncat_skull_attenuation(bb_root)
+        _patch_noncat_skull_attenuation(
+            bb_root, bone_q=args.q_correction if args.q_correction > 0 else 1.0)
 
     # Place the source at exactly the requested TxMechanicalAdjustmentZ (see
     # function docstring): BabelBrain otherwise adds a skin-surface-dependent
@@ -1414,6 +1423,13 @@ def main():
                                      tx_mech_adjust_z=args.tx_mech_adjust_z)
     else:
         print('[run_babelbrain_case] No weights file — using geometric focusing.')
+
+    if args.q_correction > 0:
+        # BabelFTD_Simulations_BASE.__init__ reads this (and only this exact key)
+        # to override its QCorrection default (CT path); the non-CT skull patch
+        # receives the same value directly.
+        os.environ['BABEL_PYTEST_QFACTOR'] = repr(float(args.q_correction))
+        print(f'[run_babelbrain_case] Bone QCorrection override: {args.q_correction:g}')
 
     if args.source_amp_pa > 0:
         kw['pressure'] = args.source_amp_pa
