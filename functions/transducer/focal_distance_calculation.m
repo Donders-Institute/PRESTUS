@@ -22,6 +22,15 @@ arguments
     parameters (1,1) struct
 end
 
+% Create the output fields on the whole array first: assigning an element
+% that gained a new field back into a struct array would otherwise fail
+% ("Subscripted assignment between dissimilar structures").
+for f = {'focal_distance_offset', 'focal_distance_ep', 'focal_distance_bowl'}
+    if ~isfield(parameters.transducer, f{1})
+        [parameters.transducer.(f{1})] = deal([]);
+    end
+end
+
 for ti = 1:numel(parameters.transducer)
     tr = parameters.transducer(ti);
 
@@ -64,7 +73,7 @@ for ti = 1:numel(parameters.transducer)
             focal_distance = norm(tr.focus_pos - tr.trans_pos);
 
             try
-                t1_file = dir(fullfile(parameters.path.anat, sprintf(parameters.t1_path_template, parameters.subject_id)));
+                t1_file = dir(fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id)));
                 t1_header = niftiinfo(fullfile(t1_file.folder, t1_file.name));
                 t1_resolution_mm = round(mean(t1_header.PixelDimensions(1:3)));
                 tr.focal_distance_bowl = focal_distance * t1_resolution_mm;
