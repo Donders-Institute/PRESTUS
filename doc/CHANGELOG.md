@@ -118,6 +118,7 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - Axial-profile plot (`plot_axial_profile`) now handles beams running towards lower grid z; previously depths were negated
 
 #### Pseudo-CT acoustic property mapping
+- With pseudo-CT, `medium_setup` caches the in-skull property distributions (pseudo-CT HU, density, sound speed, attenuation: summary statistics and histograms, plus the reference skull values) as `sub-XXX_<medium>_medium_stats<affix>.json` in `io.dir_cache`, for tools such as the Planner; written on every run, not only in debug mode
 
 Three new algorithms added for density, sound speed, and attenuation mapping (see [doc_pseudoCT.md](doc_pseudoCT.md)):
 

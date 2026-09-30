@@ -10,7 +10,10 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 % layered simulations, property maps are also smoothed if
 % headmodel.smooth_properties is set. Medium property NIfTIs (in T1 space)
 % are saved unconditionally for layered simulations; raw grid matrices are
-% saved only in debug mode.
+% saved only in debug mode. When pCT is enabled, empirical in-skull property
+% distributions (pseudoCT HU, density, sound speed, attenuation) are cached
+% unconditionally as JSON in io.dir_cache (sub-XXX_<medium>_medium_stats<affix>.json)
+% for use by downstream tools (e.g. the Planner GUI).
 %
 % Use as:
 %   kwave_medium = medium_setup(parameters, medium_masks, planimg)
@@ -119,7 +122,48 @@ end
                 pct_mapping_attenuation = 'none';
             end
             [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation, density);
-            
+
+            % [CACHE] save empirical in-skull property distributions (pseudoCT HU, density,
+            % sound speed, attenuation) so downstream tools (e.g. the Planner GUI) can show
+            % them without a debug rerun. Written unconditionally, since it is cheap relative
+            % to the per-voxel arrays already computed above; goes to dir_cache (regenerable
+            % intermediates, always created) rather than the debug-only dir_debug_medium.
+            medium_stats = struct();
+            medium_stats.subject_id    = parameters.subject_id;
+            medium_stats.medium        = parameters.simulation.medium;
+            medium_stats.output_affix  = char(parameters.io.output_affix);
+            medium_stats.layer         = label_name;
+            medium_stats.n_voxels      = numel(skull_idx);
+            medium_stats.mapping       = struct('density', pct_mapping_density, ...
+                                                 'sound_speed', pct_mapping_soundspeed, ...
+                                                 'attenuation', pct_mapping_attenuation);
+            medium_stats.properties.pseudoCT_HU = local_distribution_stats(pseudoCT(skull_idx));
+            medium_stats.properties.density     = local_distribution_stats(density(skull_idx));
+            medium_stats.properties.sound_speed = local_distribution_stats(sound_speed(skull_idx));
+            medium_stats.properties.alpha_coeff = local_distribution_stats(alpha_coeff(skull_idx));
+            medium_stats.reference = struct();
+            for ref_name = {'skull', 'skull_cortical', 'skull_trabecular'}
+                rn = ref_name{1};
+                if isfield(medium, rn)
+                    medium_stats.reference.(rn) = struct( ...
+                        'density', medium.(rn).density, ...
+                        'sound_speed', medium.(rn).sound_speed, ...
+                        'alpha_coeff', medium.(rn).alpha_coeff);
+                end
+            end
+            try
+                filename_medium_stats = fullfile(parameters.io.dir_cache, ...
+                    sprintf('sub-%03d_%s_medium_stats%s.json', ...
+                    parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+                fid = fopen(filename_medium_stats, 'w');
+                fwrite(fid, jsonencode(medium_stats, 'PrettyPrint', true));
+                fclose(fid);
+            catch ME
+                warn('medium_setup:statsCacheWrite', ...
+                    'Could not write medium property stats cache: %s', ME.message);
+            end
+            clear medium_stats
+
             % [DEBUG] save pCT mapping overview
             if parameters.simulation.debug == 1
                 h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
@@ -357,4 +401,45 @@ end
     medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
     kwave_medium = rmfield(kwave_medium, {'temp_0', 'absorption_fraction'});
 
+end
+
+function s = local_distribution_stats(x)
+% LOCAL_DISTRIBUTION_STATS  Summary stats + histogram bin data for a numeric vector.
+%
+% No Statistics Toolbox dependency (percentiles via linear interpolation on sorted
+% values). Bin count scales with sample size (sqrt rule), capped to keep the JSON cache
+% small.
+    x = x(:);
+    x = x(~isnan(x));
+    s = struct();
+    s.n = numel(x);
+    if s.n == 0
+        s.mean = NaN; s.median = NaN; s.std = NaN; s.min = NaN; s.max = NaN;
+        s.p5 = NaN; s.p25 = NaN; s.p75 = NaN; s.p95 = NaN;
+        s.histogram = struct('counts', [], 'edges', []);
+        return
+    end
+    s.mean   = mean(x);
+    s.median = median(x);
+    s.std    = std(x);
+    s.min    = min(x);
+    s.max    = max(x);
+    s.p5  = local_percentile(x, 5);
+    s.p25 = local_percentile(x, 25);
+    s.p75 = local_percentile(x, 75);
+    s.p95 = local_percentile(x, 95);
+    n_bins = min(50, max(10, round(sqrt(s.n))));
+    [counts, edges] = histcounts(x, n_bins);
+    s.histogram = struct('counts', counts, 'edges', edges);
+end
+
+function p = local_percentile(x, q)
+% LOCAL_PERCENTILE  Percentile via linear interpolation on sorted values (x already sorted-safe).
+    x = sort(x(:));
+    n = numel(x);
+    pos = (q / 100) * (n - 1) + 1;
+    lo = min(max(floor(pos), 1), n);
+    hi = min(max(ceil(pos), 1), n);
+    frac = pos - lo;
+    p = x(lo) + frac * (x(hi) - x(lo));
 end
