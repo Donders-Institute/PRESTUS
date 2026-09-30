@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prestus-planner"
+version = "0.1.0"
+description = "Build and check PRESTUS simulation configs before running them in MATLAB"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.10"
+dependencies = ["PyQt6>=6.4", "PyYAML>=6.0"]
+
+[project.optional-dependencies]
+viewer = ["numpy>=1.24", "nibabel>=5.0", "matplotlib>=3.7"]
+test = ["pytest>=7", "numpy>=1.24", "nibabel>=5.0", "matplotlib>=3.7"]
+
+[project.scripts]
+prestus-planner = "prestus_planner.app:main"
+
+[tool.setuptools]
+packages = ["prestus_planner", "prestus_planner.ui"]
+
+[tool.setuptools.package-data]
+prestus_planner = ["overlay.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["matlab: needs a local MATLAB installation (set PRESTUS_MATLAB or have matlab on PATH)"]

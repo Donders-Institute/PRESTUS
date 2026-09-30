@@ -75,6 +75,7 @@ The following documents the functions provided in PRESTUS.
 | `calibration_gui`                       | Standalone GUI to fit transducer library entries to hydrophone profiles, predict profiles at any depth and add transducers. |
 | `neuronav_gui`                          | Stand-alone GUI for Localite marker ingestion: detect and review series, QC, name targets, batch ingestion, MNI view. |
 | `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs.                         |
+| `prestus_planner`                       | Open the PRESTUS Planner (standalone PyQt6 config builder, *experimental*; see [doc_planner.md](doc_planner.md)). |
 
 #### HEAD
 

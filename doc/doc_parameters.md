@@ -481,15 +481,19 @@ Protocol duration fields must be set for thermal simulations.
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `pd` | Pulse Duration (PD) [s]. | `NaN` | Duty cycle = `pd`/`pri`. |
-| `pri` | Pulse Repetition Interval (PRI) [s]. | `NaN` | PRF = 1/`pri`. |
-| `ptd` | Pulse Train Duration (PTD) [s]. | `NaN` | |
+| `pd` | Pulse Duration (PD) [s]. | `0` | Duty cycle = `pd`/`pri`. |
+| `pri` | Pulse Repetition Interval (PRI) [s]. | `0` | PRF = 1/`pri`. |
+| `ptd` | Pulse Train Duration (PTD) [s]. | `0` | |
 | `pt_timestep` | Modelling time step within a pulse train [s]. | `0.02` | |
-| `ptri` | Pulse Train Repetition Interval (PTRI) [s]. | `NaN` | OFF duration = `ptri` − `ptd`. |
-| `ptrd` | Pulse Train Repetition Duration (PTRD) [s]. | `NaN` | |
-| `post_ptri_dur` | Post-PTRI steady-state duration [s]. | `NaN` | |
+| `ptri` | Pulse Train Repetition Interval (PTRI) [s]. | `0` | OFF duration = `ptri` − `ptd`. |
+| `ptrd` | Pulse Train Repetition Duration (PTRD) [s]. | `0` | |
+| `post_ptri_dur` | Post-PTRI steady-state duration [s]. | `0` | |
 | `post_pt_timestep` | Modelling time step following PT & PTRI [s]. | `1` | |
 | `equal_step_duration` | Equal step durations for on and off cycles? | `0` | `1 = yes`, `0 = no` |
+| `pulse_ramp_dur` | Rise (= fall) duration of the amplitude ramp at each end of a pulse [s]. | *(not set)* = `0` | Not in `config_default.yaml`. Scales the pulse-average intensity: Ipa = factor × Itp (`compute_ramp_factor`). |
+| `pulse_ramp_shape` | Ramp shape: `'linear'` or `'tukey'` (raised cosine). | *(not set)* = `'linear'` | Used with `pulse_ramp_dur`. |
+
+The Planner draws this protocol (pulse, pulse train, repetitions) and exchanges it with the [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/); see [Planner](doc_planner.md#timing-diagram-and-tus-calculator).
 
 ---
 

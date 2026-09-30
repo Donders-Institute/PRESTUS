@@ -2,6 +2,11 @@ function [trans_pos_ras, focus_pos_ras] = launch_web_alignment(parameters, nii_p
 
 % LAUNCH_WEB_ALIGNMENT  Interactive browser-based transducer placement editor
 %
+% DEPRECATED: use the PRESTUS Planner (prestus_planner, planner/README.md),
+% whose placement viewer adds the segmentation overlay, device geometry,
+% scalp snapping and trajectory import, and writes the positions into the
+% study config. This function is kept for existing scripts only.
+%
 % Exports the NIfTI volume and current transducer/focus positions to a
 % temporary working directory, starts a local Python HTTP server, and opens
 % the NiiVue-based viewer in the default browser. Blocks until the user
@@ -50,6 +55,9 @@ function [trans_pos_ras, focus_pos_ras] = launch_web_alignment(parameters, nii_p
         options.Timeout (1,1) double  = 600
         options.Browser (1,:) char    = 'auto'
     end
+
+    warning('prestus:deprecated', ['launch_web_alignment is deprecated; ' ...
+        'use prestus_planner (placement viewer) instead.']);
 
     port    = options.Port;
     timeout = options.Timeout;

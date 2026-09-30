@@ -1,0 +1,342 @@
+"""The form for one config section, shown as a card on a tab of the main window."""
+
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QCursor
+from PyQt6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+                             QScrollArea, QToolButton, QToolTip, QVBoxLayout, QWidget)
+
+from .. import labels
+from ..checks import check_value
+from ..model import TX, ConfigModel
+from ..schema import Node
+from .fields import FieldEditor, display_text, make_editor
+from .transducer_panel import DevicePanel
+
+LABEL_WIDTH = 290
+
+
+def _tooltip(node: Node) -> str:
+    """Full help for hover: description, key, default."""
+    title = labels.label(node)
+    parts = [f"<b>{title}</b>"]
+    if node.help:
+        parts.append(node.help.replace("\n", "<br>"))
+    parts.append(f"<span style='color:#9aa7b4'>Key: {node.path}</span>")
+    if not node.is_group:
+        parts.append(f"<span style='color:#9aa7b4'>Default: {display_text(node.default) or '(empty)'}</span>")
+    if node.extra:
+        parts.append("<span style='color:#9aa7b4'>Not in config_default.yaml; read by PRESTUS code.</span>")
+    return "<br>".join(parts)
+
+
+class _Row:
+    def __init__(self, node: Node, label: QLabel, container: QWidget, editor: FieldEditor,
+                 reset: QToolButton, block: QWidget):
+        self.node, self.label, self.container, self.editor, self.reset = \
+            node, label, container, editor, reset
+        self.block = block
+
+
+class _Group:
+    def __init__(self, node: Node, frame: QFrame, rows: list, groups: list):
+        self.node, self.frame, self.rows, self.groups = node, frame, rows, groups
+
+
+class SectionPage(QFrame):
+    """Card with the form for all keys of one top-level section."""
+
+    changed = pyqtSignal()
+
+    def __init__(self, model: ConfigModel, section: str, nodes: list[Node],
+                 title: str, parent: QWidget | None = None, subtitle: str = ""):
+        super().__init__(parent)
+        self.setObjectName("Card")
+        self.model = model
+        self.section = section
+        self.ti = 0
+        self.show_advanced = False
+        self.rows: list[_Row] = []
+        self.groups: list[tuple[Node, QFrame]] = []
+        self._top_rows: list[_Row] = []
+        self._top_groups: list[_Group] = []
+
+        self.vbox = QVBoxLayout(self)
+        self.vbox.setContentsMargins(16, 12, 16, 14)
+        head = QHBoxLayout()
+        self.title = QLabel(title)
+        self.title.setObjectName("CardTitle")
+        head.addWidget(self.title)
+        self.count = QLabel()
+        self.count.setObjectName("CardSub")
+        head.addWidget(self.count)
+        head.addStretch(1)
+        self.toggle = QToolButton(text="Hide")
+        self.toggle.setToolTip("Collapse / expand")
+        self.toggle.clicked.connect(self._toggle_body)
+        head.addWidget(self.toggle)
+        self.vbox.addLayout(head)
+        if subtitle:
+            sub = QLabel(subtitle)
+            sub.setObjectName("CardSub")
+            sub.setWordWrap(True)
+            self.vbox.addWidget(sub)
+
+        self.body = QWidget()
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(0, 6, 0, 0)
+        self.vbox.addWidget(self.body)
+
+        self.device_panel: DevicePanel | None = None
+        if section == TX:
+            self.body_layout.addLayout(self._transducer_bar())
+            self.device_panel = DevicePanel(model)
+            self.device_panel.changed.connect(self._panel_changed)
+            self.body_layout.addWidget(self.device_panel)
+        self.extras = QVBoxLayout()
+        self.body_layout.addLayout(self.extras)
+
+        grid = self._new_grid()
+        self.body_layout.addLayout(grid)
+        self._top_rows, self._top_groups = self._fill(grid, self.body_layout, nodes)
+        self.refresh()
+
+    # ── construction ────────────────────────────────────────────────────
+    @staticmethod
+    def _new_grid() -> QGridLayout:
+        g = QGridLayout()
+        g.setHorizontalSpacing(14)
+        g.setVerticalSpacing(8)
+        g.setColumnMinimumWidth(0, LABEL_WIDTH)
+        g.setColumnStretch(1, 1)
+        return g
+
+    def _fill(self, grid: QGridLayout, outer: QVBoxLayout, nodes: list[Node]):
+        rows, groups = [], []
+        leaves = [n for n in nodes if not n.is_group]
+        for node in leaves:
+            rows.append(self._add_row(grid, node))
+        for node in [n for n in nodes if n.is_group]:
+            frame = QFrame()
+            frame.setObjectName("SubGroup")
+            frame.setToolTip(_tooltip(node))
+            v = QVBoxLayout(frame)
+            v.setContentsMargins(12, 8, 12, 10)
+            t = QLabel(labels.label(node))
+            t.setObjectName("SubGroupTitle")
+            t.setToolTip(_tooltip(node))
+            v.addWidget(t)
+            inner = self._new_grid()
+            inner.setColumnMinimumWidth(0, LABEL_WIDTH - 14)
+            v.addLayout(inner)
+            sub_rows, sub_groups = self._fill(inner, v, node.children)
+            outer.addWidget(frame)
+            self.groups.append((node, frame))
+            groups.append(_Group(node, frame, sub_rows, sub_groups))
+        return rows, groups
+
+    def _add_row(self, grid: QGridLayout, node: Node) -> _Row:
+        tip = _tooltip(node)
+        block = QWidget()
+        bl = QVBoxLayout(block)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(1)
+        label = QLabel(labels.label(node))
+        label.setObjectName("FieldLabel")
+        label.setToolTip(tip)
+        label.setWordWrap(True)
+        bl.addWidget(label)
+
+        editor = make_editor(node)
+        editor.setToolTip(tip)
+        editor.setEnabled(not node.derived)
+        container = QWidget()
+        h = QHBoxLayout(container)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.addWidget(editor, 1)
+        if node.unit:
+            u = QLabel(node.unit)
+            u.setObjectName("CardSub")
+            h.addWidget(u)
+        helpb = QToolButton(text="?")
+        helpb.setToolTip("What is this?")
+        helpb.clicked.connect(lambda _=False, t=tip: QToolTip.showText(QCursor.pos(), t, helpb))
+        h.addWidget(helpb)
+        reset = QToolButton(text="↺")
+        reset.setToolTip("Reset to default")
+        h.addWidget(reset)
+        r = grid.rowCount()
+        grid.addWidget(block, r, 0, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(container, r, 1, Qt.AlignmentFlag.AlignTop)
+        row = _Row(node, label, container, editor, reset, block)
+        editor.edited.connect(lambda value, rr=row: self._edited(rr, value))
+        reset.clicked.connect(lambda _=False, rr=row: self._reset(rr))
+        self.rows.append(row)
+        return row
+
+    def add_extra(self, widget: QWidget) -> None:
+        """A widget shown above the fields (diagram, panel, …)."""
+        self.extras.addWidget(widget)
+
+    def _toggle_body(self) -> None:
+        self.body.setVisible(not self.body.isVisible())
+        self.toggle.setText("Hide" if self.body.isVisible() else "Show")
+
+    def _transducer_bar(self) -> QHBoxLayout:
+        bar = QHBoxLayout()
+        self.tx_combo = QComboBox()
+        self.tx_combo.currentIndexChanged.connect(self._select_transducer)
+        add = QPushButton("Add transducer")
+        add.clicked.connect(self._add_transducer)
+        self.tx_remove = QPushButton("Remove")
+        self.tx_remove.clicked.connect(self._remove_transducer)
+        self.tx_note = QLabel()
+        self.tx_note.setObjectName("CardSub")
+        bar.addWidget(QLabel("Editing:"))
+        bar.addWidget(self.tx_combo)
+        bar.addWidget(add)
+        bar.addWidget(self.tx_remove)
+        bar.addWidget(self.tx_note, 1)
+        return bar
+
+    # ── transducer handling ─────────────────────────────────────────────
+    def _update_tx_combo(self) -> None:
+        self.tx_combo.blockSignals(True)
+        self.tx_combo.clear()
+        self.tx_combo.addItems([f"Transducer {i + 1}" for i in range(self.model.n_transducers)])
+        self.ti = min(self.ti, self.model.n_transducers - 1)
+        self.tx_combo.setCurrentIndex(self.ti)
+        self.tx_combo.blockSignals(False)
+        self.tx_remove.setEnabled(self.model.n_transducers > 1)
+        self.tx_note.setText("Unset values fall back to transducer 1 (PRESTUS merge rule)"
+                             if self.ti > 0 else "")
+
+    def _select_transducer(self, index: int) -> None:
+        if index >= 0:
+            self.ti = index
+            self.refresh()
+            self.changed.emit()
+
+    def _add_transducer(self) -> None:
+        self.ti = self.model.add_transducer()
+        self.refresh()
+        self.changed.emit()
+
+    def _remove_transducer(self) -> None:
+        self.model.remove_transducer(self.ti)
+        self.ti = max(0, self.ti - 1)
+        self.refresh()
+        self.changed.emit()
+
+    def _panel_changed(self) -> None:
+        self.refresh()
+        self.changed.emit()
+
+    # ── editing ─────────────────────────────────────────────────────────
+    def _edited(self, row: _Row, value) -> None:
+        self.model.set(row.node.path, value, self.ti)
+        self.refresh()
+        self.changed.emit()
+
+    def _reset(self, row: _Row) -> None:
+        self.model.reset(row.node.path, self.ti)
+        self.refresh()
+        self.changed.emit()
+
+    # ── visibility ──────────────────────────────────────────────────────
+    def set_show_advanced(self, show: bool) -> None:
+        self.show_advanced = show
+        self.refresh()
+
+    def _ti_for(self, node: Node) -> int:
+        return self.ti if node.path.startswith(TX + ".") or node.path == TX else 0
+
+    def _row_shown(self, row: _Row) -> bool:
+        path, ti = row.node.path, self._ti_for(row.node)
+        if not self.model.is_visible(path, ti):
+            return False
+        return self.show_advanced or not row.node.advanced or self.model.is_overridden(path, ti)
+
+    def _group_shown(self, g: _Group) -> bool:
+        ti = self._ti_for(g.node)
+        if not self.model.is_visible(g.node.path, ti):
+            return False
+        any_child = any(self._row_shown(r) for r in g.rows) or any(self._group_shown(s) for s in g.groups)
+        if not any_child:
+            return False
+        return self.show_advanced or not g.node.advanced or self._has_override(g)
+
+    def _has_override(self, g: _Group) -> bool:
+        ti = self._ti_for(g.node)
+        return any(self.model.is_overridden(r.node.path, ti) for r in g.rows) or \
+            any(self._has_override(s) for s in g.groups)
+
+    def has_overrides(self) -> bool:
+        return any(self.model.is_overridden(r.node.path, self._ti_for(r.node)) for r in self.rows)
+
+    def hidden_advanced(self) -> int:
+        """Fields hidden only because they are advanced."""
+        n = 0
+        for r in self.rows:
+            path, ti = r.node.path, self._ti_for(r.node)
+            if r.node.advanced and self.model.is_visible(path, ti) and not self.show_advanced \
+                    and not self.model.is_overridden(path, ti):
+                n += 1
+        return n
+
+    def refresh(self) -> None:
+        for i in range(self.extras.count()):
+            w = self.extras.itemAt(i).widget()
+            if w is not None and hasattr(w, "refresh"):
+                w.refresh()
+        if self.section == TX:
+            self._update_tx_combo()
+            if self.device_panel is not None:
+                self.device_panel.refresh(self.ti)
+
+        def walk(rows: list[_Row], groups: list[_Group]) -> None:
+            for g in groups:
+                g.frame.setVisible(self._group_shown(g))
+                walk(g.rows, g.groups)
+            for row in rows:
+                visible = self._row_shown(row)
+                row.block.setVisible(visible)
+                row.container.setVisible(visible)
+                if not visible:
+                    continue
+                path, ti = row.node.path, self._ti_for(row.node)
+                value = self.model.get(path, ti)
+                row.editor.set_value(value, self.model.baseline(path, ti))
+                row.editor.set_error(check_value(row.node, value))
+                name = labels.label(row.node)
+                if self.model.is_modified(path, ti):
+                    row.label.setText(f"<b>{name}</b> <span style='color:#1f6fb2'>●</span>")
+                elif self.model.from_library(path, ti):
+                    row.label.setText(f"{name} <span style='color:#9aa7b4'>· from library</span>")
+                else:
+                    row.label.setText(name)
+                row.reset.setVisible(self.model.is_overridden(path, ti))
+        walk(self._top_rows, self._top_groups)
+        n_set = sum(1 for r in self.rows if self.model.is_overridden(r.node.path, self._ti_for(r.node)))
+        self.count.setText(f"· {n_set} set" if n_set else "")
+
+    def focus_key(self, path: str, ti: int | None = None) -> None:
+        """Scroll to (and focus) the row for a key; reveals advanced fields if needed."""
+        if ti is not None and self.section == TX and ti != self.ti:
+            self.ti = ti
+            self.refresh()
+        for row in self.rows:
+            if row.node.path != path:
+                continue
+            if not row.container.isVisible() and row.node.advanced and not self.show_advanced:
+                self.set_show_advanced(True)
+            if not self.body.isVisible():
+                self._toggle_body()
+            w = self.parentWidget()
+            while w is not None and not isinstance(w, QScrollArea):
+                w = w.parentWidget()
+            if isinstance(w, QScrollArea):
+                w.ensureWidgetVisible(row.container)
+            row.editor.setFocus(Qt.FocusReason.OtherFocusReason)
+            return

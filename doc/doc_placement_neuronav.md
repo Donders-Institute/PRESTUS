@@ -151,6 +151,9 @@ placement:
     target: [L_MD, R_MD]   # transducer(1) -> L_MD, transducer(2) -> R_MD
 ```
 
+#### Many subjects and sessions
+
+For a study, the Planner's Study tab turns the `neuronav_gui` outputs into manifest rows (**Import from Localite…**). It reads `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files under `path.localite_post`, and makes either one run per target, or one run per session with the targets assigned to transducers 1, 2, … (left first, alphabetical, or a given order). The runs use `placement.mode: localite`, so PRESTUS reads the ingested markers itself. See [Group analysis](doc_group.md#from-localite-ingestion).
 
 #### Standalone / batch use
 

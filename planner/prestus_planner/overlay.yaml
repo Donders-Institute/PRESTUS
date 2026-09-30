@@ -1,0 +1,686 @@
+# Schema overlay for the PRESTUS Planner.
+#
+# config/config_default.yaml stays the single source of truth for keys,
+# defaults and help text; the planner derives its schema from it. This file
+# only adds what the YAML cannot express:
+#
+#   fields:   per-key attributes, matched by dotted path. '*' globs one or more
+#             path segments (fnmatch); matches apply in file order, so put
+#             broad patterns first and exact keys after.
+#   extra:    keys PRESTUS code reads that are absent (or commented out) in
+#             config_default.yaml. The drift test checks each is referenced
+#             in functions/.
+#   deprecated: old keys with their replacement; 'ignored: true' when PRESTUS
+#             no longer reads them at all (otherwise it still converts them).
+#   sections: display labels and advanced flags for top-level groups.
+#
+# Keys found in config/config_calibration.yaml are recognised as belonging to
+# the calibration workflow and are not reported as unknown.
+#
+# Field attributes:
+#   kind:        str | int | float | number | numbers | vec3 | flag | bool |
+#                tristate | dir | file | path | strlist | yaml
+#                (flag = 0/1 integer shown as a checkbox; numbers = scalar or
+#                row vector; yaml = free YAML text, e.g. int-or-'auto')
+#   choices:     allowed values (rendered as a drop-down)
+#   unit:        display unit
+#   visible_if:  {key: <dotted path>, in: [values]}  (or not_in)
+#   derived:     computed by PRESTUS; shown read-only, never written
+#   help:        replaces the help text taken from config_default.yaml
+
+sections:
+  general:            {label: General}
+  simulation:         {label: Simulation}
+  path:               {label: Paths}
+  startup:            {label: Environment}
+  io:                 {label: Input / output}
+  calibration:        {label: Calibration, advanced: true}
+  modules:            {label: Pipeline stages}
+  study:              {label: Study (group)}
+  hpc:                {label: HPC}
+  snellius:           {label: Snellius partitions, advanced: true}
+  analysis:           {label: Analysis}
+  transducer:         {label: Transducer}
+  placement:          {label: Placement}
+  grid:               {label: Grid}
+  segmentation:       {label: Segmentation, advanced: true}
+  headmodel:          {label: Head model, advanced: true}
+  pct:                {label: Pseudo-CT}
+  layers:             {label: Tissue layers, advanced: true}
+  timing:             {label: Sonication timing}
+  thermal:            {label: Thermal}
+  jwave:              {label: jwave backend}
+  babelbrain:         {label: BabelBrain backend}
+  medium_properties:  {label: Medium properties, advanced: true}
+
+fields:
+  # ── General ──────────────────────────────────────────────────────────
+  subject_id: {kind: int, min: 0, max: 999}
+  platform: {choices: [auto, slurm, qsub, matlab]}
+
+  # ── Simulation ───────────────────────────────────────────────────────
+  simulation.medium: {choices: [water, layered, phantom]}
+  simulation.code_type: {choices: [matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu]}
+  simulation.precision: {choices: [single, double]}
+  simulation.interactive: {kind: flag}
+  simulation.debug: {kind: flag}
+  simulation.transducer_coupling: {choices: [coherent, async]}
+
+  # ── Paths & environment ──────────────────────────────────────────────
+  path.anat: {kind: dir}
+  path.sim: {kind: dir}
+  path.seg: {kind: dir}
+  path.localite*: {kind: dir}
+  path.localite_t1_pattern: {kind: str}
+  path.pct: {kind: dir}
+  startup.*_path: {kind: path}
+  startup.modules_to_load: {kind: strlist}
+  startup.paths_to_add: {kind: strlist}
+  startup.subpaths_to_add: {kind: strlist}
+
+  # ── I/O ──────────────────────────────────────────────────────────────
+  io.overwrite_files: {choices: [never, always, force, ask]}
+  io.overwrite_simnibs: {kind: flag}
+  io.save_*: {kind: flag}
+
+  calibration.focal_reference: {choices: [peak, flhm_3db, flhm_6db]}
+
+  # ── Modules ──────────────────────────────────────────────────────────
+  modules.*: {kind: flag}
+  modules.report_style: {kind: str, choices: [instrument, classic, compact, paper]}
+
+  # ── HPC ──────────────────────────────────────────────────────────────
+  hpc.name: {choices: [default, snellius]}
+  hpc.memorylimit: {unit: GB}
+  hpc.ld_library_path: {kind: path}
+  snellius: {visible_if: {key: hpc.name, in: [snellius]}}
+
+  analysis.focus_area_radius: {unit: mm}
+  analysis.target_mni_mm: {kind: vec3, unit: MNI mm}
+  analysis.target_roi_mni: {kind: file}
+
+  # ── Study (group) ────────────────────────────────────────────────────
+  study.manifest: {kind: file}
+  study.name: {kind: str}
+
+  # ── Transducer ───────────────────────────────────────────────────────
+  transducer.name: {kind: str}
+  transducer.type: {kind: str, choices: [annular, matrix]}
+  transducer.freq_hz: {kind: number, unit: Hz}
+  transducer.target_isppa_wcm2: {kind: numbers, unit: W/cm²}
+  transducer.trans_pos: {kind: vec3}
+  transducer.focus_pos: {kind: vec3}
+  transducer.focal_distance_ep: {kind: number, unit: mm}
+  transducer.focal_distance_bowl: {kind: number, unit: mm}
+  transducer.focal_distance_offset: {kind: number, unit: mm, derived: true}
+
+  transducer.annular: {visible_if: {key: transducer.type, in: [annular]}}
+  transducer.annular.*: {kind: numbers}
+  transducer.annular.elem_n: {kind: int}
+  transducer.annular.elem_id_mm: {unit: mm}
+  transducer.annular.elem_od_mm: {unit: mm}
+  transducer.annular.elem_p_amp: {unit: Pa}
+  transducer.annular.elem_phase_deg: {unit: deg}
+  transducer.annular.curv_radius_mm: {kind: number, unit: mm}
+  transducer.annular.dist_geom_ep_mm: {kind: number, unit: mm}
+  transducer.annular.depth_mm: {kind: number, unit: mm}
+
+  transducer.matrix: {visible_if: {key: transducer.type, in: [matrix]}}
+  transducer.matrix.*: {kind: number}
+  transducer.matrix.elem_p_amp: {unit: Pa}
+  transducer.matrix.steering: {kind: str, choices: [1D, 3D]}
+  transducer.matrix.elem_shape: {kind: str, choices: [rect, disc, bowl]}
+  transducer.matrix.*_mm: {unit: mm}
+  transducer.matrix.is_curved: {kind: bool}
+  transducer.matrix.is_clover_setup: {kind: bool}
+  transducer.matrix.clover: {visible_if: {key: transducer.matrix.is_clover_setup, in: [true]}}
+  transducer.matrix.clover.n_leaves: {kind: int}
+  transducer.matrix.clover.ROC_parent: {unit: mm}
+  transducer.matrix.matrix_shape.type: {kind: str, choices: [define_here, extract_from_file]}
+  transducer.matrix.matrix_shape.define_here: {visible_if: {key: transducer.matrix.matrix_shape.type, in: [define_here]}}
+  transducer.matrix.matrix_shape.define_here.grid_shape.type: {kind: str, choices: [rect, fibonacci, fermat]}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect: {visible_if: {key: transducer.matrix.matrix_shape.define_here.grid_shape.type, in: [rect]}}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fibonacci: {visible_if: {key: transducer.matrix.matrix_shape.define_here.grid_shape.type, in: [fibonacci]}}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fermat: {visible_if: {key: transducer.matrix.matrix_shape.define_here.grid_shape.type, in: [fermat]}}
+  transducer.matrix.matrix_shape.define_here.grid_shape.*.elem_n*: {kind: int}
+  transducer.matrix.matrix_shape.extract_from_file: {visible_if: {key: transducer.matrix.matrix_shape.type, in: [extract_from_file]}}
+  transducer.matrix.matrix_shape.extract_from_file.file_path: {kind: file}
+  transducer.matrix.matrix_shape.extract_from_file.start_row: {kind: int}
+  transducer.matrix.matrix_shape.extract_from_file.start_col: {kind: int}
+  transducer.matrix.matrix_shape.extract_from_file.elem_n: {kind: int}
+  transducer.matrix.matrix_shape.extract_from_file.select_random_subset: {kind: bool}
+  transducer.matrix.matrix_shape.extract_from_file.subset.random_seed: {kind: bool}
+  transducer.matrix.matrix_shape.extract_from_file.subset.subset_n_elements: {kind: int}
+  transducer.matrix.matrix_shape.extract_from_file.project_on_new_ROC: {kind: bool}
+
+  # ── Placement ────────────────────────────────────────────────────────
+  placement.mode: {choices: [manual, localite, heuristic, mni, plantus, tus_entry]}
+  placement.manual: {visible_if: {key: placement.mode, in: [manual]}}
+  placement.manual.coordinate_space: {choices: [voxel, ras, mni]}
+  placement.localite: {visible_if: {key: placement.mode, in: [localite]}}
+  placement.localite.enabled: {kind: flag}
+  placement.localite.file: {kind: file}
+  placement.localite.session: {kind: yaml}
+  placement.localite.target: {kind: yaml, help: "Pick the series by target name (the ingested name, or the XML description in file mode); '' = use the series index. With several transducers, one name per transducer, e.g. [L_MD, R_MD]: transducer i uses entry i."}
+  placement.localite.position: {kind: yaml, help: "Otherwise: index of the detected series (1-based, after the pulse-count filter); with several transducers one index per transducer, e.g. [1, 2]."}
+  placement.localite.markertype: {choices: [TriggerMarkers, GUMMarkers]}
+  placement.localite.reference_distance_mm: {unit: mm}
+  placement.localite.tracker_to_bowl_mm: {kind: number, unit: mm}
+  placement.heuristic: {visible_if: {key: placement.mode, in: [heuristic]}}
+  placement.heuristic.*: {kind: number}
+  placement.heuristic.mni_target_mm: {kind: vec3, unit: MNI mm}
+  placement.heuristic.target_name: {kind: str}
+  placement.heuristic.save_localite_t1: {kind: bool}
+  placement.heuristic.left_ear_center: {kind: vec3, unit: voxels}
+  placement.heuristic.right_ear_center: {kind: vec3, unit: voxels}
+  placement.heuristic.ear_radius: {unit: mm}
+  placement.heuristic.dist_close: {unit: mm}
+  placement.mni: {visible_if: {key: placement.mode, in: [mni]}}
+  placement.mni.trans_pos_mm: {kind: vec3, unit: MNI mm}
+  placement.mni.focus_pos_mm: {kind: vec3, unit: MNI mm}
+  placement.mni.skin_gap_mm: {unit: mm}
+  placement.plantus: {visible_if: {key: placement.mode, in: [plantus]}}
+  placement.plantus.*_mm: {unit: mm}
+  placement.plantus.script_path: {kind: dir}
+  placement.plantus.env_path: {kind: dir}
+  placement.plantus.connectome_wb_path: {kind: dir}
+  placement.plantus.mni_target_mm: {kind: vec3, unit: MNI mm}
+  placement.plantus.focal_distance_list: {kind: numbers, unit: mm}
+  placement.plantus.flhm_list: {kind: numbers, unit: mm}
+  placement.plantus.max_angle_deg: {unit: deg}
+
+  # ── Grid ─────────────────────────────────────────────────────────────
+  grid.resolution_mm: {unit: mm}
+  grid.default_dims: {kind: numbers, unit: grid points}
+  grid.pml_size: {kind: yaml}
+  grid.source_ppw: {kind: number}
+  grid.use_kWaveArray: {kind: flag}
+  grid.axisymmetric: {kind: flag}
+  grid.mode: {choices: [focal_axis, transducer_axis, ras_plus]}
+
+  segmentation.use_qform: {kind: flag}
+  segmentation.debug: {kind: flag}
+
+  headmodel.head_pad_mm: {unit: mm}
+  headmodel.csf_expansion: {unit: voxels}
+  headmodel.smooth_method: {choices: [gaussian, box]}
+  headmodel.smooth_fwhm_mm: {unit: mm}
+  headmodel.skull_fill_method: {choices: [rubberwrap, imclose]}
+  headmodel.skull_wrap_radius: {unit: voxels}
+  headmodel.skull_wrap_visualize: {kind: flag}
+
+  pct.enabled: {kind: flag}
+  pct.debug: {kind: flag}
+  pct.skull_mapping: {choices: [miscouridou, carpino, wiesinger, treeby, kosciessa]}
+  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry]}
+  pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry]}
+  pct.mapping_attenuation: {choices: [k-plan, mueller]}
+
+  layers.*: {kind: numbers}
+
+  # ── Timing & thermal ─────────────────────────────────────────────────
+  timing.*: {unit: s}
+  timing.equal_step_duration: {kind: flag, unit: ''}
+  thermal.cem43_iso: {kind: flag}
+  thermal.temp_0.*: {unit: °C}
+  thermal.sensor_xy_halfsize: {unit: grid points}
+  thermal.record_t_at_every_step: {kind: flag}
+  thermal.log_thermal_updates: {kind: flag}
+
+  # ── Backends ─────────────────────────────────────────────────────────
+  jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
+  jwave.python_env: {kind: path}
+  jwave.python_env_gpu: {kind: path}
+  jwave.use_gpu: {kind: tristate}
+  jwave.precision: {choices: [single, double]}
+  babelbrain: {visible_if: {key: acoustic_backend, in: [babelbrain]}}
+  babelbrain.computing_backend: {choices: [auto, cuda, opencl, metal, cpu]}
+  babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
+  babelbrain.z_beyond_focus_mm: {unit: mm}
+  babelbrain.python_env: {kind: path}
+
+  medium_properties.*.sound_speed: {unit: m/s}
+  medium_properties.*.density: {unit: kg/m³}
+  medium_properties.*.thermal_conductivity: {unit: W/m/°C}
+  medium_properties.*.specific_heat_capacity: {unit: J/kg/°C}
+
+deprecated:
+  transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}
+  calibration.target_isppa_wcm2: {use: transducer.target_isppa_wcm2, source: load_parameters.m}
+  expected_focal_distance_mm: {use: transducer.focal_distance_ep, source: load_transducer_parameters.m}
+  transducer.set_intensity_w_per_cm2: {use: transducer.target_isppa_wcm2, source: babelbrain_thermal_wrapper.m}
+  jwave.pml_size: {use: grid.pml_size, ignored: true, source: jwave_wrapper.m}
+
+extra:
+  simulation.async_grid_mode:
+    kind: str
+    default: shared
+    choices: [shared, per_transducer]
+    visible_if: {key: simulation.transducer_coupling, in: [async]}
+    help: "Async coupling: 'shared' preprocesses one grid for all transducers; 'per_transducer' builds one grid each (parallel on HPC)."
+  simulation.uncertainty:
+    kind: bool
+    default: false
+    help: Run the uncertainty pipeline (medium property variants) instead of a single simulation; see doc_uncertainty.md.
+  transducer.align_to_focus:
+    kind: bool
+    default: []
+    derived: true
+    help: Set by the transducer validators (annular and 1D-steered matrix → true); a configured value is overwritten.
+  timing.pulse_ramp_dur:
+    kind: number
+    default: 0
+    unit: s
+    help: "Rise (= fall) duration of the amplitude ramp at the start and end of each pulse [s]; 0 = rectangular pulse. Used for the pulse-average intensity (Ipa = factor × Itp)."
+  timing.pulse_ramp_shape:
+    kind: str
+    default: linear
+    choices: [linear, tukey]
+    help: "Shape of the pulse ramp: 'linear' or 'tukey' (raised cosine)."
+  transducer.annular.elem_phase_rad:
+    kind: numbers
+    default: []
+    unit: rad
+    visible_if: {key: transducer.type, in: [annular]}
+    help: Source phase of each element in radians; alternative to elem_phase_deg.
+  acoustic_backend:
+    kind: str
+    default: kwave
+    choices: [kwave, babelbrain, jwave]
+    help: "Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'"
+  thermal_backend:
+    kind: str
+    default: kwave
+    choices: [kwave, babelbrain]
+    help: "Thermal solver: 'kwave' (default) | 'babelbrain' (requires acoustic_backend: 'babelbrain')"
+  io.external_acoustic_nifti:
+    kind: file
+    default: ''
+    help: >-
+      Full path to a pre-computed acoustic pressure NIfTI [Pa, T1 space]. When set,
+      acoustic simulation stages are skipped and this file is passed directly to the
+      thermal simulation. Requires modules.run_heating_sims: 1.
+  transducer.serial:
+    kind: str
+    default: ''
+    help: Equipment serial (config/equipment/<serial>.yaml); geometry is filled in from the library.
+  transducer.library_path:
+    kind: dir
+    default: ''
+    help: Folder with your own calibration entries (e.g. from refine_transducer_library); used when it holds one for this transducer.
+  transducer.combo.ds_serial:
+    kind: str
+    default: ''
+    help: Driving-system serial; selects the calibration entry <serial>_<ds_serial>.yaml.
+  grid.z_beyond_focus_mm:
+    kind: number
+    default: 40
+    unit: mm
+    help: Extra axial length beyond the focal depth when acoustic_fov_length_mm is 'auto'.
+  grid.acoustic_fov_diameter_mm:
+    kind: yaml
+    default: []
+    unit: mm
+    help: Lateral diameter of the beam-axis-aligned acoustic sub-grid; 'auto' = outermost element diameter.
+  grid.acoustic_fov_length_mm:
+    kind: yaml
+    default: []
+    unit: mm
+    help: Axial length of the acoustic sub-grid; 'auto' = focal depth + z_beyond_focus_mm.
+  grid.thermal_use_acoustic_fov:
+    kind: flag
+    default: 0
+    help: Run the thermal simulation within the acoustic FOV as well (faster, less accurate cooling boundary).
+  grid.thermal_resolution_mm:
+    kind: number
+    default: []
+    unit: mm
+    help: Grid resolution for the thermal simulation only; empty reuses the acoustic resolution.
+  grid.thermal_fov_mm:
+    kind: number
+    default: []
+    unit: mm
+    help: Independent thermal FOV around the focus, independent of the acoustic FOV.
+  grid.steady_state_transits:
+    kind: number
+    default: 1
+    help: Domain-diagonal one-way transits (at minimum sound speed) before recording starts.
+  grid.steady_state_num_periods:
+    kind: number
+    default: 3
+    help: Number of trailing wave periods recorded as the steady-state window.
+  grid.origin_ras_mm:
+    kind: vec3
+    default: []
+    unit: RAS mm
+    help: RAS mm of voxel [1,1,1] for spatially registered phantom/water outputs.
+  placement.tus_entry.script_path:
+    kind: file
+    default: ''
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Full path to TUS_entry.R.
+  placement.tus_entry.env_path:
+    kind: dir
+    default: ''
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Conda environment containing Rscript.
+  placement.tus_entry.scalp_mask:
+    kind: file
+    default: ''
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Binary NIfTI scalp mask in T1 space (typically SimNIBS skin.nii.gz).
+  placement.tus_entry.target_mask:
+    kind: file
+    default: ''
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Binary NIfTI target mask; when empty a sphere is built from focus_pos or mni_target_mm.
+  placement.tus_entry.mni_target_mm:
+    kind: vec3
+    default: []
+    unit: MNI mm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: MNI target coordinate; defaults to transducer.focus_pos.
+  placement.tus_entry.return_candidates:
+    kind: bool
+    default: false
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Save the full ranked candidate list as RDS.
+
+# ── Tabs of the main window ────────────────────────────────────────────
+# Each tab shows its sections as collapsible groups. Sections marked
+# 'advanced' above, and fields marked 'advanced' below, are hidden until
+# "Show advanced options" is ticked on that tab (they stay visible while
+# they hold a value). Sections not listed here go to the Setup tab.
+tabs:
+  - key: setup
+    label: Setup
+    intro: Subject, input and output folders, software locations and how outputs are written.
+    sections: [general, path, startup, io]
+  - key: transducer
+    label: Transducer
+    intro: The device and driving system, its geometry, drive level and focal depth.
+    sections: [transducer, calibration]
+  - key: placement
+    label: Placement
+    intro: Where the transducer sits and where it focuses, from coordinates, neuronavigation or planning tools.
+    sections: [placement, neuronav]
+  - key: simulation
+    label: Simulation
+    intro: Medium and solver, the simulation grid, the sonication protocol and the thermal model.
+    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain]
+  - key: study
+    label: Study
+    intro: Many subjects with per-run settings, targeting accuracy and the group report.
+    sections: [study, analysis]
+  - key: run
+    label: Run
+    intro: Pipeline stages, where to run (this computer or HPC), and the run log.
+    sections: [modules, hpc, snellius]
+
+# ── Display: labels, advanced flags, placement in the forms ───────────
+# Same pattern rules as 'fields' (applied after them). 'label' replaces the
+# key as the field name (the key stays in the tooltip); 'help' replaces the
+# config_default.yaml comment; 'group' shows a key in another section.
+display:
+  # General
+  subject_id: {label: Subject ID}
+  platform: {label: Run on, group: hpc, group_first: true, help: "Where the pipeline runs: 'auto' submits to SLURM/qsub when a scheduler is found, 'matlab' runs in this MATLAB session (recommended for testing), 'slurm'/'qsub' force a scheduler."}
+  acoustic_backend: {label: Acoustic solver, group: simulation, group_first: true}
+  thermal_backend: {label: Thermal solver, group: simulation, group_first: true}
+
+  # Simulation
+  simulation.medium: {label: Medium, help: "'layered': head model from the SimNIBS segmentation (skin, skull, brain, …); 'water': free-field simulation in water; 'phantom': a user-defined phantom."}
+  simulation.code_type: {label: k-Wave code}
+  simulation.precision: {label: Numerical precision, advanced: true}
+  simulation.interactive: {label: Interactive mode, advanced: true}
+  simulation.debug: {label: Debug outputs, advanced: false}
+  simulation.transducer_coupling: {label: Multi-transducer coupling}
+  simulation.async_grid_mode: {label: Async grid mode, advanced: true}
+  simulation.uncertainty: {label: Uncertainty analysis, advanced: true}
+
+  # Paths
+  path.anat: {label: Anatomical images folder}
+  path.sim: {label: Simulation outputs folder}
+  path.seg: {label: SimNIBS segmentations folder}
+  path.t1_pattern: {label: T1 file pattern}
+  path.t2_pattern: {label: T2 file pattern}
+  path.localite_raw: {label: Localite exports (raw), group: placement}
+  path.localite_post: {label: Ingested Localite markers, group: placement}
+  path.localite_t1: {label: Localite planning T1 folder, group: placement, advanced: true}
+  path.localite_t1_pattern: {label: Localite planning T1 pattern, group: placement, advanced: true}
+  path.localite_export: {label: Localite export folder, group: placement, advanced: true}
+  path.localite: {label: Localite folder (deprecated), group: placement, advanced: true}
+  path.pct: {label: Pseudo-CT output folder, advanced: true}
+
+  # Environment
+  startup.simnibs_bin_path: {label: SimNIBS bin folder}
+  startup.matlab_bin_path: {label: MATLAB binary (HPC pCT), advanced: true}
+  startup.fsl_bin_path: {label: FSL bin folder, advanced: true}
+  startup.ants_bin_path: {label: ANTs bin folder, advanced: true}
+  startup.ants_simg_path: {label: ANTs Singularity image, advanced: true}
+  startup.modules_to_load: {label: HPC modules to load, advanced: true}
+  startup.paths_to_add: {label: Extra MATLAB paths, advanced: true}
+  startup.subpaths_to_add: {label: Extra MATLAB paths (recursive), advanced: true}
+
+  # I/O
+  io.output_affix: {label: Output name affix}
+  io.overwrite_files: {label: Overwrite existing outputs, help: "What to do when outputs already exist: 'never' reuses them; 'always' recomputes the outputs (chained pipelines reuse intermediate caches); 'force' also recomputes intermediate stages; any other value asks. See doc_outputs.md#overwrite-behaviour."}
+  io.overwrite_simnibs: {label: Re-run SimNIBS segmentation, advanced: true}
+  io.save_*: {advanced: true}
+  io.save_MNI: {label: Also save MNI-space NIfTIs, advanced: false}
+  io.save_matrices: {label: Save intermediate matrices (fallback)}
+  io.save_source_matrices: {label: Save source matrices}
+  io.save_acoustic_matrices: {label: Save acoustic matrices (large)}
+  io.save_thermal_matrices: {label: Save thermal matrices}
+  io.save_heatingvideo: {label: Save heating video}
+  io.save_property_maps: {label: Save medium property maps}
+  io.save_Ipa: {label: Save pulse-average intensity map}
+  io.save_Ita: {label: Save time-average intensity map}
+  io.save_p_complex: {label: Save complex pressure field}
+  io.external_acoustic_nifti: {label: External acoustic pressure NIfTI, advanced: true}
+
+  calibration: {label: Calibration conventions}
+  calibration.focal_reference: {label: Focal-depth reference, advanced: true}
+
+  # Pipeline stages
+  modules.*: {advanced: true}
+  modules.run_transducer_placement: {label: Resolve placement}
+  modules.run_grid_setup: {label: Grid and head model}
+  modules.run_medium_setup: {label: Medium properties}
+  modules.run_source_setup: {label: Acoustic source}
+  modules.run_water_baseline: {label: Free-water baseline run}
+  modules.run_acoustic_sims: {label: Acoustic simulation, advanced: false}
+  modules.run_acoustic_analysis: {label: Acoustic analysis}
+  modules.run_heating_sims: {label: Thermal simulation, advanced: false}
+  modules.run_thermal_analysis: {label: Thermal analysis}
+  modules.run_nifti_creation: {label: NIfTI export}
+  modules.run_posthoc_water_sims: {label: Free-water comparison after the head simulation, advanced: false}
+  modules.run_targeting_analysis: {label: Targeting accuracy, advanced: false}
+  modules.generate_report: {label: HTML report, advanced: false}
+  modules.report_style: {label: Report style}
+  modules.report_style_switcher: {label: Embed report style switcher}
+  modules.generate_group_report: {label: Update group report after each subject, advanced: false}
+  modules.segmentation_only: {label: Stop after segmentation}
+
+  # Study
+  study.manifest: {label: Manifest file, group: __manifest_editor__}   # edited in the manifest card
+  study.name: {label: Study name}
+
+  # HPC
+  hpc.name: {label: Cluster profile, advanced: true}
+  hpc.gpu: {label: GPU request, help: "Scheduler GPU request, e.g. 'nvidia_a100-sxm4-40gb:1' (SLURM --gres); empty = any GPU when the code type needs one."}
+  hpc.partition: {label: Partition / queue, help: "Scheduler partition; empty = 'gpu' for GPU code, the cluster default otherwise."}
+  hpc.reservation: {label: Reservation, advanced: true, help: Scheduler reservation name (optional).}
+  hpc.wait_for_job: {label: Wait for the job to finish, advanced: true, help: Block MATLAB until the submitted job has finished (otherwise MATLAB returns after submission).}
+  hpc.timelimit: {label: Time limit, help: "Wall-time limit per job (HH:MM:SS)."}
+  hpc.memorylimit: {label: Memory limit, help: Memory per job.}
+  hpc.ld_library_path: {label: LD_LIBRARY_PATH for SimNIBS, advanced: true}
+  hpc.job_prefix: {label: Job name prefix, advanced: true}
+  hpc.max_wait_checks: {label: Max. status checks while waiting, advanced: true}
+
+  # Analysis
+  analysis: {label: Targeting & analysis}
+  analysis.focus_area_radius: {label: Target area radius, advanced: true}
+  analysis.target_mni_mm: {label: Intended target (MNI)}
+  analysis.target_roi_mni: {label: Target ROI mask (MNI)}
+
+  # Transducer
+  transducer.name: {label: Name}
+  transducer.type: {label: Array type}
+  transducer.freq_hz: {label: Frequency}
+  transducer.target_isppa_wcm2: {label: Target free-water Isppa}
+  transducer.trans_pos: {label: Transducer position (bowl apex)}
+  transducer.focus_pos: {label: Focus position}
+  transducer.focal_distance_ep: {label: Focal depth from exit plane}
+  transducer.focal_distance_bowl: {label: Focal depth from bowl, advanced: true}
+  transducer.focal_distance_offset: {label: Bowl-to-exit-plane offset, advanced: true}
+  transducer.serial: {label: Equipment serial}
+  transducer.library_path: {label: Own calibration library}
+  transducer.combo.ds_serial: {label: Driving-system serial}
+  transducer.align_to_focus: {label: Align to focus, advanced: true}
+  transducer.annular: {label: Annular geometry and drive}
+  transducer.annular.*: {advanced: true}
+  transducer.annular.elem_n: {label: Number of elements}
+  transducer.annular.elem_id_mm: {label: Element inner diameters}
+  transducer.annular.elem_od_mm: {label: Element outer diameters}
+  transducer.annular.elem_p_amp: {label: Element pressure amplitude, advanced: false}
+  transducer.annular.elem_phase_deg: {label: Element phases, advanced: false}
+  transducer.annular.elem_phase_rad: {label: Element phases (rad)}
+  transducer.annular.curv_radius_mm: {label: Radius of curvature}
+  transducer.annular.dist_geom_ep_mm: {label: Exit plane to geometric focus}
+  transducer.annular.depth_mm: {label: Housing depth (display)}
+  transducer.matrix: {label: Matrix geometry and drive}
+  transducer.matrix.*: {advanced: true}
+  transducer.matrix.elem_p_amp: {label: Element pressure amplitude, advanced: false}
+  transducer.matrix.steering: {label: Steering, advanced: false}
+
+  # Placement
+  placement.mode: {label: Placement method, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}
+  placement.report: {label: Write placement report}
+  placement.manual: {label: Manual coordinates}
+  placement.manual.coordinate_space: {label: Coordinate space of the positions}
+  placement.localite: {label: Localite neuronavigation}
+  placement.localite.enabled: {label: Use Localite (legacy switch), advanced: true}
+  placement.localite.file: {label: Single Localite XML file}
+  placement.localite.session: {label: Session}
+  placement.localite.target: {label: Target name(s)}
+  placement.localite.position: {label: Series index}
+  placement.localite.markertype: {label: Marker type (deprecated), advanced: true}
+  placement.localite.loc_folder: {label: Export subfolder, advanced: true}
+  placement.localite.session_folder_pattern: {label: Session folder pattern, advanced: true}
+  placement.localite.expected_segment_length: {label: Pulses per series, advanced: true}
+  placement.localite.voxel_size: {label: Voxel size for series statistics, advanced: true}
+  placement.localite.reference_distance_mm: {label: Tracker-to-bowl fallback offset, advanced: true}
+  placement.localite.tracker_to_bowl_mm: {label: Measured tracker-to-bowl offset, advanced: true}
+  placement.heuristic: {label: Heuristic search}
+  placement.heuristic.*: {advanced: true}
+  placement.heuristic.mni_target_mm: {label: Target (MNI), advanced: false}
+  placement.heuristic.target_name: {label: Target name, advanced: false}
+  placement.heuristic.dist_close: {label: Minimum distance to target, help: Minimum allowed transducer-to-target distance of candidate positions.}
+  placement.heuristic.ear_radius: {label: Ear exclusion radius, help: Candidate positions within this radius of the ear centres are excluded.}
+  placement.heuristic.left_ear_center: {label: Left ear centre, help: Voxel position of the left ear centre (empty = estimated).}
+  placement.heuristic.right_ear_center: {label: Right ear centre, help: Voxel position of the right ear centre (empty = estimated).}
+  placement.heuristic.save_localite_t1: {label: Save Localite-aligned T1}
+  placement.heuristic.criterion_intersection: {label: Max. beam intersection criterion, help: Maximum fraction of the beam path that may intersect excluded tissue.}
+  placement.heuristic.criterion_skin_mean: {label: Skin mean criterion, help: Limit on the mean skin value along the beam entry (empty = no limit).}
+  placement.heuristic.criterion_skull_mean: {label: Skull mean criterion, help: Limit on the mean skull value along the beam path (empty = no limit).}
+  placement.heuristic.criterion_skin_var: {label: Skin variance criterion, help: Limit on the skin variance at the entry (empty = no limit).}
+  placement.heuristic.criterion_skull_var: {label: Skull variance criterion, help: Limit on the skull variance along the beam path (empty = no limit).}
+  placement.heuristic.expand_step: {label: Search sphere expansion step, help: Relative growth of the search sphere per iteration.}
+  placement.mni: {label: MNI coordinates}
+  placement.mni.trans_pos_mm: {label: Transducer entry (MNI)}
+  placement.mni.focus_pos_mm: {label: Focus (MNI)}
+  placement.mni.skin_gap_mm: {label: Gap to the scalp}
+  placement.plantus: {label: PlanTUS optimisation}
+  placement.plantus.script_path: {label: PlanTUS folder}
+  placement.plantus.env_path: {label: SimNIBS installation}
+  placement.plantus.target_name: {label: Target name}
+  placement.plantus.mni_target_mm: {label: Target (MNI)}
+  placement.plantus.focal_distance_list: {label: Candidate focal depths}
+  placement.plantus.flhm_list: {label: Focal lengths (FLHM) per depth}
+  placement.plantus.additional_offset_mm: {label: Extra stand-off, advanced: true}
+  placement.plantus.max_angle_deg: {label: Max. tilt angle, advanced: true}
+  placement.plantus.mask_radius_mm: {label: Target mask radius, advanced: true}
+  placement.plantus.weight_*: {advanced: true}
+  placement.plantus.weight_skin_target_distances: {label: "Weight: distance to target"}
+  placement.plantus.weight_skin_target_angles: {label: "Weight: beam angle at skin"}
+  placement.plantus.weight_skin_target_intersections: {label: "Weight: beam-target overlap"}
+  placement.plantus.weight_skin_skull_angles: {label: "Weight: skin-skull angle"}
+  placement.plantus.weight_skull_thickness: {label: "Weight: skull thickness"}
+  placement.plantus.save_metrics: {label: Save per-vertex metrics, advanced: true}
+  placement.plantus.evaluate: {label: Evaluate the placement, advanced: true}
+  placement.plantus.connectome_wb_path: {label: Connectome Workbench bin folder, advanced: true}
+  placement.tus_entry: {label: TUS_entry}
+  placement.tus_entry.*: {advanced: true}
+  placement.tus_entry.script_path: {label: TUS_entry.R script, advanced: false}
+  placement.tus_entry.env_path: {label: R environment, advanced: false}
+  placement.tus_entry.scalp_mask: {label: Scalp mask}
+  placement.tus_entry.target_mask: {label: Target mask}
+  placement.tus_entry.mni_target_mm: {label: Target (MNI)}
+  placement.tus_entry.return_candidates: {label: Save ranked candidates}
+
+  neuronav: {label: Localite ingestion (neuronav_gui)}
+  neuronav.*: {advanced: true}
+  neuronav.coil_map: {label: Coil map}
+  neuronav.suggest_names: {label: Name series after planned targets}
+  neuronav.axis_tolerance_mm: {label: Max. target distance from beam axis}
+  neuronav.target_depth_mm: {label: Accepted target depth range}
+  neuronav.target_labels: {label: Target label map}
+  neuronav.batch_write: {label: Batch ingestion writes}
+
+  # Grid
+  grid: {label: Simulation grid}
+  grid.*: {advanced: true}
+  grid.resolution_mm: {label: Grid resolution, advanced: false}
+  grid.default_dims: {label: Free-water grid size}
+  grid.pml_size: {label: PML thickness}
+  grid.source_ppw: {label: Points per wavelength}
+  grid.min_ppw: {label: Minimum points per wavelength}
+  grid.source_cfl: {label: CFL number}
+  grid.source_limit_fraction: {label: Time-step stability fraction}
+  grid.max_expand: {label: Max. grid expansion (FFT speed)}
+  grid.use_kWaveArray: {label: Use kWaveArray source}
+  grid.axisymmetric: {label: Axisymmetric (2-D) simulation}
+  grid.mode: {label: Grid orientation}
+  grid.z_beyond_focus_mm: {label: Axial extent beyond the focus}
+  grid.acoustic_fov_diameter_mm: {label: Acoustic FOV diameter}
+  grid.acoustic_fov_length_mm: {label: Acoustic FOV length}
+  grid.thermal_use_acoustic_fov: {label: Thermal model within the acoustic FOV}
+  grid.thermal_resolution_mm: {label: Thermal grid resolution}
+  grid.thermal_fov_mm: {label: Thermal FOV}
+  grid.steady_state_transits: {label: Transits before steady state}
+  grid.steady_state_num_periods: {label: Recorded steady-state periods}
+  grid.origin_ras_mm: {label: "RAS origin of voxel [1,1,1]"}
+
+  segmentation: {label: SimNIBS segmentation}
+  segmentation.use_qform: {label: Force qform reorientation}
+  segmentation.debug: {label: charm debug output}
+  headmodel: {label: Head model processing}
+  pct: {label: Pseudo-CT skull properties}
+  layers: {label: Tissue layers (SimNIBS labels)}
+  medium_properties: {label: Tissue acoustic & thermal properties}
+  jwave: {label: jwave solver}
+  babelbrain: {label: BabelBrain solver}
+
+  # Timing
+  timing: {label: Sonication protocol}
+  timing.pd: {label: Pulse duration (PD)}
+  timing.pri: {label: Pulse repetition interval (PRI)}
+  timing.ptd: {label: Pulse train duration (PTD)}
+  timing.ptri: {label: Pulse train repetition interval (PTRI)}
+  timing.ptrd: {label: Pulse train repetition duration (PTRD)}
+  timing.pulse_ramp_dur: {label: Pulse ramp duration}
+  timing.pulse_ramp_shape: {label: Pulse ramp shape}
+  timing.pt_timestep: {label: Time step within a train, advanced: true}
+  timing.post_ptri_dur: {label: Cool-down after the protocol, advanced: true}
+  timing.post_pt_timestep: {label: Time step after trains, advanced: true}
+  timing.equal_step_duration: {label: Equal on/off step durations, advanced: true}
+
+  # Thermal
+  thermal: {label: Thermal model}
+  thermal.*: {advanced: true}
+  thermal.cem43_iso: {label: ISO CEM43 variant, help: Also compute the ISO variant of the CEM43 thermal dose.}
+  thermal.temp_0: {label: Initial temperatures}
+  thermal.sensor_xy_halfsize: {label: Temperature sensor half-width}
+  thermal.record_t_at_every_step: {label: Record every time step (memory)}
+  thermal.log_thermal_updates: {label: Verbose thermal log}

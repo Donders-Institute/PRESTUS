@@ -41,6 +41,7 @@ nav:
     - Installation: doc_installation.md
     - Getting started: doc_getting-started.md
     - GUI: doc_gui.md
+    - Planner (standalone config builder): doc_planner.md
     - Usage Statistics: doc_usage_statistics.md
   - 🔧 Equipment Modeling:
     - Transducer Configuration: doc_transducer.md

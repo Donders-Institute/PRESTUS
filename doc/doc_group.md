@@ -86,6 +86,15 @@ prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
 - **One report at the end.** The per-subject automatic group report is switched off for study runs (`modules.generate_group_report = 0`, unless the manifest sets it). The study report is built once at the end instead: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail).
 - **Job graphs.** Rows that submit a job graph (uncertainty, multi-ISPPA, async multi-transducer) return no single final job ID. For those, run `prestus_group_report_start(cfg)` once their jobs have finished.
 
+### From Localite ingestion
+
+Ingest the recordings with `neuronav_gui` (single sessions via *Write outputs*, many via the batch window), then use **Import from Localite…** on the Planner's Study tab (or the shortcut on the Placement tab). The importer reads what the MATLAB GUI writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It then builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
+
+- **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
+- **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_MD, R_MD]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.
+
+PRESTUS reads the ingested markers itself at run time, so no positions are copied into the manifest. This replaces study-specific scripts that inject `trans_pos`/`focus_pos` per session.
+
 ## Targeting accuracy
 
 With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `run_nifti_creation` on), each run writes `sub-XXX_<medium><affix>_targeting.csv` next to its per-subject CSV. The analysis reads the focal-mask NIfTIs and never fails the pipeline; unavailable measures are `NaN`. The same function can be run post hoc: `targeting_analysis(parameters, 'PlannedFocus', f, 'PlannedTrans', t)` with T1 voxel positions.

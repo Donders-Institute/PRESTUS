@@ -18,8 +18,21 @@ Multi-subject studies whose runs differ in placement, target, depth, intensity o
 - **Targeting accuracy** (`modules.run_targeting_analysis`, `analysis.target_mni_mm`, `analysis.target_roi_mni`): `targeting_analysis` writes `sub-XXX_<medium><affix>_targeting.csv`, with the focal centroid and peak vs the planned focus (distance, axial/lateral split), vs an MNI target, and ROI overlap/coverage/intensity. The pipeline now records the planned T1 positions before the grid stage (`parameters.state.planned_*_t1_vox`)
 - **Group MNI maps** (`create_group_maps`): per-condition focal-volume overlap, mean/SD intensity and mean heating NIfTIs, plus overlap figures over the mean MNI T1 with ROI outline, focal centroids and targets
 - **Group report**: runs (subject × condition) instead of subjects; new Study design, Condition comparison, Targeting accuracy, Group MNI maps and Outliers (robust z within condition) sections; per-condition filter buttons; group-by condition / placement / target / transducer; a one-row-per-run CSV; relative links that work from the study folder. `prestus_group_report_start` switches to study mode when the config has a manifest and builds the maps
+- **Planner**: Study manifest editor (table editor, manifest checks, dry run / run / group report through the Run tab)
+- **Localite for studies and bilateral setups**: `placement.localite.target` / `.position` take one entry per transducer (`[L_MD, R_MD]`; transducer *i* uses entry *i*, each with its own pose). The Planner's *Import from Localite…* reads the `neuronav_gui` outputs (`neuronav_ingest_summary.csv`, per-session `InstrumentMarker_*.json`) and builds one localite run per target or per session (targets → transducers)
 - **Deprecated**: `prestus_group_start` / `create_group_MNI_plots` (older output layout); `prestus_group_start` now runs `prestus_group_report_start`
 - **Docs**: `doc_group.md` rewritten; `doc_outputs.md` now gives the actual per-subject CSV name (`sub-XXX_<medium><affix>.csv`, not `…_output_table…`)
+
+#### Planner: tabbed layout, readable fields, protocol diagram
+
+- **Tabs** (Setup, Transducer, Placement, Simulation, Study, Run) with each config section as a card, the PRESTUS logo and report palette, error/warning counts in the header, and per-tab counts of set values. Tabs, labels, advanced flags and field placement are defined in `overlay.yaml` (`tabs`, `display`)
+- **Advanced options per tab**: settings most studies leave at their defaults are hidden until *Show advanced options* (advanced settings that hold a value stay visible; clicking an issue reveals its field)
+- **Readable fields**: a label per field, full help (with key and default) on hover and behind **?**
+- **No start dialog**: the Planner opens straight into the main window; *File ▸ New study…* (optionally pinning `config_default.yaml` in the study folder), *Open…* and *Open recent* replace it, and the subject inputs live on the Setup tab
+- **Visualisations**: transducer cross-section (elements, exit plane, geometric focus, chosen depth, steering range) and a sonication protocol diagram (pulse with ramp, pulse train, repetitions; PRF, duty cycles, on-time, Ipa/Itp)
+- **TUS calculator exchange**: export the protocol as a settings file for the TUS calculator's *Upload settings*, and import its settings (ms → s; pulse ramps only)
+- `timing.pulse_ramp_dur` / `timing.pulse_ramp_shape` (read by `acoustic_analysis`) are now documented and editable; `doc_parameters.md` gives the actual timing defaults (`0`, not `NaN`)
+
 #### BabelBrain acoustic and thermal backend
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).
@@ -259,6 +272,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** wrong methods references — Martin et al. (2024) and Pichardo et al. (2017) had incorrect titles, authors and DOIs, and the Aubry et al. (2025) DOI disagreed with the safety-dashboard footnote (now 10.1016/j.brs.2025.10.007 in both)
 
 #### GUI
+- **PRESTUS Planner** (`planner/`, *experimental*; see [doc_planner.md](doc_planner.md)): standalone PyQt6 app to build and check a study config before running it in MATLAB. Its schema is derived from `config_default.yaml` plus a small overlay with a drift test, and it writes override-only YAML that loads unchanged in `load_parameters` (MATLAB round-trip tests). It flags unknown, misspelt and deprecated keys. It also offers a transducer panel backed by the equipment and calibration library, and a placement viewer (T1 + segmentation overlay, bowl outline, snap to scalp, Brainsight/Slicer trajectory import). The Run page validates or runs the config locally with `matlab -batch`. MATLAB entry point: `prestus_planner`. `launch_web_alignment` and `functions/gui_py` are deprecated in its favour
 - New Placement, Multi-Transducer, and Calibration tabs
 - Stand-alone Localite ingest GUI (`neuronav_gui`, with PRESTUS logo header): detect and review marker series (QC table, 3-D pulse positions, per-pulse deviation, raw-file list) before writing the `InstrumentMarker` XML/JSON; supports single- and multi-coil ingestion and pre-filling from a config. See [doc_gui.md](doc_gui.md#localite-ingest-gui)
 - ⚠️ **Fixed:** PlanTUS weights set in `prestus_gui` and the Python GUI were saved as `placement.plantus.weights.<name>`, which nothing read (the 0.2 defaults were used). Both GUIs now write `placement.plantus.weight_<name>`; `position_transducer_plantus` applies `weights.<name>` from older configs with a warning (`position_transducer_plantus:legacyWeights`)

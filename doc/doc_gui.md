@@ -2,6 +2,8 @@
 
 The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click front-end to the pipeline. Every field maps directly to a YAML parameter — see [doc_parameters.md](doc_parameters.md) for the full reference.
 
+> A standalone config builder with a placement viewer, the **PRESTUS Planner**, is available as an experimental alternative: see [doc_planner.md](doc_planner.md). The Python GUI in `functions/gui_py` is deprecated in its favour.
+
 ![PRESTUS GUI](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_gui.png)
 
 ## Starting the GUI
