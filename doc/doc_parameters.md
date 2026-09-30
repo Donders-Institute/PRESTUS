@@ -201,8 +201,8 @@ All fields are mandatory and have no defaults — they must be set in the study 
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 | `steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
 | `elem_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
-| `elem_height_mm` | Element height [mm]. | Used to define equivalent area. |
-| `elem_width_mm` | Element width [mm]. | Used to define equivalent area. |
+| `elem_height_mm` | Element height [mm], along y. | `rect` elements: size along y; `disc`/`bowl`: sets the equal-area diameter. |
+| `elem_width_mm` | Element width [mm], along x. | `rect` elements: size along x; `disc`/`bowl`: sets the equal-area diameter. |
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
 | `is_curved` | Whether the array has a curved surface. | |
 | `curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. Depends on `is_curved`. |
@@ -229,11 +229,11 @@ Warning: The `define_here` options are experimental and may contain bugs due to 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `elem_n_row` | Number of element rows. | |
-| `elem_n_col` | Number of element columns. | |
+| `elem_n_row` | Number of element rows (along y). | Row pitch: `elem_height_mm + elem_spacing_height_mm`. |
+| `elem_n_col` | Number of element columns (along x). | Column pitch: `elem_width_mm + elem_spacing_width_mm`. Elements whose centre lies outside `outer_diameter_mm` are dropped. |
 | `elem_spacing_height_mm` | Spacing between elements in height direction [mm]. | Edge-to-edge spacing. |
 | `elem_spacing_width_mm` | Spacing between elements in width direction [mm]. | Edge-to-edge spacing. |
-| `sparsity_factor` | Fraction of active elements. | Range: 0.1–1.0. |
+| `sparsity_factor` | Fraction of active elements. | Range: 0.1–1.0. Validated but **not applied** yet: all elements in the grid are used. |
 
 ###### Fibonacci Grid
 

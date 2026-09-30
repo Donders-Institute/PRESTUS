@@ -163,11 +163,12 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
                     assert(rect_grid.elem_spacing_width_mm > 0)
 
                     % Total physical span of the array
-                    tran_width = (rect_grid.n_elem_width * matrix_tr.elem_width_mm) + ...
-                        ((rect_grid.n_elem_width - 1) * rect_grid.elem_spacing_width_mm);
+                    % (columns along x/width, rows along y/height; see CONVERT_TO_ELEMENT_POS)
+                    tran_width = (rect_grid.elem_n_col * matrix_tr.elem_width_mm) + ...
+                        ((rect_grid.elem_n_col - 1) * rect_grid.elem_spacing_width_mm);
 
-                    tran_height = (rect_grid.n_elem_height * matrix_tr.elem_height_mm) + ...
-                        ((rect_grid.n_elem_height - 1) * rect_grid.elem_spacing_height_mm);
+                    tran_height = (rect_grid.elem_n_row * matrix_tr.elem_height_mm) + ...
+                        ((rect_grid.elem_n_row - 1) * rect_grid.elem_spacing_height_mm);
 
                     % Distance of the array side from the center
                     grid_radius = max(tran_width/2, tran_height/2);

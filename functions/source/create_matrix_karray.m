@@ -105,19 +105,22 @@ end
         ty(ind) = pitch;
         tz(ind) = yaw;
 
-        % Determine element type
+        % Determine element type (kWaveArray sizes are in m; width along x,
+        % height along y, matching CONVERT_TO_ELEMENT_POS)
+        elem_w_m = tr.matrix.elem_width_mm  * 1e-3;
+        elem_h_m = tr.matrix.elem_height_mm * 1e-3;
         switch lower(tr.matrix.elem_shape)
             case 'rect'
-                karray.addRectElement(el_pos_m_i, tr.matrix.elem_height_mm, tr.matrix.elem_width_mm, [roll, pitch, yaw]);
+                karray.addRectElement(el_pos_m_i, elem_w_m, elem_h_m, [roll, pitch, yaw]);
 
             case 'disc'
                 % Disc with same area as rectangular element
-                diameter = sqrt(tr.matrix.elem_height_mm * tr.matrix.elem_width_mm * 4 / pi);
+                diameter = sqrt(elem_h_m * elem_w_m * 4 / pi);
                 karray.addDiscElement(el_pos_m_i, diameter, natural_focus_pos_m);
 
             case 'bowl'
                 r_c = tr.matrix.curv_radius_mm / 1e3;
-                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm;
+                A_target = elem_h_m * elem_w_m;
                 a_min = 0.001; % Lower bound of aperture radius (in m)
                 a_max = r_c * 0.999; % Slightly less than full bowl radius
 

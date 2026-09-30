@@ -77,9 +77,17 @@ function report = check_equipment_config(equipment_path)
             end
         end
 
+        %% Matrix-specific checks
+        if ~isfield(tr, 'annular') && isfield(tr, 'matrix')
+            rec.issues = [rec.issues, check_matrix(tr.matrix)];
+            rec.valid = isempty(rec.issues);
+            report(end+1) = rec; %#ok<AGROW>
+            continue;
+        end
+
         %% Annular-specific checks
         if ~isfield(tr, 'annular')
-            rec.issues{end+1} = 'Missing required field: transducer.annular (expected for type=transducer)';
+            rec.issues{end+1} = 'Missing required field: transducer.annular or transducer.matrix';
             rec.valid = isempty(rec.issues);
             report(end+1) = rec; %#ok<AGROW>
             continue;
@@ -164,6 +172,8 @@ function report = check_equipment_config(equipment_path)
         if isfield(d, 'transducer') && isfield(d.transducer, 'annular') && ...
                 isfield(d.transducer.annular, 'elem_n')
             n_el_str = num2str(d.transducer.annular.elem_n);
+        elseif isfield(d, 'transducer') && isfield(d.transducer, 'matrix') && isfield(d, 'n_elem')
+            n_el_str = num2str(d.n_elem);
         end
         status_str = 'ok';
         if ~r.valid, status_str = 'ISSUES'; end
@@ -172,4 +182,53 @@ function report = check_equipment_config(equipment_path)
             r.serial, type_str, n_el_str, freq_str, status_str, issue_str);
     end
     fprintf('\n');
+end
+
+function issues = check_matrix(m)
+% Required fields and plausibility for a transducer.matrix block
+    issues = {};
+    req = {'elem_shape', 'elem_width_mm', 'elem_height_mm', 'outer_diameter_mm', 'is_curved', 'matrix_shape'};
+    for k = 1:numel(req)
+        if ~isfield(m, req{k}) || isempty(m.(req{k}))
+            issues{end+1} = sprintf('Missing required field: transducer.matrix.%s', req{k}); %#ok<AGROW>
+        end
+    end
+    if ~isempty(issues); return; end
+    if ~any(strcmp(char(m.elem_shape), {'rect', 'disc', 'bowl'}))
+        issues{end+1} = sprintf('matrix.elem_shape ''%s'' is not rect, disc or bowl', char(m.elem_shape));
+    end
+    if m.elem_width_mm <= 0 || m.elem_height_mm <= 0
+        issues{end+1} = 'matrix element width and height must be positive';
+    end
+    if m.is_curved
+        if ~isfield(m, 'curv_radius_mm') || isempty(m.curv_radius_mm)
+            issues{end+1} = 'Missing required field: transducer.matrix.curv_radius_mm (is_curved: true)';
+        elseif m.curv_radius_mm <= m.outer_diameter_mm / 2
+            issues{end+1} = sprintf('matrix.curv_radius_mm (%.1f) <= outer_diameter_mm/2 (%.1f)', ...
+                m.curv_radius_mm, m.outer_diameter_mm / 2);
+        elseif isfield(m, 'dist_geom_ep_mm') && ~isempty(m.dist_geom_ep_mm) && m.dist_geom_ep_mm > m.curv_radius_mm
+            issues{end+1} = sprintf('matrix.dist_geom_ep_mm (%.1f) > curv_radius_mm (%.1f)', ...
+                m.dist_geom_ep_mm, m.curv_radius_mm);
+        end
+    end
+    ms = m.matrix_shape;
+    if ~isfield(ms, 'type') || ~any(strcmp(char(ms.type), {'define_here', 'extract_from_file'}))
+        issues{end+1} = 'matrix.matrix_shape.type must be define_here or extract_from_file';
+    elseif strcmp(char(ms.type), 'define_here')
+        gs = ms.define_here.grid_shape;
+        switch char(gs.type)
+            case 'rect'
+                f = {'elem_n_row', 'elem_n_col', 'elem_spacing_height_mm', 'elem_spacing_width_mm', 'sparsity_factor'};
+            case {'fibonacci', 'fermat'}
+                f = {'elem_n'};
+            otherwise
+                issues{end+1} = sprintf('matrix grid_shape.type ''%s'' is not rect, fibonacci or fermat', char(gs.type));
+                return;
+        end
+        for k = 1:numel(f)
+            if ~isfield(gs.(char(gs.type)), f{k})
+                issues{end+1} = sprintf('Missing grid_shape.%s.%s', char(gs.type), f{k}); %#ok<AGROW>
+            end
+        end
+    end
 end

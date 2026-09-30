@@ -98,11 +98,11 @@ function [transducer_mask, source_label, tr] = ...
             natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
             % Apply Clover setup if requested
-            if tr.is_clover_setup
+            if isfield(tr.matrix, 'is_clover_setup') && isequal(tr.matrix.is_clover_setup, true)
                 elem_pos_m = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
             end
 
-            tr.elem_n = size(elem_pos_m, 2);
+            tr.matrix.elem_n = size(elem_pos_m, 2);
 
             % Convert to grid units
             elem_pos_grid = round(elem_pos_m * 1e3 / grid_res_mm);
@@ -110,11 +110,11 @@ function [transducer_mask, source_label, tr] = ...
             natural_focus_pos_grid = round(natural_focus_pos_m * 1e3 / grid_res_mm);
 
             % Loop through each transducer element to create its geometry
-            for el_i = 1:tr.elem_n
+            for el_i = 1:tr.matrix.elem_n
                 el_pos_grid_i = elem_pos_grid(:, el_i);
 
                 r_c = tr.matrix.curv_radius_mm / 1e3;
-                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm;
+                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm * 1e-6;   % [m²], as r_c
                 a_min = 0.001; % Lower bound of aperture radius (in m)
                 a_max = r_c * 0.999; % Slightly less than full bowl radius
 

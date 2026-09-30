@@ -1,201 +1,103 @@
-function [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m)
+function [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m) %#ok<INUSD>
 % CONVERT_TO_ELEMENT_POS  Generate element positions for matrix transducers
 %
 % Generates 3-D element coordinates of a matrix array transducer from the
 % configuration in the parameter structure. Supported grid layouts are
-% rectangular, Fibonacci spiral, and Fermat spiral (via makeCartBowl).
-% Element coordinates are optionally projected onto a spherical cap when
-% the transducer is defined as curved.
+% rectangular (columns along x at elem_width_mm + elem_spacing_width_mm,
+% rows along y at elem_height_mm + elem_spacing_height_mm, clipped to
+% outer_diameter_mm), Fibonacci spiral, and Fermat spiral (makeCartBowl /
+% makeCartDisc). Elements lie on the spherical cap when is_curved, with the
+% apex at trans_pos_m and the beam along +z (as CREATE_MATRIX_KARRAY
+% assumes). rect.sparsity_factor is not applied.
 %
 % Use as:
 %   [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m)
 %
 % Input:
-%   parameters  - (1,1) simulation parameters struct
+%   parameters  - (1,1) simulation parameters struct (unused; kept for the call signature)
 %   tr          - (1,1) transducer parameter struct
 %   trans_pos_m - [3x1] transducer position [m]
-%   focus_pos_m - [3x1] focus position [m]
+%   focus_pos_m - [3x1] focus position [m] (unused; steering is applied via phases)
 %
 % Output:
 %   elem_pos_m - [3xN] element center coordinates [m]
-%   tr         - updated transducer parameter struct
+%   tr         - transducer struct with tr.matrix.elem_n set
 %
 % See also: EXTRACT_ELEMENT_POS, TRANSDUCER_SETUP
 
-    % ----------------------------------------------------------------------
-    % Extract configuration
-    % -----------------------------------------------------------------------
-
-    % Extract defined matrix shape parameters for reading element positions
-    defined = tr.matrix.matrix_shape.define_here;
-    grid_shape = defined.grid_shape;
-
-    % Ensure column vectors
+    % Layout in mm in the transducer frame: apex at the origin, beam along +z
+    % (as CREATE_MATRIX_KARRAY assumes). focus_pos_m is not used: elements sit
+    % on the natural bowl and steering is applied through element phases.
+    m  = tr.matrix;
+    gs = m.matrix_shape.define_here.grid_shape;
+    a  = m.outer_diameter_mm / 2;        % aperture radius [mm]
+    R  = m.curv_radius_mm;               % radius of curvature [mm]
     trans_pos_m = trans_pos_m(:);
-    focus_pos_m = focus_pos_m(:);
 
-    switch grid_shape.type
+    switch gs.type
         case 'fibonacci'
+            % Sunflower (golden-angle) spiral, uniform density over the aperture
+            N  = double(gs.fibonacci.elem_n);
+            i  = (1:N)';
+            r  = a * sqrt((i - 0.5) / N);
+            th = pi * (3 - sqrt(5)) * (i - 1);
+            elem_pos_mm = curve([r .* cos(th), r .* sin(th)], m);
 
-            fib = grid_shape.fibonacci;
-
-            N = fib.elem_n;              % number of elements
-            D = tr.matrix.outer_diameter_mm; % aperture diameter [mm]
-            R = tr.matrix.curv_radius_mm;    % radius of curvature [mm]
-
-            a = D/2;                         % aperture radius [mm]
-            ga = pi*(3 - sqrt(5));           % golden angle
-
-            elem_pos_mm = zeros(N,3);
-
-            for i = 1:N
-
-                % Uniform point distribution inside aperture
-                r     = a * sqrt((i - 0.5)/N);
-                theta = ga * (i - 1);
-
-                x = r*cos(theta);
-                y = r*sin(theta);
-
-                % Project onto spherical cap if curved
-                if tr.matrix.is_curved
-                    z = R - sqrt(R^2 - x^2 - y^2);
-                else
-                    z = 0;
-                end
-
-                elem_pos_mm(i,:) = [x y z];
-
+            % Report pitch and the element size the kerf leaves room for
+            nn = inf(N, 1);
+            for k = 1:N
+                d = hypot(elem_pos_mm(:, 1) - elem_pos_mm(k, 1), elem_pos_mm(:, 2) - elem_pos_mm(k, 2));
+                d(k) = inf;
+                nn(k) = min(d);
             end
-
-            % --- Estimate average element pitch -------------------------------
-            avg_dist = 0;
-            for i = 1:N
-                dists = vecnorm(elem_pos_mm - elem_pos_mm(i,:),2,2); % Euclidean distances
-                dists(i) = inf; % Ignore self
-                avg_dist = avg_dist + min(dists); % Nearest neighbor distance
-            end
-
-            avg_pitch = avg_dist / N; % Average center-to-center spacing
-
-            kerf = fib.kerf_mm;                       % assumed kerf width [mm]
-            element_size = avg_pitch - kerf;
-
-            fprintf('Estimated avg pitch: %.3f mm\n', avg_pitch);
+            fprintf('Estimated avg pitch: %.3f mm\n', mean(nn));
             fprintf('Recommended element size (kerf %.3f mm): %.3f mm\n', ...
-                kerf, element_size);
-
-            % Convert to meters + translate
-            elem_pos_m = (elem_pos_mm / 1e3)' + trans_pos_m;
+                gs.fibonacci.kerf_mm, mean(nn) - gs.fibonacci.kerf_mm);
 
         case 'rect'
-
-            rect = grid_shape.rect;
-
-            % --- Compute array dimensions --------------------------------------
-            tran_width = (rect.elem_n_row * tr.elem_width_mm) + ...
-                ((rect.elem_n_row - 1) * rect.elem_spacing_width_mm);
-
-            tran_height = (rect.elem_n_col * tr.elem_height_mm) + ...
-                ((rect.elem_n_col - 1) * rect.elem_spacing_height_mm);
-
-            % --- Element center coordinates ------------------------------------
-            x_vec = linspace(-tran_width/2 + tr.elem_width_mm/2,...
-                tran_width/2 - tr.elem_width_mm/2,...
-                rect.elem_n_row);
-
-            y_vec = linspace(-tran_height/2 + tr.elem_height_mm/2,...
-                tran_height/2 - tr.elem_height_mm/2,...
-                rect.elem_n_col);
-
-            [X,Y] = meshgrid(x_vec,y_vec);
-
-            % Flat array coordinates
-            X = X + trans_pos_m(1);
-            Y = Y + trans_pos_m(2);
-            Z = trans_pos_m(3) * ones(size(X));
-
-            % [DEBUG] visualize grid
-            if parameters.debug == 1
-                h = figure;
-                scatter(X(:), Y(:), 60, 'filled')
-                axis equal
-                xlabel('X [m]')
-                ylabel('Y [m]')
-                title('Grid - Element Center Positions')
-                grid on
-
-                output_plot_filename = fullfile(parameters.io.dir_debug_source,...
-                    sprintf('sub-%03d_%s_transducer_grid%s.png',...
-                    parameters.subject_id,...
-                    parameters.simulation.medium,...
-                    parameters.io.output_affix));
-
-                saveas(h,output_plot_filename,'png')
-                close(h)
-            end
-
-            % Restrict to circular aperture
-            dx = X(:) - trans_pos_m(1);
-            dy = Y(:) - trans_pos_m(2);
-            distances = sqrt(dx.^2 + dy.^2);
-
-            radius = tr.matrix.elem_od_mm(end) * 1e-3 / 2;
-            mask   = distances <= radius;
-
-            elem_pos_m = [X(:) Y(:) Z(:)];
-            elem_pos_m = elem_pos_m(mask,:);
-
-            % Update number of elements
-            tr.matrix.elem_n = size(elem_pos_m,1);
-
-            % Duplicate source amplitude per element
-            tr.elem_p_amp = tr.elem_p_amp(1) * ...
-                ones(1,tr.matrix.elem_n);
-
-            % [DEBUG] visualize circular aperture
-            if parameters.debug == 1
-                h = figure;
-                scatter(elem_pos_m(:,1)*1e3,elem_pos_m(:,2)*1e3,60,'filled')
-                axis equal
-                xlabel('X [mm]')
-                ylabel('Y [mm]')
-                title('Circular Aperture - Element Center Positions')
-                grid on
-
-                saveas(h,output_plot_filename,'png')
-                close(h)
-            end
-
-            % Apply curvature (spherical cap)
-            if tr.matrix.is_curved
-
-                ROC = tr.matrix.curv_radius_mm / 1000;
-                R2  = ROC^2;
-
-                sagitta_term = R2 - elem_pos_m(:,1).^2 - elem_pos_m(:,2).^2;
-
-                if any(sagitta_term < 0)
-                    error('Some elements fall outside the spherical cap.');
-                end
-
-                elem_pos_m(:,3) = elem_pos_m(:,3) + ROC - sqrt(sagitta_term);
-
-            end
-
-            elem_pos_m = elem_pos_m';
+            % Columns along x (element width), rows along y (element height),
+            % centred on the axis; centres outside the aperture are dropped
+            g = gs.rect;
+            n_col = double(g.elem_n_col); n_row = double(g.elem_n_row);
+            x = ((1:n_col) - (n_col + 1) / 2) * (m.elem_width_mm  + g.elem_spacing_width_mm);
+            y = ((1:n_row) - (n_row + 1) / 2) * (m.elem_height_mm + g.elem_spacing_height_mm);
+            [X, Y] = meshgrid(x, y);
+            keep = hypot(X(:), Y(:)) <= a;
+            elem_pos_mm = curve([X(keep), Y(keep)], m);
 
         case 'fermat'
-            elem_pos_m = makeCartBowl( ...
-                trans_pos_m', ...
-                tr.matrix.curv_radius_mm * 1e-3, ...
-                tr.matrix.outer_diameter_mm * 1e-3, ...
-                focus_pos_m', ...
-                tr.elem_n, ...
-                true);
+            % k-Wave Fermat-spiral sampling of the bowl (or the flat disc)
+            N = double(gs.fermat.elem_n);
+            if m.is_curved
+                p = makeCartBowl([0 0 0], R * 1e-3, 2 * a * 1e-3, [0 0 R * 1e-3], N, false);
+            else
+                p = makeCartDisc([0 0 0], a * 1e-3, [0 0 1], N, false, true);
+            end
+            elem_pos_mm = p' * 1e3;
 
         otherwise
-            error('Grid shape %s is unknown or not implemented.', grid_shape.type)
+            error('Grid shape %s is unknown or not implemented.', gs.type)
     end
 
+    if isempty(elem_pos_mm)
+        error('convert_to_element_pos: the %s grid places no elements inside outer_diameter_mm = %g.', ...
+              gs.type, m.outer_diameter_mm);
+    end
+    tr.matrix.elem_n = size(elem_pos_mm, 1);
+    elem_pos_m = elem_pos_mm' * 1e-3 + trans_pos_m;
+end
+
+function pos = curve(xy, m)
+% Place 2-D element centres [N x 2, mm] on the spherical cap (or the plane)
+    if m.is_curved
+        R = m.curv_radius_mm;
+        s = R^2 - sum(xy.^2, 2);
+        if any(s < 0)
+            error('Some elements fall outside the spherical cap (curv_radius_mm %g).', R);
+        end
+        z = R - sqrt(s);
+    else
+        z = zeros(size(xy, 1), 1);
+    end
+    pos = [xy, z];
 end

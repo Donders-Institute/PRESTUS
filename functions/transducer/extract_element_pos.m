@@ -103,7 +103,7 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
         fprintf('Best-fit radius = %.6f m\n', R_fit);
     
         % [DEBUG] visualize grid
-        if parameters.debug == 1
+        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && parameters.simulation.debug == 1
             h = figure('Name', 'Transducer Element Distribution');
             hold on; grid on;
 
@@ -123,8 +123,8 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
             fig_name = sprintf('sub-%03d_%s_transducer_redone_element_distribution%s', ...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
 
-            saveas(h, fullfile(parameters.dir_debug, [fig_name '.fig']));
-            saveas(h, fullfile(parameters.dir_debug, [fig_name '.png']));
+            saveas(h, fullfile(parameters.io.dir_debug_source, [fig_name '.fig']));
+            saveas(h, fullfile(parameters.io.dir_debug_source, [fig_name '.png']));
 
             close(h);
         end
