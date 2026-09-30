@@ -87,7 +87,13 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
     has_focal = isfield(tr, 'focal_distance_ep') && ~isempty(tr.focal_distance_ep) ...
         && ~isnan(tr.focal_distance_ep);
     has_isppa = isfield(tr, 'target_isppa_wcm2') && ~isempty(tr.target_isppa_wcm2) ...
-        && ~isnan(tr.target_isppa_wcm2);
+        && all(~isnan(tr.target_isppa_wcm2(:)));
+    if has_isppa
+        % A vector requests a multi-ISPPA sweep: the acoustic run uses the
+        % first value as drive level and multi_isppa_pipeline rescales the
+        % pressure to every target (sqrt(target / free-water baseline)).
+        drive_isppa = tr.target_isppa_wcm2(1);
+    end
 
     if ~has_focal || ~has_isppa
         % Cannot resolve without these — let downstream validation catch it.
@@ -135,7 +141,7 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
 
     % Load from library and merge phases/amplitude (without overwriting inline values).
     lib_params = load_transducer_from_library(lib_key, tr.focal_distance_ep, ...
-        tr.target_isppa_wcm2, equip_param, library_path);
+        drive_isppa, equip_param, library_path);
 
     if ~phases_present
         tr.annular.elem_phase_deg = lib_params.transducer.annular.elem_phase_deg;
@@ -146,9 +152,9 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
     end
 
     fprintf(['[transducer %d] Resolved from library: %s | focal %.1f mm ' ...
-        '(calibrated %.1f mm) | %.1f W/cm²\n'], ...
-        t_i, lib_key, tr.focal_distance_ep, lib_params.transducer.tx_calibration.focal_depth_ep_mm, ...
-        tr.target_isppa_wcm2);
+        '(%s) | %.1f W/cm²\n'], ...
+        t_i, lib_key, tr.focal_distance_ep, lib_params.transducer.tx_calibration.phase_model, ...
+        drive_isppa);
 end
 
 % ── Helpers ──────────────────────────────────────────────────────────────
@@ -168,12 +174,18 @@ end
 function dst = mergestruct_shallow(base, override)
 % Merge two structs: fields from override take precedence over base.
 % Only one level deep — nested structs are handled field-by-field.
+% Empty override values count as unset: after load_parameters the study
+% transducer carries every config_default field, mostly [] (elem_n,
+% freq_hz, ...), which must not wipe the library geometry.
     dst = base;
     fn  = fieldnames(override);
     for i = 1:numel(fn)
         f = fn{i};
         if isstruct(override.(f)) && isfield(base, f) && isstruct(base.(f))
             dst.(f) = mergestruct_shallow(base.(f), override.(f));
+        elseif (isempty(override.(f)) || isa(override.(f), 'yaml.Null')) && ...
+                isfield(base, f) && ~isempty(base.(f))
+            % keep the library value
         else
             dst.(f) = override.(f);
         end

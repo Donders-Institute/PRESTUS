@@ -558,6 +558,45 @@ classdef test_transducer_library < matlab.unittest.TestCase
                 'type should be set to annular from equipment YAML');
         end
 
+        function test_minimal_serial_config_through_load_parameters(tc)
+            % The minimal study config from doc_transducer_library.md must
+            % load end to end: config_default's empty transducer fields
+            % ([] elem_n, freq_hz, ...) must not wipe the library geometry.
+            serial = 'CTX_500_026';
+            tran   = tc.equip_param.trans.(serial);
+            dir_   = tc.fresh_dir();
+            fid = fopen(fullfile(dir_, 'config_serial.yaml'), 'w');
+            fprintf(fid, ['subject_id: 1\npath:\n  sim: ''%s''\ntransducer:\n' ...
+                '  serial: ''%s''\n  combo:\n    ds_serial: ''SC_203_035''\n' ...
+                '  focal_distance_ep: 60\n  target_isppa_wcm2: 30\n'], dir_, serial);
+            fclose(fid);
+
+            p = load_parameters('config_serial.yaml', dir_);
+            tr = p.transducer;
+            tc.verifyEqual(char(tr.type), 'annular');
+            tc.verifyEqual(tr.freq_hz, tran.transducer.freq_hz);
+            tc.verifyEqual(tr.annular.elem_od_mm, tran.transducer.annular.elem_od_mm);
+            tc.verifyEqual(tr.annular.curv_radius_mm, tran.transducer.annular.curv_radius_mm);
+            tc.verifyNumElements(tr.annular.elem_phase_deg, tran.transducer.annular.elem_n, ...
+                'phases should be resolved from the calibration library');
+        end
+
+        function test_serial_with_isppa_sweep_resolves_at_first_value(tc)
+            % A vector target_isppa_wcm2 (multi-ISPPA sweep) must not crash the
+            % library lookup; the drive is resolved at the first sweep value.
+            serial = 'CTX_500_026';
+            n      = tc.equip_param.trans.(serial).transducer.annular.elem_n;
+            tr.serial = serial;
+            tr.combo.ds_serial = 'SC_203_035';    % shipped calibration entry
+            tr.focal_distance_ep = 60;
+            tr.target_isppa_wcm2 = [10, 20, 30];
+            sweep  = resolve_transducer_from_serial(tr, tc.equip_param, tc.library_path, 1);
+            tr.target_isppa_wcm2 = 10;
+            single = resolve_transducer_from_serial(tr, tc.equip_param, tc.library_path, 1);
+            tc.verifyNumElements(sweep.annular.elem_phase_deg, n);
+            tc.verifyEqual(sweep.annular.elem_p_amp, single.annular.elem_p_amp);
+        end
+
     end
 
     % ------------------------------------------------------------------ %
