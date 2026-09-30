@@ -46,8 +46,10 @@ if contains(parameters.simulation.medium, {'layered'})
     % matrix.
 
     % Preprocess layered head
+    % parameters.transducer is updated with positions in the (RAS+) T1 grid
+    % that planimg.transf starts from.
     [medium_masks, segmentation, bone_mask, pseudoCT, ~, ~, planimg.t1_image_orig, ...
-        planimg.t1_header, planimg.transf, planimg.inv_transf] = ...
+        planimg.t1_header, planimg.transf, planimg.inv_transf, parameters.transducer] = ...
         preproc_head(parameters);
 
     % update present layers (following medium mask creation)

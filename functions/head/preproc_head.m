@@ -1,5 +1,6 @@
 function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
-    focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix] = preproc_head(parameters)
+    focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix, ...
+    transducer] = preproc_head(parameters)
 
 % PREPROC_HEAD  Preprocess structural MRI for k-Wave simulation
 %
@@ -11,7 +12,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 % Use as:
 %   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
 %    focus_pos_final, t1_image, t1_header, final_transformation_matrix, ...
-%    inv_final_transformation_matrix] = preproc_head(parameters)
+%    inv_final_transformation_matrix, transducer] = preproc_head(parameters)
 %
 % Input:
 %   parameters - (1,1) simulation configuration struct
@@ -28,6 +29,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 %   t1_header                       - NIfTI header struct
 %   final_transformation_matrix     - [4x4] combined alignment + crop transform
 %   inv_final_transformation_matrix - [4x4] inverse of final_transformation_matrix
+%   transducer                      - parameters.transducer with configured
+%                                     trans_pos/focus_pos carried into the
+%                                     RAS+ T1 grid (unchanged if the T1 is RAS+)
 %
 % See also: PREPROC_ALIGN_TO_FOCAL_AXIS, HEAD_SMOOTH_AND_CROP, PREPROC_CROP_GRID
 
@@ -72,7 +76,23 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         t1_image = niftiread(filename_t1_simnibs);
         t1_header = niftiinfo(filename_t1_simnibs);
     end
-    [t1_image, t1_header] = ensure_ras_plus(t1_image, t1_header);
+    [t1_image, t1_header, t1_vox_map] = ensure_ras_plus(t1_image, t1_header);
+
+    % Configured voxel positions refer to the T1 as stored on disk; carry
+    % them into the reoriented grid that all transforms below start from.
+    if ~isequal(t1_vox_map, eye(4))
+        for ti = 1:numel(parameters.transducer)
+            for fn = {'trans_pos', 'focus_pos'}
+                if isfield(parameters.transducer(ti), fn{1}) && ...
+                        numel(parameters.transducer(ti).(fn{1})) == 3
+                    parameters.transducer(ti).(fn{1}) = affine_apply_pts( ...
+                        parameters.transducer(ti).(fn{1})(:)', t1_vox_map);
+                end
+            end
+        end
+        fprintf('[preproc_head] %s\n', 'Reoriented configured transducer positions to the RAS+ T1 grid.');
+    end
+    transducer = parameters.transducer;
 
     if parameters.pct.enabled == 1
         % Load pseudoCT from the resolved pCT directory (parameters.io.dir_pct).
