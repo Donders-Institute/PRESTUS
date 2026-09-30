@@ -65,7 +65,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     else
         % Use the natural focus based on transducer curvature
         curv_radius = parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm;
-        natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
+        natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid.resolution_mm];
         focal_axis = [natural_focus - trans_pos_grid, 1]';
     end
 
@@ -157,7 +157,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 
     fprintf('[preproc_align_to_focal_axis] ---- alignment summary ----\n');
     fprintf('[preproc_align_to_focal_axis]   input grid dims  : [%d %d %d]\n', size(nii_image, 1), size(nii_image, 2), size(nii_image, 3));
-    fprintf('[preproc_align_to_focal_axis]   resolution_mm    : %.4f\n', parameters.grid_step_mm);
+    fprintf('[preproc_align_to_focal_axis]   resolution_mm    : %.4f\n', parameters.grid.resolution_mm);
     fprintf('[preproc_align_to_focal_axis]   angle_x_deg      : %.4f\n', rad2deg(angle_x_rad));
     fprintf('[preproc_align_to_focal_axis]   angle_y_deg      : %.4f\n', rad2deg(angle_y_rad));
     fprintf('[preproc_align_to_focal_axis]   trans_pos_before : [%.1f %.1f %.1f]\n', trans_pos_grid(1), trans_pos_grid(2), trans_pos_grid(3));

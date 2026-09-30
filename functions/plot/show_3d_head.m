@@ -143,7 +143,7 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
             else
                 % Use the natural focus based on transducer curvature
                 curv_radius = tr.(tr.type).curv_radius_mm;
-                natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
+                natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid.resolution_mm];
                 natural_focus_grid = natural_focus / pixel_size;
 
                 norm_vec = (thisTrans - natural_focus_grid) / norm(thisTrans - natural_focus_grid);

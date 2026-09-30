@@ -73,7 +73,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
         raw1 = focus_pos_grid - trans_pos_grid;
     else
         curv_radius = parameters.transducer(1).(parameters.transducer(1).type).curv_radius_mm;
-        natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid_step_mm];
+        natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid.resolution_mm];
         raw1 = natural_focus - trans_pos_grid;
     end
     u1 = raw1 / norm(raw1);
