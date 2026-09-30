@@ -96,6 +96,7 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - ⚠️ **Fixed:** the lazy CW source (`CWSourceMatrix`, `matlab_cpu`/`matlab_gpu`) now supports k-Wave's source scaling (`source.p .* s` and the per-voxel loop for heterogeneous media); previously these runs errored before the time loop. Row index 58 was also misread as `:` (its character code), and single-element transducers produced a sparse source that could not be cast to single. Results match the dense source matrix
 
 #### Acoustic simulation
+- ⚠️ **Fixed:** 2-D and axisymmetric grids crashed in `compute_focal_metrics` (3-element peak/centroid index minus a 2-element `trans_pos`) and in the `acoustic_analysis` overlay (3-column position matrices). Positions now have the grid's dimensionality
 - `resolve_acoustic_fov_params` resolves `'auto'` sentinel values for `grid.acoustic_fov_length_mm` and `grid.acoustic_fov_diameter_mm` from focal geometry; `has_acoustic_fov` flag gates all downstream crop/restore logic
 - `resolve_water_baseline` encapsulates the decision of whether to run a free-water baseline simulation and stores the result in `acoustic_provenance.freefield_isppa_wcm2`
 - `prepare_thermal_domain` restores full-grid state (or adjusts `planimg` affines for thermal-in-FOV mode) after an acoustic FOV crop

@@ -451,8 +451,8 @@ end
     end
 
     % Build N×3 position matrices so plot_overlay can draw every transducer.
-    all_tpos = zeros(n_plots, 3);
-    all_fpos = zeros(n_plots, 3);
+    all_tpos = zeros(n_plots, numel(parameters.transducer(1).trans_pos));   % 2 on 2D grids
+    all_fpos = zeros(n_plots, numel(parameters.transducer(1).focus_pos));
     for ti = 1:n_plots
         all_tpos(ti, :) = parameters.transducer(ti).trans_pos;
         all_fpos(ti, :) = parameters.transducer(ti).focus_pos;

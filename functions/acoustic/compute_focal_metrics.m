@@ -98,8 +98,12 @@ end
 
     % Find peak intensity voxel within region
     [~, Ix, Iy, Iz] = masked_max_3d(acoustic_Ipa, region_mask);
+    % Voxel positions have the grid's dimensionality (2 on 2D/axisymmetric
+    % grids, where masked_max_3d returns a trailing index of 1)
+    nd = ndims(acoustic_Ipa);
     fm.peak_pos_vox   = [Ix, Iy, Iz];
-    fm.peak_dist_mm   = norm(([Ix, Iy, Iz] - trans_pos) .* res_mm);
+    fm.peak_pos_vox   = fm.peak_pos_vox(1:nd);
+    fm.peak_dist_mm   = norm((fm.peak_pos_vox - trans_pos) .* res_mm);
 
     % Build −3 dB and −6 dB masks
     fm.mask_3dB = acoustic_Ipa >= peak_Isppa / 2 & region_mask;  % I ≥ Imax/2
@@ -114,6 +118,7 @@ end
     if ~isempty(idx)
         [cx, cy, cz] = ind2sub(size(fm.mask_3dB), idx);
         fm.centroid_3dB_vox     = [mean(cx), mean(cy), mean(cz)];
+        fm.centroid_3dB_vox     = fm.centroid_3dB_vox(1:nd);
     else
         fm.centroid_3dB_vox     = fm.peak_pos_vox;
     end
