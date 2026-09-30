@@ -123,7 +123,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             p.transducer(1).focus_pos = [];
 
             % Ensure script_path exists and has code/PlanTUS.py so we get
-            % past path checks; _launcher_py is not needed here (error fires
+            % past path checks; launcher_py_override is not needed here (error fires
             % before the subprocess).
             script_dir = fullfile(tc.TmpDir, 'fake_plantus');
             make_fake_plantus_install(script_dir);
@@ -165,7 +165,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
 
             tc.verifyError( ...
                 @() position_transducer_plantus(p, t1_hdr), ...
@@ -188,7 +188,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
 
             tc.verifyError( ...
                 @() position_transducer_plantus(p, t1_hdr), ...
@@ -211,10 +211,15 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             p.placement.mode = 'plantus';
             p.placement.plantus.script_path = '';  % force earliest plantus error
 
-            err = tc.verifyError( ...
-                @() preproc_transducer_placement(p), ...
-                'PRESTUS:plantus:missingConfig');
-            tc.verifySubstring(err.identifier, 'plantus', ...
+            % try/catch rather than verifyError's return value, which is
+            % `missing` (not an MException) in some MATLAB releases.
+            err_id = '';
+            try
+                preproc_transducer_placement(p);
+            catch err
+                err_id = err.identifier;
+            end
+            tc.verifyEqual(err_id, 'PRESTUS:plantus:missingConfig', ...
                 'Error must originate from the plantus code path, not the mode dispatcher');
         end
 
@@ -242,7 +247,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             %   direction   = [0; 0; 1]  (pointing along z axis)
             % Using a 1mm-iso T1 centred at [100 100 100] voxels:
             %   trans_pos_ras ≈ [10 20 30] + reference_dist * [0 0 1]
-            %   trans_pos (vox) ≈ trans_pos_ras + [100 100 100]
+            %   trans_pos (vox, 1-based) ≈ trans_pos_ras + [101 101 101]
 
             python_bin = find_system_python();
             tc.assumeNotEmpty(python_bin, ...
@@ -260,7 +265,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
 
             % Use focus_pos (voxel) as target; no MNI conversion needed
             p.transducer(1).focus_pos = [100, 100, 130];
@@ -313,7 +318,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
             p.transducer(1).focus_pos            = [100, 100, 130];
             p.placement.plantus.mni_target_mm    = [];
 
@@ -350,7 +355,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
             p.transducer(1).focus_pos            = [100, 100, 130];
             p.placement.plantus.mni_target_mm    = [];
 
@@ -383,7 +388,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
             p.transducer(1).focus_pos            = [100, 100, 130];
             p.transducer(2).focus_pos            = [100, 100, 130];
             p.placement.plantus.mni_target_mm    = [];
@@ -416,7 +421,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
             p.transducer(1).focus_pos            = [100, 100, 130];
             p.placement.plantus.mni_target_mm    = [];
 
@@ -424,14 +429,15 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             % and writes the expected Localite mat so the function completes.
             [~, ~, ~, ~] = position_transducer_plantus(p, t1_hdr);
 
-            yaml_echo = fullfile(tc.TmpDir, 'm2m_sub-001', 'PlanTUS', ...
+            yaml_echo = fullfile(tc.TmpDir, 'PlanTUS', 'sub-001', ...
                 'test_thal', 'yaml_fields.txt');
             tc.assumeTrue(isfile(yaml_echo), ...
                 'check_yaml wrapper did not produce yaml_fields.txt — skipping YAML field check.');
 
             contents = fileread(yaml_echo);
             required_keys = {'min_distance', 'max_distance', 'transducer_diameter', ...
-                             'focal_distance_list', 'flhm_list', 'plane_offset'};
+                             'focal_distance_list', 'flhm_list', 'plane_offset', ...
+                             'save_metrics'};
             for i = 1:numel(required_keys)
                 tc.verifySubstring(contents, required_keys{i}, ...
                     sprintf('PlanTUS YAML must contain key: %s', required_keys{i}));
@@ -458,13 +464,13 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             p.placement.plantus.script_path      = script_dir;
             p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
-            p.placement.plantus._launcher_py     = launcher_path;
+            p.placement.plantus.launcher_py_override = launcher_path;
             p.transducer(1).focus_pos            = [100, 100, 130];
             p.placement.plantus.mni_target_mm    = [];
 
             position_transducer_plantus(p, t1_hdr);
 
-            mask_path = fullfile(tc.TmpDir, 'm2m_sub-001', 'PlanTUS', ...
+            mask_path = fullfile(tc.TmpDir, 'PlanTUS', 'sub-001', ...
                 'test_thal', 'sub-001_test_thal_mask.nii.gz');
             tc.verifyTrue(isfile(mask_path), 'Target mask NIfTI must be written to disk.');
 
@@ -519,10 +525,12 @@ function p = make_plantus_parameters(tmp_dir)
     p.path.sim         = tmp_dir;
     p.io.dir_output    = tmp_dir;
 
-    % plantus config — script_path / env_path intentionally left
-    % empty here so each test can set exactly what it needs to test.
+    % plantus config — script_path intentionally left empty here so each
+    % test can set exactly what it needs to test. env_path is a non-empty
+    % placeholder so the upfront required-field validation passes; tests
+    % that reach the Python lookup replace it with make_fake_simnibs_env.
     p.placement.plantus.script_path              = '';
-    p.placement.plantus.env_path         = '';
+    p.placement.plantus.env_path                 = fullfile(tmp_dir, 'no_simnibs_env');
     p.placement.plantus.target_name              = 'test_thal';
     p.placement.plantus.mni_target_mm            = [];
     p.placement.plantus.focal_distance_list      = [63.2, 70.0];
@@ -541,7 +549,7 @@ end
 % ── Synthetic T1 ──────────────────────────────────────────────────────────
 function t1_hdr = make_synthetic_t1_header()
 % Return a minimal header struct matching niftiinfo output for a 200³
-% 1mm-iso volume. RAS = voxel - [100 100 100] mm (origin at image centre).
+% 1mm-iso volume. RAS = voxel0 - [100 100 100] mm (0-based voxel; origin at image centre).
 % This struct is sufficient for localite_matrix_to_positions and
 % position_transducer_plantus for tests that do not touch disk.
     t1_hdr               = struct();

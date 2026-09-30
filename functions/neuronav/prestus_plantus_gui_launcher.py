@@ -8,12 +8,23 @@ Connectome Workbench.  The user clicks a skin vertex in wb_view, confirms
 placement, and the script writes a *_Localite.mat under the PlanTUS output
 directory.  PRESTUS reads that file once the subprocess exits.
 
+Metrics, scoring and outputs are shared with the headless launcher
+(plantus_common.py): the composite score is computed here too, and
+plantus_metrics.mat records both its optimum and the vertex placed.
+
+Confirmation (--selection):
+  prompt      yes/no console prompt after each click (needs a terminal stdin)
+  last_click  last selected vertex is placed when wb_view closes (used by
+              PRESTUS, which does not connect stdin)
+  auto        (default) prompt if stdin is a terminal, else last_click
+
 Usage
 -----
 python prestus_plantus_gui_launcher.py \
     <t1_filepath> <simnibs_mesh_filepath> \
     <target_mask_filepath> <tx_config_yaml> \
-    --plantus_root <path_to_PlanTUS_installation>
+    --plantus_root <path_to_PlanTUS_installation> \
+    [--selection auto|prompt|last_click]
 
 Requirements
 ------------
@@ -25,12 +36,14 @@ Requirements
 import sys
 import os
 import argparse
-import shutil
-import math
-import numpy as np
 import re
 import subprocess
 import threading
+
+import numpy as np
+
+import plantus_compat
+import plantus_common as pc
 
 
 # ---------------------------------------------------------------------------
@@ -48,45 +61,20 @@ def parse_args():
                    help="Path to PlanTUS installation directory "
                         "(must contain code/PlanTUS.py and resources/).")
     p.add_argument("--output_dir", default="",
-                   help="Output directory (accepted for interface compatibility; "
-                        "GUI launcher uses PlanTUS default output location).")
+                   help="Output directory (default: <mesh_dir>/PlanTUS/<mask_stem>, "
+                        "the PlanTUS_wrapper.py location).")
+    p.add_argument("--selection", choices=["auto", "prompt", "last_click"],
+                   default="auto",
+                   help="How a clicked vertex is confirmed. 'prompt': yes/no at "
+                        "the console (needs an interactive terminal). "
+                        "'last_click': the last selected vertex is placed when "
+                        "wb_view closes (no stdin needed). 'auto' (default): "
+                        "'prompt' if stdin is a terminal, else 'last_click'.")
     return p.parse_args()
 
 
-# ---------------------------------------------------------------------------
-# YAML loader (same as headless launcher)
-# ---------------------------------------------------------------------------
-
-def load_yaml(path):
-    try:
-        import yaml
-        with open(path, "r") as fh:
-            return yaml.safe_load(fh)
-    except ImportError:
-        pass
-    cfg = {}
-    with open(path, "r") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" not in line:
-                continue
-            k, _, v = line.partition(":")
-            k, v = k.strip(), v.strip()
-            try:
-                if v.startswith("["):
-                    import ast
-                    cfg[k] = ast.literal_eval(v)
-                elif "." in v:
-                    cfg[k] = float(v)
-                elif v.lower() in ("true", "false"):
-                    cfg[k] = v.lower() == "true"
-                else:
-                    cfg[k] = int(v)
-            except (ValueError, SyntaxError):
-                cfg[k] = v
-    return cfg
+def log(msg):
+    print(f"[prestus_plantus_gui_launcher] {msg}")
 
 
 # ---------------------------------------------------------------------------
@@ -94,210 +82,99 @@ def load_yaml(path):
 # ---------------------------------------------------------------------------
 
 def main():
+    # Line-buffer stdout so progress and instructions reach the caller (e.g.
+    # MATLAB's run_command with Echo) as they are printed, not at exit.
+    sys.stdout.reconfigure(line_buffering=True)
     args = parse_args()
 
-    t1_path    = args.t1_filepath
-    mesh_path  = args.simnibs_mesh_filepath
-    mask_path  = args.target_mask_filepath
-    yaml_path  = args.tx_config_yaml
+    # Absolute paths: the script chdirs into the PlanTUS code folder below.
+    t1_path    = os.path.abspath(args.t1_filepath)
+    mesh_path  = os.path.abspath(args.simnibs_mesh_filepath)
+    mask_path  = os.path.abspath(args.target_mask_filepath)
+    yaml_path  = os.path.abspath(args.tx_config_yaml)
 
     for p, label in [(t1_path, "T1"), (mesh_path, "mesh"),
                      (mask_path, "target mask"), (yaml_path, "YAML config")]:
         if not os.path.isfile(p):
             sys.exit(f"[prestus_plantus_gui_launcher] {label} not found: {p}")
 
-    cfg = load_yaml(yaml_path)
+    s = pc.read_config(pc.load_yaml(yaml_path))
+
+    target_mask_filename = os.path.basename(mask_path)
+    target_roi_name = target_mask_filename.replace(".nii.gz", "").replace(".nii", "")
+
+    # Resolved before the chdir below. Same output location as the headless launcher, so PRESTUS finds the
+    # *Localite.mat in the work_dir it passes as --output_dir.
+    if args.output_dir:
+        output_path = os.path.abspath(args.output_dir)
+    else:
+        output_path = os.path.join(os.path.split(mesh_path)[0],
+                                   "PlanTUS", target_roi_name)
+    os.makedirs(output_path, exist_ok=True)
 
     # ---- Resolve PlanTUS root ------------------------------------------------
-    candidates_root = []
-    if args.plantus_root:
-        candidates_root.append(args.plantus_root)
-    prestus_root = os.path.abspath(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                     "..", "..", ".."))
-    candidates_root.append(os.path.join(prestus_root, "PlanTUS"))
-    candidates_root.append(os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..", "..", "..", "..", "tools", "PlanTUS"))
-
-    plantus_main_folder = None
-    for cand in candidates_root:
-        cand = os.path.normpath(cand)
-        if os.path.isfile(os.path.join(cand, "code", "PlanTUS.py")):
-            plantus_main_folder = cand
-            break
+    plantus_main_folder, tried = pc.resolve_plantus_root(args.plantus_root, __file__)
     if plantus_main_folder is None:
         sys.exit("[prestus_plantus_gui_launcher] PlanTUS.py not found. Tried:\n  " +
-                 "\n  ".join(candidates_root))
-
+                 "\n  ".join(tried))
     plantus_code_path = os.path.join(plantus_main_folder, "code")
+    planning_template, placement_template = pc.scene_templates(plantus_main_folder)
 
     sys.path.insert(0, plantus_code_path)
     os.chdir(plantus_code_path)
     import PlanTUS
 
-    # ---- Transducer / placement variables -----------------------------------
-    max_distance        = float(cfg.get("max_distance",        70.0))
-    min_distance        = float(cfg.get("min_distance",        30.0))
-    transducer_diameter = float(cfg.get("transducer_diameter", 60.0))
-    max_angle           = float(cfg.get("max_angle",           10.0))
-    plane_offset        = float(cfg.get("plane_offset",         0.0))
-    additional_offset   = float(cfg.get("additional_offset",    0.0))
-    focal_distance_list = list(cfg.get("focal_distance_list",  []))
-    flhm_list           = list(cfg.get("flhm_list",            []))
+    # Same fix as the headless launcher: PlanTUS's cubic FLHM fit needs >= 4
+    # calibration points, but the geometric fallback yields only one.
+    plantus_compat.patch_compute_flhm(PlanTUS)
 
-    target_mask_filename = os.path.split(mask_path)[1]
-    target_roi_name = target_mask_filename.replace(".nii.gz", "").replace(".nii", "")
-
-    output_path = os.path.join(os.path.split(mesh_path)[0],
-                               "PlanTUS", target_roi_name)
-    os.makedirs(output_path, exist_ok=True)
-
-    # Copy mask to output directory (PlanTUS_wrapper.py convention)
-    shutil.copy(mask_path, output_path + "/")
-    target_roi_filepath = output_path + "/" + target_mask_filename
-
-    # Scene templates and transducer model
-    planning_scene_template_filepath = os.path.join(
-        plantus_main_folder,
-        "resources", "scene_templates",
-        "TUSTransducerPlacementPlanning_TEMPLATE.scene")
-    placement_scene_template_filepath = os.path.join(
-        plantus_main_folder,
-        "resources", "scene_templates",
-        "TUSTransducerPlacement_TEMPLATE.scene")
-    transducer_surface_model_filepath = ""  # use generic model
+    pc.remove_stale_metrics(output_path, log)
+    target_roi_filepath = pc.stage_mask(mask_path, output_path)
 
     # Connectome Workbench path
-    connectome_wb_path = str(cfg.get("connectome_wb_path", "")).strip()
-    if connectome_wb_path:
+    if s["connectome_wb_path"]:
         # Prepend to PATH so wb_view / wb_command are found
-        os.environ["PATH"] = connectome_wb_path + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = s["connectome_wb_path"] + os.pathsep + os.environ.get("PATH", "")
 
-    # ---- Metric computation (same as wrapper.py) ----------------------------
-    print("[prestus_plantus_gui_launcher] Converting SimNIBS mesh to surfaces...")
-    PlanTUS.convert_simnibs_mesh_to_surface(mesh_path, [1005], "skin",  output_path)
-    PlanTUS.add_structure_information(output_path + "/skin.surf.gii",  "CORTEX_LEFT")
-    PlanTUS.convert_simnibs_mesh_to_surface(mesh_path, [1007, 1008], "skull", output_path)
-    PlanTUS.add_structure_information(output_path + "/skull.surf.gii", "CORTEX_RIGHT")
+    missing = pc.check_dependencies()
+    if missing:
+        sys.exit("[prestus_plantus_gui_launcher] Missing PlanTUS dependencies "
+                 f"(python: {sys.executable}):\n  " + "\n  ".join(missing))
 
-    PlanTUS.create_avoidance_mask(
-        mesh_path, output_path + "/skin.surf.gii", transducer_diameter / 2)
-
-    target_center = PlanTUS.roi_center_of_gravity(target_roi_filepath)
-
-    skin_target_distances = PlanTUS.distance_between_surface_and_point(
-        output_path + "/skin.surf.gii", target_center)
-    PlanTUS.create_metric_from_pseudo_nifti(
-        "distances", skin_target_distances, output_path + "/skin.surf.gii")
-    PlanTUS.mask_metric(output_path + "/distances_skin.func.gii",
-                        output_path + "/avoidance_skin.func.gii")
-    PlanTUS.add_structure_information(
-        output_path + "/distances_skin.func.gii", "CORTEX_LEFT")
-    PlanTUS.threshold_metric(output_path + "/distances_skin.func.gii", max_distance)
-    PlanTUS.mask_metric(output_path + "/distances_skin_thresholded.func.gii",
-                        output_path + "/avoidance_skin.func.gii")
-    PlanTUS.add_structure_information(
-        output_path + "/distances_skin_thresholded.func.gii", "CORTEX_LEFT")
-
-    skin_coordinates, skin_normals = PlanTUS.compute_surface_metrics(
-        output_path + "/skin.surf.gii")
-    skin_target_vectors = PlanTUS.vectors_between_surface_and_point(
-        output_path + "/skin.surf.gii", target_center)
-    skin_target_angles = []
-    for i in np.arange(len(skin_target_vectors)):
-        skin_target_angles.append(math.degrees(
-            PlanTUS.angle_between_vectors(skin_target_vectors[i], skin_normals[i])))
-    skin_target_angles = np.abs(np.array(skin_target_angles))
-    PlanTUS.create_metric_from_pseudo_nifti(
-        "angles", skin_target_angles, output_path + "/skin.surf.gii")
-    PlanTUS.mask_metric(output_path + "/angles_skin.func.gii",
-                        output_path + "/avoidance_skin.func.gii")
-    PlanTUS.add_structure_information(
-        output_path + "/angles_skin.func.gii", "CORTEX_LEFT")
-
-    PlanTUS.stl_from_nii(target_roi_filepath, 0.25)
-    skin_target_intersections = PlanTUS.compute_vector_mesh_intersections(
-        skin_coordinates, skin_normals,
-        output_path + "/" + target_roi_name + "_3Dmodel.stl", 200)
-
-    skin_target_intersection_values = []
-    for i in np.arange(len(skin_target_intersections)):
-        segs = skin_target_intersections[i]
-        if len(segs) <= 1:
-            skin_target_intersection_values.append(0)
-        elif len(segs) in (2, 3):
-            skin_target_intersection_values.append(
-                np.linalg.norm(np.array(segs[1]) - np.array(segs[0])))
-        elif len(segs) == 4:
-            skin_target_intersection_values.append(
-                np.linalg.norm(np.array(segs[1]) - np.array(segs[0])) +
-                np.linalg.norm(np.array(segs[3]) - np.array(segs[2])))
-        else:
-            skin_target_intersection_values.append(np.nan)
-    skin_target_intersection_values = np.array(skin_target_intersection_values)
-    PlanTUS.create_metric_from_pseudo_nifti(
-        "target_intersection", skin_target_intersection_values,
-        output_path + "/skin.surf.gii")
-    PlanTUS.mask_metric(output_path + "/target_intersection_skin.func.gii",
-                        output_path + "/avoidance_skin.func.gii")
-    PlanTUS.add_structure_information(
-        output_path + "/target_intersection_skin.func.gii", "CORTEX_LEFT")
-
-    skull_coordinates, skull_normals = PlanTUS.compute_surface_metrics(
-        output_path + "/skull.surf.gii")
-    skin_skull_intersections = PlanTUS.compute_vector_mesh_intersections(
-        skin_coordinates, skin_normals, output_path + "/skull.stl", 40)
-    skin_skull_angle_list = []
-    for i in np.arange(len(skin_coordinates)):
-        try:
-            intersection_coordinate = skin_skull_intersections[i][0]
-            ED_skull = np.linalg.norm(skull_coordinates - intersection_coordinate, axis=1)
-            closest = int(np.argmin(ED_skull))
-            skin_skull_angle_list.append(math.degrees(
-                PlanTUS.angle_between_vectors(skin_normals[i], skull_normals[closest])))
-        except Exception:
-            skin_skull_angle_list.append(0)
-    skin_skull_angles = np.array(skin_skull_angle_list)
-    PlanTUS.create_metric_from_pseudo_nifti(
-        "skin_skull_angles", skin_skull_angles, output_path + "/skin.surf.gii")
-    PlanTUS.mask_metric(output_path + "/skin_skull_angles_skin.func.gii",
-                        output_path + "/avoidance_skin.func.gii")
-    PlanTUS.add_structure_information(
-        output_path + "/skin_skull_angles_skin.func.gii", "CORTEX_LEFT")
+    # ---- Metric computation and scoring (shared with headless) -------------
+    m = pc.compute_metrics(PlanTUS, mesh_path, target_roi_filepath, output_path, s, log)
+    score, best_vertex = pc.score_metrics(m, s)
+    if best_vertex is None:
+        log("Note: no vertex is eligible under the composite score "
+            "(avoidance mask / distance range); any clicked vertex can still be placed.")
+    else:
+        log(f"Composite-score optimum (headless choice): vertex {best_vertex} "
+            f"(score = {score[best_vertex]:.4f})")
 
     # ---- Build and open planning scene in wb_view ---------------------------
-    scene_variable_names = [
-        'SKIN_SURFACE_FILENAME',   'SKIN_SURFACE_FILEPATH',
-        'SKULL_SURFACE_FILENAME',  'SKULL_SURFACE_FILEPATH',
-        'DISTANCES_FILENAME',      'DISTANCES_FILEPATH',
-        'INTERSECTION_FILENAME',   'INTERSECTION_FILEPATH',
-        'ANGLES_FILENAME',         'ANGLES_FILEPATH',
-        'ANGLES_SKIN_SKULL_FILENAME', 'ANGLES_SKIN_SKULL_FILEPATH',
-        'DISTANCES_MAX_FILENAME',  'DISTANCES_MAX_FILEPATH',
-        'T1_FILENAME',             'T1_FILEPATH',
-        'MASK_FILENAME',           'MASK_FILEPATH',
-    ]
-    scene_variable_values = [
-        'skin.surf.gii',             './skin.surf.gii',
-        'skull.surf.gii',            './skull.surf.gii',
-        'distances_skin.func.gii',   './distances_skin.func.gii',
-        'target_intersection_skin.func.gii', './target_intersection_skin.func.gii',
-        'angles_skin.func.gii',      './angles_skin.func.gii',
-        'skin_skull_angles_skin.func.gii', './skin_skull_angles_skin.func.gii',
-        'distances_skin_thresholded.func.gii', './distances_skin_thresholded.func.gii',
-        'T1.nii.gz',                 '../../T1.nii.gz',
-        target_mask_filename,        './' + target_mask_filename,
-    ]
+    if not planning_template:
+        sys.exit("[prestus_plantus_gui_launcher] Planning scene template not found in "
+                 + os.path.join(plantus_main_folder, "resources", "scene_templates"))
+    scene_path = pc.write_planning_scene(PlanTUS, planning_template, output_path,
+                                         t1_path, target_mask_filename)
 
-    scene_path = output_path + "/scene.scene"
-    PlanTUS.create_scene(planning_scene_template_filepath, scene_path,
-                         scene_variable_names, scene_variable_values)
+    # Selection mode.  "prompt" asks yes/no at the console after each click,
+    # which needs an interactive stdin.  When launched from MATLAB (via
+    # run_command) stdin is a pipe nobody writes to, so input() would block
+    # forever -- there, "last_click" is used instead: every click updates the
+    # selection and the last selected vertex is placed once wb_view closes.
+    selection = args.selection
+    if selection == "auto":
+        selection = "prompt" if sys.stdin is not None and sys.stdin.isatty() else "last_click"
 
     print("[prestus_plantus_gui_launcher] Opening Connectome Workbench...")
     print("  Click on a skin vertex in wb_view to select the transducer position.")
-    print("  Type 'yes' at the prompt to confirm and generate placement, then")
-    print("  close wb_view or press Enter to finish.")
+    if selection == "prompt":
+        print("  Type 'yes' at the prompt to confirm and generate placement, then")
+        print("  close wb_view to finish.")
+    else:
+        print("  Click again to change the selection; the last selected vertex is")
+        print("  used. Close wb_view to confirm (close without clicking to abort).")
 
     command = "wb_view -logging FINER " + scene_path
     pattern = re.compile(r"Switched vertex to triangle nearest vertex\s+(\.\d+)")
@@ -314,9 +191,27 @@ def main():
     listener = mouse.Listener(on_click=on_click)
     listener.start()
 
+    # wb_view's stdout is discarded: only stderr (the logging stream) is read,
+    # and an unread stdout pipe could fill up and stall wb_view.
     process = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         shell=True, cwd=output_path, text=True)
+
+    placed = []
+
+    def place(vertex):
+        print(f"Generating placement for vertex {vertex}...")
+        pc.place_vertex(PlanTUS, vertex, output_path, target_roi_filepath,
+                        t1_path, s, placement_template)
+        placed.append(vertex)
+        if 0 <= vertex < len(score) and np.isfinite(score[vertex]):
+            rank = int((score < score[vertex]).sum()) + 1
+            print(f"Placement written for vertex {vertex} "
+                  f"(composite score {score[vertex]:.4f}, rank {rank} "
+                  f"of {int(np.isfinite(score).sum())} eligible).")
+        else:
+            print(f"Placement written for vertex {vertex} "
+                  f"(not eligible under the composite score).")
 
     def read_output():
         nonlocal triangle_number, process_line
@@ -329,29 +224,16 @@ def main():
                 if match:
                     triangle_number = int(match.group(1).replace(".", ""))
                     print(f"\nSwitched to vertex {triangle_number}")
-                    response = input(
-                        f"Generate transducer placement for vertex "
-                        f"{triangle_number}? (yes/no): ").strip().lower()
-                    if response == "yes":
-                        print(f"Generating placement for vertex {triangle_number}...")
-                        PlanTUS.prepare_acoustic_simulation(
-                            triangle_number,
-                            output_path,
-                            target_roi_filepath,
-                            t1_path,
-                            max_distance,
-                            min_distance,
-                            transducer_diameter,
-                            max_angle,
-                            plane_offset,
-                            additional_offset,
-                            transducer_surface_model_filepath,
-                            focal_distance_list,
-                            flhm_list,
-                            placement_scene_template_filepath)
-                        print(f"Placement written for vertex {triangle_number}.")
+                    if selection == "prompt":
+                        response = input(
+                            f"Generate transducer placement for vertex "
+                            f"{triangle_number}? (yes/no): ").strip().lower()
+                        if response == "yes":
+                            place(triangle_number)
+                        else:
+                            print("No action taken — click another vertex.")
                     else:
-                        print("No action taken — click another vertex.")
+                        print("  Selected. Close wb_view to confirm, or click another vertex.")
                     process_line = False
 
     output_thread = threading.Thread(target=read_output)
@@ -364,6 +246,21 @@ def main():
     if triangle_number is None:
         sys.exit("[prestus_plantus_gui_launcher] wb_view closed without vertex selection. "
                  "No Localite.mat written.")
+
+    if selection == "last_click":
+        place(triangle_number)
+
+    # Exit non-zero when nothing was confirmed, so PRESTUS does not fall back
+    # on a *Localite.mat left over from an earlier run.
+    if not placed:
+        sys.exit("[prestus_plantus_gui_launcher] No placement confirmed. "
+                 "No Localite.mat written.")
+
+    # PRESTUS uses the most recently written placement, i.e. the last one.
+    if s["save_metrics"]:
+        pc.save_metrics(output_path, m, s, score, best_vertex, placed[-1],
+                        "gui", log)
+    pc.run_evaluation(output_path, s, log)
 
     print("[prestus_plantus_gui_launcher] Done.")
 

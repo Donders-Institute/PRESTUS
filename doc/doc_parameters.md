@@ -338,6 +338,30 @@ See [doc_placement_mni.md](doc_placement_mni.md).
 | `focus_pos_mm` | Focus / target position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the nonlinear (nonl) transform, like the heuristic target. |
 | `skin_gap_mm` | Standoff from scalp to transducer along the focal axis [mm]. | `5` | Default matches the heuristic's gap. |
 
+#### `placement.plantus`
+
+See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactive selection is set by `simulation.interactive`.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `script_path` | PlanTUS installation directory (contains `code/PlanTUS.py`). | `''` | Required. |
+| `env_path` | SimNIBS installation or conda env whose Python runs PlanTUS. | `''` | Required. |
+| `target_name` | Target label, used in output folder and file names. | `''` | Required. Outputs go to `<path.seg>/PlanTUS/sub-XXX/<target_name>/`. |
+| `mni_target_mm` | Target [MNI mm]. | `[]` | Empty = use `transducer.focus_pos` (voxels). |
+| `focal_distance_list` | Focal distances from the calibration [mm]. | `[]` | Required. Set the eligible and optimal skin–target distance. |
+| `flhm_list` | Focal length at half maximum per entry of `focal_distance_list` [mm]. | `[]` | Required. |
+| `additional_offset_mm` | Extra standoff between skin and exit plane [mm]. | `0` | e.g. gel pad. |
+| `max_angle_deg` | Maximum transducer tilt [deg]. | `10` | |
+| `mask_radius_mm` | Radius of the spherical target mask [mm]. | `2` | |
+| `weight_skin_target_distances` | Weight: deviation of skin–target distance from the optimal distance. | `0.2` | The five weights should sum to 1. See [composite scoring](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
+| `weight_skin_target_angles` | Weight: angle between skin normal and direction to target. | `0.2` | |
+| `weight_skin_target_intersections` | Weight: beam path length inside the target (higher is better). | `0.2` | |
+| `weight_skin_skull_angles` | Weight: angle between skin and skull normals. | `0.2` | |
+| `weight_skull_thickness` | Weight: bone path length along the skin normal. | `0.2` | From `m2m_sub-XXX/final_tissues.nii.gz`; ignored if that file is missing. See [skull thickness](doc_placement_plantus.md#4e-skull-thickness-t_i). |
+| `save_metrics` | Write per-vertex criteria, score and selected vertex to `plantus_metrics.mat`. | `true` | Both modes. Used by the criteria evaluation and offline re-scoring. |
+| `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
+| `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed unless `wb_command` is on PATH or in the env's `bin/`; interactive mode also needs `wb_view`. |
+
 ---
 
 ### Simulation grid (`grid`)

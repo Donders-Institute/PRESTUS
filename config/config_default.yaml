@@ -327,8 +327,8 @@ placement:
 
   plantus:
     # --- Paths (required) ---
-    script_path: ''           # Path to PlanTUS installation directory (must contain PlanTUS_wrapper.py).
-                              # Install from: https://github.com/MScheltienne/PlanTUS
+    script_path: ''           # Path to PlanTUS installation directory (must contain code/PlanTUS.py).
+                              # Install from: https://github.com/mlueckel/PlanTUS
     env_path: ''      # Path to SimNIBS installation (must contain simnibs_env/bin/python).
                               # Typically the top-level SimNIBS directory, e.g. /opt/SimNIBS-4.1
     # --- Target (one of the two must be set) ---
@@ -351,9 +351,18 @@ placement:
     weight_skin_target_intersections: 0.2 # Reward beam-target volume overlap
     weight_skin_skull_angles: 0.2         # Penalise skin-skull surface angle
     weight_skull_thickness: 0.2           # Penalise skull thickness at entry
+    # --- Outputs (optional) ---
+    save_metrics: true        # Write per-vertex criteria, composite score and the placed vertex
+                              # to <path.seg>/PlanTUS/sub-XXX/<target_name>/plantus_metrics.mat
+                              # (headless and interactive; used by offline re-scoring/figures)
+    evaluate: true            # Evaluate the placement from plantus_metrics.mat: criterion values
+                              # and percentiles at the placed spot, a weight sweep, diagnostics and
+                              # two figures (plantus_evaluation.json/.csv/.png, ~10 s). Shown in the
+                              # placement report (placement.report). Needs save_metrics.
     # --- Surface visualisation (optional) ---
-    connectome_wb_path: ''    # Path to Connectome Workbench bin/ directory.
-                              # Leave empty to skip (--skip_wb_view is always passed).
+    connectome_wb_path: ''    # Connectome Workbench bin/ (wb_command, wb_view); prepended to PATH.
+                              # Empty = wb_command must be on PATH or in the Python env's bin/ (checked at start).
+                              # wb_view is only opened in interactive mode.
 
 #------------ Neuronavigation (Localite ingestion)
 

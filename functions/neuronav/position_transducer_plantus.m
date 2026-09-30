@@ -49,7 +49,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 %   target_ras     - [1×3] intended target in RAS space (mm)
 %
 % Required configuration (parameters.placement.plantus):
-%   script_path        - Path to PlanTUS installation dir (must contain PlanTUS_wrapper.py)
+%   script_path        - Path to PlanTUS installation dir (must contain code/PlanTUS.py)
 %   env_path   - Path to SimNIBS installation (must contain simnibs_env/)
 %   focal_distance_list - [1×N] calibrated focal distances [mm]
 %   flhm_list           - [1×N] full-width at half-max focal lengths [mm]
@@ -64,8 +64,17 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 %   weight_skin_target_angles       - Objective weight (default 0.2)
 %   weight_skin_target_intersections- Objective weight (default 0.2)
 %   weight_skin_skull_angles        - Objective weight (default 0.2)
-%   weight_skull_thickness          - Objective weight (default 0.2)
+%   weight_skull_thickness          - Objective weight (default 0.2); bone path
+%                                     length along the skin normal, from
+%                                     m2m_sub-XXX/final_tissues.nii.gz
 %   connectome_wb_path      - Path to Connectome Workbench bin/ (default '')
+%   save_metrics            - Write per-vertex criteria, composite score and
+%                             selected vertex to <work_dir>/plantus_metrics.mat
+%                             (default true; both modes)
+%   evaluate                - Evaluate the placement from plantus_metrics.mat
+%                             (weight sweep, diagnostics, figures; see
+%                             plantus_evaluation.py) for the placement report
+%                             (default true; needs save_metrics)
 %
 % See also: PREPROC_TRANSDUCER_PLACEMENT, LOCALITE_MATRIX_TO_POSITIONS,
 %           POSITION_TRANSDUCER_LOCALITE
@@ -206,19 +215,19 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     % the five scoring maps and manually confirm a transducer position.
     % Headless mode automatically selects the best vertex via composite score.
     %
-    % placement.plantus._launcher_py (undocumented): when set, overrides the
+    % placement.plantus.launcher_py_override (undocumented): when set, overrides the
     % launcher path directly — used by the test suite to inject mock scripts.
-    if isfield(pt, '_launcher_py') && ~isempty(pt.('_launcher_py'))
-        launcher = char(pt.('_launcher_py'));
+    use_gui = isfield(parameters, 'simulation') && ...
+              isfield(parameters.simulation, 'interactive') && ...
+              parameters.simulation.interactive;
+
+    if isfield(pt, 'launcher_py_override') && ~isempty(pt.launcher_py_override)
+        launcher = char(pt.launcher_py_override);
         if ~isfile(launcher)
             error('PRESTUS:plantus:notFound', ...
                 'Override launcher not found:\n  %s', launcher);
         end
     else
-        use_gui = isfield(parameters, 'simulation') && ...
-                  isfield(parameters.simulation, 'interactive') && ...
-                  parameters.simulation.interactive;
-
         fn_dir = fileparts(mfilename('fullpath'));
 
         if use_gui
@@ -230,8 +239,8 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
                      'position_transducer_plantus.m.'], launcher);
             end
             fprintf(['PlanTUS: interactive mode — Connectome Workbench will open.\n' ...
-                     '  Click a skin vertex → type "yes" to confirm placement.\n' ...
-                     '  Close wb_view when done.\n']);
+                     '  Click a skin vertex (click again to change it).\n' ...
+                     '  Close wb_view to confirm the last selected vertex.\n']);
         else
             launcher = fullfile(fn_dir, 'prestus_plantus_launcher.py');
             if ~isfile(launcher)
@@ -246,25 +255,36 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     plantus_argv = {python_bin, launcher, filename_t1, mesh_path, mask_path, ...
         tx_config_path, '--plantus_root', script_path, '--output_dir', work_dir};
 
-    fprintf('PlanTUS: running placement optimisation...\n  %s\n', strjoin(plantus_argv, ' '));
+    fprintf('PlanTUS: running placement optimisation...\n');
     % run_command invokes python directly via argv, with no shell at all --
     % every path here (config-derived, but still worth removing the shell
     % rather than trusting quoting) reaches the process as literal
     % argument values regardless of their contents.
-    [status, cmdout] = run_command(plantus_argv);
+    %
+    % In interactive mode the launcher's output is echoed live, so the user
+    % sees the wb_view instructions and each selected vertex while the
+    % window is open. The child's stdin is never connected, so the launcher
+    % is told to confirm by closing wb_view rather than by a console prompt.
+    if use_gui
+        plantus_argv = [plantus_argv, {'--selection', 'last_click'}];
+    end
+    % Snapshot outputs from earlier runs so only a file this run wrote is used.
+    previous_outputs = dir(fullfile(work_dir, '**', '*Localite.mat'));
+    [status, cmdout] = run_command(plantus_argv, 'Echo', use_gui);
 
     if status ~= 0
         error('PRESTUS:plantus:failed', ...
             'PlanTUS subprocess exited with status %d.\nOutput:\n%s', status, cmdout);
     end
-    fprintf('%s\n', cmdout);
+    if ~use_gui
+        fprintf('%s\n', cmdout);
+    end
 
     % ── Load output position matrix ───────────────────────────────────────
 
-    % PlanTUS names its output folder after the mask file stem and places it
-    % directly under the subject PlanTUS/ dir, not inside work_dir.
-    plantus_root_dir = fileparts(work_dir);
-    localite_mat = find_plantus_output(plantus_root_dir);
+    % Both launchers write into --output_dir (work_dir, one per target), with
+    % PlanTUS adding a vtx<N>/ subfolder per placed vertex.
+    localite_mat = find_plantus_output(work_dir, previous_outputs);
     fprintf('PlanTUS: loading result:\n  %s\n', localite_mat);
 
     result = load(localite_mat);
@@ -340,6 +360,14 @@ function write_target_mask(t1_path, target_ras, mask_path, radius_mm)
             ((Z - center_vox(3)) .* ps(3)).^2;
     vol(dist2 <= radius_mm^2) = 1;
 
+    % The header comes from the T1, whose datatype (often int16/uint8) and
+    % intensity scaling must not carry over: niftiwrite requires the volume
+    % class to match info.Datatype, and scl_slope/inter would rescale the mask.
+    info.Datatype              = 'single';
+    info.BitsPerPixel          = 32;
+    info.MultiplicativeScaling = 1;
+    info.AdditiveOffset        = 0;
+
     nii_path = regexprep(mask_path, '\.nii\.gz$', '.nii');
     niftiwrite(vol, nii_path, info);
     gzip(nii_path);
@@ -387,6 +415,15 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
         connectome_wb_path = char(pt.connectome_wb_path);
     end
 
+    save_metrics = true;
+    if isfield(pt, 'save_metrics') && ~isempty(pt.save_metrics)
+        save_metrics = logical(pt.save_metrics);
+    end
+    evaluate = true;
+    if isfield(pt, 'evaluate') && ~isempty(pt.evaluate)
+        evaluate = logical(pt.evaluate);
+    end
+
     weights = struct( ...
         'skin_target_distances',     get_weight(pt, 'weight_skin_target_distances',     0.2), ...
         'skin_target_angles',        get_weight(pt, 'weight_skin_target_angles',        0.2), ...
@@ -419,6 +456,8 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
         'weight_skin_target_intersections',weights.skin_target_intersections, ...
         'weight_skin_skull_angles',        weights.skin_skull_angles, ...
         'weight_skull_thickness',          weights.skull_thickness, ...
+        'save_metrics',                    save_metrics, ...
+        'evaluate',                        evaluate, ...
         'bUseGenericTransducerModel',      false ...
     );
 end
@@ -465,15 +504,26 @@ function write_yaml(fname, s)
 end
 
 % ── Locate PlanTUS output mat file ────────────────────────────────────────
-function mat_path = find_plantus_output(work_dir)
-% Search work_dir recursively for the *Localite.mat written by PlanTUS.
-% Errors if zero or multiple files are found.
+function mat_path = find_plantus_output(work_dir, previous)
+% Search work_dir recursively for the *Localite.mat written by this run.
+% Files listed in previous (a dir() snapshot taken before the launch) are
+% ignored unless they were modified since, so a result left over from an
+% earlier run is never picked up in place of a missing one. Errors if no
+% new file is found; takes the most recent if there are several.
 
     hits = dir(fullfile(work_dir, '**', '*Localite.mat'));
 
+    if ~isempty(hits) && ~isempty(previous)
+        prev_keys = strcat({previous.folder}, filesep, {previous.name}, '|', ...
+                           arrayfun(@(h) num2str(h.datenum, 12), previous, 'UniformOutput', false)');
+        hit_keys  = strcat({hits.folder}, filesep, {hits.name}, '|', ...
+                           arrayfun(@(h) num2str(h.datenum, 12), hits, 'UniformOutput', false)');
+        hits = hits(~ismember(hit_keys, prev_keys));
+    end
+
     if isempty(hits)
         error('PRESTUS:plantus:noOutput', ...
-            ['PlanTUS did not produce a *Localite.mat file in:\n  %s\n' ...
+            ['PlanTUS did not produce a new *Localite.mat file in:\n  %s\n' ...
              'Check the PlanTUS output above for errors.'], work_dir);
     end
 
@@ -482,7 +532,7 @@ function mat_path = find_plantus_output(work_dir)
         [~, idx] = max([hits.datenum]);
         hits = hits(idx);
         warning('PRESTUS:plantus:multipleOutputs', ...
-            'Multiple *Localite.mat files found; using the most recent:\n  %s', ...
+            'Multiple new *Localite.mat files found; using the most recent:\n  %s', ...
             fullfile(hits.folder, hits.name));
     end
 
