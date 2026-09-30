@@ -140,6 +140,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Changed:** `smooth_img` pads by edge replication before convolution. Zero padding eroded masks and darkened property maps at the grid boundary; smoothed masks and maps now differ from earlier runs in the outermost voxels
 
 #### Calibration
+- Axial profiles live in the git-ignored `local/profiles/<TRAN>/tran-<TRAN>_ds-<DS>[_acq-<LABEL>]_axial.csv`; `char_data_path` in the equipment YAML is relative to it. Manufacturer phase tables are no longer read (the Python GUI drops the phase-table folder)
 - Transducer library: scan equipment, store validated parametric models, plot and compare entries
 - `calibration.focal_reference` (`flhm_3db` default, `flhm_6db`, `peak`) sets which axial-profile convention a quoted focal depth refers to; used by `compute_flhm_center`/`compute_focal_metrics` and recorded in the calibration sidecar (see [doc_calibration.md](doc_calibration.md))
 - ⚠️ **Fixed:** `phase_optimization_annulus_full_curve` compared a column model profile against a row target profile, which broadcast to an N×N matrix and could accept a degenerate near-zero fit. Calibrations fitted to measured (row-vector) profiles should be re-run

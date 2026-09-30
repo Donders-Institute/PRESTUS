@@ -534,8 +534,7 @@ A separate `config_calibration.yaml` applies for calibration workflows and is lo
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `path_input_axial` | Directory containing axial intensity profiles. | |
-| `path_input_phase` | Directory containing phase data. | |
+| `path_input_axial` | Directory containing axial intensity profiles; `char_data_path` in the equipment YAML is relative to it. | Usually `<PRESTUS>/local/profiles/` (see doc_transducer_library.md, Appendix). |
 | `path_output` | Directory for saving free-water simulation results. | |
 | `path_output_profiles` | Directory for saving optimised profile data. | |
 | `filename_calibrated_CSV` | Filename of calibrated CSV data. | Mandatory only when not generated within standalone script. |

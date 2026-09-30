@@ -24,11 +24,11 @@ combos:
       name: IGT 128 ch. - 10 ch.
       manufact: IGT
       available_ch: 128
-    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_128_ch_comb_10_ch.csv
+    char_data_path: IS_PCD15287_01002/tran-IS_PCD15287_01002_ds-IGT_128_ch_comb_10_ch_axial.csv
   IGT_32_ch_comb_10_ch:
     ds:
       serial: IGT_32_ch_comb_10_ch
       name: IGT 32 ch. - 10 ch.
       manufact: IGT
       available_ch: 32
-    char_data_path: Axial_profiles_IS_PCD15287_01002~IGT_32_ch_comb_10_ch.csv
+    char_data_path: IS_PCD15287_01002/tran-IS_PCD15287_01002_ds-IGT_32_ch_comb_10_ch_axial.csv

@@ -20,9 +20,6 @@ class TabCalibration(BaseTab):
         self._add_row("Axial profile folder",
                       BrowseEdit("calibration.path_input_axial", "dir", registry=r),
                       note="Directory containing per-equipment axial hydrophone CSVs.")
-        self._add_row("Phase table folder",
-                      BrowseEdit("calibration.path_input_phase", "dir", registry=r),
-                      note="Directory with manufacturer phase tables (Sonic Concepts / Imasonic).")
 
         # ── Calibration Targets ───────────────────────────────────────────────
         self._add_section("Calibration Targets")

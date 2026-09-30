@@ -20,11 +20,11 @@ combos:
       name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO junior SC_203_035
       manufact: Sonic Concepts
       available_ch: 4
-    char_data_path: Axial_profiles_CTX-250-001~TPO-203-035.csv
+    char_data_path: CTX_250_001/tran-CTX_250_001_ds-SC_203_035_axial.csv
   SC_105_010:
     ds:
       serial: SC_105_010
       name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO senior SC_105_010
       manufact: Sonic Concepts
       available_ch: 4
-    char_data_path: Axial_profiles_CTX-250-001~TPO-105-010.csv
+    char_data_path: CTX_250_001/tran-CTX_250_001_ds-SC_105_010_axial.csv

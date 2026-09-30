@@ -92,3 +92,8 @@ core.*
 # Local Claude context #
 #######################
 /CLAUDE.md
+
+##########################################
+# Local site data (profiles, user library) #
+##########################################
+/local/

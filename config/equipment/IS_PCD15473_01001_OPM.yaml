@@ -20,4 +20,4 @@ combos:
       name: IGT 32 ch. - 10 ch.
       manufact: IGT
       available_ch: 32
-    char_data_path: Axial_profiles_IS_PCD15473_01001_OPM~IGT_32_ch_comb_10_ch.csv
+    char_data_path: IS_PCD15473_01001/tran-IS_PCD15473_01001_ds-IGT_32_ch_comb_10_ch_acq-OPM_axial.csv
