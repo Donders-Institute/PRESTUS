@@ -718,6 +718,9 @@ function p = make_sim_params(base, affix, medium_config, ow)
                                          isfield(base.modules, 'run_thermal_analysis') && ...
                                          base.modules.run_thermal_analysis;
     p.modules.run_posthoc_water_sims   = 0;
+    % Free water does not depend on the medium variant; stage 1 records the
+    % baseline once if the base config asks for it.
+    p.modules.run_water_baseline       = 0;
     p.modules.generate_report          = 1;
     p.io.output_affix                  = affix;
     % Both the grid cache and kwave source were written by stage 1 with
@@ -746,6 +749,7 @@ function p = make_report_params(base, affixes, log_files, ow)
     p.modules.run_heating_sims       = 0;
     p.modules.run_thermal_analysis   = 0;
     p.modules.run_posthoc_water_sims = 0;
+    p.modules.run_water_baseline     = 0;
     p.modules.generate_report        = 0;
     p.modules.uncertainty_report     = 1;
     p.io.output_affix                = '';

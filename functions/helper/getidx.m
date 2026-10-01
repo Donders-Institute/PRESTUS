@@ -2,7 +2,9 @@ function idx = getidx(parameters_fields, string)
 % GETIDX  Return tissue label indices matching a name string from a layers struct
 %
 % Searches the fieldnames of parameters_fields for entries that contain
-% string and concatenates their values. Returns empty when nothing matches.
+% string (substring match, so 'skull' also selects skull_cortical and
+% skull_trabecular) and returns their values without duplicates, in order of
+% first appearance. Returns empty when nothing matches.
 %
 % Use as:
 %   idx = getidx(parameters_fields, string)
@@ -13,7 +15,7 @@ function idx = getidx(parameters_fields, string)
 %   string            - tissue name to search for (e.g., 'skin')
 %
 % Output:
-%   idx - concatenated label indices for all matching fields
+%   idx - unique label indices of all matching fields
 %
 % See also: CHARM_SEG_LABELS, CHECK_LAYERS
 
@@ -38,4 +40,5 @@ end
             idx = [idx, parameters_fields.(labels{idx_label(numidx)})];
         end
     end
+    idx = unique(idx, 'stable');
 end

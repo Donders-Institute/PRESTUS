@@ -60,6 +60,15 @@ class MatlabWorker(QThread):
             eng.addpath(self._prestus_root, nargout=0)
             self.log_line.emit("▶ Running load_parameters…")
             params = eng.load_parameters(self._config_path, nargout=1)
+            # Fix the log path up front (path_log_setup keeps a preset
+            # io.log_file), so it can be tailed after the run.
+            log_file = None
+            try:
+                log_dir = eng.fullfile(eng.get_output_dir(params, nargout=1), "log", nargout=1)
+                log_file = eng.default_log_file(params, log_dir, nargout=1)
+                params["io"]["log_file"] = log_file
+            except Exception:
+                log_file = None
             self.log_line.emit("▶ Running prestus_pipeline_start…")
 
             # Capture stdout by redirecting via a StringIO buffer
@@ -70,11 +79,6 @@ class MatlabWorker(QThread):
                 self.log_line.emit(line)
 
             # Also tail log file if it exists
-            log_file = None
-            try:
-                log_file = eng.eval("parameters.io.log_file", nargout=1)
-            except Exception:
-                pass
             if log_file:
                 self._tail_log(log_file)
         finally:
