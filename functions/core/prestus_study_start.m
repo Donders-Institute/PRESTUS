@@ -254,8 +254,12 @@ function submit_report_job(study, runs, hpc_ids, log_dir)
     p.hpc.depend_job_ids = ids;
     p.hpc.depend_type = 'afterany';
     p.simulation.code_type = 'matlab_cpu';     % no GPU request
-    for f = {'gpu', 'n_gpu', 'partition'}
-        if isfield(p.hpc, f{1}); p.hpc = rmfield(p.hpc, f{1}); end
+    % Snellius jobs must name one of its GPU partitions (hpc_submit_job
+    % derives cores/memory/time limits from it), so keep it there.
+    if ~(isfield(p.hpc, 'name') && strcmp(p.hpc.name, 'snellius'))
+        for f = {'gpu', 'n_gpu', 'partition'}
+            if isfield(p.hpc, f{1}); p.hpc = rmfield(p.hpc, f{1}); end
+        end
     end
 
     hpc_dir = fullfile(study.out_dir, 'log_hpc');
@@ -263,10 +267,10 @@ function submit_report_job(study, runs, hpc_ids, log_dir)
     prestus_path = get_prestus_path;
     m_file = sprintf('study_report_%s', char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')));
     fid = fopen(fullfile(hpc_dir, [m_file '.m']), 'w');
-    fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
-    fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
-    fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'external'));
-    fprintf(fid, 'prestus_group_report_start(''%s'');\n', strrep(study.config, '''', ''''''));
+    fprintf(fid, 'addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions', 'helper')));
+    fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions')));
+    fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'external')));
+    fprintf(fid, 'prestus_group_report_start(''%s'');\n', matlab_escape_quotes(strrep(study.config, '''', '''''')));
     fclose(fid);
 
     job_id = hpc_submit_job(platform, m_file, p, hpc_dir);

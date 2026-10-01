@@ -144,10 +144,31 @@ function [parameters] = extract_snellius_parameters(parameters)
             error('GPU %s is unknown or not implemented for Snellius.', parameters.hpc.partition)
     end
 
-    assert(parameters.hpc.timelimit <= max_timelimit, ...
+    assert(walltime_seconds(parameters.hpc.timelimit) <= walltime_seconds(max_timelimit), ...
         'Maximum wall time of %s is exceeded (%s).', ...
         max_timelimit, ...
         parameters.hpc.timelimit)
+end
+
+function s = walltime_seconds(t)
+    % '[D-]HH:MM:SS' (also MM:SS or plain minutes, as SLURM accepts) -> seconds
+    t = strtrim(char(string(t)));
+    days = 0;
+    tok = regexp(t, '^(\d+)-(.*)$', 'tokens', 'once');
+    if ~isempty(tok)
+        days = str2double(tok{1});
+        t = tok{2};
+    end
+    parts = str2double(strsplit(t, ':'));
+    if any(isnan(parts)) || numel(parts) > 3
+        error('hpc_submit_job:badTimelimit', 'Cannot parse wall time "%s" (expected HH:MM:SS).', t);
+    end
+    switch numel(parts)
+        case 1, s = parts * 60;
+        case 2, s = parts(1) * 60 + parts(2);
+        case 3, s = parts(1) * 3600 + parts(2) * 60 + parts(3);
+    end
+    s = s + days * 86400;
 end
 
 function job_id = submit_slurm_job(temp_slurm_path, log_dir)
@@ -167,11 +188,19 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
     job_name = hpc_job_name(parameters);
     
+    needs_gpu = isfield(parameters.simulation, 'code_type') && ...
+        any(strcmp(parameters.simulation.code_type, {'matlab_gpu', 'cpp_gpu'}));
+
     fid = fopen(temp_qsub_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
     fprintf(fid, '#PBS -N %s\n', job_name);
-    fprintf(fid, '#PBS -l nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=8.0,mem=%iGb,walltime=%i\n', ...
-        parameters.hpc.memorylimit, parameters.hpc.timelimit);
+    if needs_gpu
+        fprintf(fid, '#PBS -l nodes=1:gpus=1,feature=cuda,reqattr=cudacap>=8.0,mem=%iGb,walltime=%s\n', ...
+            parameters.hpc.memorylimit, char(parameters.hpc.timelimit));
+    else
+        fprintf(fid, '#PBS -l nodes=1,mem=%iGb,walltime=%s\n', ...
+            parameters.hpc.memorylimit, char(parameters.hpc.timelimit));
+    end
     fprintf(fid, '#PBS -o %s_qsub_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -e %s_qsub_error_%%j.log\n', subj_id_string);
     fprintf(fid, '#PBS -d %s\n', log_dir);
