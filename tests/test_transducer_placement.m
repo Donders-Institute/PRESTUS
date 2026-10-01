@@ -8,9 +8,9 @@ classdef test_transducer_placement < matlab.unittest.TestCase
 %     results = runtests('tests/test_transducer_placement.m');
 
     properties (Constant)
-        % Path to a Localite InstrumentMarker XML with known 4×4 matrix entries.
-        % Update this path if you move the example data.
-        LocaliteXML = '/Volumes/2425122.01/v05/data/localite_examples/amydacc/old_format/InstrumentMarker20250401163545816.xml';
+        % Path to a Localite InstrumentMarker XML with known 4×4 matrix entries,
+        % from the environment variable PRESTUS_LOCALITE_XML (test skipped if unset).
+        LocaliteXML = getenv('PRESTUS_LOCALITE_XML');
     end
 
     % ------------------------------------------------------------------ %
@@ -169,7 +169,7 @@ classdef test_transducer_placement < matlab.unittest.TestCase
             % when given a real InstrumentMarker XML with actual matrix data.
             tc.assumeTrue(isfile(tc.LocaliteXML), ...
                 ['Localite fixture not found — skipping. ', ...
-                 'Set LocaliteXML to a valid InstrumentMarker XML path.']);
+                 'Set PRESTUS_LOCALITE_XML to a valid InstrumentMarker XML path.']);
 
             p = make_placement_parameters();
             p.placement.localite.reference_distance_mm = 0;
