@@ -216,17 +216,24 @@ function [oneil_profile, kwave_profile] = free_water_references(parameters, z_mm
     if ~options.FreeWater
         return;
     end
-    tr = parameters.transducer(1);
+    % The references are optional overlays: without a (typed) transducer the
+    % O'Neil curve is skipped and depths are taken as distances from the bowl
+    n_tr = 0; tr = struct(); tr_type = '';
+    if isfield(parameters, 'transducer') && ~isempty(parameters.transducer)
+        n_tr = numel(parameters.transducer);
+        tr   = parameters.transducer(1);
+        if isfield(tr, 'type') && ~isempty(tr.type); tr_type = char(tr.type); end
+    end
     bowl_depth_mm = 0;
-    if isfield(tr, tr.type) && isfield(tr.(tr.type), 'curv_radius_mm') && ...
-            isfield(tr.(tr.type), 'dist_geom_ep_mm')
-        bowl_depth_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
+    if ~isempty(tr_type) && isfield(tr, tr_type) && isfield(tr.(tr_type), 'curv_radius_mm') && ...
+            isfield(tr.(tr_type), 'dist_geom_ep_mm')
+        bowl_depth_mm = tr.(tr_type).curv_radius_mm - tr.(tr_type).dist_geom_ep_mm;
     end
     d_bowl_mm = z_mm + bowl_depth_mm;
 
     % O'Neil model of the simulated annular transducer (elem_p_amp, phases).
     % A coherent multi-transducer field is not one transducer's free-water field.
-    if numel(parameters.transducer) == 1 && strcmp(tr.type, 'annular') && ...
+    if n_tr == 1 && strcmp(tr_type, 'annular') && ...
             isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'water')
         try
             an  = tr.annular;
