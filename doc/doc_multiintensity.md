@@ -14,7 +14,7 @@ The acoustic simulation (k-Wave skull propagation) is the computationally expens
 
 ```
 [Stage 1]   Acoustic simulation + water baseline
-            Runs once at the configured elem_amp.
+            Runs once at the configured elem_p_amp.
             Saves sensor_data + acoustic_provenance.freefield_isppa_wcm2.
             No thermal simulation.
 
@@ -40,7 +40,7 @@ On HPC (SLURM/qsub), stages 2…N are submitted in parallel with an `afterok` de
 ```yaml
 transducer:
   target_isppa_wcm2: [10, 20, 30, 50]   # W/cm² — triggers multi-ISPPA mode
-  elem_amp: ...
+  elem_p_amp: ...
   # ... other transducer fields
 ```
 

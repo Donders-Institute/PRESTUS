@@ -28,7 +28,7 @@ load_parameters
       ▼
 [water baseline]        modules.run_water_baseline  (default: off)
       │                 Fast water sim → record free-water ISPPA provenance
-      │                 alongside the acoustic cache; no elem_amp changes
+      │                 alongside the acoustic cache; no elem_p_amp changes
       ▼
 [acoustic simulation]   modules.run_acoustic_sims
       │                 k-Wave pressure field simulation; cache saved with

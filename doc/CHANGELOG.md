@@ -37,6 +37,7 @@ Multi-subject studies whose runs differ in placement, target, depth, intensity o
 
 BabelBrain can now be used as a drop-in acoustic solver via `acoustic_backend: babelbrain` (see [doc_babelbrain.md](doc_babelbrain.md)).
 
+- ⚠️ **Fixed:** per-ring amplitude shading never reached BabelBrain: `babelbrain_wrapper` read `transducer.annular.elem_amp`, which `validate_annular_transducer` renames to `elem_p_amp`. Per-ring `elem_p_amp` now sets the weight magnitudes (a scalar drive stays uniform)
 - **Solver bridge** — `babelbrain_wrapper` translates the PRESTUS grid, medium masks, and transducer geometry into BabelBrain's NIfTI input format, invokes the Python FDTD engine, and returns `sensor_data` in the same format as the k-Wave backend
 - **Transducer preset resolution** — transducer serial is automatically matched to a named BabelBrain preset; novel transducers are written to a temporary CSV so BabelBrain can handle them without a matching built-in entry
 - **Calibrated phase export** — optimised element phases from the transducer library are exported as an `OptimizedWeightsFile` (H5); geometric (Rayleigh) focusing is used as a fallback when no library entry is present

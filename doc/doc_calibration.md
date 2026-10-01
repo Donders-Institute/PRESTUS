@@ -201,7 +201,7 @@ This function implements the single-depth refinement pipeline. It is called by `
 
 ##### Step 1 — Scale the empirical profile to the desired intensity
 
-`scale_real_intensity_profile` linearly rescales the input empirical profile so its peak equals `desired_intensity`. It simultaneously sets the initial `elem_amp` in `parameters.transducer.annular` to the pressure amplitude corresponding to `desired_intensity` via:
+`scale_real_intensity_profile` linearly rescales the input empirical profile so its peak equals `desired_intensity`. It simultaneously sets the initial `elem_p_amp` in `parameters.transducer.annular` to the pressure amplitude corresponding to `desired_intensity` via:
 
 $$p = \sqrt{2 \cdot I_\mathrm{desired} \cdot 10^4 \cdot \rho \cdot c}$$
 
@@ -302,7 +302,7 @@ where `v_original` and `amp_original` come from the initial simulation (Steps 4�
 
 ##### Step 8 — Rerun water simulation with optimized settings (Optional)
 
-The pipeline reruns `prestus_pipeline_start` with `elem_amp = elem_amp_optimized`, `elem_phase_rad = opt_phases`, and `output_affix = '_optimized'`.
+The pipeline reruns `prestus_pipeline_start` with the optimised drive (`elem_p_amp`) and phases (`elem_phase_rad` / `elem_phase_deg`), and `output_affix = '_optimized'` (`'_optimized_I<intensity>'` when several intensities are calibrated).
 
 Whether a free-water simulation is run to verify the calibration results is governed by parameter `opt_amp_validation`.
 By default, this is set to always, but it can also be set to 'never', 'initial' (only for the first target intensity), or 'final' (only for the final target intensity).
@@ -323,7 +323,7 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 
 `save_optimized_values` writes two output files to `calibration.path_output_profiles`:
 
-1. **CSV** (`calibration.filename_calibrated_CSV`) — a lookup table indexed by `[desired_intensity × focal_depth_ep]`. Each cell contains a string encoding `[opt_phases_deg, elem_amp]`. If the file already exists, the new entry is inserted and the table is re-sorted by intensity (rows) and focal depth (columns).
+1. **CSV** (`calibration.filename_calibrated_CSV`) — a lookup table indexed by `[desired_intensity × focal_depth_ep]`. Each cell contains a string encoding `[opt_phases_deg, elem_p_amp]`. If the file already exists, the new entry is inserted and the table is re-sorted by intensity (rows) and focal depth (columns).
 
 2. **YAML** (`<equipment_name>-F<focal_depth>mm-I<intensity>wpercm2.yaml`) — the full `transducer` parameter struct with optimized phases and amplitude, ready to be merged into a PRESTUS study config.
 

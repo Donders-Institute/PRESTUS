@@ -169,7 +169,7 @@ transducer:
     trans_pos: [x1, y1, z1]
     focus_pos: [fx1, fy1, fz1]
     annular:
-      elem_amp: 100000
+      elem_p_amp: 100000
 
   - name: CTX500-B
     target_isppa_wcm2: 3.0
@@ -177,7 +177,7 @@ transducer:
     trans_pos: [x2, y2, z2]
     focus_pos: [fx2, fy2, fz2]
     annular:
-      elem_amp: 100000
+      elem_p_amp: 100000
 
 modules:
   run_water_baseline: 1   # required to record free-water ISPPA provenance
@@ -210,7 +210,7 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
                  _desc-asyncPreproc-t01, …, -tNN.
 
 [Stage 1…N]    Acoustic simulation — one per transducer (parallel on HPC)
-               Each runs at its configured elem_amp and records a water baseline.
+               Each runs at its configured elem_p_amp and records a water baseline.
                Affixes: _desc-t01, _desc-t02, …, _desc-tNN
 
 [Stage N+1…    Dual-field combination — one per sweep point j

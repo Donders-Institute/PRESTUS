@@ -819,9 +819,13 @@ if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr
             aim_ep_ref_mm, ME.message);
     end
 
+    % Per-ring drive (elem_p_amp, one value per ring) sets the relative
+    % amplitude shading in the weights; a scalar drive means uniform rings.
+    % (Read elem_amp before, which validate_annular_transducer renames to
+    % elem_p_amp, so per-ring shading never reached BabelBrain.)
     elem_amp_for_weights = [];
-    if isfield(tr.annular, 'elem_amp') && ~isempty(tr.annular.elem_amp)
-        elem_amp_for_weights = tr.annular.elem_amp;
+    if numel(tr.annular.elem_p_amp) == tr.annular.elem_n
+        elem_amp_for_weights = tr.annular.elem_p_amp;
     end
     export_babelbrain_weights(phases_rad, elem_p_amp, parameters, weights_path, geo_phases_rad, elem_amp_for_weights);
 else

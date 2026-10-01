@@ -190,7 +190,7 @@ All fields are mandatory and have no defaults — they must be set in the study 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `elem_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Must be calibrated. `elem_amp` is the deprecated name (renamed on load with a warning). |
 | `elem_phase_deg` | Source phase per element [degrees]. | Must be calibrated. |
 | `elem_n` | Number of transducer elements. | |
 | `elem_id_mm` | Inner diameter of each element [mm]. | |
@@ -203,7 +203,7 @@ All fields are mandatory and have no defaults — they must be set in the study 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `elem_amp` | Pressure amplitude [Pa]. | Must be calibrated. |
+| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Must be calibrated. `elem_amp` is the deprecated name (renamed on load with a warning). |
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 | `steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
 | `elem_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
@@ -494,7 +494,7 @@ Protocol duration fields must be set for thermal simulations.
 | `pulse_ramp_dur` | Rise (= fall) duration of the amplitude ramp at each end of a pulse [s]. | *(not set)* = `0` | Not in `config_default.yaml`. Scales the pulse-average intensity: Ipa = factor × Itp (`compute_ramp_factor`). |
 | `pulse_ramp_shape` | Ramp shape: `'linear'` or `'tukey'` (raised cosine). | *(not set)* = `'linear'` | Used with `pulse_ramp_dur`. |
 
-The Planner draws this protocol (pulse, pulse train, repetitions) and exchanges it with the [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/); see [Planner](doc_planner.md#timing-diagram-and-tus-calculator).
+The Nexus draws this protocol (pulse, pulse train, repetitions) and exchanges it with the [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/); see [Nexus](doc_nexus.md#timing-diagram-and-tus-calculator).
 
 ---
 
