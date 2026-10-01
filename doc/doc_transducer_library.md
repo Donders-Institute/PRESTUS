@@ -225,6 +225,8 @@ refine_transducer_library('CTX_250_001_SC_105_010', 'my_profiles.csv', ...
 
 Then set `transducer.library_path` in the study config. At the measured depths PRESTUS uses your refinement. Between them it interpolates, and more than `blend_mm` outside them it returns to the global model. `examples/demo_transducer_refinement.m` runs the whole path on demonstration profiles in a few seconds.
 
+To inspect an entry, `plot_transducer_library(combo, library_path)` plots the ring phases, drive and ring gains it resolves to across depths, and `generate_calibration_report(combo, library_path)` writes an HTML summary with the fit quality and the settings at the fitted depths.
+
 Per-depth fits free the phase offsets and per-ring gains (`FreeParams = {'phase','amp'}`), with an intensity-domain loss (`Domain = 'intensity'`, `HuberDelta = 0.8`). They are regularised towards the entry's static model, which is geometric steering for per-depth entries. The same defaults apply in the GUI and in `build_transducer_library`. The axial registration `z_shift` stays at 0: a study does not apply it, so phases fitted with it would match the hydrophone only after a shift the entry never gets. The GUI therefore does not offer it. `build_transducer_library` still fits it once, separately, as a diagnostic (`z_shift_mm` in its quality report); a shift at its bound (±3 mm) at many depths points to an error in the equipment geometry or exit-plane distance, which should be corrected in the profiles or the equipment config rather than fitted.
 
 You can also use the GUI:

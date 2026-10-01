@@ -1,14 +1,20 @@
-function plot_transducer_library(combo_name, library_path, equip_param)
-% PLOT_TRANSDUCER_LIBRARY  Visualise calibration library entry for a combo
+function fig = plot_transducer_library(combo_name, library_path, equip_param)
+% PLOT_TRANSDUCER_LIBRARY  Visualise the settings a calibration library entry resolves to
 %
-% Creates a figure with two subplots:
-%   1. Phase vs depth for each transducer element (lines + optional markers)
-%   2. Amplitude vs ISPPA from the calibrated amplitude_scaling entries
+% Resolves the entry over a range of focal depths exactly as a study does
+% (LIBRARY_SETTINGS_TABLE, i.e. LIBRARY_MODEL_AT_DEPTH, the runtime path of
+% LOAD_TRANSDUCER_FROM_LIBRARY): per-depth refinements interpolated between
+% the refined depths and blended back to the global model outside them.
+% Works for every library schema the loader reads. Three panels:
+%   1. Ring phase relative to ring 1 vs depth (markers: refined / fitted depths)
+%   2. Drive (mean source pressure) vs depth, at the stored reference ISPPA
+%   3. Per-ring amplitude gain vs depth
 %
 % Use as:
 %   plot_transducer_library(combo_name)
 %   plot_transducer_library(combo_name, library_path)
 %   plot_transducer_library(combo_name, library_path, equip_param)
+%   fig = plot_transducer_library(...)
 %
 % Input:
 %   combo_name   - equipment combination key (library filename without .yaml)
@@ -17,9 +23,9 @@ function plot_transducer_library(combo_name, library_path, equip_param)
 %   equip_param  - struct from load_equipment_config (optional; loaded if missing)
 %
 % Output:
-%   (none) — produces a MATLAB figure
+%   fig - figure handle
 %
-% See also: UPDATE_TRANSDUCER_LIBRARY, VALIDATE_TRANSDUCER_LIBRARY
+% See also: LIBRARY_SETTINGS_TABLE, GENERATE_CALIBRATION_REPORT, VALIDATE_TRANSDUCER_LIBRARY
 
     if nargin < 2 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
@@ -28,123 +34,120 @@ function plot_transducer_library(combo_name, library_path, equip_param)
         equip_param = load_equipment_config();
     end
 
-    %% Load library
+    [lib, tran, knots] = load_library_entry(combo_name, library_path, equip_param);
+    depths = library_plot_depths(tran, knots);
+    T  = library_settings_table(tran, lib, depths);
+    Tk = [];
+    if ~isempty(knots); Tk = library_settings_table(tran, lib, knots); end
+
+    n_elem = tran.transducer.annular.elem_n;
+    cmap   = lines(n_elem);
+
+    fig = figure('Name', ['Library: ' combo_name], 'NumberTitle', 'off', ...
+                 'Position', [100 100 1200 400]);
+
+    %% Phase vs depth
+    ax1 = subplot(1, 3, 1, 'Parent', fig);
+    hold(ax1, 'on');
+    ph = relative_phase(table2array(T(:, compose('elem_phase_deg_%d', 1:n_elem))));
+    for el = 1:n_elem
+        plot(ax1, T.depth_ep_mm, ph(:, el), '-', 'Color', cmap(el, :), 'LineWidth', 1.2, ...
+            'DisplayName', sprintf('Ring %d', el));
+    end
+    if ~isempty(Tk)
+        phk = relative_phase(table2array(Tk(:, compose('elem_phase_deg_%d', 1:n_elem))));
+        for el = 1:n_elem
+            % markers on the unwrapped curve: shift each knot by whole turns
+            ref = interp1(T.depth_ep_mm, ph(:, el), Tk.depth_ep_mm);
+            plot(ax1, Tk.depth_ep_mm, phk(:, el) + 360 * round((ref - phk(:, el)) / 360), 'o', ...
+                'Color', cmap(el, :), 'MarkerFaceColor', cmap(el, :), 'HandleVisibility', 'off');
+        end
+    end
+    xlabel(ax1, 'Focal depth from exit plane (mm)');
+    ylabel(ax1, 'Phase relative to ring 1 (°)');
+    title(ax1, 'Ring phases');
+    legend(ax1, 'show', 'Location', 'best', 'FontSize', 7);
+    grid(ax1, 'on');
+
+    %% Drive vs depth
+    ax2 = subplot(1, 3, 2, 'Parent', fig);
+    hold(ax2, 'on');
+    plot(ax2, T.depth_ep_mm, T.drive_pa / 1e3, 'k-', 'LineWidth', 1.4);
+    if ~isempty(Tk)
+        plot(ax2, Tk.depth_ep_mm, Tk.drive_pa / 1e3, 'ko', 'MarkerFaceColor', 'k');
+    end
+    xlabel(ax2, 'Focal depth from exit plane (mm)');
+    ylabel(ax2, 'Mean source pressure (kPa)');
+    title(ax2, sprintf('Drive (%s)', strjoin(unique(cellstr(T.amplitude_source))', ', ')), ...
+        'Interpreter', 'none');
+    grid(ax2, 'on');
+    xlim(ax2, [min(T.depth_ep_mm) max(T.depth_ep_mm)]);
+    if all(isnan(T.drive_pa))
+        text(0.5, 0.5, 'No amplitude data', 'Parent', ax2, ...
+            'HorizontalAlignment', 'center', 'Units', 'normalized');
+    end
+
+    %% Ring gains vs depth
+    ax3 = subplot(1, 3, 3, 'Parent', fig);
+    hold(ax3, 'on');
+    g = table2array(T(:, compose('elem_amp_weight_%d', 1:n_elem)));
+    for el = 1:n_elem
+        plot(ax3, T.depth_ep_mm, g(:, el), '-', 'Color', cmap(el, :), 'LineWidth', 1.2);
+    end
+    xlabel(ax3, 'Focal depth from exit plane (mm)');
+    ylabel(ax3, 'Gain (mean 1)');
+    title(ax3, 'Ring gains');
+    grid(ax3, 'on');
+
+    cal_type = '';
+    if isfield(lib, 'meta') && isfield(lib.meta, 'calibration_type')
+        cal_type = sprintf(' (%s)', lib.meta.calibration_type);
+    end
+    sgtitle(fig, [combo_name cal_type], 'Interpreter', 'none');
+end
+
+% -------------------------------------------------------------------------
+function [lib, tran, knots] = load_library_entry(combo_name, library_path, equip_param)
+% Library struct, transducer struct and the depths the entry was fitted at.
     lib_file = fullfile(library_path, [combo_name '.yaml']);
     if ~isfile(lib_file)
         error('plot_transducer_library: library file not found:\n  %s', lib_file);
     end
     lib = yaml.loadFile(lib_file, 'ConvertToArray', true);
-
-    %% Determine tran_serial and load geometry
+    tran_serial = combo_name;
     if isfield(lib, 'meta') && isfield(lib.meta, 'tran_serial')
         tran_serial = lib.meta.tran_serial;
+    end
+    if ~isfield(equip_param.trans, tran_serial)
+        error('plot_transducer_library: transducer %s not in the equipment config.', tran_serial);
+    end
+    tran  = equip_param.trans.(tran_serial);
+    knots = [];
+    if isfield(lib, 'refinement') && isfield(lib.refinement, 'depths_ep_mm')
+        knots = lib.refinement.depths_ep_mm;
+    elseif isfield(lib, 'global_model') && isfield(lib.global_model, 'fit_depths_ep_mm')
+        knots = lib.global_model.fit_depths_ep_mm;
+    elseif isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')
+        knots = lib.global_model.depths_ep_mm;
+    end
+    knots = double(knots(:)');
+end
+
+function d = library_plot_depths(tran, knots)
+% Depth grid: the fitted span plus 10 mm either side, else around the
+% geometric focus.
+    if isempty(knots)
+        f = tran.transducer.annular.dist_geom_ep_mm;
+        lo = 0.5 * f; hi = 1.3 * f;
     else
-        tran_serial = combo_name;
+        lo = min(knots) - 10; hi = max(knots) + 10;
     end
+    d = linspace(max(lo, 5), hi, 80);
+end
 
-    n_elem = NaN;
-    if isfield(equip_param.trans, tran_serial)
-        n_elem = equip_param.trans.(tran_serial).transducer.annular.elem_n;
-    end
-
-    %% ── Figure ──────────────────────────────────────────────────────────────
-    fig = figure('Name', ['Library: ' combo_name], ...
-                 'NumberTitle', 'off', ...
-                 'Position', [100 100 900 420]);
-
-    %% Subplot 1: Phase vs depth
-    ax1 = subplot(1, 2, 1, 'Parent', fig);
-    hold(ax1, 'on');
-
-    % Collect per-depth data from global_model (lines) and per-depth entries (markers)
-    gm_depths = [];
-    gm_phases = [];  % [n_depths × n_elem]
-
-    if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')
-        gm_depths  = lib.global_model.depths_ep_mm(:)';
-        phase_cell = lib.global_model.elem_phase_deg;
-        if ~iscell(phase_cell)
-            phase_cell = num2cell(phase_cell, 2);
-        end
-        gm_phases = cell2mat(cellfun(@(r) r(:)', phase_cell, 'UniformOutput', false));
-
-        % If n_elem still unknown, infer from data
-        if isnan(n_elem)
-            n_elem = size(gm_phases, 2);
-        end
-
-        cmap = lines(n_elem);
-        for el = 1:size(gm_phases, 2)
-            plot(ax1, gm_depths, gm_phases(:, el), '-o', ...
-                'Color', cmap(el, :), 'LineWidth', 1.2, ...
-                'DisplayName', sprintf('Elem %d', el));
-        end
-    end
-
-    % Overlay per-depth parametric entries as square markers
-    if isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
-        dk     = fieldnames(lib.calibration.focal_depths);
-        depths_pd = cellfun(@(k) str2double(strrep(strrep(k,'f',''),'p','.')), dk);
-        if isnan(n_elem), n_elem = 4; end
-        cmap = lines(n_elem);
-        for di = 1:numel(dk)
-            entry = lib.calibration.focal_depths.(dk{di});
-            if isfield(entry, 'elem_phase_deg')
-                ph_deg = entry.elem_phase_deg(:)';
-            elseif isfield(entry, 'phase_start_deg') && isfield(entry, 'phase_step_deg')
-                ph_deg = entry.phase_start_deg + (0:n_elem-1) * entry.phase_step_deg;
-            else
-                continue;
-            end
-            for el = 1:min(numel(ph_deg), n_elem)
-                plot(ax1, depths_pd(di), ph_deg(el), 's', ...
-                    'Color', cmap(el, :), 'MarkerSize', 8, 'MarkerFaceColor', cmap(el, :), ...
-                    'HandleVisibility', 'off');
-            end
-        end
-    end
-
-    xlabel(ax1, 'Depth (mm)');
-    ylabel(ax1, 'Phase (°)');
-    title(ax1, 'Phase vs Depth');
-    if ~isnan(n_elem) && n_elem <= 12
-        legend(ax1, 'show', 'Location', 'best', 'FontSize', 7);
-    end
-    grid(ax1, 'on');
-
-    %% Subplot 2: Amplitude vs ISPPA
-    ax2 = subplot(1, 2, 2, 'Parent', fig);
-    hold(ax2, 'on');
-
-    amp_map = [];
-    if isfield(lib, 'global_model') && isfield(lib.global_model, 'amplitude_scaling')
-        amp_map = lib.global_model.amplitude_scaling;
-    elseif isfield(lib, 'calibration') && isfield(lib.calibration, 'focal_depths')
-        dk = fieldnames(lib.calibration.focal_depths);
-        if ~isempty(dk)
-            first_entry = lib.calibration.focal_depths.(dk{1});
-            if isfield(first_entry, 'amplitude_scaling')
-                amp_map = first_entry.amplitude_scaling;
-            end
-        end
-    end
-
-    if ~isempty(amp_map) && isstruct(amp_map)
-        int_keys   = fieldnames(amp_map);
-        int_values = cellfun(@(k) str2double(strrep(strrep(k, 'i', ''), 'p', '.')), int_keys);
-        amp_values = cellfun(@(k) double(amp_map.(k)), int_keys);
-        [int_values, srt] = sort(int_values);
-        amp_values = amp_values(srt);
-
-        plot(ax2, int_values, amp_values, 'o-', 'LineWidth', 1.5, 'MarkerSize', 6);
-        xlabel(ax2, 'ISPPA (W/cm²)');
-        ylabel(ax2, 'Amplitude (a.u.)');
-        title(ax2, 'Amplitude vs Intensity');
-        grid(ax2, 'on');
-    else
-        text(0.5, 0.5, 'No amplitude scaling data', ...
-            'Parent', ax2, 'HorizontalAlignment', 'center', 'Units', 'normalized');
-    end
-
-    sgtitle(fig, combo_name, 'Interpreter', 'none');
+function ph = relative_phase(ph)
+% Phase of each ring relative to ring 1, wrapped to (-180, 180] and then
+% unwrapped along depth so curves stay continuous.
+    ph = angle(exp(1i * (ph - ph(:, 1)) * pi / 180));
+    ph = unwrap(ph, [], 1) * 180 / pi;
 end

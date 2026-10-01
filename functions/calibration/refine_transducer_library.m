@@ -163,7 +163,7 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
             % Per-depth defaults as in CALIBRATION_GUI: phase and gain,
             % intensity-domain loss, z shift fixed at 0 — the loader does not
             % apply a fitted shift, and phases fitted with one match the
-            % hydrophone only after that shift (diagnostics/calib_ship_strategy)
+            % hydrophone only after that shift
             prior.z_shift_mm = 0;
             po = struct('FreeParams', {{'phase', 'amp'}}, 'Domain', 'intensity', ...
                         'HuberDelta', 0.8, 'Prior', prior);

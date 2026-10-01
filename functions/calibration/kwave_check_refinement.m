@@ -34,7 +34,9 @@ function [lib, report, sims] = kwave_check_refinement(lib, prof, options)
 %                        Without platform: SLURM/qsub if detected, else local.
 %     .WorkDir         - scratch folder (default tempdir/prestus_kwave_check/<key>)
 %     .Axisymmetric    - use a 2D axisymmetric grid unless SimConfig sets
-%                        grid.axisymmetric (default true)
+%                        grid.axisymmetric (default false: the axisymmetric
+%                        free-water grid currently puts the focus far short
+%                        of the target; see doc_transducer_library.md)
 %     .ApplyCorrection - rescale the stored drives (default true)
 %     .NearFieldSkipMm - ignore z < this [mm from EP] (default 10)
 %     .EquipParam      - struct from load_equipment_config (default: loaded)
@@ -78,7 +80,7 @@ function [lib, report, sims] = kwave_check_refinement(lib, prof, options)
     skip_mm = opt(options, 'NearFieldSkipMm', 10);
     apply   = opt(options, 'ApplyCorrection', true);
     progress = opt(options, 'ProgressFcn', []);
-    base    = sim_config(opt(options, 'SimConfig', []), opt(options, 'Axisymmetric', true));
+    base    = sim_config(opt(options, 'SimConfig', []), opt(options, 'Axisymmetric', false));
 
     lib_dir = fullfile(work, 'library');
     if ~isfolder(lib_dir); mkdir(lib_dir); end

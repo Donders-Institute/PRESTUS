@@ -20,12 +20,13 @@
 %   Add a YAML to config/equipment/, set char_data_path if you have hydrophone
 %   data, then re-run this script. The new combo is processed automatically.
 %
-% PER-DEPTH REFINEMENTS
-%   Use examples/calibration_standalone.m to layer single-depth refinements
-%   (calibrate_transducer Mode='single_ref') on top of the library baseline.
+% SINGLE COMBOS / NEW PROFILES
+%   REFINE_TRANSDUCER_LIBRARY (or CALIBRATION_GUI) refits one combo's per-depth
+%   refinements, optionally with the free-water k-Wave check
+%   (KWAVE_CHECK_REFINEMENT).
 %
-% See also: LOAD_TRANSDUCER_FROM_LIBRARY, UPDATE_TRANSDUCER_LIBRARY,
-%           VALIDATE_TRANSDUCER_LIBRARY, CALIBRATION_STANDALONE
+% See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY,
+%           FIT_TRANSDUCER_MODEL, VALIDATE_TRANSDUCER_LIBRARY, CALIBRATION_GUI
 
 close all;
 
@@ -53,20 +54,9 @@ if ~exist('COMBOS_TO_RUN',      'var'); COMBOS_TO_RUN      = 'all'; end
 % '' if those paths are already absolute.
 if ~exist('CHAR_DATA_ROOT',     'var'); CHAR_DATA_ROOT     = fullfile(repo_root, 'local', 'profiles'); end
 
-% Intensities [W/cm²] to calibrate amplitude for (empirical combos only).
+% Reference ISPPA [W/cm²] the stored drive is scaled to (empirical combos;
+% only the first value is used).
 if ~exist('DESIRED_INTENSITIES','var'); DESIRED_INTENSITIES = [30]; end
-
-% Scratch folder for intermediate per-depth YAMLs.
-% Defaults to a temp subfolder; set to a persistent path to keep them.
-if ~exist('OUTPUT_YAML_FOLDER', 'var')
-    OUTPUT_YAML_FOLDER = fullfile(tempdir, 'prestus_library_build');
-end
-
-% Amplitude fit settings
-if ~exist('OPT_UPPER_VELOCITY', 'var'); OPT_UPPER_VELOCITY = 0.2;  end
-if ~exist('OPT_WEIGHTS',        'var'); OPT_WEIGHTS        = 0;    end
-if ~exist('SKIP_FRONT_PEAK_MM', 'var'); SKIP_FRONT_PEAK_MM = 10;   end
-if ~exist('INITIAL_VELOCITY',   'var'); INITIAL_VELOCITY   = 0.05; end
 
 % Library model:
 %   'per_depth' (default) — one refinement per measured depth (phases, gains,
@@ -83,8 +73,7 @@ if ~exist('LIBRARY_MODE',       'var'); LIBRARY_MODE       = 'per_depth'; end
 if ~exist('FIT_OPTIONS',        'var'); FIT_OPTIONS        = struct('FreeParams', {{'phase', 'amp'}}); end
 % Per-depth fits (as CALIBRATION_GUI / REFINE_TRANSDUCER_LIBRARY): phase and gain,
 % intensity-domain loss, z shift fixed at 0 (a fitted shift is not applied at run
-% time; diagnostics/calib_ship_strategy). Settings tuned on held-out depths by
-% diagnostics/calib_ship_strategy/run_calib_refine_hpo.
+% time). Settings tuned on held-out depths.
 if ~exist('PER_DEPTH_FIT_OPTIONS', 'var')
     PER_DEPTH_FIT_OPTIONS = struct('FreeParams', {{'phase', 'amp'}}, ...
         'Domain', 'intensity', 'HuberDelta', 0.8, 'Lambda', 1e-3, 'NearFieldSkipMm', 10);
@@ -96,26 +85,11 @@ end
 % geometric, with the reason in meta.quality.
 if ~exist('GATE_WORST',         'var'); GATE_WORST         = 0.05; end
 
-% Water sound speed [m/s] used for geometric phase computation.
-if ~exist('SOUND_SPEED',        'var'); SOUND_SPEED        = 1500; end
-
 % ── END CONFIGURATION ─────────────────────────────────────────────────────────
-
-if ~exist(OUTPUT_YAML_FOLDER, 'dir'); mkdir(OUTPUT_YAML_FOLDER); end
 
 %% ── Load equipment config ────────────────────────────────────────────────────
 equip_param = load_equipment_config(equip_path);
 all_serials = fieldnames(equip_param.trans);
-
-% Build default parameters struct from repo config
-config_default_path = fullfile(repo_root, 'config', 'config_default.yaml');
-if isfile(config_default_path)
-    parameters = yaml.loadFile(config_default_path, 'ConvertToArray', true);
-else
-    parameters = struct();
-    warning('build_transducer_library: config_default.yaml not found at %s — using empty base parameters.', ...
-        config_default_path);
-end
 
 %% ── Build combo list ─────────────────────────────────────────────────────────
 combo_list = {};   % {combo_name, tran_serial, ds_serial, has_char}
@@ -178,7 +152,7 @@ for ci = 1:n_total
 
     try
         if strcmp(level, 'geometric')
-            build_geometric_entry(tran_serial, ds_serial, tran, library_path, SOUND_SPEED);
+            build_geometric_entry(tran_serial, ds_serial, library_path);
         else
             combo_entry = tran.combos.(ds_serial);
             if strcmp(LIBRARY_MODE, 'static')
@@ -208,28 +182,6 @@ catch ME
     fprintf('[WARN] Validation error: %s\n', ME.message);
 end
 
-%% ── Update library_version.yaml ─────────────────────────────────────────────
-manifest_path = fullfile(library_path, 'library_version.yaml');
-if isfile(manifest_path)
-    fprintf('\n--- Updating library_version.yaml ---\n');
-    manifest = yaml.loadFile(manifest_path, 'ConvertToArray', true);
-    n_added  = 0;
-    for ci = 1:numel(results)
-        r = results(ci);
-        if ~strcmp(r.status, 'ok') || isfield(manifest.combos, r.combo); continue; end
-        manifest.combos.(r.combo) = struct( ...
-            'calibration_type', r.level, ...
-            'added_date',       datestr(now, 'yyyy-mm-dd')); %#ok<TNOW1,DATST>
-        n_added = n_added + 1;
-    end
-    if n_added > 0
-        yaml.dumpFile(manifest_path, manifest, 'block');
-        fprintf('[OK]  %d new combo(s) added. Bump patch version before committing.\n', n_added);
-    else
-        fprintf('[OK]  library_version.yaml already up to date.\n');
-    end
-end
-
 %% ── Summary ──────────────────────────────────────────────────────────────────
 n_ok  = sum(strcmp({results.status}, 'ok'));
 n_err = sum(strcmp({results.status}, 'error'));
@@ -245,7 +197,7 @@ end
 
 %% ═══════════════════════ Local helpers ════════════════════════════════════════
 
-function build_geometric_entry(tran_serial, ds_serial, tran, library_path, sound_speed) %#ok<INUSD>
+function build_geometric_entry(tran_serial, ds_serial, library_path)
 % Write a geometry-only library entry (no empirical phase correction).
 %
 % Stores an empty global_model.elem_phase_correction_deg so that

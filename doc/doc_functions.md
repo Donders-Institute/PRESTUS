@@ -30,6 +30,8 @@ The following documents the functions provided in PRESTUS.
 | `extract_simulated_profile`             | Extract and visualize simulated acoustic pressure data.                                         |
 | `focal_reference_to_frac`               | Map a `focal_reference` config value (`flhm_3db`/`flhm_6db`) to its FLHM threshold fraction of peak; errors on `peak` (no associated fraction) or an unknown value. |
 | `import_babelbrain_weights`             | Read per-element phase weights from a BabelBrain OptimizedWeightsFile (.h5), derive hardware correction relative to geometric phases, and write the correction into the transducer equipment YAML. |
+| `plot_transducer_library`               | Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas). |
+| `generate_calibration_report`           | Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup. |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |
 | `phase_optimization_annulus`            | Optimizes the phase profile by calculating focal distance error for an annular transducer.      |

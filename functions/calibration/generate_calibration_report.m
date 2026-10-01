@@ -1,14 +1,17 @@
-function html_path = generate_calibration_report(combo_name, library_path, output_path)
+function html_path = generate_calibration_report(combo_name, library_path, output_path, equip_param)
 % GENERATE_CALIBRATION_REPORT  Write an HTML summary of a transducer calibration
 %
 % Reads the library YAML for a given equipment combination and generates a
-% self-contained HTML report summarising provenance, phase correction, and
-% per-depth/intensity amplitude data.
+% self-contained HTML report: provenance, model and fit quality
+% (meta.quality), the settings the entry resolves to at its fitted depths
+% (LIBRARY_SETTINGS_TABLE: phases, drive, gains, model focus, as a study gets
+% them), a static phase correction if any, and the amplitude lookup.
 %
 % Use as:
 %   html_path = generate_calibration_report(combo_name)
 %   html_path = generate_calibration_report(combo_name, library_path)
 %   html_path = generate_calibration_report(combo_name, library_path, output_path)
+%   html_path = generate_calibration_report(combo_name, library_path, output_path, equip_param)
 %
 % Input:
 %   combo_name   - equipment combination key, e.g.
@@ -17,11 +20,13 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
 %                  defaults to config/calibration/ under PRESTUS root
 %   output_path  - (optional) file path for the output HTML;
 %                  defaults to <library_path>/<combo_name>_report.html
+%   equip_param  - (optional) struct from load_equipment_config; loaded if
+%                  missing (needed for the resolved settings table)
 %
 % Output:
 %   html_path - absolute path to the written HTML file
 %
-% See also: UPDATE_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY
+% See also: LIBRARY_SETTINGS_TABLE, PLOT_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY
 
     if nargin < 2 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
@@ -36,6 +41,9 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
     if nargin < 3 || isempty(output_path)
         output_path = fullfile(library_path, [combo_name, '_report.html']);
     end
+    if nargin < 4 || isempty(equip_param)
+        equip_param = load_equipment_config();
+    end
 
     %% ── Gather provenance ────────────────────────────────────────────────
     meta = lib.meta;
@@ -43,7 +51,15 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
     prestus_version = get_field(meta, 'prestus_version', '—');
     tran_serial     = get_field(meta, 'tran_serial',     combo_name);
 
-    cal_type  = '—'; fwd_model = '—'; lambda_str = '—'; n_depths = '—';
+    cal_type  = get_field(meta, 'calibration_type', '—');
+    fwd_model = '—'; lambda_str = '—'; n_depths = '—';
+    lib_mode  = get_field(meta, 'library_mode', '—');
+    blend_str = '—';
+    if isfield(lib, 'global_model'); fwd_model = get_field(lib.global_model, 'forward_model', '—'); end
+    if isfield(lib, 'refinement')
+        n_depths  = num2str(numel(lib.refinement.depths_ep_mm));
+        blend_str = sprintf('%s mm', get_field(lib.refinement, 'blend_mm', '—'));
+    end
     if isfield(meta, 'calibration')
         mc = meta.calibration;
         cal_type  = get_field(mc, 'calibration_type', get_field(mc, 'phase_mode', '—'));
@@ -110,13 +126,55 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
         amp_html = ['<table class="data">', header, rows, '</table>'];
     end
 
-    %% ── Depths covered by global model ──────────────────────────────────
-    depths_html = '<p><em>No global model depth list.</em></p>';
-    if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm') && ...
-            ~isempty(lib.global_model.depths_ep_mm)
-        depths = lib.global_model.depths_ep_mm(:)';
-        depth_strs = arrayfun(@(d) sprintf('%.1f', d), depths, 'UniformOutput', false);
-        depths_html = ['<p>', strjoin(depth_strs, ' mm &nbsp;|&nbsp; '), ' mm</p>'];
+    %% ── Fit quality (meta.quality) ──────────────────────────────────────
+    quality_html = '<p><em>No fit quality recorded.</em></p>';
+    if isfield(meta, 'quality') && isstruct(meta.quality)
+        qn = fieldnames(meta.quality);
+        rows = '';
+        for k = 1:numel(qn)
+            v = meta.quality.(qn{k});
+            if isnumeric(v) || islogical(v)
+                v = strjoin(arrayfun(@(x) sprintf('%.3g', x), double(v(:)'), 'UniformOutput', false), ', ');
+            elseif iscell(v) || isstring(v)
+                v = strjoin(cellstr(v), ', ');
+            end
+            rows = [rows, sprintf('<tr><td>%s</td><td>%s</td></tr>\n', qn{k}, v)]; %#ok<AGROW>
+        end
+        quality_html = ['<table class="data"><tr><th>Measure</th><th>Value</th></tr>', rows, '</table>'];
+    end
+
+    %% ── Settings at the fitted depths (as resolved at run time) ─────────
+    settings_html = '<p><em>No fitted depths in library.</em></p>';
+    depths = [];
+    if isfield(lib, 'refinement') && isfield(lib.refinement, 'depths_ep_mm')
+        depths = lib.refinement.depths_ep_mm;
+    elseif isfield(lib, 'global_model') && isfield(lib.global_model, 'fit_depths_ep_mm')
+        depths = lib.global_model.fit_depths_ep_mm;
+    elseif isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')
+        depths = lib.global_model.depths_ep_mm;
+    end
+    tran_key = matlab.lang.makeValidName(tran_serial);
+    if ~isempty(depths) && isfield(equip_param.trans, tran_key)
+        try
+            T = library_settings_table(equip_param.trans.(tran_key), lib, double(depths(:)'));
+            n_elem = equip_param.trans.(tran_key).transducer.annular.elem_n;
+            ph = table2array(T(:, compose('elem_phase_deg_%d', 1:n_elem)));
+            gw = table2array(T(:, compose('elem_amp_weight_%d', 1:n_elem)));
+            header = ['<tr><th>Depth (mm EP)</th><th>Phase model</th><th>Drive source</th>', ...
+                '<th>Drive (kPa)</th><th>Model focus (mm EP)</th><th>Phases (deg)</th><th>Gains</th></tr>'];
+            rows = '';
+            for k = 1:height(T)
+                rows = [rows, sprintf(['<tr><td>%.1f</td><td>%s</td><td>%s</td><td>%.1f</td>', ...
+                    '<td>%.1f</td><td>%s</td><td>%s</td></tr>\n'], T.depth_ep_mm(k), T.phase_model(k), ...
+                    T.amplitude_source(k), T.drive_pa(k) / 1e3, T.model_focus_ep_mm(k), ...
+                    num2str(round(mod(ph(k, :), 360), 1)), num2str(round(gw(k, :), 3)))]; %#ok<AGROW>
+            end
+            settings_html = ['<table class="data">', header, rows, '</table>'];
+        catch ME
+            settings_html = sprintf('<p><em>Settings could not be resolved: %s</em></p>', ME.message);
+        end
+    elseif ~isempty(depths)
+        settings_html = sprintf('<p><em>Transducer %s not in the equipment config.</em></p>', tran_serial);
     end
 
     %% ── Render HTML ─────────────────────────────────────────────────────
@@ -152,13 +210,17 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
     html = [html, sprintf(['<h2>Calibration Parameters</h2>\n' ...
         '<dl class="meta-grid">\n' ...
         '<dt>Calibration type</dt><dd>%s</dd>\n' ...
+        '<dt>Library mode</dt><dd>%s</dd>\n' ...
         '<dt>Forward model</dt><dd>%s</dd>\n' ...
         '<dt>Lambda (regularisation)</dt><dd>%s</dd>\n' ...
-        '<dt>Depths used in fit</dt><dd>%s</dd>\n' ...
-        '</dl>\n'], cal_type, fwd_model, lambda_str, n_depths)];
+        '<dt>Refined depths</dt><dd>%s</dd>\n' ...
+        '<dt>Refinement blend</dt><dd>%s</dd>\n' ...
+        '</dl>\n'], cal_type, lib_mode, fwd_model, lambda_str, n_depths, blend_str)];
 
-    html = [html, '<h2>Depths Covered (Global Model)</h2>', depths_html];
-    html = [html, '<h2>Per-Element Phase Correction</h2>', correction_html];
+    html = [html, '<h2>Fit Quality</h2>', quality_html];
+    html = [html, '<h2>Settings at the Fitted Depths</h2>', ...
+        '<p>Resolved as a study gets them (<code>library_model_at_depth</code>); phases are absolute.</p>', settings_html];
+    html = [html, '<h2>Static Per-Element Phase Correction</h2>', correction_html];
     html = [html, '<h2>Amplitude Lookup</h2>', amp_html];
 
     html = [html, sprintf(['<footer>Generated by GENERATE_CALIBRATION_REPORT &bull; ' ...
