@@ -2,7 +2,8 @@ function affix = sanitize_output_affix(label)
 % SANITIZE_OUTPUT_AFFIX  Normalise io.output_affix to the BIDS desc entity
 %
 % Replaces characters other than letters, digits, '_' and '-' with '_' and
-% wraps a non-empty label as '_desc-<label>' (leading underscores stripped).
+% wraps a non-empty label as '_desc-<label>' (leading underscores and a
+% leading 'desc-' stripped, so 'foo', '_foo' and 'desc-foo' agree).
 % An affix that already starts with '_desc-' is returned unchanged. Used by
 % LOAD_PARAMETERS and by the study tools, so both derive the same output
 % file names from the same label.
@@ -23,7 +24,11 @@ function affix = sanitize_output_affix(label)
         return
     end
     affix = regexprep(char(label), '[^a-zA-Z0-9_-]', '_');
-    if ~isempty(affix) && ~startsWith(affix, '_desc-')
-        affix = ['_desc-' regexprep(affix, '^_+', '')];
+    if startsWith(affix, '_desc-')
+        return
+    end
+    affix = regexprep(regexprep(affix, '^_+', ''), '^desc-', '');
+    if ~isempty(affix)
+        affix = ['_desc-' affix];
     end
 end

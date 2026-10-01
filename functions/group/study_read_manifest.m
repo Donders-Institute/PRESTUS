@@ -18,8 +18,8 @@ function [manifest, info] = study_read_manifest(manifest_path)
 % 'placement.localite.target', 'transducer.target_isppa_wcm2',
 % 'transducer(2).serial'). Cells are parsed as YAML scalars or flow
 % sequences ('30', '[-38, 20, 52]', 'L_MD', 'true'); an empty cell keeps the
-% study value, '[]' sets an empty value. Lines starting with '#' are
-% comments.
+% study value, '[]' sets an empty value. yes/no/on/off and zero-padded
+% numbers ('001') stay text. Lines starting with '#' are comments.
 %
 % Use as:
 %   [manifest, info] = study_read_manifest(manifest_path)
@@ -113,6 +113,7 @@ function T = read_text_table(file, delim)
 % All columns as text, header names preserved (dots, parentheses), '#' comments.
     lines = splitlines(string(fileread(file)));
     keep = strlength(strtrim(lines)) > 0 & ~startsWith(strtrim(lines), "#");
+    line_no = find(keep);
     lines = lines(keep);
     if isempty(lines)
         error('study_read_manifest:empty', 'Manifest %s is empty.', file);
@@ -132,7 +133,7 @@ function T = read_text_table(file, delim)
         if numel(cells) > numel(header)
             if any(strtrim(cells(numel(header)+1:end)) ~= "")
                 error('study_read_manifest:tooManyCells', ...
-                    'Manifest %s line %d has more cells than columns.', file, r);
+                    'Manifest %s line %d has more cells than columns.', file, line_no(r));
             end
             cells = cells(1:numel(header));
         end
@@ -193,6 +194,13 @@ end
 
 function v = parse_manifest_value(txt)
 % YAML scalar or flow sequence, typed like values read from a config file.
+% YAML 1.1 reads yes/no/on/off as booleans and '001' as 1; in a manifest
+% these are labels or serials, so they stay text (use true/false for flags).
+    if any(strcmpi(txt, {'yes', 'no', 'y', 'n', 'on', 'off'})) || ...
+            ~isempty(regexp(char(txt), '^0\d+$', 'once'))
+        v = char(txt);
+        return
+    end
     try
         v = yaml.load(txt, "ConvertToArray", true);
     catch
