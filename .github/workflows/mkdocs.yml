@@ -5,9 +5,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -17,28 +21,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+      with:
+        fetch-depth: 0
+
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-    
+
     - uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-    
+
     - name: Install dependencies
       run: |
         pip install -U pip
-        pip install mkdocs mkdocs-material pymdown-extensions
-    
+        pip install mkdocs mkdocs-material pymdown-extensions mike
+
+    # --- CURRENT (live) publishing path: unversioned, single-site build via
+    # the native GitHub Pages "Actions" source. This is what visitors
+    # actually see today and keeps working unchanged. ---
     - name: Build
       run: mkdocs build --clean
-    
+
     - uses: actions/upload-pages-artifact@v3
       with:
         path: ./site
-    
+
     - name: Deploy to GitHub Pages
       id: deployment
       uses: actions/deploy-pages@v4
+
+    # --- NEW (shadow) publishing path: populates the versioned gh-pages
+    # branch via mike, in parallel, without affecting the live site above.
+    # Once the repo's Pages source is switched to "Deploy from a branch:
+    # gh-pages", this becomes the live path and the steps above can be
+    # removed. ---
+    - name: Configure git identity for mike
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Shadow-deploy main docs (mike)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        mike deploy --push --update-aliases main latest
+        mike set-default --push main
+
+    - name: Shadow-deploy development docs (mike)
+      if: github.ref == 'refs/heads/development'
+      run: mike deploy --push --update-aliases development dev
