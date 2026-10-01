@@ -6,7 +6,7 @@ function fig = calibration_gui(options)
 % entry, fit per-depth refinements (default) or — for debugging — the
 % static model (all selected depths jointly), optionally check the per-depth
 % refinements in free-water k-Wave (drive corrected to the simulated ISPPA;
-% KWAVE_CHECK_REFINEMENT), and save the result to a user library folder
+% KWAVE_CALIBRATE_DRIVE), and save the result to a user library folder
 % (transducer.library_path).
 %
 % Desired depths. "Predict" works at any depths: each gets a profile from
@@ -44,7 +44,7 @@ function fig = calibration_gui(options)
 %   .ProfileRoot - folder that char_data_path in the equipment YAML is relative to
 %                  (default local/profiles/)
 %   .OutputPath  - folder to save entries to (default: ask on save)
-%   .SimConfig   - study/simulation YAML for the k-Wave check (grid, code_type,
+%   .SimConfig   - study/simulation YAML for the k-Wave drive calibration (grid, code_type,
 %                  platform/hpc); default: config_default
 %   .ExportFolder - write "Export profiles…" / "Export settings…" CSVs here
 %                  under their default names, without a file dialog
@@ -54,7 +54,7 @@ function fig = calibration_gui(options)
 %
 % See also: FIT_TRANSDUCER_MODEL, EVALUATE_LIBRARY_ENTRY, INTERPOLATE_AXIAL_PROFILES,
 %           LIBRARY_SETTINGS_TABLE, REFINE_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY,
-%           CHECK_EQUIPMENT_CONFIG, KWAVE_CHECK_REFINEMENT
+%           CHECK_EQUIPMENT_CONFIG, KWAVE_CALIBRATE_DRIVE
 
     if nargin < 1; options = struct(); end
     root = get_prestus_path();
@@ -69,7 +69,7 @@ function fig = calibration_gui(options)
                             % their measured/derived profiles (.profile_type)
     st.lib = []; st.res = struct(); st.fit_model = []; st.fit_mode = '';
     st.fit_prof = [];       % profiles the current fit was fitted to (.profile_type per depth)
-    st.kw = [];   % k-Wave check of the current per-depth fit: .lib, .report, .sims, .res
+    st.kw = [];   % k-Wave drive calibration of the current per-depth fit: .lib, .report, .sims, .res
     st.predicted = false;   % true: st.prof is the desired-depth grid
     st.adv = struct();      % advanced FIT_TRANSDUCER_MODEL options ("Advanced…"); empty = defaults
 
@@ -151,9 +151,9 @@ function fig = calibration_gui(options)
     lab('Reference ISPPA (W/cm²)', 21);
     ui.isppa   = at(uieditfield(L, 'numeric', 'Value', 30, 'Limits', [0.1 1000]), 21, 2);
 
-    lab('k-Wave check', 22);
+    lab('k-Wave drive', 22);
     kb = at(uigridlayout(L, [1 2], 'Padding', 0, 'ColumnWidth', {'1x', 95}, 'ColumnSpacing', 4), 22, 2);
-    ui.kw      = uicheckbox(kb, 'Text', 'free water, after fit', 'Value', false, 'Tooltip', ...
+    ui.kw      = uicheckbox(kb, 'Text', 'calibrate in free water, after fit', 'Value', false, 'Tooltip', ...
         ['Per-depth only: simulate each refined depth in free-water k-Wave through the ' ...
          'runtime library path, compare with the (measured or derived) profile and correct the drive ' ...
          'to the simulated ISPPA (minutes per depth).']);
@@ -201,7 +201,7 @@ function fig = calibration_gui(options)
     %% Callbacks --------------------------------------------------------------
     function on_mode()
         % c steer changes the steering law of the whole entry: static model only.
-        % The k-Wave check applies to per-depth refinements.
+        % The k-Wave drive calibration applies to per-depth refinements.
         per_depth = ~startsWith(ui.mode.Value, 'Static');
         ui.fp_c.Enable = ternary(per_depth, 'off', 'on');
         ui.kw.Enable   = ternary(per_depth, 'on', 'off');
@@ -209,7 +209,7 @@ function fig = calibration_gui(options)
     end
 
     function on_browse_simcfg()
-        [f, p] = uigetfile({'*.yaml;*.yml', 'YAML config'}, 'Simulation config for the k-Wave check');
+        [f, p] = uigetfile({'*.yaml;*.yml', 'YAML config'}, 'Simulation config for the k-Wave drive calibration');
         if ~isequal(f, 0); ui.simcfg.Value = fullfile(p, f); end
     end
 
@@ -336,7 +336,7 @@ function fig = calibration_gui(options)
 
     function on_evaluate()
         % Rebuild all results on view from the current state (profiles,
-        % library entry, fit, k-Wave check) and redraw
+        % library entry, fit, k-Wave drive calibration) and redraw
         if is_matrix(st.equip.trans.(ui.tran.Value)); say('Evaluation supports annular arrays only.'); return; end
         if isempty(st.prof); on_predict(); return; end
         tran = st.equip.trans.(ui.tran.Value);
@@ -455,14 +455,8 @@ function fig = calibration_gui(options)
             fo.FreeParams = intersect(free, {'phase', 'amp'}, 'stable');
             if ~isempty(st.lib); fo.Prior = library_static_model(st.lib); end
             fo.Prior.z_shift_mm = 0;
-            models = cell(1, numel(sel.depths_ep_mm));
-            for k = 1:numel(sel.depths_ep_mm)
-                dlg.Message = sprintf('Depth %.1f mm, %s profile (%d/%d)', sel.depths_ep_mm(k), ...
-                    sel.profile_type{k}, k, numel(sel.depths_ep_mm));
-                pk = sel; pk.depths_ep_mm = sel.depths_ep_mm(k); pk.I = sel.I(:, k);
-                models{k} = fit_transducer_model(tran, pk, fo);
-                models{k}.profile_type = sel.profile_type{k};   % stored as refinement.profile_type
-            end
+            models = calibration_fit_depths(tran, sel, fo, @(k, n, d, pt) set_msg(dlg, ...
+                sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
             st.fit_model = models;
             st.fit_mode  = 'per_depth';
             r2 = cellfun(@(m) m.metrics.r2, models);
@@ -473,7 +467,7 @@ function fig = calibration_gui(options)
             st.fit_mode, strjoin(fo.FreeParams, '+'), numel(pt), nnz(strcmp(pt, 'measured')), ...
             nnz(strcmp(pt, 'interpolated')), nnz(strcmp(pt, 'extrapolated')), toc(t0), median(r2), min(r2)));
         if strcmp(st.fit_mode, 'per_depth') && ui.kw.Value
-            run_kwave_check(sel, dlg);
+            run_kwave_drive_calibration(sel, dlg);
         end
         if at_desired || st.predicted
             on_predict();    % show the result on the desired depths, as a study resolves it
@@ -482,23 +476,23 @@ function fig = calibration_gui(options)
         end
     end
 
-    function run_kwave_check(sel, dlg)
+    function run_kwave_drive_calibration(sel, dlg)
         % Free-water k-Wave of the refined depths through the runtime library path
-        dlg.Indeterminate = 'off'; dlg.Title = 'k-Wave check';
+        dlg.Indeterminate = 'off'; dlg.Title = 'k-Wave drive calibration';
         ko = struct('EquipParam', st.equip, 'Axisymmetric', strcmp(ui.kw_grid.Value, 'axisymmetric'), ...
-            'NearFieldSkipMm', ui.skip.Value, 'WorkDir', fullfile(tempdir, 'prestus_kwave_check', combo_name()), ...
+            'NearFieldSkipMm', ui.skip.Value, 'WorkDir', fullfile(tempdir, 'prestus_kwave_drive', combo_name()), ...
             'ProgressFcn', @(k, n, d) set(dlg, 'Value', (k - 1) / n, ...
                 'Message', sprintf('Free-water simulation at %.1f mm (%d/%d)', d, k, n)));
         if ~isempty(strtrim(ui.simcfg.Value)); ko.SimConfig = strtrim(ui.simcfg.Value); end
         t1 = tic;
         try
-            [lib, rep, sims] = kwave_check_refinement(entry_from_fit(), sel, ko);
+            [lib, rep, sims] = kwave_calibrate_drive(entry_from_fit(), sel, ko);
         catch ME
-            say(['k-Wave check failed: ' ME.message]); return;
+            say(['k-Wave drive calibration failed: ' ME.message]); return;
         end
         st.kw = struct('lib', lib, 'report', rep, 'sims', sims, ...
             'res', pack_kwave(sims, rep, st.fit_model{1}.z_ep_mm, ui.skip.Value));
-        say(sprintf(['k-Wave check (%d depths, %.0f s): ISPPA %s W/cm² at the analytical drive ' ...
+        say(sprintf(['k-Wave drive calibration (%d depths, %.0f s): ISPPA %s W/cm² at the analytical drive ' ...
             '(target %g) → drive ×%s; median R² %.3f'], height(rep), toc(t1), ...
             strjoin(compose('%.1f', rep.isppa_kwave_wcm2'), ' '), ui.isppa.Value, ...
             strjoin(compose('%.2f', rep.amp_scale'), ' '), median(rep.r2_kwave)));
@@ -1436,4 +1430,9 @@ function issues = validate_equipment_entry(t)
     yaml.dumpFile(fullfile(tmp, [t.serial '.yaml']), t);
     [~, rep] = evalc('check_equipment_config(tmp)');
     issues = rep(1).issues;
+end
+
+function set_msg(dlg, msg)
+% Progress text for CALIBRATION_FIT_DEPTHS (uiprogressdlg is a handle object)
+    dlg.Message = msg;
 end

@@ -22,7 +22,7 @@ function lib = library_refinement_from_fits(lib, fits, isppa_wcm2, blend_mm, sou
 %   source     - provenance string, e.g. the profile CSV
 %   c_water, rho_water - medium for velocity → pressure (default 1500, 994)
 %
-% See also: LIBRARY_ADD_REFINEMENTS, REFINE_TRANSDUCER_LIBRARY, KWAVE_CHECK_REFINEMENT
+% See also: LIBRARY_ADD_REFINEMENTS, REFINE_TRANSDUCER_LIBRARY, KWAVE_CALIBRATE_DRIVE
 
     if nargin < 4; blend_mm = []; end
     if nargin < 5; source = ''; end

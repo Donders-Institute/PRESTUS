@@ -12,7 +12,7 @@ function job_id = calibration_pipeline_start(...
 % arguments to a temp .mat file, generates a bootstrap .m script, and submits
 % via hpc_submit_job.
 %
-% When running on HPC, the inner water simulations executed inside
+% When running on HPC, the free-water k-Wave drive calibrations executed inside
 % calibration_transducer run locally on the allocated node (parameters.platform
 % is forced to 'matlab' in the serialised payload), so the job must request the
 % GPU resources required by parameters.simulation.code_type.
@@ -23,10 +23,10 @@ function job_id = calibration_pipeline_start(...
 %   job_id = calibration_pipeline_start(...)
 %
 % Input:
-%   profile_empirical         - struct with axial_intensity and axial_distance_bowl [mm]
-%   equipment_name            - name/identifier for the transducer or equipment
-%   desired_intensity         - target focal intensity/intensities [W/cm²] (scalar or row vector)
-%   desired_focal_distance_ep - desired focal distance from transducer exit plane [mm]
+%   profile_empirical         - axial profile CSV path or profiles struct (see CALIBRATION_TRANSDUCER)
+%   equipment_name            - equipment combo '{tran_serial}_{ds_serial}' or transducer serial
+%   desired_intensity         - target ISPPA(s) [W/cm²] (scalar or row vector)
+%   desired_focal_distance_ep - focal depth(s) from the exit plane [mm]; [] = all measured
 %   parameters                - PRESTUS config with calibration settings;
 %                               parameters.platform controls dispatch
 %                               ('matlab' | 'slurm' | 'qsub' | 'auto')

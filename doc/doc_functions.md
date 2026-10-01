@@ -19,26 +19,28 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `calc_virtual_elem`                     | (STANDALONE) Calculate additional virtual elements                                              |
-| `calibration_transducer`                | Run water simulations to optimize transducer source amplitude and element phases matching a target intensity profile via O’Neil analytical solution, global search, and re-simulation. |
+| `calibrate_library_entry`               | Calibration core: profiles at requested depths (measured or interpolated), per-depth fits, refinements, optional k-Wave drive calibration, report (no file I/O) |
+| `calibration_fit_depths`                | One `fit_transducer_model` fit per depth of a profile set (shared by library build, refinement, GUI, `calibration_transducer`) |
+| `calibration_fit_options`               | Per-depth fit presets: `rayleigh_phase_gain` (default) and `oneil_phase_only` (former global-search settings) |
+| `calibration_transducer`                | Config-driven calibration at chosen depths and intensities; writes a library entry and a calibration output folder |
 | `compute_flhm_center`                   | Compute the FLHM (Focal Length at Half Maximum) centre/span of an axial intensity profile at a configurable threshold fraction of peak (0.5 = −3 dB default, 0.25 = −6 dB). |
 | `compute_oneil_solution`                | Compute analytical O’Neil pressure along the beam axis for focused annular transducers in water, derives particle velocity and grid adjustment factor, and plots comparisons with simulated/desired intensities. |
 | `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
 | `babelbrain_insitu_isppa`               | In-brain peak ISPPA of the scaled acoustic field — the `Isppa` BabelBrain's thermal solver normalises to. |
 | `export_babelbrain_weights`             | Pack PRESTUS per-element phases and particle velocity into a BabelBrain OptimizedWeightsFile (HDF5 complex64 phasors). |
-| `extract_analytical_profile`           | Compute an axial intensity profile analytically (O'Neil or Rayleigh forward model) without running a k-Wave simulation; returns the same struct layout as `extract_simulated_profile`. |
 | `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
-| `extract_simulated_profile`             | Extract and visualize simulated acoustic pressure data.                                         |
 | `focal_reference_to_frac`               | Map a `focal_reference` config value (`flhm_3db`/`flhm_6db`) to its FLHM threshold fraction of peak; errors on `peak` (no associated fraction) or an unknown value. |
 | `import_babelbrain_weights`             | Read per-element phase weights from a BabelBrain OptimizedWeightsFile (.h5), derive hardware correction relative to geometric phases, and write the correction into the transducer equipment YAML. |
 | `plot_transducer_library`               | Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas). |
 | `generate_calibration_report`           | Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup. |
+| `kwave_calibrate_drive`                 | Calibrate the drive of per-depth refinements in free-water k-Wave (rescale to the simulated ISPPA) and report agreement with the measured profiles |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |
 | `phase_optimization_annulus`            | Optimizes the phase profile by calculating focal distance error for an annular transducer.      |
-| `plot_opt_sim_results`                  | Load optimized k-Wave results, generate 2D focal plane intensity maps and axial profile comparisons (simulated vs. analytical O’Neil vs. desired), and save annotated plots.  |
+| `plot_calibration_report`               | Measured vs library vs calibrated axial profiles per depth (PNG) |
 | `recompute_oneil_solution`              | Recompute O’Neil analytical pressure profile using optimized phases/velocity, convert to intensity, plot comparisons with original/desired profiles (skipping near-field), and report focal metrics.  |
 | `save_optimized_values`                 | Append optimized transducer phases and amplitudes into a CSV table (indexed by intensity/focus) and save parameters as YAML for PRESTUS config integration. |
-| `scale_real_intensity_profile`          | Linearly scale measured focal intensity profile and update transducer source amplitude (via acoustic impedance) to match desired peak Isppa (W/cm²). |
+| `save_library_entry`                    | Write a user-calibrated library entry with provenance |
 | `set_real_phases`                       | Load or compute manufacturer-specific (Sonic Concepts/Imasonic) transducer element phases for given focal depth (wrt exit plane), interpolate/unwrap for virtual elements, and return phase degrees.  |
 
 #### CORE

@@ -1,438 +1,274 @@
-function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibration_transducer(...
-    profile_empirical,...
+function [lib, report, out] = calibration_transducer(...
+    profile_empirical, ...
     equipment_name, ...
     desired_intensity, ...
     desired_focal_distance_ep, ...
     parameters, ...
     sim_id)
 
-% CALIBRATION_TRANSDUCER  Calibrate transducer phases and amplitude to match a target intensity profile
+% CALIBRATION_TRANSDUCER  Calibrate a transducer to hydrophone profiles at chosen depths and intensities
 %
-% Determines optimal element phases and source amplitude to reproduce a
-% measured empirical intensity profile at one or more target intensities.
+% Config-driven front end to CALIBRATE_LIBRARY_ENTRY, the same calibration
+% core that builds and refines the transducer library. For each requested
+% focal depth the measured axial profile is taken (a measured depth) or
+% interpolated from the neighbouring measured depths, and the element phases,
+% per-ring gains and drive are fitted to it analytically (FIT_TRANSDUCER_MODEL).
+% Optionally, a free-water k-Wave simulation per depth checks the result and
+% rescales the drive to the simulated ISPPA (KWAVE_CALIBRATE_DRIVE).
 %
-% Pipeline overview:
-%   1. Phase optimisation runs purely analytically using the configured
-%      forward model (O'Neil or Rayleigh; see calibration.forward_model).
-%   2. An optional free-water k-Wave simulation (calibration.run_free_water_sim,
-%      default true) then corrects the analytical-to-simulation scaling factor.
-%      Set to false for a fully simulation-free calibration — appropriate when
-%      the analytical model alone is considered sufficient (e.g. single-element
-%      transducers with no inter-element phase steering).
-%   3. For each target intensity the velocity and source amplitude are scaled
-%      analytically (I ∝ v²), followed by an optional per-intensity validation
-%      simulation (calibration.opt_amp_validation).
+% Two endpoints are written:
+%   1. Library entry  {library_path}/{combo}.yaml — the calibrated depths as
+%      refinements on top of the existing (user or shipped) entry. Studies use
+%      it by setting transducer.library_path to library_path.
+%   2. Calibration output folder (path_output_profiles) — per depth ×
+%      intensity: element phases and amplitude (CSV table and one PRESTUS
+%      transducer YAML each, SAVE_OPTIMIZED_VALUES), per-depth settings per
+%      intensity (LIBRARY_SETTINGS_TABLE), the profiles fitted to, the fit
+%      report and a figure. All values are resolved from the library entry,
+%      so both endpoints agree exactly.
 %
-% Because optimal phases are independent of intensity level, phase optimisation
-% runs once and the per-intensity loop only adjusts velocity and amplitude.
+% Configuration (parameters.calibration, see config_calibration.yaml):
+%   phase_mode        - 'single_depth' (default): fit each depth |
+%                       'geometric': no fit, geometric steering with the
+%                       measured drive | 'multi_depth': one depth-independent
+%                       model over all depths (debugging)
+%   fit_preset        - 'rayleigh_phase_gain' (default) | 'oneil_phase_only'
+%                       (CALIBRATION_FIT_OPTIONS)
+%   fit_options       - struct of FIT_TRANSDUCER_MODEL options on top of the preset
+%   forward_model     - 'rayleigh' | 'oneil' (overrides the preset)
+%   skip_front_peak_mm, opt_phase_precession, opt_limits [mm from the bowl],
+%   opt_weights       - mapped to NearFieldSkipMm, PhaseConstraint,
+%                       FitWindowMm, FocalWeight
+%   opt_method, opt_seed - optimiser and seed (oneil_phase_only preset only)
+%   elem_phase_correction_deg - prior phase offsets (deg) to regularise towards
+%   profile_align, max_extrapolation_mm, max_gap_mm - profile interpolation
+%   add_FDO           - 1 (default): profile distances are from the exit
+%                       plane | 0: from the bowl apex
+%   kwave_drive_calibration - free-water k-Wave drive calibration per depth
+%                       (default true; former name run_free_water_sim);
+%                       force_kwavearray, axisymmetric2D set up its grid
+%   library_path      - library endpoint (default {path_output}/library)
+%   path_output_profiles - calibration output folder (default {path_output}/profiles)
 %
 % Use as:
-%   [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = ...
-%       calibration_transducer(profile_empirical, equipment_name, ...
-%                              desired_intensity, desired_focal_distance_ep, parameters, sim_id)
+%   [lib, report, out] = calibration_transducer(profile_empirical, equipment_name, ...
+%       desired_intensity, desired_focal_distance_ep, parameters)
+%   ... = calibration_transducer(..., sim_id)
 %
 % Input:
-%   profile_empirical         - struct with axial_intensity and axial_distance_bowl [mm]
-%   equipment_name            - name/identifier for the transducer or equipment
-%   desired_intensity         - target focal intensity/intensities [W/cm²] (scalar or row vector)
-%   desired_focal_distance_ep - desired focal distance from transducer exit plane [mm]
-%   parameters                - PRESTUS config with calibration settings
-%   sim_id                    - numeric subject or simulation ID
+%   profile_empirical         - axial profile CSV path, measured profiles
+%                               (READ_AXIAL_PROFILES struct), or a single
+%                               profile struct with axial_intensity and
+%                               axial_distance_bowl [mm] (former interface)
+%   equipment_name            - combo '{tran_serial}_{ds_serial}' or a transducer serial
+%   desired_intensity         - target ISPPA(s) [W/cm²]; the first is the
+%                               reference drive stored in the library
+%   desired_focal_distance_ep - focal depth(s) from the exit plane [mm];
+%                               [] = all measured depths
+%   parameters                - PRESTUS config with a calibration section
+%   sim_id                    - run number for the k-Wave work folder (default 1)
 %
 % Output:
-%   opt_source_amp        - optimised source amplitude(s), one per desired intensity
-%   opt_source_phase_deg  - optimised element phases [°]  (shared across intensities)
-%   opt_source_phase_rad  - optimised element phases [rad] (shared across intensities)
+%   lib    - the calibrated library entry as written
+%   report - per-depth table (CALIBRATE_LIBRARY_ENTRY)
+%   out    - .library_file, .output_folder, .settings_files, .report_file
 %
-% See also: SCALE_REAL_INTENSITY_PROFILE, COMPUTE_PHASES, PERFORM_GLOBAL_SEARCH,
-%           SAVE_OPTIMIZED_VALUES
+% See also: CALIBRATE_LIBRARY_ENTRY, CALIBRATION_SETUP, CALIBRATION_PIPELINE_START,
+%           REFINE_TRANSDUCER_LIBRARY, CALIBRATION_FIT_OPTIONS
 
-    desired_intensities = desired_intensity(:)';   % ensure row vector
-    N_intensities       = numel(desired_intensities);
+    if nargin < 6 || isempty(sim_id); sim_id = 1; end
+    cal   = parameters.calibration;
+    equip = load_equipment_config();
 
-    % =========================================================================
-    % STAGE 1 — Prepare target profile
-    %
-    % Attach run-specific metadata to the parameter struct and scale the
-    % empirical hydrophone measurement to the first (reference) target intensity.
-    % This scaled profile is the shape the transducer must reproduce; all
-    % subsequent optimisation steps work to match it.
-    % The first intensity is used as the reference because optimal phases are
-    % independent of level (I ∝ v²) — only velocity changes across intensities.
-    % =========================================================================
-
-    parameters.calibration.equipment_name            = equipment_name;
-    parameters.calibration.desired_focal_distance_ep = desired_focal_distance_ep;
-    parameters.calibration.desired_intensity         = desired_intensities(1);
-
-    [profile_target_ref, ~] = scale_real_intensity_profile(...
-        parameters, ...
-        profile_empirical, ...
-        desired_intensities(1));
-
-    % =========================================================================
-    % STAGE 2 — Analytical bootstrap
-    %
-    % Compute an axial intensity profile from the configured analytical forward
-    % model (O'Neil or Rayleigh; see calibration.forward_model) using the
-    % nominal transducer parameters from the config.  This gives us a velocity
-    % estimate and an intensity shape that phase optimisation can work with —
-    % no k-Wave simulation is needed at this stage.
-    %
-    % If run_free_water_sim = true (default, Stage 4), this profile is later
-    % replaced with the actual k-Wave result.
-    % =========================================================================
-
-    bootstrap_params = parameters;
-    bootstrap_params.calibration.prefix = 'Initial_';
-    if ~isfield(bootstrap_params.transducer.annular, 'elem_phase_rad')
-        bootstrap_params.transducer.annular.elem_phase_rad = ...
-            bootstrap_params.transducer.annular.elem_phase_deg * pi / 180;
-    end
-
-    profile_sim = extract_analytical_profile(bootstrap_params);
-
-    % =========================================================================
-    % STAGE 3 — Phase determination
-    %
-    % Three modes, selected in order of precedence:
-    %
-    %   Geometric + correction (elem_phase_correction_deg is non-empty):
-    %     Applies a pre-fitted per-element delta on top of depth-dependent
-    %     geometric steering phases. The correction is typically produced by
-    %     the multi_depth path in calibration_setup (perform_joint_depth_fit)
-    %     or imported from BabelBrain (import_babelbrain_weights). No search
-    %     is run.
-    %
-    %   Geometric only (default, correction absent):
-    %     Uses the geometric steering phases computed by set_real_phases from
-    %     the ring geometry in the equipment YAML. No search is run. This is
-    %     the starting point before any empirical refinement.
-    %
-    %   Single-depth search (phase_mode = 'single_depth', explicit opt-in):
-    %     perform_global_search jointly optimises phases and velocity at this
-    %     depth to match the empirical profile. Set
-    %     calibration.save_elem_correction = true to persist the per-element
-    %     correction for reuse at other depths.
-    % =========================================================================
-
-    % Configure output folder before any simulation or file I/O
-    if parameters.calibration.save_in_calibration_folder
-        parameters.path.anat = parameters.calibration.path_output;
-        parameters.path.seg  = parameters.calibration.path_output;
-        parameters.path.sim  = parameters.calibration.path_output;
-    end
-    disp(['Saving free-water calibration in ', parameters.path.sim]);
-    parameters.io.outputs_folder = fullfile(parameters.path.sim, sprintf('sub-%03d', sim_id));
-    bootstrap_params.io.outputs_folder = parameters.io.outputs_folder;
-
-    use_geo_correction = isfield(parameters.calibration, 'elem_phase_correction_deg') && ...
-        ~isempty(parameters.calibration.elem_phase_correction_deg);
-
-    use_geometric_only = isfield(parameters.calibration, 'phase_mode') && ...
-        strcmp(parameters.calibration.phase_mode, 'geometric');
-
-    if use_geo_correction
-        % --- Geometric steering + pre-fitted correction -----------------------
-        % Correction set by multi_depth calibration or imported from BabelBrain.
-        % Applied on top of depth-adaptive geometric phases; no search needed.
-        correction_deg = parameters.calibration.elem_phase_correction_deg(:)';
-
-        if numel(correction_deg) ~= parameters.transducer.annular.elem_n
-            error(['calibration_transducer: elem_phase_correction_deg has %d elements ' ...
-                'but transducer has %d elements.'], ...
-                numel(correction_deg), parameters.transducer.annular.elem_n);
-        end
-
-        geo_phases_deg       = bootstrap_params.transducer.annular.elem_phase_deg;
-        combined_deg         = mod(geo_phases_deg + correction_deg, 360);
-        combined_rad         = combined_deg * pi / 180;
-        opt_source_phase_rad = combined_rad;
-        opt_source_phase_deg = combined_deg;
-        opt_velocity_ref     = profile_sim.velocity;
-        min_err              = NaN;
-
-        fprintf('Stage 3: geometric + correction  phases [deg]: %s\n', ...
-            mat2str(round(combined_deg)));
-
-    elseif use_geometric_only
-        % --- Geometric phases only (explicit opt-in) -------------------------
-        opt_source_phase_rad = bootstrap_params.transducer.annular.elem_phase_rad;
-        opt_source_phase_deg = bootstrap_params.transducer.annular.elem_phase_deg;
-        opt_velocity_ref     = profile_sim.velocity;
-        min_err              = NaN;
-
-        fprintf('Stage 3: geometric phases only  [deg]: %s\n', ...
-            mat2str(round(opt_source_phase_deg)));
-
+    %% Equipment -------------------------------------------------------------
+    combo = char(string(equipment_name));
+    if isfield(equip.combos, combo)
+        tran_serial = char(equip.combos.(combo).tran_serial);
+        ds_serial   = combo(numel(tran_serial) + 2:end);
+    elseif isfield(equip.trans, combo)
+        tran_serial = combo; ds_serial = '';
     else
-        % --- Single-depth global search (default) ----------------------------
-        fprintf('Stage 3: single-depth global search at %.1f mm\n', desired_focal_distance_ep);
-        [opt_source_phase_rad, opt_velocity_ref, min_err, ~] = perform_global_search(...
-            bootstrap_params, profile_target_ref, profile_sim.velocity);
-
-        opt_source_phase_deg = opt_source_phase_rad / pi * 180;
+        error('calibration_transducer:unknownEquipment', ...
+            'calibration_transducer: ''%s'' is neither an equipment combo nor a transducer serial.', combo);
     end
+    tran = equip.trans.(tran_serial);
+    bowl_offset = tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm;
 
-    % =========================================================================
-    % STAGE 4 — Free-water correction simulation (optional)
-    %
-    % Runs a k-Wave simulation in free water to compute
-    % simulated_analytical_scaling — the ratio by which the analytical model
-    % under- or over-estimates the simulation at the same source conditions.
-    % This factor corrects the source amplitude in Stage 5.
-    %
-    % Phase injection strategy:
-    %   Global search mode  — the optimised phases from Stage 3 are injected
-    %     into sim_param so that the correction simulation and the Stage 5
-    %     analytical profile are evaluated at matching conditions, making
-    %     simulated_analytical_scaling a clean model-vs-simulation ratio.
-    %   Geo correction mode — combined phases (geo + hardware offset) are not
-    %     yet known before the simulation runs; the simulation must use the
-    %     geometric steering phases to resolve them.  simulated_analytical_scaling
-    %     is therefore computed as peak_sim_geo / peak_analytical_combined.
-    %     This slight mismatch is acceptable because the correction offsets are
-    %     typically small relative to the steering phases.
-    %
-    % Set calibration.run_free_water_sim = false to skip this stage.  The
-    % scaling factor then defaults to 1 (pure analytical amplitude prediction),
-    % which is appropriate for single-element transducers where the analytical
-    % model closely matches the simulation.
-    % =========================================================================
+    %% Measured profiles -------------------------------------------------------
+    depths = reshape(desired_focal_distance_ep, 1, []);
+    [meas, source] = measured_profiles(profile_empirical, depths, bowl_offset, get_or(cal, 'add_FDO', 1));
+    if isempty(depths); depths = meas.depths_ep_mm; end
+    intensities = reshape(desired_intensity, 1, []);
 
-    sim_param = parameters;
-    sim_param.simulation.medium = 'water';
-    % save_acoustic_matrices must be set explicitly: the per-field flag takes
-    % precedence over the global save_matrices fallback and the default is 0.
-    % The correction and validation simulations both need the .mat result files.
-    sim_param.io.save_matrices        = 1;
-    sim_param.io.save_acoustic_matrices = 1;
-    sim_param.modules.run_nifti_creation = 0;
-    sim_param.modules.run_heating_sims   = 0;
-    if isfield(parameters.calibration, 'force_kwavearray') && ...
-            parameters.calibration.force_kwavearray == 1
-        sim_param.grid.use_kWaveArray = 1;
+    %% Options -----------------------------------------------------------------
+    mode   = phase_mode_to_mode(get_or(cal, 'phase_mode', 'single_depth'));
+    preset = char(get_or(cal, 'fit_preset', 'rayleigh_phase_gain'));
+    co = struct('Depths', depths, 'Mode', mode, 'Preset', preset, ...
+        'FitOptions', fit_overrides(cal, preset, bowl_offset), 'Intensity', intensities(1), ...
+        'Source', source, 'EquipParam', equip, 'MaxGapMm', get_or(cal, 'max_gap_mm', 10), ...
+        'InterpolateOptions', struct('Align', char(get_or(cal, 'profile_align', 'label')), ...
+            'MaxExtrapolationMm', get_or(cal, 'max_extrapolation_mm', 0)));
+    co.KWaveDriveCalibration = logical(get_or(cal, 'kwave_drive_calibration', get_or(cal, 'run_free_water_sim', true))) && ...
+        ~strcmp(mode, 'static');
+    if co.KWaveDriveCalibration
+        sim_cfg = parameters;
+        if get_or(cal, 'force_kwavearray', 0) == 1; sim_cfg.grid.use_kWaveArray = 1; end
+        co.KWaveDriveOptions = struct('SimConfig', sim_cfg, 'EquipParam', equip, ...
+            'Axisymmetric', logical(get_or(cal, 'axisymmetric2D', 0)), ...
+            'WorkDir', fullfile(cal.path_output, sprintf('sub-%03d', sim_id), 'kwave_drive_calibration'));
     end
-    if isfield(parameters.calibration, 'axisymmetric2D') && ...
-            parameters.calibration.axisymmetric2D == 1
-        sim_param.grid.axisymmetric = 1;
-        if numel(sim_param.grid.default_dims) == 3
-            sim_param.grid.default_dims(2) = [];
-        end
-    end
-    sim_param.simulation.interactive = 0;
-    sim_param.subject_id             = sim_id;
-    sim_param.hpc.wait_for_job       = true;
+    warn_obsolete(cal);
 
-    % Inject optimised phases for global search mode so the correction
-    % simulation matches the analytical comparison in Stage 5.
-    % Geo correction mode cannot do this — combined phases are unknown until
-    % after the simulation resolves the steering geometry.
-    if ~use_geo_correction
-        sim_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
-        sim_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
-    end
-
-    run_free_water_sim = ~isfield(parameters.calibration, 'run_free_water_sim') || ...
-        parameters.calibration.run_free_water_sim;
-
-    if run_free_water_sim
-
-        disp('Run free-water correction simulation...')
-        prestus_pipeline_start(sim_param);
-
-        initial_res = load(fullfile(sim_param.io.outputs_folder, 'cache', ...
-            sprintf('sub-%03d_water_results%s.mat', sim_id, sim_param.io.output_affix)));
-
-        % resolved_params replaces bootstrap_params: the simulation resolves
-        % geometry-dependent fields (e.g. steering phases) that were not
-        % fully determined from the config alone.
-        resolved_params = initial_res.acoustic_info.parameters;
-        resolved_params.calibration.prefix = 'Initial_';
-        profile_sim = extract_simulated_profile(initial_res, resolved_params);
-        clear initial_res;
-
-        % In geometric correction mode the simulation also computes the true
-        % steering phases for the requested focal depth; update combined phases.
-        if use_geo_correction
-            geo_phases_deg       = resolved_params.transducer.annular.elem_phase_deg;
-            combined_deg         = mod(geo_phases_deg + correction_deg, 360);
-            combined_rad         = combined_deg * pi / 180;
-            opt_source_phase_rad = combined_rad;
-            opt_source_phase_deg = combined_deg;
-        end
-
+    %% Base entry: user library, else shipped, else new ----------------------
+    lib_path = char(get_or(cal, 'library_path', fullfile(cal.path_output, 'library')));
+    out_file = fullfile(lib_path, [combo '.yaml']);
+    shipped  = fullfile(get_prestus_path(), 'config', 'calibration', [combo '.yaml']);
+    if isfile(out_file)
+        lib = yaml.loadFile(out_file, 'ConvertToArray', true);
+    elseif isfile(shipped)
+        lib = yaml.loadFile(shipped, 'ConvertToArray', true);
     else
-        % No simulation run; resolved_params is identical to bootstrap_params.
-        resolved_params = bootstrap_params;
-        % Re-evaluate the analytical profile with the optimised phases so that
-        % Stage 5's compute_analytical_solution sees matching conditions in
-        % profile_sim and params_for_analytical, giving simulated_analytical_scaling = 1
-        % as documented in extract_analytical_profile.
-        profile_sim_params = bootstrap_params;
-        profile_sim_params.transducer.annular.elem_phase_rad = opt_source_phase_rad;
-        profile_sim_params.transducer.annular.elem_phase_deg = opt_source_phase_deg;
-        profile_sim = extract_analytical_profile(profile_sim_params);
+        lib = struct('meta', struct('tran_serial', tran_serial, ...
+            'created_at', datestr(now, 'yyyy-mm-dd'))); %#ok<TNOW1,DATST>
+        if ~isempty(ds_serial); lib.meta.driving_system = ds_serial; end
     end
 
-    % =========================================================================
-    % STAGE 5 — Compute analytical reference profile with optimised phases
-    %
-    % Evaluates the forward model once with the final optimised phases to get
-    % a clean analytical intensity profile (profile_analytical) and the
-    % simulated_analytical_scaling factor.  Both are used in the per-intensity
-    % amplitude calculation below.
-    % =========================================================================
+    %% Calibrate -----------------------------------------------------------------
+    [lib, ~, report, prof, diag] = calibrate_library_entry(lib, tran, meas, co);
+    disp(report);
 
-    params_for_analytical = resolved_params;
-    params_for_analytical.transducer.annular.elem_phase_deg = opt_source_phase_deg;
-    params_for_analytical.transducer.annular.elem_phase_rad = opt_source_phase_rad;
-    [profile_analytical, simulated_analytical_scaling] = compute_analytical_solution(...
-        params_for_analytical, profile_sim, profile_target_ref);
+    %% Endpoint 1: library entry ---------------------------------------------
+    lib = save_library_entry(lib, out_file, mode, report, ...
+        struct('calibration_preset', preset, 'calibration_source', source));
+    fprintf('Library entry: %s\n', out_file);
 
-    % Optionally save the per-element phase offsets found by global search so
-    % they can be reused as hardware corrections at other focal depths.
-    if ~use_geo_correction && ...
-            isfield(parameters.calibration, 'save_elem_correction') && ...
-            parameters.calibration.save_elem_correction
-        save_elem_correction(parameters.calibration.equipment_yaml_path, opt_source_phase_deg, ...
-            resolved_params.transducer.annular.elem_phase_deg, desired_focal_distance_ep);
+    %% Endpoint 2: calibration output folder ---------------------------------
+    out_dir = char(get_or(cal, 'path_output_profiles', fullfile(cal.path_output, 'profiles')));
+    if ~isfolder(out_dir); mkdir(out_dir); end
+    out = struct('library_file', out_file, 'output_folder', out_dir, 'settings_files', {{}});
+    fm  = diag.fit_options.ForwardModel;
+
+    csv_name = char(get_or(cal, 'filename_calibrated_CSV', ''));
+    if isempty(csv_name)
+        prefix = 'PRESTUS_virtual_';
+        if isfield(equip.gen, 'prestus_virt_name'); prefix = char(equip.gen.prestus_virt_name); end
+        csv_name = [prefix combo '.csv'];
     end
+    for d = prof.depths_ep_mm
+        for I = intensities
+            m = library_model_at_depth(lib, tran, d, I, out_file);
+            p = parameters;
+            p.transducer = tran.transducer;
+            p.transducer.annular.elem_phase_deg = m.elem_phase_deg;
+            p.transducer.annular.elem_phase_rad = m.elem_phase_rad;
+            p.transducer.annular.elem_p_amp     = m.elem_p_amp;
+            p.calibration.path_output_profiles  = out_dir;
+            p.calibration.filename_calibrated_CSV = csv_name;
+            p.calibration.equipment_name        = combo;
+            p.calibration.desired_focal_distance_ep = round(d, 2);
+            p.calibration.desired_intensity     = I;
+            p.calibration.phase_mode            = mode;
+            p.calibration.forward_model         = fm;
+            p.calibration.calibration_type      = 'user_empirical';
+            save_optimized_values(p);
+        end
+    end
+    for I = intensities
+        f = fullfile(out_dir, sprintf('%s_settings_I%g.csv', combo, I));
+        library_settings_table(tran, lib, prof.depths_ep_mm, struct('IsppaWcm2', I, 'CsvPath', f, ...
+            'ProfileType', {prof.profile_type}, 'ForwardModel', fm));
+        out.settings_files{end+1} = f;
+    end
+    write_axial_profiles(prof, fullfile(out_dir, [combo '_calibration_profiles.csv']), struct('combo', combo));
+    out.report_file = fullfile(out_dir, [combo '_calibration_report.csv']);
+    writetable(report, out.report_file);
+    if ~isempty(diag.kwave)
+        writetable(diag.kwave, fullfile(out_dir, [combo '_kwave_drive_calibration.csv']));
+    end
+    plot_calibration_report(prof, report, diag, ...
+        sprintf('%s — calibration (%s, %s preset)', strrep(combo, '_', '\_'), mode, preset), ...
+        fullfile(out_dir, [combo '_calibration.png']));
+    fprintf('Calibration outputs: %s\n', out_dir);
+end
 
-    % =========================================================================
-    % STAGE 6 — Per-intensity amplitude calibration
-    %
-    % Phases are shared across all intensities (determined once above).
-    % For each target intensity:
-    %   a) Scale the empirical profile to the target level.
-    %   b) Correct the particle velocity analytically so the forward-model peak
-    %      matches the target (I ∝ v², so v_new = v_ref * sqrt(I_target / I_ref)).
-    %   c) Derive the source amplitude from the corrected velocity, normalised
-    %      by simulated_analytical_scaling to account for any model–sim offset.
-    %   d) Optionally run a free-water validation simulation to confirm the
-    %      achieved intensity (calibration.opt_amp_validation: 'always' |
-    %      'initial' | 'final' | 'none').
-    %   e) Plot and save results.
-    % =========================================================================
-
-    if isfield(parameters.calibration, 'opt_amp_validation')
-        opt_amp_validation = parameters.calibration.opt_amp_validation;
+% -------------------------------------------------------------------------
+function [meas, source] = measured_profiles(src, depths, bowl_offset, add_fdo)
+% Measured profiles in READ_AXIAL_PROFILES form, distances from the exit plane
+    if ischar(src) || isstring(src)
+        source = char(src);
+        meas = read_axial_profiles(source);
+        if ~add_fdo   % distances in the CSV are from the bowl apex
+            meas.z_ep_mm = meas.z_ep_mm - bowl_offset;
+        end
+    elseif isfield(src, 'depths_ep_mm')
+        meas = src; source = get_or(src, 'source', 'profiles struct');
+    elseif isfield(src, 'axial_intensity')
+        % Former interface: one profile at the (single) requested depth
+        assert(numel(depths) == 1, 'calibration_transducer:singleProfile', ...
+            'A single axial profile can only calibrate one focal depth.');
+        z  = src.axial_distance_bowl(:) - bowl_offset;
+        I  = src.axial_intensity(:);
+        ok = z >= 0;                       % drop the padding before the exit plane
+        meas = struct('depths_ep_mm', depths, 'z_ep_mm', z(ok), 'I', I(ok), 'source', 'profile struct');
+        source = meas.source;
     else
-        opt_amp_validation = 'always';
+        error('calibration_transducer:profiles', ...
+            'profile_empirical must be a CSV path, a READ_AXIAL_PROFILES struct or an axial profile struct.');
     end
+end
 
-    opt_source_amp = zeros(1, N_intensities);
-
-    for k = 1:N_intensities
-        desired_intensity_k = desired_intensities(k);
-
-        % Scale empirical profile to this target intensity
-        [profile_target_k, ~] = scale_real_intensity_profile(...
-            parameters, profile_empirical, desired_intensity_k);
-
-        % Correct velocity so the analytical peak matches the target intensity
-        [opt_velocity_k, ~, ~] = fit_velocity_to_intensity(...
-            resolved_params, profile_analytical, opt_source_phase_rad, opt_velocity_ref, ...
-            desired_intensity_k);
-
-        % Derive source amplitude: scale from reference velocity, then apply
-        % the simulation correction factor (sqrt because amplitude ∝ v ∝ sqrt(I))
-        velocity_scaling = opt_velocity_k / profile_sim.velocity;
-        opt_source_amp_k = round(velocity_scaling * ...
-            (resolved_params.transducer.annular.elem_p_amp / ...
-            sqrt(simulated_analytical_scaling)));
-        opt_source_amp(k) = opt_source_amp_k(1);
-
-        fprintf('The optimized elem_p_amp = %i (intensity %g W/cm²)\n', ...
-            opt_source_amp_k(1), desired_intensity_k);
-
-        % Build per-intensity parameter struct for plotting and saving
-        params_k = resolved_params;
-        params_k.calibration.desired_intensity = desired_intensity_k;
-
-        % Evaluate forward model with the optimised phases and corrected velocity
-        profile_analytical_opt_k = recompute_analytical_solution(...
-            params_k, ...
-            profile_analytical, ...
-            profile_target_k, ...
-            opt_source_phase_rad, ...
-            opt_velocity_k);
-
-        % Use a per-intensity output affix when calibrating multiple intensities
-        if N_intensities > 1
-            intensity_affix = sprintf('_optimized_I%g', desired_intensity_k);
-        else
-            intensity_affix = '_optimized';
-        end
-
-        opt_param = sim_param;
-        opt_param.transducer.annular.elem_p_amp       = opt_source_amp_k;
-        opt_param.transducer.annular.elem_phase_rad = opt_source_phase_rad;
-        opt_param.transducer.annular.elem_phase_deg = opt_source_phase_deg;
-        opt_param.io.output_affix                   = intensity_affix;
-        opt_param.calibration.desired_intensity     = desired_intensity_k;
-
-        % --- Optional validation simulation -----------------------------------
-        % Runs a free-water k-Wave simulation with the optimised parameters to
-        % verify that the achieved intensity matches the target.  Controlled by
-        % opt_amp_validation: 'always' runs for every intensity; 'initial' and
-        % 'final' run only for the first or last; 'none' skips all.
-        if strcmp(opt_amp_validation, 'always') || ...
-                (strcmp(opt_amp_validation, 'initial') && k == 1) || ...
-                (strcmp(opt_amp_validation, 'final') && k == N_intensities)
-
-            prestus_pipeline_start(opt_param);
-
-            opt_res = load(fullfile(opt_param.io.outputs_folder, 'cache', ...
-                sprintf('sub-%03d_water_results%s.mat', sim_id, opt_param.io.output_affix)));
-
-            opt_params_ref                    = opt_res.acoustic_info.parameters;
-            opt_params_ref.calibration.prefix = 'Opt_';
-            profile_sim_opt_k                 = extract_simulated_profile(opt_res, opt_params_ref);
-
-            clear opt_res;
-
-        else
-            % No validation sim; carry forward the previous profile_sim_opt_k
-            % (seeded from profile_sim on the first iteration) with NaN intensity
-            % and pressure fields so downstream plotting treats them as absent.
-            if ~exist('profile_sim_opt_k', 'var')
-                profile_sim_opt_k = profile_sim;
-            end
-            for fn = {'Isppa','Ispta','Ita','p_max','p_min','p_rms'}
-                if isfield(profile_sim_opt_k, fn{1})
-                    profile_sim_opt_k.(fn{1}) = NaN;
-                end
-            end
-        end
-
-        plot_opt_sim_results(...
-            opt_param, ...
-            profile_target_k, ...
-            profile_analytical, ...
-            profile_analytical_opt_k, ...
-            profile_sim, ...
-            profile_sim_opt_k, ...
-            min_err)
-
-        save_optimized_values(opt_param);
-
-    end % intensity loop
-
-    % =========================================================================
-    % STAGE 7 — Cache cleanup
-    %
-    % k-Wave writes large .mat result files to the cache folder during
-    % calibration.  Remove them once all simulations are complete unless the
-    % caller explicitly requested to keep them for debugging by setting
-    % parameters.io.save_acoustic_matrices = 1 or save_matrices = 1.
-    % =========================================================================
-    if ~should_save_output(parameters.io, 'save_acoustic_matrices')
-        cache_folder = fullfile(sim_param.io.outputs_folder, 'cache');
-        if isfolder(cache_folder)
-            rmdir(cache_folder, 's');
-            disp(['Calibration cache removed: ', cache_folder]);
-        end
+function mode = phase_mode_to_mode(phase_mode)
+    switch char(phase_mode)
+        case 'single_depth'; mode = 'per_depth';
+        case 'geometric';    mode = 'geometric';
+        case 'multi_depth';  mode = 'static';
+        otherwise
+            error('calibration_transducer:phaseMode', ...
+                'Unknown calibration.phase_mode ''%s'' (single_depth | geometric | multi_depth).', char(phase_mode));
     end
+end
 
+function fo = fit_overrides(cal, preset, bowl_offset)
+% calibration.* keys → FIT_TRANSDUCER_MODEL options on top of the preset
+    fo = get_or(cal, 'fit_options', struct());
+    if isempty(fo); fo = struct(); end
+    if isfield(cal, 'forward_model') && ~isempty(cal.forward_model)
+        fo.ForwardModel = lower(char(cal.forward_model));
+    end
+    if isfield(cal, 'skip_front_peak_mm'); fo.NearFieldSkipMm = cal.skip_front_peak_mm; end
+    pp = get_or(cal, 'opt_phase_precession', false);
+    if ischar(pp) || isstring(pp); fo.PhaseConstraint = char(pp); end
+    lim = get_or(cal, 'opt_limits', []);
+    if numel(lim) == 2; fo.FitWindowMm = double(lim(:)') - bowl_offset; end
+    w = get_or(cal, 'opt_weights', 0);
+    if w > 0; fo.FocalWeight = w; end
+    if strcmp(preset, 'oneil_phase_only')
+        if isfield(cal, 'opt_method'); fo.Optimizer = lower(char(cal.opt_method)); end
+        if isfield(cal, 'opt_seed') && ~isempty(cal.opt_seed); fo.Seed = cal.opt_seed; end
+    end
+    corr = get_or(cal, 'elem_phase_correction_deg', []);
+    if ~isempty(corr)
+        fo.Prior = struct('elem_phase_correction_deg', double(corr(:)'), 'z_shift_mm', 0);
+    end
+end
+
+function warn_obsolete(cal)
+    if isfield(cal, 'save_elem_correction') && cal.save_elem_correction
+        warning('calibration_transducer:obsolete', ['calibration.save_elem_correction is obsolete: ' ...
+            'the calibrated offsets are written to the library entry (library_path).']);
+    end
+    if isfield(cal, 'opt_amp_validation') && ~strcmp(char(cal.opt_amp_validation), 'always')
+        warning('calibration_transducer:obsolete', ['calibration.opt_amp_validation is obsolete: ' ...
+            'the drive scales exactly with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once.']);
+    end
+end
+
+function v = get_or(s, f, d)
+% Field value, or d when absent or empty (YAML '' loads as the string "")
+    if isstruct(s) && isfield(s, f) && ~isempty(s.(f)) && ...
+            ~((isstring(s.(f)) || ischar(s.(f))) && strlength(string(s.(f))) == 0)
+        v = s.(f);
+    else
+        v = d;
+    end
 end

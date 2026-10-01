@@ -27,7 +27,7 @@ drive_i  = elem_p_amp(d) · gain_i · exp(i · phase_i(d))
 
 `transducer.tx_calibration.phase_model` records what was used: `geometric`, `static`, `refined` or `blend`; `amplitude_source` records `refinement`, `blend` or `global`.
 
-**Amplitude.** Hydrophone profiles are recorded at a matched focal ISPPA per depth. The fit therefore uses profile *shape* only, with a free scale per depth, and derives the drive that produced the measured peak at each depth. For a refinement this is the drive with its own refined phases and gains (`refinement.elem_p_amp` at `refinement.isppa_wcm2`); for the global model it is `global_model.amplitude_by_depth`. Both are normalised to the reference ISPPA, interpolated in depth and scaled as √I at load time. Entries without either use the depth-independent `amplitude_scaling`. An optional free-water k-Wave check (Level 2) corrects the refinement drive to the simulated ISPPA.
+**Amplitude.** Hydrophone profiles are recorded at a matched focal ISPPA per depth. The fit therefore uses profile *shape* only, with a free scale per depth, and derives the drive that produced the measured peak at each depth. For a refinement this is the drive with its own refined phases and gains (`refinement.elem_p_amp` at `refinement.isppa_wcm2`); for the global model it is `global_model.amplitude_by_depth`. Both are normalised to the reference ISPPA, interpolated in depth and scaled as √I at load time. Entries without either use the depth-independent `amplitude_scaling`. An optional free-water k-Wave drive calibration (Level 2) rescales the refinement drive to the simulated ISPPA.
 
 ### How the model is fitted
 
@@ -78,7 +78,7 @@ refinement:                           # per-depth (default for built and user en
     - [0.97, 1.10, 1.03, 0.90]
   elem_p_amp: [98000, 104000]         # drive giving isppa_wcm2 in water (NaN: global drive)
   isppa_wcm2: 30
-  amp_source: [analytical, kwave]     # kwave: corrected by the free-water k-Wave check
+  amp_source: [analytical, kwave]     # kwave: calibrated by the free-water k-Wave drive calibration
   fit_z_shift_mm: [-1.5, -0.4]        # axial registration, diagnostic only
   profile_type: [measured, interpolated]   # profile each depth was fitted to (interpolate_axial_profiles)
   calibration_profiles_csv: /path/{combo}_calibration_profiles.csv   # written when any depth is derived
@@ -239,20 +239,20 @@ Before saving, **Predict** shows what the fit gives at the depths you will stimu
 
 Fit settings are passed through `FitOptions` (see `help fit_transducer_model`). `Mode = 'static'` (GUI: **Static model (joint, debug)**) refits one depth-independent model over all selected depths instead. It is kept for debugging and comparison, not as the default.
 
-#### Optional: free-water k-Wave check
+#### Optional: free-water k-Wave drive calibration
 
-The analytical fit (Rayleigh) sets the phases and the drive for each refined depth. `kwave_check_refinement` checks every refined depth in a free-water k-Wave simulation of what a study would resolve from the entry (serial, driving system, depth, target ISPPA; in-pipeline ISPPA targeting off). It reports the simulated ISPPA, R² and FLHM-centre error against the hydrophone profile, and corrects the drive to the simulated ISPPA (`elem_p_amp × √(I_ref / I_kWave)`, `amp_source: kwave`). Phases are not changed: k-Wave checks the analytical fit and corrects its amplitude; it is not an optimiser.
+The analytical fit (Rayleigh) sets the phases and the drive for each refined depth. `kwave_calibrate_drive` simulates every refined depth in free-water k-Wave exactly as a study would resolve it from the entry (serial, driving system, depth, target ISPPA; in-pipeline ISPPA targeting off), and rescales the stored drive so that the simulation hits the reference ISPPA (`elem_p_amp × √(I_ref / I_kWave)`, `amp_source: kwave`). It also reports the simulated ISPPA, R² and FLHM-centre error against the hydrophone profile. Phases are not changed: k-Wave calibrates the amplitude of the analytical fit and validates its phases; it is not a phase optimiser. (Former name: `kwave_check_refinement`, kept as a deprecated wrapper.)
 
 ```matlab
 refine_transducer_library('CTX_250_001_SC_105_010', 'my_profiles.csv', lib, struct( ...
-    'KWave', true, 'KWaveOptions', struct('SimConfig', 'my_study_config.yaml')));
+    'KWaveDriveCalibration', true, 'KWaveDriveOptions', struct('SimConfig', 'my_study_config.yaml')));
 ```
 
-**Consumption-time warning.** Until this check is run, an entry's `amp_source` stays `analytical` at every depth — the drive was never validated against a real k-Wave simulation, only against the O'Neil/Rayleigh model. `load_transducer_from_library` surfaces this at the point of use: it resolves `tx_calibration.amp_kwave_verified` (true only when the drive at the requested depth comes wholly from a `kwave`-checked refinement, not the always-analytical global model or a blend with it) and, if false, issues `load_transducer_from_library:unverifiedAmplitude` naming the nearest checked depth (if any) and its R²/focal error for context. This is independent of BabelBrain's own `water_amp_calibration` (see `doc_babelbrain.md`), which corrects a *different* bias (BabelBrain's FDTD vs. its own Rayleigh reference) and runs automatically on every BabelBrain simulation regardless of whether the library entry itself was k-Wave-checked.
+**Consumption-time warning.** Until the drive calibration is run, an entry's `amp_source` stays `analytical` at every depth — the drive was never validated against a real k-Wave simulation, only against the O'Neil/Rayleigh model. `load_transducer_from_library` surfaces this at the point of use: it resolves `tx_calibration.amp_kwave_calibrated` (true only when the drive at the requested depth comes wholly from a k-Wave-calibrated refinement (`amp_source: kwave`), not the always-analytical global model or a blend with it) and, if false, issues `load_transducer_from_library:uncalibratedAmplitude` naming the nearest checked depth (if any) and its R²/focal error for context. (The former names `amp_kwave_verified`, `amp_kwave_ref_depth_mm` are still written as deprecated aliases of `amp_kwave_calibrated`, `amp_kwave_nearest_depth_mm`; the warning was formerly `:unverifiedAmplitude`.) This is independent of BabelBrain's own `water_amp_calibration` (see `doc_babelbrain.md`), which corrects a *different* bias (BabelBrain's FDTD vs. its own Rayleigh reference) and runs automatically on every BabelBrain simulation regardless of whether the library entry itself was k-Wave-checked.
 
-In the GUI, tick **k-Wave check: free water, after fit** (per-depth mode). The simulated profiles are overlaid in green, and **Save entry** stores the corrected drives. `SimConfig` supplies grid, `code_type` and `platform`/HPC settings. Without it, PRESTUS runs locally with `config_default` (CPU on macOS). Each depth is one full free-water simulation; the 3D default grid takes about an hour per depth on a CPU, so use a GPU or the cluster. The **axisymmetric** grid option is currently not reliable: on the free-water grid the simulated focus lies far short of the target (tested 2026-09-30, CTX-500-026). Use 3D until that is resolved.
+In the GUI, tick **k-Wave drive: calibrate in free water, after fit** (per-depth mode). The simulated profiles are overlaid in green, and **Save entry** stores the corrected drives. `SimConfig` supplies grid, `code_type` and `platform`/HPC settings. Without it, PRESTUS runs locally with `config_default` (CPU on macOS). Each depth is one full free-water simulation; the 3D default grid takes about an hour per depth on a CPU, so use a GPU or the cluster. The **axisymmetric** grid option is currently not reliable: on the free-water grid the simulated focus lies far short of the target (tested 2026-09-30, CTX-500-026). Use 3D until that is resolved.
 
-Existing single-depth k-Wave calibrations (`{combo}-F*mm-I*wpercm2.yaml` from `calibration_standalone`) can be ingested as refinements with:
+`calibration_transducer` (`examples/calibration_standalone.m`, config-driven) runs the same calibration (`calibrate_library_entry`) and writes the library entry directly, plus a calibration output folder; see [doc_calibration.md](doc_calibration.md#calibration-at-chosen-depths-and-intensities-calibration_transducer). Per-run YAMLs from older versions (`{combo}-F*mm-I*wpercm2.yaml`) can still be ingested as refinements with:
 
 ```matlab
 update_transducer_library(combo_name, path_output_profiles, my_library_path)
@@ -347,7 +347,7 @@ The profile CSV path is stored relative to `ProfileRoot` when it lies under it, 
 
 - **Geometric**: geometric steering only.
 - **Library**: the library entry, including any refinements (the entry in **Save to folder**, if there is one, otherwise the shipped entry).
-- **Fit**: the current fit, before it is saved, with k-Wave-corrected drives if the k-Wave check ran.
+- **Fit**: the current fit, before it is saved, with k-Wave-calibrated drives if the k-Wave drive calibration ran.
 
 Between refined depths the refinement offsets are interpolated. Outside the refined span they fade back to the static model over `blend_mm`. Drives and per-ring gains are interpolated in depth and held constant outside the span. The diagnostic `fit_z_shift_mm` is not applied, because a study does not apply it either.
 

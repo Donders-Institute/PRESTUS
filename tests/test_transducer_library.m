@@ -235,9 +235,9 @@ classdef test_transducer_library < matlab.unittest.TestCase
             tc.verifyEqual(amp(50, 7.5).transducer.annular.elem_p_amp, repmat(60000, 1, n), 'AbsTol', 1);
         end
 
-        function test_unverified_amplitude_warns(tc)
+        function test_uncalibrated_amplitude_warns(tc)
             % Analytical-only drive (no refinement.amp_source, or 'analytical'):
-            % amp_kwave_verified is false and the loader warns.
+            % amp_kwave_calibrated is false and the loader warns.
             [serial, ~, n] = tc.first_annular();
             ref.depths_ep_mm = 40;
             ref.elem_phase_correction_deg = {zeros(1, n)};
@@ -247,16 +247,21 @@ classdef test_transducer_library < matlab.unittest.TestCase
             lib_dir = tc.fresh_dir();
             tc.write_static_library(lib_dir, serial, zeros(1, n), ref);
             tc.verifyWarning(@() load_transducer_from_library(serial, 40, 30, tc.equip_param, lib_dir), ...
-                'load_transducer_from_library:unverifiedAmplitude');
-            w = warning('off', 'load_transducer_from_library:unverifiedAmplitude');
+                'load_transducer_from_library:uncalibratedAmplitude');
+            w = warning('off', 'load_transducer_from_library:uncalibratedAmplitude');
             out = load_transducer_from_library(serial, 40, 30, tc.equip_param, lib_dir);
             warning(w);
-            tc.verifyFalse(out.transducer.tx_calibration.amp_kwave_verified);
+            tc.verifyFalse(out.transducer.tx_calibration.amp_kwave_calibrated);
+            % Deprecated aliases mirror the current fields
+            tc.verifyEqual(out.transducer.tx_calibration.amp_kwave_verified, ...
+                out.transducer.tx_calibration.amp_kwave_calibrated);
+            tc.verifyEqual(out.transducer.tx_calibration.amp_kwave_ref_depth_mm, ...
+                out.transducer.tx_calibration.amp_kwave_nearest_depth_mm);
         end
 
-        function test_kwave_verified_amplitude_silent(tc)
+        function test_kwave_calibrated_amplitude_silent(tc)
             % A refinement whose amp_source is 'kwave', resolved exactly at its
-            % own depth (no blend with the analytical global model): verified,
+            % own depth (no blend with the analytical global model): calibrated,
             % no warning.
             [serial, ~, n] = tc.first_annular();
             ref.depths_ep_mm = 40;
@@ -270,14 +275,15 @@ classdef test_transducer_library < matlab.unittest.TestCase
             tc.write_static_library(lib_dir, serial, zeros(1, n), ref);
             tc.verifyWarningFree(@() load_transducer_from_library(serial, 40, 30, tc.equip_param, lib_dir));
             out = load_transducer_from_library(serial, 40, 30, tc.equip_param, lib_dir);
-            tc.verifyTrue(out.transducer.tx_calibration.amp_kwave_verified);
+            tc.verifyTrue(out.transducer.tx_calibration.amp_kwave_calibrated);
+            tc.verifyEqual(out.transducer.tx_calibration.amp_kwave_nearest_depth_mm, 40);
             tc.verifyEqual(out.transducer.tx_calibration.amp_kwave_r2, 0.98);
         end
 
-        function test_blend_with_kwave_refinement_stays_unverified(tc)
+        function test_blend_with_kwave_refinement_stays_uncalibrated(tc)
             % Between the refined knot and the blend edge, the drive is a mix of
-            % the (verified) refinement and the (always-analytical) global
-            % model — amp_kwave_verified must be false there even though the
+            % the (k-Wave-calibrated) refinement and the (always-analytical) global
+            % model — amp_kwave_calibrated must be false there even though the
             % nearest refinement is 'kwave', since the blended amplitude is not.
             [serial, ~, n] = tc.first_annular();
             ref.depths_ep_mm = 40;
@@ -290,8 +296,8 @@ classdef test_transducer_library < matlab.unittest.TestCase
             tc.write_static_library(lib_dir, serial, zeros(1, n), ref);   % global i30 = 100000
             out_knot  = load_transducer_from_library(serial, 40, 30, tc.equip_param, lib_dir);
             out_blend = load_transducer_from_library(serial, 42, 30, tc.equip_param, lib_dir);
-            tc.verifyTrue(out_knot.transducer.tx_calibration.amp_kwave_verified);
-            tc.verifyFalse(out_blend.transducer.tx_calibration.amp_kwave_verified);
+            tc.verifyTrue(out_knot.transducer.tx_calibration.amp_kwave_calibrated);
+            tc.verifyFalse(out_blend.transducer.tx_calibration.amp_kwave_calibrated);
         end
 
         function test_model_at_depth_matches_loader(tc)

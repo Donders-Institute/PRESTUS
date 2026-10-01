@@ -44,20 +44,20 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
 %   .phase_model           - 'geometric' | 'static' | 'refined' | 'blend'
 %   .refinement_weight     - w, 0 (static) … 1 (refined)
 %   .amplitude_source      - 'global' | 'refinement' | 'blend'
-%   .amp_kwave_verified    - true iff the resolved drive comes wholly from a
+%   .amp_kwave_calibrated    - true iff the resolved drive comes wholly from a
 %                            refinement whose amplitude was corrected against
-%                            a free-water k-Wave simulation (KWAVE_CHECK_REFINEMENT,
+%                            a free-water k-Wave simulation (KWAVE_CALIBRATE_DRIVE,
 %                            refinement.amp_source == 'kwave'). False for the
 %                            analytical-only global model, an unchecked
 %                            refinement, or any blend between them.
-%   .amp_kwave_ref_depth_mm/.amp_kwave_r2/.amp_kwave_focal_err_mm
+%   .amp_kwave_nearest_depth_mm/.amp_kwave_r2/.amp_kwave_focal_err_mm
 %                          - nearest refinement depth used for the check above
 %                            and its k-Wave-vs-measured agreement, for context
-%                            even when amp_kwave_verified is false (NaN if no
+%                            even when amp_kwave_calibrated is false (NaN if no
 %                            refinement drive exists at all)
 %
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, LIBRARY_STATIC_MODEL, LIBRARY_ADD_REFINEMENTS,
-%           KWAVE_CHECK_REFINEMENT
+%           KWAVE_CALIBRATE_DRIVE
 
     if nargin < 5 || isempty(source_label); source_label = '(in-memory entry)'; end
     n_elem = tran.transducer.annular.elem_n;
@@ -147,8 +147,8 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
     % with the global amplitude by the same weight w. Without a global
     % amplitude the nearest refined drive is used at any depth.
     amp_source = 'global';
-    amp_kwave_verified = false;
-    amp_kwave_ref_depth_mm = NaN;
+    amp_kwave_calibrated = false;
+    amp_kwave_nearest_depth_mm = NaN;
     amp_kwave_r2 = NaN;
     amp_kwave_focal_err_mm = NaN;
     ok = isfinite(ref_pamp);
@@ -159,20 +159,20 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
         if numel(dk) == 1; a_r = ak; else; a_r = interp1(dk, ak, dq, 'linear'); end
         if ~isnan(desired_intensity); a_r = a_r * sqrt(desired_intensity / ref_isppa); end
         % Nearest refinement point actually driving this depth's amplitude, for
-        % k-Wave-verification provenance (categorical, so nearest-neighbour
+        % k-Wave drive-calibration provenance (categorical, so nearest-neighbour
         % rather than interpolated like the numeric drive above).
         [~, nearest_i] = min(abs(dk - dq));
         nearest_kwave = strcmpi(src_k{nearest_i}, 'kwave');
-        amp_kwave_ref_depth_mm = dk(nearest_i);
+        amp_kwave_nearest_depth_mm = dk(nearest_i);
         amp_kwave_r2 = r2_k(nearest_i);
         amp_kwave_focal_err_mm = fe_k(nearest_i);
         if isempty(drive)
             drive = round(a_r); amp_source = 'refinement';
-            amp_kwave_verified = nearest_kwave;
+            amp_kwave_calibrated = nearest_kwave;
         elseif w > 0
             drive = round((1 - w) * drive + w * a_r);
             amp_source = ternary(w >= 1, 'refinement', 'blend');
-            amp_kwave_verified = (w >= 1) && nearest_kwave;
+            amp_kwave_calibrated = (w >= 1) && nearest_kwave;
         end
     end
 
@@ -201,8 +201,8 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
     s.phase_model          = phase_model;
     s.refinement_weight    = w;
     s.amplitude_source     = amp_source;
-    s.amp_kwave_verified   = amp_kwave_verified;
-    s.amp_kwave_ref_depth_mm = amp_kwave_ref_depth_mm;
+    s.amp_kwave_calibrated   = amp_kwave_calibrated;
+    s.amp_kwave_nearest_depth_mm = amp_kwave_nearest_depth_mm;
     s.amp_kwave_r2         = amp_kwave_r2;
     s.amp_kwave_focal_err_mm = amp_kwave_focal_err_mm;
 end
@@ -224,7 +224,7 @@ function [depths, offs, amps, blend_mm, pamp, isppa, gain, amp_src, kw_r2, kw_fe
 % Gather refinement offsets [deg] per depth from the current and legacy forms.
 % pamp: per-depth drive [Pa] at isppa [W/cm²]; gain: [K x N_elem] per-ring
 % gains (current form only; NaN = none). amp_src: 'kwave' | 'analytical' | ''
-% per depth (KWAVE_CHECK_REFINEMENT provenance); kw_r2/kw_fe: the k-Wave
+% per depth (KWAVE_CALIBRATE_DRIVE provenance); kw_r2/kw_fe: the k-Wave
 % check's profile R² / focal error [mm] at that depth, NaN if unchecked.
     depths = []; offs = zeros(0, n_elem); amps = {}; blend_mm = 5; pamp = []; isppa = NaN;
     gain = zeros(0, n_elem); amp_src = {}; kw_r2 = []; kw_fe = [];
@@ -303,7 +303,7 @@ function [depths, offs, amps, blend_mm, pamp, isppa, gain, amp_src, kw_r2, kw_fe
 
     pamp(end+1:numel(depths)) = NaN;   % legacy knots carry no per-depth drive or gains
     gain(end+1:numel(depths), :) = NaN;
-    amp_src(end+1:numel(depths)) = {''};   % legacy knots were never k-Wave-checked
+    amp_src(end+1:numel(depths)) = {''};   % legacy knots were never k-Wave-calibrated
     kw_r2(end+1:numel(depths)) = NaN;
     kw_fe(end+1:numel(depths)) = NaN;
     [depths, order] = sort(depths);

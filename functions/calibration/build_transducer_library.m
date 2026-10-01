@@ -74,10 +74,7 @@ if ~exist('FIT_OPTIONS',        'var'); FIT_OPTIONS        = struct('FreeParams'
 % Per-depth fits (as CALIBRATION_GUI / REFINE_TRANSDUCER_LIBRARY): phase and gain,
 % intensity-domain loss, z shift fixed at 0 (a fitted shift is not applied at run
 % time). Settings tuned on held-out depths.
-if ~exist('PER_DEPTH_FIT_OPTIONS', 'var')
-    PER_DEPTH_FIT_OPTIONS = struct('FreeParams', {{'phase', 'amp'}}, ...
-        'Domain', 'intensity', 'HuberDelta', 0.8, 'Lambda', 1e-3, 'NearFieldSkipMm', 10);
-end
+if ~exist('PER_DEPTH_FIT_OPTIONS', 'var'); PER_DEPTH_FIT_OPTIONS = calibration_fit_options('rayleigh_phase_gain'); end
 
 % Acceptance gate: an empirical entry is written only if, on held-out depths
 % (leave-one-depth-out), its median R² is at least the geometric median and no
@@ -358,11 +355,7 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
         if isfield(fit_options, f{1}); ev.(f{1}) = fit_options.(f{1}); end
     end
     geo  = fit_transducer_model(tran, prof, ev);
-    fits = cell(1, n_d);
-    for j = 1:n_d
-        pj = prof; pj.depths_ep_mm = prof.depths_ep_mm(j); pj.I = prof.I(:, j);
-        fits{j} = fit_transducer_model(tran, pj, fit_options);
-    end
+    fits = calibration_fit_depths(tran, prof, fit_options);
     r2_fit = cellfun(@(f) f.metrics.r2, fits);
     dz     = cellfun(@(f) f.z_shift_mm, fits);
 

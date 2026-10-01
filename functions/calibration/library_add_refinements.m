@@ -3,7 +3,7 @@ function lib = library_add_refinements(lib, depths_ep_mm, offsets_deg, blend_mm,
 %
 % Offsets are relative to geometric steering (at the entry's
 % steering_sound_speed). Existing refinements at the same depth (±0.5 mm)
-% are replaced, together with their drive amplitude and any k-Wave check
+% are replaced, together with their drive amplitude and any k-Wave drive calibration
 % result (those belonged to the old phases); others are kept.
 %
 % Use as:
@@ -36,10 +36,10 @@ function lib = library_add_refinements(lib, depths_ep_mm, offsets_deg, blend_mm,
 %   fit_z_shift_mm            - fitted axial registration [mm] (NaN = not fitted)
 %   profile_type              - profile the depth was fitted to ('' = not recorded)
 %   kwave_isppa_wcm2, kwave_r2, kwave_focal_err_mm
-%                             - free-water k-Wave check (NaN = not checked;
-%                               written by KWAVE_CHECK_REFINEMENT)
+%                             - free-water k-Wave drive calibration (NaN = not run;
+%                               written by KWAVE_CALIBRATE_DRIVE)
 %
-% See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY, KWAVE_CHECK_REFINEMENT
+% See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY, KWAVE_CALIBRATE_DRIVE
 
     if nargin < 4; blend_mm = []; end
     if nargin < 5; forward_model = ''; end

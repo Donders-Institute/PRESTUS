@@ -38,7 +38,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 %                        on dist_from_exit_plane
 %   max_intens         - maximum intensity beyond the skip-front-peak distance [W/cm²]
 %
-% See also: INTERPOLATE_AXIAL_PROFILES, WRITE_AXIAL_PROFILES, SCALE_REAL_INTENSITY_PROFILE,
+% See also: INTERPOLATE_AXIAL_PROFILES, WRITE_AXIAL_PROFILES, CALIBRATE_LIBRARY_ENTRY,
 %           CALIBRATION_TRANSDUCER
 
     cal = parameters.calibration;

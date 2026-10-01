@@ -39,7 +39,7 @@ function I_axial = rayleigh_axial_intensity(phases_rad, velocity, parameters, di
 %   - n_quad points per ring; increase for very narrow rings or high freq.
 %   - For moderate frequencies and ring widths, 32 points is sufficient.
 %
-% See also: PERFORM_JOINT_DEPTH_FIT, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE
+% See also: AXIAL_TRANSFER_MATRIX, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE
 
 arguments
     phases_rad   (1,:) {mustBeNumeric}

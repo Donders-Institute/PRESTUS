@@ -50,18 +50,20 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %     .transducer.tx_calibration.phase_model       — 'geometric' | 'static' | 'refined' | 'blend'
 %     .transducer.tx_calibration.refinement_weight — 0 (static) … 1 (refined)
 %     .transducer.tx_calibration.isppa_source      — 'library'
-%     .transducer.tx_calibration.amp_kwave_verified — true iff elem_p_amp at this depth
-%                                                     was validated by KWAVE_CHECK_REFINEMENT
-%                                                     against a free-water k-Wave simulation,
+%     .transducer.tx_calibration.amp_kwave_calibrated — true iff elem_p_amp at this depth
+%                                                     was calibrated by KWAVE_CALIBRATE_DRIVE
+%                                                     to a free-water k-Wave simulation,
 %                                                     rather than being analytical-only
-%     .transducer.tx_calibration.amp_kwave_ref_depth_mm/.amp_kwave_r2/.amp_kwave_focal_err_mm
-%                                                   — nearest k-Wave check, for context even
-%                                                     when amp_kwave_verified is false
+%     .transducer.tx_calibration.amp_kwave_nearest_depth_mm/.amp_kwave_r2/.amp_kwave_focal_err_mm
+%                                                   — nearest k-Wave drive calibration, for context even
+%                                                     when amp_kwave_calibrated is false
+%     (.amp_kwave_verified / .amp_kwave_ref_depth_mm: deprecated aliases of
+%      .amp_kwave_calibrated / .amp_kwave_nearest_depth_mm, to be removed)
 %     .transducer.tx_calibration.library_key       — combo name used for lookup
 %     .transducer.tx_calibration.library_meta      — provenance from the library YAML
 %
-% A warning (load_transducer_from_library:unverifiedAmplitude) is issued when an
-% amplitude is resolved but was never k-Wave-checked — see KWAVE_CHECK_REFINEMENT.
+% A warning (load_transducer_from_library:uncalibratedAmplitude) is issued when an
+% amplitude is resolved but was never k-Wave-calibrated — see KWAVE_CALIBRATE_DRIVE.
 %
 % Static-model fields written by FIT_TRANSDUCER_MODEL (all optional):
 %   global_model.steering_sound_speed — sound speed of the steering law [m/s]
@@ -123,7 +125,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     w           = m.refinement_weight;
     amp_source  = m.amplitude_source;
     elem_p_amp  = m.drive_pa;
-    amp_kwave_verified = m.amp_kwave_verified;
+    amp_kwave_calibrated = m.amp_kwave_calibrated;
 
     %% Focal distance bookkeeping
     parameters.transducer.focal_distance_ep   = focal_distance_ep;
@@ -136,26 +138,30 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.tx_calibration.refinement_weight = w;
     parameters.transducer.tx_calibration.isppa_source      = 'library';
     parameters.transducer.tx_calibration.amplitude_source  = amp_source;   % 'global' | 'refinement' | 'blend'
-    parameters.transducer.tx_calibration.amp_kwave_verified = amp_kwave_verified;
-    parameters.transducer.tx_calibration.amp_kwave_ref_depth_mm = m.amp_kwave_ref_depth_mm;
+    parameters.transducer.tx_calibration.amp_kwave_calibrated       = amp_kwave_calibrated;
+    parameters.transducer.tx_calibration.amp_kwave_nearest_depth_mm = m.amp_kwave_nearest_depth_mm;
     parameters.transducer.tx_calibration.amp_kwave_r2           = m.amp_kwave_r2;
     parameters.transducer.tx_calibration.amp_kwave_focal_err_mm = m.amp_kwave_focal_err_mm;
     parameters.transducer.tx_calibration.library_key       = combo_name;
     parameters.transducer.tx_calibration.library_meta      = lib.meta;
+    % Deprecated aliases (former names), kept for one release for scripts
+    % that read them; prefer amp_kwave_calibrated / amp_kwave_nearest_depth_mm
+    parameters.transducer.tx_calibration.amp_kwave_verified     = amp_kwave_calibrated;
+    parameters.transducer.tx_calibration.amp_kwave_ref_depth_mm = m.amp_kwave_nearest_depth_mm;
 
-    if ~isempty(elem_p_amp) && ~amp_kwave_verified
-        if isfinite(m.amp_kwave_ref_depth_mm)
-            nearest_str = sprintf(['nearest k-Wave check is at %.1f mm from the exit plane ' ...
+    if ~isempty(elem_p_amp) && ~amp_kwave_calibrated
+        if isfinite(m.amp_kwave_nearest_depth_mm)
+            nearest_str = sprintf(['nearest k-Wave drive calibration is at %.1f mm from the exit plane ' ...
                 '(R²=%.3f, focal error %.2f mm) but does not cover the requested depth'], ...
-                m.amp_kwave_ref_depth_mm, m.amp_kwave_r2, m.amp_kwave_focal_err_mm);
+                m.amp_kwave_nearest_depth_mm, m.amp_kwave_r2, m.amp_kwave_focal_err_mm);
         else
-            nearest_str = 'no depth in this entry has been k-Wave-checked at all';
+            nearest_str = 'no depth in this entry has a k-Wave-calibrated drive';
         end
-        warning('load_transducer_from_library:unverifiedAmplitude', ...
+        warning('load_transducer_from_library:uncalibratedAmplitude', ...
             ['%s @ %.1f mm: elem_p_amp is analytical only — it was fit to the O''Neil/Rayleigh ' ...
-             'model and measured hydrophone profile but never validated against a free-water ' ...
+             'model and measured hydrophone profile but never calibrated against a free-water ' ...
              'k-Wave simulation, so its absolute intensity may be biased by the analytical-vs-' ...
-             'simulation offset (%s). Run KWAVE_CHECK_REFINEMENT on this entry to close the gap.'], ...
+             'simulation offset (%s). Run KWAVE_CALIBRATE_DRIVE on this entry to calibrate it.'], ...
             combo_name, focal_distance_ep, nearest_str);
     end
 

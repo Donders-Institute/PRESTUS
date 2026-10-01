@@ -25,7 +25,7 @@ function [opt_phases, opt_velocity, min_err, opt_params_raw] = perform_global_se
 %                     'monotonic':[phase_start_rad, delta_1..delta_{N-1}_rad, velocity_m_s]
 %                     otherwise:  [phase_1..phase_N_rad, velocity_m_s]
 %
-% See also: FIT_VELOCITY_TO_INTENSITY, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE,
+% See also: FIT_TRANSDUCER_MODEL, PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE,
 %           CALIBRATION_TRANSDUCER
 
 arguments

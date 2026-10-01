@@ -808,25 +808,28 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
     end
 
     calib_str = '';
-    if isfield(td, 'tx_calibration') && isstruct(td.tx_calibration) && ...
-            isfield(td.tx_calibration, 'amp_kwave_verified')
-        cal = td.tx_calibration;
-        if cal.amp_kwave_verified
+    if isfield(td, 'tx_calibration') && isstruct(td.tx_calibration)
+        cal = tx_calibration_fields(td.tx_calibration);
+    else
+        cal = struct();
+    end
+    if isfield(cal, 'amp_kwave_calibrated')
+        if cal.amp_kwave_calibrated
             calib_str = sprintf([' Element drive amplitude was calibrated against measured ' ...
-                'free-water hydrophone profiles and validated by an additional free-water ' ...
+                'free-water hydrophone profiles and scaled to an additional free-water ' ...
                 'k-Wave simulation (R&sup2;=%.3f, focal-position error %.2f&#8201;mm).'], ...
                 safe_field(cal, 'amp_kwave_r2', NaN), safe_field(cal, 'amp_kwave_focal_err_mm', NaN));
-        elseif isfield(cal, 'amp_kwave_ref_depth_mm') && isfinite(cal.amp_kwave_ref_depth_mm)
+        elseif isfield(cal, 'amp_kwave_nearest_depth_mm') && isfinite(cal.amp_kwave_nearest_depth_mm)
             calib_str = sprintf([' Element drive amplitude was calibrated against measured ' ...
                 'free-water hydrophone profiles using an analytical (O''Neil/Rayleigh) forward ' ...
-                'model; it has not been validated against a free-water k-Wave simulation at this ' ...
-                'depth (nearest check at %.1f&#8201;mm: R&sup2;=%.3f, focal-position error ' ...
-                '%.2f&#8201;mm).'], cal.amp_kwave_ref_depth_mm, ...
+                'model; it has not been calibrated against a free-water k-Wave simulation at this ' ...
+                'depth (nearest k-Wave drive calibration at %.1f&#8201;mm: R&sup2;=%.3f, focal-position error ' ...
+                '%.2f&#8201;mm).'], cal.amp_kwave_nearest_depth_mm, ...
                 safe_field(cal, 'amp_kwave_r2', NaN), safe_field(cal, 'amp_kwave_focal_err_mm', NaN));
         else
             calib_str = [' Element drive amplitude was calibrated against measured free-water ' ...
                 'hydrophone profiles using an analytical (O''Neil/Rayleigh) forward model; it ' ...
-                'has not been validated against a free-water k-Wave simulation.'];
+                'has not been calibrated against a free-water k-Wave simulation.'];
         end
     end
 
@@ -1798,34 +1801,34 @@ end
 
 function html = build_calibration_provenance_rows(td, csv_table)
 % Rows documenting where the driven phases/amplitude came from, and whether
-% the amplitude was ever checked against a free-water k-Wave simulation
-% (KWAVE_CHECK_REFINEMENT) rather than being purely analytical
-% (LOAD_TRANSDUCER_FROM_LIBRARY / load_transducer_from_library:unverifiedAmplitude).
+% the amplitude was ever calibrated to a free-water k-Wave simulation
+% (KWAVE_CALIBRATE_DRIVE) rather than being purely analytical
+% (LOAD_TRANSDUCER_FROM_LIBRARY / load_transducer_from_library:uncalibratedAmplitude).
     html = '';
     if ~isfield(td, 'tx_calibration') || ~isstruct(td.tx_calibration)
         return
     end
-    cal = td.tx_calibration;
+    cal = tx_calibration_fields(td.tx_calibration);
 
     if isfield(cal, 'library_key') && ~isempty(cal.library_key)
         html = config_row(html, 'Calibration library entry', char(cal.library_key));
     end
 
-    if isfield(cal, 'amp_kwave_verified')
-        if cal.amp_kwave_verified
+    if isfield(cal, 'amp_kwave_calibrated')
+        if cal.amp_kwave_calibrated
             detail = '';
             if isfield(cal, 'amp_kwave_r2') && isfinite(cal.amp_kwave_r2)
                 detail = sprintf(' (R&sup2;=%.3f, focal error %.2f mm)', ...
                     cal.amp_kwave_r2, safe_field(cal, 'amp_kwave_focal_err_mm', NaN));
             end
-            badge = sprintf('<span class="badge badge-green">k-Wave-verified</span>%s', detail);
+            badge = sprintf('<span class="badge badge-green">k-Wave-calibrated</span>%s', detail);
         else
-            if isfield(cal, 'amp_kwave_ref_depth_mm') && isfinite(cal.amp_kwave_ref_depth_mm)
-                detail = sprintf(' &mdash; nearest check at %.1f mm (R&sup2;=%.3f, focal error %.2f mm) ' , ...
-                    cal.amp_kwave_ref_depth_mm, safe_field(cal, 'amp_kwave_r2', NaN), ...
+            if isfield(cal, 'amp_kwave_nearest_depth_mm') && isfinite(cal.amp_kwave_nearest_depth_mm)
+                detail = sprintf(' &mdash; nearest k-Wave drive calibration at %.1f mm (R&sup2;=%.3f, focal error %.2f mm) ' , ...
+                    cal.amp_kwave_nearest_depth_mm, safe_field(cal, 'amp_kwave_r2', NaN), ...
                     safe_field(cal, 'amp_kwave_focal_err_mm', NaN));
             else
-                detail = ' &mdash; no depth in this entry has been k-Wave-checked';
+                detail = ' &mdash; no depth in this entry has a k-Wave-calibrated drive';
             end
             badge = sprintf('<span class="badge badge-amber">Analytical only</span>%s', detail);
         end
@@ -2576,3 +2579,13 @@ newline ...
 ];
 end
 
+function cal = tx_calibration_fields(cal)
+% tx_calibration with the current field names; outputs written before the
+% rename carry only amp_kwave_verified / amp_kwave_ref_depth_mm
+    if ~isfield(cal, 'amp_kwave_calibrated') && isfield(cal, 'amp_kwave_verified')
+        cal.amp_kwave_calibrated = cal.amp_kwave_verified;
+    end
+    if ~isfield(cal, 'amp_kwave_nearest_depth_mm') && isfield(cal, 'amp_kwave_ref_depth_mm')
+        cal.amp_kwave_nearest_depth_mm = cal.amp_kwave_ref_depth_mm;
+    end
+end
