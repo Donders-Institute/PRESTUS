@@ -88,7 +88,7 @@ prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
 
 ### From Localite ingestion
 
-Ingest the recordings with `neuronav_gui` (single sessions via *Write outputs*, many via the batch window), then use **Import from Localite…** on the Planner's Study tab (or the shortcut on the Placement tab). The importer reads what the MATLAB GUI writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It then builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
+Ingest the recordings with `neuronav_gui` (single sessions via *Write outputs*, many via the batch window), then use **Import from Localite…** on the Nexus's Study tab (or the shortcut on the Placement tab). The importer reads what the MATLAB GUI writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It then builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
 
 - **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
 - **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_MD, R_MD]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.

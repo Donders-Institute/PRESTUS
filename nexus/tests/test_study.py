@@ -1,0 +1,164 @@
+"""Study manifest model, Localite import, study launcher and the Study page."""
+
+import os
+import stat
+import subprocess
+
+import pytest
+
+from prestus_nexus import launcher
+from prestus_nexus.model import ConfigModel
+from prestus_nexus.study import Manifest, from_neuronav_summary, resolve_manifest, sanitize_affix
+
+
+def test_manifest_roundtrip_tsv_and_csv(tmp_path):
+    m = Manifest()
+    m.add_row({"subject_id": "1", "condition": "M1", "analysis.target_mni_mm": "[-38, -20, 60]"})
+    m.add_row({"subject_id": "2", "condition": "M1"})
+    for name in ("s.tsv", "s.csv"):
+        p = m.save(tmp_path / name)
+        back = Manifest.load(p)
+        assert back.columns == ["subject_id", "condition", "analysis.target_mni_mm"]
+        assert back.rows[0]["analysis.target_mni_mm"] == "[-38, -20, 60]"
+        assert back.rows[1]["analysis.target_mni_mm"] == ""
+    assert "# " not in (tmp_path / "s.tsv").read_text()
+
+
+def test_manifest_comments_and_key_columns(tmp_path):
+    p = tmp_path / "m.tsv"
+    p.write_text("# comment\nsubject_id\tcondition\tnotes\tplacement.localite.target\n1\tA\tx\tL_MD\n")
+    m = Manifest.load(p)
+    assert m.key_columns() == ["placement.localite.target"]
+    assert m.subjects() == [1] and m.conditions() == ["A"]
+
+
+def test_affixes_match_matlab_rule():
+    m = Manifest()
+    for r in ({"subject_id": "1", "condition": "M1"}, {"subject_id": "1", "condition": "PUL"},
+              {"subject_id": "2", "io.output_affix": "custom"}, {"subject_id": "3"}):
+        m.add_row(r)
+    assert m.affixes("_desc-liberal") == ["_desc-liberal-M1", "_desc-liberal-PUL", "_desc-custom", "_desc-liberal"]
+    assert m.affixes("") == ["_desc-M1", "_desc-PUL", "_desc-custom", ""]
+    assert sanitize_affix("cond A") == "_desc-cond_A"
+
+
+def test_issues(schema):
+    m = Manifest(columns=["subject_id", "condition", "include", "placement.localite.targte", "bad key"])
+    m.add_row({"subject_id": "1", "condition": "A"})
+    m.add_row({"subject_id": "sub-001", "condition": "A"})         # same outputs as row 1
+    m.add_row({"subject_id": "x"})
+    m.add_row({"subject_id": "4", "include": "maybe"})
+    m.add_row({"subject_id": "1", "condition": "A", "include": "0"})  # excluded: no clash
+    by = {(i.row, i.column): i for i in m.issues(schema)}
+    assert by[(None, "bad key")].level == "error"
+    assert "did you mean placement.localite.target" in by[(None, "placement.localite.targte")].message
+    assert by[(1, "condition")].level == "error"
+    assert by[(2, "subject_id")].level == "error"
+    assert by[(3, "include")].level == "error"
+    assert (4, "condition") not in by
+
+
+def test_import_neuronav_summary(tmp_path):
+    p = tmp_path / "neuronav_ingest_summary.csv"
+    p.write_text("sub,ses,target,series_index,status\n"
+                 "sub-001,ses-01,L_MD,1,2 target(s) written\n"
+                 "sub-001,ses-01,R_MD,2,2 target(s) written\n"
+                 "sub-002,ses-01,L_MD,1,1 target(s) written\n"
+                 "sub-002,ses-02,L_MD,1,1 target(s) written\n"
+                 "sub-003,ses-01,,,no usable markers\n")
+    m = from_neuronav_summary(p)
+    assert [r["subject_id"] for r in m.rows] == ["1", "1", "2", "2"]
+    assert [r["condition"] for r in m.rows] == ["L_MD", "R_MD", "L_MD-ses-01", "L_MD-ses-02"]
+    assert all(r["placement.mode"] == "localite" for r in m.rows)
+    assert m.rows[3]["placement.localite.session"] == "ses-02"
+    assert not m.issues()
+
+
+def test_resolve_manifest(tmp_path):
+    cfg = tmp_path / "cfg" / "config_s.yaml"
+    assert resolve_manifest(cfg, "study.tsv") == tmp_path / "cfg" / "study.tsv"
+    assert resolve_manifest(cfg, "/abs/m.tsv").as_posix() == "/abs/m.tsv"
+    assert resolve_manifest(cfg, "") is None
+
+
+def test_study_launcher_and_commands(tmp_path, prestus_root):
+    study = tmp_path / "config_grp.yaml"
+    path = launcher.write_study_launcher(study, prestus_root)
+    assert path.name == "run_study_grp.m"
+    text = path.read_text()
+    assert f"prestus_study_start('{study.resolve()}', 'Platform', 'matlab');" in text
+    argv = launcher.study_dry_run_command("/x/matlab", study, prestus_root)
+    assert argv[:2] == ["/x/matlab", "-batch"] and "'DryRun', true" in argv[2]
+    assert launcher.OK_SENTINEL in argv[2]
+    argv = launcher.group_report_command("/x/matlab", study, prestus_root)
+    assert "prestus_group_report_start(" in argv[2]
+
+
+# ── Study page (offscreen) ──────────────────────────────────────────────
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+def test_study_page_edit_save_and_dry_run(schema, prestus_root, tmp_path):
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtCore import QEventLoop, QTimer
+    from PyQt6.QtWidgets import QApplication
+
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import RUN, STUDY, MainWindow
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    m = ConfigModel(schema)
+    m.set("path.sim", str(tmp_path / "sim"))
+    m.save(tmp_path / "config_g.yaml")
+    window = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    page = window.show_special(STUDY)
+    page.refresh()
+
+    page.path.setText("study.tsv")
+    page._path_edited()
+    assert window.model.get("study.manifest") == "study.tsv"
+    page.add_column("transducer.target_isppa_wcm2")
+    page.add_row({"subject_id": "1", "condition": "A", "transducer.target_isppa_wcm2": "30"})
+    page.add_row({"subject_id": "2", "condition": "A"})
+    page.table.item(1, 2).setText("20")                  # edit a cell in the table
+    assert page.manifest.rows[1]["transducer.target_isppa_wcm2"] == "20"
+    saved = page.save_manifest()
+    assert saved == tmp_path / "study.tsv"
+    assert Manifest.load(saved).rows[1]["transducer.target_isppa_wcm2"] == "20"
+    assert "2</b> row(s)" in page.summary.text()
+
+    # dry run through the Run page with a fake MATLAB that records its arguments
+    fake = tmp_path / "matlab"
+    fake.write_text(f"#!/bin/sh\necho \"$@\" > {tmp_path / 'args.txt'}\necho '{launcher.OK_SENTINEL}'\nexit 0\n")
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    run = window._page(RUN)
+    run.matlab.setText(str(fake))
+    results = []
+    loop = QEventLoop()
+    run.finished.connect(lambda task, ok: (results.append((task, ok)), loop.quit()))
+    QTimer.singleShot(20000, loop.quit)
+    page.dry_run()
+    loop.exec()
+    assert results == [("Study dry run", True)]
+    assert "prestus_study_start" in (tmp_path / "args.txt").read_text()
+
+
+MATLAB = launcher.find_matlab()
+
+
+@pytest.mark.matlab
+@pytest.mark.skipif(MATLAB is None, reason="MATLAB not available")
+def test_study_dry_run_in_matlab(schema, prestus_root, tmp_path):
+    m = ConfigModel(schema)
+    m.set("path.sim", str(tmp_path / "sim"))
+    m.set("study.manifest", "study.tsv")
+    study = m.save(tmp_path / "config_d.yaml")
+    man = Manifest(columns=["subject_id", "condition", "transducer.target_isppa_wcm2"])
+    man.add_row({"subject_id": "1", "condition": "A", "transducer.target_isppa_wcm2": "30"})
+    man.add_row({"subject_id": "2", "condition": "B"})
+    man.save(tmp_path / "study.tsv")
+    proc = subprocess.run(launcher.study_dry_run_command(MATLAB, study, prestus_root),
+                          capture_output=True, text=True, timeout=600, cwd=tmp_path)
+    out = proc.stdout + proc.stderr
+    assert proc.returncode == 0 and launcher.OK_SENTINEL in out, out[-3000:]
+    assert "Dry run: 2 run(s) ready, 0 with config errors" in out

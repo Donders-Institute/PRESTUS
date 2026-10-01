@@ -18,17 +18,17 @@ Multi-subject studies whose runs differ in placement, target, depth, intensity o
 - **Targeting accuracy** (`modules.run_targeting_analysis`, `analysis.target_mni_mm`, `analysis.target_roi_mni`): `targeting_analysis` writes `sub-XXX_<medium><affix>_targeting.csv`, with the focal centroid and peak vs the planned focus (distance, axial/lateral split), vs an MNI target, and ROI overlap/coverage/intensity. The pipeline now records the planned T1 positions before the grid stage (`parameters.state.planned_*_t1_vox`)
 - **Group MNI maps** (`create_group_maps`): per-condition focal-volume overlap, mean/SD intensity and mean heating NIfTIs, plus overlap figures over the mean MNI T1 with ROI outline, focal centroids and targets
 - **Group report**: runs (subject × condition) instead of subjects; new Study design, Condition comparison, Targeting accuracy, Group MNI maps and Outliers (robust z within condition) sections; per-condition filter buttons; group-by condition / placement / target / transducer; a one-row-per-run CSV; relative links that work from the study folder. `prestus_group_report_start` switches to study mode when the config has a manifest and builds the maps
-- **Planner**: Study manifest editor (table editor, manifest checks, dry run / run / group report through the Run tab)
-- **Localite for studies and bilateral setups**: `placement.localite.target` / `.position` take one entry per transducer (`[L_MD, R_MD]`; transducer *i* uses entry *i*, each with its own pose). The Planner's *Import from Localite…* reads the `neuronav_gui` outputs (`neuronav_ingest_summary.csv`, per-session `InstrumentMarker_*.json`) and builds one localite run per target or per session (targets → transducers)
+- **Nexus**: Study manifest editor (table editor, manifest checks, dry run / run / group report through the Run tab)
+- **Localite for studies and bilateral setups**: `placement.localite.target` / `.position` take one entry per transducer (`[L_MD, R_MD]`; transducer *i* uses entry *i*, each with its own pose). The Nexus's *Import from Localite…* reads the `neuronav_gui` outputs (`neuronav_ingest_summary.csv`, per-session `InstrumentMarker_*.json`) and builds one localite run per target or per session (targets → transducers)
 - **Deprecated**: `prestus_group_start` / `create_group_MNI_plots` (older output layout); `prestus_group_start` now runs `prestus_group_report_start`
 - **Docs**: `doc_group.md` rewritten; `doc_outputs.md` now gives the actual per-subject CSV name (`sub-XXX_<medium><affix>.csv`, not `…_output_table…`)
 
-#### Planner: tabbed layout, readable fields, protocol diagram
+#### Nexus: tabbed layout, readable fields, protocol diagram
 
 - **Tabs** (Setup, Transducer, Placement, Simulation, Study, Run) with each config section as a card, the PRESTUS logo and report palette, error/warning counts in the header, and per-tab counts of set values. Tabs, labels, advanced flags and field placement are defined in `overlay.yaml` (`tabs`, `display`)
 - **Advanced options per tab**: settings most studies leave at their defaults are hidden until *Show advanced options* (advanced settings that hold a value stay visible; clicking an issue reveals its field)
 - **Readable fields**: a label per field, full help (with key and default) on hover and behind **?**
-- **No start dialog**: the Planner opens straight into the main window; *File ▸ New study…* (optionally pinning `config_default.yaml` in the study folder), *Open…* and *Open recent* replace it, and the subject inputs live on the Setup tab
+- **No start dialog**: the Nexus opens straight into the main window; *File ▸ New study…* (optionally pinning `config_default.yaml` in the study folder), *Open…* and *Open recent* replace it, and the subject inputs live on the Setup tab
 - **Visualisations**: transducer cross-section (elements, exit plane, geometric focus, chosen depth, steering range) and a sonication protocol diagram (pulse with ramp, pulse train, repetitions; PRF, duty cycles, on-time, Ipa/Itp)
 - **TUS calculator exchange**: export the protocol as a settings file for the TUS calculator's *Upload settings*, and import its settings (ms → s; pulse ramps only)
 - `timing.pulse_ramp_dur` / `timing.pulse_ramp_shape` (read by `acoustic_analysis`) are now documented and editable; `doc_parameters.md` gives the actual timing defaults (`0`, not `NaN`)
@@ -135,7 +135,7 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - ⚠️ **Fixed:** the axial-profile plot drew its tissue bands from 0 to 1 in data units (invisible at kPa / W/cm² scales) and one voxel short per tissue run; bands now span the panel and meet at half-voxel edges
 
 #### Pseudo-CT acoustic property mapping
-- With pseudo-CT, `medium_setup` caches the in-skull property distributions (pseudo-CT HU, density, sound speed, attenuation: summary statistics and histograms, plus the reference skull values) as `sub-XXX_<medium>_medium_stats<affix>.json` in `io.dir_cache`, for tools such as the Planner; written on every run, not only in debug mode
+- With pseudo-CT, `medium_setup` caches the in-skull property distributions (pseudo-CT HU, density, sound speed, attenuation: summary statistics and histograms, plus the reference skull values) as `sub-XXX_<medium>_medium_stats<affix>.json` in `io.dir_cache`, for tools such as the Nexus; written on every run, not only in debug mode
 
 Three new algorithms added for density, sound speed, and attenuation mapping (see [doc_pseudoCT.md](doc_pseudoCT.md)):
 
@@ -279,7 +279,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** wrong methods references — Martin et al. (2024) and Pichardo et al. (2017) had incorrect titles, authors and DOIs, and the Aubry et al. (2025) DOI disagreed with the safety-dashboard footnote (now 10.1016/j.brs.2025.10.007 in both)
 
 #### GUI
-- **PRESTUS Planner** (`planner/`, *experimental*; see [doc_planner.md](doc_planner.md)): standalone PyQt6 app to build and check a study config before running it in MATLAB. Its schema is derived from `config_default.yaml` plus a small overlay with a drift test, and it writes override-only YAML that loads unchanged in `load_parameters` (MATLAB round-trip tests). It flags unknown, misspelt and deprecated keys. It also offers a transducer panel backed by the equipment and calibration library, and a placement viewer (T1 + segmentation overlay, bowl outline, snap to scalp, Brainsight/Slicer trajectory import). The Run page validates or runs the config locally with `matlab -batch`. MATLAB entry point: `prestus_planner`. `launch_web_alignment` and `functions/gui_py` are deprecated in its favour
+- **PRESTUS Nexus** (`nexus/`, *experimental*; see [doc_nexus.md](doc_nexus.md)): standalone PyQt6 app to build and check a study config before running it in MATLAB. Its schema is derived from `config_default.yaml` plus a small overlay with a drift test, and it writes override-only YAML that loads unchanged in `load_parameters` (MATLAB round-trip tests). It flags unknown, misspelt and deprecated keys. It also offers a transducer panel backed by the equipment and calibration library, and a placement viewer (T1 + segmentation overlay, bowl outline, snap to scalp, Brainsight/Slicer trajectory import). The Run page validates or runs the config locally with `matlab -batch`. MATLAB entry point: `prestus_nexus`. `launch_web_alignment` and `functions/gui_py` are deprecated in its favour
 - New Placement, Multi-Transducer, and Calibration tabs
 - Stand-alone Localite ingest GUI (`neuronav_gui`, with PRESTUS logo header): detect and review marker series (QC table, 3-D pulse positions, per-pulse deviation, raw-file list) before writing the `InstrumentMarker` XML/JSON; supports single- and multi-coil ingestion and pre-filling from a config. See [doc_gui.md](doc_gui.md#localite-ingest-gui)
 - ⚠️ **Fixed:** PlanTUS weights set in `prestus_gui` and the Python GUI were saved as `placement.plantus.weights.<name>`, which nothing read (the 0.2 defaults were used). Both GUIs now write `placement.plantus.weight_<name>`; `position_transducer_plantus` applies `weights.<name>` from older configs with a warning (`position_transducer_plantus:legacyWeights`)
@@ -291,8 +291,8 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - ⚠️ **Fixed:** thermal timing enable state re-synced on config load
 
 #### Infrastructure
-- ⚠️ **Fixed:** `io.save_matrices: 1` had no effect with the default config, because `config_default.yaml` set every per-step flag (`save_source_matrices`, `save_acoustic_matrices`, `save_thermal_matrices`) explicitly and per-step flags take precedence. These flags now default to empty (`[]`): an empty flag inherits `io.save_matrices`, and when both are empty `should_save_output` applies its built-in default (source 1, acoustic 0, thermal 1; grid/medium cache 0), so default behaviour is unchanged. `save_MNI` and `save_property_maps` no longer fall back to `save_matrices`. `calibration_transducer` keeps its cache when `save_acoustic_matrices` resolves to 1 (previously both flags had to be 1). `prestus_gui`: toggling *Save all matrices* sets the per-step checkboxes, and loading a config shows the effective values; the Planner's output summary resolves the flags the same way
-- `doc_installation.md`: new *Python and conda environments* table (SimNIBS/PlanTUS, BabelBrain, jwave, TUS_entry, Planner): what each is for, how to create it and which config key points to it
+- ⚠️ **Fixed:** `io.save_matrices: 1` had no effect with the default config, because `config_default.yaml` set every per-step flag (`save_source_matrices`, `save_acoustic_matrices`, `save_thermal_matrices`) explicitly and per-step flags take precedence. These flags now default to empty (`[]`): an empty flag inherits `io.save_matrices`, and when both are empty `should_save_output` applies its built-in default (source 1, acoustic 0, thermal 1; grid/medium cache 0), so default behaviour is unchanged. `save_MNI` and `save_property_maps` no longer fall back to `save_matrices`. `calibration_transducer` keeps its cache when `save_acoustic_matrices` resolves to 1 (previously both flags had to be 1). `prestus_gui`: toggling *Save all matrices* sets the per-step checkboxes, and loading a config shows the effective values; the Nexus's output summary resolves the flags the same way
+- `doc_installation.md`: new *Python and conda environments* table (SimNIBS/PlanTUS, BabelBrain, jwave, TUS_entry, Nexus): what each is for, how to create it and which config key points to it
 - New `predict_outputs` / `print_predicted_outputs`: predict, before submission, which pipeline mode `prestus_pipeline_start` will dispatch to (single, async, multi-ISPPA, uncertainty) and which CSV/HTML files it writes; read-only, uses the same mode predicates as the dispatcher
 - `print_parameter_summary` formats vector entries one by one, so unit suffixes no longer run together
 - `doc_limited_fov.md` — user guide for the acoustic FOV crop feature
@@ -304,6 +304,21 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - Compromised polyfill.io CDN replaced with Cloudflare drop-in
 - `pydeface` added to environment setup script
 - ⚠️ **Fixed:** SimNIBS path guard added in `subject2mni_coords_LDfix` to prevent crashes when SimNIBS is not on the path
+
+#### Code audit fixes (2026-10)
+- ⚠️ **Fixed:** every Snellius SLURM submission failed: the wall-time check compared `HH:MM:SS` strings character by character. Wall times are now compared in seconds
+- ⚠️ **Fixed:** qsub scripts wrote `walltime` as character codes (`%i` on a string), and requested a GPU node for CPU-only jobs
+- ⚠️ **Fixed:** the study report job could not be submitted on Snellius (its partition was removed)
+- ⚠️ **Fixed:** targeting analysis converted planned positions with the wrong header when the T1 is not stored RAS+, so `focus_error_*` was wrong for such T1s
+- ⚠️ **Fixed:** `analysis.mni_warp_method: native` placed MNI outputs one subject voxel off along each axis (missed by the 1-based `ras_to_grid` fix)
+- ⚠️ **Fixed:** `io.overwrite_simnibs` never passed `--forcerun` to charm
+- ⚠️ **Fixed:** `config_tutorial.yaml` nested the transducer positions under an unused `transducer.position` key and referenced a missing `.xlsx` element file
+- **Fixed:** the telemetry prompt blocked `matlab -batch` and SLURM/PBS jobs; non-interactive sessions now print the notice and record nothing, as documented. The prompt lists the hardware fields that are sent, and the doc link works
+- **Fixed:** uncertainty variant and report jobs no longer start their own free-water baseline simulation
+- Study manifests: `yes`/`no`/`on`/`off` and zero-padded numbers (`001`) stay text; errors report the file line. `io.output_affix: desc-foo` no longer becomes `_desc-desc-foo`
+- `getidx` returns each label index once; `load_parameters` heterogeneous struct-array error now has the identifier `prestus:heterogeneousStructArray`; the deprecated Python GUI tails the correct log file
+- Security hardening: annular phase expressions in configs accept only numbers, `pi` and arithmetic (previously passed to `eval`); the PlanTUS GUI launcher no longer runs `wb_view` through a shell; pseudo-CT module names and PATH entries are shell-quoted; paths written into generated MATLAB job scripts and the BabelBrain run script are escaped; JSON inlined in group-report `<script>` blocks escapes `</`, and HTML escaping covers `'`
+- **Removed:** `launch_web_alignment` and `functions/dynpos/` (the browser alignment viewer), superseded by the PRESTUS Nexus's placement viewer
 
 ---
 

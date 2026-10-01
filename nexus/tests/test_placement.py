@@ -1,0 +1,168 @@
+"""Placement geometry, PRESTUS voxel conventions and trajectory import."""
+
+import math
+
+import numpy as np
+import pytest
+
+nib = pytest.importorskip("nibabel")
+
+from prestus_nexus import placement as pl  # noqa: E402
+
+AFFINE = np.array([[-1.1, 0.05, 0, 90.3], [0.02, 1.2, 0.1, -126.7],
+                   [0, -0.08, 0.9, -72.2], [0, 0, 0, 1]])
+
+
+@pytest.fixture
+def vol(tmp_path):
+    data = np.zeros((40, 50, 60), np.float32)
+    data[10, 20, 30] = 1
+    path = tmp_path / "t1.nii.gz"
+    nib.save(nib.Nifti1Image(data, AFFINE), str(path))
+    return pl.Volume(path)
+
+
+def test_voxel_conventions(vol):
+    ras = (AFFINE @ [10, 20, 30, 1])[:3]           # centre of the bright voxel
+    # MATLAB element (1-based) holding it is [11 21 31] (checked in R2023b)
+    assert pl.ras_to_prestus_voxel(vol, ras) == [11, 21, 31]
+    np.testing.assert_allclose(pl.prestus_voxel_to_ras(vol, [11, 21, 31]), ras)
+    assert vol.sample([ras])[0] == 1
+
+
+def test_canonical_round_trip(vol):
+    ras = np.array([[12.3, -40.1, 5.5]])
+    np.testing.assert_allclose(vol.canon_to_ras(vol.ras_to_canon(ras)), ras, atol=1e-9)
+
+
+def test_bowl_geometry():
+    tx = {"type": "annular", "annular": {"curv_radius_mm": 63.2, "dist_geom_ep_mm": 52.38,
+                                         "elem_od_mm": [32.3, 45.4, 55.4, 64]}}
+    bowl = pl.Bowl.from_transducer(tx)
+    assert bowl.aperture == 64 and math.isclose(bowl.offset, 63.2 - 52.38)
+    out = bowl.outline([0, 0, 0], [0, 0, 1])
+    np.testing.assert_allclose(out["geom_focus"], [0, 0, 63.2])
+    radii = np.linalg.norm(out["rim"][:, :2], axis=1)
+    np.testing.assert_allclose(radii, 32, atol=1e-9)
+    np.testing.assert_allclose(out["rim"][:, 2], bowl.sagitta, atol=1e-9)
+    assert pl.Bowl.from_transducer({"type": "annular", "annular": {}}) is None
+
+
+def test_fov_box_geometry():
+    trans, focus = np.array([0.0, 0, 0]), np.array([0.0, 0, 50])
+    box = pl.fov_box(trans, focus, diameter_mm=20, length_mm=120)
+    assert box["corners"].shape == (8, 3) and len(box["edges"]) == 12
+    # axial: starts at the transducer (z=0), ends length_mm along the beam axis
+    np.testing.assert_allclose(sorted(box["corners"][:, 2].tolist()), [0.0] * 4 + [120.0] * 4,
+                               atol=1e-9)
+    # lateral: full width is diameter_mm regardless of where the focus sits along the axis
+    assert np.ptp(box["corners"][:, 0]) == pytest.approx(20) and \
+        np.ptp(box["corners"][:, 1]) == pytest.approx(20)
+    for edge in box["edges"]:
+        assert edge.shape == (2, 3)
+
+
+def test_resolve_focal_distance_ep():
+    bowl = pl.Bowl.from_transducer({"type": "annular",
+                                    "annular": {"curv_radius_mm": 100, "dist_geom_ep_mm": 92.7,
+                                               "elem_od_mm": [65]}})
+    assert pl.resolve_focal_distance_ep({"focal_distance_ep": 85.0}, bowl) == 85.0
+    # derived from focal_distance_bowl via bowl.offset when ep itself isn't set
+    derived = pl.resolve_focal_distance_ep({"focal_distance_bowl": 92.3}, bowl)
+    assert derived == pytest.approx(92.3 - bowl.offset)
+    assert pl.resolve_focal_distance_ep({}, bowl) is None
+    assert pl.resolve_focal_distance_ep({"focal_distance_bowl": 92.3}, None) is None
+
+
+def test_snap_to_scalp(tmp_path):
+    # 1 mm grid, a 'head' sphere of radius 50 mm around the origin
+    shape = (121, 121, 121)
+    affine = np.eye(4)
+    affine[:3, 3] = -60
+    g = np.indices(shape).reshape(3, -1).T - 60
+    head = (np.linalg.norm(g, axis=1) <= 50).reshape(shape).astype(np.uint8)
+    path = tmp_path / "seg.nii.gz"
+    nib.save(nib.Nifti1Image(head, affine), str(path))
+    seg = pl.Volume(path)
+    bowl = pl.Bowl(63.2, 64, 52.38)
+    apex = pl.snap_to_scalp(seg, [0, 0, 0], [0, 0, 1], bowl, gap_mm=5)
+    # exit plane 5 mm outside the scalp (z = 50), apex a further offset behind
+    assert apex[2] == pytest.approx(50 + 5 + bowl.offset, abs=0.6)
+
+
+def test_read_brainsight(tmp_path):
+    text = ("# Version: 13\n# Coordinate system: NIfTI:Aligned\n"
+            "# Target name\tLoc. X\tLoc. Y\tLoc. Z\tm0n0\tm0n1\tm0n2\tm1n0\tm1n1\tm1n2\tm2n0\tm2n1\tm2n2\n"
+            "left_amy\t-21.5\t-3.0\t-18.0\t1\t0\t0\t0\t1\t0\t0\t0\t1\n")
+    path = tmp_path / "traj.txt"
+    path.write_text(text)
+    t = pl.read_trajectory(path)
+    assert t.name == "left_amy" and t.source == "Brainsight"
+    np.testing.assert_allclose(t.target, [-21.5, -3, -18])
+    np.testing.assert_allclose(t.towards_transducer, [0, 0, 1])   # BabelBrain: transducer along +z
+
+
+def test_brainsight_rejects_non_nifti(tmp_path):
+    path = tmp_path / "traj.txt"
+    path.write_text("# Coordinate system: Scanner\n# Target name\tLoc. X\n"
+                    "t\t0\t0\t0\t1\t0\t0\t0\t1\t0\t0\t0\t1\n")
+    with pytest.raises(ValueError, match="NIfTI"):
+        pl.read_trajectory(path)
+
+
+def test_slicer_matches_babelbrain_conversion(tmp_path):
+    # Identity rotation about a fixed centre, translated in LPS
+    text = ("#Insight Transform File V1.0\n#Transform 0\n"
+            "Transform: AffineTransform_double_3_3\n"
+            "Parameters: 1 0 0 0 1 0 0 0 1 10 20 30\nFixedParameters: 0 0 0\n")
+    path = tmp_path / "traj.tfm"
+    path.write_text(text)
+    t = pl.read_trajectory(path)
+    # itk_to_BSight: inv(ras2lps @ M @ ras2lps), rotation negated
+    itk = np.eye(4)
+    itk[:3, 3] = [10, 20, 30]
+    ras2lps = np.diag([-1.0, -1, 1, 1])
+    ref = np.linalg.inv(ras2lps @ itk @ ras2lps)
+    ref[:3, :3] = -ref[:3, :3]
+    np.testing.assert_allclose(t.target, ref[:3, 3])
+    np.testing.assert_allclose(t.towards_transducer, ref[:3, 2])
+
+
+def _fake_mni2subject_coords(bin_dir, offset=(1.0, 2.0, 3.0)):
+    """A stand-in for SimNIBS's CLI tool: reads the input CSV, adds `offset`, writes it back
+    in the same 'Generic, x, y, z' format -- enough to test the subprocess/CSV plumbing without
+    a real SimNIBS install or m2m folder."""
+    import stat
+    exe = bin_dir / "mni2subject_coords"
+    exe.write_text(
+        "#!/usr/bin/env python3\n"
+        "import csv, sys\n"
+        "args = dict(zip(sys.argv[1::2], sys.argv[2::2]))\n"
+        f"offset = {tuple(offset)!r}\n"
+        "with open(args['-s']) as f: rows = list(csv.reader(f))\n"
+        "with open(args['-o'], 'w', newline='') as f:\n"
+        "    w = csv.writer(f)\n"
+        "    for row in rows:\n"
+        "        w.writerow([row[0]] + [float(v) + o for v, o in zip(row[1:4], offset)])\n")
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    return exe
+
+
+def test_mni_to_subject(tmp_path):
+    bin_dir, m2m = tmp_path / "bin", tmp_path / "m2m_sub-001"
+    bin_dir.mkdir()
+    m2m.mkdir()
+    _fake_mni2subject_coords(bin_dir)
+    out = pl.mni_to_subject([10.0, -20.0, 30.0], m2m, str(bin_dir))
+    np.testing.assert_allclose(out, [11.0, -18.0, 33.0])
+
+
+def test_mni_to_subject_missing_tool_or_m2m(tmp_path):
+    bin_dir, m2m = tmp_path / "bin", tmp_path / "m2m_sub-001"
+    bin_dir.mkdir()
+    m2m.mkdir()
+    with pytest.raises(pl.SimnibsCoordError, match="not found"):
+        pl.mni_to_subject([0, 0, 0], m2m, str(bin_dir))          # tool missing
+    _fake_mni2subject_coords(bin_dir)
+    with pytest.raises(pl.SimnibsCoordError, match="not found"):
+        pl.mni_to_subject([0, 0, 0], tmp_path / "no_m2m", str(bin_dir))

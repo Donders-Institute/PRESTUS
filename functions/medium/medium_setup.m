@@ -13,7 +13,7 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 % saved only in debug mode. When pCT is enabled, empirical in-skull property
 % distributions (pseudoCT HU, density, sound speed, attenuation) are cached
 % unconditionally as JSON in io.dir_cache (sub-XXX_<medium>_medium_stats<affix>.json)
-% for use by downstream tools (e.g. the Planner GUI).
+% for use by downstream tools (e.g. the Nexus GUI).
 %
 % Use as:
 %   kwave_medium = medium_setup(parameters, medium_masks, planimg)
@@ -124,7 +124,7 @@ end
             [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation, density);
 
             % [CACHE] save empirical in-skull property distributions (pseudoCT HU, density,
-            % sound speed, attenuation) so downstream tools (e.g. the Planner GUI) can show
+            % sound speed, attenuation) so downstream tools (e.g. the Nexus GUI) can show
             % them without a debug rerun. Written unconditionally, since it is cheap relative
             % to the per-voxel arrays already computed above; goes to dir_cache (regenerable
             % intermediates, always created) rather than the debug-only dir_debug_medium.

@@ -78,7 +78,7 @@ The following documents the functions provided in PRESTUS.
 | `calibration_gui`                       | Standalone GUI to fit transducer library entries to hydrophone profiles, predict profiles at any depth and add transducers. |
 | `neuronav_gui`                          | Stand-alone GUI for Localite marker ingestion: detect and review series, QC, name targets, batch ingestion, MNI view. |
 | `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs.                         |
-| `prestus_planner`                       | Open the PRESTUS Planner (standalone PyQt6 config builder, *experimental*; see [doc_planner.md](doc_planner.md)). |
+| `prestus_nexus`                       | Open the PRESTUS Nexus (standalone PyQt6 config builder, *experimental*; see [doc_nexus.md](doc_nexus.md)). |
 
 #### HEAD
 
@@ -120,6 +120,7 @@ The following documents the functions provided in PRESTUS.
 | `should_save_output`                    | Decide whether an output is saved: per-step `io` flag, else `io.save_matrices` (matrix outputs), else the built-in default. |
 | `log_timer`                             | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region.                                       |
+| `matlab_escape_quotes`                  | Escapes text for a single-quoted MATLAB literal in generated job scripts (doubles `'`).         |
 | `read_ini_file`                         | Read an INI file into MATLAB                                                                    |
 | `sample_beam_axis`                      | Interpolate a 2D/3D field along the beam axis from the bowl apex to the grid edge (distances from the apex). |
 | `round_if_integer`                      | Rounds values if they are sufficiently close to integers; otherwise raises an error.            |

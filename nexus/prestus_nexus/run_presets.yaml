@@ -1,0 +1,63 @@
+# Named hpc.* override bundles for the Run tab's "Run profile" picker.
+#
+# Grounded in this repo's own resource usage, not invented numbers:
+#   - config/config_default.yaml's hpc:/snellius: blocks (the shipped defaults, and the
+#     two Snellius GPU tiers it already ships).
+#   - functions/hpc/hpc_submit_job.m's extract_snellius_parameters (local function):
+#     switches on parameters.hpc.partition == 'gpu_a100' | 'gpu_h100' literally -- those
+#     are the exact strings a Snellius preset must set; memory/cores/n_gpu are then
+#     filled in from snellius.gpu_a100/gpu_h100 at submission time, so the preset itself
+#     only needs hpc.name + hpc.partition.
+#   - doc_hpc.md: the Donders gpu40g partition ("nodes with GPU with vRAM > 40 GB...
+#     should be used for the majority of thermal simulations") and its GPU benchmark
+#     table (acoustic ~14-145 min, thermal ~45-115 min depending on GPU; A16/P100 noted
+#     "Out of RAM" on thermal at a near-default memory footprint).
+#
+# Applying a preset only sets hpc.* keys on the open study (via ConfigModel.set, so the
+# usual 'changed' marker and Issues panel apply); it never submits a job -- see
+# doc_hpc.md for the manual srun/sbatch workflow.
+
+presets:
+  - name: Local
+    description: No scheduler. Runs in this MATLAB session (Run tab's "Run locally"), as today.
+    overrides: {}
+
+  - name: Donders HPC — default
+    description: >-
+      Submit to the Donders cluster's default queue, at the shipped defaults
+      (hpc.timelimit 04:00:00, hpc.memorylimit 20 GB). Suits a single acoustic-only
+      run or a small grid; see doc_hpc.md for the srun/sbatch workflow this fills in for.
+    overrides:
+      hpc.name: default
+
+  - name: Donders HPC — GPU, high-fidelity
+    description: >-
+      hpc.partition gpu40g (doc_hpc.md: the >40GB-VRAM partition recommended for most
+      thermal simulations), 1 GPU, 8h / 48GB -- a conservative starting point against
+      the doc_hpc.md GPU benchmark table (slower GPUs: up to ~115 min thermal + ~43 min
+      acoustic per run; A16/P100 ran out of RAM at a near-default footprint on thermal).
+      Tune timelimit/memorylimit to your actual grid size once you've run one job.
+    overrides:
+      hpc.name: default
+      hpc.partition: gpu40g
+      hpc.gpu: "gpu:1"
+      hpc.timelimit: "08:00:00"
+      hpc.memorylimit: 48
+
+  - name: Snellius — A100
+    description: >-
+      hpc.name snellius, hpc.partition gpu_a100 -- selects the snellius.gpu_a100 block
+      already in config_default.yaml (18 cores, 120 GB, up to 120h, 1 GPU); SLURM
+      resources are filled in from there at submission, not set here.
+    overrides:
+      hpc.name: snellius
+      hpc.partition: gpu_a100
+
+  - name: Snellius — H100
+    description: >-
+      hpc.name snellius, hpc.partition gpu_h100 -- selects the snellius.gpu_h100 block
+      already in config_default.yaml (16 cores, 180 GB, up to 120h, 1 GPU); SLURM
+      resources are filled in from there at submission, not set here.
+    overrides:
+      hpc.name: snellius
+      hpc.partition: gpu_h100

@@ -1,8 +1,8 @@
 """Entry point for the PRESTUS Python GUI.
 
-DEPRECATED: superseded by the PRESTUS Planner (planner/, ``python -m
-prestus_planner``), which is schema-driven and round-trip tested against
-load_parameters. Kept until the planner covers the results views.
+DEPRECATED: superseded by the PRESTUS Nexus (nexus/, ``python -m
+prestus_nexus``), which is schema-driven and round-trip tested against
+load_parameters. Kept until the Nexus covers the results views.
 
 Usage
 -----
@@ -21,8 +21,8 @@ import sys
 
 def prestus_gui(init_params: dict | None = None):
     """Launch the PRESTUS GUI application."""
-    print("Note: functions/gui_py is deprecated; use the PRESTUS Planner "
-          "(python -m prestus_planner, see planner/README.md).", file=sys.stderr)
+    print("Note: functions/gui_py is deprecated; use the PRESTUS Nexus "
+          "(python -m prestus_nexus, see nexus/README.md).", file=sys.stderr)
     # Ensure the gui_py folder is on sys.path
     gui_dir = os.path.dirname(os.path.abspath(__file__))
     if gui_dir not in sys.path:

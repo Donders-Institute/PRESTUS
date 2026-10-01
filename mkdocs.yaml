@@ -41,7 +41,7 @@ nav:
     - Installation: doc_installation.md
     - Getting started: doc_getting-started.md
     - GUI: doc_gui.md
-    - Planner (standalone config builder): doc_planner.md
+    - Nexus (standalone config builder): doc_nexus.md
     - Usage Statistics: doc_usage_statistics.md
   - 🔧 Equipment Modeling:
     - Transducer Configuration: doc_transducer.md
@@ -49,6 +49,7 @@ nav:
     - Calibration: doc_calibration.md
     - Transducer Placement Overview: doc_placement.md
     - Transducer Placement (Heuristic): doc_placement_heuristic.md
+    - Transducer Placement (MNI): doc_placement_mni.md
     - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
     - Neuronavigation Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
     - Neuronavigation Multi-Target Toolkit: doc_placement_neuronav_multitarget.md
@@ -88,6 +89,11 @@ nav:
 
 plugins:
   - search
+
+extra:
+  version:
+    provider: mike
+    default: main
 
 markdown_extensions:
   - abbr                    # Abbreviations
