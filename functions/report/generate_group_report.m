@@ -784,7 +784,7 @@ function html = build_analysis_section(subjects_meta, limits)
     if isempty(subs)
         subjects_json = '[]';
     else
-        subjects_json = jsonencode(subs);
+        subjects_json = html_utils.script_json(subs);
     end
 
     % Metric registry (emitted as a JS literal so informational limits can use Infinity)
@@ -1366,7 +1366,7 @@ function html = build_filter_script(subjects_meta, limits)
     for k = 1:numel(subjects_meta)
         payload{k} = subjects_meta(k).metrics;
     end
-    json = jsonencode(payload);
+    json = html_utils.script_json(payload);
 
     % Build a JS-friendly limits object
     lim_fields = fieldnames(limits);

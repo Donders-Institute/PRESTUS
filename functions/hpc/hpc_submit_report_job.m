@@ -36,12 +36,12 @@ save(params_file, 'parameters');
 % Write the MATLAB report script
 m_file = fullfile(log_dir, sprintf('report_job%s.m', main_job_id_str));
 fid = fopen(m_file, 'w+');
-fprintf(fid, 'load(''%s'', ''parameters'');\n', params_file);
-fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
-fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
+fprintf(fid, 'load(''%s'', ''parameters'');\n', matlab_escape_quotes(params_file));
+fprintf(fid, 'addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions', 'helper')));
+fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions')));
 fprintf(fid, 'hpc_job_report(%s, ''slurm'', parameters, ''%s'');\n', main_job_id_str, log_dir);
-fprintf(fid, 'delete(''%s'');\n', params_file);
-fprintf(fid, 'delete(''%s'');\n', m_file);
+fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(params_file));
+fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(m_file));
 fclose(fid);
 
 % Determine which MATLAB module to load (match main job)

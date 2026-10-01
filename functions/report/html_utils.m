@@ -18,12 +18,19 @@ classdef html_utils
     methods (Static)
 
         function str = escape(str)
-        % escape  Escape <, >, &, and " for safe HTML embedding.
+        % escape  Escape <, >, &, " and ' for safe HTML embedding.
             if ~ischar(str), str = char(string(str)); end
             str = strrep(str, '&', '&amp;');
             str = strrep(str, '<', '&lt;');
             str = strrep(str, '>', '&gt;');
             str = strrep(str, '"', '&quot;');
+            str = strrep(str, '''', '&#39;');
+        end
+
+        function json = script_json(value)
+        % script_json  jsonencode for inlining in a <script> block: '</'
+        % is written as '<\/' so a string value cannot close the block.
+            json = strrep(jsonencode(value), '</', '<\/');
         end
 
         function b64 = base64(filepath)

@@ -50,11 +50,11 @@ function transducer_positioning_start(parameters, pn, target_name, mni_targets)
             save(temp_data_path, "parameters", "pn", "target_name", "mni_targets");
 
             fid = fopen(temp_m_path, 'w');
-            fprintf(fid, 'load(''%s'');\n', temp_data_path);
-            fprintf(fid, 'addpath(genpath(''%s''));\n', prestus_path);
+            fprintf(fid, 'load(''%s'');\n', matlab_escape_quotes(temp_data_path));
+            fprintf(fid, 'addpath(genpath(''%s''));\n', matlab_escape_quotes(prestus_path));
             fprintf(fid, 'transducer_positioning(parameters, pn, target_name, mni_targets);\n');
-            fprintf(fid, 'delete(''%s'');\n', temp_data_path);
-            fprintf(fid, 'delete(''%s'');\n', temp_m_path);
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_data_path));
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_m_path));
             fclose(fid);
 
             parameters.hpc.job_prefix = 'TP';

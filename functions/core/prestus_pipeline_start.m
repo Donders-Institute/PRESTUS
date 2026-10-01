@@ -115,20 +115,20 @@ function job_id = prestus_pipeline_start(parameters, options)
 
             % Generate MATLAB call
             fid = fopen(temp_m_path, 'w+');
-            fprintf(fid, 'load(''%s'');\n', temp_data_path);
+            fprintf(fid, 'load(''%s'');\n', matlab_escape_quotes(temp_data_path));
             % Bootstrap safe_addpath, then use it to add all PRESTUS paths
             % without including hidden directories (e.g. .claude worktrees).
-            fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
-            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
-            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'external'));
+            fprintf(fid, 'addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions', 'helper')));
+            fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions')));
+            fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'external')));
             if isfield(options, 'sequential_configs')
                 save(temp_data_path, 'options', '-append');
                 fprintf(fid, 'prestus_pipeline(parameters, options);\n');
             else
                 fprintf(fid, 'prestus_pipeline(parameters);\n');
             end
-            fprintf(fid, 'delete(''%s'');\n', temp_data_path);
-            fprintf(fid, 'delete(''%s'');\n', temp_m_path);
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_data_path));
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_m_path));
             fclose(fid);
 
             % Submit job

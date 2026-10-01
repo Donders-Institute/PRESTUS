@@ -176,7 +176,7 @@ def main():
         print("  Click again to change the selection; the last selected vertex is")
         print("  used. Close wb_view to confirm (close without clicking to abort).")
 
-    command = "wb_view -logging FINER " + scene_path
+    command = ["wb_view", "-logging", "FINER", str(scene_path)]
     pattern = re.compile(r"Switched vertex to triangle nearest vertex\s+(\.\d+)")
     triangle_number = None
     process_line = False
@@ -195,7 +195,7 @@ def main():
     # and an unread stdout pipe could fill up and stall wb_view.
     process = subprocess.Popen(
         command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-        shell=True, cwd=output_path, text=True)
+        cwd=output_path, text=True)
 
     placed = []
 

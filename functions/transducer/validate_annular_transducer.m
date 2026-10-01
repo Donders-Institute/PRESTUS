@@ -64,7 +64,7 @@ function tr = validate_annular_transducer(tr, t_i)
     if isfield(annular_tr, 'elem_phase_rad') && iscell(annular_tr.elem_phase_rad)
         for p_i = 1:numel(annular_tr.elem_phase_rad)
             if ~isnumeric(annular_tr.elem_phase_rad{p_i})
-                annular_tr.elem_phase_rad{p_i} = eval(annular_tr.elem_phase_rad{p_i});
+                annular_tr.elem_phase_rad{p_i} = eval_phase_expression(annular_tr.elem_phase_rad{p_i});
             end
         end
         annular_tr.elem_phase_rad = cell2mat(annular_tr.elem_phase_rad);
@@ -73,7 +73,7 @@ function tr = validate_annular_transducer(tr, t_i)
     if isfield(annular_tr, 'elem_phase_deg') && iscell(annular_tr.elem_phase_deg)
         for p_i = 1:numel(annular_tr.elem_phase_deg)
             if ~isnumeric(annular_tr.elem_phase_deg{p_i})
-                annular_tr.elem_phase_deg{p_i} = eval(annular_tr.elem_phase_deg{p_i});
+                annular_tr.elem_phase_deg{p_i} = eval_phase_expression(annular_tr.elem_phase_deg{p_i});
             end
         end
         annular_tr.elem_phase_deg = cell2mat(annular_tr.elem_phase_deg);
@@ -112,4 +112,15 @@ function tr = validate_annular_transducer(tr, t_i)
     % Encode updated annular transducer field
     tr.annular = annular_tr;
    
+end
+
+function v = eval_phase_expression(expr)
+% Evaluate a config phase expression such as '274*pi/180'. Only numbers, pi
+% and arithmetic are allowed, so a config value can never run other code.
+    expr = char(string(expr));
+    if isempty(regexp(regexprep(expr, '\<pi\>', ''), '^[0-9.eE+\-*/^()\[\],; \t]*$', 'once'))
+        error('validate_annular_transducer:badPhaseExpression', ...
+            'Phase "%s" must be a number or an arithmetic expression of numbers and pi.', expr);
+    end
+    v = eval(expr);
 end

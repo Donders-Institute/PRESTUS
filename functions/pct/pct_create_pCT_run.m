@@ -115,15 +115,12 @@ end
     modules_to_load = {};
     if isfield(parameters, 'startup') && isfield(parameters.startup, 'modules_to_load') ...
             && ~isempty(parameters.startup.modules_to_load)
-        modules_to_load = parameters.startup.modules_to_load;
-        if ischar(modules_to_load)
-            modules_to_load = {modules_to_load};
-        end
+        modules_to_load = cellstr(parameters.startup.modules_to_load);
     end
     % Inline form used for local bash -c execution
     if ~isempty(modules_to_load)
         module_prefix = ['source /etc/profile && module load ' ...
-            strjoin(modules_to_load, ' ') ' && '];
+            strjoin(cellfun(@shell_quote_arg, modules_to_load, 'UniformOutput', false), ' ') ' && '];
     else
         module_prefix = '';
     end
@@ -139,7 +136,7 @@ end
         end
     end
     if ~isempty(extra_paths)
-        path_prefix = sprintf('export PATH=%s:$PATH && ', strjoin(extra_paths, ':'));
+        path_prefix = sprintf('export PATH=%s:"$PATH" && ', shell_quote_arg(strjoin(extra_paths, ':')));
     else
         path_prefix = '';
     end
@@ -197,10 +194,10 @@ end
             fullfile(log_dir, sprintf('sub-%s_slurm_pct_error_%%j.log', subj_id_string)));
         fprintf(fid, 'source /etc/profile\n');
         for mi = 1:numel(modules_to_load)
-            fprintf(fid, 'module load %s\n', modules_to_load{mi});
+            fprintf(fid, 'module load %s\n', shell_quote_arg(modules_to_load{mi}));
         end
         if ~isempty(extra_paths)
-            fprintf(fid, 'export PATH=%s:$PATH\n', strjoin(extra_paths, ':'));
+            fprintf(fid, 'export PATH=%s:"$PATH"\n', shell_quote_arg(strjoin(extra_paths, ':')));
         end
         if ~isempty(ants_simg_export)
             fprintf(fid, 'export ANTS_SIMG=%s\n', shell_quote_arg(parameters.startup.ants_simg_path));
@@ -253,10 +250,10 @@ end
         fprintf(fid, '#PBS -e %s\n', fullfile(log_dir, sprintf('sub-%s_qsub_pct_error.log', subj_id_string)));
         fprintf(fid, 'source /etc/profile\n');
         for mi = 1:numel(modules_to_load)
-            fprintf(fid, 'module load %s\n', modules_to_load{mi});
+            fprintf(fid, 'module load %s\n', shell_quote_arg(modules_to_load{mi}));
         end
         if ~isempty(extra_paths)
-            fprintf(fid, 'export PATH=%s:$PATH\n', strjoin(extra_paths, ':'));
+            fprintf(fid, 'export PATH=%s:"$PATH"\n', shell_quote_arg(strjoin(extra_paths, ':')));
         end
         if ~isempty(ants_simg_export)
             fprintf(fid, 'export ANTS_SIMG=%s\n', shell_quote_arg(parameters.startup.ants_simg_path));

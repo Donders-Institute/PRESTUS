@@ -256,19 +256,19 @@ fprintf(fid, '  3. Run: python RunBabelBrain.py\n');
 fprintf(fid, '"""\n\n');
 fprintf(fid, 'import sys, os\n\n');
 fprintf(fid, '# ── Configuration ─────────────────────────────────────────────\n');
-fprintf(fid, 'BabelBrain_ROOT = r''%s''\n', bb_root_py);
+fprintf(fid, 'BabelBrain_ROOT = ''%s''\n', py_escape(bb_root_py));
 fprintf(fid, 'if BabelBrain_ROOT and BabelBrain_ROOT not in sys.path:\n');
 fprintf(fid, '    sys.path.insert(0, BabelBrain_ROOT)\n\n');
 fprintf(fid, 'from TranscranialModeling.BabelIntegrationANNULAR_ARRAY import RUN_SIM\n\n');
 fprintf(fid, 'R = RUN_SIM()\n');
 fprintf(fid, 'output_files = R.RunCases(\n');
-fprintf(fid, '    targets        = [r''%s''],\n', target);
-fprintf(fid, '    ID             = r''%s'',\n', subj_id);
-fprintf(fid, '    basedir        = r''%s'',\n', strrep(out_dir, '\', '/'));
+fprintf(fid, '    targets        = [''%s''],\n', py_escape(target));
+fprintf(fid, '    ID             = ''%s'',\n', py_escape(subj_id));
+fprintf(fid, '    basedir        = ''%s'',\n', py_escape(strrep(out_dir, '\', '/')));
 fprintf(fid, '    Frequencies    = [%g],\n', freq_hz);
 fprintf(fid, '    basePPW        = [%d],\n', ppw_use);
 fprintf(fid, '    COMPUTING_BACKEND           = %d,\n', bb.computing_backend);
-fprintf(fid, '    deviceName                  = r''%s'',\n', bb.device_name);
+fprintf(fid, '    deviceName                  = ''%s'',\n', py_escape(bb.device_name));
 fprintf(fid, '    TxMechanicalAdjustmentZ     = %.6f,  # m: %.1f mm placement corr + %.1f mm user\n', ...
     tx_mech_adjust_total_m, geom_corr_m*1e3, bb.tx_mech_adjust_z_m*1e3);
 if isfield(bb, 'use_rayleigh_for_water') && ~isempty(bb.use_rayleigh_for_water)
@@ -380,4 +380,14 @@ function folder = get_babel_folder(tx_system)
     else
         folder = tx_system;
     end
+end
+
+function s = py_escape(s)
+% Text for a single-quoted Python string literal: no quote or newline in a
+% value can end the literal and run the rest as Python.
+    s = char(string(s));
+    s = strrep(s, '\', '\\');
+    s = strrep(s, '''', '\''');
+    s = strrep(s, newline, '\n');
+    s = strrep(s, char(13), '\r');
 end

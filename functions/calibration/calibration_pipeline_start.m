@@ -112,15 +112,15 @@ function job_id = calibration_pipeline_start(...
 
             %% Generate bootstrap MATLAB script
             fid = fopen(temp_m_path, 'w+');
-            fprintf(fid, 'load(''%s'');\n', temp_data_path);
+            fprintf(fid, 'load(''%s'');\n', matlab_escape_quotes(temp_data_path));
             % Bootstrap safe_addpath, then add all PRESTUS paths (excluding
             % hidden directories such as .claude worktrees).
-            fprintf(fid, 'addpath(''%s'');\n', fullfile(prestus_path, 'functions', 'helper'));
-            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'functions'));
-            fprintf(fid, 'safe_addpath(''%s'');\n', fullfile(prestus_path, 'external'));
+            fprintf(fid, 'addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions', 'helper')));
+            fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'functions')));
+            fprintf(fid, 'safe_addpath(''%s'');\n', matlab_escape_quotes(fullfile(prestus_path, 'external')));
             fprintf(fid, 'calibration_transducer(cal_args.profile_empirical, cal_args.equipment_name, cal_args.desired_intensity, cal_args.desired_focal_distance_ep, parameters, cal_args.sim_id);\n');
-            fprintf(fid, 'delete(''%s'');\n', temp_data_path);
-            fprintf(fid, 'delete(''%s'');\n', temp_m_path);
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_data_path));
+            fprintf(fid, 'delete(''%s'');\n', matlab_escape_quotes(temp_m_path));
             fclose(fid);
 
             %% Submit job
