@@ -14,11 +14,10 @@ transducer:
   type: matrix # 'annular' (Annular array transducer) or 'matrix' (Matrix array transducer)
   freq_hz: 250e3 # [Hz] the central frequency
 
-  position:
-    trans_pos: [128, 139, 15] # position on T1 grid
-    focus_pos: [128, 142, 75] # stimulation target on T1 grid
-    focal_distance_ep: 60             # Expected focal distance from transducer exit plane [mm]
-    focal_distance_bowl: []           # Expected focal distance from transducer bowl [mm]
+  trans_pos: [128, 139, 15] # position on T1 grid
+  focus_pos: [128, 142, 75] # stimulation target on T1 grid
+  focal_distance_ep: 60     # Expected focal distance from transducer exit plane [mm]
+  focal_distance_bowl: []   # Expected focal distance from transducer bowl [mm]
 
   annular:
     elem_p_amp: 91590 # [Pa]
@@ -92,7 +91,7 @@ transducer:
             elem_n: 64
 
       extract_from_file:
-        file_path: example_coord_file.xlsx # Path to the file containing x, y, z coordinates of the elements
+        file_path: example_coord_file.csv # x, y, z element coordinates; resolved with which(), so its folder (config/equipment) must be on the MATLAB path
 
         # First row and column containing x, y, z element coordinates.
         # Note: MATLAB may ignore the first Excel row if it contains headers.
