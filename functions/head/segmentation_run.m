@@ -51,7 +51,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if ~isempty(filename_t2)
         charm_args = [charm_args, {filename_t2}];
     end
-    if isfield(parameters, 'overwrite_simnibs') && parameters.io.overwrite_simnibs == 1
+    if isfield(parameters.io, 'overwrite_simnibs') && parameters.io.overwrite_simnibs == 1
         charm_args = [charm_args, {'--forcerun'}];
     end
     if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'use_qform') && parameters.segmentation.use_qform == 1
