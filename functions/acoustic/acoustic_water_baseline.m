@@ -2,7 +2,8 @@ function acoustic_provenance = acoustic_water_baseline(parameters, acoustic_prov
 % ACOUSTIC_WATER_BASELINE  Decide and run the free-water baseline simulation.
 %
 % Determines whether a water-baseline acoustic simulation is needed, runs it
-% if so, and stores the result in acoustic_provenance.freefield_isppa_wcm2.
+% if so, and stores the result in acoustic_provenance.freefield_isppa_wcm2
+% and the free-water beam-axis profile in acoustic_provenance.freefield_axial.
 %
 % A baseline is skipped when the calibration ISPPA already matches the target
 % (common case: simulate at the drive level from the transducer library).
@@ -48,7 +49,7 @@ end
 if run_baseline && ...
         (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1)
     log_timer('start', 'freefield_baseline', parameters.io.dir_output);
-    acoustic_provenance.freefield_isppa_wcm2 = ...
+    [acoustic_provenance.freefield_isppa_wcm2, acoustic_provenance.freefield_axial] = ...
         water_baseline(parameters, kgrid, source, sensor, source_labels);
     if isfield(acoustic_provenance, 'tx_calibration')
         acoustic_provenance.tx_calibration.isppa_wcm2   = acoustic_provenance.freefield_isppa_wcm2;

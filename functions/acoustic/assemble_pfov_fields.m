@@ -208,6 +208,11 @@ acoustic_provenance.combination_full_ac_dims = full_ac_dims;
 acoustic_provenance.combination_targets      = targets_log;
 acoustic_provenance.combination_baselines    = baselines_log;
 acoustic_provenance.combination_time         = datestr(now); %#ok<TNOW1,DATST>
+% The reference file's free-water axial profile describes that single run at
+% its own drive level; it does not match the combined, per-source scaled field.
+if isfield(acoustic_provenance, 'freefield_axial')
+    acoustic_provenance = rmfield(acoustic_provenance, 'freefield_axial');
+end
 % Clear per-FOV crop metadata — the combined file represents the full grid
 acoustic_provenance.fov_offset_ac  = [];
 acoustic_provenance.full_ac_dims   = full_ac_dims;

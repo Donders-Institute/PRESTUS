@@ -343,7 +343,7 @@ The library YAML schema (`meta`, `global_model`, `refinement`, and the legacy fo
 
 ## In-pipeline ISPPA targeting
 
-Rather than scaling `elem_amp` before the acoustic simulation, PRESTUS uses a two-step approach: a **water baseline measurement** records the free-water ISPPA at the current drive level, and **post-hoc pressure scaling** is applied when loading the cached acoustic results for thermal analysis. This means the acoustic simulation never needs to be repeated when changing the target intensity.
+Rather than scaling `elem_p_amp` before the acoustic simulation, PRESTUS uses a two-step approach: a **water baseline measurement** records the free-water ISPPA at the current drive level, and **post-hoc pressure scaling** is applied when loading the cached acoustic results for thermal analysis. This means the acoustic simulation never needs to be repeated when changing the target intensity.
 
 | | `calibration_transducer` | ISPPA targeting |
 |---|---|---|
@@ -359,7 +359,7 @@ Rather than scaling `elem_amp` before the acoustic simulation, PRESTUS uses a tw
 
 **Function: `water_baseline`**
 
-Runs a fast homogeneous water simulation at the current `elem_amp` (after source setup, before the main acoustic simulation). The peak free-water ISPPA is computed from the sensor output and stored as `acoustic_provenance.freefield_isppa_wcm2` alongside the acoustic cache file.
+Runs a fast homogeneous water simulation at the current `elem_p_amp` (after source setup, before the main acoustic simulation). The peak free-water ISPPA is computed from the sensor output and stored as `acoustic_provenance.freefield_isppa_wcm2` alongside the acoustic cache file. The free-water intensity along each transducer's beam axis (bowl apex → grid edge, distances from the apex) is stored as `acoustic_provenance.freefield_axial`. Combined async / FOV caches drop it, because the combined field is scaled per source.
 
 This step is **disabled by default** (`modules.run_water_baseline = 0`). Enable it when ISPPA scaling provenance is needed. It adds a few minutes on a typical workstation (no tissue mapping, uses the configured `code_type`):
 
@@ -389,11 +389,11 @@ A warning is issued if the scale factor exceeds 4× or is below 0.25×, indicati
 ```yaml
 transducer:
   target_isppa_wcm2: 30   # Target free-water ISPPA [W/cm²]
-  elem_amp: ...
+  elem_p_amp: ...
   # ... other transducer fields
 ```
 
-`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_amp` is configured; `target_isppa_wcm2` controls only the analysis and thermal stages.
+`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_p_amp` is configured; `target_isppa_wcm2` controls only the analysis and thermal stages.
 
 > **Backwards compatibility:** The older form `calibration.target_isppa_wcm2` is still accepted and is automatically migrated to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning. Update configs to use the per-transducer form.
 

@@ -129,6 +129,7 @@ jwave (JAX-based) can be used as an acoustic solver via `acoustic_backend: jwave
 - ⚠️ **Fixed:** simulation end time (`t_end`) now derived from the minimum sound speed (soft tissue / water, ~1500 m/s) rather than the maximum (bone, ~2800 m/s); the previous behaviour truncated the simulation ~1.9× too early, causing an artefactual pressure drop before steady state was reached
 - `grid.steady_state_transits` / `grid.steady_state_num_periods` (defaults 1 and 3, as before) set the simulated duration and recorded steady-state window, for compact, strongly reflective domains that need longer to settle
 - Axial-profile plot (`plot_axial_profile`) now handles beams running towards lower grid z; previously depths were negated
+- `water_baseline` also returns the free-water intensity along each transducer's beam axis (new helper `sample_beam_axis`; distances from the bowl apex), stored as `acoustic_provenance.freefield_axial`. Async / FOV combinations and BabelBrain runs drop it (drive level differs); `apply_isppa_scaling` records the applied pressure factor as `sensor_data.isppa_scale_p`
 
 #### Pseudo-CT acoustic property mapping
 - With pseudo-CT, `medium_setup` caches the in-skull property distributions (pseudo-CT HU, density, sound speed, attenuation: summary statistics and histograms, plus the reference skull values) as `sub-XXX_<medium>_medium_stats<affix>.json` in `io.dir_cache`, for tools such as the Planner; written on every run, not only in debug mode

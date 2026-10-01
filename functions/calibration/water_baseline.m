@@ -1,4 +1,4 @@
-function freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor, source_labels)
+function [freefield_isppa_wcm2, freefield_axial] = water_baseline(parameters, kgrid, source, sensor, source_labels)
 % WATER_BASELINE  Measure free-water ISPPA at the current source amplitude
 %
 % Runs a fast homogeneous water simulation using the current grid, source,
@@ -17,6 +17,7 @@ function freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor
 % Use as:
 %   freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor)
 %   freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor, source_labels)
+%   [freefield_isppa_wcm2, freefield_axial] = water_baseline(...)
 %
 % Input:
 %   parameters    - (1,1) PRESTUS config struct; must contain:
@@ -31,8 +32,12 @@ function freefield_isppa_wcm2 = water_baseline(parameters, kgrid, source, sensor
 %
 % Output:
 %   freefield_isppa_wcm2 - peak free-water ISPPA [W/cm²] at current elem_p_amp
+%   freefield_axial      - [1 x N_transducers] struct with axial_distance_bowl [mm]
+%                          and axial_intensity [W/cm²]: the free-water intensity
+%                          along each transducer's beam axis, at the current
+%                          elem_p_amp (empty fields if the axis could not be sampled)
 %
-% See also: PRESTUS_PIPELINE, MULTI_ISPPA_PIPELINE, ACOUSTIC_WRAPPER, JWAVE_WRAPPER
+% See also: PRESTUS_PIPELINE, MULTI_ISPPA_PIPELINE, ACOUSTIC_WRAPPER, JWAVE_WRAPPER, SAMPLE_BEAM_AXIS
 
 arguments
     parameters    (1,1) struct
@@ -104,6 +109,24 @@ end
     freefield_isppa_wcm2 = (peak_pa^2 / (2 * rho * c)) * 1e-4;
     fprintf('Free-water baseline ISPPA: %.2f W/cm² (peak pressure: %.0f Pa)\n\n', ...
             freefield_isppa_wcm2, peak_pa);
+
+    %% Free-water intensity along each beam axis
+    % Distances are measured from the bowl apex, so the profile does not depend
+    % on the grid frame (axisymmetric grid or acoustic FOV crop).
+    freefield_axial = struct('axial_distance_bowl', {}, 'axial_intensity', {});
+    I_water = double(gather(sensor_data_baseline.p_max_all)).^2 / (2 * rho * c) * 1e-4;
+    for ti = 1:numel(parameters.transducer)
+        freefield_axial(ti).axial_distance_bowl = [];
+        freefield_axial(ti).axial_intensity     = [];
+        try
+            [freefield_axial(ti).axial_distance_bowl, freefield_axial(ti).axial_intensity] = ...
+                sample_beam_axis(I_water, parameters.transducer(ti).trans_pos, ...
+                                 parameters.transducer(ti).focus_pos, parameters.grid.resolution_mm);
+        catch ME
+            warning('water_baseline:axialProfile', ...
+                'water_baseline: axial profile not extracted for transducer %d (%s).', ti, ME.message);
+        end
+    end
 end
 
 

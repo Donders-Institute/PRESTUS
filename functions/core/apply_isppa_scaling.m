@@ -85,6 +85,7 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
     fprintf('Scaling cached pressure field: %.2f → %.2f W/cm² (scale_p = %.4f)\n', ...
             baseline, target, scale_p);
     sensor_data.p_max_all = sensor_data.p_max_all * scale_p;
+    sensor_data.isppa_scale_p = scale_p;  % recorded for the free-water references in PLOT_AXIAL_PROFILE
     % Scale peak-rarefaction and final fields with the same factor so that the
     % mechanical index (computed from p_min_all) stays consistent with the
     % scaled intensities (computed from p_max_all).

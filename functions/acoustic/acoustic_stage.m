@@ -176,6 +176,11 @@ if use_babelbrain
         acoustic_provenance.freefield_isppa_wcm2             = sensor_data.freefield_isppa_wcm2;
         acoustic_provenance.tx_calibration.isppa_wcm2        = sensor_data.freefield_isppa_wcm2;
         acoustic_provenance.tx_calibration.isppa_source      = 'babelbrain_water_sim';
+        % A k-Wave baseline profile from acoustic_water_baseline is at the
+        % unscaled PRESTUS drive level, not BabelBrain's; drop it.
+        if isfield(acoustic_provenance, 'freefield_axial')
+            acoustic_provenance = rmfield(acoustic_provenance, 'freefield_axial');
+        end
     end
     if should_save_output(parameters.io, 'save_acoustic_matrices')
         cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
@@ -241,6 +246,9 @@ if ~cached_ok && live_ok
     provenance.freefield_isppa_wcm2 = live.freefield_isppa_wcm2;
     if isfield(live, 'tx_calibration')
         provenance.tx_calibration = live.tx_calibration;
+    end
+    if isfield(live, 'freefield_axial')
+        provenance.freefield_axial = live.freefield_axial;
     end
 end
 end

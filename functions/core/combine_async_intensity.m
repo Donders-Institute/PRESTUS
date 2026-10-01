@@ -293,6 +293,11 @@ acoustic_provenance.combination_targets                    = targets_log;
 acoustic_provenance.combination_baselines                  = baselines_log;
 acoustic_provenance.combination_isppa_per_transducer_wcm2  = isppa_per_t;
 acoustic_provenance.combination_time                       = datestr(now); %#ok<TNOW1,DATST>
+% The reference file's free-water axial profile describes that single run at
+% its own drive level; it does not match the combined, per-source scaled field.
+if isfield(acoustic_provenance, 'freefield_axial')
+    acoustic_provenance = rmfield(acoustic_provenance, 'freefield_axial');
+end
 if has_fov_ref
     % Combined output is on the full grid — clear per-file FOV crop metadata
     % so the downstream thermal pipeline does not attempt a second back-projection.
