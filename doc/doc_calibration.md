@@ -331,7 +331,7 @@ The black line indicates the **transducer bowl**, the red line the **transducer 
 
 ##### Step 11 — Cache cleanup
 
-After all simulations complete, k-Wave `.mat` result files written to the cache folder during calibration are removed to free disk space. Set `parameters.io.save_acoustic_matrices = 1` or `parameters.io.save_matrices = 1` to retain them for debugging.
+After all simulations complete, k-Wave `.mat` result files written to the cache folder during calibration are removed to free disk space. Set `parameters.io.save_acoustic_matrices = 1` (or `parameters.io.save_matrices = 1` while `save_acoustic_matrices` is left empty) to retain them for debugging.
 
 ---
 

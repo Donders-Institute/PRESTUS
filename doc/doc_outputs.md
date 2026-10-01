@@ -194,7 +194,7 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
     source/         source/transducer setup (element distribution plots)
 ```
 
-**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving matrices (cache files will not be written). See [Overwrite behaviour](#overwrite-behaviour) below.
+**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving intermediate matrices (cache files will not be written), or `1` to save all of them; per-step flags such as `io.save_acoustic_matrices` override it when set. See [Overwrite behaviour](#overwrite-behaviour) below.
 
 **Debug files** are only written when `parameters.simulation.debug = 1`.
 

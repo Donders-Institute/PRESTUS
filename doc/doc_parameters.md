@@ -106,12 +106,13 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour). |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
-| `save_matrices` | Save acoustic/thermal simulation outputs as `.mat`? | `0` | `1 = yes`, `0 = no`. Set to `0` for large batch runs to save disk space. |
-| `save_source_matrices` | Save the transducer source matrix to `.mat`? | `0` | `1 = yes`, `0 = no`. Needed by multi-stage pipelines (e.g. uncertainty). |
-| `save_acoustic_matrices` | Save the full acoustic simulation result (sensor data) to `.mat`? | `0` | `1 = yes`, `0 = no`. Large files; set to `1` only when caching is needed across pipeline stages. |
-| `save_thermal_matrices` | Save the full thermal simulation result to `.mat`? | `0` | `1 = yes`, `0 = no`. |
-| `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | 0 |
-| `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? |
+| `save_matrices` | Save all intermediate matrices (`.mat` / cache files)? | `[]` | `1` = save all, `0` = save none, `[]` = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to `0`/`1` always wins. `0` also triggers cleanup of uncertainty intermediates. |
+| `save_source_matrices` | Save `kwave_source.mat` (transducer source array)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. Needed by multi-stage pipelines (e.g. uncertainty). |
+| `save_acoustic_matrices` | Save acoustic results (`sensor_data`, `kgrid`, medium; can be very large)? | `[]` → `0` | `[]` inherits `save_matrices`, else default. Needed to reload acoustics (e.g. separate thermal runs, calibration debugging). |
+| `save_thermal_matrices` | Save `heating_res.mat` (temperature time series and field maps)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. |
+| `save_grid_cache` / `save_medium_cache` | Save grid / medium caches? | unset → `0` | Inherit `save_matrices` when unset. |
+| `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | `0` | Not affected by `save_matrices`. |
+| `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? | `1` | Not affected by `save_matrices`. |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
 | `deface_plots` | Remove facial anatomy from all QC figures? | `1` | `1 = yes`, `0 = no`. Uses the SimNIBS eye label to anchor the cut plane ~30 mm posterior to the eye socket (ear-canal level). Requires the SimNIBS segmentation (`path.seg`). Has no effect on saved NIfTIs; see `segmentation.deface` for that. |
 | `adopted_heatmap` | Path to an existing **temperature** heatmap NIfTI (`heating_end.nii.gz`) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually. | — | Optional. Used for sequential multi-target runs. |

@@ -6,7 +6,7 @@ function nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder
 % medium is not layered.
 %
 % MNI output is controlled by parameters.io.save_MNI (default: true via
-% should_save_output; global fallback: parameters.io.save_matrices).
+% should_save_output; not affected by parameters.io.save_matrices).
 %
 % Two optional fill modes address out-of-T1w-FOV voxels (those SimNIBS
 % zero-fills because they fall outside the T1w image boundary):

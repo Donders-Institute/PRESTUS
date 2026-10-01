@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .model import ConfigModel
+from .model import ConfigModel, is_empty
 
 _MODE_FUNCTION = {
     "async": "async_transducer_pipeline",
@@ -236,12 +236,14 @@ def save_summary(model: ConfigModel) -> list[str]:
     the always-written CSV/report. Mirrors config_default.yaml's io section
     comments — a direct readout, not a prediction, so it needs no mode branching."""
     g = model.get
-    global_default = bool(g("io.save_matrices"))
-    lines = [
-        "Global default (io.save_matrices): " +
-        ("ON — saves everything below unless a flag overrides it" if global_default
-         else "OFF — nothing below is saved unless a flag overrides it"),
-    ]
+    global_flag = g("io.save_matrices")
+    if is_empty(global_flag):
+        global_text = "unset — each matrix flag below uses its own default"
+    elif bool(global_flag):
+        global_text = "ON — saves every matrix below whose flag is left empty"
+    else:
+        global_text = "OFF — saves no matrix below whose flag is left empty"
+    lines = ["Global default (io.save_matrices): " + global_text]
     flags = [
         ("save_source_matrices", "source matrices", "kwave_source.mat — shared across variants"),
         ("save_acoustic_matrices", "acoustic matrices", "sensor_data + kgrid + medium + source (can be large)"),
@@ -255,7 +257,7 @@ def save_summary(model: ConfigModel) -> list[str]:
     ]
     width = max(len(label) for _, label, _ in flags) + 2
     for key, label, note in flags:
-        on = bool(g(f"io.{key}"))
+        on = _effective_save(g, key)
         mark = "✓" if on else "✗"
         lines.append(f"  {mark} {label:<{width}}{note}")
     debug_on = bool(g("simulation.debug"))
@@ -263,3 +265,23 @@ def save_summary(model: ConfigModel) -> list[str]:
                  " Debug diagnostics (simulation.debug): " +
                  ("ON — writes debug/{preproc,medium,source}/" if debug_on else "OFF"))
     return lines
+
+
+# Built-in defaults of should_save_output.m. Matrix flags inherit
+# io.save_matrices when empty; the other io.save_* flags do not.
+_MATRIX_SAVE_DEFAULTS = {"save_source_matrices": True, "save_acoustic_matrices": False,
+                         "save_thermal_matrices": True}
+
+
+def _effective_save(g, key: str) -> bool:
+    """Mirror should_save_output.m: per-step flag, else io.save_matrices (matrix
+    flags only), else the built-in default."""
+    value = g(f"io.{key}")
+    if not is_empty(value):
+        return bool(value)
+    if key in _MATRIX_SAVE_DEFAULTS:
+        global_flag = g("io.save_matrices")
+        if not is_empty(global_flag):
+            return bool(global_flag)
+        return _MATRIX_SAVE_DEFAULTS[key]
+    return bool(value)

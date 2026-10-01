@@ -150,11 +150,18 @@ def test_save_summary_reflects_flags(schema):
     m = _base(schema)
     lines = save_summary(m)
     text = "\n".join(lines)
-    assert "Global default (io.save_matrices): OFF" in text
-    # config_default.yaml defaults: save_source_matrices=1, save_acoustic_matrices=0
+    assert "Global default (io.save_matrices): unset" in text
+    # config_default.yaml leaves the matrix flags empty: built-in defaults
+    # save_source_matrices=1, save_acoustic_matrices=0 apply
     assert "✓ source matrices" in text
     assert "✗ acoustic matrices" in text
     assert "Debug diagnostics (simulation.debug): OFF" in text
+
+    # empty per-step flags inherit io.save_matrices
+    m.set("io.save_matrices", 1)
+    assert "✓ acoustic matrices" in "\n".join(save_summary(m))
+    m.set("io.save_matrices", 0)
+    assert "✗ source matrices" in "\n".join(save_summary(m))
 
     m.set("io.save_acoustic_matrices", 1)
     m.set("simulation.debug", 1)

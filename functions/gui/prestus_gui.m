@@ -234,18 +234,22 @@ end
         sp(gl, 25);
 
         sec(gl, 26, 'Matrix Saving');
-        note_lbl(gl, 27, 'Global flag is the fallback; individual flags take precedence when set.');
-        lbl(gl, 28, 1, 'Global save flag');
-        chk(gl, 28, 2, 'io.save_matrices', false, 'Global fallback: save all intermediate matrices');
+        note_lbl(gl, 27, 'Toggling "Save all" sets the individual flags below; they can then be adjusted.');
+        lbl(gl, 28, 1, 'Save all matrices');
+        h_save_all = chk(gl, 28, 2, 'io.save_matrices', false, 'Save all intermediate matrices');
 
         lbl(gl, 29, 1, 'Save source matrices');
-        chk(gl, 29, 2, 'io.save_source_matrices', true, 'kwave_source.mat (shared across variants)');
+        h_save_src = chk(gl, 29, 2, 'io.save_source_matrices', true, 'kwave_source.mat (shared across variants)');
 
         lbl(gl, 30, 1, 'Save acoustic matrices');
-        chk(gl, 30, 2, 'io.save_acoustic_matrices', false, 'sensor_data + kgrid + medium (large)');
+        h_save_ac = chk(gl, 30, 2, 'io.save_acoustic_matrices', false, 'sensor_data + kgrid + medium (large)');
 
         lbl(gl, 31, 1, 'Save thermal matrices');
-        chk(gl, 31, 2, 'io.save_thermal_matrices', true, 'heating_res.mat — temperature timeseries');
+        h_save_th = chk(gl, 31, 2, 'io.save_thermal_matrices', true, 'heating_res.mat — temperature timeseries');
+
+        % The GUI always writes every per-step flag, and per-step flags take
+        % precedence over io.save_matrices, so propagate the global toggle.
+        h_save_all.ValueChangedFcn = @(cb,~) set([h_save_src, h_save_ac, h_save_th], 'Value', cb.Value);
 
         lbl(gl, 32, 1, 'Save heating video');
         chk(gl, 32, 2, 'io.save_heatingvideo', false, 'Save MP4 of incremental heating');
@@ -2082,6 +2086,15 @@ end
         for i = 1:numel(keys)
             tag = strrep(keys{i}, '__', '.');
             set_widget(tag, flat.(keys{i}));
+        end
+        % Matrix-saving checkboxes show the effective value (per-step flag,
+        % else io.save_matrices, else built-in default), because the GUI
+        % writes every checkbox back as an explicit per-step flag.
+        if isfield(params, 'io')
+            save_flags = {'save_source_matrices', 'save_acoustic_matrices', 'save_thermal_matrices'};
+            for i = 1:numel(save_flags)
+                set_widget(['io.' save_flags{i}], should_save_output(params.io, save_flags{i}));
+            end
         end
         % XYZ array fields stored as separate _1/_2/_3 widgets
         xyz_tags = {'transducer.trans_pos', 'transducer.focus_pos', 'grid.default_dims', ...

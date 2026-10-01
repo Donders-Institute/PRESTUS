@@ -72,13 +72,14 @@ io:
   overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs.md#overwrite-behaviour
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
   # Intermediate matrix saving
-  # save_matrices is the global fallback: set to 0 to suppress all saves,
-  # set to 1 to enable all saves. Individual flags below take precedence
-  # when explicitly set, allowing fine-grained control per output type.
-  save_matrices: 0          # Global fallback for all intermediate matrix saves (0 = skip all)
-  save_source_matrices: 1   # kwave_source.mat — transducer source array; shared across variants
-  save_acoustic_matrices: 0 # Acoustic sensor_data + kgrid + kwave_medium + source (can be very large)
-  save_thermal_matrices: 1  # heating_res.mat — temperature timeseries and field maps
+  # save_matrices sets all intermediate matrix saves at once: 1 = save all, 0 = save none.
+  # A per-step flag below overrides it when set to 0 or 1; leave it empty ([]) to inherit
+  # save_matrices. When both are empty, the default in [brackets] applies.
+  # (Grid and medium caches follow the same rule via save_grid_cache / save_medium_cache [0].)
+  save_matrices: []           # Global switch for all intermediate matrices ([] = use per-step defaults)
+  save_source_matrices: []    # [1] kwave_source.mat — transducer source array; shared across variants
+  save_acoustic_matrices: []  # [0] Acoustic sensor_data + kgrid + kwave_medium + source (can be very large)
+  save_thermal_matrices: []   # [1] heating_res.mat — temperature timeseries and field maps
   save_heatingvideo: 0      # Save a video of incremental heating?
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)

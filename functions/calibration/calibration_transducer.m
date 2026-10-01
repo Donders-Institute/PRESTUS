@@ -427,10 +427,7 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % caller explicitly requested to keep them for debugging by setting
     % parameters.io.save_acoustic_matrices = 1 or save_matrices = 1.
     % =========================================================================
-    if ~isfield(parameters.io, 'save_acoustic_matrices') || ...
-            parameters.io.save_acoustic_matrices == 0 || ...
-            ~isfield(parameters.io, 'save_matrices') || ...
-            parameters.io.save_matrices == 0
+    if ~should_save_output(parameters.io, 'save_acoustic_matrices')
         cache_folder = fullfile(sim_param.io.outputs_folder, 'cache');
         if isfolder(cache_folder)
             rmdir(cache_folder, 's');

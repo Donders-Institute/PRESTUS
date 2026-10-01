@@ -6,7 +6,7 @@ function simnibs_t1_to_mni(parameters, is_layered, m2m_folder)
 % forces re-registration and 'never' skips an existing file.
 %
 % MNI output is controlled by parameters.io.save_MNI (default: true via
-% should_save_output; global fallback: parameters.io.save_matrices).
+% should_save_output; not affected by parameters.io.save_matrices).
 %
 % Use as:
 %   simnibs_t1_to_mni(parameters, is_layered, m2m_folder)

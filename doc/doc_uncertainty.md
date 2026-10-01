@@ -159,7 +159,7 @@ The built-in medium override configs live in `config/uncertainty/`:
 
 Each simulation variant writes its outputs into the shared `path.sim` output folder (or a subject subfolder), identified by `io.output_affix`:
 
-| File pattern | Description | Kept when `save_matrices = 0` |
+| File pattern | Description | Kept when `save_matrices` is `0` or empty |
 |---|---|---|
 | `sub-NNN_layered_output_table<affix>.csv` | Acoustic and thermal metrics table | yes |
 | `sub-NNN_layered_report<affix>.html` | Per-variant simulation report | yes |
@@ -171,7 +171,7 @@ Each simulation variant writes its outputs into the shared `path.sim` output fol
 | `debug/sub-NNN_after_rotating_and_scaling.mat` | Intermediate head model (debug) | **removed** |
 | `debug/sub-NNN_layered_after_cropping_and_smoothing.mat` | Intermediate skull grid (debug) | **removed** |
 
-> **Automatic cleanup.** When `parameters.io.save_matrices = 0`, the pipeline deletes the files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, called automatically on both the MATLAB and HPC platforms. Cleanup only runs after stage 5 completes, so a failed run can be resumed beforehand.
+> **Automatic cleanup.** When `parameters.io.save_matrices` is `0` or empty (the default), the pipeline deletes the files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, called automatically on both the MATLAB and HPC platforms. Cleanup only runs after stage 5 completes, so a failed run can be resumed beforehand.
 
 The uncertainty report is written as:
 
