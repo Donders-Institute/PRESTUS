@@ -148,6 +148,7 @@ if abs(z_highlight_mm - z_focus_mm) > res_mm
     xline(ax1, z_highlight_mm, '--r', 'LineWidth', 1.2, 'Label', 'peak');
 end
 hold(ax1, 'off');
+stretch_tissue_bands(ax1);
 ylabel(ax1, 'Pressure (kPa)');
 title(ax1, sprintf('Axial profile — sub-%03d  %s%s', ...
     parameters.subject_id, parameters.simulation.medium, ...
@@ -176,6 +177,7 @@ if abs(z_highlight_mm - z_focus_mm) > res_mm
     xline(ax2, z_highlight_mm, '--r', 'LineWidth', 1.2);
 end
 hold(ax2, 'off');
+stretch_tissue_bands(ax2);
 xlabel(ax2, 'Depth from exit plane (mm)');
 ylabel(ax2, 'I_{sppa} (W/cm²)');
 xlim(ax2, [min(z_mm) max(z_mm)]);
@@ -264,22 +266,25 @@ function [labels, starts, lens] = tissue_runs(mask_profile)
     d      = [true; diff(mask_profile) ~= 0; true];
     starts = find(d(1:end-1));
     ends   = find(d(2:end));
-    lens   = ends - starts;
+    lens   = ends - starts + 1;
     labels = mask_profile(starts);
 end
 
 % -------------------------------------------------------------------------
 function draw_tissue_bands(ax, run_labels, run_start, run_len, z_mm, Nz, ...
                             medium_labels, layer_colors, default_color)
-% Draw background patch bands for each tissue run.
-    ylims = [-Inf Inf];   % will be reset after data is plotted; use patch ydata trick
+% Draw background patch bands for each tissue run (y extent set by
+% stretch_tissue_bands once the data are plotted).
     for r = 1:numel(run_labels)
         lbl  = run_labels(r);
         iz1  = run_start(r);
         iz2  = run_start(r) + run_len(r) - 1;
         iz2  = min(iz2, Nz);
-        z1   = z_mm(iz1);
-        z2   = z_mm(iz2);
+        % band edges half a voxel beyond the run's first/last sample (z_mm
+        % may run either way), so neighbouring bands meet without a gap
+        dz   = (z_mm(end) - z_mm(1)) / max(Nz - 1, 1);
+        z1   = z_mm(iz1) - dz / 2;
+        z2   = z_mm(iz2) + dz / 2;
         if lbl >= 1 && lbl <= numel(medium_labels)
             tname = medium_labels{lbl};
         else
@@ -294,7 +299,16 @@ function draw_tissue_bands(ax, run_labels, run_start, run_len, z_mm, Nz, ...
             'EdgeColor', 'none', 'FaceAlpha', 0.45, ...
             'Tag', tname, 'YLimInclude', 'off');
     end
-    ylims = ylim(ax);   %#ok<NASGU>  y-extent updated by data plot after this call
+end
+
+% -------------------------------------------------------------------------
+function stretch_tissue_bands(ax)
+% Extend the tissue bands over the full y-range of the plotted data. The bands
+% are drawn first with a placeholder extent and excluded from autoscaling.
+    yl = ylim(ax);
+    ylim(ax, yl);
+    bands = findobj(ax, 'Type', 'patch', '-not', 'Tag', '');
+    set(bands, 'YData', [yl(1); yl(1); yl(2); yl(2)]);
 end
 
 % -------------------------------------------------------------------------
