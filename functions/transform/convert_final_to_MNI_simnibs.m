@@ -153,11 +153,13 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
     % --- Load warp field (shared across all images) ---
     warp_info = niftiinfo(fullfile(m2m_folder, 'toMNI', 'MNI2Conform_nonl.nii.gz'));
     warp_data = single(niftiread(warp_info));   % [Wx Wy Wz 3], subject world coords (mm)
-    warp_A    = warp_info.Transform.T';         % 4×4: warp vox (1-based) → world
+    % niftiinfo's Transform.T maps 0-based voxel indices to world; the
+    % 1-based MATLAB grids below are shifted by one on the way in and out.
+    warp_A    = warp_info.Transform.T';         % 4×4: warp vox (0-based) → world
 
     % --- Reference output space: final_tissues_MNI defines the MNI grid ---
     ref_info = niftiinfo(fullfile(m2m_folder, 'toMNI', 'final_tissues_MNI.nii.gz'));
-    ref_A    = ref_info.Transform.T';           % 4×4: MNI vox (1-based) → MNI world
+    ref_A    = ref_info.Transform.T';           % 4×4: MNI vox (0-based) → MNI world
     ref_dims = ref_info.ImageSize(1:3);
 
     % --- Build subject-world-coordinate lookup for every MNI output voxel ---
@@ -165,13 +167,14 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
     N = numel(xi);
 
     % MNI vox → MNI world
-    mni_h = [xi(:)'; yi(:)'; zi(:)'; ones(1, N, 'single')];
+    mni_h = [xi(:)' - 1; yi(:)' - 1; zi(:)' - 1; ones(1, N, 'single')];
     clear xi yi zi
     mni_world = ref_A * double(mni_h);
     clear mni_h
 
     % MNI world → warp-field vox
-    warp_vox = warp_A \ mni_world;             % 4×N
+    warp_vox = warp_A \ mni_world;             % 4×N, 0-based
+    warp_vox(1:3, :) = warp_vox(1:3, :) + 1;
     clear mni_world
 
     % Interpolate warp field → subject world coords (NaN outside warp FOV)
@@ -209,7 +212,8 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
         in_dims = in_info.ImageSize(1:3);
 
         % Subject world → input voxel coords
-        in_vox = in_A \ sw_h;                  % 4×N
+        in_vox = in_A \ sw_h;                  % 4×N, 0-based
+        in_vox(1:3, :) = in_vox(1:3, :) + 1;
 
         px = reshape(in_vox(1,:), ref_dims);
         py = reshape(in_vox(2,:), ref_dims);

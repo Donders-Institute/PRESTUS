@@ -143,6 +143,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % Planned positions in T1 voxels, kept for the targeting analysis: the
     % grid stage replaces transducer(i).trans_pos/focus_pos with grid indices.
+    % For a non-RAS+ T1, GRID_TISSUE_SETUP re-records them in the reoriented grid.
     parameters.state.planned_trans_t1_vox = planned_positions(parameters, 'trans_pos');
     parameters.state.planned_focus_t1_vox = planned_positions(parameters, 'focus_pos');
 

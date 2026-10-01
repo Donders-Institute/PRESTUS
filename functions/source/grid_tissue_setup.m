@@ -52,6 +52,18 @@ if contains(parameters.simulation.medium, {'layered'})
         planimg.t1_header, planimg.transf, planimg.inv_transf, parameters.transducer] = ...
         preproc_head(parameters);
 
+    % Planned positions for TARGETING_ANALYSIS must refer to the same (RAS+)
+    % T1 grid as planimg.t1_header, which the T1w output NIfTIs carry.
+    if isfield(parameters, 'state')
+        for fn = {'trans_pos', 'focus_pos'}
+            f = ['planned_' strrep(fn{1}, '_pos', '') '_t1_vox'];
+            if isfield(parameters.state, f) && ~isempty(parameters.state.(f))
+                parameters.state.(f) = cell2mat(arrayfun(@(t) double(t.(fn{1})(:)'), ...
+                    parameters.transducer(:), 'UniformOutput', false));
+            end
+        end
+    end
+
     % update present layers (following medium mask creation)
     [parameters] = check_layers(parameters, segmentation);
 

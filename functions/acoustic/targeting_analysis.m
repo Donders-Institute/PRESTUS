@@ -38,7 +38,8 @@ function tgt = targeting_analysis(parameters, options)
 %   parameters - PRESTUS config of the run (after path_log_setup). The planned
 %                T1 positions are read from parameters.state.planned_focus_t1_vox
 %                / planned_trans_t1_vox, recorded by PRESTUS_PIPELINE before
-%                the grid stage.
+%                the grid stage (in the RAS+ T1 grid of the T1w outputs; see
+%                GRID_TISSUE_SETUP).
 %   options    - name-value pairs:
 %     'PlannedFocus' [N×3] planned focus per transducer [T1 voxels, 1-based]
 %     'PlannedTrans' [N×3] planned transducer position [T1 voxels, 1-based]
