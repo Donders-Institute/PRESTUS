@@ -11,6 +11,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_simulation`                   | Set up acoustic simulation                                                                      |
 | `acoustic_wrapper`                      | Set up acoustic simulation                                                                      |
+| `plot_axial_profile`                    | Plot and save pressure and intensity along the beam axis (depth from the exit plane) with tissue shading and the free-water O'Neil / k-Wave baseline intensity of the simulated transducer. |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 
 #### CALIBRATION
@@ -114,9 +115,11 @@ The following documents the functions provided in PRESTUS.
 | `predict_outputs`                       | Predict the pipeline mode and the CSV/HTML files a run will write, before submission (read-only). |
 | `print_predicted_outputs`               | Print `predict_outputs`' plan to the console. |
 | `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
+| `should_save_output`                    | Decide whether an output is saved: per-step `io` flag, else `io.save_matrices` (matrix outputs), else the built-in default. |
 | `log_timer`                             | Start or stop logs for benchmarking time, RAM, and disk space use.                              |
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region.                                       |
 | `read_ini_file`                         | Read an INI file into MATLAB                                                                    |
+| `sample_beam_axis`                      | Interpolate a 2D/3D field along the beam axis from the bowl apex to the grid edge (distances from the apex). |
 | `round_if_integer`                      | Rounds values if they are sufficiently close to integers; otherwise raises an error.            |
 | `simnibs_version`                       | Get SimNIBS version of segmentation from HTML, print, allocate to `parameters`.                 |
 | `subset_fields`                         | Copy designated structure field to new structure.                                               |

@@ -551,8 +551,20 @@ end
     % with tissue-layer shading. Saves PNG + CSV alongside the overlay plots.
     if numel(parameters.grid.dims) == 3 && ~isempty(medium_masks)
         try
+            % Free-water references at the plotted drive level; not for combined
+            % (per-source scaled) fields or BabelBrain (own drive scaling).
+            ref_opts = struct('IsppaScale', 1, 'FreefieldAxial', struct(), ...
+                'FreeWater', ~isfield(provenance, 'combination_mode') && ...
+                ~(isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain')));
+            if isfield(sensor_data, 'isppa_scale_p')
+                ref_opts.IsppaScale = double(sensor_data.isppa_scale_p)^2;
+            end
+            if isfield(provenance, 'freefield_axial') && ~isempty(provenance.freefield_axial)
+                ref_opts.FreefieldAxial = provenance.freefield_axial(1);
+            end
+            ref_args = namedargs2cell(ref_opts);
             plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
-                parameters, exit_plane_pos, focus_pos, highlighted_pos);
+                parameters, exit_plane_pos, focus_pos, highlighted_pos, ref_args{:});
         catch ME
             warning('acoustic_analysis:axialProfile', ...
                 'plot_axial_profile failed: %s', ME.message);

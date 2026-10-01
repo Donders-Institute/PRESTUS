@@ -361,6 +361,8 @@ Rather than scaling `elem_p_amp` before the acoustic simulation, PRESTUS uses a 
 
 Runs a fast homogeneous water simulation at the current `elem_p_amp` (after source setup, before the main acoustic simulation). The peak free-water ISPPA is computed from the sensor output and stored as `acoustic_provenance.freefield_isppa_wcm2` alongside the acoustic cache file. The free-water intensity along each transducer's beam axis (bowl apex → grid edge, distances from the apex) is stored as `acoustic_provenance.freefield_axial`. Combined async / FOV caches drop it, because the combined field is scaled per source.
 
+The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3-D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical O'Neil profile for a single annular transducer (always). Both are drawn at the drive level of the plotted field (after post-hoc scaling, below). They are omitted for combined async / FOV fields and the BabelBrain backend.
+
 This step is **disabled by default** (`modules.run_water_baseline = 0`). Enable it when ISPPA scaling provenance is needed. It adds a few minutes on a typical workstation (no tissue mapping, uses the configured `code_type`):
 
 ```yaml

@@ -1,5 +1,5 @@
 function plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
-                             parameters, exitplane_pos, focus_pos, highlighted_pos)
+                             parameters, exitplane_pos, focus_pos, highlighted_pos, options)
 % PLOT_AXIAL_PROFILE  Save axial pressure/intensity profile with tissue-layer shading
 %
 % Extracts the 1D profile along the beam axis (z-dimension) through the
@@ -13,9 +13,20 @@ function plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
 % voxel position, which is the bowl apex shifted toward the focus by the bowl
 % depth (sagitta = curv_radius_mm - dist_geom_ep_mm).
 %
+% The intensity panel also shows the free-water on-axis intensity of the
+% transducer settings used in the simulation, as a check of the realised
+% focal intensity and depth against the calibrated transducer:
+%   - O'Neil analytical model (single annular transducer);
+%   - k-Wave free-water profile from WATER_BASELINE, when the baseline ran
+%     (options.FreefieldAxial).
+% Both are drawn at the drive level of the plotted field (options.IsppaScale)
+% and placed on the plot's depth axis via their distance from the bowl apex,
+% which assumes the beam runs along grid z (as the simulated profile does).
+%
 % Use as:
 %   plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
 %                      parameters, exitplane_pos, focus_pos, highlighted_pos)
+%   plot_axial_profile(..., 'IsppaScale', s, 'FreefieldAxial', ff, 'FreeWater', tf)
 %
 % Input:
 %   acoustic_Ipa      - [Nx×Ny×Nz] Isppa map [W/cm²]
@@ -25,6 +36,18 @@ function plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
 %   exitplane_pos     - [1×3] transducer exit-plane voxel position (axis origin)
 %   focus_pos         - [1×3] intended focus voxel position
 %   highlighted_pos   - [1×3] actual peak intensity voxel position
+%
+% Options (name-value):
+%   IsppaScale     - intensity factor applied to the field after the
+%                    simulation (APPLY_ISPPA_SCALING: scale_p^2); applied to
+%                    the free-water references (default 1)
+%   FreefieldAxial - struct with axial_distance_bowl [mm] and axial_intensity
+%                    [W/cm²] from WATER_BASELINE (default: none)
+%   FreeWater      - draw the free-water references at all (default true);
+%                    false for fields whose drive level the references do not
+%                    match (combined async/FOV fields, BabelBrain)
+%
+% See also: ACOUSTIC_ANALYSIS, WATER_BASELINE, FOCUSEDANNULUSONEIL
 
 arguments
     acoustic_Ipa      (:,:,:) {mustBeNumeric}
@@ -34,6 +57,9 @@ arguments
     exitplane_pos     (1,3)   {mustBeNumeric}
     focus_pos         (1,3)   {mustBeNumeric}
     highlighted_pos   (1,3)   {mustBeNumeric}
+    options.IsppaScale     (1,1) {mustBeNumeric, mustBePositive} = 1
+    options.FreefieldAxial (1,1) struct = struct()
+    options.FreeWater      (1,1) logical = true
 end
 
 res_mm = parameters.grid.resolution_mm;
@@ -63,6 +89,9 @@ z_mm   = prop_dir * (z_vox - exitplane_pos(3)) * res_mm;   % mm from exit plane
 z_focus_mm       = prop_dir * (focus_pos(3)       - exitplane_pos(3)) * res_mm;
 z_highlight_mm   = prop_dir * (highlighted_pos(3) - exitplane_pos(3)) * res_mm;
 
+%% Free-water references (calibrated transducer settings)
+[oneil_profile, kwave_profile] = free_water_references(parameters, z_mm, options);
+
 %% Save CSV
 medium_labels = fieldnames(parameters.medium_properties);
 tissue_names  = repmat({''}, Nz, 1);
@@ -78,6 +107,12 @@ end
 T = table(z_mm, pressure_profile, intensity_profile, tissue_names, ...
     'VariableNames', {'depth_from_exit_plane_mm', 'pressure_Pa', ...
                       'intensity_Wcm2', 'tissue'});
+if ~isempty(oneil_profile)
+    T.freewater_oneil_Wcm2 = oneil_profile;
+end
+if ~isempty(kwave_profile)
+    T.freewater_kwave_Wcm2 = kwave_profile;
+end
 
 csv_path = fullfile(parameters.io.dir_img, ...
     sprintf('sub-%03d_%s_axial_profile%s.csv', ...
@@ -126,7 +161,16 @@ ax2 = subplot(2,1,2);
 draw_tissue_bands(ax2, run_labels, run_start, run_len, z_mm, Nz, ...
     medium_labels, layer_colors, default_color);
 hold(ax2, 'on');
-plot(ax2, z_mm, intensity_profile, 'k-', 'LineWidth', 1.5);
+h_sim = plot(ax2, z_mm, intensity_profile, 'k-', 'LineWidth', 1.5, 'DisplayName', 'simulated');
+ref_handles = gobjects(1, 0);
+if ~isempty(oneil_profile)
+    ref_handles(end+1) = plot(ax2, z_mm, oneil_profile, '--', 'LineWidth', 1.2, ...
+        'Color', [0.2 0.2 0.2], 'DisplayName', 'free water (O''Neil)');
+end
+if ~isempty(kwave_profile)
+    ref_handles(end+1) = plot(ax2, z_mm, kwave_profile, '-.', 'LineWidth', 1.2, ...
+        'Color', [0.85 0.45 0], 'DisplayName', 'free water (k-Wave baseline)');
+end
 xline(ax2, z_focus_mm,     '--b', 'LineWidth', 1.2);
 if abs(z_highlight_mm - z_focus_mm) > res_mm
     xline(ax2, z_highlight_mm, '--r', 'LineWidth', 1.2);
@@ -140,6 +184,9 @@ box(ax2, 'on');
 
 % Shared legend for tissue layers
 legend_handles = build_layer_legend(run_labels, medium_labels, layer_colors, default_color);
+if ~isempty(ref_handles)
+    legend_handles = [h_sim, ref_handles, legend_handles];
+end
 if ~isempty(legend_handles)
     legend(ax2, legend_handles, 'Location', 'northeast', 'FontSize', 7);
 end
@@ -155,6 +202,60 @@ close(h);
 
 fprintf('[plot_axial_profile] Saved: %s\n', png_path);
 fprintf('[plot_axial_profile] Saved: %s\n', csv_path);
+end
+
+% -------------------------------------------------------------------------
+function [oneil_profile, kwave_profile] = free_water_references(parameters, z_mm, options)
+% Free-water on-axis intensity [W/cm²] at the plot's depths (mm from the exit
+% plane); [] when unavailable. Both references are functions of the distance
+% from the bowl apex, which lies a bowl depth behind the exit plane.
+    oneil_profile = [];
+    kwave_profile = [];
+    if ~options.FreeWater
+        return;
+    end
+    tr = parameters.transducer(1);
+    bowl_depth_mm = 0;
+    if isfield(tr, tr.type) && isfield(tr.(tr.type), 'curv_radius_mm') && ...
+            isfield(tr.(tr.type), 'dist_geom_ep_mm')
+        bowl_depth_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
+    end
+    d_bowl_mm = z_mm + bowl_depth_mm;
+
+    % O'Neil model of the simulated annular transducer (elem_p_amp, phases).
+    % A coherent multi-transducer field is not one transducer's free-water field.
+    if numel(parameters.transducer) == 1 && strcmp(tr.type, 'annular') && ...
+            isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'water')
+        try
+            an  = tr.annular;
+            rho = parameters.medium_properties.water.density;
+            c   = parameters.medium_properties.water.sound_speed;
+            if isfield(an, 'elem_phase_rad') && ~isempty(an.elem_phase_rad)
+                phase_rad = an.elem_phase_rad(:)';
+            else
+                phase_rad = deg2rad(an.elem_phase_deg(:)');
+            end
+            vel = an.elem_p_amp(:)' / (rho * c);
+            if isscalar(vel); vel = repmat(vel, 1, an.elem_n); end
+            in_front = d_bowl_mm > 0;
+            p_ref = focusedAnnulusONeil(an.curv_radius_mm / 1e3, ...
+                [an.elem_id_mm(:)'; an.elem_od_mm(:)'] / 1e3, vel, phase_rad, ...
+                tr.freq_hz, c, rho, d_bowl_mm(in_front)' * 1e-3);
+            oneil_profile = NaN(size(z_mm));
+            oneil_profile(in_front) = options.IsppaScale * p_ref(:).^2 / (2 * c * rho) * 1e-4;
+        catch ME
+            warning('plot_axial_profile:oneil', ...
+                'plot_axial_profile: O''Neil free-water reference not computed (%s).', ME.message);
+            oneil_profile = [];
+        end
+    end
+
+    % k-Wave free-water profile from the baseline run
+    ff = options.FreefieldAxial;
+    if isfield(ff, 'axial_intensity') && numel(ff.axial_intensity) > 1
+        kwave_profile = options.IsppaScale * interp1(ff.axial_distance_bowl(:), ...
+            ff.axial_intensity(:), d_bowl_mm, 'linear', NaN);
+    end
 end
 
 % -------------------------------------------------------------------------
