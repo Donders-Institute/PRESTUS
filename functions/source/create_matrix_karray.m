@@ -3,11 +3,14 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 %
 % For each element in elem_pos_m, computes the rotation matrix that aligns
 % the default element normal [0;0;1] with the vector from the element to
-% the natural focus (defined by the radius of curvature along Z). The
-% per-element Euler angles (ZYX) are passed to kWaveArray.addRectElement,
+% the natural focus (defined by the radius of curvature along Z; for a
+% Clover setup, the natural focus of the element's leaf). The per-element
+% Euler angles (ZYX) are passed to kWaveArray.addRectElement,
 % addDiscElement, or addBowlElement depending on tr.matrix.elem_shape.
 % Phase delays for steering to the requested focus_pos are also computed
-% and stored in tr.matrix.elem_phase_rad.
+% and stored in tr.matrix.elem_phase_rad, unless calibrated phases are
+% given in tr.matrix.elem_phase_override_deg (one value per element), which
+% then replace the geometric steering phases.
 %
 % Use as:
 %   [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
@@ -19,7 +22,9 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 %                and simulation.debug
 %   tr         - transducer geometry: tr.matrix.elem_shape, tr.matrix.curv_radius_mm [mm],
 %                tr.matrix.elem_height_mm [mm], tr.matrix.elem_width_mm [mm],
-%                tr.matrix.elem_p_amp, tr.freq_hz [Hz]
+%                tr.matrix.elem_p_amp, tr.freq_hz [Hz]; optional
+%                tr.matrix.elem_diameter_mm [mm] (disc/bowl aperture, see
+%                MATRIX_ELEM_DIAMETER) and tr.matrix.elem_phase_override_deg [deg]
 %   elem_pos_m - [3xN] element positions [m]
 %   trans_pos  - [1x3] transducer reference position (grid indices)
 %   focus_pos  - [1x3] desired focus position (grid indices)
@@ -57,8 +62,9 @@ end
     natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
     % Apply Clover setup if requested
+    aim_pos_m = repmat(natural_focus_pos_m, 1, size(elem_pos_m, 2));
     if tr.matrix.is_clover_setup    
-        elem_pos_m = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
+        [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
     end
     
     tr.matrix.elem_n = size(elem_pos_m, 2);
@@ -77,13 +83,19 @@ end
     ty = zeros(1, tr.matrix.elem_n);
     tz = zeros(1, tr.matrix.elem_n);
 
+    % Aperture diameter of circular elements (same for every element)
+    if ismember(lower(tr.matrix.elem_shape), {'disc', 'bowl'})
+        elem_diameter_m = matrix_elem_diameter(tr.matrix);
+    end
+
     % Loop over each element and add it to karray
     for ind = 1:tr.matrix.elem_n
         el_pos_m_i = elem_pos_m(:, ind);
 
         % Vector from element to natural focus to position elements to
         % natural focus
-        vec_to_nat_focus = natural_focus_pos_m - el_pos_m_i;
+        aim_i = aim_pos_m(:, ind);
+        vec_to_nat_focus = aim_i - el_pos_m_i;
         norm_vec = vec_to_nat_focus / norm(vec_to_nat_focus);
         scaled_vectors(:, ind) = vec_to_nat_focus;
 
@@ -114,34 +126,32 @@ end
                 karray.addRectElement(el_pos_m_i, elem_w_m, elem_h_m, [roll, pitch, yaw]);
 
             case 'disc'
-                % Disc with same area as rectangular element
-                diameter = sqrt(elem_h_m * elem_w_m * 4 / pi);
-                karray.addDiscElement(el_pos_m_i, diameter, natural_focus_pos_m);
+                % Disc with same area as rectangular element (or elem_diameter_mm)
+                karray.addDiscElement(el_pos_m_i, elem_diameter_m, aim_i);
 
             case 'bowl'
+                % Spherical cap with same area as rectangular element (or elem_diameter_mm)
                 r_c = tr.matrix.curv_radius_mm / 1e3;
-                A_target = elem_h_m * elem_w_m;
-                a_min = 0.001; % Lower bound of aperture radius (in m)
-                a_max = r_c * 0.999; % Slightly less than full bowl radius
-
-                
-                % Define the function to solve: A_cap(a) - A_target = 0
-                area_diff = @(a) 2*pi*r_c*(r_c - sqrt(r_c^2 - a^2)) - A_target;
-
-                % Check if the function changes sign in the interval
-                if sign(area_diff(a_min)) == sign(area_diff(a_max))
-                    error('No sign change in interval: cannot find bowl diameter. Possibly A_target is out of bounds.');
-                end
-
-                a_solution = fzero(area_diff, [a_min, a_max]);
-                diameter = 2 * a_solution;
-                karray.addBowlElement(el_pos_m_i, r_c, diameter, natural_focus_pos_m);
+                karray.addBowlElement(el_pos_m_i, r_c, elem_diameter_m, aim_i);
         end
 
         % Calculate phase delay based on set focus
         distance = sqrt((el_pos_m_i(1) - focus_pos_m(1))^2 + (el_pos_m_i(2) - focus_pos_m(2))^2 + (el_pos_m_i(3) - focus_pos_m(3))^2);
 
         elem_phase_rad(ind) = mod(k * distance, 2 * pi);
+    end
+
+    % Calibrated phases (e.g. from hydrophone characterisation) replace the
+    % geometric steering phases when provided
+    if isfield(tr.matrix, 'elem_phase_override_deg') && ~isempty(tr.matrix.elem_phase_override_deg)
+        override_deg = tr.matrix.elem_phase_override_deg(:)';
+        if numel(override_deg) ~= tr.matrix.elem_n
+            error('create_matrix_karray:phaseOverrideSize', ...
+                'elem_phase_override_deg has %d values but the matrix array has %d elements.', ...
+                numel(override_deg), tr.matrix.elem_n);
+        end
+        fprintf('Matrix transducer: using elem_phase_override_deg instead of geometric steering phases.\n');
+        elem_phase_rad = mod(deg2rad(override_deg), 2 * pi);
     end
 
     tr.matrix.elem_phase_rad = elem_phase_rad;

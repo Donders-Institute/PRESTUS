@@ -227,6 +227,8 @@ transducer:
     elem_shape: []        # 'rect', 'disc', or 'bowl' - physical shape of each element
     elem_height_mm: []    # Element height [mm]
     elem_width_mm: []     # Element width [mm]
+    elem_diameter_mm: []  # Aperture diameter of 'disc'/'bowl' elements [mm]; [] = equal area to width x height
+    elem_phase_override_deg: [] # Calibrated per-element phases [deg] replacing geometric steering; [] = steer geometrically to focus_pos
     outer_diameter_mm: [] # Outer diameter of the transducer [mm]
     depth_mm: []          # Depth of transducer used for visualization purposes [mm]
     is_curved: []         # true if transducer has a curved (spherical) surface, false if flat
@@ -236,8 +238,10 @@ transducer:
     # Optional Clover multi-aperture configuration
     is_clover_setup: []  # true to enable Clover replication
     clover:
-      n_leaves: []       # Number of leaves (1–3)
+      n_leaves: []       # Number of leaves (>= 1)
       ROC_parent: []     # Radius of curvature of parent setup [mm]
+      az_sep_deg: []     # Azimuthal separation between adjacent leaves [deg]; [] = 360 / n_leaves
+      elevation_deg: []  # Leaf tilt from the parent axis [deg]; [] = smallest tilt without overlap (0 for one leaf)
 
     # --------------------------
     # Grid definition

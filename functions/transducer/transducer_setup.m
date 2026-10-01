@@ -98,8 +98,9 @@ function [transducer_mask, source_label, tr] = ...
             natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
 
             % Apply Clover setup if requested
+            aim_pos_m = repmat(natural_focus_pos_m, 1, size(elem_pos_m, 2));
             if isfield(tr.matrix, 'is_clover_setup') && isequal(tr.matrix.is_clover_setup, true)
-                elem_pos_m = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
+                [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
             end
 
             tr.matrix.elem_n = size(elem_pos_m, 2);
@@ -107,33 +108,21 @@ function [transducer_mask, source_label, tr] = ...
             % Convert to grid units
             elem_pos_grid = round(elem_pos_m * 1e3 / grid_res_mm);
 
-            natural_focus_pos_grid = round(natural_focus_pos_m * 1e3 / grid_res_mm);
+            aim_pos_grid = round(aim_pos_m * 1e3 / grid_res_mm);
+
+            % Every element is drawn as a bowl of equal area (or of
+            % elem_diameter_mm) in the mask, whatever its elem_shape
+            mask_elem = tr.matrix;
+            mask_elem.elem_shape = 'bowl';
+            r_c = tr.matrix.curv_radius_mm / 1e3;
+            r_c_grid = r_c * 1e3 / grid_res_mm;
+            diameter_grid = matrix_elem_diameter(mask_elem) * 1e3 / grid_res_mm;
 
             % Loop through each transducer element to create its geometry
             for el_i = 1:tr.matrix.elem_n
                 el_pos_grid_i = elem_pos_grid(:, el_i);
 
-                r_c = tr.matrix.curv_radius_mm / 1e3;
-                A_target = tr.matrix.elem_height_mm * tr.matrix.elem_width_mm * 1e-6;   % [m²], as r_c
-                a_min = 0.001; % Lower bound of aperture radius (in m)
-                a_max = r_c * 0.999; % Slightly less than full bowl radius
-
-                % Define the function to solve: A_cap(a) - A_target = 0
-                area_diff = @(a) 2*pi*r_c*(r_c - sqrt(r_c^2 - a^2)) - A_target;
-
-                % Check if the function changes sign in the interval
-                if sign(area_diff(a_min)) == sign(area_diff(a_max))
-                    error('No sign change in interval: cannot find bowl diameter. Possibly A_target is out of bounds.');
-                end
-
-                a_solution = fzero(area_diff, [a_min, a_max]);
-                diameter = 2 * a_solution;
-
-                % Convert to grid dimensions
-                r_c_grid = r_c * 1e3 / grid_res_mm;
-                diameter_grid = diameter * 1e3 / grid_res_mm;
-
-                bowl = makeBowl(grid_dims, el_pos_grid_i, r_c_grid, diameter_grid, natural_focus_pos_grid);
+                bowl = makeBowl(grid_dims, el_pos_grid_i, r_c_grid, diameter_grid, aim_pos_grid(:, el_i));
 
                 % Add the current element's bowl geometry to the binary mask
                 transducer_mask = transducer_mask + bowl;

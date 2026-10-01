@@ -56,6 +56,17 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     assert(isfield(matrix_tr, 'elem_width_mm'), ...
         'Transducer %i; Missing elem_width parameter. Please specify to define width of each element.', t_i);
 
+    if isfield(matrix_tr, 'elem_diameter_mm') && ~isempty(matrix_tr.elem_diameter_mm)
+        assert(isscalar(matrix_tr.elem_diameter_mm) && matrix_tr.elem_diameter_mm > 0, ...
+            'Transducer %i; elem_diameter_mm must be a positive scalar.', t_i);
+    end
+
+    if isfield(matrix_tr, 'elem_phase_override_deg') && ~isempty(matrix_tr.elem_phase_override_deg)
+        assert(isnumeric(matrix_tr.elem_phase_override_deg) && isvector(matrix_tr.elem_phase_override_deg) && ...
+            all(isfinite(matrix_tr.elem_phase_override_deg)), ...
+            'Transducer %i; elem_phase_override_deg must be a numeric vector (one phase per element) [deg].', t_i);
+    end
+
     % Validate outer diameter
     assert(isfield(matrix_tr, 'outer_diameter_mm'), ...
         'Transducer %i; Missing outer_diameter_mm parameter for matrix array. Please specify to define overall size.', t_i);
@@ -110,6 +121,21 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
             assert(isfield(matrix_tr.clover, 'ROC_parent'), ...
                 'Transducer %i; Missing additional information of Clover setup. Define ROC of parent.', t_i);
+
+            n_leaves = matrix_tr.clover.n_leaves;
+            assert(isscalar(n_leaves) && n_leaves >= 1 && n_leaves == round(n_leaves), ...
+                'Transducer %i; clover.n_leaves must be a positive integer.', t_i);
+
+            if isfield(matrix_tr.clover, 'az_sep_deg') && ~isempty(matrix_tr.clover.az_sep_deg)
+                assert(isscalar(matrix_tr.clover.az_sep_deg) && matrix_tr.clover.az_sep_deg > 0 && ...
+                    matrix_tr.clover.az_sep_deg * n_leaves <= 360 + 1e-9, ...
+                    'Transducer %i; clover.az_sep_deg must be > 0 and n_leaves * az_sep_deg <= 360.', t_i);
+            end
+            if isfield(matrix_tr.clover, 'elevation_deg') && ~isempty(matrix_tr.clover.elevation_deg)
+                assert(isscalar(matrix_tr.clover.elevation_deg) && ...
+                    matrix_tr.clover.elevation_deg >= 0 && matrix_tr.clover.elevation_deg < 90, ...
+                    'Transducer %i; clover.elevation_deg must be in [0, 90).', t_i);
+            end
         end
     else
         % Clover array configuration not provided; skip Clover setup

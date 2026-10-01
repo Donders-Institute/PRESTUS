@@ -29,8 +29,7 @@ Amplitude of the acoustic source (in Pa). [**CALIBRATED**]
 `transducer.annular.elem_phase_deg`  
 Phase of the acoustic source per element (in degrees). [**CALIBRATED**]
 
-For **matrix arrays**, phase delays are currently **not provided as input**.  
-Instead, steering is performed automatically by computing the phase for each element based on `transducer.trans_pos` and `transducer.focus_pos`.
+For **matrix arrays**, steering is by default performed automatically by computing the phase for each element based on `transducer.trans_pos` and `transducer.focus_pos`. Calibrated phases (one per element) can replace the geometric phases via `transducer.matrix.elem_phase_override_deg`.
 
 See [transducer calibration](doc_calibration.md).
 
@@ -83,7 +82,7 @@ Use annular arrays when your hardware is a single-focus or multi-ring bowl trans
 A matrix array consists of many small elements distributed across a curved or flat surface. Because each element can be driven with an independent phase delay, the acoustic focus can be steered electronically in three dimensions without moving the transducer.
 
 **Modeling in PRESTUS:**  
-Element positions are either defined analytically (Fibonacci, Fermat spiral, or rectangular grid) or loaded from a coordinate file. Element shape can be rectangular (`rect`), circular (`disc`), or curved (`bowl`). Phase delays are computed automatically from the geometric relationship between each element, `trans_pos`, and `focus_pos` — no manual phase input is required. For curved arrays, `curv_radius_mm` and `dist_geom_ep_mm` define the bowl geometry used for visualization and offset calculations. An optional Clover configuration replicates the array into a multi-aperture (up to three-leaf) arrangement.
+Element positions are either defined analytically (Fibonacci, Fermat spiral, or rectangular grid) or loaded from a coordinate file. Element shape can be rectangular (`rect`), circular (`disc`), or curved (`bowl`). Phase delays are computed automatically from the geometric relationship between each element, `trans_pos`, and `focus_pos` — no manual phase input is required; `elem_phase_override_deg` replaces them with calibrated phases. The aperture of `disc`/`bowl` elements is equal-area to `elem_width_mm` × `elem_height_mm` unless `elem_diameter_mm` is set. For curved arrays, `curv_radius_mm` and `dist_geom_ep_mm` define the bowl geometry used for visualization and offset calculations. An optional Clover configuration replicates the array into a multi-aperture arrangement of `n_leaves` leaves on a parent bowl (`ROC_parent`), `az_sep_deg` apart (default `360 / n_leaves`) and tilted by `elevation_deg` (default: the smallest non-overlapping tilt).
 
 **When to use:**  
 Use matrix arrays when your hardware supports electronic steering (e.g., a phased array system) or when you want to simulate volumetric targeting without repositioning the transducer. Note that amplitude calibration is not yet implemented for matrix arrays.

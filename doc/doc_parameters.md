@@ -206,9 +206,11 @@ All fields are mandatory and have no defaults — they must be set in the study 
 | `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Must be calibrated. `elem_amp` is the deprecated name (renamed on load with a warning). |
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 | `steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
-| `elem_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape. |
+| `elem_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape, unless `elem_diameter_mm` is set. |
 | `elem_height_mm` | Element height [mm], along y. | `rect` elements: size along y; `disc`/`bowl`: sets the equal-area diameter. |
 | `elem_width_mm` | Element width [mm], along x. | `rect` elements: size along x; `disc`/`bowl`: sets the equal-area diameter. |
+| `elem_diameter_mm` | Aperture diameter of `disc`/`bowl` elements [mm]. | Optional. Empty = equal-area diameter from `elem_width_mm` × `elem_height_mm` (flat disc area for `disc`, spherical-cap area for `bowl`). Also sets the element size in the transducer mask. |
+| `elem_phase_override_deg` | Calibrated per-element phases [deg]. | Optional, one value per element (after Clover replication). Replaces the geometric steering phases toward `focus_pos`; element orientation is unchanged. Empty = geometric steering. |
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
 | `is_curved` | Whether the array has a curved surface. | |
 | `curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. Depends on `is_curved`. |
@@ -220,8 +222,10 @@ All fields are mandatory and have no defaults — they must be set in the study 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `n_leaves` | Number of Clover leaves. | Maximum: 3. |
-| `ROC_parent` | Radius of curvature of the combined Clover setup [mm]. | Can differ from individual array ROC. |
+| `n_leaves` | Number of Clover leaves. | Any positive integer; one leaf stays on the parent axis unless `elevation_deg` is set. |
+| `ROC_parent` | Radius of curvature of the combined Clover setup [mm]. | Can differ from individual array ROC; elements then point at their own leaf's natural focus. |
+| `az_sep_deg` | Azimuthal separation between adjacent leaves [deg]. | Optional. Empty = `360 / n_leaves`. `n_leaves × az_sep_deg` must not exceed 360. |
+| `elevation_deg` | Tilt of each leaf from the parent axis [deg]. | Optional. Empty = smallest tilt at which adjacent leaf centres are one `outer_diameter_mm` apart on the parent bowl. |
 
 ##### Matrix: Grid distribution (`define_here`)
 

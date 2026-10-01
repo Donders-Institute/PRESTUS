@@ -233,6 +233,7 @@ The following documents the functions provided in PRESTUS.
 | `get_arc`                               | Generates the coordinates of an arc in 2D space.                                                |
 | `get_trans_pos_from_trigger_markers`    | Determines transducer and target positions using Localite trigger marker files.                 |
 | `get_transducer_box`                    | Computes transducer box dimensions and positions for simulations.                               |
+| `matrix_elem_diameter`                  | Aperture diameter of a disc/bowl matrix element (equal-area or `elem_diameter_mm`).             |
 | `transducer_analyze_position_fast`      | Analyzes the transducer position relative to the skull and skin.                                |
 | `transducer_analyze_position`           | Computes geometric and statistical measures for a transducer position.                          |
 | `transducer_positioning`                | Determines heuristic transducer placement for a given target.                                   |
