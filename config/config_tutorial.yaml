@@ -20,6 +20,8 @@ transducer:
   focal_distance_bowl: []   # Expected focal distance from transducer bowl [mm]
 
   annular:
+    # Illustrative legacy geometry with matching phases/amplitude. For the current
+    # Sonic Concepts CTX ring geometry see config/equipment/CTX_*.yaml (transducer library).
     elem_p_amp: 91590 # [Pa]
     elem_phase_deg: [0, 0, 0, 274]
     depth_mm: 16 # depth of transducer used for visualization purposes

@@ -69,11 +69,10 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     end
 
     %% Validate input positions against image boundaries
-    if any(focus_pos > size(bg_image), 'all')
+    % The transducer may lie outside the image (e.g. beyond a tight T1 field
+    % of view); its marker and outline are then drawn past the image edge.
+    if any(focus_pos > size(bg_image), 'all') || any(focus_pos < 1, 'all')
         error('Focus point is outside of image boundaries');
-    end
-    if ~isempty(trans_pos) && any(trans_pos > size(bg_image), 'all')
-        error('Transducer point is outside of image boundaries');
     end
     if any(max_data_pos > size(bg_image))
         warn('Max intensity point is outside of image boundaries. Regularizing to max. of dimensions');
