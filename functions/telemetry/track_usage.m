@@ -3,7 +3,7 @@ function track_usage(event, parameters, options, pipe_options)
 %
 % Does nothing unless the user has explicitly opted in via telemetry_setup.
 % All network errors are silently swallowed – this function never interrupts
-% the pipeline. No personal data is transmitted; see docs/telemetry.md.
+% the pipeline. No personal data is transmitted; see doc/doc_telemetry.md.
 %
 % Use as:
 %   track_usage('run_end',   parameters, struct('run_id', rid, 'duration_s', t, 'status', 'success'))

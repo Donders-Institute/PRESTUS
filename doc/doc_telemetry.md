@@ -22,15 +22,16 @@ You can change your decision at any time:
 
 ### Non-interactive environments (HPC batch jobs)
 
-In non-interactive sessions PRESTUS cannot prompt for input. The full notice
+In non-interactive sessions (`matlab -batch`, SLURM/PBS jobs, compiled code) PRESTUS cannot prompt for input. The full notice
 is printed to stdout (visible in job logs) on every run, but **no decision is
 recorded and no data is sent**. The message will reappear on every run until
 you make an explicit decision.
 
 To opt in from an HPC environment, either:
 
-1. Run PRESTUS once interactively (e.g. on a login node) and answer `y`, or
-2. Create `~/.prestus/telemetry.json` manually:
+1. Run PRESTUS once interactively (e.g. on a login node) and answer `y`,
+2. Run `telemetry_set_consent(true)` (or `false` to opt out) in MATLAB, or
+3. Create `~/.prestus/telemetry.json` manually:
    ```json
    {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
    ```
