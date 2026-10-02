@@ -54,11 +54,14 @@ classdef test_integration_water < matlab.unittest.TestCase
         function test_intensity_positive(tc)
             % Read the output CSV and check Isppa > 0
             prestus_pipeline(tc.Parameters);
-            csv_files = dir(fullfile(tc.SimPath, '**', '*output_table*.csv'));
-            tc.verifyNotEmpty(csv_files);
+            % Summary table: sub-XXX_<medium><affix>.csv (io.filename_table)
+            p = tc.Parameters;
+            csv_name = sprintf('sub-%03d_%s%s.csv', p.subject_id, p.simulation.medium, p.io.output_affix);
+            csv_files = dir(fullfile(tc.SimPath, '**', csv_name));
+            tc.assertNotEmpty(csv_files, sprintf('Summary table %s not written', csv_name));
             tbl = readtable(fullfile(csv_files(1).folder, csv_files(1).name));
-            intensity_col = tbl{:, contains(tbl.Properties.VariableNames, 'Isppa', 'IgnoreCase', true)};
-            tc.verifyGreaterThan(intensity_col(1), 0, 'Isppa (I_sppa) should be positive');
+            tc.assertTrue(ismember('Isppa', tbl.Properties.VariableNames), 'Summary table has no Isppa column');
+            tc.verifyGreaterThan(tbl.Isppa(1), 0, 'Isppa (I_sppa) should be positive');
         end
 
         function test_axisymmetric_water_runs(tc)
