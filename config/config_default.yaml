@@ -70,6 +70,7 @@ startup:
 io:
   output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
   overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs.md#overwrite-behaviour
+  cache_signature_check: error # Reused grid/medium caches (overwrite_files: never) must match this run's settings: 'error' | 'warn' (reuse anyway) | 'off'
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
   # Intermediate matrix saving
   # save_matrices sets all intermediate matrix saves at once: 1 = save all, 0 = save none.

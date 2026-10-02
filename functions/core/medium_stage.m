@@ -33,11 +33,19 @@ filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
     sprintf('sub-%03d_%s_planimg%s.mat', ...
     parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
+medium_signature = cache_signature(parameters, 'medium');
+
 if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_medium_setup == 1
-    if reuse_upstream_cache(filename_medium_cache, parameters, 'medium') || ...
-            ~confirm_overwriting(filename_medium_cache, parameters)
-        disp('Loading medium cache - skipping medium property mapping.')
+    internal_reuse = reuse_upstream_cache(filename_medium_cache, parameters, 'medium');
+    if internal_reuse || ~confirm_overwriting(filename_medium_cache, parameters)
         loaded = load(filename_medium_cache);
+        if ~internal_reuse
+            % User-driven reuse (io.overwrite_files: never): see GRID_STAGE.
+            stored = [];
+            if isfield(loaded, 'medium_cache_signature'); stored = loaded.medium_cache_signature; end
+            check_cache_signature(filename_medium_cache, stored, medium_signature, parameters);
+        end
+        disp('Loading medium cache - skipping medium property mapping.')
         kwave_medium = loaded.kwave_medium;
         medium_plus  = loaded.medium_plus;
         if isfield(loaded, 'medium_masks')
@@ -64,7 +72,9 @@ if ~isfield(parameters.modules, 'run_medium_setup') || parameters.modules.run_me
 
         if should_save_output(parameters.io, 'save_medium_cache')
             % medium_masks saved so this cache is self-contained for thermal/NIfTI stages.
-            save(filename_medium_cache, 'kwave_medium', 'medium_plus', 'medium_masks', '-v7.3');
+            medium_cache_signature = medium_signature; %#ok<NASGU> saved with the cache
+            save(filename_medium_cache, 'kwave_medium', 'medium_plus', 'medium_masks', ...
+                'medium_cache_signature', '-v7.3');
         end
     end
 else

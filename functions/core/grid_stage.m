@@ -29,9 +29,18 @@ filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
     sprintf('sub-%03d_%s_planimg%s.mat', ...
     parameters.subject_id, parameters.simulation.medium, preproc_affix));
 
+% Settings the grid cache depends on, taken before this stage changes them.
+grid_signature = cache_signature(parameters, 'grid');
+
 if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid_setup == 1
-    if reuse_upstream_cache(filename_grid_cache, parameters, 'grid') || ...
-            ~confirm_overwriting(filename_grid_cache, parameters)
+    internal_reuse = reuse_upstream_cache(filename_grid_cache, parameters, 'grid');
+    if internal_reuse || ~confirm_overwriting(filename_grid_cache, parameters)
+        if ~internal_reuse
+            % User-driven reuse (io.overwrite_files: never): the cache must match
+            % this run's settings. Internal sub-jobs reuse their own stage-0 cache.
+            check_cache_signature(filename_grid_cache, stored_signature(filename_grid_cache), ...
+                grid_signature, parameters);
+        end
         disp('Loading grid cache - skipping head preprocessing.')
         [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, ...
          trans_pos, focus_pos] = load_grid_cache_file(filename_grid_cache, parameters);
@@ -55,6 +64,7 @@ if ~isfield(parameters.modules, 'run_grid_setup') || parameters.modules.run_grid
 
         if should_save_output(parameters.io, 'save_grid_cache')
             grid_cache_info.parameters = parameters;
+            grid_cache_info.signature  = grid_signature;
             save(filename_grid_cache, ...
                 'planimg', 'medium_masks', 'segmentation', 'bone_mask', 'pseudoCT', ...
                 'trans_pos', 'focus_pos', 'grid_cache_info', '-v7.3');
@@ -91,4 +101,17 @@ if isempty(trans_pos)
     end
 end
 
+end
+
+function sig = stored_signature(filename)
+% Signature saved with a grid cache; [] for caches written before signatures.
+    sig = [];
+    info = whos('-file', filename, 'grid_cache_info');
+    if isempty(info)
+        return
+    end
+    loaded = load(filename, 'grid_cache_info');
+    if isfield(loaded.grid_cache_info, 'signature')
+        sig = loaded.grid_cache_info.signature;
+    end
 end
