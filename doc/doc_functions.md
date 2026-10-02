@@ -34,6 +34,9 @@ The following documents the functions provided in PRESTUS.
 | `plot_transducer_library`               | Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas). |
 | `generate_calibration_report`           | Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup. |
 | `kwave_calibrate_drive`                 | Calibrate the drive of per-depth refinements in free-water k-Wave (rescale to the simulated ISPPA) and report agreement with the measured profiles |
+| `library_add_conditions`                | Add dephased drive conditions to a library entry [EXPERIMENTAL] |
+| `library_condition`                     | Phases, gains and drive of a dephased library condition [EXPERIMENTAL] |
+| `library_ingest_conditions`             | Add dephased conditions from a profile CSV + sidecar [EXPERIMENTAL] |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves.             |
 | `phase_optimization_annulus`            | Optimizes the phase profile by calculating focal distance error for an annular transducer.      |

@@ -1,4 +1,4 @@
-function parameters = load_transducer_from_library(combo_name, focal_distance_ep, desired_intensity, equip_param, library_path)
+function parameters = load_transducer_from_library(combo_name, focal_distance_ep, desired_intensity, equip_param, library_path, condition)
 % LOAD_TRANSDUCER_FROM_LIBRARY  Load calibrated transducer parameters from library
 %
 % Reads the calibration library YAML for the given equipment combination and
@@ -31,6 +31,12 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %                    desired_intensity, equip_param)
 %   parameters = load_transducer_from_library(combo_name, focal_distance_ep, ...
 %                    desired_intensity, equip_param, library_path)
+%   parameters = load_transducer_from_library(..., library_path, condition)
+%
+% With condition (EXPERIMENTAL, not validated) the phases, gains and drive
+% come from the dephased condition lib.conditions.<condition>
+% (LIBRARY_CONDITION) instead of a focal depth; focal_distance_ep may then be
+% empty and defaults to the condition's nominal setpoint.
 %
 % Input:
 %   combo_name         - equipment combination key, e.g.
@@ -47,7 +53,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %     .transducer.tx_calibration.isppa_wcm2        — ISPPA the elem_p_amp produces [W/cm²]
 %     .transducer.tx_calibration.focal_depth_ep_mm — requested depth [mm]
 %     .transducer.tx_calibration.phase_source      — 'library'
-%     .transducer.tx_calibration.phase_model       — 'geometric' | 'static' | 'refined' | 'blend'
+%     .transducer.tx_calibration.phase_model       — 'geometric' | 'static' | 'refined' | 'blend' | 'condition'
+%     .transducer.tx_calibration.condition         — dephased condition label ('' = focal depth)
 %     .transducer.tx_calibration.refinement_weight — 0 (static) … 1 (refined)
 %     .transducer.tx_calibration.isppa_source      — 'library'
 %     .transducer.tx_calibration.amp_kwave_calibrated — true iff elem_p_amp at this depth
@@ -88,6 +95,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     if nargin < 5 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
+    if nargin < 6; condition = ''; end
+    condition = char(condition);
 
     %% Load calibration library entry
     yaml_path = fullfile(library_path, [combo_name, '.yaml']);
@@ -115,7 +124,14 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer = tran.transducer;
 
     %% Phases, gains and drive at the requested depth
-    m = library_model_at_depth(lib, tran, focal_distance_ep, desired_intensity, yaml_path);
+    if isempty(condition)
+        m = library_model_at_depth(lib, tran, focal_distance_ep, desired_intensity, yaml_path);
+    else
+        m = library_condition(lib, tran, condition, desired_intensity, yaml_path);
+        if isempty(focal_distance_ep) || isnan(focal_distance_ep)
+            focal_distance_ep = m.setpoint_ep_mm;
+        end
+    end
     parameters.transducer.annular.elem_phase_rad = m.elem_phase_rad;
     parameters.transducer.annular.elem_phase_deg = m.elem_phase_deg;
     if ~isempty(m.elem_p_amp)
@@ -133,6 +149,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
         (tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm);
     parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
     parameters.transducer.tx_calibration.focal_depth_ep_mm = focal_distance_ep;
+    parameters.transducer.tx_calibration.condition         = condition;
     parameters.transducer.tx_calibration.phase_source      = 'library';
     parameters.transducer.tx_calibration.phase_model       = phase_model;
     parameters.transducer.tx_calibration.refinement_weight = w;
@@ -149,7 +166,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.tx_calibration.amp_kwave_verified     = amp_kwave_calibrated;
     parameters.transducer.tx_calibration.amp_kwave_ref_depth_mm = m.amp_kwave_nearest_depth_mm;
 
-    if ~isempty(elem_p_amp) && ~amp_kwave_calibrated
+    if ~isempty(elem_p_amp) && ~amp_kwave_calibrated && isempty(condition)
         if isfinite(m.amp_kwave_nearest_depth_mm)
             nearest_str = sprintf(['nearest k-Wave drive calibration is at %.1f mm from the exit plane ' ...
                 '(R²=%.3f, focal error %.2f mm) but does not cover the requested depth'], ...

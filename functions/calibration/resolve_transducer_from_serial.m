@@ -95,10 +95,18 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
         drive_isppa = tr.target_isppa_wcm2(1);
     end
 
-    if ~has_focal || ~has_isppa
+    % EXPERIMENTAL: a dephased library condition replaces the focal depth
+    % (focal_distance_ep then defaults to the condition's nominal setpoint).
+    condition = '';
+    if isfield(tr, 'condition') && ~isempty(tr.condition) && ~isa(tr.condition, 'yaml.Null')
+        condition = char(tr.condition);
+    end
+    if (~has_focal && isempty(condition)) || ~has_isppa
         % Cannot resolve without these — let downstream validation catch it.
         return;
     end
+    focal_req = [];
+    if has_focal; focal_req = tr.focal_distance_ep; end
 
     % Determine combo name (transducer + driving system).
     combo_name = resolve_combo_name(serial, tr, equip_param, t_i);
@@ -140,8 +148,11 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
     end
 
     % Load from library and merge phases/amplitude (without overwriting inline values).
-    lib_params = load_transducer_from_library(lib_key, tr.focal_distance_ep, ...
-        drive_isppa, equip_param, library_path);
+    lib_params = load_transducer_from_library(lib_key, focal_req, ...
+        drive_isppa, equip_param, library_path, condition);
+    if ~has_focal
+        tr.focal_distance_ep = lib_params.transducer.focal_distance_ep;
+    end
 
     if ~phases_present
         tr.annular.elem_phase_deg = lib_params.transducer.annular.elem_phase_deg;

@@ -198,6 +198,7 @@ transducer:
   # serial: ''            # Equipment serial (config/equipment/<serial>.yaml); fills in geometry and library phases/drive
   # combo: {ds_serial: ''} # Driving-system serial; selects config/calibration/<serial>_<ds_serial>.yaml
   # library_path: ''      # Folder with your own library entries (refine_transducer_library / calibration_gui); used when it holds this combo
+  # condition: ''        # EXPERIMENTAL, not validated: dephased library condition (lib.conditions.<label>) instead of focal_distance_ep
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
   focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]

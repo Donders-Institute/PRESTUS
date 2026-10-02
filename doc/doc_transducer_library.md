@@ -388,6 +388,64 @@ Changing the ring geometry of a transducer invalidates its library entries. Rebu
 
 ---
 
+## Dephased conditions (experimental)
+
+> **Experimental — not validated.** No dephased hydrophone measurements have been compared with these predictions yet. Every use prints a `library_condition:experimental` warning. Do not report dephased-condition results without your own validation.
+
+Dephased (defocused) settings drive the rings with explicit phases (e.g. alternate rings shifted by 180°) instead of steering to a focal depth. They cannot be interpolated in depth, so they are stored in the same library entry as separate, named **conditions**:
+
+```yaml
+conditions:
+  geom_180:
+    status: experimental
+    validated: false
+    phase_mode: shift                    # shift | absolute
+    phase_shift_deg: [0, 180, 0, 180]    # shift mode: added to the setpoint's steering phases
+    nominal_phase_deg: [...]             # driver phases before the hardware correction
+    setpoint_ep_mm: 52.38                # nominal focal setpoint the condition derives from
+    inherit_correction: true
+    elem_phase_correction_deg: [...]     # hardware offset of the entry at the setpoint
+    elem_phase_deg: [...]                # phases used in simulation
+    elem_amp_weight: [...]               # per-ring gains of the setpoint
+    elem_p_amp: 98000                    # drive for isppa_wcm2 at the model's free-water peak
+    isppa_wcm2: 30
+    peak_z_ep_mm: 18.5                   # where that peak is (can be a near-field or split focus)
+    predicted_r2: .nan                   # model vs measured profile (NaN = no measurement)
+    predicted_focal_err_mm: .nan
+    source_csv: ''
+```
+
+A study selects a condition with `transducer.condition: geom_180` (with `serial`, `combo.ds_serial` and `target_isppa_wcm2` as usual). `focal_distance_ep` may be omitted; it then defaults to `setpoint_ep_mm`.
+
+**How phases and drive are derived.** In `shift` mode the phases are the geometric steering phases at the setpoint plus `phase_shift_deg`, which keeps the dephasing angles explicit. In `absolute` mode they are the given driver phases. With `inherit_correction` the entry's hardware phase offset and gains at the setpoint are added, assuming the correction fitted to focused profiles transfers to dephased drives. That assumption is what a dephased measurement has to confirm. The drive is set so that the Rayleigh free-water on-axis peak beyond 10 mm reaches `isppa_wcm2`. Measured profiles are only used to score the prediction (`predicted_r2`, focal and peak error), never to fit it.
+
+**Adding conditions.** Without measurements:
+
+```matlab
+equip = load_equipment_config();
+tran  = equip.trans.CTX_250_001;
+lib   = yaml.loadFile('config/calibration/CTX_250_001_SC_203_035.yaml', 'ConvertToArray', true);
+cond  = struct('label', 'geom_180', 'phase_shift_deg', [0 180 0 180], 'setpoint_ep_mm', 52.38);
+lib   = library_add_conditions(lib, tran, cond, struct('IsppaWcm2', 30));
+yaml.dumpFile('my_library/CTX_250_001_SC_203_035.yaml', lib);   % then transducer.library_path: my_library
+```
+
+With measurements, store them as `tran-{TRAN}_ds-{DS}_acq-dephased_axial.csv` in the usual CSV layout. The depth row holds each column's nominal setpoint. The sidecar describes the columns in order:
+
+```yaml
+columns:
+  - label: geom_180
+    phase_shift_deg: [0, 180, 0, 180]
+  - label: geom_120
+    elem_phase_deg: [0, 120, 240, 0]     # absolute driver phases
+```
+
+`library_ingest_conditions(lib_file, csv_path)` predicts every column, prints the agreement table and writes the conditions to `lib_file` (`struct('DryRun', true)` to only score). Dephased CSVs must not be passed to `build_transducer_library` or `refine_transducer_library`, which read every column as a focal depth.
+
+**Before treating a condition as validated:** compare `predicted_r2` and the focal/peak errors with those of the focused depths of the same entry, check the location of `peak_z_ep_mm` against the measured peak, and confirm the free-water ISPPA in a k-Wave water run. Then set `validated: true` in your copy of the entry.
+
+---
+
 ## Library limitations
 
 | Limitation | Effect | Mitigation |
