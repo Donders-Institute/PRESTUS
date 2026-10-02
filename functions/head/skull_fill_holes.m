@@ -23,9 +23,15 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
     labels_medium = fieldnames(parameters.medium_properties);
     labels_requested = fieldnames(parameters.layers);
 
-    if parameters.pct.enabled == 0 && any(contains(labels_requested, 'skull_cortical'))  
-        % treat cortical bone as the base layer
-        skull_i = find(ismember(labels_medium, {'skull_cortical'; 'skull_trabecular'}));
+    % Treat cortical bone as the base layer when it was requested and is
+    % present in the mask. PREPROC_MEDIUM_MASK drops requested layers that the
+    % segmentation lacks (e.g. bone labelled 4 instead of 7/8) without updating
+    % parameters.layers, so the requested list alone would select labels that
+    % do not occur and leave the skull unfilled.
+    cortical_i = find(ismember(labels_medium, {'skull_cortical'; 'skull_trabecular'}));
+    if parameters.pct.enabled == 0 && any(contains(labels_requested, 'skull_cortical')) && ...
+            any(ismember(medium_masks(:), cortical_i))
+        skull_i = cortical_i;
     else
         skull_i = find(strcmp(labels_medium, 'skull'));
     end

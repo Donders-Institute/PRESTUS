@@ -19,7 +19,7 @@ function [min_dims, max_dims, grid_size] = get_crop_dims(image, margin)
 % See also: PREPROC_CROP_GRID, FIND_MIN_FACTOR
 
 arguments
-    image  (:,:,:) {mustBeNumeric}
+    image  (:,:,:) {mustBeNumericOrLogical}
     margin (1,1) {mustBeNonnegative, mustBeInteger}
 end
 

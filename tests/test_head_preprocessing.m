@@ -102,7 +102,7 @@ classdef test_head_preprocessing < matlab.unittest.TestCase
     methods (Test, TestTags = {'skull_fill'})
 
         function test_skull_fill_closes_small_hole(tc)
-            tc.assumeTrue(license('test', 'Image_Toolbox'), ...
+            tc.assumeTrue(logical(license('test', 'Image_Toolbox')), ...
                 'Image Processing Toolbox not available — skipping skull_fill_holes test');
 
             % Build a synthetic segmentation with a skull shell and a punched hole

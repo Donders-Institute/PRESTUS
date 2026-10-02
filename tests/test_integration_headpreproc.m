@@ -34,6 +34,10 @@ classdef test_integration_headpreproc < matlab.unittest.TestCase
             tc.Parameters.layers.brain  = [1, 2];
             tc.Parameters.layers.skin   = [5];
             tc.Parameters.layers.skull  = [4];
+
+            % Outputs that skull_fill_holes may write in debug mode
+            tc.Parameters.io.debug_dir  = tempdir;
+            tc.Parameters.io.output_dir = tempdir;
         end
     end
 
@@ -71,23 +75,35 @@ classdef test_integration_headpreproc < matlab.unittest.TestCase
     methods (Test, TestTags = {'headpreproc', 'skull'})
 
         function test_skull_fill_holes_runs(tc)
-            % skull_fill_holes should not error on synthetic skull
-            skull_mask = ismember(tc.Segmentation, tc.Parameters.layers.skull);
-            tc.verifyWarningFree(@() skull_fill_holes(skull_mask, tc.Parameters));
+            % skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmentation)
+            % must not error on the synthetic head
+            [masks, focus] = tc.masks_and_focus();
+            [filled, skull_i] = skull_fill_holes(tc.Parameters, masks, focus, tc.Segmentation);
+            tc.verifyNotEmpty(filled);
+            tc.verifyNotEmpty(skull_i);   % one label, or cortical + trabecular
         end
 
         function test_skull_fill_holes_output_size(tc)
-            skull_mask = ismember(tc.Segmentation, tc.Parameters.layers.skull);
-            filled = skull_fill_holes(skull_mask, tc.Parameters);
-            tc.verifyEqual(size(filled), size(skull_mask));
+            [masks, focus] = tc.masks_and_focus();
+            filled = skull_fill_holes(tc.Parameters, masks, focus, tc.Segmentation);
+            tc.verifyEqual(size(filled), size(masks));
         end
 
         function test_skull_fill_holes_non_empty(tc)
-            skull_mask = ismember(tc.Segmentation, tc.Parameters.layers.skull);
-            filled = skull_fill_holes(skull_mask, tc.Parameters);
-            tc.verifyGreaterThan(sum(filled(:)), 0, 'Filled skull should contain non-zero voxels');
+            % Filling never removes skull voxels
+            [masks, focus] = tc.masks_and_focus();
+            [filled, skull_i] = skull_fill_holes(tc.Parameters, masks, focus, tc.Segmentation);
+            tc.verifyGreaterThan(nnz(ismember(filled, skull_i)), 0, 'Filled skull should contain voxels');
+            tc.verifyGreaterThanOrEqual(nnz(ismember(filled, skull_i)), nnz(ismember(masks, skull_i)));
         end
 
+    end
+
+    methods (Access = private)
+        function [masks, focus] = masks_and_focus(tc)
+            masks = preproc_medium_mask(tc.Segmentation, tc.Parameters);
+            focus = round(size(tc.Segmentation) / 2);
+        end
     end
 
     % ------------------------------------------------------------------ %
