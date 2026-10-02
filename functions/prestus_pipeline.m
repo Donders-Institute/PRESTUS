@@ -479,8 +479,9 @@ function [parameters] = prestus_pipeline(parameters, options)
             water_parameters.simulation.debug            = 0;
             water_parameters.grid.default_dims           = water_parameters.grid.dims;
             water_parameters.io.log_file                 = '';
-            water_parameters.hpc.timelimit               = '05:00:00';
-            water_parameters.hpc.memorylimit             = 40;
+            % Water runs have their own HPC limits (hpc.posthoc_water_*)
+            water_parameters.hpc.timelimit   = posthoc_water_limit(parameters, 'timelimit',   '05:00:00');
+            water_parameters.hpc.memorylimit = posthoc_water_limit(parameters, 'memorylimit', 40);
             water_parameters.hpc.wait_for_job            = false;
             if transducer_N_water > 1
                 water_parameters.transducer      = parameters.transducer(it_water:it_water);
@@ -517,6 +518,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 
 end
 
+        diary('off')   % do not keep logging into this run's log after it failed
 function pos = planned_positions(parameters, field)
 % [N×3] transducer(i).<field> for all transducers; [] when any is unset.
     pos = [];
@@ -530,5 +532,14 @@ function pos = planned_positions(parameters, field)
             return
         end
         pos(ti, :) = double(v(:)'); %#ok<AGROW>
+    end
+end
+
+function v = posthoc_water_limit(parameters, field, fallback)
+% hpc.posthoc_water_<field> when set, else the built-in water-run default.
+    key = ['posthoc_water_' field];
+    v = fallback;
+    if isfield(parameters, 'hpc') && isfield(parameters.hpc, key) && ~isempty(parameters.hpc.(key))
+        v = parameters.hpc.(key);
     end
 end

@@ -77,15 +77,16 @@ fprintf(fid, 'matlab -batch "%s"\n', m_name);
 fclose(fid);
 
 % Submit. run_command invokes sbatch directly via argv, no shell at all.
-[status, out] = run_command({'sbatch', sh_file}, 'WorkingDir', log_dir);
+[status, out] = run_command({'sbatch', '--parsable', sh_file}, 'WorkingDir', log_dir);
 if status ~= 0
     warning('PRESTUS:hpc_submit_report_job:submitFailed', ...
         'Report job submission failed: %s', out);
     return;
 end
-job_ids = regexp(out, '\d+', 'match');
-if ~isempty(job_ids)
-    report_job_id = str2double(job_ids{1});
+report_job_id = parse_sbatch_job_id(out);
+if isnan(report_job_id)
+    report_job_id = [];
+else
     fprintf('  Report job %d submitted (depends on job %s)\n', report_job_id, main_job_id_str);
 end
 end

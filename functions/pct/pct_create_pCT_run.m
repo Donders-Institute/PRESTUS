@@ -211,19 +211,19 @@ end
 
         java.io.File([temp_slurm_file '.sh']).setExecutable(true);
         fprintf('Submitting pseudoCT job:\nsbatch --export=MANPATH %s.sh\n', temp_slurm_file);
-        [res, out] = run_command({'sbatch', '--export=MANPATH', [temp_slurm_file '.sh']});
+        [res, out] = run_command({'sbatch', '--parsable', '--export=MANPATH', [temp_slurm_file '.sh']});
         if res ~= 0
             error('sbatch submission failed (exit code %d):\n%s', res, out);
         end
-        % Extract first run of digits — matches any sbatch output format
-        job_id_tok = regexp(strtrim(out), '\d+', 'match', 'once');
+        job_id_tok = parse_sbatch_job_id(out);
+        if isnan(job_id_tok); job_id_tok = []; end
         max_checks = 540;
         if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'max_wait_checks')
             max_checks = parameters.hpc.max_wait_checks;
         end
         pseudoCT_file = fullfile(path_pct_out, 'pseudoCT.nii.gz');
         if ~isempty(job_id_tok)
-            pct_job_id = str2double(job_id_tok);
+            pct_job_id = job_id_tok;
             fprintf('pseudoCT SLURM job %d submitted — waiting for completion.\n', pct_job_id);
             hpc_wait_for_completion(pct_job_id, 'slurm', max_checks);
         else

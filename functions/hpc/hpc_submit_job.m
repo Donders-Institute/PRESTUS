@@ -54,7 +54,13 @@ switch hpc_type
         error('Unsupported HPC type: %s', hpc_type);
 end
 
-fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters), sprintf('%d', job_id));
+% qsub returns the ID as text (e.g. '12345.server'); sprintf('%d') would print its char codes
+if ischar(job_id) || isstring(job_id)
+    job_text = char(job_id);
+else
+    job_text = sprintf('%d', job_id);
+end
+fprintf('Job "%s" (ID: %s) submitted successfully\n', hpc_job_name(parameters), job_text);
 if strcmp(hpc_type, 'slurm')
     fprintf('Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
 end
@@ -175,13 +181,12 @@ function job_id = submit_slurm_job(temp_slurm_path, log_dir)
     % run_command invokes sbatch directly via argv, no shell at all --
     % log_dir/temp_slurm_path reach the process as literal arguments
     % regardless of their contents.
-    fprintf('SLURM command: sbatch %s (in %s)\n', temp_slurm_path, log_dir);
-    [status, out] = run_command({'sbatch', temp_slurm_path}, 'WorkingDir', log_dir);
+    fprintf('SLURM command: sbatch --parsable %s (in %s)\n', temp_slurm_path, log_dir);
+    [status, out] = run_command({'sbatch', '--parsable', temp_slurm_path}, 'WorkingDir', log_dir);
     if status ~= 0, error('SLURM submission failed: %s', out); end
-    
-    job_ids = regexp(out, '\d+', 'match');
-    if isempty(job_ids), error('No SLURM job ID returned'); end
-    job_id = str2double(job_ids{1});
+
+    job_id = parse_sbatch_job_id(out);
+    if isnan(job_id), error('No SLURM job ID returned:\n%s', out); end
 end
 
 function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)

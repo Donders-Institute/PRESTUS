@@ -155,6 +155,8 @@ hpc:
   wait_for_job: false
   timelimit: '04:00:00'
   memorylimit: 20
+  posthoc_water_timelimit: '05:00:00'  # Wall time for the post-hoc free-water jobs (modules.run_posthoc_water_sims)
+  posthoc_water_memorylimit: 40        # Memory [GB] for the post-hoc free-water jobs
   ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
   job_prefix: 'PS' # Prefix for HPC job names (keep short; total name capped at 20 chars)
   max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
