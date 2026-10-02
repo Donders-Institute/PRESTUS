@@ -13,7 +13,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prestus-root", help="PRESTUS checkout (default: auto-detect)")
     args = parser.parse_args(argv)
 
-    from PyQt6.QtWidgets import QApplication, QMessageBox
+    from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
     from .equipment import EquipmentLibrary
     from .model import ConfigModel
@@ -27,22 +27,31 @@ def main(argv: list[str] | None = None) -> int:
     session = Session()
 
     root = find_prestus_root(args.prestus_root or session.get("prestus_root"))
-    if root is None:
-        QMessageBox.critical(None, "PRESTUS Nexus",
-                             "Could not find PRESTUS (config/config_default.yaml).\n"
-                             "Pass --prestus-root or set PRESTUS_ROOT.")
-        return 2
+    while root is None:
+        # Standalone builds (and checkouts elsewhere) cannot find PRESTUS by their own
+        # location: ask once; the choice is remembered in the session.
+        QMessageBox.information(None, "PRESTUS Nexus",
+                                "Select your PRESTUS folder (the one containing config/ and "
+                                "functions/). You can also pass --prestus-root or set PRESTUS_ROOT.")
+        chosen = QFileDialog.getExistingDirectory(None, "PRESTUS folder", str(Path.home()))
+        if not chosen:
+            return 2
+        root = find_prestus_root(chosen)
+        if root is None:
+            QMessageBox.warning(None, "PRESTUS Nexus",
+                                f"{chosen} does not contain config/config_default.yaml and functions/.")
     session.set("prestus_root", str(root))
     from .ui import style
     style.apply(app, root, dark=bool(session.get("dark_mode", False)))
 
     if args.config:
         path = Path(args.config).resolve()
-        model = ConfigModel.from_file(Schema(base_default_for(path, root)), path,
+        model = ConfigModel.from_file(Schema(base_default_for(path, root), toolbox_path=toolbox_default(root)), path,
                                       EquipmentLibrary(root))
         session.add_recent(path)
     else:           # untitled study; File > New study… / Open… / Open recent
-        model = ConfigModel(Schema(toolbox_default(root)), EquipmentLibrary(root))
+        model = ConfigModel(Schema(toolbox_default(root), toolbox_path=toolbox_default(root)),
+                            EquipmentLibrary(root))
 
     window = MainWindow(model, session, root)
     window.show()

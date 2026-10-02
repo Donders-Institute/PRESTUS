@@ -83,12 +83,14 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Match focal distance* then sets `focal_distance_ep` to fit.
    - Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
    - Positions are written in the space set by `placement.manual.coordinate_space` (`voxel` or `ras`). See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
+   - Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`, written by `write_placement_positions`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.
    - With `placement.mode: localite`, the Placement card offers *Open neuronav_gui* and *Import into study…*.
 6. **Timing diagram and TUS calculator** (Simulation tab, *Sonication protocol*). See the next section.
-7. **Issues panel.** Lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries. Clicking an issue opens its tab and field, showing advanced options if needed. The header shows the error and warning counts.
+7. **Issues panel.** Lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), and a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied. Clicking an issue opens its tab and field, showing advanced options if needed. The header shows the error and warning counts.
 8. **Run tab.**
    - *Validate in MATLAB* only runs `load_parameters`.
    - *Run locally* writes `run_<study>.m` next to the config and runs it with `matlab -batch`, streaming the log. It sets `platform: matlab` for that run only. You can also run the launcher yourself with `run('run_<study>.m')`.
+   - *Submit to cluster* (when `sbatch` or `qsub` is on this computer, e.g. on a cluster login node) writes `submit_<study>.m`, which keeps the config's `platform` and `hpc.*` settings, and runs it: PRESTUS submits as usual (`prestus_pipeline_start`; chained pipelines submit several jobs). The Nexus reads the job IDs from the log and lists them under *Cluster jobs*, refreshing their state every 30 s (`squeue`/`sacct`, or `qstat`) until they finish; *Cancel selected* runs `scancel`/`qdel`. The *Run profile* presets fill in the `hpc.*` fields.
    - *Review YAML* shows the exact YAML that will be written.
 9. **Study tab.** Runs many subjects with per-run settings. See [Group analysis](doc_group.md#study-setup).
    - Set the manifest file (`study.manifest`, relative to the config) and edit the table: one row per run, with `subject_id`, `condition`, `include`, `config` and any config key as a column (*Add column…* offers the known keys).
@@ -114,6 +116,14 @@ The **Tools** menu opens PRESTUS's standalone MATLAB GUIs in an interactive MATL
 
 - **Localite marker ingest** (`neuronav_gui`, see [doc_gui.md](doc_gui.md#localite-ingest-gui)). The study config is saved first and passed to the GUI, which reads `path.localite_*`, `placement.localite.*` and `neuronav.coil_map` from it. After ingestion, set `placement.mode: localite` in the Nexus, or import the ingested targets into a study manifest (Study tab).
 - **Transducer calibration** (`calibration_gui`). Fitted library entries are saved to `transducer.library_path` when that is set. The Nexus's transducer panel then reports them as the calibration entry PRESTUS will use.
+
+## Project defaults
+
+When the study folder holds a copy of `config_default.yaml` (from *File ▸ New study…* or `prestus_config_init`), the Nexus merges it onto the toolbox default exactly as `load_parameters` does: the copy's values win, keys added to PRESTUS since the copy was made keep their toolbox defaults. The *Review YAML* page names both files. **Tools ▸ Update project defaults…** replaces the copy with the toolbox default (keeping a dated backup), optionally after writing the values the copy pinned differently into the study config so the simulation settings stay the same; `prestus_config_upgrade(folder)` does the same from MATLAB.
+
+## Standalone app
+
+`nexus/packaging/prestus_nexus.spec` builds a standalone app with PyInstaller (`pip install -e ".[viewer]" pyinstaller`, then `pyinstaller packaging/prestus_nexus.spec` in `nexus/`). The app does not contain PRESTUS: on first start it asks for the PRESTUS folder (or use `--prestus-root` / `PRESTUS_ROOT`) and remembers it.
 
 ## Compatibility with MATLAB's YAML loader
 

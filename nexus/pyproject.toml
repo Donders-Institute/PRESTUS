@@ -21,7 +21,7 @@ prestus-nexus = "prestus_nexus.app:main"
 packages = ["prestus_nexus", "prestus_nexus.ui"]
 
 [tool.setuptools.package-data]
-prestus_nexus = ["overlay.yaml"]
+prestus_nexus = ["overlay.yaml", "run_presets.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

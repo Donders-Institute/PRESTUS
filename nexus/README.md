@@ -37,14 +37,18 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 
 | File | Role |
 |---|---|
-| `schema.py` | Builds the key tree from `config/config_default.yaml`: key order, defaults, and help text taken from inline comments and the comment blocks above keys. |
+| `schema.py` | Builds the key tree from `config/config_default.yaml`: key order, defaults, and help text taken from inline comments and the comment blocks above keys. A project copy of `config_default.yaml` is merged on top, as `load_parameters` does (`stale_keys`, `pinned`). |
 | `overlay.yaml` | Adds only what the YAML can't express: widget kinds, allowed values, units, visibility rules, keys the code reads that the default omits (`extra`), and deprecated aliases. |
 | `model.py` | Defaults plus sparse overrides, merged like `mergestruct` + `restore_struct_arrays` in `load_parameters`. |
 | `yamlio.py` | YAML reading and writing that matches MATLAB's loader (see below). |
 | `checks.py` | Validation. Each rule notes the MATLAB source it mirrors. |
 | `equipment.py` | Equipment library (`config/equipment`) and calibration coverage (`config/calibration`). |
 | `placement.py` | Voxel conventions, bowl geometry, scalp snapping, Brainsight/Slicer trajectory import. |
-| `launcher.py` | MATLAB discovery, `run_<study>.m` launcher, `-batch` commands with success/failure markers. |
+| `launcher.py` | MATLAB discovery, `run_<study>.m` / `submit_<study>.m` launchers, `-batch` commands with success/failure markers. |
+| `jobs.py` | Cluster jobs submitted through PRESTUS: IDs from the log, `squeue`/`sacct`/`qstat` state, cancel. |
+| `merge.py` | `mergestruct` semantics, shared by the schema (toolbox + project defaults) and the model. |
+| `project_defaults.py` | Refreshing a project's `config_default.yaml` copy (*Tools ▸ Update project defaults…*). |
+| `outputs.py` | Where the pipeline writes per-subject outputs; the placement record (`sub-XXX_placement<affix>.json`). |
 | `ui/` | PyQt6 main window (tabs), section forms, transducer panel and cross-section, placement viewer, timing diagram, study manifest and Localite import, run page, style. |
 | `timing.py` | Protocol maths and the TUS calculator settings exchange. |
 | `study.py`, `neuronav_import.py` | Study manifest model; manifest rows from the `neuronav_gui` outputs. |
@@ -66,7 +70,7 @@ python -m pytest -q                 # everything; the MATLAB test runs if MATLAB
 python -m pytest -q -m "not matlab" # without MATLAB (~30 s)
 ```
 
-- `test_schema.py` is the drift test. It checks that every overlay rule still matches a key, that every `extra`/`deprecated` key is still referenced in `functions/`, that no `extra` key has since been added to the default, and that allowed values contain the default.
+- `test_schema.py` is the drift test. It checks that every overlay rule still matches a key, that every `extra`/`deprecated` key is still referenced in `functions/`, that no `extra` key has since been added to the default, and that allowed values contain the default. MATLAB's `load_parameters` reads the same `extra`/`deprecated` lists (`config_known_extra_keys`) for its unknown-key warning, so this test also keeps that check accurate.
 - `test_matlab_roundtrip.py` writes a study config with the Nexus, loads it with the real `load_parameters` and compares every value with the Nexus's own merge. Set `PRESTUS_MATLAB` if `matlab` is not on your `PATH`.
 - `test_real_configs.py` loads and round-trips every study config in `$PRESTUS_REAL_CONFIG_DIR` (skipped when unset).
 
@@ -86,10 +90,11 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - Tools: snap to scalp with a gap, place at the focal distance, and match the focal distance to the placement.
    - Brainsight/Slicer trajectory import using BabelBrain's conventions.
    - Tissue at the focus, and the exit plane's distance from the scalp.
-4. **Run** (`launcher.py`, `ui/run_page.py`).
+4. **Run** (`launcher.py`, `jobs.py`, `ui/run_page.py`).
    - A `run_<study>.m` launcher.
    - *Validate in MATLAB* (`load_parameters` only).
    - *Run locally* via `matlab -batch`, with a live log and success/failure markers.
+   - *Submit to cluster* through PRESTUS' own HPC path, and a job list that follows the submitted jobs.
    - **Tools menu:** opens `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
 5. **Retirement.** `launch_web_alignment` has been removed and `functions/gui_py` is deprecated, with a pointer to the Nexus. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
 
@@ -100,6 +105,5 @@ PRESTUS voxels are 1-based MATLAB indices into the T1 array, while MATLAB's `nif
 ## Not done yet
 
 - A 3-D view (NiiVue via QtWebEngine) is not included; the viewer uses 2-D orthogonal slices, as BabelBrain does.
-- Placement modes other than manual (Localite, heuristic, MNI, PlanTUS, TUS_entry) are edited as forms. PRESTUS computes their positions, and the viewer shows positions only for manual placement.
-- Submitting to HPC (SLURM/qsub) is out of scope: runs are local only.
-- There is no frozen app bundle (PyInstaller) yet.
+- Non-manual placement modes are edited as forms; the viewer shows their resolved positions read-only (from the last run, see `outputs.placement_record`) but cannot place them interactively.
+- The standalone app (`packaging/prestus_nexus.spec`) is not built or signed in CI yet.
