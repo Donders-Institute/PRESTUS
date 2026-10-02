@@ -2,8 +2,13 @@ function parameters = load_parameters(varargin)
 % LOAD_PARAMETERS  Load default PRESTUS config and merge with one or more extra YAML files or structs
 %
 % Reads config/config_default.yaml relative to the PRESTUS root (resolved from
-% this file's location so CWD is irrelevant), then deep-merges any caller-supplied
-% YAML files or parameter structs on top. After merging, runs validation:
+% this file's location so CWD is irrelevant). When a project-specific
+% config_default.yaml is found (see below), it is merged on top of the toolbox
+% default, so keys added to the toolbox since the project copy was made still
+% get their defaults (a warning lists them). Caller-supplied YAML files or
+% parameter structs are then deep-merged on top; keys in those YAML files that
+% PRESTUS does not know are reported (CONFIG_UNKNOWN_KEYS). After merging, runs
+% validation:
 % interactive-mode check, transducer parameter derivation, thermal timing check,
 % output-affix sanitization, path existence checks, and MATLAB version guard.
 %
@@ -83,7 +88,17 @@ function parameters = load_parameters(varargin)
         if exist(candidate, 'file')
             default_config_path = candidate;
             using_toolbox_default = false;
+            if ~same_file(candidate, toolbox_default)
+                warning('prestus:cwdDefault', ...
+                    ['Using config_default.yaml from the current folder (%s). Pass the ' ...
+                     'config folder explicitly, load_parameters(file, folder), to make ' ...
+                     'the project defaults independent of where MATLAB runs.'], candidate);
+            end
         end
+    end
+
+    if ~using_toolbox_default && same_file(default_config_path, toolbox_default)
+        using_toolbox_default = true;
     end
 
     if using_toolbox_default
@@ -95,7 +110,27 @@ function parameters = load_parameters(varargin)
              '  parameters = load_parameters(''config_projectX.yaml'', ''/path/to/project/config'');']);
     end
 
-    parameters = yaml_load_validated(default_config_path);
+    % Toolbox defaults are always the base layer; a project copy of
+    % config_default.yaml (prestus_config_init) pins its values on top.
+    parameters = yaml_load_validated(toolbox_default);
+    if ~using_toolbox_default
+        fprintf('Project defaults: %s\n', default_config_path);
+        project_defaults = yaml_load_validated(default_config_path);
+        report_stale_project_default(default_config_path, parameters, project_defaults);
+        parameters = mergestruct(parameters, project_defaults);
+        parameters = restore_struct_arrays(parameters, project_defaults);
+    end
+    known_keys  = parameters;          % for the unknown-key check below
+    extra_keys  = config_known_extra_keys(prestus_root);
+    calibration_cfg = fullfile(prestus_root, 'config', 'config_calibration.yaml');
+    if isfile(calibration_cfg)
+        % Calibration-workflow settings are loaded into parameters.calibration
+        if ~isfield(known_keys, 'calibration') || ~isstruct(known_keys.calibration)
+            known_keys.calibration = struct();
+        end
+        known_keys.calibration = mergestruct(known_keys.calibration, ...
+            yaml_load_validated(calibration_cfg));
+    end
 
     %% Merge with additional configuration files or structures
 
@@ -105,6 +140,7 @@ function parameters = load_parameters(varargin)
             extra_parameters = extra_config_file; % Use provided struct directly
         else
             extra_parameters = yaml_load_validated(fullfile(extra_config_file));
+            report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
         end
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
@@ -112,6 +148,7 @@ function parameters = load_parameters(varargin)
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
         extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
+        report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargs > 2
@@ -124,6 +161,7 @@ function parameters = load_parameters(varargin)
             extra_config_file = varargin{i};
             extra_config_location = varargin{i+1};
             extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
+            report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
             parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
         end
@@ -197,16 +235,17 @@ function parameters = load_parameters(varargin)
     % Check LD_LIBRARY_PATH existence and warn user if missing
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') && ...
        ~strcmp(parameters.hpc.ld_library_path, "") && ~exist(parameters.hpc.ld_library_path, 'dir')
-        assert(all(confirmation_dlg('The path `hpc.ld_library_path` has been specified but does not exist. Do you want to continue?', ...
-                                    'Yes', 'No')), 'Exiting');
+        confirm_or_warn(parameters, 'prestus:missingLdLibraryPath', ...
+            sprintf('The path `hpc.ld_library_path` (%s) has been specified but does not exist.', ...
+                    parameters.hpc.ld_library_path));
     end
 
     % Check segmentation software path existence and warn user if missing
     if isfield(parameters.startup, 'simnibs_bin_path') && ~strcmp(parameters.startup.simnibs_bin_path, "") && ...
        ~exist(fullfile(parameters.startup.simnibs_bin_path, 'charm'), 'file')
-        assert(all(confirmation_dlg(sprintf('charm does not exist at %s. Do you want to continue?', ...
-                                            parameters.startup.simnibs_bin_path), ...
-                                    'Yes', 'No')), 'Exiting');
+        confirm_or_warn(parameters, 'prestus:missingCharm', ...
+            sprintf('charm does not exist at %s (startup.simnibs_bin_path).', ...
+                    parameters.startup.simnibs_bin_path));
     elseif (~isfield(parameters.startup, 'simnibs_bin_path') || strcmp(parameters.startup.simnibs_bin_path, "")) && contains(parameters.simulation.medium, {'layered'})
         warn('prestus:noSimNIBS', 'No path to SimNIBS binaries provided. Segmentation and MNI-conversion may fail...');
     end
@@ -234,9 +273,9 @@ function parameters = load_parameters(varargin)
     %% MATLAB version check for compatibility
 
     % Warn user about outdated MATLAB versions (< R2022b)
-    if verLessThan('matlab', '9.13')
-       assert(all(confirmation_dlg('MATLAB appears to be outdated. Please update before continuing. Do you want to continue?', ...
-                                   'Yes', 'No')), 'Exiting');
+    if isMATLABReleaseOlderThan('R2022b')
+        confirm_or_warn(parameters, 'prestus:oldMatlab', ...
+            sprintf('MATLAB %s is older than R2022b; please update.', version('-release')));
     end
 
     %% Validate acoustic_backend value
@@ -364,4 +403,67 @@ function s = yaml_load_validated(yaml_path)
         error('load_parameters:invalidConfig', ...
             'Config file did not parse to a struct (got %s):\n  %s', class(s), yaml_path);
     end
+end
+
+function confirm_or_warn(parameters, id, message)
+% Ask whether to continue in an interactive desktop session; otherwise (batch,
+% HPC, simulation.interactive = 0) warn and continue, as no dialog can be shown.
+    interactive = isfield(parameters, 'simulation') && ...
+        isfield(parameters.simulation, 'interactive') && ...
+        parameters.simulation.interactive && usejava('desktop');
+    if interactive
+        assert(all(confirmation_dlg([message ' Do you want to continue?'], 'Yes', 'No')), ...
+            id, 'Exiting: %s', message);
+    else
+        warning(id, '%s Continuing (non-interactive session).', message);
+    end
+end
+
+function report_stale_project_default(project_path, toolbox, project)
+% Warn when a project copy of config_default.yaml lacks keys that the toolbox
+% default now has; those keys take their toolbox default values.
+    missing = config_unknown_keys(toolbox, project);
+    if isempty(missing)
+        return
+    end
+    shown = strjoin(missing(1:min(end, 12)), ', ');
+    if numel(missing) > 12
+        shown = sprintf('%s, ... (%d more)', shown, numel(missing) - 12);
+    end
+    warning('prestus:staleProjectDefault', ...
+        ['Project config_default.yaml (%s) lacks %d key(s) added to the toolbox default ' ...
+         'since it was copied; their toolbox defaults are used: %s. Run ' ...
+         'prestus_config_upgrade(''%s'') to refresh the copy.'], ...
+        project_path, numel(missing), shown, fileparts(project_path));
+end
+
+function report_unknown_keys(user, known, extra_keys, source)
+% Warn about study-config keys PRESTUS does not read (typos are otherwise
+% silently ignored and the default value is used).
+    [unknown, hints] = config_unknown_keys(user, known, extra_keys);
+    if isempty(unknown)
+        return
+    end
+    items = cell(size(unknown));
+    for i = 1:numel(unknown)
+        if isempty(hints{i})
+            items{i} = unknown{i};
+        else
+            items{i} = sprintf('%s (did you mean ''%s''?)', unknown{i}, hints{i});
+        end
+    end
+    warning('prestus:unknownConfigKey', ...
+        'Config %s has key(s) PRESTUS does not use; they are ignored:\n  %s', ...
+        char(source), strjoin(items, sprintf('\n  ')));
+end
+
+function tf = same_file(a, b)
+% True when two paths name the same file (resolves relative paths and links).
+    tf = false;
+    if ~isfile(a) || ~isfile(b)
+        return
+    end
+    ia = dir(a);
+    ib = dir(b);
+    tf = strcmp(fullfile(ia.folder, ia.name), fullfile(ib.folder, ib.name));
 end
