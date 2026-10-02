@@ -565,6 +565,9 @@ babelbrain:
   z_beyond_focus_mm: 40     # How far beyond the focus to extend the simulation domain [mm]
   python_env: ''            # Path to Python environment or executable; empty = system python
   ct_mapping: ''            # CT Hounsfield-to-property mapping name for CT-based skull modelling; empty = label-based path
+  air_regions: false        # pseudoCT path only (ct_mapping set): internal air (sinuses, mastoid) as BabelBrain's pressure-release reflector mask
+  air_hu_window: [-1200, -400] # HU range classified as air for air_regions
+  air_keep_boundary: false  # Keep air components touching the domain boundary (default: removed with the exterior air)
   cleanup_cache: true       # Delete per-subject BabelBrain cache dir after reading output; set false to keep HDF5/NIfTI files for debugging
 
 #------------  Medium properties

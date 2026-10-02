@@ -235,6 +235,18 @@ def parse_args():
                         'Valid: Webb-Marsac (default), Aubry, Pichardo, McDannold, '
                         'Marsac-Aubry, Pichardo-Marsac, McDannold-Marsac. '
                         'Only used when --use_ct is set.')
+    p.add_argument('--air_regions',         action='store_true',
+                   help='CT path only: write <target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz from the raw-HU '
+                        'CT.nii.gz (BabelBrain recipe: HU window, 3-voxel median filter, exterior air '
+                        'removed) and enable bExtractAirRegions, so BabelBrain treats internal air '
+                        '(sinuses, mastoid cells) as a pressure-release reflector. Ignored with --water_only.')
+    p.add_argument('--air_hu_window',       nargs=2, type=float, default=[-1200.0, -400.0],
+                   metavar=('LO', 'HI'),
+                   help='HU range classified as air for --air_regions (default -1200 -400, as BabelBrain).')
+    p.add_argument('--air_keep_boundary',   action='store_true',
+                   help='--air_regions: keep air components that touch the domain boundary. By default '
+                        'they are removed with the largest component, since cropping can split the '
+                        'exterior air (and the coupling gap in front of the transducer) into pieces.')
     p.add_argument('--use_petra',           action='store_true',
                    help="Pass bPETRA=True to __init__ -- uses Bjorn's density formula for "
                         'PETRA-sequence-derived pseudo-CT. Leave unset for ZTE/UTE pCT.')
@@ -1116,6 +1128,70 @@ _PRESTUS_TO_BB_MATERIAL = [
 ]
 
 
+def _write_air_regions(basedir, subject_id, target, freq, ppw, hu_window=(-1200.0, -400.0),
+                       keep_boundary=False):
+    """Write the AirRegions.nii.gz BabelBrain reads as its reflector mask (AIRMASK).
+
+    Mirrors BabelDatasetPreps.py's air extraction (bExtractAirRegions): voxels
+    of the raw-HU CT inside hu_window, 3-voxel median filter, connected
+    components, the largest component (air around the head) removed. In
+    addition, components touching the domain boundary are removed unless
+    keep_boundary is set: PRESTUS hands BabelBrain an already-cropped grid, in
+    which the exterior air -- including the coupling gap between transducer and
+    scalp, which is air (-1000 HU) in the pseudoCT but water in the
+    simulation -- can be split into several pieces.
+
+    Must run before _quantize_ct_for_babelbrain, which overwrites CT.nii.gz
+    with the index map. BabelBrain (BabelIntegrationBASE.RunCases) loads the
+    file from basedir/ID/<target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz with the
+    same axis-2 flip as the CT, so writing it on the CT grid keeps them aligned.
+    In the solver, stress and particle velocity are never updated inside the
+    mask (ReflectorMask), i.e. the region acts as a pressure-release reflector.
+    """
+    import nibabel as nib
+    from scipy import ndimage
+
+    freq_kHz = round(freq / 1e3)
+    stem = os.path.join(basedir, subject_id, f'{target}_{freq_kHz}kHz_{ppw}PPW_')
+    ct_path = stem + 'CT.nii.gz'
+    if not os.path.isfile(ct_path):
+        raise FileNotFoundError(f'[run_babelbrain_case] air regions: {ct_path} not found.')
+    ct_nii = nib.load(ct_path)
+    ct = np.asarray(ct_nii.get_fdata(), dtype=np.float64)
+
+    lo, hi = float(hu_window[0]), float(hu_window[1])
+    air = ((ct >= lo) & (ct <= hi)).astype(np.uint8)     # NaN padding compares False
+    air = ndimage.median_filter(air, 3)
+    labels, n = ndimage.label(air == 1, structure=np.ones((3, 3, 3)))
+    n_raw = int(air.sum())
+    removed = 0
+    if n > 0:
+        sizes = np.bincount(labels.ravel())[1:]
+        drop = {int(np.argmax(sizes)) + 1}
+        if not keep_boundary:
+            faces = [labels[0], labels[-1], labels[:, 0], labels[:, -1], labels[:, :, 0], labels[:, :, -1]]
+            for f in faces:
+                drop.update(int(v) for v in np.unique(f) if v > 0)
+        drop_mask = np.isin(labels, list(drop))
+        removed = int(drop_mask.sum())
+        air[drop_mask] = 0
+    n_kept = int(air.sum())
+    vox_mm3 = float(np.prod(ct_nii.header.get_zooms()[:3]))
+    print(f'[run_babelbrain_case] Air regions: HU [{lo:.0f}, {hi:.0f}], {n} component(s); '
+          f'{removed} exterior/boundary voxels removed, {n_kept} internal air voxels kept '
+          f'({n_kept * vox_mm3 / 1e3:.2f} cm³).')
+    if n_kept == 0:
+        print('[run_babelbrain_case] Air regions: no internal air in the simulation domain '
+              '(the mask is empty; results equal a run without --air_regions).')
+
+    out = stem + 'AirRegions.nii.gz'
+    img = nib.Nifti1Image(air, ct_nii.affine)
+    img.header.set_data_dtype(np.uint8)
+    img.to_filename(out)
+    print(f'[run_babelbrain_case] Air regions written: {out}')
+    return out, n_kept
+
+
 def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
     """Convert the raw-HU CT.nii.gz written by write_babelbrain_input.m into the
     quantized index-map format + companion CT-cal.npz that BabelBrain's CT path
@@ -1400,16 +1476,27 @@ def main():
         kw['bUseCT'] = True
         kw['MappingMethod'] = args.ct_mapping
         kw['bPETRA'] = args.use_petra
-        # BabelBrain only builds/reads an air mask when bExtractAirRegions=True
-        # (BabelIntegrationBASE.py RunCases: AIRMASK is only set to a real path
-        # in that case, otherwise None). PRESTUS does not currently generate the
-        # AirRegions.nii.gz file that would be required, so this stays disabled
-        # rather than pointing BabelBrain at a file that doesn't exist.
-        kw['bExtractAirRegions'] = False
+        # BabelBrain only reads an air mask when bExtractAirRegions=True
+        # (BabelIntegrationBASE.py RunCases sets AIRMASK to
+        # <target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz, else None). With
+        # --air_regions PRESTUS writes that file from the raw-HU CT first
+        # (before quantization overwrites CT.nii.gz). Never for water-only runs,
+        # where the reflector would sit in free water.
+        use_air = args.air_regions and not args.water_only
+        if use_air:
+            _write_air_regions(args.basedir, args.subject_id, args.target, args.freq, args.ppw,
+                               args.air_hu_window, args.air_keep_boundary)
+        elif args.air_regions:
+            print('[run_babelbrain_case] --air_regions ignored for the water-only run.')
+        kw['bExtractAirRegions'] = use_air
         print(f'[run_babelbrain_case] CT path enabled: mapping={args.ct_mapping}'
-              f'{"  bPETRA=True" if args.use_petra else ""}')
+              f'{"  bPETRA=True" if args.use_petra else ""}'
+              f'{"  air regions=on" if use_air else ""}')
         _quantize_ct_for_babelbrain(args.basedir, args.subject_id, args.target,
                                      args.freq, args.ppw)
+    elif args.air_regions:
+        print('[run_babelbrain_case] Warning: --air_regions needs --use_ct (pseudoCT path); ignored.',
+              file=sys.stderr)
 
     if args.weights_file and os.path.isfile(args.weights_file):
         kw['OptimizedWeightsFile'] = convert_weights_if_needed(args.weights_file)

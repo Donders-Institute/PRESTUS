@@ -56,6 +56,9 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 | `use_rayleigh_for_water` | Water-only solver. | `false` | `false` = FDTD (like-for-like with k-Wave/jwave). |
 | `q_correction` | Bone Q-factor correction (BabelBrain `QCorrection`) of the relaxation attenuation model. | `[]` | `[]` = 1.0 on the non-CT path (realises the specified bone `alpha_coeff`), BabelBrain's 3.0 on the CT path. Realised bone attenuation scales ~1/Q; values > 0 override both paths. |
 | `ct_mapping` | BabelBrain HU→property mapping. | `''` | Empty = label mask with PRESTUS `medium_properties`. See [CT-based skull properties](doc_babelbrain.md#ct-based-skull-properties-ct_mapping). |
+| `air_regions` | Internal air (sinuses, mastoid) as a pressure-release reflector mask. | `false` | Pseudo-CT path only (`ct_mapping` set); not applied to the free-water run. See [Internal air](doc_babelbrain.md#internal-air-air_regions). |
+| `air_hu_window` | HU range classified as air for `air_regions`. | `[-1200, -400]` | BabelBrain's default. |
+| `air_keep_boundary` | Keep air components touching the domain boundary. | `false` | By default they are removed with the exterior air (cropping can split it). |
 | `ct_use_petra` | PETRA density formula for `Webb-Marsac`. | `false` | |
 | `tx_mech_adjust_z_m` | Additional transducer standoff [m]. | `0` | Added to the automatic placement correction. |
 | `z_steering_m` | Pin BabelBrain `ZSteering` [m]. | `~` | Empty = auto-derived. |

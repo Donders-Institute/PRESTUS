@@ -241,6 +241,9 @@ fields:
   babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
   babelbrain.z_beyond_focus_mm: {unit: mm}
   babelbrain.python_env: {kind: path}
+  babelbrain.air_regions: {kind: bool, visible_if: {key: babelbrain.ct_mapping, not_in: ['']}}
+  babelbrain.air_hu_window: {kind: numbers, unit: HU}
+  babelbrain.air_keep_boundary: {kind: bool}
 
   medium_properties.*.sound_speed: {unit: m/s}
   medium_properties.*.density: {unit: kg/m³}

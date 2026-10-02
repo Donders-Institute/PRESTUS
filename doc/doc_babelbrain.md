@@ -203,6 +203,33 @@ The `Pichardo`, `McDannold`, and their `-Marsac` hybrids are **not replicated in
 
 When `ct_use_petra: true`, BabelBrain uses Björn's formula for the density step inside `Webb-Marsac` mode (`SimNIBS_PETRApct_Density`). This is appropriate when the pseudo-CT HU values were generated from a PETRA sequence via SimNIBS's ZTE/PETRA pipeline. For UTE-derived pCT (the default PRESTUS pCT source), leave `ct_use_petra: false`.
 
+#### Internal air (`air_regions`)
+
+On the pseudo-CT path, BabelBrain can treat internal air (frontal and sphenoid sinuses, mastoid cells) as a reflector. Air is not simulated as a material, because its low sound speed would force a tiny timestep. Instead, BabelBrain's solver never updates stress or particle velocity inside the air mask (`ReflectorMask` in BabelViscoFDTD), so the region acts as a pressure-release boundary with reflection close to −1. BabelBrain's own GUI enables this by default for CT/ZTE/PETRA input (*Generate air regions*). PRESTUS enables it with:
+
+```yaml
+babelbrain:
+  ct_mapping: Webb-Marsac
+  air_regions: true
+  air_hu_window: [-1200, -400]   # default, as BabelBrain
+  air_keep_boundary: false
+```
+
+`run_babelbrain_case.py` writes `<target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz` next to the CT input, on the same grid, using BabelBrain's recipe:
+1. Take the pseudo-CT voxels within `air_hu_window`.
+2. Apply a 3-voxel median filter and find connected components (26-connectivity).
+3. Remove the largest component (the air around the head).
+
+PRESTUS additionally removes every component that touches the domain boundary (`air_keep_boundary: false`). PRESTUS hands BabelBrain an already-cropped grid, so the exterior air can be split into several pieces. That includes the gap between transducer and scalp, which is −1000 HU in the pseudo-CT but water in the simulation and would otherwise block the beam. It then sets `bExtractAirRegions`. The log reports the voxel count and volume of the internal air that was kept.
+
+Limitations:
+
+- **Pseudo-CT only.** It needs `ct_mapping`. On the label path, PRESTUS has no air label (SimNIBS background is water), so the option is ignored with a warning.
+- **Free-water runs never get the mask.** The water baseline and `water_amp_calibration` are unaffected.
+- **Air depends on the pseudo-CT.** In PRESTUS's UTE pseudo-CT, label-0 voxels are −1000 HU and skull voxels are mapped from UTE intensity, so air cells inside the skull mask are captured only where their mapped HU falls in the window. Check the written `AirRegions.nii.gz` against the anatomy.
+- **Air touching the domain boundary is dropped.** Internal air cut by the domain boundary is removed together with the exterior air. Set `air_keep_boundary: true` if a sinus is cut by the domain edge and no exterior air touches the boundary.
+- **No k-Wave equivalent.** k-Wave cannot freeze fields voxel-wise (pseudospectral), so k-Wave and BabelBrain runs differ wherever the beam meets internal air.
+
 #### UTE image as direct BabelBrain CT input
 
 Providing the raw UTE NIfTI directly (rather than a pre-processed pseudo-CT) is technically supported by setting `ct_mapping` and passing a UTE volume as `pseudoCT`. The UTE HU-like intensities will then be fed into BabelBrain's mapping pipeline. However:

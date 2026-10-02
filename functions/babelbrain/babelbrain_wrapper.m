@@ -62,6 +62,14 @@ function sensor_data = babelbrain_wrapper( ...
 %   .ct_use_petra       - logical; set true when the HU values in pseudoCT were derived from a
 %                         PETRA sequence (uses Björn's density formula in BabelBrain).
 %                         Default false (appropriate for ZTE/UTE-derived pCT).
+%   .air_regions        - logical (default false). pseudoCT path only (ct_mapping set): model
+%                         internal air (sinuses, mastoid cells) as BabelBrain's pressure-release
+%                         reflector mask. The mask is the pseudoCT HU window air_hu_window,
+%                         median-filtered, with the exterior air (largest component and, unless
+%                         air_keep_boundary, every component touching the domain boundary)
+%                         removed. Not applied to the free-water run.
+%   .air_hu_window      - [lo hi] HU range classified as air (default [-1200 -400], as BabelBrain).
+%   .air_keep_boundary  - logical (default false). Keep air components touching the domain boundary.
 %   .water_amp_calibration - logical (default true). Scale the output pressure by
 %                         k = sqrt(target_isppa_wcm2 / achieved free-water ISPPA), so the
 %                         free-water ISPPA matches the transducer's intended value. Applied only
@@ -201,6 +209,14 @@ bb = apply_default(bb, 'z_steering_m',       []);   % empty = auto-derived below
 bb = apply_default(bb, 'root',               '');
 bb = apply_default(bb, 'ct_mapping',         '');   % empty = label-based path
 bb = apply_default(bb, 'ct_use_petra',       false);
+bb = apply_default(bb, 'air_regions',        false);   % pseudoCT path: internal air as reflector
+bb = apply_default(bb, 'air_hu_window',      [-1200 -400]);
+bb = apply_default(bb, 'air_keep_boundary',  false);
+if bb.air_regions && isempty(bb.ct_mapping)
+    warning('babelbrain_wrapper:airRegionsNeedCT', ...
+        ['babelbrain.air_regions needs the pseudoCT path (babelbrain.ct_mapping set): air is ' ...
+         'taken from the pseudoCT HU values. Ignored for this run.']);
+end
 bb = apply_default(bb, 'cleanup_cache',      true);   % delete BabelBrain cache dir after reading output
 bb = apply_default(bb, 'source_amp_pa',     []);    % [] = use BabelBrain built-in default (~50 kPa)
 bb = apply_default(bb, 'water_amp_calibration', true);  % scale output to the intended free-water ISPPA
@@ -610,6 +626,9 @@ else
 end
 if ~isempty(bb.ct_mapping)
     fprintf('[babelbrain_wrapper]  CT mapping:       %s  (pseudoCT path active)\n', bb.ct_mapping);
+    if bb.air_regions
+        fprintf('[babelbrain_wrapper]  Air regions:      on  (HU [%g %g], reflector mask)\n', bb.air_hu_window);
+    end
 end
 
 % --- Focus position in grid ---
@@ -904,6 +923,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     bb_usect_flag(~isempty(bb.ct_mapping)), ...
     bb_ctmapping_flag(bb.ct_mapping), ...
     bb_petra_flag(bb.ct_use_petra), ...
+    bb_air_flag(bb), ...
     bb_medium_json_flag(medium_json_path), ...
     bb_wateronly_flag(is_water_medium), ...
     bb_rayleigh_water_flag(bb.use_rayleigh_for_water), ...
@@ -1277,6 +1297,19 @@ end
 function flag = bb_ctmapping_flag(ct_mapping)
     if ~isempty(ct_mapping)
         flag = {'--ct_mapping', ct_mapping};
+    else
+        flag = {};
+    end
+end
+
+function flag = bb_air_flag(bb)
+    % Transcranial run only; the free-water run never gets the reflector mask
+    if bb.air_regions && ~isempty(bb.ct_mapping)
+        flag = {'--air_regions', '--air_hu_window', ...
+            sprintf('%g', bb.air_hu_window(1)), sprintf('%g', bb.air_hu_window(2))};
+        if bb.air_keep_boundary
+            flag{end+1} = '--air_keep_boundary';
+        end
     else
         flag = {};
     end
