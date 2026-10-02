@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 
 from . import yamlio
+from .merge import is_empty, mergestruct  # noqa: F401  (re-exported)
 from .schema import Node, Schema
 
 if TYPE_CHECKING:
@@ -24,25 +25,7 @@ if TYPE_CHECKING:
 TX = "transducer"
 
 
-# ── Merge semantics (functions/helper/mergestruct.m) ─────────────────────
-
-def is_empty(value: Any) -> bool:
-    """MATLAB isempty() for values read from YAML ('' and [] and ~ are empty)."""
-    return value is None or value == [] or value == "" or value == {}
-
-
-def mergestruct(a: Any, b: Any) -> Any:
-    """Python port of PRESTUS mergestruct: b's non-struct values replace a's."""
-    if not isinstance(b, dict):
-        return copy.deepcopy(a)
-    res = copy.deepcopy(a) if isinstance(a, dict) else {}
-    for key, new in b.items():
-        old = res.get(key) if isinstance(a, dict) else None
-        if is_empty(old) or not isinstance(new, dict):
-            res[key] = copy.deepcopy(new)
-        else:
-            res[key] = mergestruct(old, new)
-    return res
+# Merge semantics (functions/helper/mergestruct.m): see merge.py
 
 
 def _merge_unset(base: dict, override: dict) -> dict:

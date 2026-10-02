@@ -269,8 +269,52 @@ def library_issues(model: ConfigModel) -> list[Issue]:
     return issues
 
 
+def isppa_issues(model: ConfigModel) -> list[Issue]:
+    """Whether transducer.target_isppa_wcm2 can be met (needs_water_baseline.m,
+    isppa_scale_factor.m): the free-water baseline must run unless the library
+    calibration supplies a matching ISPPA."""
+    issues: list[Issue] = []
+    mode = model.get("modules.run_water_baseline")
+    off = mode in (0, False, "0")
+    for ti, t in enumerate(model.effective_transducers()):
+        target = t.get("target_isppa_wcm2")
+        if not _is_num(target):
+            continue                       # empty (drive level) or a multi-ISPPA vector
+        ann = t.get("annular") or {}
+        inline_drive = isinstance(ann, dict) and not is_empty(ann.get("elem_p_amp"))
+        library_drive = not is_empty(t.get("serial")) and not inline_drive
+        if library_drive:
+            continue                       # calibration ISPPA from the library
+        if off:
+            level = "warning" if not is_empty(t.get("serial")) else "error"
+            issues.append(Issue(level, "modules.run_water_baseline",
+                                f"target_isppa_wcm2 = {target:g} W/cm² needs a free-water baseline "
+                                "(this transducer has no library calibration), but "
+                                "run_water_baseline is 0: PRESTUS stops with prestus:isppa:noBaseline. "
+                                "Use 'auto', or set target_isppa_wcm2: [] to report the drive level", ti))
+        elif mode != 1:
+            issues.append(Issue("info", f"{TX}.target_isppa_wcm2",
+                                f"An extra free-water simulation runs to scale the field to "
+                                f"{target:g} W/cm² (no library calibration; run_water_baseline: auto). "
+                                "Set target_isppa_wcm2: [] to report the elem_p_amp drive level", ti))
+    return issues
+
+
+def defaults_issues(model: ConfigModel) -> list[Issue]:
+    """A project copy of config_default.yaml that predates toolbox keys (load_parameters.m)."""
+    schema = model.schema
+    if schema.project_path is None or not schema.stale_keys:
+        return []
+    shown = ", ".join(schema.stale_keys[:4]) + (", …" if len(schema.stale_keys) > 4 else "")
+    return [Issue("warning", "",
+                  f"The project's config_default.yaml lacks {len(schema.stale_keys)} key(s) added to "
+                  f"PRESTUS since it was copied ({shown}); they use the toolbox defaults. "
+                  "Tools ▸ Update project defaults… refreshes the copy")]
+
+
 def all_issues(model: ConfigModel) -> list[Issue]:
     order = {"error": 0, "warning": 1, "info": 2}
     issues = (value_issues(model) + model.unknown_keys()
-              + subject_issues(model) + rule_issues(model) + library_issues(model))
+              + subject_issues(model) + rule_issues(model) + library_issues(model)
+              + isppa_issues(model) + defaults_issues(model))
     return sorted(issues, key=lambda i: order.get(i.level, 3))

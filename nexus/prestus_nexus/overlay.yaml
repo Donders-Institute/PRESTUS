@@ -80,6 +80,8 @@ fields:
 
   # ── I/O ──────────────────────────────────────────────────────────────
   io.overwrite_files: {choices: [never, always, force, ask]}
+  io.cache_signature_check: {choices: [error, warn, 'off']}
+  modules.run_water_baseline: {choices: [auto, 1, 0]}
   io.overwrite_simnibs: {kind: flag}
   io.save_*: {kind: flag}
 
@@ -475,6 +477,7 @@ display:
   # I/O
   io.output_affix: {label: Output name affix}
   io.overwrite_files: {label: Overwrite existing outputs, help: "What to do when outputs already exist: 'never' reuses them; 'always' recomputes the outputs (chained pipelines reuse intermediate caches); 'force' also recomputes intermediate stages; any other value asks. See doc_outputs.md#overwrite-behaviour."}
+  io.cache_signature_check: {label: Check reused caches, help: "When a grid or medium cache is reused (overwrite 'never', or intermediate stages of chained pipelines) but was built with different settings: 'error' stops, 'warn' reuses it anyway, 'off' skips the check. See doc_outputs.md#cache-reuse-checks."}
   io.overwrite_simnibs: {label: Re-run SimNIBS segmentation, advanced: true}
   io.save_*: {advanced: true}
   io.save_MNI: {label: Also save MNI-space NIfTIs, advanced: false}
@@ -498,7 +501,7 @@ display:
   modules.run_grid_setup: {label: Grid and head model}
   modules.run_medium_setup: {label: Medium properties}
   modules.run_source_setup: {label: Acoustic source}
-  modules.run_water_baseline: {label: Free-water baseline run}
+  modules.run_water_baseline: {label: Free-water baseline run, help: "Free-water simulation that measures the ISPPA of the current drive, so results can be scaled to transducer.target_isppa_wcm2. 'auto' runs it when a target needs it (no library calibration, or a target different from it); 1 always; 0 only when the target differs from a calibration. A target that cannot be met stops the run. See doc_simulations-acoustic.md#isppa-targeting."}
   modules.run_acoustic_sims: {label: Acoustic simulation, advanced: false}
   modules.run_acoustic_analysis: {label: Acoustic analysis}
   modules.run_heating_sims: {label: Thermal simulation, advanced: false}

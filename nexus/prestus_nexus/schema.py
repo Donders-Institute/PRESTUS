@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from . import yamlio
+from .merge import is_empty, mergestruct
 
 OVERLAY_PATH = Path(__file__).with_name("overlay.yaml")
 
@@ -153,14 +154,88 @@ def infer_kind(value: Any) -> str:
 
 # ── Schema ───────────────────────────────────────────────────────────────
 
+TOOLBOX_DEFAULT = Path(__file__).resolve().parents[2] / "config" / "config_default.yaml"
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    try:
+        return a.resolve() == b.resolve() or a.samefile(b)
+    except OSError:
+        return False
+
+
+def _leaf_paths(data: Any, prefix: str = "") -> list[str]:
+    out: list[str] = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            path = f"{prefix}.{k}" if prefix else str(k)
+            if isinstance(v, dict) and v:
+                out.extend(_leaf_paths(v, path))
+            else:
+                out.append(path)
+    return out
+
+
+def _get(data: Any, path: str) -> Any:
+    for part in path.split("."):
+        if not isinstance(data, dict) or part not in data:
+            return _ABSENT
+        data = data[part]
+    return data
+
+
+_ABSENT = object()
+
+
+def _missing_keys(toolbox: dict, project: dict) -> list[str]:
+    """Leaf keys of the toolbox default absent from a project copy."""
+    return [p for p in _leaf_paths(toolbox) if _get(project, p) is _ABSENT]
+
+
+def _differing_values(project: dict, toolbox: dict) -> dict[str, tuple[Any, Any]]:
+    """Leaf values a project copy sets differently: {key: (project, toolbox)}."""
+    out: dict[str, tuple[Any, Any]] = {}
+    for p in _leaf_paths(project):
+        tv = _get(toolbox, p)
+        pv = _get(project, p)
+        if tv is not _ABSENT and pv != tv and not (is_empty(pv) and is_empty(tv)):
+            out[p] = (pv, tv)
+    return out
+
+
+def _ordered_merge(toolbox: dict, project: dict) -> dict:
+    """mergestruct(toolbox, project), keeping the toolbox key order."""
+    return mergestruct(toolbox, project)
+
+
 class Schema:
     """Key tree for one config_default.yaml."""
 
-    def __init__(self, default_path: str | Path, overlay_path: str | Path = OVERLAY_PATH):
+    def __init__(self, default_path: str | Path, overlay_path: str | Path = OVERLAY_PATH,
+                 toolbox_path: str | Path | None = None):
+        """default_path: the config_default.yaml a study is merged onto (a project
+        copy or the toolbox file). As in load_parameters, a project copy is merged
+        on top of the toolbox default, so keys added to the toolbox since the copy
+        was made keep their defaults; stale_keys lists them and pinned the values
+        the copy sets differently."""
         self.default_path = Path(default_path)
+        self.toolbox_path = Path(toolbox_path) if toolbox_path else TOOLBOX_DEFAULT
         text = self.default_path.read_text(encoding="utf-8")
-        self.defaults: dict = yamlio.load(text) or {}
+        own: dict = yamlio.load(text) or {}
         helps = extract_help(text)
+        self.project_path: Path | None = None
+        self.stale_keys: list[str] = []
+        self.pinned: dict[str, tuple[Any, Any]] = {}
+        if self.toolbox_path.is_file() and not _same_file(self.toolbox_path, self.default_path):
+            tb_text = self.toolbox_path.read_text(encoding="utf-8")
+            toolbox = yamlio.load(tb_text) or {}
+            self.project_path = self.default_path
+            self.stale_keys = _missing_keys(toolbox, own)
+            self.pinned = _differing_values(own, toolbox)
+            self.defaults: dict = _ordered_merge(toolbox, own)
+            helps = {**helps, **extract_help(tb_text)}
+        else:
+            self.defaults = own
         overlay = yamlio.load_file(overlay_path) or {}
         self.sections: dict[str, dict] = overlay.get("sections", {}) or {}
         self.tabs: list[dict] = overlay.get("tabs", []) or []

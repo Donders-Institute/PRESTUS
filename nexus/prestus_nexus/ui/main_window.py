@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QDockWidget, QFileDialog, 
 from .. import checks
 from ..model import TX, ConfigModel, iter_leaves
 from ..paths import DEFAULT_NAME, base_default_for, toolbox_default
+from ..project_defaults import carry_pinned_values, replace_project_default
 from ..schema import GENERAL, Schema
 from ..session import Session
 from . import style
@@ -80,7 +81,9 @@ class ReviewPage(QWidget):
         n_warn = sum(1 for i in self.window.issues if i.level == "warning")
         self.info.setText(
             f"<b>File:</b> {m.path or '(not saved)'}<br>"
-            f"<b>Merged onto:</b> {m.schema.default_path}<br>"
+            + (f"<b>Merged onto:</b> {m.schema.toolbox_path} + project defaults "
+               f"{m.schema.project_path}<br>" if m.schema.project_path is not None
+               else f"<b>Merged onto:</b> {m.schema.default_path}<br>") +
             f"<b>{m.modified_count()}</b> value(s) differ from the defaults · "
             f"{n_err} error(s), {n_warn} warning(s) — see the Issues panel.")
 
@@ -335,7 +338,12 @@ class MainWindow(QMainWindow):
     def _build_tools_menu(self) -> None:
         tools = self.menuBar().addMenu("&Tools")
         for text, slot in [("Localite marker ingest (neuronav_gui)…", self.open_neuronav_gui),
-                           ("Transducer calibration (calibration_gui)…", self.open_calibration_gui)]:
+                           ("Transducer calibration (calibration_gui)…", self.open_calibration_gui),
+                           (None, None),
+                           ("Update project defaults…", self.update_project_defaults)]:
+            if text is None:
+                tools.addSeparator()
+                continue
             action = QAction(text, self)
             action.triggered.connect(slot)
             tools.addAction(action)
@@ -682,7 +690,7 @@ class MainWindow(QMainWindow):
             if not path:
                 return None
         path = Path(path).resolve()
-        model = ConfigModel.from_file(Schema(base_default_for(path, self.prestus_root)), path,
+        model = ConfigModel.from_file(Schema(base_default_for(path, self.prestus_root), toolbox_path=toolbox_default(self.prestus_root)), path,
                                       self.model.library)
         return self._switch_to(model)
 
@@ -706,9 +714,56 @@ class MainWindow(QMainWindow):
                     == QMessageBox.StandardButton.Yes
             if copy_default:
                 shutil.copy2(toolbox_default(self.prestus_root), local)
-        model = ConfigModel(Schema(base_default_for(target, self.prestus_root)), self.model.library)
+        model = ConfigModel(Schema(base_default_for(target, self.prestus_root), toolbox_path=toolbox_default(self.prestus_root)), self.model.library)
         model.save(target, header=study_header(target))
         return self._switch_to(model)
+
+    def update_project_defaults(self) -> "MainWindow | None":
+        """Refresh the project's config_default.yaml from the toolbox (prestus_config_upgrade)."""
+        schema = self.model.schema
+        if schema.project_path is None:
+            QMessageBox.information(self, "Project defaults",
+                                    "This study is merged onto the toolbox config_default.yaml directly; "
+                                    "there is no project copy to update.")
+            return None
+        if not schema.stale_keys and not schema.pinned:
+            QMessageBox.information(self, "Project defaults",
+                                    f"{schema.project_path} matches the toolbox default.")
+            return None
+        if self.model.path is None:
+            QMessageBox.information(self, "Project defaults", "Save the study config first.")
+            return None
+        pinned = [f"{k}: {pv!r} (toolbox: {tv!r})" for k, (pv, tv) in schema.pinned.items()]
+        box = QMessageBox(self)
+        box.setWindowTitle("Update project defaults")
+        box.setText(
+            f"<b>{schema.project_path}</b><br><br>"
+            f"{len(schema.stale_keys)} key(s) added to PRESTUS are missing from this copy; "
+            f"{len(pinned)} value(s) are pinned differently from the toolbox default.<br><br>"
+            "Replacing the copy with the toolbox default keeps a dated backup. "
+            "<i>Keep pinned values</i> first writes the pinned values into the study config, "
+            "so the simulation settings stay the same. The study config is saved.")
+        box.setDetailedText("Pinned values:\n" + ("\n".join(pinned) or "(none)") +
+                            "\n\nMissing keys:\n" + ("\n".join(schema.stale_keys) or "(none)"))
+        keep = box.addButton("Keep pinned values", QMessageBox.ButtonRole.AcceptRole)
+        plain = box.addButton("Use toolbox values", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked not in (keep, plain):
+            return None
+        if clicked is keep:
+            carry_pinned_values(self.model, schema.pinned)
+        self.model.save(header=study_header(self.model.path))
+        backup = replace_project_default(schema.project_path, toolbox_default(self.prestus_root))
+        self.dirty = False
+        model = ConfigModel.from_file(
+            Schema(base_default_for(self.model.path, self.prestus_root),
+                   toolbox_path=toolbox_default(self.prestus_root)),
+            self.model.path, self.model.library)
+        window = self._switch_to(model)
+        window.statusBar().showMessage(f"Project defaults refreshed; backup: {backup.name}", 10000)
+        return window
 
     def save(self) -> bool:
         if self.model.path is None:
