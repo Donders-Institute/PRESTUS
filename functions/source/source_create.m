@@ -268,7 +268,12 @@ end
 
             for el_i = 1:tr.(tr.type).elem_n
                 grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
-                source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) > 0.25);
+                % Keep every grid point with a non-zero BLI weight, including the
+                % negative sinc side lobes, as the 3D path (getElementBinaryMask)
+                % and k-Wave do. A positive threshold (formerly > 0.25) drops part
+                % of the band-limited source and raised the free-water focal
+                % pressure by 6-11 % (ITRUSST BM1, 0.5-0.25 mm; see test_itrusst_benchmark).
+                source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) ~= 0);
             end
 
             source.p_mask        = source_mask_full(:, kgrid.Ny:end);
