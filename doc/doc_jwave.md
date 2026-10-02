@@ -227,7 +227,7 @@ Finite-difference time-domain solver. Use `jwave.fd_accuracy` to set the spatial
 | `python_env` | string | `''` | Full path to the **bin directory** of the CPU jwave environment. Empty = system `python3`. |
 | `python_env_gpu` | string | `''` | Full path to the **bin directory** of the GPU (CUDA) jwave environment. Empty = always use CPU env. |
 | `use_gpu` | bool/empty | `[]` | GPU selection override. `[]` = auto-detect via `nvidia-smi`; `true` = force GPU env (errors if `python_env_gpu` unset); `false` = force CPU env. |
-| `dry_run` | bool | `false` | If true, write HDF5 inputs but skip the simulation. Useful for inspecting the grid before running. |
+| `dry_run` | bool | `false` | If true, write HDF5 inputs but skip the simulation. The pipeline then stops after the acoustic stage (no analysis, thermal or report) and nothing is cached. Useful for inspecting the grid before running. |
 | `gmres_restart` | int | `10` | GMRES Krylov subspace size. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `gmres_maxiter` | int | `1000` | Maximum GMRES outer iterations. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `fd_accuracy` | int | `8` | Spatial stencil order. `finite_differences` solver only. |

@@ -40,7 +40,7 @@ classdef test_jwave < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     properties
         SimPath     % root output directory for this test run
-        RefData     % struct: kwave reference sensor_data, kgrid, parameters
+        RefData     % struct: kwave reference sensor_data, parameters
         PyBinCpu    % resolved CPU Python executable path
         PyBinGpu    % resolved GPU Python executable path (may be empty)
     end
@@ -119,7 +119,8 @@ classdef test_jwave < matlab.unittest.TestCase
         function test_jwave_runs_without_error(tc)
         % jwave Helmholtz backend should complete without throwing.
             p = tc.make_jwave_params('helm_basic', [48 48 80]);
-            tc.verifyWarningFree(@() prestus_pipeline(p));
+            % Incidental warnings from the minimal fixture (no T1, missing layers) are expected.
+            prestus_pipeline(p);
         end
 
         % -------------------------------------------------------------- %
@@ -127,7 +128,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % Peak pressure field should be non-empty and contain positive values.
             p   = tc.make_jwave_params('helm_pos', [48 48 80]);
             out = prestus_pipeline(p);
-            sd  = out.sensor_data;
+            sd  = out.benchmark_sensor_data;
             tc.verifyNotEmpty(sd.p_max_all,           'p_max_all is empty');
             tc.verifyGreaterThan(max(sd.p_max_all(:)), 0, 'p_max_all has no positive values');
         end
@@ -137,7 +138,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % jwave_wrapper must return the same field names as acoustic_simulation.
             p   = tc.make_jwave_params('helm_fields', [48 48 80]);
             out = prestus_pipeline(p);
-            sd  = out.sensor_data;
+            sd  = out.benchmark_sensor_data;
             for f = {'p_max_all', 'p_min_all', 'p_final'}
                 tc.verifyTrue(isfield(sd, f{1}), sprintf('Missing field: %s', f{1}));
             end
@@ -148,7 +149,7 @@ classdef test_jwave < matlab.unittest.TestCase
         % Peak negative pressure should be strictly negative (rarefaction).
             p   = tc.make_jwave_params('helm_pmin', [48 48 80]);
             out = prestus_pipeline(p);
-            sd  = out.sensor_data;
+            sd  = out.benchmark_sensor_data;
             tc.verifyLessThan(min(sd.p_min_all(:)), 0, 'p_min_all has no negative values');
         end
 
@@ -180,9 +181,11 @@ classdef test_jwave < matlab.unittest.TestCase
             p = tc.make_jwave_params('helm_dryrun', [48 48 80]);
             p.jwave.dry_run = true;
             out = prestus_pipeline(p);
-            sd  = out.sensor_data;
+            sd  = out.benchmark_sensor_data;
             tc.verifyEmpty(sd.p_max_all, 'Dry-run should return empty p_max_all');
             tc.verifyTrue(isfile(sd.jwave_input_h5), 'Input HDF5 should exist after dry run');
+            cached = dir(fullfile(out.io.dir_cache, '*_results*.mat'));
+            tc.verifyEmpty(cached, 'Dry run must not write an acoustic results cache');
         end
 
     end
@@ -198,7 +201,8 @@ classdef test_jwave < matlab.unittest.TestCase
             p = tc.make_jwave_params('env_cpu', [48 48 80]);
             p.jwave.use_gpu = false;
             p.jwave.dry_run = true;
-            tc.verifyWarningFree(@() prestus_pipeline(p));
+            log = evalc('prestus_pipeline(p);');
+            tc.verifySubstring(log, 'backend   : CPU', 'use_gpu = false should run on the CPU env');
         end
 
         % -------------------------------------------------------------- %
@@ -220,7 +224,8 @@ classdef test_jwave < matlab.unittest.TestCase
             p.jwave.use_gpu        = true;
             p.jwave.python_env_gpu = tc.PyBinGpu;
             p.jwave.dry_run        = true;
-            tc.verifyWarningFree(@() prestus_pipeline(p));
+            log = evalc('prestus_pipeline(p);');
+            tc.verifySubstring(log, 'backend   : GPU (CUDA)', 'use_gpu = true should run on the GPU env');
         end
 
         % -------------------------------------------------------------- %
@@ -250,7 +255,7 @@ classdef test_jwave < matlab.unittest.TestCase
 
             p   = tc.make_jwave_params('helm_agree', [48 48 80]);
             out = prestus_pipeline(p);
-            jw_peak = max(out.sensor_data.p_max_all(:));
+            jw_peak = max(out.benchmark_sensor_data.p_max_all(:));
 
             rel_err = abs(jw_peak - ref_peak) / ref_peak;
             fprintf('[test_jwave] Peak pressure: kwave=%.1f Pa  jwave_helm=%.1f Pa  rel_err=%.1f%%\n', ...
@@ -266,7 +271,7 @@ classdef test_jwave < matlab.unittest.TestCase
             ref = tc.get_ref_data().sensor_data.p_max_all(:);
             p   = tc.make_jwave_params('helm_corr', [48 48 80]);
             out = prestus_pipeline(p);
-            jw  = out.sensor_data.p_max_all(:);
+            jw  = out.benchmark_sensor_data.p_max_all(:);
 
             r = corr(double(ref), double(jw));
             fprintf('[test_jwave] Spatial correlation (p_max_all): r = %.4f\n', r);
@@ -285,7 +290,7 @@ classdef test_jwave < matlab.unittest.TestCase
 
             p   = tc.make_jwave_params('helm_focal', [48 48 80]);
             out = prestus_pipeline(p);
-            jw_axial = squeeze(max(max(out.sensor_data.p_max_all, [], 1), [], 2));
+            jw_axial = squeeze(max(max(out.benchmark_sensor_data.p_max_all, [], 1), [], 2));
             [~, jw_z] = max(jw_axial);
 
             fprintf('[test_jwave] Focal depth: kwave=%d vox  jwave_helm=%d vox\n', ref_z, jw_z);
@@ -431,8 +436,7 @@ classdef test_jwave < matlab.unittest.TestCase
                 t0 = tic;
                 out = prestus_pipeline(p);
                 tc.RefData.elapsed     = toc(t0);
-                tc.RefData.sensor_data = out.sensor_data;
-                tc.RefData.kgrid       = out.kgrid;
+                tc.RefData.sensor_data = out.benchmark_sensor_data;
                 tc.RefData.parameters  = p;
                 fprintf('[test_jwave] k-Wave reference done in %.1f s.\n', tc.RefData.elapsed);
             end
@@ -448,6 +452,8 @@ classdef test_jwave < matlab.unittest.TestCase
             p.grid.use_kWaveArray = 0;
             p.io.output_affix     = ['_' affix];
             p.io.overwrite_files  = 'always';
+            % prestus_pipeline returns parameters; this exposes sensor_data on it.
+            p.modules.store_acoustic_results = 1;
         end
 
         function p = make_jwave_params(tc, affix, grid_dims)

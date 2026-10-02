@@ -38,7 +38,8 @@ function [sensor_data, parameters, kgrid, kwave_medium, medium_masks, ...
 % Outputs:
 %   sensor_data       - struct with p_max_all field (Pa), or char NIfTI path
 %                       for external acoustic input, or [] when unavailable
-%   parameters        - updated with state.acoustics_available flag
+%   parameters        - updated with state.acoustics_available and
+%                       state.acoustic_dry_run flags
 %   kgrid, kwave_medium, medium_masks, segmentation, source, source_labels -
 %                       updated by k-Wave path; unchanged for other backends
 
@@ -68,6 +69,7 @@ filename_sensor_data = fullfile(parameters.io.dir_cache, ...
     parameters.subject_id, parameters.simulation.medium, acoustic_file_affix));
 
 parameters.state.acoustics_available = 0;
+parameters.state.acoustic_dry_run    = false;
 
 % --- External acoustic NIfTI (e.g. from BabelBrain or a prior PRESTUS run) ---
 % When io.external_acoustic_nifti is set, all acoustic sim stages are skipped
@@ -101,6 +103,11 @@ if run_new_sim
         parameters, kgrid, kwave_medium, source, sensor, medium_masks, ...
         segmentation, source_labels, acoustic_provenance, planimg, ...
         trans_pos, focus_pos, pseudoCT, filename_sensor_data);
+    if parameters.state.acoustic_dry_run
+        % Inputs written, nothing simulated: there is no field to scale or analyse.
+        parameters.modules.run_acoustic_analysis = 0;
+        return;
+    end
     sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
     parameters.state.acoustics_available = 1;
 
@@ -161,6 +168,11 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 
 use_babelbrain = strcmpi(acoustic_backend_name(parameters), 'babelbrain');
 use_jwave      = strcmpi(acoustic_backend_name(parameters), 'jwave');
+% A dry run (jwave/BabelBrain) writes the solver inputs and returns no field;
+% it is never cached, so a later real run cannot load the empty result.
+parameters.state.acoustic_dry_run = is_acoustic_dry_run(parameters);
+save_cache = should_save_output(parameters.io, 'save_acoustic_matrices') && ...
+    ~parameters.state.acoustic_dry_run;
 
 if use_babelbrain
     sensor_data = babelbrain_wrapper( ...
@@ -174,6 +186,7 @@ if use_babelbrain
     end
     if isfield(sensor_data, 'freefield_isppa_wcm2') && isfinite(sensor_data.freefield_isppa_wcm2)
         acoustic_provenance.freefield_isppa_wcm2             = sensor_data.freefield_isppa_wcm2;
+        acoustic_provenance.freefield_source                 = 'babelbrain_water_sim';
         acoustic_provenance.tx_calibration.isppa_wcm2        = sensor_data.freefield_isppa_wcm2;
         acoustic_provenance.tx_calibration.isppa_source      = 'babelbrain_water_sim';
         % A k-Wave baseline profile from acoustic_water_baseline is at the
@@ -182,11 +195,10 @@ if use_babelbrain
             acoustic_provenance = rmfield(acoustic_provenance, 'freefield_axial');
         end
     end
-    if should_save_output(parameters.io, 'save_acoustic_matrices')
+    if save_cache
         cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
             acoustic_provenance, struct('parameters', parameters, 'backend', 'babelbrain'), kwave_medium);
         fprintf('[pipeline] babelbrain sensor_data cached: %s\n', filename_sensor_data);
-        acoustic_provenance.freefield_source                 = 'babelbrain_water_sim';
     end
 
 elseif use_jwave
@@ -202,7 +214,7 @@ elseif use_jwave
     if isfield(sensor_data, 'jwave_pml_size')
         parameters.grid.pml_size_effective = sensor_data.jwave_pml_size;
     end
-    if should_save_output(parameters.io, 'save_acoustic_matrices')
+    if save_cache
         jw_solver = 'helmholtz';
         if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')
             jw_solver = parameters.jwave.solver;
@@ -245,6 +257,9 @@ if ~cached_ok && live_ok
     fprintf('[acoustic_stage] Using free-water baseline from this run (%.2f W/cm²); cached value unavailable.\n', ...
         live.freefield_isppa_wcm2);
     provenance.freefield_isppa_wcm2 = live.freefield_isppa_wcm2;
+    if isfield(live, 'freefield_source')
+        provenance.freefield_source = live.freefield_source;
+    end
     if isfield(live, 'tx_calibration')
         provenance.tx_calibration = live.tx_calibration;
     end
@@ -253,6 +268,3 @@ if ~cached_ok && live_ok
     end
 end
 end
-    if isfield(live, 'freefield_source')
-        provenance.freefield_source = live.freefield_source;
-    end

@@ -328,6 +328,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - `getidx` returns each label index once; `load_parameters` heterogeneous struct-array error now has the identifier `prestus:heterogeneousStructArray`; the deprecated Python GUI tails the correct log file
 - Security hardening: annular phase expressions in configs accept only numbers, `pi` and arithmetic (previously passed to `eval`); the PlanTUS GUI launcher no longer runs `wb_view` through a shell; pseudo-CT module names and PATH entries are shell-quoted; paths written into generated MATLAB job scripts and the BabelBrain run script are escaped; JSON inlined in group-report `<script>` blocks escapes `</`, and HTML escaping covers `'`
 - **Removed:** `launch_web_alignment` and `functions/dynpos/` (the browser alignment viewer), superseded by the PRESTUS Nexus's placement viewer
+- ⚠️ **Fixed:** a jwave/BabelBrain dry run (`jwave.dry_run`, `babelbrain.dry_run`) crashed in acoustic analysis on the empty field and cached that empty result, which a later real run could load. The pipeline now stops after the acoustic stage, caches nothing and skips the free-water baseline (`is_acoustic_dry_run`); both keys are in `config_default.yaml`. Also repairs `acoustic_stage.m` and `prestus_pipeline.m`, which did not parse (statements outside a function). `test_jwave` read `out.sensor_data`, which the pipeline never returns, and required warning-free runs; it now reads `benchmark_sensor_data` and checks the selected CPU/GPU env from the log
 
 ---
 

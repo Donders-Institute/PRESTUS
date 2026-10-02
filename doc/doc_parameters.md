@@ -64,10 +64,11 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 | `z_steering_m` | Pin BabelBrain `ZSteering` [m]. | `~` | Empty = auto-derived. |
 | `isppa_w_per_cm2` | Override the Isppa given to BabelBrain thermal [W/cm²]. | `~` | Interpreted as the **in-situ peak ISPPA in brain**. Empty = derived from the scaled acoustic field (recommended; matches k-Wave thermal). |
 | `cleanup_cache` | Delete the per-subject BabelBrain cache after reading. | `true` | Result HDF5s are moved out first. |
+| `dry_run` | Prepare the BabelBrain inputs without simulating. | `false` | The pipeline stops after the acoustic stage; nothing is cached. |
 
 #### jwave settings (`jwave`)
 
-Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `gmres_restart: 10`, `gmres_maxiter: 1000`, `precision: single`; `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `gmres_restart: 10`, `gmres_maxiter: 1000`, `precision: single`, `dry_run: false` (write the HDF5 inputs only; the pipeline stops after the acoustic stage and caches nothing); `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
 
 ---
 

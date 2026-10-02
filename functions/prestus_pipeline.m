@@ -270,6 +270,16 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     log_timer('stop', 'acoustic');
 
+    if parameters.state.acoustic_dry_run
+        fprintf('Acoustic dry run: solver inputs written, no field simulated. Finishing.\n');
+        if isfield(parameters.modules, 'store_acoustic_results') && parameters.modules.store_acoustic_results
+            parameters.benchmark_sensor_data = sensor_data;
+        end
+        log_timer('stop','prestus_pipeline')
+        diary('off')
+        return;
+    end
+
     % ====================================================================
     %% STAGE 7 — ACOUSTIC ANALYSIS & NIFTI EXPORT
     % ====================================================================
@@ -508,6 +518,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid), options);
 
     catch me_
+        diary('off')   % do not keep logging into this run's log after it failed
         track_usage('run_error', parameters, struct( ...
             'duration_s', toc(telemetry_t0), ...
             'status',     'error', ...
@@ -518,7 +529,6 @@ function [parameters] = prestus_pipeline(parameters, options)
 
 end
 
-        diary('off')   % do not keep logging into this run's log after it failed
 function pos = planned_positions(parameters, field)
 % [N×3] transducer(i).<field> for all transducers; [] when any is unset.
     pos = [];

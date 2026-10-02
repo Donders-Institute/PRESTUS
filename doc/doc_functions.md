@@ -11,6 +11,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_convert_axisymmetry`          |  Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_simulation`                   | Set up acoustic simulation                                                                      |
 | `acoustic_wrapper`                      | Set up acoustic simulation                                                                      |
+| `is_acoustic_dry_run`                   | True when the configured acoustic backend only writes inputs |
 | `plot_axial_profile`                    | Plot and save pressure and intensity along the beam axis (depth from the exit plane) with tissue shading and the free-water O'Neil / k-Wave baseline intensity of the simulated transducer. |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 

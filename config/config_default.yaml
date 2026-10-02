@@ -553,6 +553,7 @@ jwave:
   gmres_restart: 10         # GMRES restart parameter (Krylov subspace size); jwave's own default. Larger values can destabilise GMRES in single precision
   gmres_maxiter: 1000       # Maximum GMRES iterations; jwave's own default
   precision: single         # Computational precision: 'single' | 'double'
+  dry_run: false            # Write the HDF5 solver inputs only; the pipeline stops after the acoustic stage and caches nothing
 
 #------------ BabelBrain solver settings (used when acoustic_backend / thermal_backend = 'babelbrain'; see doc_babelbrain.md)
 babelbrain:
@@ -573,6 +574,7 @@ babelbrain:
   air_hu_window: [-1200, -400] # HU range classified as air for air_regions
   air_keep_boundary: false  # Keep air components touching the domain boundary (default: removed with the exterior air)
   cleanup_cache: true       # Delete per-subject BabelBrain cache dir after reading output; set false to keep HDF5/NIfTI files for debugging
+  dry_run: false            # Prepare the BabelBrain inputs only; the pipeline stops after the acoustic stage and caches nothing
 
 #------------  Medium properties
 # References: ITRUSST benchmarks (https://arxiv.org/abs/2202.04552); Tissue Properties DB (https://itis.swiss/virtual-population/tissue-properties/overview/);
