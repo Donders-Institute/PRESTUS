@@ -28,8 +28,8 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
 %   rayleigh_axial_intensity(angle(w), v, ...) for uniform |w| = v.
 %   'oneil' builds each column from the complex per-ring O'Neil field
 %   (FOCUSEDBOWLONEIL outer minus inner bowl), i.e. the terms that
-%   FOCUSEDANNULUSONEIL sums before taking abs(); same (z - 0.5 mm)
-%   evaluation offset as elsewhere in PRESTUS calibration.
+%   FOCUSEDANNULUSONEIL sums before taking abs(). Both models take z from
+%   the bowl apex, so for the same drive they place the focus alike.
 %
 % See also: RAYLEIGH_AXIAL_INTENSITY, FIT_TRANSDUCER_MODEL
 
@@ -58,10 +58,10 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
         case 'oneil'
             R_c = ann.curv_radius_mm * 1e-3;
             for i = 1:n
-                [~, ~, p_out] = focusedBowlONeil(R_c, ann.elem_od_mm(i) * 1e-3, 1, f, c, rho, z - 0.5e-3, []);
+                [~, ~, p_out] = focusedBowlONeil(R_c, ann.elem_od_mm(i) * 1e-3, 1, f, c, rho, z, []);
                 p_in = 0;
                 if ann.elem_id_mm(i) > 0
-                    [~, ~, p_in] = focusedBowlONeil(R_c, ann.elem_id_mm(i) * 1e-3, 1, f, c, rho, z - 0.5e-3, []);
+                    [~, ~, p_in] = focusedBowlONeil(R_c, ann.elem_id_mm(i) * 1e-3, 1, f, c, rho, z, []);
                 end
                 H(:, i) = p_out(:) - p_in(:);
             end

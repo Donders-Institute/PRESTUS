@@ -45,9 +45,35 @@ classdef test_transducer_model < matlab.unittest.TestCase
             z    = (10:0.5:90)';
             ph   = linspace(0.3, 5.9, n);
             ref  = focusedAnnulusONeil(ann.curv_radius_mm * 1e-3, [ann.elem_id_mm(:)'; ann.elem_od_mm(:)'] * 1e-3, ...
-                0.05 * ones(1, n), ph, tran.transducer.freq_hz, 1500, 994, z * 1e-3 - 0.5e-3);
+                0.05 * ones(1, n), ph, tran.transducer.freq_hz, 1500, 994, z * 1e-3);
             H    = axial_transfer_matrix(tran, z, 1500, 994, 'oneil');
             tc.verifyEqual(abs(H * (0.05 * exp(1i * ph(:)))), ref(:), 'RelTol', 1e-10);
+        end
+
+        function test_oneil_and_rayleigh_place_focus_alike(tc)
+            % Both forward models take distances from the bowl apex, so for the
+            % same geometric drive they must put the axial peak and FLHM centre
+            % at the same depth (their amplitudes differ; positions do not).
+            for serial = {'CTX_250_001', 'CTX_500_026', 'IS_PCD15473_01001'}
+                tran = tc.equip_param.trans.(serial{1});
+                ann  = tran.transducer.annular;
+                tran.n_elem = ann.elem_n;
+                bowl_off = ann.curv_radius_mm - ann.dist_geom_ep_mm;
+                for d = ann.dist_geom_ep_mm * [0.7 1 1.2]
+                    z_ep = (10:0.02:2*d)';
+                    ph   = compute_phases(1500, tran, d);
+                    w    = 0.05 * exp(1i * ph(:) * pi/180);
+                    I    = @(m) abs(axial_transfer_matrix(tran, z_ep + bowl_off, 1500, 994, m) * w).^2;
+                    I_r  = I('rayleigh');
+                    I_o  = I('oneil');
+                    [~, k_r] = max(I_r);
+                    [~, k_o] = max(I_o);
+                    msg = sprintf('%s at %.1f mm', serial{1}, d);
+                    tc.verifyEqual(z_ep(k_o), z_ep(k_r), 'AbsTol', 0.1, ['peak, ' msg]);
+                    tc.verifyEqual(compute_flhm_center(I_o / max(I_o), z_ep), ...
+                        compute_flhm_center(I_r / max(I_r), z_ep), 'AbsTol', 0.1, ['FLHM centre, ' msg]);
+                end
+            end
         end
 
         function test_steering_paths_match_compute_phases(tc)
