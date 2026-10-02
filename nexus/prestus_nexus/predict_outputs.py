@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .model import ConfigModel, is_empty
+from .study import sanitize_affix
 
 _MODE_FUNCTION = {
     "async": "async_transducer_pipeline",
@@ -92,7 +93,7 @@ def predict(model: ConfigModel) -> Plan:
 
     medium = model.get("simulation.medium") or "layered"
     layered = medium == "layered"
-    base_affix = model.get("io.output_affix") or ""
+    base_affix = sanitize_affix(model.get("io.output_affix") or "")   # as load_parameters does
 
     async_on = is_async_mode(model)
     multi_isppa_on = is_multi_isppa_mode(model)

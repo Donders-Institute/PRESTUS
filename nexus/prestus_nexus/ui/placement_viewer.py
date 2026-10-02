@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialo
 from .. import checks, neuronav_import as ni, paths, placement as pl
 from ..heuristic_import import candidates as heuristic_candidates, selected as heuristic_selected
 from ..model import TX, ConfigModel, is_empty
-from ..outputs import dir_output
+from ..outputs import dir_output, placement_record
 
 try:        # matplotlib is optional: the page explains what is missing
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -40,6 +40,7 @@ class PlacementPage(QWidget):
 
     def __init__(self, model: ConfigModel, parent: QWidget | None = None):
         super().__init__(parent)
+        self.position_source = ""         # where a non-manual position came from (banner)
         self.model = model
         self.ti = 0
         self.t1: pl.Volume | None = None
@@ -249,10 +250,32 @@ class PlacementPage(QWidget):
                 out.append(None)          # MNI: needs SimNIBS to map to subject space
         if out[0] is None and out[1] is None:
             mode = self.model.get("placement.mode")
+            found, self.position_source = (None, None), ""
             if mode == "localite":
-                return self._localite_positions_for(ti)
-            if mode == "heuristic":
-                return self._heuristic_positions_for(ti)
+                found, self.position_source = self._localite_positions_for(ti), "neuronav_gui"
+            elif mode == "heuristic":
+                found, self.position_source = self._heuristic_positions_for(ti), "transducer_positioning"
+            if found == (None, None) and mode not in ("manual", None, ""):
+                found = self._recorded_positions_for(ti)
+                rec = placement_record(self.model)
+                self.position_source = f"the last run's placement stage ({rec.get('created', '')})" \
+                    if rec else ""
+            return found
+        return out[0], out[1]
+
+    def _recorded_positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Positions a previous run's placement stage resolved (sub-XXX_placement<affix>.json,
+        write_placement_positions.m) -- covers every placement mode."""
+        rec = placement_record(self.model)
+        if rec is None or self.t1 is None or rec.get("mode") != self.model.get("placement.mode"):
+            return None, None
+        txs = rec["transducers"]
+        if ti >= len(txs) or not isinstance(txs[ti], dict):
+            return None, None
+        out = []
+        for key in ("trans_pos", "focus_pos"):
+            v = txs[ti].get(key)
+            out.append(pl.prestus_voxel_to_ras(self.t1, v) if isinstance(v, list) and len(v) == 3 else None)
         return out[0], out[1]
 
     def _localite_positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
@@ -364,21 +387,20 @@ class PlacementPage(QWidget):
         mode = self.model.get("placement.mode")
         msgs = []
         self.use_manual.setVisible(mode != "manual")
-        if mode in ("localite", "heuristic"):
+        if mode not in ("manual", None, ""):
             r_trans, r_focus = self.positions()
             if r_trans is not None or r_focus is not None:
-                msgs.append(f"placement.mode is <b>{mode}</b>: showing the position already "
-                            f"written by {'neuronav_gui' if mode == 'localite' else 'transducer_positioning'} "
+                source = self.position_source or "PRESTUS"
+                msgs.append(f"placement.mode is <b>{mode}</b>: showing the position written by {source} "
                             "(read-only here — PRESTUS resolves it again at run time).")
             else:
-                where = ("path.localite_post, placement.localite.session/.target"
-                        if mode == "localite" else
-                        "placement.heuristic.target_name and io.dir_output (tpars_*.csv)")
-                msgs.append(f"placement.mode is <b>{mode}</b>: no position found on disk yet "
-                            f"(checked {where}). Run it once, or switch to manual placement.")
-        elif mode != "manual":
-            msgs.append(f"placement.mode is <b>{mode}</b>: PRESTUS computes the positions. "
-                        "The viewer shows configured positions only.")
+                where = {"localite": "path.localite_post, placement.localite.session/.target",
+                         "heuristic": "placement.heuristic.target_name and io.dir_output (tpars_*.csv)"
+                         }.get(mode, "")
+                where = (where + " and " if where else "") + "sub-XXX_placement*.json in io.dir_output"
+                msgs.append(f"placement.mode is <b>{mode}</b>: no resolved position found yet "
+                            f"(checked {where}). Run the placement stage once "
+                            "(e.g. with only modules.run_transducer_placement), or switch to manual placement.")
         if self._space() == "mni":
             msgs.append("coordinate_space is <b>mni</b>: positions need SimNIBS to map to this "
                         "subject and are not shown. Use 'ras' or 'voxel' to place here.")

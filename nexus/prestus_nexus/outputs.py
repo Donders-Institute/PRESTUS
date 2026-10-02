@@ -37,3 +37,25 @@ def dir_pct(model: ConfigModel) -> Path | None:
     if is_empty(pct):
         return None if is_empty(seg_root) else m2m_dir(seg_root, sid)
     return Path(pct) / f"sub-{sid:03d}"
+
+
+def placement_record(model: ConfigModel) -> dict | None:
+    """Positions the placement stage resolved, from <dir_output>/sub-XXX_placement<affix>.json
+    (write_placement_positions.m): {'mode', 'created', 'transducers': [{'trans_pos', 'focus_pos'}]}
+    with 1-based T1 voxel positions; None when the file is missing or unreadable."""
+    import json
+
+    from .study import sanitize_affix
+    base, sid = dir_output(model), _subject_id(model)
+    if base is None or sid is None:
+        return None
+    affix = sanitize_affix(model.get("io.output_affix") or "")
+    path = base / f"sub-{sid:03d}_placement{affix}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("transducers"), list):
+        return None
+    data["path"] = str(path)
+    return data

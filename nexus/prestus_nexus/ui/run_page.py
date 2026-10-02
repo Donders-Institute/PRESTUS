@@ -1,15 +1,18 @@
-"""Run page: write the launcher, validate in MATLAB, run locally with a live log."""
+"""Run page: write the launcher, validate in MATLAB, run locally or submit to the cluster
+with a live log, and follow submitted jobs."""
 
 from __future__ import annotations
 
 import html
 from pathlib import Path
 
-from PyQt6.QtCore import QProcess, pyqtSignal
+from PyQt6.QtCore import QProcess, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QTextCursor
-from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                             QPlainTextEdit, QPushButton, QTextEdit, QToolButton, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+                             QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
+                             QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
+from .. import jobs as hpc_jobs
 from .. import launcher
 from ..model import ConfigModel
 from ..predict_outputs import predict, save_summary
@@ -29,7 +32,8 @@ class RunPage(QWidget):
         title = QLabel("Run in MATLAB")
         title.setObjectName("CardTitle")
         v.addWidget(title)
-        intro = QLabel("Runs the saved study config in MATLAB on this computer. "
+        intro = QLabel("Runs the saved study config in MATLAB on this computer, or submits it to the "
+                       "cluster (on a login node with sbatch/qsub) and follows the jobs. "
                        "Validate first: it only loads the config with <tt>load_parameters</tt>.")
         intro.setWordWrap(True)
         v.addWidget(intro)
@@ -68,12 +72,19 @@ class RunPage(QWidget):
         self.b_validate.clicked.connect(self.validate)
         self.b_run = QPushButton("Run locally")
         self.b_run.clicked.connect(self.run)
+        self.b_submit = QPushButton("Submit to cluster")
+        self.b_submit.clicked.connect(self.submit)
+        self.scheduler = hpc_jobs.scheduler()
+        self.b_submit.setToolTip(
+            "PRESTUS submits the run to the scheduler with the config's hpc.* settings "
+            "(prestus_pipeline_start); the jobs are listed below." if self.scheduler else
+            "No sbatch or qsub on this computer: run the Nexus on a cluster login node to submit.")
         self.b_stop = QPushButton("Stop")
         self.b_stop.setEnabled(False)
         self.b_stop.clicked.connect(self.stop)
         self.b_save_log = QPushButton("Save log…")
         self.b_save_log.clicked.connect(self._save_log)
-        for b in (self.b_write, self.b_validate, self.b_run, self.b_stop):
+        for b in (self.b_write, self.b_validate, self.b_run, self.b_submit, self.b_stop):
             buttons.addWidget(b)
         buttons.addStretch(1)
         buttons.addWidget(self.b_save_log)
@@ -88,6 +99,30 @@ class RunPage(QWidget):
         self.log.setFont(mono)
         v.addWidget(self.log, 1)
 
+        # Submitted jobs (see jobs.py): polled every 30 s while any is open
+        self.jobs: list[hpc_jobs.Job] = []
+        jobs_row = QHBoxLayout()
+        self.jobs_label = QLabel("Cluster jobs")
+        jobs_row.addWidget(self.jobs_label)
+        jobs_row.addStretch(1)
+        self.b_jobs_refresh = QPushButton("Refresh")
+        self.b_jobs_refresh.clicked.connect(self.refresh_jobs)
+        self.b_jobs_cancel = QPushButton("Cancel selected")
+        self.b_jobs_cancel.clicked.connect(self.cancel_jobs)
+        jobs_row.addWidget(self.b_jobs_refresh)
+        jobs_row.addWidget(self.b_jobs_cancel)
+        v.addLayout(jobs_row)
+        self.jobs_tree = QTreeWidget()
+        self.jobs_tree.setHeaderLabels(["Job ID", "Name", "State"])
+        self.jobs_tree.setRootIsDecorated(False)
+        self.jobs_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.jobs_tree.setFixedHeight(110)
+        v.addWidget(self.jobs_tree)
+        self.jobs_timer = QTimer(self)
+        self.jobs_timer.setInterval(30_000)
+        self.jobs_timer.timeout.connect(self.refresh_jobs)
+        self._show_jobs()
+
     @property
     def model(self) -> ConfigModel:
         return self.window.model
@@ -101,6 +136,7 @@ class RunPage(QWidget):
         running = self.proc is not None
         for b in (self.b_write, self.b_validate, self.b_run):
             b.setEnabled(not running)
+        self.b_submit.setEnabled(not running and self.scheduler is not None)
         self.b_stop.setEnabled(running)
         self.update_deployment_summary()
 
@@ -190,6 +226,8 @@ class RunPage(QWidget):
                             f"{'finished' if ok else f'failed (exit code {code})'}</span>")
         self.proc.deleteLater()
         self.proc = None
+        if self.task == "Submit":
+            self._collect_jobs()
         self.refresh()
         self.finished.emit(self.task, ok)
 
@@ -222,6 +260,66 @@ class RunPage(QWidget):
         if path is None or not self._ready():
             return
         self._start("Run", launcher.run_command(self.matlab.text(), path), path.parent)
+
+    def submit(self) -> None:
+        """Submit with PRESTUS' own HPC path; the Nexus only follows the jobs."""
+        if self.scheduler is None:
+            return
+        platform = self.model.get("platform")
+        if platform == "matlab":
+            QMessageBox.warning(self, "Submit", "platform is 'matlab' in this config, which runs "
+                                "locally. Set it to 'auto', 'slurm' or 'qsub' (Setup tab) to submit.")
+            return
+        errors = [i for i in self.window.issues if i.level == "error"]
+        if errors and QMessageBox.question(
+                self, "Submit", f"{len(errors)} error(s) in the Issues panel. Submit anyway?") \
+                != QMessageBox.StandardButton.Yes:
+            return
+        if not self._ready():
+            return
+        path = launcher.write_submit_launcher(self.model.path, self.window.prestus_root)
+        self._start("Submit", launcher.run_command(self.matlab.text(), path), path.parent)
+
+    def _collect_jobs(self) -> None:
+        known = {j.job_id for j in self.jobs}
+        new = [j for j in hpc_jobs.parse_submissions(self.log.toPlainText()) if j.job_id not in known]
+        if not new:
+            self._append("No submitted job was reported (see the log above).", "#b8860b")
+        self.jobs.extend(new)
+        self.refresh_jobs()
+
+    def refresh_jobs(self) -> None:
+        if self.jobs:
+            hpc_jobs.query(self.jobs, self.scheduler)
+        self._show_jobs()
+        if any(not j.finished for j in self.jobs):
+            self.jobs_timer.start()
+        else:
+            self.jobs_timer.stop()
+
+    def _show_jobs(self) -> None:
+        self.jobs_tree.clear()
+        for j in self.jobs:
+            item = QTreeWidgetItem([j.job_id, j.name, j.state])
+            self.jobs_tree.addTopLevelItem(item)
+        n_open = sum(1 for j in self.jobs if not j.finished)
+        self.jobs_label.setText(f"Cluster jobs ({len(self.jobs)}, {n_open} open)" if self.jobs
+                                else "Cluster jobs (none submitted from this window)")
+        has = bool(self.jobs) and self.scheduler is not None
+        self.b_jobs_refresh.setEnabled(has)
+        self.b_jobs_cancel.setEnabled(has)
+
+    def cancel_jobs(self) -> None:
+        ids = [it.text(0) for it in self.jobs_tree.selectedItems()]
+        if not ids:
+            return
+        if QMessageBox.question(self, "Cancel jobs", f"Cancel job(s) {', '.join(ids)}?") \
+                != QMessageBox.StandardButton.Yes:
+            return
+        out = hpc_jobs.cancel(ids, self.scheduler)
+        if out.strip():
+            self._append(out, "#777")
+        self.refresh_jobs()
 
     def stop(self) -> None:
         if self.proc is not None:

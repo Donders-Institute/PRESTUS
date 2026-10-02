@@ -62,6 +62,19 @@ def write_launcher(study: Path, prestus_root: Path, local: bool = True) -> Path:
     return path
 
 
+def submit_launcher_path(study: Path) -> Path:
+    stem = study.stem[len("config_"):] if study.stem.startswith("config_") else study.stem
+    return study.with_name(f"submit_{stem}.m")
+
+
+def write_submit_launcher(study: Path, prestus_root: Path) -> Path:
+    """Launcher that keeps the config's platform, so PRESTUS submits to SLURM/qsub
+    (prestus_pipeline_start -> hpc_submit_job) and returns after submission."""
+    path = submit_launcher_path(study)
+    path.write_text(launcher_script(study, prestus_root, local=False), encoding="utf-8")
+    return path
+
+
 def _wrapped(body: str) -> str:
     """-batch statement that prints a sentinel on success and on failure."""
     return (f"try, {body}; fprintf('\\n{OK_SENTINEL}\\n'); "

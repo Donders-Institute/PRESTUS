@@ -150,13 +150,14 @@ class Manifest:
 
 
 def sanitize_affix(label: str) -> str:
-    """Python twin of sanitize_output_affix.m."""
-    if not label:
+    """Python twin of sanitize_output_affix.m: '_desc-<label>', a leading 'desc-' not repeated."""
+    if not label or not isinstance(label, str):
         return ""
     affix = re.sub(r"[^a-zA-Z0-9_-]", "_", label)
-    if not affix.startswith("_desc-"):
-        affix = "_desc-" + affix.lstrip("_")
-    return affix
+    if affix.startswith("_desc-"):
+        return affix
+    affix = re.sub(r"^desc-", "", affix.lstrip("_"))
+    return "_desc-" + affix if affix else ""
 
 
 def resolve_manifest(config_path: Path | None, value: str | None) -> Path | None:
