@@ -43,9 +43,11 @@ transducer:
     elem_shape: bowl
 
     # Element area is based on a rectangular shape with the specified height and width.
-    # If a disc or bowl shape is selected, its area matches that of the rectangular element.
-    elem_height_mm: 5.317e-3 # [mm]
-    elem_width_mm: 5.317e-3 # [mm]
+    # If a disc or bowl shape is selected, its area matches that of the rectangular element
+    # (5.317 x 5.317 mm -> 6.0 mm bowl diameter), unless elem_diameter_mm is set.
+    # (Was 5.317e-3, a leftover from when these fields were read as metres.)
+    elem_height_mm: 5.317 # [mm]
+    elem_width_mm: 5.317 # [mm]
 
     outer_diameter_mm: 62.5 # outer diameter of the transducer [mm]
 
@@ -54,16 +56,19 @@ transducer:
     curv_radius_mm: 100 # radius of curvature of the bowl
     dist_geom_ep_mm: 94.99 # distance to the transducer plane from the geometric focus
 
-    # When the Clover setup is enabled, the defined transducer is replicated
-    # into a three-leaf Clover configuration (up to three leaves).
-    # The parent ROC of the composite setup can differ from the individual transducer ROC.
+    # When the Clover setup is enabled, the defined transducer is replicated into
+    # n_leaves leaves on a parent bowl, az_sep_deg apart (default 360/n_leaves, i.e.
+    # 180 deg for two leaves) and tilted by elevation_deg (default: smallest tilt
+    # without overlap, 18.2 deg here). The parent ROC can differ from the leaf ROC.
     is_clover_setup: true
     clover:
-      n_leaves: 2 # Number of leaves (up to three leaves)
+      n_leaves: 2 # Number of leaves
       ROC_parent: 100 # [mm]
 
     matrix_shape:
-      type: extract_from_file # 'define_here', 'extract_from_file'
+      # extract_from_file needs a coordinate file; config/equipment/example_coord_file.csv
+      # only has the header (no element coordinates), so the tutorial uses define_here.
+      type: define_here # 'define_here', 'extract_from_file'
       define_here:
         # Type of element grid distribution:
         #   rect → Rectangular grid
@@ -84,8 +89,9 @@ transducer:
             sparsity_factor: 1 # (0.1 to 1.0) Example: 0.7 = use 70% of elements
 
           fibonacci:
-            # Total number of elements for Fibonacci grid.
-            elem_n: 64
+            # Total number of elements for Fibonacci grid (per leaf). 52 elements on a
+            # 62.5 mm aperture: min pitch 6.7 mm >= 6.0 mm element + 0.5 mm kerf.
+            elem_n: 52
             kerf_mm: 0.5
 
           fermat:
