@@ -60,6 +60,7 @@ function payload = build_payload(event, parameters, options, pipe_options)
 
     % --- identity (all anonymous) ---
     payload.event         = event;
+    payload.run_type      = telemetry_run_type();
     payload.timestamp_utc = posixtime(datetime('now', 'TimeZone', 'UTC'));
     payload.uuid          = get_or_create_uuid();
     [payload.prestus_hash, payload.prestus_ver] = prestus_version();

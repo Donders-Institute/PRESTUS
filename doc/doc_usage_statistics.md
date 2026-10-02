@@ -298,9 +298,9 @@ The charts below are populated live from the anonymised telemetry database. Data
   async function init() {
     const client = supabase.createClient(URL, KEY);
 
-    const { data, error } = await client
+    const { data: rawData, error } = await client
       .from('events')
-      .select('received_at,event,status,duration_s,uuid,sim_platform,code_type,pipeline_mode,medium,pct_enabled,prestus_ver,prestus_hash')
+      .select('received_at,event,status,duration_s,uuid,sim_platform,code_type,pipeline_mode,medium,pct_enabled,prestus_ver,prestus_hash,run_type')
       .in('event', ['run_end', 'run_error'])
       .limit(5000);
 
@@ -313,6 +313,16 @@ The charts below are populated live from the anonymised telemetry database. Data
       return;
     }
 
+    // run_type is absent on events sent before this field existed, and
+    // defaults to 'deployment' server-side (see doc_telemetry.md); treat a
+    // missing value here the same way so old and new rows agree.
+    const runType = r => r.run_type ?? 'deployment';
+
+    // All charts/stats below are deployment-only so technical/CI runs
+    // (run_all_tests, tagged 'technical') don't skew real usage stats.
+    const technicalData = rawData.filter(r => runType(r) === 'technical');
+    const data = rawData.filter(r => runType(r) === 'deployment');
+
     // ── Stat cards ─────────────────────────────────────────────────
     const total     = data.length;
     const layeredRuns = data.filter(r => classifyMedium(r).startsWith('layered'));
@@ -320,6 +330,10 @@ The charts below are populated live from the anonymised telemetry database. Data
     const successPct  = layeredRuns.length ? Math.round(layeredSucc.length / layeredRuns.length * 100) + '%' : '—';
     const users     = new Set(data.map(r => r.uuid).filter(Boolean)).size;
     const versions  = new Set(data.map(resolveVersion).filter(v => v !== 'unknown')).size;
+    const technicalSucc = technicalData.filter(r => r.status === 'success');
+    const technicalPct  = technicalData.length
+      ? Math.round(technicalSucc.length / technicalData.length * 100) + '%'
+      : '—';
 
     const statsEl = document.getElementById('telem-stats');
     statsEl.style.display = 'grid';
@@ -328,6 +342,7 @@ The charts below are populated live from the anonymised telemetry database. Data
       ['Success rate (layered)', successPct],
       ['Versions',       versions],
       ['Unique users',   users],
+      ['Technical pass rate', technicalPct],
     ].forEach(([label, val]) => {
       statsEl.insertAdjacentHTML('beforeend',
         `<div class="telem-stat"><div class="tv">${val}</div><div class="tl">${label}</div></div>`);

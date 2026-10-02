@@ -162,6 +162,16 @@ load_defaults();
 fig.Visible = 'on';
 drawnow;
 
+% Resolve telemetry consent now (modal dialog, not console input()) so the
+% decision is already recorded before "Run Simulation" dispatches the
+% pipeline to a background worker, which has no console to prompt on.
+try
+    telemetry_setup(fig);
+catch
+    % telemetry_setup() itself never throws; this guards GUI startup
+    % against an unexpected failure in a future revision of it.
+end
+
 if ~isempty(init_params) && isstruct(init_params)
     apply_params_to_gui(init_params);
     if isfield(init_params, 'config_path') && ~isempty(init_params.config_path)

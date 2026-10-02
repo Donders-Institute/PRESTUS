@@ -14,6 +14,8 @@ prestus_gui
 
 Use **⬆ Load** to populate fields from an existing YAML, **⬇ Save** to export the current state, and **↺ Defaults** to reset to `config_default.yaml`.
 
+If no telemetry decision has been recorded yet, a modal dialog asks whether to enable anonymous usage statistics (Allow / Decline / Ask me later) — see [doc_telemetry.md](doc_telemetry.md). It is shown once at startup rather than as a console prompt, since **Run Simulation** may dispatch to a background worker with no console to answer on.
+
 ### Configuration loading
 
 The GUI and the pipeline share the same two-layer loading logic:

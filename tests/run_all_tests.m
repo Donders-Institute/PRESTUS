@@ -47,6 +47,14 @@ function run_all_tests(level)
     % currently on disk, not a version loaded earlier in the session.
     clear functions %#ok<CLFUNC>
 
+    % Any test that exercises prestus_pipeline() (water/head/acoustic/all,
+    % physics, demo levels) emits telemetry like a real run would; tag it
+    % 'technical' so test pass/fail rates are reported separately from
+    % deployment usage (see telemetry_run_type.m).
+    orig_run_type = getenv('PRESTUS_RUN_TYPE');
+    setenv('PRESTUS_RUN_TYPE', 'technical');
+    restore_run_type = onCleanup(@() setenv('PRESTUS_RUN_TYPE', orig_run_type)); %#ok<NASGU>
+
     % ---- Resolve paths ------------------------------------------------
     here      = fileparts(mfilename('fullpath'));
     repo_root = fileparts(here);
