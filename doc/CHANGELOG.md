@@ -330,6 +330,7 @@ Three new algorithms added for density, sound speed, and attenuation mapping (se
 - **Removed:** `launch_web_alignment` and `functions/dynpos/` (the browser alignment viewer), superseded by the PRESTUS Nexus's placement viewer
 - ⚠️ **Fixed:** a jwave/BabelBrain dry run (`jwave.dry_run`, `babelbrain.dry_run`) crashed in acoustic analysis on the empty field and cached that empty result, which a later real run could load. The pipeline now stops after the acoustic stage, caches nothing and skips the free-water baseline (`is_acoustic_dry_run`); both keys are in `config_default.yaml`. Also repairs `acoustic_stage.m` and `prestus_pipeline.m`, which did not parse (statements outside a function). `test_jwave` read `out.sensor_data`, which the pipeline never returns, and required warning-free runs; it now reads `benchmark_sensor_data` and checks the selected CPU/GPU env from the log
 - ⚠️ **Fixed:** the O'Neil forward model was evaluated 0.5 mm short of the requested depth (a leftover from an old 1-based voxel axis), so its focus sat 0.5 mm deeper than the Rayleigh model's for the same drive. Affects library entries fitted with the `oneil_phase_only` preset and `babelbrain.profile_calibration`, whose O'Neil target was 0.5 mm deeper than its Rayleigh fit; the default `rayleigh_phase_gain` preset is unchanged. New test `test_oneil_and_rayleigh_place_focus_alike`
+- **Removed:** the deprecated Python GUI (`functions/gui_py`), superseded by the PRESTUS Nexus
 
 ---
 

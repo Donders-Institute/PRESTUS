@@ -96,7 +96,7 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - *Run locally* via `matlab -batch`, with a live log and success/failure markers.
    - *Submit to cluster* through PRESTUS' own HPC path, and a job list that follows the submitted jobs.
    - **Tools menu:** opens `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
-5. **Retirement.** `launch_web_alignment` has been removed and `functions/gui_py` is deprecated, with a pointer to the Nexus. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
+5. **Retirement.** `launch_web_alignment` and `functions/gui_py` have been removed. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
 
 ## Voxel convention note
 

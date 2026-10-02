@@ -1,5 +1,5 @@
 """Results tab: acoustic/thermal NIfTI viewer, the self-contained HTML report, and the
-output CSV, for the subject/study config currently open. Ported from the deprecated
+output CSV, for the subject/study config currently open. Ported from the removed
 functions/gui_py/tabs/tab_results.py onto this package's OrthoViewer/placement.Volume
 stack instead of the old standalone nibabel viewer, and onto outputs.dir_output()
 instead of a path set imperatively by the run tab."""
