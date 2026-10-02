@@ -108,6 +108,9 @@ end
                    'or ''tus_entry''.'], mode);
     end
 
+    % Resolved positions for other tools, e.g. the Nexus viewer (never errors)
+    write_placement_positions(parameters, mode);
+
     % Stand-alone placement report (never errors; see generate_placement_report)
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'report') ...
             || isempty(parameters.placement.report) || logical(parameters.placement.report)
