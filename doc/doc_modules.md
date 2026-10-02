@@ -42,7 +42,7 @@ prestus_pipeline
       ▼
 [6 acoustic]            modules.run_acoustic_sims           (acoustic cache)
       │                 k-Wave / jwave / BabelBrain, or io.external_acoustic_nifti;
-      │                 field scaled to target_isppa_wcm2
+      │                 field scaled to target_isppa_wcm2; dry-run backends stop here
       ▼
 [7 acoustic analysis]   modules.run_acoustic_analysis
       │                 Isppa, MI, focal metrics → CSV; NIfTI (modules.run_nifti_creation);

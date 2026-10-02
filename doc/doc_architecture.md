@@ -77,7 +77,7 @@ Three **chained pipelines** split one run into several jobs that pass results th
 | `sensor_data` | `p_max_all`, `p_min_all`, `p_final` (scaled to the target ISPPA) | acoustic stage |
 | `fov_state` | Full-grid copies when the acoustic run uses a cropped field of view | FOV crop |
 
-`parameters.state` records what is available downstream: `acoustics_available`, `heating_available`, and `planned_trans_t1_vox` / `planned_focus_t1_vox` (planned positions in T1 voxels, kept for the targeting analysis because the grid stage replaces `trans_pos`/`focus_pos` with grid indices).
+`parameters.state` records what is available downstream: `acoustics_available`, `heating_available`, `acoustic_dry_run` (a backend wrote its inputs but did not simulate), and `planned_trans_t1_vox` / `planned_focus_t1_vox` (planned positions in T1 voxels, kept for the targeting analysis because the grid stage replaces `trans_pos`/`focus_pos` with grid indices).
 
 | # | Stage | Function(s) | Reads | Writes / caches |
 |---|---|---|---|---|
