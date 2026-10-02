@@ -186,6 +186,7 @@ if use_babelbrain
         cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
             acoustic_provenance, struct('parameters', parameters, 'backend', 'babelbrain'), kwave_medium);
         fprintf('[pipeline] babelbrain sensor_data cached: %s\n', filename_sensor_data);
+        acoustic_provenance.freefield_source                 = 'babelbrain_water_sim';
     end
 
 elseif use_jwave
@@ -252,3 +253,6 @@ if ~cached_ok && live_ok
     end
 end
 end
+    if isfield(live, 'freefield_source')
+        provenance.freefield_source = live.freefield_source;
+    end

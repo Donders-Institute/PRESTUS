@@ -123,7 +123,7 @@ modules:
   run_grid_setup: 1           # Setup grid and run head processing? Mandatory for simulations.
   run_medium_setup: 1         # Map medium acoustic properties? Mandatory for simulations.
   run_source_setup: 1         # Set up acoustic source? Mandatory for simulations.
-  run_water_baseline: 0       # Run fast water sim to record free-water ISPPA provenance alongside acoustic cache?
+  run_water_baseline: auto    # Free-water baseline sim for target_isppa_wcm2 scaling: auto (when a target needs it), 1 (always), 0 (only if target differs from calibration)
   run_acoustic_sims: 1        # Run acoustic simulations?
   run_acoustic_analysis: 1    # Run acoustic analysis?
   run_heating_sims: 0         # Run thermal simulations? Default: off; run once acoustic simulation provides sensible results.
@@ -187,8 +187,9 @@ analysis:
 #   Empty   → no scaling; use elem_p_amp drive level as-is.
 #
 # The acoustic simulation always runs at the elem_p_amp specified below.
-# modules.run_water_baseline must be enabled to record the free-water baseline
-# ISPPA so that post-hoc pressure scaling can be applied.
+# Scaling needs a free-water baseline ISPPA. With modules.run_water_baseline: auto
+# (default) it runs whenever a target is set and the transducer has no matching
+# calibration ISPPA; a target that cannot be met stops the run with an error.
 
 transducer:
   name: []              # Optional transducer name / identifier (e.g., 'CTX500-026')

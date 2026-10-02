@@ -718,9 +718,11 @@ function p = make_sim_params(base, affix, medium_config, ow)
                                          isfield(base.modules, 'run_thermal_analysis') && ...
                                          base.modules.run_thermal_analysis;
     p.modules.run_posthoc_water_sims   = 0;
-    % Free water does not depend on the medium variant; stage 1 records the
-    % baseline once if the base config asks for it.
-    p.modules.run_water_baseline       = 0;
+    % Free water does not depend on the medium variant, but each variant runs
+    % its own acoustic simulation. 'auto' runs the baseline only when a target
+    % ISPPA needs one (no calibration, or target differs from it), so a target
+    % is never reported unscaled; see NEEDS_WATER_BASELINE.
+    p.modules.run_water_baseline       = 'auto';
     p.modules.generate_report          = 1;
     p.io.output_affix                  = affix;
     % Both the grid cache and kwave source were written by stage 1 with

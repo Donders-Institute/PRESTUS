@@ -2,20 +2,20 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
 % APPLY_ISPPA_SCALING  Scale the simulated pressure field so the free-water
 %                      ISPPA matches parameters.transducer(1).target_isppa_wcm2.
 %
-% Rescaling is only applied when a target is set AND the baseline ISPPA came
-% from an actually-run free-water simulation (isppa_source is one of the
-% *_water_sim / *_simulation tags) and the two differ by more than 1%.  This
-% covers the two legitimate cases:
+% Rescaling is applied when a target is set and the free-water baseline
+% (ISPPA_BASELINE) differs from it by more than 1 %. The baseline must come
+% from an actually-run free-water simulation (k-Wave, jwave or BabelBrain):
 %
 %   * a multi-ISPPA sweep, whose Stage-1 always runs a free-water baseline and
 %     scales each requested level from that measured baseline; and
-%   * any run with modules.run_water_baseline=1 whose simulated free-water peak
-%     does not correspond to the requested target.
+%   * any run whose free-water baseline ran (modules.run_water_baseline = 'auto'
+%     runs it whenever a target is set without a matching calibration).
 %
-% A single/coherent/sequential run is NOT force-rescaled off the stored library
-% or hydrophone-measured calibration value — without a run free-water baseline
-% the field is reported at its raw simulated drive level.  Set
-% modules.run_water_baseline=1 to calibrate such a run to target_isppa_wcm2.
+% A run is never force-rescaled off the stored library or hydrophone-measured
+% calibration value, and a requested target is never silently ignored: when
+% the target needs a rescale but no simulated baseline exists, this errors
+% (prestus:isppa:noBaseline / prestus:isppa:unsimulatedBaseline) rather than
+% reporting the field at its raw simulated drive level. See ISPPA_SCALE_FACTOR.
 %
 % The target is read from the first transducer entry (single-transducer and
 % coherent multi-transducer runs share one combined field driven by
@@ -43,82 +43,20 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
     end
 
     target = get_target(parameters);
-    if isempty(target) || ~isfinite(target)
+    [scale_p, baseline] = isppa_scale_factor(target, acoustic_provenance);
+    if scale_p == 1
         return;
-    end
-
-    [baseline, baseline_source] = get_baseline(acoustic_provenance);
-    if isempty(baseline) || ~(baseline > 0)
-        warning('apply_isppa_scaling:noBaseline', ...
-            ['apply_isppa_scaling: neither freefield_isppa_wcm2 nor tx_calibration.isppa_wcm2 ' ...
-             'found in provenance — pressure scaling skipped. Re-run the acoustic stage ' ...
-             'or ensure the transducer library sets tx_calibration.isppa_wcm2.']);
-        return;
-    end
-
-    % Only rescale off an actually-run free-water simulation.  A library or
-    % hydrophone-measured calibration value is not a per-run baseline, so the
-    % field is left at its raw simulated drive level (see header).
-    SIM_SOURCES = {'kwave_simulation', 'jwave_water_sim', 'babelbrain_water_sim'};
-    if ~any(strcmp(baseline_source, SIM_SOURCES))
-        fprintf(['apply_isppa_scaling: baseline source ''%s'' is not a run free-water ' ...
-                 'simulation — reporting raw simulated drive level (no target rescale). ' ...
-                 'Set modules.run_water_baseline=1 to calibrate to target_isppa_wcm2.\n'], ...
-                baseline_source);
-        return;
-    end
-
-    scale_p  = sqrt(target / baseline);
-
-    if abs(scale_p - 1) <= 0.01
-        return;
-    end
-
-    if scale_p > 4 || scale_p < 0.25
-        warning('apply_isppa_scaling:largeScale', ...
-            ['apply_isppa_scaling: large pressure scale factor (%.2fx) from %.1f to ' ...
-             '%.1f W/cm². Verify that the target is in the linear acoustic regime ' ...
-             'relative to the baseline simulation amplitude.'], ...
-            scale_p, baseline, target);
     end
 
     fprintf('Scaling cached pressure field: %.2f → %.2f W/cm² (scale_p = %.4f)\n', ...
             baseline, target, scale_p);
     sensor_data.p_max_all = sensor_data.p_max_all * scale_p;
     sensor_data.isppa_scale_p = scale_p;  % recorded for the free-water references in PLOT_AXIAL_PROFILE
-    % Scale peak-rarefaction and final fields with the same factor so that the
-    % mechanical index (computed from p_min_all) stays consistent with the
-    % scaled intensities (computed from p_max_all).
     if isfield(sensor_data, 'p_min_all')
         sensor_data.p_min_all = sensor_data.p_min_all * scale_p;
     end
     if isfield(sensor_data, 'p_final')
         sensor_data.p_final = sensor_data.p_final * scale_p;
-    end
-end
-
-function [baseline, source] = get_baseline(acoustic_provenance)
-% Resolve the free-water baseline ISPPA and the provenance source tag that
-% records how it was obtained.  Prefers the free-water field if present, else
-% the transducer-calibration value.  NOTE: freefield_isppa_wcm2 is populated
-% with the calibration value in the baseline-skip path (no sim run), so the
-% source tag — not the presence of freefield_isppa_wcm2 — determines whether an
-% actual simulation produced it.
-    baseline = [];
-    source   = '';
-    if isfield(acoustic_provenance, 'tx_calibration') && ...
-            isfield(acoustic_provenance.tx_calibration, 'isppa_source')
-        source = acoustic_provenance.tx_calibration.isppa_source;
-    end
-    if isfield(acoustic_provenance, 'freefield_isppa_wcm2') && ...
-            ~isempty(acoustic_provenance.freefield_isppa_wcm2) && ...
-            acoustic_provenance.freefield_isppa_wcm2 > 0
-        baseline = acoustic_provenance.freefield_isppa_wcm2;
-    elseif isfield(acoustic_provenance, 'tx_calibration') && ...
-            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2') && ...
-            ~isempty(acoustic_provenance.tx_calibration.isppa_wcm2) && ...
-            acoustic_provenance.tx_calibration.isppa_wcm2 > 0
-        baseline = acoustic_provenance.tx_calibration.isppa_wcm2;
     end
 end
 

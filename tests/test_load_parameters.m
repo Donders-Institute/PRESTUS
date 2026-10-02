@@ -64,7 +64,7 @@ classdef test_load_parameters < matlab.unittest.TestCase
             tc.verifyEqual(p.modules.segmentation_only,         0);
             tc.verifyEqual(p.modules.generate_report,           1);
             tc.verifyEqual(p.modules.run_transducer_placement,  1);
-            tc.verifyEqual(p.modules.run_water_baseline,        0);
+            tc.verifyEqual(string(p.modules.run_water_baseline), "auto");
         end
 
         function test_grid_defaults(tc)

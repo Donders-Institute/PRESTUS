@@ -545,56 +545,25 @@ function [p_scaled, target_used, baseline_used] = scale_pressure( ...
         end
     end
 
-    % Resolve baseline: prefer measured free-water ISPPA (isppa_source =
-    % 'kwave_simulation'); fall back to library calibration value.
-    baseline      = NaN;
-    baseline_src  = '';
-    if isfield(acoustic_provenance, 'freefield_isppa_wcm2') && ...
-            isscalar(acoustic_provenance.freefield_isppa_wcm2) && ...
-            acoustic_provenance.freefield_isppa_wcm2 > 0
-        baseline     = acoustic_provenance.freefield_isppa_wcm2;
-        baseline_src = 'kwave_simulation'; %#ok<NASGU>
-    elseif isfield(acoustic_provenance, 'tx_calibration') && ...
-            isfield(acoustic_provenance.tx_calibration, 'isppa_wcm2') && ...
-            isscalar(acoustic_provenance.tx_calibration.isppa_wcm2) && ...
-            acoustic_provenance.tx_calibration.isppa_wcm2 > 0
-        baseline     = acoustic_provenance.tx_calibration.isppa_wcm2;
-        baseline_src = acoustic_provenance.tx_calibration.isppa_source;
-        fprintf('  Transducer %d: using tx_calibration.isppa_wcm2 (%.2f W/cm², source: %s) as baseline.\n', ...
-            transducer_idx, baseline, baseline_src);
-    end
-
+    % Baseline lookup, the no-baseline error and the large-scale warning are
+    % shared with APPLY_ISPPA_SCALING (ISPPA_SCALE_FACTOR). A library calibration
+    % value is accepted as the baseline here, as these runs record one per transducer.
+    [scale_p, baseline, baseline_src] = isppa_scale_factor(target, acoustic_provenance, ...
+        AllowCalibrationBaseline=true, Context=sprintf('transducer %d', transducer_idx));
     target_used   = target;
     baseline_used = baseline;
 
-    if ~isfinite(target) || ~isfinite(baseline)
-        if ~isfinite(target) && ~isfinite(baseline)
-            fprintf('  Intensity scaling (transducer %d): no target_isppa_wcm2 or baseline — using simulated drive level.\n', ...
-                transducer_idx);
-        elseif ~isfinite(baseline)
-            warning('combine_async_intensity:noBaseline', ...
-                ['Intensity scaling (transducer %d): freefield_isppa_wcm2 missing from provenance — ' ...
-                 'pressure scaling skipped. Re-run the acoustic stage with ' ...
-                 'modules.run_water_baseline = 1.'], transducer_idx);
-        else
-            fprintf('  Intensity scaling (transducer %d): no target_isppa_wcm2 specified — using simulated drive level.\n', ...
-                transducer_idx);
-        end
+    if ~isfinite(target)
+        fprintf('  Intensity scaling (transducer %d): no target_isppa_wcm2 specified — using simulated drive level.\n', ...
+            transducer_idx);
         p_scaled = p;
         return;
     end
-
-    scale_p = sqrt(target / baseline);
-    if abs(scale_p - 1) <= 0.01
+    if scale_p == 1
         p_scaled = p;
         return;
     end
-    if scale_p > 4 || scale_p < 0.25
-        warning('combine_async_intensity:largeScale', ...
-            ['Transducer %d: large pressure scale factor (%.2fx) from %.1f to %.1f W/cm². ' ...
-             'Verify linear acoustic regime.'], transducer_idx, scale_p, baseline, target);
-    end
-    fprintf('  Transducer %d: %.2f → %.2f W/cm² (scale_p = %.4f)\n', ...
-        transducer_idx, baseline, target, scale_p);
+    fprintf('  Transducer %d: %.2f → %.2f W/cm² (scale_p = %.4f, baseline source: %s)\n', ...
+        transducer_idx, baseline, target, scale_p, baseline_src);
     p_scaled = p * scale_p;
 end

@@ -71,6 +71,9 @@ function parameters = make_minimal_parameters(sim_path)
     parameters.transducer.annular.elem_p_amp         = 91590;
     parameters.transducer.annular.elem_phase_deg   = 0;
     parameters.transducer.annular.elem_phase_rad   = 0;
+    % Run at the elem_p_amp drive level: no target ISPPA, so no free-water
+    % baseline and no scaling (config_default.yaml sets 30 W/cm²).
+    parameters.transducer.target_isppa_wcm2      = [];
 
     % Transducer & focus position (centre of grid, pointing along z)
     half = round(parameters.grid.default_dims / 2);
