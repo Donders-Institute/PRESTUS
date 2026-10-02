@@ -120,7 +120,7 @@ which python   # inside the activated environment
 #      /home/user/.venvs/jwave_env/bin/python
 ```
 
-Copy this path — it is what you pass to `parameters.jwave.python_env` (see [Configuration](#configuration) below).
+Copy this path — it is what you pass to `parameters.jwave.python_env` (see [Configuration reference](#configuration-reference) below).
 
 ---
 

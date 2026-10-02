@@ -76,6 +76,7 @@ nav:
     - Sequential: doc_sequential.md
     - Group Analysis: doc_group.md
   - 📚 Reference:
+    - How PRESTUS works: doc_architecture.md
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
     - Modules: doc_modules.md

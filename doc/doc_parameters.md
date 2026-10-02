@@ -21,7 +21,8 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [doc_backend.md](doc_backend.md). |
 | `precision` | Computational precision for acoustic and thermal simulations. | `'single'` | `single` / `double` |
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
-| `debug` | Verbose debug mode with additional intermediate outputs. | `1` | `1 = yes`, `0 = no` |
+| `debug` | Verbose debug mode with additional intermediate outputs. | `0` | `1 = yes`, `0 = no` |
+| `transducer_coupling` | How several transducers interact acoustically. | `'coherent'` | `coherent`: pressure fields superpose in one k-Wave run (interference). `async`: each transducer is simulated separately and intensities are summed incoherently before the thermal simulation. See [doc_multitransducer.md](doc_multitransducer.md). |
 
 ---
 
@@ -68,7 +69,17 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 
 #### jwave settings (`jwave`)
 
-Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu: ''`, `use_gpu: ~` (auto), `gmres_restart: 10`, `gmres_maxiter: 1000`, `precision: single`, `dry_run: false` (write the HDF5 inputs only; the pipeline stops after the acoustic stage and caches nothing); `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `python_env` | Python environment or executable with jwave. | `''` | Empty = system `python3`. |
+| `python_env_gpu` | GPU-capable Python environment. | `''` | Empty = same as `python_env`. |
+| `use_gpu` | Use GPU acceleration. | `~` | `true` / `false` / `~` (auto-detect). |
+| `gmres_restart` | GMRES restart parameter (Krylov subspace size). | `10` | jwave's default; larger values can destabilise GMRES in single precision. |
+| `gmres_maxiter` | Maximum GMRES iterations. | `1000` | jwave's default. |
+| `precision` | Computational precision. | `'single'` | `single` / `double` |
+| `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
 
 ---
 
@@ -86,7 +97,7 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `localite_export` | Output folder for files to import into Localite (heuristic placement), per subject `sub-XXX/`. | `''` | Resolved into `io.dir_localite_export`. |
 | `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
-| `t2_pattern` | T2 image path template relative to `path.anat`. | `'sub-%1$03d_T2w.nii*'` | Optional |
+| `t2_pattern` | T2 image path template relative to `path.anat`. | `''` | Optional; empty skips the T2 (e.g. `'sub-%1$03d_T2w.nii*'`). |
 
 ---
 
@@ -98,6 +109,8 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `matlab_bin_path` | Absolute path to MATLAB binary. | Required for pseudoCT generation on HPC (e.g. `/opt/matlab/R2024a/bin/matlab`). Local execution falls back to `matlabroot`. |
 | `fsl_bin_path` | Absolute path to FSL bin directory. | Required for pseudoCT generation (e.g. `/opt/fsl/bin`). Prepended to PATH at runtime. |
 | `ants_bin_path` | Absolute path to ANTs bin directory. | Required for pseudoCT generation (e.g. `/opt/ants/bin`). Prepended to PATH at runtime. |
+| `ants_simg_path` | ANTs Singularity image (`.simg`/`.sif`). | When set, ANTs tools run via `singularity exec`. |
+| `modules_to_load` | HPC environment modules loaded before pseudoCT generation. | e.g. `['matlab/R2023b', 'fsl/6.0.7', 'ants/2.5.3']` |
 | `paths_to_add` | Paths to add with `addpath()`. | [cell] e.g. `{"path/to/x"}` |
 | `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to config file location |
 
@@ -109,6 +122,7 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 |---|---|---|---|
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour). |
+| `cache_signature_check` | Response when a reused grid/medium cache was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Applies when a cache is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs.md#cache-reuse-checks). |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save all intermediate matrices (`.mat` / cache files)? | `[]` | `1` = save all, `0` = save none, `[]` = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to `0`/`1` always wins. `0` also triggers cleanup of uncertainty intermediates. |
 | `save_source_matrices` | Save `kwave_source.mat` (transducer source array)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. Needed by multi-stage pipelines (e.g. uncertainty). |
@@ -118,6 +132,9 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 | `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | `0` | Not affected by `save_matrices`. |
 | `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? | `1` | Not affected by `save_matrices`. |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
+| `save_Ipa` | Save the pulse-average intensity (Ipa) NIfTI map? | `1` | Suppressed automatically when `timing.pd` is absent. |
+| `save_Ita` | Save the temporal-average intensity (Ita) NIfTI map? | `1` | Suppressed automatically when `timing.pd`/`timing.pri` are absent. |
+| `save_p_complex` | Save the complex pressure field (`p_complex`) in the acoustic cache? | `0` | Large. |
 | `deface_plots` | Remove facial anatomy from all QC figures? | `1` | `1 = yes`, `0 = no`. Uses the SimNIBS eye label to anchor the cut plane ~30 mm posterior to the eye socket (ear-canal level). Requires the SimNIBS segmentation (`path.seg`). Has no effect on saved NIfTIs; see `segmentation.deface` for that. |
 | `adopted_heatmap` | Path to an existing **temperature** heatmap NIfTI (`heating_end.nii.gz`) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually. | — | Optional. Used for sequential multi-target runs. |
 | `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. Set automatically by the sequential dispatcher. | — | Optional. Used for sequential multi-target runs. |
@@ -151,9 +168,11 @@ Used when `acoustic_backend: jwave`. Defaults: `python_env: ''`, `python_env_gpu
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
+| `run_transducer_placement` | Resolve `trans_pos`/`focus_pos` from `placement.mode`. | `1` | Required when `placement.manual.coordinate_space` is `ras` or `mni` (positions are converted here). |
 | `run_grid_setup` | Setup grid and run head processing. | `1` | Mandatory for simulations. |
 | `run_medium_setup` | Map medium acoustic properties. | `1` | Mandatory for simulations. |
 | `run_source_setup` | Set up acoustic source. | `1` | Mandatory for simulations. |
+| `run_water_baseline` | Run a free-water simulation that records the ISPPA of the current drive, for scaling to `transducer.target_isppa_wcm2`. | `'auto'` | `auto`: when a target is set and the transducer has no calibration ISPPA or the target differs from it. `1`: always. `0`: only when the target differs from a calibration ISPPA. A target that cannot be met stops the run (`prestus:isppa:noBaseline`). See [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting). |
 | `run_acoustic_sims` | Run acoustic simulations. | `1` | |
 | `run_acoustic_analysis` | Run acoustic analysis. | `1` | |
 | `run_heating_sims` | Run thermal simulations. | `0` | Enable after acoustic results are validated. |
@@ -175,10 +194,11 @@ All flags: `1 = yes`, `0 = no`.
 
 See [doc_transducer.md](doc_transducer.md).
 
-All fields are mandatory and have no defaults — they must be set in the study config.
+Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must be set in the study config or come from the equipment library (`serial`).
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
+| `target_isppa_wcm2` | Target free-water ISPPA [W/cm²]. | Default `30`. Scalar: the field is scaled to it (needs a free-water baseline; see `modules.run_water_baseline`). Vector: one thermal job per value ([multi-intensity](doc_multiintensity.md)). Empty `[]`: no scaling, the field is reported at `elem_p_amp`. |
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
 | `serial` | Equipment serial; geometry, phases and drive come from the equipment config and transducer library. | See [doc_transducer_library.md](doc_transducer_library.md). Values set in the study config take precedence. |
@@ -387,7 +407,7 @@ See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactiv
 | `resolution_mm` | Grid resolution (must be isotropic) [mm]. | `0.5` | |
 | `default_dims` | Requested grid dimensions [voxels per dimension]. | `[144, 144, 400]` | Directly sets the simulation grid for `water` and `phantom` media. For `layered`, the grid is determined by head preprocessing and this value is not used. |
 | `axisymmetric` | Run axisymmetric 2D simulation (`kspaceFirstOrderAS`). | `0` | `1 = yes`, `0 = no`. See [doc_simulations-acoustic.md](doc_simulations-acoustic.md). |
-| `pml_size` | Perfectly Matched Layer (PML) size [voxels]. | `10` | Absorbs waves at boundaries. Recommended for 3D. See [k-Wave docs](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). |
+| `pml_size` | Perfectly Matched Layer (PML) size [voxels]. | `'auto'` | `'auto'` chooses a size that keeps FFT grid sizes small-prime (k-Wave `getOptimalPMLSize`); a number fixes it. Absorbs waves at boundaries. Recommended for 3D. See [k-Wave docs](http://www.k-wave.org/documentation/example_na_controlling_the_pml.php). |
 | `source_ppw` | Points per wavelength (PPW) override. | `[]` | Calculated internally from `resolution_mm` and the medium's maximum sound speed if not set. Setting this overrides the internal calculation and fixes the number of spatial samples per wavelength used to derive the time step. |
 | `min_ppw` | Minimum acceptable PPW at the fundamental frequency. | `6` | Checked against the slowest medium sound speed (worst-case spatial sampling). A warning is raised if the actual PPW falls below this value, along with the maximum `resolution_mm` that would satisfy it. |
 | `source_cfl` | Courant-Friedrichs-Lewy (CFL) fraction. | `0.15` | Controls temporal resolution independently of spatial resolution. Given a fixed spatial step `dx`, the time step is `dt = CFL × dx / c_max`, where `c_max` is the fastest medium sound speed (typically skull at ~2800 m/s). Smaller CFL = finer temporal sampling and must remain below the stability limit. Set to 0.15 (half k-Wave's default of 0.3) for additional stability margin in heterogeneous skull simulations. Can be relaxed toward 0.3 to reduce runtime, but should be validated against `checkStability` output. |
@@ -517,6 +537,7 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 | `temp_0.{tissue}` | Initial temperature per tissue compartment [°C]. | `37` | Tissues: `water`, `skull`, `brain`, `skin`, `skull_trabecular`, `skull_cortical` |
 | `sensor_xy_halfsize` | Sensor window half-size for temperature recording [grid units]. | `100` | |
 | `record_t_at_every_step` | Record temperature at every time step for the full sensor window? | `0` | Memory-intensive; disable if out-of-memory errors occur. |
+| `log_thermal_updates` | Show k-Wave's thermal output for every time step. | `0` | `0`: only the first step is shown in full. |
 
 ---
 
@@ -553,11 +574,28 @@ See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 | `wait_for_job` | Block MATLAB until the submitted HPC job completes? | `false` | |
 | `timelimit` | Job time limit. | `'04:00:00'` | |
 | `memorylimit` | Memory limit [GB]. | `20` | |
+| `posthoc_water_timelimit` | Time limit of the post-hoc free-water jobs (`modules.run_posthoc_water_sims`). | `'05:00:00'` | |
+| `posthoc_water_memorylimit` | Memory limit of the post-hoc free-water jobs [GB]. | `40` | |
 | `ld_library_path` | LD_LIBRARY path for SimNIBS installation. | `''` | Set if you see `undefined symbol` errors. e.g. `/opt/gcc/7.2.0/lib64` |
-| `job_prefix` | Prefix string for HPC job names. | `'PRESTUS'` | Overridden to `'TP'` for transducer positioning jobs. |
+| `job_prefix` | Prefix string for HPC job names. | `'PS'` | Keep short; the job name is capped at 20 characters. Overridden to `'TP'` for transducer positioning jobs. |
 | `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
 | `depend_type` | Scheduler dependency type for `depend_job_id(s)`. | `'afterok'` | `'afterok'` or `'afterany'`. Internal (not in `config_default.yaml`); `prestus_study_start` uses `'afterany'` for the study-report job. |
 
+
+#### Snellius GPU partitions (`snellius`)
+
+Used when `hpc.name: 'snellius'`: `hpc.partition` selects one of these blocks, which sets the job's resources.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `gpu_a100.cores` | CPU cores requested on `gpu_a100`. | `18` | |
+| `gpu_a100.memorylimit` | Memory [GB] on `gpu_a100`. | `120` | |
+| `gpu_a100.timelimit` | Wall time on `gpu_a100`. | `'120:00:00'` | Partition maximum. |
+| `gpu_a100.n_gpu` | GPUs requested on `gpu_a100`. | `1` | |
+| `gpu_h100.cores` | CPU cores requested on `gpu_h100`. | `16` | |
+| `gpu_h100.memorylimit` | Memory [GB] on `gpu_h100`. | `180` | |
+| `gpu_h100.timelimit` | Wall time on `gpu_h100`. | `'120:00:00'` | Partition maximum. |
+| `gpu_h100.n_gpu` | GPUs requested on `gpu_h100`. | `1` | |
 ---
 
 ### Transducer calibration (`calibration`)

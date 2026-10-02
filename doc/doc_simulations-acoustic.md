@@ -106,7 +106,34 @@ f      = (k × ramp_dur + t_flat + k × ramp_dur) / pd
 
 > **Note.** The correction is applied automatically in `acoustic_analysis` when `parameters.timing.pulse_ramp_dur > 0`. The `acoustic_Ipa` map and all derived ISPPA values (per-tissue, at-target, etc.) are scaled by `f` before any further analysis. When `pulse_ramp_dur` is absent or zero the factor is 1 and no correction is applied.
 
-See [`benchmark_ramp_factor.m`](../code/benchmark_ramp_factor.m) for a minimal timing comparison of the no-ramp fast path versus both ramp shapes.
+---
+
+## ISPPA targeting
+
+The acoustic simulation runs at the drive set by `elem_p_amp` (from the study config or the transducer library). `transducer.target_isppa_wcm2` (default `30` W/cm²) then sets the **free-water** ISPPA the results are reported at. Pressure is linear in drive, so PRESTUS scales the simulated field by
+
+```
+scale_p = sqrt(target_isppa / baseline_isppa)
+```
+
+where `baseline_isppa` is the free-water peak ISPPA of the same drive. All pressure fields used downstream (`p_max_all`, `p_min_all`, `p_final`) are scaled, so intensities, MI and heating are consistent. A scalar target scales one run; a vector runs [one thermal job per value](doc_multiintensity.md); an empty target (`[]`) reports the field at `elem_p_amp`.
+
+The baseline comes from (`isppa_baseline`):
+
+1. a **free-water simulation** with the same grid, source and backend (`acoustic_water_baseline` → `water_baseline`; BabelBrain runs its own), recorded as `acoustic_provenance.freefield_isppa_wcm2` with its origin in `freefield_source`; or
+2. the transducer's **calibration ISPPA** (`tx_calibration.isppa_wcm2`, from the library), used only when it matches the target to within 1 % — then no scaling is needed.
+
+`modules.run_water_baseline` decides when the free-water simulation runs (`needs_water_baseline`):
+
+| Value | Runs the baseline when |
+|---|---|
+| `auto` (default) | a target is set and the transducer has no calibration ISPPA, or the target differs from it by more than 1 % |
+| `1` | always |
+| `0` | only when the target differs from a calibration ISPPA |
+
+A target is never reported unscaled: when it needs a rescale but no simulated baseline exists (e.g. `run_water_baseline: 0` with an uncalibrated transducer, or a cached result from a run without baseline and `run_source_setup: 0`), the run stops with `prestus:isppa:noBaseline` or `prestus:isppa:unsimulatedBaseline` (`isppa_scale_factor`). Scale factors above 4 or below 0.25 warn (`prestus:isppa:largeScale`): check that the target is in the linear regime of the simulated drive.
+
+> **Changed in 2026-10.** Before, a target on a transducer without calibration ISPPA was silently ignored — even with `run_water_baseline: 1` — and the field was reported at `elem_p_amp`. Such runs now run the baseline (`auto`) and are scaled to the target, which with the default target means 30 W/cm². Set `target_isppa_wcm2: []` to keep reporting the drive level.
 
 ---
 
@@ -164,6 +191,7 @@ Multiple adjustments are made if axisymmetry is requested:
 - Following acoustic simulation, values are either mirrored into a cartesian 2D grid, or radially expanded into a cartesion 3D grid (see the note below). In cartesian 2D, the output will have [radial x 2, axial] dimensions again, in line with the default specification for kspaceFirstOrder2D.
 - Only a **single transducer** is supported; specifying multiple transducers with `axisymmetric == 1` raises an error.
 - Only **annular transducers** explicitly support axisymmetric `kWaveArray` mode. Other transducer types are not tested in this configuration.
+- The source keeps every grid point with a non-zero band-limited-interpolation weight (as the 3D path and k-Wave do). Until 2026-10 points with weights ≤ 0.25 were dropped, which raised the free-water focal pressure by 6–11 % (ITRUSST BM1 at 0.5–0.25 mm); results of earlier axisymmetric runs at the drive level are affected, runs scaled to a simulated free-water baseline much less so. `test_physics_water` and `test_itrusst_benchmark` check this against the O'Neil solution and the ITRUSST reference ([Testing](doc_testing.md)).
 
 > **Axisymmetric 2D vs. 3D output**
 > Axisymmetric simulations are effectively 3D simulations that are performed efficiently on 2D input grids. By default, PRESTUS assumes that users want to follow-up an axisymmetric acoustic simulation with a 3D heating simulation. When heating is requested in the simulation pipeline, axisymmetric acoustic simulation outputs will be provided in 3D. If 2D outputs are desired, heating has to be deactivated. 2D heating simulations are possible by first running an acoustic 2D simulation without heating, and then running a heating simulation with the prior output, while deactivating (or not overwriting) the acoustic simulation.

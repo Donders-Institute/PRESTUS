@@ -67,9 +67,9 @@ See [Neuronavigation read-in](doc_placement_neuronav.md) for full details. In br
 2. `neuronav_compute_series_statistics` parses any of these formats and returns a mean 4×4 matrix per position series.
 3. `localite_matrix_to_positions` converts the matrix to transducer bowl and focus positions in both RAS mm and T1 voxel space.
 
-The recommended preprocessing output is a small JSON file with `trans_pos_ras` and `focus_pos_ras` (RAS mm), generated once per session and fed back into PRESTUS via `ras_to_grid`. See [Neuronavigation read-in § Recommended simple output format](doc_placement_neuronav.md#recommended-simple-output-format).
+Ingestion (`neuronav_gui` or the script workflow) writes one mean pose per target to `<path.localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml`, with a QC sidecar JSON; `placement.mode: localite` reads these and converts them to grid voxels via `ras_to_grid`. See [Neuronavigation read-in § Output layout](doc_placement_neuronav.md#output-layout).
 
-An example workflow (`examples/demo_localite.m`) and a multi-format debugging script (`code/debug_localite_inputs.m`) are provided.
+An example workflow is provided in `examples/demo_localite.m`.
 
 ## TUS_entry coordinate selection
 

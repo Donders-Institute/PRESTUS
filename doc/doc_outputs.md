@@ -178,15 +178,22 @@ Filename patterns:
 sub-XXX_<medium>_report<affix>.html       ← self-contained HTML report
 sub-XXX_<medium><affix>.csv               ← quantitative metrics
 sub-XXX_<medium><affix>_targeting.csv     ← targeting accuracy (layered or phantom)
+sub-XXX_placement<affix>.json             ← resolved transducer positions (T1 voxels; every placement mode)
 
 cache/                                     ← regenerable intermediates
-    sub-XXX_<medium>_parameters_<ts>.mat     parameters snapshot
-    sub-XXX_<medium>_after_rotating_and_scaling<affix>.mat
-    sub-XXX_<medium>_after_cropping_and_smoothing<affix>.mat
-    sub-XXX_<medium>_kwave_source<affix>.mat
-    sub-XXX_<medium>_results<affix>.mat      acoustic sensor data
-    sub-XXX_<medium>_heating_res<affix>.mat  thermal results
-    sound_speed.nii.gz  density.nii.gz  ...  T1-space property maps
+    sub-XXX_<medium>_parameters_<yyMMdd_HHmm><affix>.mat   parameters snapshot at start
+    sub-XXX_<medium>_report_parameters<affix>.mat          final parameters (report re-rendering)
+    sub-XXX_<medium>_cropped_smoothed<affix>.mat           cropped/smoothed head (layered)
+    sub-XXX_<medium>_grid_cache<affix>.mat                 grid stage (io.save_grid_cache)
+    sub-XXX_<medium>_planimg<affix>.mat                    planning-image sidecar (always)
+    sub-XXX_<medium>_medium_cache<affix>.mat               medium stage (io.save_medium_cache)
+    sub-XXX_<medium>_kwave_source<affix>.mat               source (io.save_source_matrices)
+    sub-XXX_<medium>_results<affix>.mat                    acoustic results + provenance
+    sub-XXX_<medium>_heating_res<affix>.mat                thermal results
+
+log/
+    sub-XXX_<medium>_<timestamp><affix>.txt                MATLAB diary of the run
+    sub-XXX_<medium>_parameters<affix>.yaml                resolved parameters (human-readable)
 
 debug/                                     ← diagnostic artefacts (debug=1 only)
     preproc/        head preprocessing (rotation, cropping, skull visualisations)
@@ -219,9 +226,30 @@ SimNIBS segmentations are governed separately by `io.overwrite_simnibs`.
 | Multi-ISPPA ([doc](doc_multiintensity.md)) | Stage-1 acoustic | Per-ISPPA thermal + report, summary report |
 | Uncertainty ([doc](doc_uncertainty.md)) | Stage-1 preprocessing | Variant simulations + reports, uncertainty report |
 
-So with the default `always`, resubmitting a finished chained run reuses the expensive acoustic simulations and regenerates the CSV, NIfTI and HTML outputs. Use `force` when an input that feeds the intermediate caches has changed — transducer placement, transducer or source parameters, grid, segmentation, or medium properties — because intermediate caches are **not** invalidated automatically. The alternative is to delete the relevant `cache/` files before resubmitting.
+So with the default `always`, resubmitting a finished chained run reuses the expensive acoustic simulations and regenerates the CSV, NIfTI and HTML outputs. Use `force` when an input that feeds the intermediate caches has changed — transducer placement, transducer or source parameters, grid, segmentation, or medium properties. Grid and medium caches detect such changes (see below); the acoustic cache only detects a changed grid size, so after changing source or medium parameters use `force` or delete the relevant `cache/` files before resubmitting.
 
 Within a chained run, sub-jobs that consume a shared cache (e.g. per-transducer acoustic jobs loading the Stage-0 grid) always load it rather than rebuilding it, even under `force`; the stage that owns the cache is the one that rebuilds it. Internally this is signalled by `io.reuse_upstream_caches` (set by the pipelines; not a user setting).
+
+### Cache reuse checks
+
+Grid and medium caches are named by subject, medium and affix only. So that a cache built from different settings is not reused silently, each cache stores the settings it depends on (`cache_signature`):
+
+| Cache | Compared settings |
+|---|---|
+| Grid (`*_grid_cache*.mat`) | `simulation.medium`, `grid`, `layers`, `headmodel`, `pct`, and the transducer (geometry and positions after placement) |
+| Medium (`*_medium_cache*.mat`) | the grid settings above, plus `medium_properties` |
+
+Paths, I/O, HPC and module flags are not compared (moving data or changing downstream stages does not change these caches), nor is the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field.
+
+When a cache is reused because of `io.overwrite_files: never` (or a declined overwrite prompt, or the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
+
+| Value | Effect |
+|---|---|
+| `error` (default) | Stop with `prestus:cache:signatureMismatch`, naming the differing keys. |
+| `warn` | Warn and reuse the cache anyway. |
+| `off` | No check. |
+
+Caches written before signatures existed cannot be checked; they are reused with the warning `prestus:cache:unverified`. Sub-jobs that load a cache owned by another stage of the same chained run (`io.reuse_upstream_caches`) are not checked.
 
 ---
 

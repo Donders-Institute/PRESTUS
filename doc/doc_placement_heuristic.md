@@ -4,7 +4,7 @@ The function `transducer_positioning` identifies heuristic locations for transdu
 
 The function targets brain regions specified by MNI coordinates, converting them to subject-native space using SimNIBS tools. It aims to identify candidate transducer positions where the geometric focus aligns with a target within a user-defined focal distance range. For each position, it computes the intersection proportion between the transducer and skin, mean/variance distances to skin and skull, and geometric focus/exit plane positions. It (optionally removes) areas including ears and selects a heuristic position based on user-defined criteria. Besides target MNI coordinates, the function does not require manual intervention, enabling automatic end-to-end workflows.
 
-For parameters, see the [overview](doc_parameters.md#heuristic-transducer-placement).
+For parameters, see the [overview](doc_parameters.md#placementheuristic).
 
 ### Candidate positions
 
