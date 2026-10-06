@@ -50,6 +50,11 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %                     matches jwave's own helmholtz_solver default)
 %   .gmres_maxiter  - Max GMRES outer iterations (default: 1000; helmholtz only;
 %                     matches jwave's own helmholtz_solver default)
+%   .helmholtz_operator - 'conservative' (default) | 'jwave'; helmholtz only.
+%                     conservative: rho*div((1/rho)*grad p), source scaled by the
+%                     local sound speed. jwave: jwave's built-in density term,
+%                     which underestimates transmission through density jumps
+%                     (~20 % through a skull plate; see run_jwave_sim.py).
 %   .gmres_tol      - GMRES convergence tolerance (default: 1e-3; helmholtz only;
 %                     matches jwave's own helmholtz_solver default). A tighter
 %                     restart/maxiter/tol budget does not improve accuracy once
@@ -143,6 +148,7 @@ fd_accuracy    = get_field(jw, 'fd_accuracy',     8);
 gmres_restart  = get_field(jw, 'gmres_restart',   10);
 gmres_maxiter  = get_field(jw, 'gmres_maxiter',   1000);
 gmres_tol      = get_field(jw, 'gmres_tol',       1e-3);
+helmholtz_operator = get_field(jw, 'helmholtz_operator', 'conservative');
 precision      = get_field(jw, 'precision',       'single');
 dry_run        = get_field(jw, 'dry_run',         false);
 
@@ -150,6 +156,11 @@ valid_solvers = {'helmholtz', 'pseudo_spectral', 'finite_differences'};
 if ~any(strcmp(solver, valid_solvers))
     error('jwave_wrapper: unknown solver ''%s''. Valid options: %s.', ...
           solver, strjoin(valid_solvers, ', '));
+end
+valid_operators = {'conservative', 'jwave'};
+if ~any(strcmp(helmholtz_operator, valid_operators))
+    error('jwave_wrapper: unknown helmholtz_operator ''%s''. Valid options: %s.', ...
+          helmholtz_operator, strjoin(valid_operators, ', '));
 end
 
 % convergence_threshold — relative spectral residual above which the Helmholtz
@@ -397,7 +408,8 @@ jwave_argv = {python_bin, bridge_py, '--input', input_h5, '--output', output_h5,
     '--gmres_restart', num2str(gmres_restart), ...
     '--gmres_maxiter', num2str(gmres_maxiter), ...
     '--gmres_tol', sprintf('%.1e', gmres_tol), ...
-    '--fd_accuracy', num2str(fd_accuracy)};
+    '--fd_accuracy', num2str(fd_accuracy), ...
+    '--helmholtz_operator', helmholtz_operator};
 % parameters.simulation.debug drives run_jwave_sim.py's --debug: extra prints
 % for PML/domain sizing in wavelengths, time-domain steady-state margin, and
 % a Helmholtz compile-vs-solve time breakdown (see run_jwave_sim.py --help).

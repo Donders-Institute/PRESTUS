@@ -87,6 +87,14 @@ def parse_args():
                         'compile-vs-solve time breakdown (Helmholtz).')
     p.add_argument('--fd_accuracy', type=int, default=8,
                    help='FD stencil accuracy order for finite_differences solver (default: 8)')
+    p.add_argument('--helmholtz_operator', default='conservative',
+                   choices=['conservative', 'jwave'],
+                   help='Helmholtz density term (default: conservative). conservative: '
+                        'rho*div((1/rho)*grad p) with 1/rho averaged to the staggered points, '
+                        'source scaled by the local sound speed. jwave: jwave\'s built-in '
+                        'operator (grad p . grad rho / rho with a spectral gradient of rho, '
+                        'source scaled by the minimum sound speed), which underestimates '
+                        'transmission through density jumps (~20 %% through a skull plate).')
     return p.parse_args()
 
 
@@ -899,7 +907,81 @@ def run_finite_differences(inp, accuracy=8):
     return np.array(p_max_all), np.array(p_min_all), np.array(p_final)
 
 
-def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, debug=False):
+def conservative_helmholtz_parts(inp, domain, op_params):
+    """Precomputed fields for conservative_helmholtz.
+
+    jwave's FourierSeries laplacian_with_pml writes the density term as
+    grad(p).grad(rho)/rho with a spectral gradient of rho. Across a density
+    jump (water/skull) that form does not enforce continuity of (1/rho) dp/dn
+    and loses energy at every interface: 1D plane-wave tests against the
+    analytic transmission give -19 % through a density-only plate and -26 %
+    through the ITRUSST BM3 cortical plate at 0.5 mm (-17 % at 0.125 mm). The
+    conservative form rho*div((1/rho)*grad p), with 1/rho averaged onto the
+    staggered points where grad p lives (as k-Wave staggers rho0_sgx), gives
+    <= 3 % in the same tests.
+    """
+    import jax.numpy as jnp
+    from jaxdf.discretization import FourierSeries
+
+    lap = op_params['laplacian'] if 'laplacian' in op_params else op_params   # jwave version layouts
+    nd  = len(domain.N)
+    rho = np.broadcast_to(np.asarray(inp['density'], dtype=np.float64), tuple(domain.N))
+    inv = 1.0 / rho
+    # 1/rho at x + dx/2 along each axis (the stagger=+0.5 points of gradient);
+    # periodic wrap is harmless: the grid edges are homogeneous PML water
+    inv_stag = np.stack([0.5 * (inv + np.roll(inv, -1, axis=d)) for d in range(nd)], axis=-1)
+    return dict(
+        pml=lap['pml_on_grid'],
+        fft_u=lap['fft_u'],
+        rho=FourierSeries(params=jnp.array(rho[..., np.newaxis], dtype=jnp.float32), domain=domain),
+        inv_rho_stag=FourierSeries(params=jnp.array(inv_stag, dtype=jnp.float32), domain=domain),
+        wavevector=op_params.get('wavevector') if 'laplacian' in op_params else None,
+    )
+
+
+def conservative_helmholtz(u, medium, omega, parts):
+    """rho*div((1/rho)*grad u) with PML, plus jwave's wavevector term (k^2 u with attenuation)."""
+    from jaxdf.operators import gradient, diag_jacobian, sum_over_dims
+    from jwave.acoustics.operators import wavevector
+
+    pml = parts['pml']
+    g = gradient(u, stagger=[0.5], correct_nyquist=False, params=parts['fft_u'])
+    g = g * pml[0] * parts['inv_rho_stag']
+    div = diag_jacobian(g, stagger=[-0.5], correct_nyquist=False, params=parts['fft_u']) * pml[1]
+    if parts['wavevector'] is None:
+        k = wavevector(u, medium, omega=omega)
+    else:
+        k = wavevector(u, medium, omega=omega, params=parts['wavevector'])
+    return sum_over_dims(div) * parts['rho'] + k
+
+
+def scaled_source_local_c(source_field, inp, domain):
+    """Helmholtz right-hand side: source amplitude [Pa] * 2/(dx*c) with c at each source voxel.
+
+    jwave's scale_source_helmholtz uses the minimum sound speed of the whole
+    medium; k-Wave scales each source point by its local sound speed. The two
+    agree when the source sits in the slowest medium (water), and differ by
+    c_water/c_min otherwise (e.g. ~4 % with fat at 1440 m/s).
+    """
+    import jax.numpy as jnp
+    from jaxdf.discretization import FourierSeries
+
+    c = np.broadcast_to(np.asarray(inp['sound_speed'], dtype=np.float64), source_field.shape)
+    rhs = source_field * 2.0 / (domain.dx[0] * c)
+    return FourierSeries(params=jnp.array(rhs[..., np.newaxis], dtype=jnp.complex64), domain=domain)
+
+
+def conservative_residual(P_raw, rhs, medium, omega, parts):
+    """Relative residual ||A u - b|| / ||b|| of the conservative solve, u = P/(-i omega)."""
+    u   = P_raw / (-1j * omega)
+    res = np.array((conservative_helmholtz(u, medium, omega, parts) - rhs).params[..., 0])
+    b   = np.array(rhs.params[..., 0])
+    nb  = np.linalg.norm(b)
+    return float('nan') if nb == 0 else float(np.linalg.norm(res) / nb)
+
+
+def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, debug=False,
+                  helmholtz_operator='conservative'):
     """
     Run jwave frequency-domain (Helmholtz) solver.
 
@@ -919,6 +1001,10 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     accuracy. Medium parameters (alpha_coeff, c0, rho0) are used as passed from
     the upstream MATLAB parameters struct without modification (besides the
     attenuation floor).
+
+    helmholtz_operator selects the density term (see conservative_helmholtz):
+    'conservative' (default) solves rho*div((1/rho)*grad p) + k^2 p and scales the
+    source by the local sound speed; 'jwave' uses jwave's helmholtz_solver as is.
 
     Returns:
         p_max_all = |P|        (peak amplitude)
@@ -1026,11 +1112,31 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     # arrays, never bare scalars. Verified empirically before landing this change.
     op_params = helmholtz.default_params(jw_source, medium, omega=omega)
 
-    @jax.jit
-    def forward(medium, source, op_params):
-        return helmholtz_solver(medium, omega, source, params=op_params,
-                                restart=gmres_restart, maxiter=gmres_maxiter,
-                                tol=gmres_tol)
+    if helmholtz_operator == 'conservative':
+        # Same GMRES call as jwave's helmholtz_solver (checkpointed, batched),
+        # on the conservative operator and a locally scaled source
+        from jax.scipy.sparse.linalg import gmres
+        parts = conservative_helmholtz_parts(inp, domain, op_params)
+        rhs   = scaled_source_local_c(source_field, inp, domain)
+        print('[run_jwave_sim] Helmholtz operator: conservative (rho*div((1/rho) grad p), '
+              'source scaled by local sound speed)')
+
+        @jax.jit
+        def forward(medium, source, parts):
+            helm = jax.checkpoint(lambda u: conservative_helmholtz(u, medium, omega, parts))
+            u = gmres(helm, source, source * 0, tol=gmres_tol, restart=gmres_restart,
+                      maxiter=gmres_maxiter, solve_method='batched')[0]
+            return -1j * omega * u
+        jw_source_in, params_in = rhs, parts
+    else:
+        print('[run_jwave_sim] Helmholtz operator: jwave built-in (non-conservative density term)')
+
+        @jax.jit
+        def forward(medium, source, op_params):
+            return helmholtz_solver(medium, omega, source, params=op_params,
+                                    restart=gmres_restart, maxiter=gmres_maxiter,
+                                    tol=gmres_tol)
+        jw_source_in, params_in = jw_source, op_params
 
     if debug:
         # jax.scipy.sparse.linalg.gmres runs a fixed restart*maxiter iteration
@@ -1040,17 +1146,20 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
         # much of the wall-clock time is XLA compilation vs actual GMRES work.
         import time as _time
         t0 = _time.time()
-        P_raw = jax.block_until_ready(forward(medium, jw_source, op_params))
+        P_raw = jax.block_until_ready(forward(medium, jw_source_in, params_in))
         t_first = _time.time() - t0
         t0 = _time.time()
-        P_raw = jax.block_until_ready(forward(medium, jw_source, op_params))
+        P_raw = jax.block_until_ready(forward(medium, jw_source_in, params_in))
         t_second = _time.time() - t0
         print(f'[run_jwave_sim] [debug] compile+solve={t_first:.2f}s  '
               f'solve-only (2nd call, cache warm)={t_second:.2f}s  '
               f'estimated compile time={max(0.0, t_first - t_second):.2f}s')
     else:
-        P_raw = forward(medium, jw_source, op_params)
-    residual_norm = compute_helmholtz_residual(P_raw, jw_source, medium, omega, op_params)
+        P_raw = forward(medium, jw_source_in, params_in)
+    if helmholtz_operator == 'conservative':
+        residual_norm = conservative_residual(P_raw, rhs, medium, omega, parts)
+    else:
+        residual_norm = compute_helmholtz_residual(P_raw, jw_source, medium, omega, op_params)
 
     if hasattr(P_raw, 'params'):
         P_complex = np.array(P_raw.params[..., 0])
@@ -1238,6 +1347,7 @@ def main():
                 gmres_maxiter=args.gmres_maxiter,
                 gmres_tol=args.gmres_tol,
                 debug=args.debug,
+                helmholtz_operator=args.helmholtz_operator,
             )
             print(f'[run_jwave_sim] Helmholtz spectral residual: {residual_norm:.4e}')
             diagnostics['residual_norm'] = residual_norm

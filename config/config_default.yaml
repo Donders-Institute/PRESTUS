@@ -557,6 +557,7 @@ jwave:
   # PML thickness is set by grid.pml_size (shared with k-Wave; jwave resolves 'auto' to ~2.5 wavelengths)
   gmres_restart: 10         # GMRES restart parameter (Krylov subspace size); jwave's own default. Larger values can destabilise GMRES in single precision
   gmres_maxiter: 1000       # Maximum GMRES iterations; jwave's own default
+  helmholtz_operator: conservative  # Helmholtz density term: 'conservative' (rho*div((1/rho) grad p), local-c source scaling) | 'jwave' (jwave's built-in term; ~20 % low through skull)
   precision: single         # Computational precision: 'single' | 'double'
   dry_run: false            # Write the HDF5 solver inputs only; the pipeline stops after the acoustic stage and caches nothing
 

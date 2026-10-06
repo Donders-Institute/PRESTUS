@@ -78,6 +78,7 @@ Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thick
 | `use_gpu` | Use GPU acceleration. | `~` | `true` / `false` / `~` (auto-detect). |
 | `gmres_restart` | GMRES restart parameter (Krylov subspace size). | `10` | jwave's default; larger values can destabilise GMRES in single precision. |
 | `gmres_maxiter` | Maximum GMRES iterations. | `1000` | jwave's default. |
+| `helmholtz_operator` | Density term of the Helmholtz solver. | `'conservative'` | `conservative`: ρ∇·((1/ρ)∇p), source scaled by the local sound speed. `jwave`: jwave's built-in term, which underestimates transmission through density jumps (~20 % through a skull plate). See [jwave: density term](doc_jwave.md#density-term-helmholtz_operator). |
 | `precision` | Computational precision. | `'single'` | `single` / `double` |
 | `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
 
