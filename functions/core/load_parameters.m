@@ -53,7 +53,8 @@ function parameters = load_parameters(varargin)
     % Ensure yaml (and other external dependencies) are on the path.
     % This makes load_parameters callable before a full PRESTUS path setup.
     external_dir = fullfile(prestus_root, 'external');
-    if exist(external_dir, 'dir') && ~exist('yaml.loadFile', 'file')
+    % (exist() is 0 for package functions such as yaml.loadFile, so use which)
+    if exist(external_dir, 'dir') && isempty(which('yaml.loadFile'))
         addpath(genpath(external_dir));
     end
 
