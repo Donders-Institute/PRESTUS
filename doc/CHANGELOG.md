@@ -12,6 +12,10 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 - **`load_parameters` speed**: it re-added `external/` with `genpath` on every call, because `exist('yaml.loadFile', 'file')` is 0 for package functions. It now checks with `which`; a call takes 0.1–2 s instead of 2–28 s on a network drive
 
+#### Backend accuracy (ITRUSST intercomparison)
+
+- **k-Wave with `fit_alpha_power: 0`**: `medium_setup` passed a per-voxel `alpha_power` array, which k-Wave rejects (`medium.alpha_power must be scalar`). It now passes the single power law, and errors with a clear message when tissues have different powers
+
 #### Robustness, benchmarks and documentation (2026-10 audit, part 2)
 
 - ⚠️ **Axisymmetric source amplitude**: the axisymmetric kWaveArray source kept only grid points with BLI weight > 0.25, dropping part of the band-limited footprint (incl. its negative side lobes). This raised the free-water focal pressure by 6 % at 0.5 mm and 11 % at 0.25 mm (ITRUSST BM1), i.e. 12–23 % in intensity. `source_create` now keeps every non-zero weight, as the 3D path and k-Wave do; BM1 now agrees to +0.2 % (focal pressure), 0.0 mm (focus), L∞ 2.1 %, L2 1.5 %. 3D simulations were not affected. Axisymmetric results at the drive level change; results scaled to a simulated free-water baseline change much less

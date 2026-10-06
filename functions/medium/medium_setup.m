@@ -273,7 +273,16 @@ end
     else
         warn('Attenuation power-law is not remapped (as requested).')
         alpha_coeff_fixed = alpha_coeff;
-        alpha_power_fixed = alpha_power;
+        % k-Wave accepts a single power law only (medium.alpha_power must be scalar)
+        y = unique(alpha_power(~isnan(alpha_power)));
+        if isscalar(y)
+            alpha_power_fixed = y;
+        else
+            error('medium_setup:alphaPowerNotUniform', ...
+                ['fit_alpha_power = 0 needs one alpha_power for all tissues (found %s); ' ...
+                 'k-Wave supports a single power law. Use fit_alpha_power = 1 to remap.'], ...
+                mat2str(y(:)'));
+        end
     end
 
     %% smooth medium masks
