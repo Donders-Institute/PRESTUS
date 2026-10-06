@@ -373,6 +373,9 @@ placement:
     additional_offset_mm: 0   # Extra stand-off between skin and transducer exit plane [mm]
                               # (e.g., coupling gel pad or water-filled cone).
     max_angle_deg: 10         # Maximum allowed transducer tilt angle [degrees].
+    min_distance_mm: []       # Skin–target distance window [mm] for eligibility; [] = min(focal_distance_list) - max(flhm_list).
+    max_distance_mm: []       # [] = max(focal_distance_list) + max(flhm_list). Set both for a steerable array.
+    optimal_distance_mm: []   # Optimum of the distance criterion [mm]; [] = mean(focal_distance_list).
     mask_radius_mm: 2         # Radius of the spherical target mask [mm].
     # --- Optimisation weights (must sum to 1.0) ---
     weight_skin_target_distances: 0.2     # Penalise transducer-to-target distance

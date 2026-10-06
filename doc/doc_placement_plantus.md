@@ -49,15 +49,20 @@ Key fields: `max_distance`, `min_distance`, `optimal_distance`,
 `focal_distance_list`, `flhm_list`, five `weight_*` scalars.
 
 The distance fields are derived by `position_transducer_plantus.m` from the
-transducer calibration (`focal_distance_list`, `flhm_list`):
+transducer calibration (`focal_distance_list`, `flhm_list`), unless set
+explicitly with `placement.plantus.min_distance_mm`, `max_distance_mm` and
+`optimal_distance_mm`:
 
-| Field | Value written by PRESTUS |
+| Field | Value written by PRESTUS (when not set) |
 |-------|--------------------------|
 | `min_distance` | `max(0, min(focal_distance_list) − max(flhm_list))` |
 | `max_distance` | `max(focal_distance_list) + max(flhm_list)` |
 | `optimal_distance` | `mean(focal_distance_list)` — the desired skin–target distance |
 
-If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead.  If
+If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead.  For a
+steerable array, list the steering depths in `focal_distance_list` and set
+the window to the steering range: the default margin (the largest FLHM,
+often > 50 mm) otherwise admits skin spots the focus cannot reach.  If
 `optimal_distance` is missing from the YAML, the launcher falls back to
 `(min_distance + max_distance) / 2`.
 
