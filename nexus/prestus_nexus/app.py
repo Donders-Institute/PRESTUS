@@ -8,6 +8,10 @@ from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--askpass"]:                 # ssh's password prompt (remote.askpass_env)
+        from .askpass import run
+        return run(" ".join(argv[1:]))
     parser = argparse.ArgumentParser(prog="prestus-nexus", description=__doc__)
     parser.add_argument("config", nargs="?", help="study config YAML to open directly")
     parser.add_argument("--prestus-root", help="PRESTUS checkout (default: auto-detect)")

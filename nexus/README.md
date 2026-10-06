@@ -47,6 +47,9 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `placement.py` | Voxel conventions, bowl geometry, scalp snapping, Brainsight/Slicer trajectory import. |
 | `launcher.py` | MATLAB discovery, `run_<study>.m` / `submit_<study>.m` launchers, `-batch` commands with success/failure markers. |
 | `jobs.py` | Cluster jobs submitted through PRESTUS: IDs from the log, `squeue`/`sacct`/`qstat` state, cancel. |
+| `ui/jobs_view.py` | The *Jobs* side tab and its pop-out window: job table, and the selected job's output/error/report logs, followed live. |
+| `remote.py` | Submitting over SSH: local → cluster path mapping, the `ssh … bash -lc` submit and probe commands, scheduler commands run on the host, and the shared connection (*Connect…*: one password login, reused via `ControlPath`). |
+| `askpass.py` | ssh's `SSH_ASKPASS` prompt as a Nexus dialog (`prestus-nexus --askpass`). |
 | `merge.py` | `mergestruct` semantics, shared by the schema (toolbox + project defaults) and the model. |
 | `project_defaults.py` | Refreshing a project's `config_default.yaml` copy (*Tools ▸ Update project defaults…*). |
 | `outputs.py` | Where the pipeline writes per-subject outputs; the placement record (`sub-XXX_placement<affix>.json`). |
@@ -96,6 +99,7 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - *Validate in MATLAB* (`load_parameters` only).
    - *Run locally* via `matlab -batch`, with a live log and success/failure markers.
    - *Submit to cluster* through PRESTUS' own HPC path, and a job list that follows the submitted jobs.
+   - *Submit over SSH* from a computer without `sbatch`/`qsub` that sees the study folder on a shared drive.
    - **Tools menu:** opens `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
 5. **Retirement.** `launch_web_alignment` and `functions/gui_py` have been removed. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
 

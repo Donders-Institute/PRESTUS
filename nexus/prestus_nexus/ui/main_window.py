@@ -468,6 +468,7 @@ class MainWindow(QMainWindow):
                 self._section_tab[RUN] = self._section_tab[REVIEW] = key
                 side.addTab(run, "Run log")
                 side.addTab(review, "Review YAML")
+                side.addTab(run.jobs_view, "Jobs")
                 side.currentChanged.connect(lambda _i, s=side: s.currentWidget().refresh())
                 self.run_side = side
                 tab.set_side(side, (2, 3))

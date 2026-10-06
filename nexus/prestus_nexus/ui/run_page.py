@@ -1,25 +1,29 @@
 """Run page: write the launcher, validate in MATLAB, run locally or submit to the cluster
-with a live log, and follow submitted jobs."""
+(here, or over SSH from a computer without a scheduler) with a live log, and follow
+submitted jobs."""
 
 from __future__ import annotations
 
 import html
 from pathlib import Path
 
-from PyQt6.QtCore import QProcess, QTimer, pyqtSignal
+from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QTextCursor
-from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                              QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
-                             QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget)
 
 from .. import jobs as hpc_jobs
 from .. import launcher
+from .. import remote as rmt
 from ..model import ConfigModel
 from ..predict_outputs import predict, save_summary
+from .jobs_view import JobsView, JobsWindow
 
 
 class RunPage(QWidget):
     finished = pyqtSignal(str, bool)          # task, success
+    jobs_changed = pyqtSignal()
 
     def __init__(self, window, parent: QWidget | None = None):
         super().__init__(parent)
@@ -27,13 +31,15 @@ class RunPage(QWidget):
         self.proc: QProcess | None = None
         self.task = ""
         self._ok = False
+        self._program = ""
+        self._remote_host: rmt.RemoteHost | None = None
 
         v = QVBoxLayout(self)
         title = QLabel("Run in MATLAB")
         title.setObjectName("CardTitle")
         v.addWidget(title)
         intro = QLabel("Runs the saved study config in MATLAB on this computer, or submits it to the "
-                       "cluster (on a login node with sbatch/qsub) and follows the jobs. "
+                       "cluster (on a login node with sbatch/qsub, or over SSH) and follows the jobs. "
                        "Validate first: it only loads the config with <tt>load_parameters</tt>.")
         intro.setWordWrap(True)
         v.addWidget(intro)
@@ -63,6 +69,59 @@ class RunPage(QWidget):
         row.addWidget(self.matlab, 1)
         row.addWidget(browse)
         v.addLayout(row)
+
+        # Submit over SSH (remote.py): for a computer without sbatch/qsub that sees the
+        # study folder on a shared drive
+        self.remote_toggle = QCheckBox("Submit over SSH")
+        self.remote_toggle.setToolTip(
+            "Submit from this computer by running PRESTUS on a cluster login node over SSH. "
+            "The study folder must be on a drive the cluster also sees; paths are translated "
+            "by the folder mapping. Log in with Connect… (password, once) or an SSH key.")
+        self.remote_toggle.setChecked(bool(window.session.get("remote_enabled", False)))
+        self.remote_toggle.toggled.connect(self._toggle_remote)
+        v.addWidget(self.remote_toggle)
+        self.remote_box = QWidget()
+        form = QFormLayout(self.remote_box)
+        form.setContentsMargins(18, 0, 0, 0)
+        sess = window.session
+        self.r_host = QLineEdit(sess.get("remote_host", ""))
+        self.r_host.setPlaceholderText("user@mentat005.dccn.nl, or an alias from ~/.ssh/config")
+        self.r_host.textChanged.connect(lambda _t: self.refresh())
+        self.r_local = QLineEdit(sess.get("remote_local_prefix", ""))
+        self.r_local.setPlaceholderText("folder on this computer, e.g. /Volumes/2425122.01")
+        self.r_remote = QLineEdit(sess.get("remote_remote_prefix", ""))
+        self.r_remote.setPlaceholderText("the same folder on the cluster, e.g. /project/2425122.01")
+        self.r_setup = QLineEdit(sess.get("remote_setup", ""))
+        self.r_setup.setPlaceholderText("e.g. module load slurm matlab/R2024a")
+        self.r_matlab = QLineEdit(sess.get("remote_matlab", ""))
+        self.r_matlab.setPlaceholderText("matlab")
+        self.r_root = QLineEdit(sess.get("remote_prestus_root", ""))
+        self.r_root.setPlaceholderText("empty: this PRESTUS checkout, through the folder mapping")
+        form.addRow("Host", self.r_host)
+        form.addRow("Local folder", self.r_local)
+        form.addRow("is on the cluster", self.r_remote)
+        form.addRow("Setup commands", self.r_setup)
+        form.addRow("Remote MATLAB", self.r_matlab)
+        form.addRow("Remote PRESTUS", self.r_root)
+        self.b_connect = QPushButton("Connect…")
+        self.b_connect.setToolTip(
+            "Log in once with your password; submits, status checks and cancels reuse this "
+            f"connection until it has been idle for {rmt.CONTROL_PERSIST}. Not needed with an SSH key."
+            if rmt.sharing_supported() else "Connection sharing needs OpenSSH on macOS/Linux; use an SSH key.")
+        self.b_connect.clicked.connect(self.connect_ssh)
+        self.b_disconnect = QPushButton("Disconnect")
+        self.b_disconnect.clicked.connect(self.disconnect_ssh)
+        self.b_probe = QPushButton("Test connection")
+        self.b_probe.setToolTip("Report sbatch/qsub, MATLAB and the PRESTUS folder on the host")
+        self.b_probe.clicked.connect(self.test_connection)
+        self.r_status = QLabel()
+        conn_row = QHBoxLayout()
+        for b in (self.b_connect, self.b_disconnect, self.b_probe):
+            conn_row.addWidget(b)
+        conn_row.addWidget(self.r_status, 1)
+        form.addRow("", conn_row)
+        self.remote_box.setVisible(self.remote_toggle.isChecked())
+        v.addWidget(self.remote_box)
 
         buttons = QHBoxLayout()
         self.b_write = QPushButton("Write launcher")
@@ -99,29 +158,17 @@ class RunPage(QWidget):
         self.log.setFont(mono)
         v.addWidget(self.log, 1)
 
-        # Submitted jobs (see jobs.py): polled every 30 s while any is open
+        # Submitted jobs (see jobs.py): polled every 30 s while any is open, with the
+        # scheduler and (for SSH submissions) the host they were submitted on
         self.jobs: list[hpc_jobs.Job] = []
-        jobs_row = QHBoxLayout()
-        self.jobs_label = QLabel("Cluster jobs")
-        jobs_row.addWidget(self.jobs_label)
-        jobs_row.addStretch(1)
-        self.b_jobs_refresh = QPushButton("Refresh")
-        self.b_jobs_refresh.clicked.connect(self.refresh_jobs)
-        self.b_jobs_cancel = QPushButton("Cancel selected")
-        self.b_jobs_cancel.clicked.connect(self.cancel_jobs)
-        jobs_row.addWidget(self.b_jobs_refresh)
-        jobs_row.addWidget(self.b_jobs_cancel)
-        v.addLayout(jobs_row)
-        self.jobs_tree = QTreeWidget()
-        self.jobs_tree.setHeaderLabels(["Job ID", "Name", "State"])
-        self.jobs_tree.setRootIsDecorated(False)
-        self.jobs_tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.jobs_tree.setFixedHeight(110)
-        v.addWidget(self.jobs_tree)
+        self.job_kind: str | None = self.scheduler
+        self.job_remote: rmt.RemoteHost | None = None
         self.jobs_timer = QTimer(self)
         self.jobs_timer.setInterval(30_000)
         self.jobs_timer.timeout.connect(self.refresh_jobs)
-        self._show_jobs()
+        # Shown in the Run section's "Jobs" side tab (main_window) and, on demand, a window
+        self.jobs_view = JobsView(self)
+        self.jobs_window: JobsWindow | None = None
 
     @property
     def model(self) -> ConfigModel:
@@ -136,8 +183,16 @@ class RunPage(QWidget):
         running = self.proc is not None
         for b in (self.b_write, self.b_validate, self.b_run):
             b.setEnabled(not running)
-        self.b_submit.setEnabled(not running and self.scheduler is not None)
+        self.b_submit.setEnabled(not running and (self.scheduler is not None or self._remote_on()))
+        for b in (self.b_probe, self.b_disconnect):
+            b.setEnabled(not running)
+        self.b_connect.setEnabled(not running and rmt.sharing_supported())
         self.b_stop.setEnabled(running)
+        if self._remote_on():
+            self.b_submit.setToolTip("Runs PRESTUS on the SSH host, which submits with the config's "
+                                     "hpc.* settings; the jobs are listed below.")
+        if self.model.path is not None and not self.r_local.text():
+            self._guess_mapping(self.model.path)
         self.update_deployment_summary()
 
     def update_deployment_summary(self) -> None:
@@ -158,6 +213,113 @@ class RunPage(QWidget):
         self.deploy_text.setVisible(on)
         if on:
             self.update_deployment_summary()
+
+    # ── SSH submission ─────────────────────────────────────────────────
+    def _toggle_remote(self, on: bool) -> None:
+        self.window.session.set("remote_enabled", on)
+        self.remote_box.setVisible(on)
+        self.refresh()
+
+    def _remote_on(self) -> bool:
+        return self.remote_toggle.isChecked() and bool(self.r_host.text().strip())
+
+    def _guess_mapping(self, study: Path) -> None:
+        """A study on /Volumes/<share> is usually /project/<share> on the Donders cluster."""
+        parts = Path(study).resolve().parts
+        if len(parts) > 2 and parts[1] == "Volumes":
+            self.r_local.setText(f"/Volumes/{parts[2]}")
+            if not self.r_remote.text():
+                self.r_remote.setText(f"/project/{parts[2]}")
+
+    def _remote(self, need_mapping: bool = True) -> rmt.RemoteHost | None:
+        """The SSH host from the fields (saved to the session), or None after telling the user."""
+        host = self.r_host.text().strip()
+        local, remote = self.r_local.text().strip(), self.r_remote.text().strip()
+        if not host or (need_mapping and (not local or not remote)):
+            QMessageBox.warning(self, "SSH", "Set the host" + (" and the folder mapping" if need_mapping
+                                                               else "") + " first.")
+            return None
+        values = {"remote_host": host, "remote_local_prefix": local, "remote_remote_prefix": remote,
+                  "remote_setup": self.r_setup.text().strip(),
+                  "remote_matlab": self.r_matlab.text().strip(),
+                  "remote_prestus_root": self.r_root.text().strip()}
+        for k, val in values.items():
+            self.window.session.set(k, val)
+        return rmt.RemoteHost(host=host, path_map=[(local, remote)] if local and remote else [],
+                              setup=values["remote_setup"], matlab=values["remote_matlab"] or "matlab",
+                              prestus_root=values["remote_prestus_root"])
+
+    def connect_ssh(self) -> None:
+        """Log in once (password in a Nexus dialog) and keep a shared connection open."""
+        r = self._remote(need_mapping=False)
+        if r is None:
+            return
+        self._remote_host = r
+        self._start("Connect", rmt.connect_command(r), Path.home(), env=rmt.askpass_env())
+
+    def disconnect_ssh(self) -> None:
+        r = self._remote(need_mapping=False)
+        if r is None:
+            return
+        self._remote_host = r
+        self._start("Disconnect", rmt.disconnect_command(r), Path.home())
+
+    def _connection_done(self, code: int) -> None:
+        host = self._remote_host.host if self._remote_host else ""
+        if self.task == "Connect":
+            self._ok = code == 0
+            self.r_status.setText(f"Connected to {host}" if self._ok else "Not connected")
+        elif self.task == "Disconnect":
+            self._ok = True                       # 'no master running' is fine too
+            self.r_status.setText("Not connected")
+
+    def test_connection(self) -> None:
+        r = self._remote()
+        if r is None:
+            return
+        try:
+            argv = rmt.probe_command(r, self.window.prestus_root)
+        except rmt.PathMapError as e:
+            QMessageBox.warning(self, "SSH", f"PRESTUS: {e}. Set the remote PRESTUS folder.")
+            return
+        self._start("Test connection", argv, Path.home())
+
+    def _probe_summary(self) -> None:
+        found = rmt.parse_probe(self.log.toPlainText())
+        if "host" not in found:
+            return
+        missing = [k for k in ("matlab", "prestus") if found.get(k, "-").startswith("-")]
+        if found.get("sbatch", "-") == "-" and found.get("qsub", "-") == "-":
+            missing.insert(0, "sbatch/qsub")
+        self._ok = not missing
+        if missing:
+            self._append(f"Not found on {found['host']}: {', '.join(missing)} "
+                         "(check the setup commands and the remote PRESTUS folder).", "#c9302c")
+        else:
+            self._append(f"Ready to submit from {found['host']}.", "#3c763d")
+
+    def _submit_remote(self) -> None:
+        r = self._remote()
+        if r is None or not self._ready(need_matlab=False):
+            return
+        mapped, unmapped = rmt.path_overrides(self.model, r)
+        if unmapped and QMessageBox.question(
+                self, "Submit over SSH",
+                "These config values are paths on this computer outside the mapped folder, so "
+                "they cannot be translated for the cluster:\n\n" +
+                "\n".join(unmapped[:8]) +
+                "\n\nSubmit anyway?") != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            argv = rmt.submit_command(r, self.model.path, self.window.prestus_root, mapped)
+        except rmt.PathMapError as e:
+            QMessageBox.warning(self, "SSH", f"{e}.\nThe study folder (and PRESTUS, unless a remote "
+                                "PRESTUS folder is set) must be under the local folder.")
+            return
+        self.job_remote = r
+        self._start("Submit", argv, self.model.path.parent)
+        for key, value in mapped:
+            self._append(f"  {key} → {value}  (on the cluster)", "#777")
 
     # ── helpers ─────────────────────────────────────────────────────────
     def _browse(self) -> None:
@@ -190,15 +352,23 @@ class RunPage(QWidget):
             if launcher.OK_SENTINEL in line:
                 self._ok = True
             safe = html.escape(line) or "&nbsp;"
-            self.log.append(f"<span style='color:{c}'>{safe}</span>" if c else safe)
+            # Always a span: a bare escaped line is taken as plain text and keeps its
+            # entities (&quot;), which breaks parse_submissions on the log
+            self.log.append(f"<span style='color:{c}'>{safe}</span>" if c else f"<span>{safe}</span>")
         self.log.moveCursor(QTextCursor.MoveOperation.End)
 
-    def _start(self, task: str, argv: list[str], cwd: Path) -> None:
-        self.task, self._ok = task, False
+    def _start(self, task: str, argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
+        self.task, self._ok, self._program = task, False, argv[0]
         self.log.clear()
-        self._append("$ " + " ".join(argv[:2]) + " …", "#777")
+        shown = argv[:2] if argv[0] != "ssh" else ["ssh", rmt.host_of(argv)]
+        self._append("$ " + " ".join(shown) + " …", "#777")
         self.proc = QProcess(self)
         self.proc.setWorkingDirectory(str(cwd))
+        if env:
+            penv = QProcessEnvironment.systemEnvironment()
+            for k, val in env.items():
+                penv.insert(k, val)
+            self.proc.setProcessEnvironment(penv)
         self.proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.proc.readyReadStandardOutput.connect(self._read)
         self.proc.finished.connect(self._done)
@@ -213,13 +383,27 @@ class RunPage(QWidget):
 
     def _error(self, err) -> None:
         if err == QProcess.ProcessError.FailedToStart:
-            self._append(f"Could not start {self.matlab.text()}", "#c9302c")
+            self._append(f"Could not start {self._program}", "#c9302c")
             self._done(-1, None)
 
     def _done(self, code: int, _status) -> None:
         if self.proc is None:
             return
         self._read()
+        if self.task == "Test connection":
+            self._ok = code == 0
+            self._probe_summary()
+        self._connection_done(code)
+        # ssh's own refusal reads "Permission denied (publickey,password)."; a bare
+        # "Permission denied" comes from the remote side (e.g. MATLAB's mkdir)
+        if self._program == "ssh" and code != 0 and "Permission denied (" in self.log.toPlainText():
+            self._append("Not logged in: click Connect… to log in with your password, "
+                         "or set up an SSH key.", "#b8860b")
+        if self._program == "ssh" and "DISPLAY" in self.log.toPlainText():
+            # site 'matlab' wrappers (e.g. Donders' module) refuse to start without X
+            self._append("The host's 'matlab' is a wrapper that needs a display. Set Remote MATLAB "
+                         "to the MATLAB binary itself (e.g. <matlabroot>/bin/matlab; on the host: "
+                         "module load matlab/<version>; type -a matlab).", "#b8860b")
         ok = code == 0 and self._ok
         colour = "#3c763d" if ok else "#c9302c"
         self.status.setText(f"<b>{self.task}</b>: <span style='color:{colour}'>"
@@ -263,7 +447,7 @@ class RunPage(QWidget):
 
     def submit(self) -> None:
         """Submit with PRESTUS' own HPC path; the Nexus only follows the jobs."""
-        if self.scheduler is None:
+        if self.scheduler is None and not self._remote_on():
             return
         platform = self.model.get("platform")
         if platform == "matlab":
@@ -275,8 +459,12 @@ class RunPage(QWidget):
                 self, "Submit", f"{len(errors)} error(s) in the Issues panel. Submit anyway?") \
                 != QMessageBox.StandardButton.Yes:
             return
+        if self._remote_on():
+            self._submit_remote()
+            return
         if not self._ready():
             return
+        self.job_remote = None
         path = launcher.write_submit_launcher(self.model.path, self.window.prestus_root)
         self._start("Submit", launcher.run_command(self.matlab.text(), path), path.parent)
 
@@ -285,38 +473,47 @@ class RunPage(QWidget):
         new = [j for j in hpc_jobs.parse_submissions(self.log.toPlainText()) if j.job_id not in known]
         if not new:
             self._append("No submitted job was reported (see the log above).", "#b8860b")
+        elif self.job_remote is not None:
+            self.job_kind = rmt.scheduler_from_log(self.log.toPlainText()) or "slurm"
+        else:
+            self.job_kind = self.scheduler
         self.jobs.extend(new)
         self.refresh_jobs()
+        if new:
+            self.show_jobs_tab(new[0].job_id)
 
     def refresh_jobs(self) -> None:
         if self.jobs:
-            hpc_jobs.query(self.jobs, self.scheduler)
-        self._show_jobs()
+            hpc_jobs.query(self.jobs, self.job_kind, self.job_remote)
+        self.jobs_changed.emit()
         if any(not j.finished for j in self.jobs):
             self.jobs_timer.start()
         else:
             self.jobs_timer.stop()
 
-    def _show_jobs(self) -> None:
-        self.jobs_tree.clear()
-        for j in self.jobs:
-            item = QTreeWidgetItem([j.job_id, j.name, j.state])
-            self.jobs_tree.addTopLevelItem(item)
-        n_open = sum(1 for j in self.jobs if not j.finished)
-        self.jobs_label.setText(f"Cluster jobs ({len(self.jobs)}, {n_open} open)" if self.jobs
-                                else "Cluster jobs (none submitted from this window)")
-        has = bool(self.jobs) and self.scheduler is not None
-        self.b_jobs_refresh.setEnabled(has)
-        self.b_jobs_cancel.setEnabled(has)
+    def show_jobs_tab(self, job_id: str | None = None) -> None:
+        """Bring the Jobs side tab forward, with job_id selected."""
+        side = getattr(self.window, "run_side", None)
+        if side is not None:
+            side.setCurrentWidget(self.jobs_view)
+        self.jobs_view.select(job_id)
 
-    def cancel_jobs(self) -> None:
-        ids = [it.text(0) for it in self.jobs_tree.selectedItems()]
+    def pop_out_jobs(self, job_id: str | None = None) -> None:
+        """The jobs and their logs in a separate, resizable window."""
+        if self.jobs_window is None:
+            self.jobs_window = JobsWindow(self)
+        self.jobs_window.view.select(job_id or self.jobs_view.selected_id())
+        self.jobs_window.show()
+        self.jobs_window.raise_()
+        self.jobs_window.activateWindow()
+
+    def cancel_jobs(self, ids: list[str]) -> None:
         if not ids:
             return
         if QMessageBox.question(self, "Cancel jobs", f"Cancel job(s) {', '.join(ids)}?") \
                 != QMessageBox.StandardButton.Yes:
             return
-        out = hpc_jobs.cancel(ids, self.scheduler)
+        out = hpc_jobs.cancel(ids, self.job_kind, self.job_remote)
         if out.strip():
             self._append(out, "#777")
         self.refresh_jobs()
