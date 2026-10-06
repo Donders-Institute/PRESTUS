@@ -11,6 +11,7 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %   CFL  = grid.source_cfl  (default 0.15)    [Courant-Friedrichs-Lewy number]
 %   PPP  = ceil(PPW / CFL)                    [temporal samples per period]
 %   dt   = wave_period / PPP                   [time step, s]
+% grid.source_ppp, when set, gives PPP directly (PPW and CFL are then unused).
 %
 % max_sound_speed sets PPW (and therefore dt): using the fastest medium
 % gives the smallest dt, which is numerically stable everywhere.
@@ -23,6 +24,8 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %
 % t_end is the simulation duration:
 %   t_end = grid_diagonal / min_sound_speed
+% or grid.sim_time_us when set (a fixed duration, e.g. to match a reference
+% simulation).
 %
 % min_sound_speed (the slowest medium, typically water at ~1500 m/s) is
 % used here — NOT max_sound_speed. Using max_sound_speed would shorten the
@@ -138,8 +141,12 @@ end
         else
             cfl = parameters.grid.source_cfl;
         end
-        % Temporal samples per wave period.
-        points_per_period = ceil(points_per_wavelength / cfl);              
+        % Temporal samples per wave period (grid.source_ppp sets it directly)
+        if isfield(parameters.grid, 'source_ppp') && ~isempty(parameters.grid.source_ppp)
+            points_per_period = parameters.grid.source_ppp;
+        else
+            points_per_period = ceil(points_per_wavelength / cfl);
+        end
         % Calculate time step dt  
         grid_time_step = (wave_period / points_per_period);
         % Validate PPW against minimum requirement using the slowest medium
@@ -178,8 +185,13 @@ end
             end
         end
         % Print parameter summary
-        fprintf('Calculating the time step of %.1d based on PPW %.1f, CFL= %.2f and PPP %d.\n', ...
-            grid_time_step, points_per_wavelength, cfl, points_per_period);
+        if isfield(parameters.grid, 'source_ppp') && ~isempty(parameters.grid.source_ppp)
+            fprintf('Calculating the time step of %.1d from grid.source_ppp = %d.\n', ...
+                grid_time_step, points_per_period);
+        else
+            fprintf('Calculating the time step of %.1d based on PPW %.1f, CFL= %.2f and PPP %d.\n', ...
+                grid_time_step, points_per_wavelength, cfl, points_per_period);
+        end
     else
         fprintf('Using the time step of %.1d based on approx. max. stable time step.\n', ...
             grid_time_step);
@@ -202,6 +214,10 @@ end
         steady_state_transits = 1;
     end
     t_end = steady_state_transits * sqrt(kgrid.x_size.^2 + kgrid.z_size.^2 + kgrid.y_size.^2) / t_end_speed;    % [s]
+    fixed_t_end = isfield(parameters.grid, 'sim_time_us') && ~isempty(parameters.grid.sim_time_us);
+    if fixed_t_end
+        t_end = parameters.grid.sim_time_us * 1e-6;
+    end
 
     % jwave steady-state safety margin.
     % jwave's PML sits INSIDE the declared grid (k-Wave's sits outside), so
@@ -219,7 +235,7 @@ end
     % Add worst-case margin (pml on both ends of one axis) so recording start
     % stays safely past the true one-way transit regardless of whether the
     % Python-side pad actually triggers.
-    if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
+    if ~fixed_t_end && isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
         if isfield(parameters.grid, 'pml_size') && isnumeric(parameters.grid.pml_size)
             pml_voxels = max(parameters.grid.pml_size(:));
         else
@@ -327,8 +343,13 @@ end
     fprintf('[source_sensor_setup] Nt                : %d\n', simulation_time_points);
     fprintf('[source_sensor_setup] t_end             : %.4f ms\n', simulation_time_points * kgrid.dt * 1e3);
     fprintf('[source_sensor_setup] Record start idx  : %d  (steady-state window: last %d periods)\n', sensor.record_start_index, num_periods);
-    fprintf('[source_sensor_setup] Steady-state margin: %d domain-diagonal transit(s) + %d recorded periods\n', ...
-        steady_state_transits, num_periods);
+    if fixed_t_end
+        fprintf('[source_sensor_setup] Duration          : fixed (grid.sim_time_us = %g) + %d recorded periods\n', ...
+            parameters.grid.sim_time_us, num_periods);
+    else
+        fprintf('[source_sensor_setup] Steady-state margin: %d domain-diagonal transit(s) + %d recorded periods\n', ...
+            steady_state_transits, num_periods);
+    end
     fprintf('[source_sensor_setup] ------------------------------------\n');
 
 end

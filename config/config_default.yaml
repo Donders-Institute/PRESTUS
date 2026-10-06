@@ -450,9 +450,14 @@ grid:
   #                                 # Default 3. Increase together with steady_state_transits if Isppa/focal
   #                                 # depth are still drifting as either is increased (a converged setup should
   #                                 # stop changing further).
+  # source_ppp: []                 # Time steps per wave period; when set, replaces the PPW/CFL derivation
+  #                                 # (dt = period / source_ppp), e.g. to match a reference simulation.
+  # sim_time_us: []                # Fixed simulation duration [us]; when set, replaces steady_state_transits.
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
+  axisymmetric_output: 'auto' # Axisymmetric results: 'auto' (3D for phantoms or with heating, else the 2D plane),
+                              # '2d' (mirrored plane; no heating), '3d' (always expand)
   mode: 'focal_axis'       # Grid orientation mode:
                            #   'focal_axis' (default) — rotate volume so the mean focal unit
                            #     vector of all transducers aligns with z. For N=1 this equals

@@ -201,6 +201,7 @@ fields:
   grid.source_ppw: {kind: number}
   grid.use_kWaveArray: {kind: flag}
   grid.axisymmetric: {kind: flag}
+  grid.axisymmetric_output: {choices: [auto, 2d, 3d]}
   grid.mode: {choices: [focal_axis, transducer_axis, ras_plus]}
 
   segmentation.use_qform: {kind: flag}
@@ -357,6 +358,15 @@ extra:
     kind: number
     default: 3
     help: Number of trailing wave periods recorded as the steady-state window.
+  grid.source_ppp:
+    kind: number
+    default: []
+    help: Time steps per wave period; when set, replaces the PPW/CFL derivation of the time step.
+  grid.sim_time_us:
+    kind: number
+    default: []
+    unit: us
+    help: Fixed simulation duration; when set, replaces steady_state_transits.
   grid.origin_ras_mm:
     kind: vec3
     default: []
@@ -654,6 +664,7 @@ display:
   grid.max_expand: {label: Max. grid expansion (FFT speed)}
   grid.use_kWaveArray: {label: Use kWaveArray source}
   grid.axisymmetric: {label: Axisymmetric (2-D) simulation}
+  grid.axisymmetric_output: {label: Axisymmetric output form}
   grid.mode: {label: Grid orientation}
   grid.z_beyond_focus_mm: {label: Axial extent beyond the focus}
   grid.acoustic_fov_diameter_mm: {label: Acoustic FOV diameter}
@@ -663,6 +674,8 @@ display:
   grid.thermal_fov_mm: {label: Thermal FOV}
   grid.steady_state_transits: {label: Transits before steady state}
   grid.steady_state_num_periods: {label: Recorded steady-state periods}
+  grid.source_ppp: {label: Time steps per period}
+  grid.sim_time_us: {label: Fixed simulation duration}
   grid.origin_ras_mm: {label: "RAS origin of voxel [1,1,1]"}
 
   segmentation: {label: SimNIBS segmentation}
