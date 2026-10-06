@@ -282,12 +282,31 @@ end
             source_idx = find(source.p_mask);
             num_points = numel(source_idx);
             nTime      = size(cw_signal, 2);
-            source.p   = zeros(num_points, nTime);
 
-            for el_i = 1:tr.(tr.type).elem_n
-                weights_el  = squeeze(grid_weights_cropped(el_i, :, :));
-                weights_vec = weights_el(source_idx);
-                source.p    = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
+            if ismember(parameters.simulation.code_type, {'matlab_cpu', 'matlab_gpu'})
+                % Lazy rank-2 CWSourceMatrix, as the non-axisymmetric path: the
+                % dense num_points x Nt matrix reaches tens of GB at fine grids
+                % with long runs (ITRUSST reference grid: 0.05 mm, up to 720k
+                % steps). createCWSignals is A*sin(wt + phi) = Re(A e^{i(phi - pi/2)} e^{iwt}),
+                % so the signal is that of the dense path below without its 4-period
+                % start ramp (as in the non-axisymmetric lazy path); the steady state
+                % is the same.
+                C_src = zeros(num_points, 1);
+                for el_i = 1:tr.(tr.type).elem_n
+                    weights_el = squeeze(grid_weights_cropped(el_i, :, :));
+                    C_src = C_src + weights_el(source_idx) * tr.annular.elem_p_amp(el_i) * ...
+                        exp(1i * (tr.annular.elem_phase_rad(el_i) - pi/2));
+                end
+                source.p = CWSourceMatrix(real(C_src), imag(C_src), 2 * pi * tr.freq_hz, kgrid.dt, nTime);
+                fprintf('[source_create] axisymmetric %s: using lazy CWSourceMatrix (%d src x %d steps, %.1f MB saved)\n', ...
+                    parameters.simulation.code_type, num_points, nTime, num_points * nTime * 8 / 1e6);
+            else
+                source.p = zeros(num_points, nTime);
+                for el_i = 1:tr.(tr.type).elem_n
+                    weights_el  = squeeze(grid_weights_cropped(el_i, :, :));
+                    weights_vec = weights_el(source_idx);
+                    source.p    = source.p + bsxfun(@times, weights_vec, cw_signal(el_i, :));
+                end
             end
 
             source_labels = sum(grid_weights_cropped > 0.5, 1) > 0;
