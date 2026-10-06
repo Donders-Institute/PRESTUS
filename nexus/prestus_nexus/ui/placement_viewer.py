@@ -453,7 +453,6 @@ class PlacementPage(QWidget):
         vs = np.sqrt((t1.canon_affine[:3, :3] ** 2).sum(axis=0))
         lo, hi = np.percentile(data[::4, ::4, ::4], [1, 99.5])
         trans, focus = self.positions()
-        bowl = self._bowl()
         # One entry per transducer that has a drawable bowl: (is_selected, shapes, trans, focus).
         # Non-selected transducers are drawn dimmed, so a multi-transducer arrangement is visible
         # as a whole rather than only one bowl at a time (doc_multitransducer.md).
@@ -465,10 +464,16 @@ class PlacementPage(QWidget):
                     np.linalg.norm(ti_focus - ti_trans) > 0:
                 tx_shapes.append((i == self.ti, ti_bowl.outline(ti_trans, ti_focus - ti_trans),
                                   ti_trans, ti_focus))
-        fov_diam, fov_len, fov_diam_auto, fov_len_auto = self._resolved_fov(trans, focus, bowl)
-        fov = pl.fov_box(trans, focus, fov_diam, fov_len) \
-            if trans is not None and focus is not None and fov_diam and fov_len \
-            and np.linalg.norm(focus - trans) > 0 else None
+        # Acoustic FOV box of every transducer, each resolved from its own geometry as
+        # resolve_acoustic_fov_params.m does; coherent coupling crops to their union,
+        # async coupling uses one per transducer (doc_limited_fov.md).
+        fovs = []
+        for i in range(self.model.n_transducers):
+            ti_trans, ti_focus = (trans, focus) if i == self.ti else self._positions_for(i)
+            ti_diam, ti_len, _, _ = self._resolved_fov(ti_trans, ti_focus, self._bowl_for(i))
+            if ti_trans is not None and ti_focus is not None and ti_diam and ti_len \
+                    and np.linalg.norm(ti_focus - ti_trans) > 0:
+                fovs.append((i == self.ti, pl.fov_box(ti_trans, ti_focus, ti_diam, ti_len)))
         heur_pts, heur_prop = self._heuristic_candidate_points()
         row_ratio = 0.0     # tallest per-column (height/width) need across the three views
         for ax, (title, plane, (h, w)) in zip(self.axes, VIEWS):
@@ -504,10 +509,10 @@ class PlacementPage(QWidget):
                 for point, colour, marker in ((s_trans, rim_c, "o"), (s_focus, "#1e88e5" if selected else "#9e9e9e", "+")):
                     x, y = proj(point[None])
                     ax.plot(x, y, marker, color=colour, ms=9, mew=2, mfc="none" if marker == "o" else colour, alpha=a)
-            if fov is not None:
+            for selected, fov in fovs:
                 for edge in fov["edges"]:
                     x, y = proj(edge)
-                    ax.plot(x, y, color="#43a047", lw=0.8, ls=(0, (3, 2)))
+                    ax.plot(x, y, color="#43a047", lw=0.8, ls=(0, (3, 2)), alpha=1.0 if selected else 0.35)
             if len(heur_pts):
                 x, y = proj(heur_pts)
                 ax.scatter(x, y, c=heur_prop, cmap="RdYlGn_r", vmin=0, vmax=0.3, s=8,

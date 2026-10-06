@@ -16,6 +16,9 @@ function [parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus
 %   .segmentation_full - segmentation before crop (for thermal restore)
 %   .trans_pos_full    - trans_pos in full sim-grid voxels
 %   .focus_pos_full    - focus_pos in full sim-grid voxels
+%   .transducer_pos_full - struct array (trans_pos, focus_pos) of every
+%                        transducer in full sim-grid voxels; restore with
+%                        FOV_RESTORE_TRANSDUCERS
 %
 % Use as:
 %   [parameters, kwave_medium, medium_masks, segmentation, ...
@@ -34,7 +37,7 @@ end
 
 fov_state = struct('active', false, 'offset', [], 'full_dims', [], ...
     'kwave_medium_full', [], 'medium_masks_full', [], 'segmentation_full', [], ...
-    'trans_pos_full',    [], 'focus_pos_full',    []);
+    'trans_pos_full',    [], 'focus_pos_full',    [], 'transducer_pos_full', []);
 
 % No transducer/focus geometry (e.g. run_grid_setup=0 with no cache): an FOV
 % crop is impossible (acoustic_grid_fov centres on the focus) and
@@ -78,6 +81,10 @@ if use_jwave
     jw_pml_mm = jw_pml_eff * parameters.grid.resolution_mm;
     parameters.grid.acoustic_fov_diameter_mm = parameters.grid.acoustic_fov_diameter_mm + 2 * jw_pml_mm;
     parameters.grid.acoustic_fov_length_mm   = parameters.grid.acoustic_fov_length_mm   + 2 * jw_pml_mm;
+    if isfield(parameters, 'state') && isfield(parameters.state, 'acoustic_fov_per_tx')
+        parameters.state.acoustic_fov_per_tx.diameter_mm = parameters.state.acoustic_fov_per_tx.diameter_mm + 2 * jw_pml_mm;
+        parameters.state.acoustic_fov_per_tx.length_mm   = parameters.state.acoustic_fov_per_tx.length_mm   + 2 * jw_pml_mm;
+    end
     fprintf('[pipeline] jwave pfov PML expansion (+%.0f mm each side): diameter=%.1f mm, length=%.1f mm\n', ...
         jw_pml_mm, parameters.grid.acoustic_fov_diameter_mm, parameters.grid.acoustic_fov_length_mm);
 end
@@ -89,6 +96,7 @@ fov_state.medium_masks_full = medium_masks;
 fov_state.segmentation_full = segmentation;
 fov_state.trans_pos_full    = trans_pos;
 fov_state.focus_pos_full    = focus_pos;
+fov_state.transducer_pos_full = transducer_positions(parameters);
 
 % Apply FOV crop.
 [parameters, kwave_medium, medium_masks, trans_pos, focus_pos, fov_offset] = ...
@@ -108,4 +116,16 @@ if ~isempty(segmentation) && isequal(size(segmentation), double(fov_state.full_d
         fov_offset(3):fov_end(3));
 end
 
+end
+
+function pos = transducer_positions(parameters)
+% trans_pos/focus_pos of every transducer (full sim-grid voxels, before the crop).
+pos = struct('trans_pos', {}, 'focus_pos', {});
+for ti = 1:numel(parameters.transducer)
+    tr = parameters.transducer(ti);
+    pos(ti).trans_pos = [];
+    pos(ti).focus_pos = [];
+    if isfield(tr, 'trans_pos'), pos(ti).trans_pos = tr.trans_pos; end
+    if isfield(tr, 'focus_pos'), pos(ti).focus_pos = tr.focus_pos; end
+end
 end

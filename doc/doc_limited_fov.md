@@ -85,8 +85,22 @@ the caveat in [doc_parameters.md](doc_parameters.md)).
 
 ### Multi-transducer setups
 
-When multiple transducers each target a different focus with independent limited-FOV
-acoustic runs, use `assemble_limited_fov_fields` to combine them before thermal:
+The FOV works in both multi-transducer couplings
+([details](doc_multitransducer.md#partial-acoustic-fov)):
+
+- **Coherent** (all transducers in one run): the FOV box is the union of one box per
+  transducer, each around that transducer's own beam axis, and every transducer's
+  position is moved into the FOV grid. `'auto'` is resolved per transducer.
+- **Async** (`transducer_coupling: async`): each transducer's acoustic run has its own
+  FOV box; `combine_async_intensity` back-projects each field onto its full grid before
+  combining, in `shared` and `per_transducer` grid mode.
+
+Coherent fields can also be built from per-transducer limited-FOV runs by adding their
+complex fields (`io.save_p_complex`, `superpose_complex_fields`); the sum is complete
+only where the FOV boxes overlap.
+
+For independent limited-FOV acoustic runs outside async mode, use
+`assemble_limited_fov_fields` to combine them before thermal:
 
 ```matlab
 assemble_limited_fov_fields( ...

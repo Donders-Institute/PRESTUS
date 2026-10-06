@@ -310,10 +310,7 @@ function [parameters] = prestus_pipeline(parameters, options)
             % NIfTI export so outputs are in full simulation-grid space.
             params_nii           = parameters;
             params_nii.grid.dims = fov_state.full_dims;
-            params_nii.transducer(1).trans_pos = fov_state.trans_pos_full;
-            if isfield(params_nii.transducer(1), 'focus_pos')
-                params_nii.transducer(1).focus_pos = fov_state.focus_pos_full;
-            end
+            params_nii = fov_restore_transducers(params_nii, fov_state);
             % FOV box in full-grid voxels, outlined on the T1 overlay.
             params_nii.grid.acoustic_fov_offset_vox = fov_state.offset;
             params_nii.grid.acoustic_fov_dims_vox   = parameters.grid.dims;

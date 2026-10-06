@@ -11,6 +11,14 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
 %   lateral (dims 1 & 2):  grid.acoustic_fov_diameter_mm  [mm]
 %   axial   (dim  3):      grid.acoustic_fov_length_mm    [mm]
 %
+% A beam more than 2 degrees off the grid axis gets a box around its own beam
+% axis instead (see below).
+%
+% With several transducers (coherent coupling) the box is the union of one
+% box per transducer, each enclosing a cylinder of the FOV diameter that runs
+% the FOV length from that transducer's centre along its own beam axis, and
+% every transducer's trans_pos/focus_pos is moved into FOV voxels.
+%
 % The crop offsets are stored in fov_offset_ac and full_ac_dims so that the
 % resulting pressure field can be back-projected onto the full acoustic grid
 % by ASSEMBLE_LIMITED_FOV_FIELDS.
@@ -38,8 +46,8 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
 %   focus_pos    - [1×3] focal point in full acoustic grid voxels
 %
 % Output:
-%   parameters_fov   - parameters copy with grid.dims, trans_pos, focus_pos
-%                      updated to the cropped FOV grid
+%   parameters_fov   - parameters copy with grid.dims and every transducer's
+%                      trans_pos, focus_pos updated to the cropped FOV grid
 %   kwave_medium_fov - kwave_medium fields cropped to FOV (same resolution)
 %   medium_masks_fov - medium_masks cropped to FOV (integer labels preserved)
 %   trans_pos_fov    - transducer position in FOV grid voxels (clamped)
@@ -132,6 +140,19 @@ end
 fov_lo_mm(lateral_dims) = focus_mm(lateral_dims) - fov_diameter_mm / 2;
 fov_hi_mm(lateral_dims) = focus_mm(lateral_dims) + fov_diameter_mm / 2;
 
+% Several transducers (coherent coupling): the box must hold every beam, so
+% it becomes the union of one box per transducer (see MULTI_TRANSDUCER_BOX).
+% A single beam that is oblique to the grid axis (e.g. transducer 2 on an
+% async shared grid aligned to transducer 1) gets the same beam-axis box:
+% the box above, centred laterally on the focus, would cut off its bowl.
+n_tx = numel(parameters.transducer);
+u_beam  = (focus_pos - trans_pos) / max(norm(focus_pos - trans_pos), eps);
+oblique = ~ras_plus_mode && acosd(min(1, abs(u_beam(beam_dim)))) > 2;
+if n_tx > 1 || oblique
+    [fov_lo_mm, fov_hi_mm] = multi_transducer_box(parameters, trans_pos, focus_pos, ...
+        fov_diameter_mm, fov_length_mm, dx_mm);
+end
+
 % Clamp to full acoustic grid
 fov_lo_mm = max(fov_lo_mm, 0);
 fov_hi_mm = min(fov_hi_mm, ac_fov_mm);
@@ -145,6 +166,12 @@ fov_offset_ac = fov_start_ac;   % 1-based start index in full grid
 
 fprintf('[acoustic_grid_fov] Full acoustic grid: [%s] vox @ %.2f mm\n', ...
     num2str(full_ac_dims), dx_mm);
+if n_tx > 1
+    fprintf('[acoustic_grid_fov] FOV box = union of %d transducer beam boxes\n', n_tx);
+elseif oblique
+    fprintf('[acoustic_grid_fov] Beam %.0f deg off the grid axis: FOV box around the beam axis\n', ...
+        acosd(min(1, abs(u_beam(beam_dim)))));
+end
 fprintf('[acoustic_grid_fov] FOV box: lateral=%.1f mm, axial=%.1f mm  ->  [%s] vox  (offset [%s])\n', ...
     fov_diameter_mm, fov_length_mm, num2str(fov_dims), num2str(fov_start_ac));
 
@@ -203,4 +230,59 @@ if isfield(parameters_fov.transducer(1), 'focus_pos')
     parameters_fov.transducer(1).focus_pos = focus_pos_fov;
 end
 
+% Transducers 2..N: source_sensor_setup reads their positions from
+% parameters.transducer(ti), so they must move into FOV voxels as well.
+for ti = 2:n_tx
+    for key = {'trans_pos', 'focus_pos'}
+        pos = parameters.transducer(ti).(key{1});
+        pos_fov = round(((pos(:)' - 1) * dx_mm - fov_origin_mm) / dx_mm + 1);
+        if any(pos_fov < 1 | pos_fov > fov_dims)
+            warning('acoustic_grid_fov:transducerOutsideFOV', ...
+                ['Transducer %d %s (full-grid vox [%s]) lies outside the FOV box [%s] ' ...
+                 '(offset [%s]); it is clamped to the box edge.'], ti, key{1}, ...
+                num2str(pos(:)'), num2str(fov_dims), num2str(fov_start_ac));
+            pos_fov = max(1, min(pos_fov, fov_dims));
+        end
+        parameters_fov.transducer(ti).(key{1}) = pos_fov;
+    end
+end
+
+end
+
+% -------------------------------------------------------------------------
+function [lo_mm, hi_mm] = multi_transducer_box(parameters, trans_pos1, focus_pos1, ...
+                                               diameter_mm, length_mm, dx_mm)
+% Union of one box per transducer, in full-grid mm (0 = first voxel). Each
+% transducer's box encloses a cylinder of diameter_mm that starts at the
+% transducer centre and runs length_mm along its own trans->focus axis, so
+% it does not rely on the grid z axis being any one beam's axis (focal_axis
+% mode aligns z to the MEAN axis of all transducers). Per-transducer
+% 'auto' values resolved by RESOLVE_ACOUSTIC_FOV_PARAMS, when present,
+% replace the scalar diameter/length for that transducer.
+n_tx = numel(parameters.transducer);
+diam = repmat(diameter_mm, 1, n_tx);
+len  = repmat(length_mm,   1, n_tx);
+if isfield(parameters, 'state') && isfield(parameters.state, 'acoustic_fov_per_tx')
+    per = parameters.state.acoustic_fov_per_tx;
+    if numel(per.diameter_mm) == n_tx, diam = per.diameter_mm; end
+    if numel(per.length_mm)   == n_tx, len  = per.length_mm;   end
+end
+
+lo_mm = inf(1, 3);
+hi_mm = -inf(1, 3);
+for ti = 1:n_tx
+    if ti == 1
+        t = trans_pos1(:)'; f = focus_pos1(:)';
+    else
+        t = parameters.transducer(ti).trans_pos(:)';
+        f = parameters.transducer(ti).focus_pos(:)';
+    end
+    t_mm = (t - 1) * dx_mm;
+    u    = (f - t) / max(norm(f - t), eps);
+    e_mm = t_mm + len(ti) * u;
+    % half-extent of a disc of radius r with normal u, per axis
+    r_ax = diam(ti) / 2 * sqrt(max(0, 1 - u.^2));
+    lo_mm = min(lo_mm, min(t_mm, e_mm) - r_ax);
+    hi_mm = max(hi_mm, max(t_mm, e_mm) + r_ax);
+end
 end

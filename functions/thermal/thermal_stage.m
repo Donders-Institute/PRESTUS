@@ -108,10 +108,7 @@ if run_new_sim
         trans_pos     = fov_state.trans_pos_full;
         focus_pos     = fov_state.focus_pos_full;
         parameters.grid.dims = fov_state.full_dims;
-        parameters.transducer(1).trans_pos = fov_state.trans_pos_full;
-        if isfield(parameters.transducer(1), 'focus_pos')
-            parameters.transducer(1).focus_pos = fov_state.focus_pos_full;
-        end
+        parameters = fov_restore_transducers(parameters, fov_state);
         if ~isempty(highlighted_pos)
             highlighted_pos = fov_to_grid_pos(highlighted_pos, fov_state.offset);
         end

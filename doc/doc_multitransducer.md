@@ -66,7 +66,45 @@ io:
   save_p_complex: true
 ```
 
-This writes `sub-XXX_<medium>_p_complex<affix>.mat` containing a single variable `p_complex` — a complex-valued array where magnitude encodes peak pressure amplitude and phase encodes the spatial phase of the wavefield at the fundamental frequency.
+This writes `sub-XXX_<medium>_p_complex<affix>.mat` with two variables:
+
+- `p_complex`: complex array on the simulation grid (the acoustic FOV sub-grid when a [limited FOV](doc_limited_fov.md) is active), at the simulated drive level, before any ISPPA rescaling. The magnitude is the pressure amplitude at the fundamental; the phase is referred to t = 0 of the simulation, when every source signal starts.
+- `p_complex_info`: `phase_reference` (`'simulation_t0'`), `freq_hz`, `record_t0_s` and `dt_s` (start and step of the recorded window), `drive_level` (`'simulated'`), `grid_dims`, and `fov_offset_ac` / `full_ac_dims` when a limited FOV was used.
+
+Because the phase has a common time origin, fields from separate runs can be added: acoustic propagation in PRESTUS is linear (no nonlinearity parameter is set), so the field of several transducers firing together is the sum of their fields simulated one at a time. `superpose_complex_fields` does this on one shared grid, back-projecting limited-FOV fields, and also returns the incoherent and maximum combinations used by async mode:
+
+```matlab
+out = superpose_complex_fields({'.../sub-001_layered_p_complex_trans-01.mat', ...
+                                '.../sub-001_layered_p_complex_trans-02.mat'});
+out.p_coherent    % |p1 + p2|          coherent (simultaneous) firing
+out.p_incoherent  % sqrt(|p1|^2+|p2|^2) async heat source
+out.p_max         % max(|p1|, |p2|)    async peak pressure
+out = superpose_complex_fields(files, Weights=[1, exp(1i*pi/2)]);   % relative phase of transducer 2
+```
+
+The per-transducer runs of async mode (`async_grid_mode: shared`) are on the same grid as a coherent run, so one async run with `io.save_p_complex: true` gives the async result and, through `superpose_complex_fields`, the coherent field for any relative drive amplitude and phase without another simulation. Fields on different grids (`per_transducer` mode) are not added: interpolating the phase of a field sampled at a few points per wavelength is not accurate. Fields at different frequencies do not interfere on average and are rejected.
+
+Storing `p_complex` records the pressure time series of the last periods over the whole (FOV) grid during the simulation, which takes a lot of memory on fine grids.
+
+> Before this version, `p_complex` was saved as a column vector (k-Wave returns the recorded time series as sensor points × time) and its phase referred to the start of each run's recording window. Old files lack `p_complex_info`; `superpose_complex_fields` accepts them only all together and with a warning (valid only for runs with the same time step and length).
+
+---
+
+## Partial acoustic FOV
+
+A [limited acoustic FOV](doc_limited_fov.md) (`grid.acoustic_fov_diameter_mm`, `grid.acoustic_fov_length_mm`) works with several transducers:
+
+- **Coherent coupling**: all transducers are in one k-Wave run, so the FOV box must hold every beam. It is the union of one box per transducer, each enclosing a cylinder of the FOV diameter that runs the FOV length from that transducer's centre along its own beam axis. `'auto'` is resolved per transducer (its outer element diameter; its focal depth + `grid.z_beyond_focus_mm`). For transducers on opposite sides of the head the union spans most of the head along the inter-transducer axis, so the saving is mostly lateral.
+- **Async coupling**: each transducer's acoustic run gets its own FOV box around its own beam. The fields are back-projected onto their full grid and then combined as without a FOV, in both `shared` and `per_transducer` grid mode. Partial-FOV and full-grid caches can be mixed.
+- **Complex superposition**: per-transducer `p_complex` fields from partial-FOV runs can be added with `superpose_complex_fields`. Each field is zero outside its own FOV box, so the sum is only complete where the boxes overlap (`out.coverage` counts the fields covering each voxel). Make the boxes cover the region of interest around both foci.
+
+The Nexus placement viewer draws every transducer's FOV box.
+
+---
+
+## Comparison with BabelBrain
+
+BabelBrain models one transducer per simulation. Several foci of one phased array (*multi-point* focusing) are treated as time-multiplexed, like PRESTUS async mode: each focal spot is simulated separately, the displayed and safety field is the per-voxel maximum of the pressure amplitudes (`CalculateFieldProcess.py`), and the thermal simulation switches between the spots' magnitude fields with each spot on for its share of the duty cycle (`BHTEMultiplePressureFields` in `ThermalModeling/CalculateTemperatureEffects.py`). The fields are not added as complex fields. Complex fields are used inside one BabelBrain simulation, for the Rayleigh propagation of the source and for phase-conjugation refocusing.
 
 ---
 
@@ -125,7 +163,7 @@ $$p_\mathrm{thermal} = \sqrt{2 \cdot I_\mathrm{total} \cdot \rho c}$$
 
 By default (`simulation.async_grid_mode: 'shared'`), all transducers share one grid — see
 [Grid alignment](#grid-alignment) and [Grid cropping](#grid-cropping) above. This means each
-transducer's own acoustic sub-run (`_desc-t01`, `_desc-t02`, …) is simulated on a grid aligned to
+transducer's own acoustic sub-run (`_trans-01`, `_trans-02`, …) is simulated on a grid aligned to
 the *mean* focal axis and cropped to enclose every transducer's bowl, not just its own — so a
 per-transducer result (e.g. focal distance, ISPPA) can differ noticeably from what the same
 transducer would show run alone (solo/sequential mode), even though only that transducer drives
@@ -211,7 +249,7 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
 
 [Stage 1…N]    Acoustic simulation — one per transducer (parallel on HPC)
                Each runs at its configured elem_p_amp and records a water baseline.
-               Affixes: _desc-t01, _desc-t02, …, _desc-tNN
+               Affixes: _trans-01, _trans-02, …, _trans-NN
 
 [Stage N+1…    Dual-field combination — one per sweep point j
  N+M]          Scales each p_i to target_i(j); writes combined acoustic cache
@@ -223,7 +261,7 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
 
 [Stage N+M+1…  Thermal simulation — one per sweep point j
  N+2M]         Loads combined cache, runs kWaveDiffusion, generates report.
-               Affixes: _desc-asyncThermal (M=1) or _desc-asyncThermalS01… (M>1)
+               Affixes: _desc-asyncJoint (M=1) or _desc-asyncJointS01… (M>1)
 ```
 
 On HPC (SLURM/qsub): in `shared` mode, all N acoustic stages are submitted simultaneously after the
@@ -237,24 +275,26 @@ combine stage.
 For two transducers, single thermal target each:
 
 ```
-cache/sub-001_layered_results_desc-t01.mat
-cache/sub-001_layered_results_desc-t02.mat
+cache/sub-001_layered_results_trans-01.mat
+cache/sub-001_layered_results_trans-02.mat
 cache/sub-001_layered_results_desc-asyncCombined.mat
-sub-001_layered_desc-asyncThermal.csv
-sub-001_layered_desc-asyncThermal_report.html
+sub-001_layered_desc-asyncJoint.csv
+sub-001_layered_report_desc-asyncJoint.html
 ```
+
+With an `io.output_affix` (e.g. `run1`), every affix starts with it: `_desc-run1_trans-01`, `_desc-run1_desc-asyncJoint`. The per-transducer runs also write their own CSV and acoustic NIfTIs (at the simulated drive level), which the Nexus Results tab shows under the joint result.
 
 For a 3-point sweep:
 
 ```
-cache/sub-001_layered_results_desc-t01.mat
-cache/sub-001_layered_results_desc-t02.mat
+cache/sub-001_layered_results_trans-01.mat
+cache/sub-001_layered_results_trans-02.mat
 cache/sub-001_layered_results_desc-asyncCombinedS01.mat
 cache/sub-001_layered_results_desc-asyncCombinedS02.mat
 cache/sub-001_layered_results_desc-asyncCombinedS03.mat
-sub-001_layered_desc-asyncThermalS01.csv
-sub-001_layered_desc-asyncThermalS02.csv
-sub-001_layered_desc-asyncThermalS03.csv
+sub-001_layered_desc-asyncJointS01.csv
+sub-001_layered_desc-asyncJointS02.csv
+sub-001_layered_desc-asyncJointS03.csv
 ```
 
 ### Activation

@@ -612,6 +612,10 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.modules.generate_report        = 1;
     p.io.acoustic_cache_affix        = affix_combined;
     p.io.output_affix                = affix_thermal;
+    % The combined field is already on the full grid (combine_async_intensity
+    % back-projects partial-FOV fields), so this job must not crop again.
+    p.grid.acoustic_fov_diameter_mm  = [];
+    p.grid.acoustic_fov_length_mm    = [];
     p.io.preproc_affix               = affix_preproc;  % reuse trans-01 preproc cache
     p.io.overwrite_files             = ow.outputs;
     p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};  % the combined field was computed on these

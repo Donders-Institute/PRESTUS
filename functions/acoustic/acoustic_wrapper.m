@@ -192,22 +192,54 @@ end
     % per unique frequency. A single-frequency setup produces the original
     % sensor_data.p_complex field; a multi-frequency setup produces one field per
     % unique frequency, keyed as p_complex_<freq_Hz>Hz.
+    % extractAmpPhase returns the phase relative to the first recorded sample;
+    % subtracting 2*pi*f*t0 refers it to t = 0 of the simulation, where every
+    % run's source signal starts. Fields from separate runs (e.g. one per
+    % transducer, possibly on FOV sub-grids with a different dt) can then be
+    % added coherently (SUPERPOSE_COMPLEX_FIELDS).
     if isfield(sensor_data, 'p')
         freqs_all    = [parameters.transducer.freq_hz];
         unique_freqs = unique(freqs_all);
-        if numel(unique_freqs) == 1
-            [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(1), 'Dim', ndims(sensor_data.p));
-            sensor_data.p_complex = amp .* exp(1i .* phase);
-        else
+        t0_s = 0;
+        if isfield(sensor, 'record_start_index') && ~isempty(sensor.record_start_index)
+            t0_s = (double(sensor.record_start_index) - 1) * kgrid.dt;
+        end
+        p_complex_keys = cell(1, numel(unique_freqs));
+        if numel(unique_freqs) > 1
             fprintf('Multi-frequency setup: extracting p_complex at %d frequencies (%s Hz).\n', ...
                 numel(unique_freqs), num2str(unique_freqs));
-            for fi = 1:numel(unique_freqs)
-                [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(fi), 'Dim', ndims(sensor_data.p));
-                fkey = sprintf('p_complex_%gHz', unique_freqs(fi));
-                sensor_data.(fkey) = amp .* exp(1i .* phase);
+        end
+        for fi = 1:numel(unique_freqs)
+            [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(fi), 'Dim', ndims(sensor_data.p));
+            % k-Wave returns p as [sensor points x time]; the sensor mask is the
+            % whole grid, so the points are in linear-index order.
+            if numel(amp) == prod(parameters.grid.dims) && ~isequal(size(amp), parameters.grid.dims)
+                amp   = reshape(amp,   parameters.grid.dims);
+                phase = reshape(phase, parameters.grid.dims);
             end
+            if numel(unique_freqs) == 1
+                p_complex_keys{fi} = 'p_complex';
+            else
+                p_complex_keys{fi} = sprintf('p_complex_%gHz', unique_freqs(fi));
+            end
+            sensor_data.(p_complex_keys{fi}) = amp .* exp(1i .* (phase - 2 * pi * unique_freqs(fi) * t0_s));
         end
         sensor_data = rmfield(sensor_data, 'p');
+        % Saved with each p_complex file (one entry per frequency below).
+        p_complex_meta = struct( ...
+            'phase_reference', 'simulation_t0', ...
+            'freq_hz',         unique_freqs, ...
+            'field_names',     {p_complex_keys}, ...
+            'record_t0_s',     t0_s, ...
+            'dt_s',            kgrid.dt, ...
+            'drive_level',     'simulated', ...   % before any ISPPA rescaling
+            'grid_dims',       [], ...
+            'fov_offset_ac',   [], ...
+            'full_ac_dims',    []);
+        if nargin >= 10 && isstruct(acoustic_provenance) && isfield(acoustic_provenance, 'fov_offset_ac')
+            p_complex_meta.fov_offset_ac = acoustic_provenance.fov_offset_ac;
+            p_complex_meta.full_ac_dims  = acoustic_provenance.full_ac_dims;
+        end
     end
 
     % convert media and results to 2D/3D (if axisymmetry was used)
@@ -266,8 +298,11 @@ end
                     freq_suffix = fld(length('p_complex')+1:end); % e.g. '_500Hz'
                     filename_p_complex = fullfile(fdir, [strrep(fname, '_results', ['_p_complex' freq_suffix]), fext]);
                 end
-                p_complex = sensor_data.(fld); %#ok<NASGU>
-                save(filename_p_complex, 'p_complex', '-v7.3');
+                p_complex = sensor_data.(fld);
+                p_complex_info = rmfield(p_complex_meta, 'field_names');
+                p_complex_info.freq_hz   = p_complex_meta.freq_hz(strcmp(p_complex_meta.field_names, fld));
+                p_complex_info.grid_dims = size(p_complex);
+                save(filename_p_complex, 'p_complex', 'p_complex_info', '-v7.3');
                 fprintf('Saved complex pressure field (%s) to %s\n', fld, filename_p_complex);
             end
             sensor_data = rmfield(sensor_data, fld);

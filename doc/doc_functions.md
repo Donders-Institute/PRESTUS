@@ -19,12 +19,14 @@ The following documents the functions provided in PRESTUS.
 | `cache_acoustic`                        | Save or load the slim acoustic results cache. |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 | `fov_backproject_volume`                | Zero-pad a FOV sub-grid volume back to the full acoustic grid. |
+| `fov_restore_transducers`               | Put every transducer back at its full-grid position after an FOV crop. |
 | `fov_to_grid_pos`                       | Convert FOV-grid voxel indices to full sim-grid indices. |
 | `is_acoustic_dry_run`                   | True when the configured acoustic backend only writes inputs |
 | `needs_water_baseline`                  | Decide whether a free-water baseline simulation must run |
 | `plot_axial_profile`                    | Plot and save pressure and intensity along the beam axis (depth from the exit plane) with tissue shading and the free-water O'Neil / k-Wave baseline intensity of the simulated transducer. |
 | `prepare_thermal_domain`                | Restore full-grid state or adjust planimg for thermal FOV. |
 | `resolve_acoustic_fov_params`           | Resolve 'auto' FOV settings and check readiness. |
+| `superpose_complex_fields`              | Coherent sum of complex pressure fields from separate runs. |
 | `targeting_analysis`                    | Targeting accuracy of one run from its focal-mask NIfTIs: simulated focus vs planned focus (axial/lateral), vs MNI target and ROI; writes `sub-XXX_<medium><affix>_targeting.csv`. |
 
 #### BABELBRAIN

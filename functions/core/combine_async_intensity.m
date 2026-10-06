@@ -26,16 +26,17 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 %
 % Partial-FOV support
 % -------------------
-% If any per-transducer cache was produced with ACOUSTIC_GRID_FOV (i.e.
-% acoustic_provenance.fov_offset_ac is non-empty), ALL caches must have
-% consistent FOV provenance with the same full_ac_dims.  Each FOV field is
-% zero-padded (back-projected) into the shared full grid before accumulation.
-% The combined output is always on the full grid; fov_offset_ac is cleared in
-% the combined provenance so the downstream thermal pipeline needs no changes.
+% A cache produced with ACOUSTIC_GRID_FOV (acoustic_provenance.fov_offset_ac
+% non-empty) is zero-padded (back-projected) onto its own full grid
+% (full_ac_dims) first. In shared grid mode that full grid is the reference
+% grid; in per_transducer mode it is then remapped like any other grid (below).
+% FOV and full-grid caches can be mixed. The combined output is always on the
+% full grid; fov_offset_ac is cleared in the combined provenance so the
+% downstream thermal pipeline needs no changes.
 %
-% Grid remapping (non-FOV)
-% ------------------------
-% When a non-FOV cache was produced on a different grid than the reference
+% Grid remapping
+% --------------
+% When a cache (after any FOV back-projection) is on a different grid than the reference
 % (file 1) — e.g. simulation.async_grid_mode = 'per_transducer', where each
 % transducer is simulated on its own aligned/cropped grid — the field is
 % resampled onto the reference physical space (transducer 1's grid). Two
@@ -179,29 +180,6 @@ for k = 2:N
     [full_ac_dims_k, fov_offset_k, has_fov_k] = ...
         resolve_grid(data_k.acoustic_provenance, size(p_k), k);
 
-    % Validate FOV consistency across files.
-    if has_fov_k ~= has_fov_ref
-        error('combine_async_intensity:fovModeMismatch', ...
-            ['File 1 %s FOV mode but file %d %s. ' ...
-             'All per-transducer caches must be produced with the same FOV setting.'], ...
-            bool2str(has_fov_ref), k, bool2str(has_fov_k));
-    end
-    if ~isequal(full_ac_dims_k, full_ac_dims)
-        if has_fov_k
-            % FOV + different full_ac_dims: the files do not share the same
-            % underlying anatomy grid — cannot be combined safely.
-            error('combine_async_intensity:fovGridMismatch', ...
-                ['FOV full grid mismatch: file 1 full_ac_dims [%s], file %d [%s]. ' ...
-                 'FOV caches must all share the same full acoustic grid.'], ...
-                num2str(full_ac_dims), k, num2str(full_ac_dims_k));
-        else
-            % Non-FOV grid mismatch: interpolate file k onto the reference grid.
-            fprintf(['[combine_async_intensity] File %d grid [%s] differs from ' ...
-                     'reference [%s] — remapping via interpolation.\n'], ...
-                k, num2str(full_ac_dims_k), num2str(full_ac_dims));
-        end
-    end
-
     [p_k_scaled, target_used, baseline_used] = scale_pressure( ...
         p_k, data_k.acoustic_provenance, data_k.acoustic_info, targets_wcm2(k), k);
 
@@ -210,6 +188,21 @@ for k = 2:N
     p_min_k  = double(data_k.sensor_data.p_min_all) .* scale_k;
     clear scale_k;
 
+    % A partial-FOV field is first put back onto its own full grid (the
+    % grid its planimg affine describes), so it can be combined like a
+    % full-grid run below: directly when that grid is the reference grid
+    % (shared mode), else after remapping (per_transducer mode).
+    if has_fov_k
+        p_k_scaled = backproject(p_k_scaled, fov_offset_k, full_ac_dims_k);
+        p_min_k    = backproject(p_min_k,    fov_offset_k, full_ac_dims_k);
+        fov_offset_k = [1, 1, 1];
+    end
+    if ~isequal(full_ac_dims_k, full_ac_dims)
+        fprintf(['[combine_async_intensity] File %d grid [%s] differs from ' ...
+                 'reference [%s] — remapping via interpolation.\n'], ...
+            k, num2str(full_ac_dims_k), num2str(full_ac_dims));
+    end
+
     % Grid remapping: if this file was simulated on a different grid than the
     % reference (e.g. simulation.async_grid_mode = 'per_transducer', where
     % each transducer has its own aligned/cropped grid), resample it onto the
@@ -217,7 +210,7 @@ for k = 2:N
     % rotation + translation between grids, e.g. per_transducer mode);
     % fall back to the legacy origin-centred spacing-only remap when the
     % affine cannot be recovered (e.g. deleted planimg sidecar, legacy cache).
-    if ~has_fov_k && ~isequal(full_ac_dims_k, full_ac_dims)
+    if ~isequal(full_ac_dims_k, full_ac_dims)
         [M_k2ref, have_affine] = resolve_affine_remap(data_k.acoustic_info, data_ref.acoustic_info, ...
                                                        data_k.kgrid);
         if have_affine
@@ -384,11 +377,6 @@ end
 vol = zeros(full_dims, 'like', p_fov);
 fov_end = fov_offset + size(p_fov) - 1;
 vol(fov_offset(1):fov_end(1), fov_offset(2):fov_end(2), fov_offset(3):fov_end(3)) = p_fov .^ 2;
-end
-
-function s = bool2str(b)
-s = 'uses';
-if ~b, s = 'does not use'; end
 end
 
 function [M, ok] = resolve_affine_remap(info_k, info_ref, kgrid_k)
