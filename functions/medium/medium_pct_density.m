@@ -20,7 +20,7 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 %   density    - full-grid density array to update [kg/m^3]
 %   pseudoCT   - pseudo-CT Hounsfield values (full grid)
 %   skull_idx  - linear indices of skull voxels into the grid
-%   algorithm  - one of 'k-plan', 'k-wave', 'marsac', 'aubry', 'none'
+%   algorithm  - one of 'k-plan', 'k-wave', 'marsac', 'aubry', 'air-tissue', 'none'
 %
 % Output:
 %   density - updated density with skull voxels filled [kg/m^3]

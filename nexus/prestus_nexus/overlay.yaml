@@ -219,9 +219,9 @@ fields:
   pct.enabled: {kind: flag}
   pct.debug: {kind: flag}
   pct.skull_mapping: {choices: [miscouridou, carpino, wiesinger, treeby, kosciessa]}
-  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry]}
-  pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry]}
-  pct.mapping_attenuation: {choices: [k-plan, mueller]}
+  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry, air-tissue, none]}
+  pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry, webb, pichardo, mcdannold, none]}
+  pct.mapping_attenuation: {choices: [k-plan, mueller, aubry, webb, pichardo, mcdannold, none]}
 
   layers.*: {kind: numbers}
 

@@ -508,9 +508,9 @@ pct:
   enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
   skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/carpino/wiesinger/treeby/kosciessa
   debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
-  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry
-  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry
-  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller
+  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry/air-tissue
+  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold
+  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller/aubry/webb/pichardo/mcdannold
 
 #------------ Simulation layers
 # Assign tissue compartments to model, with their SimNIBS segmentation label indices.

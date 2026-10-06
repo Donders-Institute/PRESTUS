@@ -33,6 +33,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 #### Elastic skull backend (draft)
 
 - **`acoustic_backend: kwave_elastic`** (draft, not yet validated in PRESTUS): models shear waves in the skull with k-Wave's `pstdElastic3D/2D`, motivated by Gao et al. (2026, IEEE TBME 73(3):1298). The pressure source becomes an equivalent normal-stress source; the free-water baseline runs through the same solver. Skull elastic properties come from the new `elastic:` section (`medium_elastic_properties`) and follow Pichardo et al. (2017), the model behind BabelBrain: density-based shear speed from their 270 and 836 kHz fits interpolated to the transducer frequency, power-law shear and longitudinal attenuation through their paired values, and a Poisson-ratio floor. MATLAB CPU/GPU only (`cpp_*` is overridden), no axisymmetric grids. See [k-Wave elastic backend](doc_backend.md#k-wave-elastic-backend-shear-waves)
+- **Nexus**: the `pct.mapping_*` choice lists now match the algorithms the code accepts (several were missing)
 
 #### Robustness, benchmarks and documentation (2026-10 audit, part 2)
 
