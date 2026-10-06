@@ -1,6 +1,6 @@
 # Localite ingestion: GUI and script workflows
 
-Recorded Localite positions are turned into named, averaged targets per subject and session by **ingestion** (see [Localite I/O](doc_placement_neuronav.md#localite-io) for the folder layout and output files). Ingestion can be run interactively in `neuronav_gui` or scripted with `neuronav_ingest_batch`. Both run the same functions on the same settings, so the choice depends on the task:
+Recorded Localite positions are turned into named, averaged targets per subject and session by **ingestion** (see [Localite I/O](doc_placement_neuronav.md#localite-io) for the folder layout and output files). Ingestion can be run interactively in `neuronav_gui` (or on the PRESTUS Nexus's *Placement ▸ Localite* page, which takes its settings from the study config; see [Localite page](doc_nexus.md#localite-page)) or scripted with `neuronav_ingest_batch`. All of them run the same functions on the same settings, so the choice depends on the task:
 
 | | GUI (`neuronav_gui`) | Script (`neuronav_ingest_batch`) |
 |---|---|---|

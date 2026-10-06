@@ -73,7 +73,8 @@ refine_transducer_library ──────────────────
                                      ├─ library_refinement_from_fits phases, gains, drive → refinements
                                      ├─ kwave_calibrate_drive        optional: drive calibrated in free-water k-Wave
                                      └─ evaluate_library_entry       R² / focal error before and after
-build_transducer_library, calibration_gui ─► calibration_fit_depths (same fit loop and presets)
+build_transducer_library ─► calibration_fit_depths (same fit loop and presets)
+calibration_gui, Nexus Calibration page ─► calibration_fit ─► calibration_fit_depths
 ```
 
 `calibrate_library_entry` reads and writes no files; the callers decide where the result goes.

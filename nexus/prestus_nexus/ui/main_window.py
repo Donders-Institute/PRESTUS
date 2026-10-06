@@ -28,7 +28,10 @@ RUN = "__run__"
 STUDY = "__study__"
 RESULTS = "__results__"
 PCT = "__pct__"
-SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT)
+CALIBRATION = "__calibration__"
+LOCALITE = "__localite__"
+SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE)
+SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE)
 LEVEL_ICON = {"error": "✗", "warning": "⚠", "info": "ℹ"}
 LEVEL_COLOR_KEY = {"error": "red", "warning": "amber", "info": "info"}
 ISSUE_DOCK_COLLAPSED_HEIGHT = 32
@@ -99,6 +102,7 @@ class TabPage(QWidget):
         self.cards: list[QWidget] = []
         self.side: QWidget | None = None
         self.subtabs: QTabWidget | None = None
+        self.settings_page: QWidget | None = None     # the 'Settings' sub-tab, once there are sub-tabs
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 10, 14, 6)
@@ -174,10 +178,25 @@ class TabPage(QWidget):
         self.subtabs = QTabWidget()
         self.subtabs.setDocumentMode(True)
         self.subtabs.addTab(self.scroll, "Settings")
+        self.settings_page = self.scroll
         self.subtabs.addTab(widget, label)
         self.subtabs.currentChanged.connect(self._sub_tab_changed)
         outer.addWidget(self.subtabs, 1)
         self.split.setParent(None)
+
+    def add_subtab(self, widget: QWidget, label: str) -> None:
+        """Another full-width sub-tab. A tab without sub-tabs gets them here, with its
+        settings (and side panel, if any) as 'Settings'."""
+        if self.subtabs is None:
+            outer = self.layout()
+            outer.removeWidget(self.split)
+            self.subtabs = QTabWidget()
+            self.subtabs.setDocumentMode(True)
+            self.subtabs.addTab(self.split, "Settings")
+            self.settings_page = self.split
+            self.subtabs.currentChanged.connect(self._sub_tab_changed)
+            outer.addWidget(self.subtabs, 1)
+        self.subtabs.addTab(widget, label)
 
     def _sub_tab_changed(self, _index: int) -> None:
         w = self.subtabs.widget(_index)
@@ -367,8 +386,11 @@ class MainWindow(QMainWindow):
 
     def _build_tools_menu(self) -> None:
         tools = self.menuBar().addMenu("&Tools")
-        for text, slot in [("Localite marker ingest (neuronav_gui)…", self.open_neuronav_gui),
-                           ("Transducer calibration (calibration_gui)…", self.open_calibration_gui),
+        for text, slot in [("Localite ingestion", lambda: self.show_special(LOCALITE)),
+                           ("Transducer calibration", lambda: self.show_special(CALIBRATION)),
+                           (None, None),
+                           ("neuronav_gui in MATLAB…", self.open_neuronav_gui),
+                           ("calibration_gui in MATLAB…", self.open_calibration_gui),
                            (None, None),
                            ("Update project defaults…", self.update_project_defaults)]:
             if text is None:
@@ -444,8 +466,13 @@ class MainWindow(QMainWindow):
                 self.schematic = TransducerSchematic(self.model)
                 card = self._card("Transducer geometry", self.schematic,
                                   "Cross-section along the beam: elements, exit plane, geometric focus, the "
-                                  "focal depth you set (✕) and the device's steering range.")
+                                  "focal depth setting (✕) and the device's steering range.")
                 tab.set_side(card)
+                from .calibration_page import CalibrationPage
+                calib = CalibrationPage(self)
+                self.pages[CALIBRATION] = calib
+                self._section_tab[CALIBRATION] = key
+                tab.add_subtab(calib, "Calibration")
             elif key == "placement":
                 from .placement_viewer import PlacementPage
                 viewer = PlacementPage(self.model)
@@ -453,6 +480,11 @@ class MainWindow(QMainWindow):
                 self.pages[VIEWER] = viewer
                 self._section_tab[VIEWER] = key
                 tab.set_full_tab(viewer, "Viewer")
+                from .localite_page import LocalitePage
+                loc = LocalitePage(self)
+                self.pages[LOCALITE] = loc
+                self._section_tab[LOCALITE] = key
+                tab.add_subtab(loc, "Localite")
             elif key == "simulation":
                 from .pct_page import PctPage
                 pct_page = PctPage(self)
@@ -513,6 +545,19 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "MATLAB", "MATLAB not found; set its path on the Run tab.")
         return path or None
 
+    def matlab_path(self) -> str | None:
+        """MATLAB binary without asking: the Run tab's field, the session, or a standard install."""
+        from .. import launcher
+        run = self.pages.get(RUN)
+        path = (run.matlab.text() if run is not None else "") or launcher.find_matlab(
+            self.session.get("matlab_path"))
+        return path or None
+
+    def bridge(self):
+        """The shared MATLAB session for interactive steps (Localite, Calibration)."""
+        from .. import bridge
+        return bridge.shared_bridge(self.prestus_root, self.matlab_path)
+
     def _start_matlab_gui(self, call: str, what: str) -> None:
         from PyQt6.QtCore import QProcess
 
@@ -559,6 +604,9 @@ class MainWindow(QMainWindow):
                 self.run_side.currentWidget().refresh()
             if tab.key == "results" and RESULTS in self.pages:
                 self.pages[RESULTS].refresh()
+            if tab.subtabs is not None and tab.subtabs.currentWidget() in (
+                    self.pages.get(CALIBRATION), self.pages.get(LOCALITE)):
+                tab.subtabs.currentWidget().refresh()
 
     def _select_tab(self, key: str) -> TabPage | None:
         tab = self.tab_pages.get(key)
@@ -572,7 +620,7 @@ class MainWindow(QMainWindow):
         page = self.pages[key]
         if key in (RUN, REVIEW):
             self.run_side.setCurrentWidget(page)
-        elif key in (VIEWER, PCT, RESULTS) and tab is not None and tab.subtabs is not None:
+        elif key in SUBTAB_PAGES and tab is not None and tab.subtabs is not None:
             tab.subtabs.setCurrentWidget(page)
         page.refresh()
         return page
@@ -602,7 +650,7 @@ class MainWindow(QMainWindow):
         tab = self._select_tab(self._section_tab.get(section, ""))
         if tab is not None:
             if tab.subtabs is not None:
-                tab.subtabs.setCurrentWidget(tab.scroll)       # the field lives under 'Settings'
+                tab.subtabs.setCurrentWidget(tab.settings_page)   # the field lives under 'Settings'
             tab.refresh()
             row = next((r for r in page.rows if r.node.path == path), None)
             if not page.isVisibleTo(tab):
@@ -883,14 +931,15 @@ class LocaliteActions(QWidget):
         self.window = window
         h = QHBoxLayout(self)
         h.setContentsMargins(0, 0, 0, 6)
-        note = QLabel("Localite: ingest recordings in MATLAB, then use them for single runs "
+        note = QLabel("Localite: ingest recordings on the Localite page, then use them for single runs "
                       "(session / target below) or turn them into study runs.")
         note.setObjectName("CardSub")
         note.setWordWrap(True)
         h.addWidget(note, 1)
-        gui = QPushButton("Open neuronav_gui")
-        gui.clicked.connect(window.open_neuronav_gui)
-        h.addWidget(gui)
+        page = QPushButton("Localite page")
+        page.setToolTip("Detect, name and write the recorded series of a session")
+        page.clicked.connect(lambda: window.show_special(LOCALITE))
+        h.addWidget(page)
         imp = QPushButton("Import into study…")
         imp.setToolTip("Build study manifest rows from the ingested sessions and targets")
         imp.clicked.connect(self._import)

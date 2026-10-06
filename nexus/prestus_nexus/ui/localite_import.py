@@ -12,11 +12,11 @@ from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialo
 from .. import neuronav_import as ni
 from ..study import Manifest
 
-HELP = ("Reads what <tt>neuronav_gui</tt> writes under <tt>path.localite_post</tt>: "
+HELP = ("Reads what the Localite page (or <tt>neuronav_gui</tt>) writes under <tt>path.localite_post</tt>: "
         "<tt>neuronav_ingest_summary.csv</tt> (batch window) and the per-session "
         "<tt>InstrumentMarker_*.json</tt> files (“Write outputs”). Each run uses "
         "<tt>placement.mode: localite</tt>, so PRESTUS reads the ingested markers itself when it runs. "
-        "Ingest (or re-ingest) sessions with <b>Open neuronav_gui</b>, then <b>Scan</b>.")
+        "Ingest (or re-ingest) sessions on the <b>Localite page</b>, then <b>Scan</b>.")
 
 
 class LocaliteImportDialog(QDialog):
@@ -43,9 +43,9 @@ class LocaliteImportDialog(QDialog):
         scan = QPushButton("Scan")
         scan.clicked.connect(lambda: self.scan())
         row.addWidget(scan)
-        gui = QPushButton("Open neuronav_gui")
-        gui.setToolTip("Localite marker ingestion in MATLAB (pre-filled from this study config)")
-        gui.clicked.connect(window.open_neuronav_gui)
+        gui = QPushButton("Localite page")
+        gui.setToolTip("Detect, name and write sessions (Placement tab ▸ Localite)")
+        gui.clicked.connect(self._localite_page)
         row.addWidget(gui)
         v.addLayout(row)
 
@@ -106,6 +106,11 @@ class LocaliteImportDialog(QDialog):
         v.addWidget(bb)
         if self.folder.text():
             self.scan()
+
+    def _localite_page(self) -> None:
+        from .main_window import LOCALITE
+        self.reject()
+        self.window.show_special(LOCALITE)
 
     def _browse(self) -> None:
         d = QFileDialog.getExistingDirectory(self, "Ingested Localite markers", self.folder.text())

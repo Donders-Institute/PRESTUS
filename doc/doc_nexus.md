@@ -29,8 +29,8 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    | Tab | Sections | Also on the tab |
    |---|---|---|
    | Setup | subject, paths, environment, input/output | |
-   | Transducer | transducer, calibration conventions | device panel, cross-section drawing |
-   | Placement | placement (incl. the Localite folders), Localite ingestion | placement viewer (own 'Viewer' sub-tab, next to 'Settings'), Localite shortcuts |
+   | Transducer | transducer, calibration conventions | device panel, cross-section drawing; 'Calibration' sub-tab |
+   | Placement | placement (incl. the Localite folders), Localite ingestion | placement viewer ('Viewer' sub-tab, next to 'Settings'); 'Localite' sub-tab; Localite shortcuts |
    | Simulation | medium & solvers, grid, sonication protocol, thermal, head model, pseudo-CT, tissue layers and properties, jwave, BabelBrain | timing diagram, TUS calculator exchange |
    | Study | study name, targeting & analysis | study manifest editor |
    | Run | pipeline stages, where to run, HPC | run log, YAML review |
@@ -55,6 +55,7 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - The panel shows the focal range (`min_foc`/`max_foc`) and which calibration entry PRESTUS will use.
    - With several transducers, transducer 2 and later inherit transducer 1's values unless set.
    - The cross-section on the right draws the elements, exit plane, geometric focus, the focal depth you set (✕) and the device's steering range.
+   - The *Calibration* sub-tab compares, fits and saves library entries for the config's transducers (see [Calibration page](#calibration-page)).
 5. **Placement viewer** (manual placement). The Placement tab has two sub-tabs: **Settings** (the
    `placement`/Localite cards) and **Viewer**, which gives the viewer the full tab width instead of
    sharing it with the settings — the same nested-tab pattern the Run tab uses for Run log / Review
@@ -94,7 +95,8 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
    - Positions are written in the space set by `placement.manual.coordinate_space` (`voxel` or `ras`). See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
    - Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`, written by `write_placement_positions`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.
-   - With `placement.mode: localite`, the Placement card offers *Open neuronav_gui* and *Import into study…*.
+   - The *Localite* sub-tab detects, names and writes the recorded series of a session (see [Localite page](#localite-page)).
+   - With `placement.mode: localite`, the Placement card offers *Localite page* and *Import into study…*.
 6. **Timing diagram and TUS calculator** (Simulation tab, *Sonication protocol*). See the next section.
 7. **Issues panel.** Lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), and a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied. Clicking an issue opens its tab and field, showing advanced options if needed. The header shows the error and warning counts.
 8. **Run tab.**
@@ -105,7 +107,7 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - *Review YAML* shows the exact YAML that will be written.
 9. **Study tab.** Runs many subjects with per-run settings. See [Group analysis](doc_group.md#study-setup).
    - Set the manifest file (`study.manifest`, relative to the config) and edit the table: one row per run, with `subject_id`, `condition`, `include`, `config` and any config key as a column (*Add column…* offers the known keys).
-   - *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. *Open neuronav_gui* starts the MATLAB ingestion GUI with this config. See [Group analysis](doc_group.md#from-localite-ingestion).
+   - *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. *Localite page* opens the ingestion page. See [Group analysis](doc_group.md#from-localite-ingestion).
    - The summary under the table checks the manifest as you type: subject IDs, `include` values, unknown keys (with suggestions), and rows that would write to the same outputs.
    - *Check all rows in MATLAB* runs `prestus_study_start(config, 'DryRun', true)`. *Run study locally* writes `run_study_<study>.m` and runs it. *Build group report* runs `prestus_group_report_start(config)` (group maps + report). All three stream to the Run tab.
 
@@ -121,12 +123,46 @@ The [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/) (Rad
 
 Both use the same ramp convention: the ramp duration is the rise (= fall) time at each end of a pulse (`timing.pulse_ramp_dur`, `timing.pulse_ramp_shape` `linear` or `tukey`). PRESTUS models pulse ramps only, so the calculator's pulse-train and repetition ramps are exported as 0 and reported when an imported file sets them. A level disabled in the calculator sets the corresponding PRESTUS durations to 0.
 
-## MATLAB tools
+## MATLAB session
 
-The **Tools** menu opens PRESTUS's standalone MATLAB GUIs in an interactive MATLAB session. They need the MATLAB desktop, so they are not run through `-batch`:
+The Calibration and Localite pages compute in MATLAB, with the same functions as `calibration_gui` and `neuronav_gui`. To avoid a MATLAB start-up per click, the Nexus keeps one MATLAB session open (`nexus_bridge`, started with `matlab -batch` on the first use; the MATLAB binary is the one set on the Run tab). The first call takes as long as MATLAB needs to start (15–60 s); later ones take only the computation. The pages show the session's state (*starting*, *ready*, *working*), and **Stop** ends it.
 
-- **Localite marker ingest** (`neuronav_gui`, see [doc_gui.md](doc_gui.md#localite-ingest-gui)). The study config is saved first and passed to the GUI, which reads `path.localite_*`, `placement.localite.*` and `neuronav.coil_map` from it. After ingestion, set `placement.mode: localite` in the Nexus, or import the ingested targets into a study manifest (Study tab).
-- **Transducer calibration** (`calibration_gui`). Fitted library entries are saved to `transducer.library_path` when that is set. The Nexus's transducer panel then reports them as the calibration entry PRESTUS will use.
+- The session ends by itself after 30 min without use, since it holds a MATLAB licence, and when the Nexus quits or stops answering. The next call starts a new one, and the pages open their transducer or session again.
+- The Nexus and MATLAB exchange JSON files in a temporary folder. MATLAB runs only `nexus_calibration`, `nexus_neuronav` and `nexus_ping` from it.
+- Long work does not use the session: batch ingestion and the k-Wave drive check are written as scripts and run on the Run tab, where the log streams and *Stop* works.
+
+## Calibration page
+
+*Transducer ▸ Calibration* is the transducer-calibration GUI for the study's own transducers. It does what `calibration_gui` does ([Transducer library](doc_transducer_library.md)), computed by the same functions (`calibration_desired_profiles`, `calibration_evaluate`, `calibration_fit`, `calibration_save_entry`):
+
+- **Transducer** lists the config's transducers that use a device from `config/equipment`; the driving system and `transducer.library_path` are taken from the config. The current library entry is the one PRESTUS would use (the user folder first, then `config/calibration`).
+- **Profile CSV** defaults to the combination's `char_data_path` under `local/profiles`. Loading it shows the geometric model and the library entry against the measured profiles (R² per depth).
+- **Desired depths** and **Predict** model any depths through the runtime library path, with the measured, interpolated or (within *extrapolate ≤*) extrapolated profile at each depth. The desired depths are prefilled with the depths this study uses with the device: the focal depth settings (`focal_distance_ep` or `_bowl` of every matching transducer, and the manifest's `transducer[(i)].focal_distance_ep` columns) and each matching transducer's target depth in the placement viewer (exit plane → `focus_pos`, 0.1 mm). They follow the config and placement each time the page is shown, until you type your own; **Study depths** fills them in again. Without either, the depths of the entry's `meta.fit`, then the device's defaults, are used. The plot then shows focus against target per depth, and the table the phases and drive each depth resolves to.
+- **Fit** calibrates per-depth refinements (default) or the static model, at the ticked measured depths or at the desired depths. **Reference ISPPA** defaults to `transducer.target_isppa_wcm2`. *Advanced…* holds the fitter's further options.
+- **Save entry** writes `<serial>[_<ds>].yaml` to `transducer.library_path`. If that is not set, it asks for a folder and sets it in the config. The entry records how it was fitted (`meta.fit`), and opening it later restores those settings. The device panel on the Settings sub-tab then shows the new entry as the one PRESTUS will use.
+- **k-Wave drive check…** (per-depth fits) writes the unsaved fit and `calibration/kwave_drive_<combo>.m` next to the config. The script runs `kwave_calibrate_drive` with the study config's grid and platform, then saves the drive-corrected entry. Run it on the Run tab, or yourself (e.g. on the cluster); it takes minutes per depth.
+- *Export profiles…* and *Export settings…* write the same CSVs as `calibration_gui`.
+
+Matrix transducers and new equipment entries (`calibration_gui`'s *View geometry* and *New…*) are only available in `calibration_gui`.
+
+## Localite page
+
+*Placement ▸ Localite* ingests Localite recordings with the study config's settings (`path.localite_raw`/`_post`, `placement.localite.*`, `io.overwrite_files`, `neuronav.*`). These are edited on the Settings sub-tab (*Edit settings*), not on the page. The config is saved before each step, because MATLAB reads it with `load_parameters` as a run does. The steps are those of `neuronav_gui` ([doc_placement_neuronav.md](doc_placement_neuronav.md)):
+
+1. **Detect series** (`neuronav_detect_series`, `neuronav_name_series`) lists the series of the chosen subject and session with their QC (pulses, position and rotation deviation, tracking flags). Each series is named after the coil table, the planned target nearest its beam axis, or `series_<k>`. Tabs show the pulse positions in 3-D (with the beam direction and the planned targets), the deviation per pulse, the marker files found and the log.
+2. **Write outputs** (`neuronav_check_target_map`, `neuronav_ingest_markers`) writes the ticked series under their (editable) names and colours to `path.localite_post/sub-XXX/ses-XX/`. When the inputs or the settings change after detection, the page asks you to detect again.
+
+- **Use in this study** sets `placement.localite.session` and `.target` to the written session and target(s) (one per transducer).
+- **Import into study…** builds manifest rows from all ingested sessions (Study tab).
+- **Ingest all sessions…** scans every session (`neuronav_scan_sessions`) and lists the planned-target labels found, whose target names you can edit (*Group labels by stem*, *Use labels as found*). *Save label map and run batch* writes the map to `neuronav.target_labels` and the write mode to `neuronav.batch_write`, then runs `ingest_<study>.m` (`neuronav_ingest_batch` on the ticked sessions) on the Run tab.
+- **MNI view…** maps `neuronav_ingest_summary.csv` to MNI space with each subject's SimNIBS warp (`neuronav_summary_to_mni`, needs `path.seg`). It plots transducer, focus and beam axis over the MNI152 head outline, with filters per subject, session and target.
+
+## MATLAB GUIs
+
+The **Tools** menu opens the Localite and Calibration pages, and still opens PRESTUS's standalone MATLAB GUIs in an interactive MATLAB session (they need the MATLAB desktop):
+
+- **neuronav_gui in MATLAB…** ([doc_gui.md](doc_gui.md#localite-ingest-gui)). The study config is saved first and passed to the GUI.
+- **calibration_gui in MATLAB…** saves entries to `transducer.library_path` when that is set. It also offers *View geometry* and *New…* (adding a transducer to `config/equipment`), which the Calibration page does not.
 
 ## Project defaults
 

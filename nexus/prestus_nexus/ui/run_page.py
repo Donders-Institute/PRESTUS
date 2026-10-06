@@ -445,6 +445,17 @@ class RunPage(QWidget):
             return
         self._start("Run", launcher.run_command(self.matlab.text(), path), path.parent)
 
+    def run_script(self, task: str, script: Path) -> bool:
+        """Run a generated MATLAB script (Localite batch ingestion, k-Wave drive check)
+        with the live log; the config is saved first."""
+        if self.proc is not None:
+            QMessageBox.warning(self, task, f"MATLAB is still running “{self.task}” on the Run tab.")
+            return False
+        if not self._ready():
+            return False
+        self._start(task, launcher.run_command(self.matlab.text(), Path(script)), Path(script).parent)
+        return True
+
     def submit(self) -> None:
         """Submit with PRESTUS' own HPC path; the Nexus only follows the jobs."""
         if self.scheduler is None and not self._remote_on():

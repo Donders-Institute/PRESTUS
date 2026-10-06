@@ -62,6 +62,8 @@ Use **Refresh** to reload results, **Open HTML Report** to open the report in a 
 
 `neuronav_gui` is a stand-alone window for Stage 1 of the neuronav pipeline (`neuronav_ingest_markers`, see [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)). It turns a raw Localite session folder into the normalised `InstrumentMarker_<sub>_<ses>.xml` and its QC JSON sidecar, with a review step before anything is written.
 
+The PRESTUS Nexus offers the same steps on its *Placement ▸ Localite* page, with the settings taken from the study config ([Localite page](doc_nexus.md#localite-page)).
+
 ```matlab
 neuronav_gui                % empty form
 neuronav_gui('my_config.yaml') % pre-fill from a study config

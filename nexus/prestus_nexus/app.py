@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
 
     app = QApplication(sys.argv[:1])
     app.setApplicationName("PRESTUS Nexus")
+    from .bridge import shutdown_shared
+    app.aboutToQuit.connect(shutdown_shared)       # end the MATLAB session with the app
     session = Session()
 
     root = find_prestus_root(args.prestus_root or session.get("prestus_root"))

@@ -48,6 +48,7 @@ No data, SimNIBS, k-Wave simulation or GPU is needed. `test_suite_wiring` fails 
 | Backends (logic only) | `test_babelbrain_insitu_isppa`, `test_babelbrain_thermal_timing`, `test_babelbrain_air_regions` (needs Python with numpy/scipy/nibabel; skipped otherwise) |
 | HPC | `test_hpc_job_report`, `test_parse_memory_tags`, `test_hpc_submit_parsing` |
 | Security | `test_shell_quote_arg`, `test_r_quote_string`, `test_run_command`, `test_command_injection` |
+| Nexus MATLAB session | `test_nexus_bridge` (`nexus_bridge` protocol and allow-list, `nexus_neuronav` and `nexus_calibration` on synthetic data) |
 | Helpers, reports, regressions | `test_helper`, `test_numerical_fixes`, `test_reports`, `test_audit_fixes`, `test_suite_wiring` |
 
 ---
@@ -155,6 +156,7 @@ prestus_testdata/
 | `test_jwave.m` | jwave (Helmholtz) vs k-Wave on the same water simulation: peak, FWHM, field correlation (tag `quick` without the timing sweep) | `JWAVE_PYTHON` |
 | `nexus/tests/test_matlab_roundtrip.py` | configs written by the Nexus load in `load_parameters` with identical values | MATLAB (`PRESTUS_MATLAB`) |
 | `nexus/tests/test_real_configs.py` | every study config in `$PRESTUS_REAL_CONFIG_DIR` round-trips | real configs |
+| `nexus/tests/test_bridge.py` (matlab-marked part), `test_bridge_pages_matlab.py` | the real `nexus_bridge`; the Localite and Calibration pages end to end (synthetic Localite study; CTX_250_001 profiles from `local/profiles`) | MATLAB |
 
 ```matlab
 runtests('tests/test_babelbrain.m', 'Tag', 'nogpu')

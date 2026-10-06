@@ -161,6 +161,11 @@ The following documents the functions provided in PRESTUS.
 | `calibration_gui`                       | Standalone GUI to fit transducer library entries to hydrophone profiles, predict profiles at any depth and add transducers. |
 | `gui_run_worker`                        | Run the PRESTUS pipeline from a YAML config file |
 | `neuronav_gui`                          | Stand-alone GUI for Localite marker ingestion: detect and review series, QC, name targets, batch ingestion, MNI view. |
+| `nexus_bridge`                          | Persistent MATLAB session that serves the PRESTUS Nexus |
+| `nexus_calibration`                     | Transducer calibration for the PRESTUS Nexus (through NEXUS_BRIDGE) |
+| `nexus_neuronav`                        | Localite marker ingestion for the PRESTUS Nexus (through NEXUS_BRIDGE) |
+| `nexus_ping`                            | Answer a NEXUS_BRIDGE health check |
+| `nexus_progress`                        | Report progress of the current NEXUS_BRIDGE request to the Nexus |
 | `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs. |
 | `prestus_nexus`                         | Open the PRESTUS Nexus (standalone PyQt6 config builder, *experimental*; see [doc_nexus.md](doc_nexus.md)). |
 

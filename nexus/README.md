@@ -2,7 +2,7 @@
 
 A standalone desktop app for putting a PRESTUS study config together before running it in MATLAB. It writes a normal override YAML for `load_parameters`, containing only the values that differ from `config_default.yaml`. MATLAB still does all loading, validation and simulation.
 
-Status: *experimental*. All five planned phases are in place: config builder, transducer library panel, placement viewer, MATLAB validate/run, and deprecation of the old tools. User documentation is in [doc/doc_nexus.md](../doc/doc_nexus.md).
+Status: *experimental*. In place: config builder, transducer library panel, placement viewer, MATLAB validate/run, deprecation of the old tools, and the Localite and Calibration pages (MATLAB GUIs integrated through a persistent MATLAB session). User documentation is in [doc/doc_nexus.md](../doc/doc_nexus.md).
 
 ## Running
 
@@ -53,9 +53,11 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `merge.py` | `mergestruct` semantics, shared by the schema (toolbox + project defaults) and the model. |
 | `project_defaults.py` | Refreshing a project's `config_default.yaml` copy (*Tools ▸ Update project defaults…*). |
 | `outputs.py` | Where the pipeline writes per-subject outputs; the placement record (`sub-XXX_placement<affix>.json`). |
-| `ui/` | PyQt6 main window (tabs), section forms, transducer panel and cross-section, placement viewer, timing diagram, study manifest and Localite import, run page, style. |
+| `ui/` | PyQt6 main window (tabs), section forms, transducer panel and cross-section, placement viewer, timing diagram, study manifest and Localite import, run page, Calibration page (`calibration_page.py`), Localite page with batch and MNI dialogs (`localite_page.py`), MATLAB session status (`matlab_status.py`), style. |
 | `timing.py` | Protocol maths and the TUS calculator settings exchange. |
-| `study.py`, `neuronav_import.py` | Study manifest model; manifest rows from the `neuronav_gui` outputs. |
+| `study.py`, `neuronav_import.py` | Study manifest model; manifest rows from the Localite ingestion outputs. |
+| `bridge.py` | The MATLAB session for interactive steps: file protocol (`BridgeClient`), the Qt client (`MatlabBridge`, one per app), JSON helpers. MATLAB side: `functions/gui/nexus_bridge.m`. |
+| `calibration.py`, `localite.py` | Calibration and Localite page logic without Qt: depth lists, the study's focal depths, `meta.fit` ↔ fit settings; raw-root resolution, settings snapshot, target map. |
 | `labels.py` | Readable field labels. |
 
 ### YAML compatibility with MATLAB
@@ -77,6 +79,7 @@ python -m pytest -q -m "not matlab" # without MATLAB (~30 s)
 - `test_schema.py` is the drift test. It checks that every overlay rule (including `tuning`) still matches a key and every tuning goal is declared, that every `extra`/`deprecated` key is still referenced in `functions/`, that no `extra` key has since been added to the default, and that allowed values contain the default. MATLAB's `load_parameters` reads the same `extra`/`deprecated` lists (`config_known_extra_keys`) for its unknown-key warning, so this test also keeps that check accurate.
 - `test_matlab_roundtrip.py` writes a study config with the Nexus, loads it with the real `load_parameters` and compares every value with the Nexus's own merge. Set `PRESTUS_MATLAB` if `matlab` is not on your `PATH`.
 - `test_real_configs.py` loads and round-trips every study config in `$PRESTUS_REAL_CONFIG_DIR` (skipped when unset).
+- `test_bridge.py` tests the bridge protocol and the Qt client against `fake_bridge.py` (no MATLAB), and the real `nexus_bridge` with MATLAB. `test_bridge_pages.py` tests the Calibration and Localite pages on recorded MATLAB answers (`tests/fixtures/bridge`; rerun `make_bridge_fixtures.m` in MATLAB after changing `nexus_calibration` / `nexus_neuronav`). `test_bridge_pages_matlab.py` drives both pages end to end with MATLAB.
 
 When `config_default.yaml` gains or loses keys, run the drift test and update `overlay.yaml` if it fails.
 
@@ -100,7 +103,11 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - *Run locally* via `matlab -batch`, with a live log and success/failure markers.
    - *Submit to cluster* through PRESTUS' own HPC path, and a job list that follows the submitted jobs.
    - *Submit over SSH* from a computer without `sbatch`/`qsub` that sees the study folder on a shared drive.
-   - **Tools menu:** opens `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
+   - **Tools menu:** the Localite and Calibration pages, and `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
+6. **MATLAB GUIs in the Nexus** (`bridge.py`, `ui/calibration_page.py`, `ui/localite_page.py`).
+   - One persistent MATLAB session (`nexus_bridge`, `matlab -batch`) serves interactive steps through JSON request/response files; it ends after 30 min idle or with the app.
+   - *Transducer ▸ Calibration*: `calibration_gui`'s predict / evaluate / fit / save for the config's transducers, saving to `transducer.library_path`, predicting at the study's focal depths; k-Wave drive check as a Run-tab script. Computed by `nexus_calibration` → `calibration_fit` etc., the same functions `calibration_gui` uses.
+   - *Placement ▸ Localite*: `neuronav_gui`'s detect / name / write with the study config's settings, *Use in this study*, batch ingestion (label map → `neuronav.target_labels`, `ingest_<study>.m` on the Run tab), MNI view. Computed by `nexus_neuronav`.
 5. **Retirement.** `launch_web_alignment` and `functions/gui_py` have been removed. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
 
 ## Voxel convention note
