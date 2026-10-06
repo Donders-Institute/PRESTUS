@@ -444,7 +444,8 @@ end
 
     output_HEAT = fullfile(parameters.io.dir_cache, sprintf('sub-%03d_%s_HEAT%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-    save(output_HEAT, 'HEAT', 'timeseries');
+    % time_status_seq: sonication on/off steps, for shading the time courses (Nexus)
+    save(output_HEAT, 'HEAT', 'timeseries', 'time_status_seq');
 
     %% Create a video of sagittal in-plane heating (if requested)
 

@@ -25,10 +25,15 @@ import numpy as np
 # ── Volumes ──────────────────────────────────────────────────────────────
 
 class Volume:
-    """A NIfTI volume with RAS <-> voxel helpers (needs nibabel)."""
+    """A NIfTI volume with RAS <-> voxel helpers (needs nibabel).
+
+    Only the header is read up front. The voxels are read on first use in one go:
+    nibabel's own .nii.gz reader fetches the file in small chunks, which on a network
+    drive costs a round trip each (several seconds per volume)."""
 
     def __init__(self, path: str | Path):
         import nibabel as nib
+        from nibabel.orientations import inv_ornt_aff, io_orientation
         self.path = Path(path)
         img = nib.load(str(self.path))
         self.affine = np.asarray(img.affine, dtype=float)       # 0-based voxel -> RAS
@@ -36,16 +41,18 @@ class Volume:
         self.shape = img.shape[:3]
         self._img = img
         self._data = None
-        canon = nib.as_closest_canonical(img)
-        self.canon_affine = np.asarray(canon.affine, dtype=float)
+        # Closest-canonical (RAS) orientation, as nibabel.as_closest_canonical
+        ornt = io_orientation(img.affine)
+        self._ornt = None if np.array_equal(ornt, [[0, 1], [1, 1], [2, 1]]) else ornt
+        canon_affine = img.affine if self._ornt is None else img.affine.dot(inv_ornt_aff(ornt, img.shape))
+        self.canon_affine = np.asarray(canon_affine, dtype=float)
         self.canon_inv = np.linalg.inv(self.canon_affine)
-        self._canon_img = canon
         self._canon = None
 
     @property
     def data(self) -> np.ndarray:
         if self._data is None:
-            self._data = np.asanyarray(self._img.dataobj)
+            self._data = _read_voxels(self.path, self._img)
             if self._data.ndim > 3:
                 self._data = self._data[..., 0]
         return self._data
@@ -54,8 +61,11 @@ class Volume:
     def canon(self) -> np.ndarray:
         """Data reoriented to the closest RAS axes (for display)."""
         if self._canon is None:
-            d = np.asanyarray(self._canon_img.dataobj)
-            self._canon = d[..., 0] if d.ndim > 3 else d
+            if self._ornt is None:
+                self._canon = self.data
+            else:
+                from nibabel.orientations import apply_orientation
+                self._canon = apply_orientation(self.data, self._ornt)
         return self._canon
 
     @property
@@ -87,6 +97,19 @@ class Volume:
         i = idx[inside]
         out[inside] = self.data[i[:, 0], i[:, 1], i[:, 2]]
         return out
+
+
+def _read_voxels(path: Path, img) -> np.ndarray:
+    """The image's (scaled) voxel array; a .nii.gz is read whole and decompressed in
+    memory, falling back to nibabel's reader for anything that fails."""
+    if path.name.endswith(".gz"):
+        try:
+            import gzip
+            whole = type(img).from_bytes(gzip.decompress(path.read_bytes()))
+            return np.asanyarray(whole.dataobj)
+        except Exception:
+            pass
+    return np.asanyarray(img.dataobj)
 
 
 # ── PRESTUS voxel conventions ────────────────────────────────────────────

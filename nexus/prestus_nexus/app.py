@@ -26,6 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     from .session import Session
     from .ui.main_window import MainWindow
 
+    try:   # Qt allows this only before the QApplication exists (Results ▸ Report uses it)
+        from PyQt6 import QtWebEngineWidgets  # noqa: F401
+    except ImportError:
+        pass
     app = QApplication(sys.argv[:1])
     app.setApplicationName("PRESTUS Nexus")
     from .bridge import shutdown_shared
