@@ -81,8 +81,9 @@ for i = 1:numel(fields)
 end
 
 % Discrete label/mask fields: nearest-neighbour to preserve integer values
-segmentation  = expand(segmentation,           'nearest');
-medium_masks  = expand(medium_masks,           'nearest');
+% (interp1 takes double/single only; the label class is restored afterwards)
+segmentation  = restore_class(expand(double(segmentation), 'nearest'), segmentation);
+medium_masks  = restore_class(expand(double(medium_masks), 'nearest'), medium_masks);
 source.p_mask = expand(double(source.p_mask),  'nearest');
 source_labels = expand(double(source_labels),  'nearest');
 
@@ -112,4 +113,13 @@ kgrid = kWaveGrid(parameters.grid.dims(1), parameters.grid.resolution_mm/1e3, ..
           parameters.grid.dims(2), parameters.grid.resolution_mm/1e3, ...
           parameters.grid.dims(3), parameters.grid.resolution_mm/1e3);
 
+end
+
+function out = restore_class(A, like)
+    % Return A in the class of LIKE (cast() does not take 'logical')
+    if islogical(like)
+        out = logical(A);
+    else
+        out = cast(A, class(like));
+    end
 end

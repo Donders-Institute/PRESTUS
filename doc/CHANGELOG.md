@@ -15,6 +15,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 #### Backend accuracy (ITRUSST intercomparison)
 
 - **k-Wave with `fit_alpha_power: 0`**: `medium_setup` passed a per-voxel `alpha_power` array, which k-Wave rejects (`medium.alpha_power must be scalar`). It now passes the single power law, and errors with a clear message when tissues have different powers
+- **Axisymmetric → 3D conversion**: `convert_axisymmetric_to_3d` failed on integer label maps (`interp1` takes double/single only), after the simulation had finished. Labels are now expanded as double and returned in their class
 
 #### Robustness, benchmarks and documentation (2026-10 audit, part 2)
 
