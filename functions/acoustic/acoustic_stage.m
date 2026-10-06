@@ -205,9 +205,6 @@ elseif use_jwave
     if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
         error('[pipeline] jwave backend does not support axisymmetric grids.');
     end
-    if isfield(parameters.grid, 'use_kWaveArray') && parameters.grid.use_kWaveArray
-        error('[pipeline] jwave backend requires direct source geometry (grid.use_kWaveArray: 0).');
-    end
     sensor_data = jwave_wrapper(parameters, kgrid, kwave_medium, source, source_labels, sensor);
     % Record the PML jwave actually used (its 'auto' differs from k-Wave's) so the
     % report states it, mirroring acoustic_wrapper for the k-Wave path.

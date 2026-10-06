@@ -162,17 +162,14 @@ classdef test_jwave < matlab.unittest.TestCase
         end
 
         % -------------------------------------------------------------- %
-        function test_kWaveArray_overridden_with_warning(tc)
-        % load_parameters should silently override use_kWaveArray=1 to 0 when
-        % the jwave backend is selected, emitting a warning rather than erroring.
+        function test_kWaveArray_kept_for_jwave(tc)
+        % jwave takes the kWaveArray (BLI) source: load_parameters keeps
+        % use_kWaveArray = 1 for the jwave backend.
             p = tc.make_jwave_params('helm_kwa', [48 48 80]);
             p.grid.use_kWaveArray = 1;
-            tc.verifyWarning( ...
-                @() load_parameters(p), ...
-                'prestus:jwaveKWaveArrayUnsupported');
-            p_fixed = load_parameters(p);
-            tc.verifyEqual(p_fixed.grid.use_kWaveArray, 0, ...
-                'use_kWaveArray should be overridden to 0 for jwave backend');
+            p_out = load_parameters(p);
+            tc.verifyEqual(p_out.grid.use_kWaveArray, 1, ...
+                'use_kWaveArray should be kept for the jwave backend');
         end
 
         % -------------------------------------------------------------- %

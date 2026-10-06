@@ -14,6 +14,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 #### Backend accuracy (ITRUSST intercomparison)
 
+- **jwave with kWaveArray sources**: `grid.use_kWaveArray: 1` is no longer overridden to 0 for jwave. The kWaveArray CW source is written in factored form (`CWSourceMatrix.factors`). With the stair-stepped `makeBowl` source jwave was ~9 % low in free water (ITRUSST BM1, 0.5 mm). Flat (piston) elements now also run with jwave
 - **k-Wave with `fit_alpha_power: 0`**: `medium_setup` passed a per-voxel `alpha_power` array, which k-Wave rejects (`medium.alpha_power must be scalar`). It now passes the single power law, and errors with a clear message when tissues have different powers
 - **Axisymmetric → 3D conversion**: `convert_axisymmetric_to_3d` failed on integer label maps (`interp1` takes double/single only), after the simulation had finished. Labels are now expanded as double and returned in their class
 - **BabelBrain label path**: an empty `babelbrain.ct_mapping` read from YAML as the string `""` counted as set (`isempty("")` is false), so label-based runs stopped with `ct_mapping is set but no pseudoCT was supplied`. `babelbrain_wrapper` now converts it to char

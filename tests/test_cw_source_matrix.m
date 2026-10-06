@@ -41,6 +41,14 @@ classdef test_cw_source_matrix < matlab.unittest.TestCase
             verify_close(tc, tc.Lazy([2 5], 3), tc.Dense([2 5], 3), 'AbsTol', 1e-5);
         end
 
+        function test_factors_reproduce_dense(tc)
+            % jwave_wrapper writes the source as coeffs * basis
+            [coeffs, basis] = factors(tc.Lazy);
+            tc.verifyEqual(size(coeffs), [size(tc.Dense, 1), 2]);
+            tc.verifyEqual(size(basis),  [2, size(tc.Dense, 2)]);
+            verify_close(tc, single(coeffs * basis), tc.Dense, 'AbsTol', 1e-5);
+        end
+
         function test_full_rows_match_dense(tc)
             verify_close(tc, tc.Lazy(3, :), tc.Dense(3, :), 'AbsTol', 1e-5);
             verify_close(tc, full(tc.Lazy), tc.Dense, 'AbsTol', 1e-5);

@@ -123,8 +123,14 @@ def read_input(h5_path):
         # MATLAB writes source.p as [N_unique x Nt] in column-major; h5py reads
         # it transposed as (Nt, N_unique). Transpose back to (N_unique, Nt).
         source_p            = f['/source/p'][()].T        # [N_unique x Nt]
-        # Expand deduplicated signals: sig_map[i] is the index into source_p for voxel i.
-        if '/source/sig_map' in f:
+        source_coeffs       = None
+        if '/source/coeffs' in f:
+            # Factored CW source (kWaveArray): voxel i emits coeffs[i] @ source_p,
+            # with source_p the [2 x Nt] basis [cos(wt); -sin(wt)]. Kept factored:
+            # N_src can reach ~1e5 BLI voxels, too many to store as signals.
+            source_coeffs = f['/source/coeffs'][()].T     # [N_src x 2]
+        elif '/source/sig_map' in f:
+            # Expand deduplicated signals: sig_map[i] is the index into source_p for voxel i.
             sig_map  = f['/source/sig_map'][()].flatten().astype(int)
             source_p = source_p[sig_map, :]               # [N_src x Nt]
         record_start_index  = int(np.asarray(f['/source/record_start_index'][()]).flat[0])
@@ -140,7 +146,7 @@ def read_input(h5_path):
 
     # Validate source dimensions immediately after read
     n_src_mask = len(mask_indices)
-    n_src_sig  = source_p.shape[0]
+    n_src_sig  = source_p.shape[0] if source_coeffs is None else source_coeffs.shape[0]
     if n_src_mask != n_src_sig:
         raise ValueError(
             f'Source shape mismatch: mask has {n_src_mask} active voxels '
@@ -155,7 +161,7 @@ def read_input(h5_path):
         N=N, dx=dx, Nt=Nt, dt=dt,
         sound_speed=sound_speed, density=density,
         alpha_coeff=alpha_coeff, alpha_power=alpha_power,
-        mask_indices=mask_indices, source_p=source_p,
+        mask_indices=mask_indices, source_p=source_p, source_coeffs=source_coeffs,
         record_start_index=record_start_index,
         pml_size=pml_size, freq_hz=freq_hz, dims=dims,
     )
@@ -366,6 +372,13 @@ def build_medium_and_domain(inp, use_fourier_series=False):
     return domain, medium
 
 
+def source_signals(inp):
+    """Per-voxel source signals [N_src x Nt]; expands a factored (kWaveArray) source."""
+    if inp.get('source_coeffs') is None:
+        return inp['source_p']
+    return inp['source_coeffs'] @ inp['source_p']
+
+
 def build_sources(inp, domain):
     """Reconstruct source mask and signals as jwave Sources."""
     from jwave.geometry import Sources
@@ -376,7 +389,7 @@ def build_sources(inp, domain):
     # MATLAB find() uses column-major (Fortran) linear indexing.
     multi_idx = np.unravel_index(flat_indices, N, order='F')
     positions = tuple(jnp.array(ax) for ax in multi_idx)
-    signals   = jnp.array(inp['source_p'], dtype=jnp.float32)  # [N_src x Nt]
+    signals   = jnp.array(source_signals(inp), dtype=jnp.float32)  # [N_src x Nt]
 
     return Sources(positions=positions, signals=signals, dt=inp['dt'], domain=domain)
 
@@ -949,7 +962,7 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     Nt = inp['Nt']
     dt = inp['dt']
     record_start = inp['record_start_index']
-    source_p = inp['source_p'][:, record_start:]
+    source_p = inp['source_p'][:, record_start:]      # [N_src or 2 (factored) x Nt_steady]
     Nt_steady = source_p.shape[1]
     if record_start > 0:
         print(f'[run_jwave_sim] Helmholtz: DFT source amplitude over steady-state window '
@@ -976,6 +989,9 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     # beam), but a real steering phase gradient gets its focusing correction
     # applied backwards, displacing the focus.
     fft_coeff = np.conj(np.fft.rfft(source_p, axis=-1)[:, freq_idx]) * (2 / Nt_steady)  # [N_src] complex
+    if inp.get('source_coeffs') is not None:
+        # Factored source: the DFT is linear and the coefficients are real
+        fft_coeff = inp['source_coeffs'] @ fft_coeff                                    # [N_src] complex
 
     N = tuple(inp['N'].tolist())
     source_field = np.zeros(N, dtype=complex)

@@ -250,6 +250,15 @@ classdef CWSourceMatrix
             M = gather(obj.Re_C) * obj.cs_ - gather(obj.Im_C) * obj.sn_;   % num_src x Nt
         end
 
+        % ----------------------------------------------------------------
+        % Factors: full(obj) == coeffs * basis (used by jwave_wrapper to
+        % hand the source to jwave without materialising it)
+        % ----------------------------------------------------------------
+        function [coeffs, basis] = factors(obj)
+            coeffs = double([gather(obj.Re_C), gather(obj.Im_C)]);   % num_src x 2
+            basis  = double([obj.cs_; -obj.sn_]);                     % 2 x Nt
+        end
+
     end
 
     methods (Access = private)

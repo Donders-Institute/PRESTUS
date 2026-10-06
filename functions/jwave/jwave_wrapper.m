@@ -10,8 +10,12 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 % ITRUSST intercomparison benchmarks. Attenuation is applied via db2neper with
 % fixed exponent y=2.0 inside jwave's wavevector operator.
 %
-% Only the direct-geometry source path (use_kWaveArray == 0) is supported.
-% Axisymmetric grids are not supported. Thermal simulation is not supported.
+% Both source paths are supported: direct geometry (use_kWaveArray == 0,
+% makeBowl/makeArc voxels) and kWaveArray (use_kWaveArray == 1, band-limited
+% off-grid source; recommended, as for k-Wave). A kWaveArray source arrives as
+% a CWSourceMatrix and is written in factored form (per-voxel complex amplitude
+% x [cos; -sin] basis). Axisymmetric grids are not supported. Thermal
+% simulation is not supported.
 %
 % Use as:
 %   sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_labels, sensor)
@@ -338,7 +342,14 @@ if ismember(solver, {'pseudo_spectral', 'finite_differences'})
         % pchip interpolation is accurate for smooth CW sinusoids.
         jw_t_old = kgrid.t_array;                              % [1 x Nt]
         jw_t_new = (0:jw_Nt_safe-1) * jw_dt_safe;             % [1 x Nt_safe]
-        source.p = interp1(jw_t_old', source.p', jw_t_new', 'pchip', 0)';
+        if isa(source.p, 'CWSourceMatrix')
+            % kWaveArray CW source: rebuild on the new time axis (exact)
+            jw_coeffs = factors(source.p);
+            source.p = CWSourceMatrix(jw_coeffs(:, 1), jw_coeffs(:, 2), jw_omega, jw_dt_safe, jw_Nt_safe);
+            clear jw_coeffs
+        else
+            source.p = interp1(jw_t_old', source.p', jw_t_new', 'pchip', 0)';
+        end
         % Preserve the same physical recording window at the end of the run.
         jw_t_rec_window = (kgrid.Nt - record_start_index + 1) * kgrid.dt;
         record_start_index = max(1, ...
@@ -564,22 +575,35 @@ src_indices = int32(find(source.p_mask(:))' - 1);  % 0-based for Python
 h5create(write_path, '/source/mask_indices', size(src_indices));
 h5write( write_path, '/source/mask_indices', src_indices);
 
-% Source signal: deduplicate rows to reduce HDF5 size.
-% Voxels belonging to the same transducer element share the same waveform,
-% so storing only unique signals can cut the matrix from [N_src x Nt] to
-% [N_elements x Nt] — typically a 100-1000x reduction.
-src_p_cast = cast_fn(source.p);
-[unique_sigs, ~, sig_map] = unique(src_p_cast, 'rows', 'stable');
-n_unique = size(unique_sigs, 1);
-if n_unique < size(source.p, 1)
-    fprintf('[jwave_wrapper] Source signals: %d voxels → %d unique waveforms (%.0f%% reduction in source data)\n', ...
-        size(source.p,1), n_unique, (1 - n_unique/size(source.p,1))*100);
+if isa(source.p, 'CWSourceMatrix')
+    % kWaveArray CW source: every voxel has its own BLI weight, so rows do not
+    % deduplicate. Write the rank-2 factors instead: voxel i emits
+    % coeffs(i,:) * basis with basis = [cos(wt); -sin(wt)] (2 x Nt).
+    [coeffs, basis] = factors(source.p);
+    h5create(write_path, '/source/p',      size(basis));
+    h5write( write_path, '/source/p',      cast_fn(basis));
+    h5create(write_path, '/source/coeffs', size(coeffs));
+    h5write( write_path, '/source/coeffs', cast_fn(coeffs));
+    fprintf('[jwave_wrapper] Source signals: %d voxels written as complex amplitudes (kWaveArray CW source)\n', ...
+        size(coeffs, 1));
+else
+    % Source signal: deduplicate rows to reduce HDF5 size.
+    % Voxels belonging to the same transducer element share the same waveform,
+    % so storing only unique signals can cut the matrix from [N_src x Nt] to
+    % [N_elements x Nt] — typically a 100-1000x reduction.
+    src_p_cast = cast_fn(source.p);
+    [unique_sigs, ~, sig_map] = unique(src_p_cast, 'rows', 'stable');
+    n_unique = size(unique_sigs, 1);
+    if n_unique < size(source.p, 1)
+        fprintf('[jwave_wrapper] Source signals: %d voxels → %d unique waveforms (%.0f%% reduction in source data)\n', ...
+            size(source.p,1), n_unique, (1 - n_unique/size(source.p,1))*100);
+    end
+    chunk_p = [min(256, n_unique), min(512, size(unique_sigs, 2))];
+    h5create(write_path, '/source/p',       size(unique_sigs), 'Deflate', 4, 'ChunkSize', chunk_p);
+    h5write( write_path, '/source/p',       unique_sigs);
+    h5create(write_path, '/source/sig_map', [1, numel(sig_map)]);
+    h5write( write_path, '/source/sig_map', int32(sig_map(:)' - 1));  % 0-based for Python
 end
-chunk_p = [min(256, n_unique), min(512, size(unique_sigs, 2))];
-h5create(write_path, '/source/p',       size(unique_sigs), 'Deflate', 4, 'ChunkSize', chunk_p);
-h5write( write_path, '/source/p',       unique_sigs);
-h5create(write_path, '/source/sig_map', [1, numel(sig_map)]);
-h5write( write_path, '/source/sig_map', int32(sig_map(:)' - 1));  % 0-based for Python
 
 % Record start index (1-based MATLAB → 0-based Python)
 h5create(write_path, '/source/record_start_index', [1 1]);

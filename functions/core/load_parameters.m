@@ -331,17 +331,6 @@ function parameters = load_parameters(varargin)
         end
     end
 
-    %% jwave compatibility: kWaveArray source is not supported
-    if isfield(parameters, 'acoustic_backend') && ...
-            strcmpi(parameters.acoustic_backend, 'jwave') && ...
-            isfield(parameters, 'grid') && isfield(parameters.grid, 'use_kWaveArray') && ...
-            parameters.grid.use_kWaveArray
-        warning('prestus:jwaveKWaveArrayUnsupported', ...
-            ['jwave backend does not support kWaveArray sources. ' ...
-             'Overriding grid.use_kWaveArray to 0.']);
-        parameters.grid.use_kWaveArray = 0;
-    end
-
     %% [DEBUG] Summary of requested parameters
     % With debugging off, the parameters are saved to the log at the
     % start of pipeline execution (see path_log_setup).

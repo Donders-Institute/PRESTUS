@@ -507,7 +507,10 @@ end
             %                        gpuArray slices for the GPU time loop.
             % NOT valid for cpp backends (source.p written to HDF5 → needs
             % a dense matrix), or when transducers have different frequencies.
-            use_cw_lazy = ismember(parameters.simulation.code_type, {'matlab_cpu', 'matlab_gpu'}) && ...
+            % jwave_wrapper writes a CWSourceMatrix in factored form (code_type
+            % does not apply to jwave), so jwave always takes the lazy path.
+            is_jwave    = isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave');
+            use_cw_lazy = (ismember(parameters.simulation.code_type, {'matlab_cpu', 'matlab_gpu'}) || is_jwave) && ...
                           numel(unique([tr_arr.freq_hz])) == 1;
 
             if use_cw_lazy

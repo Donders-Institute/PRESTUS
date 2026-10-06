@@ -28,7 +28,6 @@ See [Simulation backends](doc_backend.md) for the k-Wave-only backend options.
 ## Limitations
 
 - **Acoustic only** — jwave has no bio-heat solver. Thermal simulation (`run_heating_sims`) must still use k-Wave or BabelBrain.
-- **No `kWaveArray` sources** — jwave works only with `grid.use_kWaveArray = 0` (direct `makeBowl`/`makeArc` geometry).
 - **No axisymmetric grids** — jwave requires a full 3-D domain.
 - **GPU: NVIDIA CUDA only** — JAX does not officially support AMD ROCm or Apple Metal. CPU execution works on any platform.
 
@@ -201,6 +200,8 @@ Significantly faster than `pseudo_spectral` for CW simulations because the stead
 > problem — they peak-track with `max`/`min` rather than average). Restricting
 > to the steady-state window also removes most DFT scalloping loss "for free",
 > since that window is built from an integer number of samples per period.
+
+> **Sources.** Both source paths work: `grid.use_kWaveArray: 1` (band-limited off-grid source, as for k-Wave; recommended, and needed for flat elements) and `0` (`makeBowl`/`makeArc` voxels). The stair-stepped `makeBowl` bowl is ~9 % low in focal pressure in free water at 0.5 mm (ITRUSST BM1). The kWaveArray source reaches jwave as a `CWSourceMatrix` and is written to the HDF5 input in factored form (per-voxel complex amplitude × [cos; −sin] basis), since its BLI weights make every voxel's signal distinct.
 
 ### `pseudo_spectral`
 
