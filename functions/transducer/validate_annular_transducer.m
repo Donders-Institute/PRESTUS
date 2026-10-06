@@ -48,8 +48,15 @@ function tr = validate_annular_transducer(tr, t_i)
     % 3D steering unavailable for annular arrays → align with focus
     tr.align_to_focus = true;
 
+    % Flat elements (curv_radius_mm = Inf): no geometric focus, the face is the
+    % exit plane (see annular_bowl_depth_mm)
+    if isinf(annular_tr.curv_radius_mm)
+        if ~isfield(annular_tr, 'dist_geom_ep_mm') || isempty(annular_tr.dist_geom_ep_mm)
+            annular_tr.dist_geom_ep_mm = Inf;
+        end
+
     % Calculate distance to transducer plane if not provided
-    if ~isfield(annular_tr, 'dist_geom_ep_mm') || isempty(annular_tr.dist_geom_ep_mm)
+    elseif ~isfield(annular_tr, 'dist_geom_ep_mm') || isempty(annular_tr.dist_geom_ep_mm)
         assert(annular_tr.curv_radius_mm > max(annular_tr.elem_od_mm)/2, ...
             'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 

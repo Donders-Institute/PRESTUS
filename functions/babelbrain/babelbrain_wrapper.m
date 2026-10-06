@@ -138,6 +138,13 @@ arguments
     pseudoCT           {mustBeNumeric} = []
 end
 
+tr_chk = parameters.transducer(1);
+if isfield(tr_chk, 'annular') && isfield(tr_chk.annular, 'curv_radius_mm') && ...
+        any(isinf(tr_chk.annular.curv_radius_mm))
+    error('PRESTUS:babelbrain:flatSource', ...
+        'Flat annular sources (curv_radius_mm = Inf) are not mapped to a BabelBrain transducer.');
+end
+
 %% Resolve BabelBrain config with defaults
 bb = struct();
 if isfield(parameters, 'babelbrain')

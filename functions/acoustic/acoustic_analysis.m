@@ -174,8 +174,7 @@ end
     for it = 1:numel(parameters.transducer)
         tr_it        = parameters.transducer(it);
         trans_pos_it = tr_it.trans_pos;
-        bowl_depth_grid_it = round((tr_it.(tr_it.type).curv_radius_mm - ...
-            tr_it.(tr_it.type).dist_geom_ep_mm) / parameters.grid.resolution_mm);
+        bowl_depth_grid_it = round(annular_bowl_depth_mm(tr_it.(tr_it.type)) / parameters.grid.resolution_mm);
 
         % Assumption: the beam travels along the last grid dimension (z / axial),
         % and whether the transducer is on the "high-z" or "low-z" face is inferred
@@ -266,10 +265,8 @@ end
     % The exit plane sits a bowl depth (sagitta = curv_radius_mm - dist_geom_ep_mm,
     % also stored as focal_distance_offset) in front of the apex, along the beam
     % axis toward the focus.
-    if isfield(tr, tr.type) && isfield(tr.(tr.type), 'curv_radius_mm') && ...
-            isfield(tr.(tr.type), 'dist_geom_ep_mm')
-        bowl_depth_vox = (tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm) ...
-            / parameters.grid.resolution_mm;
+    if isfield(tr, tr.type)
+        bowl_depth_vox = annular_bowl_depth_mm(tr.(tr.type)) / parameters.grid.resolution_mm;
     else
         bowl_depth_vox = 0;   % non-bowl source: exit plane coincides with trans_pos
     end

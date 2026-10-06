@@ -24,6 +24,12 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 %       3. Element weights are computed on the full bilateral grid, then
 %          cropped to columns kgrid.Ny:end → [Nx x Ny] where column 1 = r=0.
 %
+%   Flat annular elements (curv_radius_mm = Inf, e.g. a plane piston): a line
+%     element (addLineElement) across the axis in axisymmetric and 2D mode, a
+%     disc (addDiscElement) in 3D; the face lies at trans_pos, normal to the
+%     trans_pos -> focus_pos direction. kWaveArray only (Branch 2); in 3D a
+%     single element without an inner diameter.
+%
 % Element diameters are converted from mm to odd-integer grid points before
 % geometry creation.
 %
@@ -100,6 +106,14 @@ end
     %% Branch 1: Custom element geometry (non-kWaveArray setup, multi-transducer)
 
     if parameters.grid.use_kWaveArray == 0
+
+        for it = 1:transducer_N
+            if strcmp(tr_arr(it).type, 'annular') && any(isinf(tr_arr(it).annular.curv_radius_mm))
+                error('PRESTUS:sourceCreate:flatNeedsKWaveArray', ...
+                    ['Transducer %d is flat (curv_radius_mm = Inf), which needs the kWaveArray source ' ...
+                     '(grid.use_kWaveArray = 1). makeBowl/makeArc only build curved elements.'], it);
+            end
+        end
 
         % --- per-transducer CW signals (per-element) ---
 
@@ -238,7 +252,10 @@ end
             % Add arc to main karray (not used below but keeps object consistent)
             pos_vec   = [kgrid.x_vec(trans_pos_1(1)), kgrid.y_vec(trans_pos_1(2))];
             focus_vec = [kgrid.x_vec(focus_pos_1(1)), kgrid.y_vec(focus_pos_1(2))];
-            karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, max(tr.annular.elem_od_mm) * 1e-3, focus_vec);   % full aperture (addArcElement takes one diameter)
+            is_flat   = isinf(tr.annular.curv_radius_mm);
+            if ~is_flat
+                karray.addArcElement(pos_vec, tr.annular.curv_radius_mm * 1e-3, max(tr.annular.elem_od_mm) * 1e-3, focus_vec);   % full aperture (addArcElement takes one diameter)
+            end
 
             cw_signal = createCWSignals(kgrid.t_array, tr.freq_hz, ...
                 tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
@@ -252,6 +269,17 @@ end
             for el_i = 1:tr.annular.elem_n
                 inner_r_m = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;
                 outer_r_m = tr.annular.elem_od_mm(el_i) / 2 * 1e-3;
+                if is_flat
+                    % Flat face at the transducer plane, normal to the axis: a disc is
+                    % the line r in [-R, R] of the mirrored grid, a ring r in [Ri, Ro]
+                    % (only r >= 0 is kept by the crop below)
+                    if inner_r_m == 0
+                        karray_full.addLineElement([x_trans_m, -outer_r_m], [x_trans_m, outer_r_m]);
+                    else
+                        karray_full.addLineElement([x_trans_m, inner_r_m], [x_trans_m, outer_r_m]);
+                    end
+                    continue
+                end
                 if inner_r_m == 0
                     element_pos   = [x_trans_m, 0+eps];
                     el_diameter_m = 2 * outer_r_m;
@@ -331,7 +359,34 @@ end
 
                 switch tr.type
                     case 'annular'
-                        if numel(parameters.grid.dims) == 3
+                        is_flat = isinf(tr.annular.curv_radius_mm);
+                        if is_flat && numel(parameters.grid.dims) == 3
+                            % Flat disc (plane piston), normal along trans_pos -> focus_pos
+                            if tr.annular.elem_n ~= 1 || tr.annular.elem_id_mm(1) ~= 0
+                                error('PRESTUS:sourceCreate:flatRings3D', ...
+                                    ['Transducer %d: a flat (curv_radius_mm = Inf) annular source in 3D must be a ' ...
+                                     'single disc (elem_n = 1, elem_id_mm = 0); kWaveArray has no flat ring element.'], it);
+                            end
+                            pos_vec   = [kgrid.x_vec(trans_pos_it(1)), kgrid.y_vec(trans_pos_it(2)), kgrid.z_vec(trans_pos_it(3))];
+                            focus_vec = [kgrid.x_vec(focus_pos_it(1)), kgrid.y_vec(focus_pos_it(2)), kgrid.z_vec(focus_pos_it(3))];
+                            karray.addDiscElement(pos_vec, tr.annular.elem_od_mm(1) * 1e-3, focus_vec);
+                        elseif is_flat
+                            % Flat element in 2D: a line through trans_pos normal to the beam
+                            pos_vec   = [kgrid.x_vec(trans_pos_it(1)), kgrid.y_vec(trans_pos_it(2))];
+                            focus_vec = [kgrid.x_vec(focus_pos_it(1)), kgrid.y_vec(focus_pos_it(2))];
+                            beam = (focus_vec - pos_vec) / norm(focus_vec - pos_vec);
+                            perp = [-beam(2), beam(1)];
+                            for el_i = 1:tr.annular.elem_n
+                                ri = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;
+                                ro = tr.annular.elem_od_mm(el_i) / 2 * 1e-3;
+                                if ri == 0
+                                    karray.addLineElement(pos_vec - ro * perp, pos_vec + ro * perp);
+                                else
+                                    error('PRESTUS:sourceCreate:flatRings2D', ...
+                                        'Transducer %d: flat rings are supported in axisymmetric mode only.', it);
+                                end
+                            end
+                        elseif numel(parameters.grid.dims) == 3
                             pos_vec   = [kgrid.x_vec(trans_pos_it(1)), kgrid.y_vec(trans_pos_it(2)), kgrid.z_vec(trans_pos_it(3))];
                             focus_vec = [kgrid.x_vec(focus_pos_it(1)), kgrid.y_vec(focus_pos_it(2)), kgrid.z_vec(focus_pos_it(3))];
                             karray.addAnnularArray(pos_vec, ...

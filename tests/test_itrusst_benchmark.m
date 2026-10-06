@@ -1,13 +1,14 @@
 classdef test_itrusst_benchmark < matlab.unittest.TestCase
-% TEST_ITRUSST_BENCHMARK  ITRUSST intercomparison benchmark 1 (water, bowl source).
+% TEST_ITRUSST_BENCHMARK  ITRUSST intercomparison benchmark 1 (water; bowl and piston sources).
 %
-% Runs benchmark PH1-BM1-SC1 of Aubry et al. (2022), "Benchmark problems for
+% Runs benchmarks PH1-BM1-SC1 and -SC2 of Aubry et al. (2022), "Benchmark problems for
 % transcranial ultrasound simulation: Intercomparison of compressional wave
 % models", JASA 152(2):1003, through PRESTUS_PIPELINE and compares the
 % pressure amplitude in the central plane with the published k-Wave reference
 % (60 points per wavelength, axisymmetric):
 %
-%   source  focused bowl, ROC 64 mm, aperture 64 mm, 500 kHz, 60 kPa
+%   source  SC1 focused bowl, ROC 64 mm, aperture 64 mm; SC2 plane piston, 20 mm
+%           (annular, curv_radius_mm = Inf); 500 kHz, 60 kPa
 %   medium  lossless water, c = 1500 m/s, rho = 1000 kg/m^3
 %   plane   70 mm (lateral) x 120 mm (axial) from the bowl apex, 0.5 mm grid
 %
@@ -20,8 +21,8 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
 % when it is not set.
 %
 % Tags:
-%   'itrusst_axisym'  PRESTUS on a 2D axisymmetric grid (minutes on CPU)
-%   'itrusst_3d'      PRESTUS on a 3D grid (GPU/HPC; PRESTUS_PHYSICS_CODE_TYPE)
+%   'itrusst_axisym'  PRESTUS on a 2D axisymmetric grid, SC1 and SC2 (minutes on CPU)
+%   'itrusst_3d'      PRESTUS on a 3D grid, SC1 (GPU/HPC; PRESTUS_PHYSICS_CODE_TYPE)
 %
 % Before the 2026-10 fix of the axisymmetric source mask, PRESTUS exceeded the
 % reference focal pressure by 6 % (0.5 mm) to 11 % (0.25 mm). Tolerances: see
@@ -33,6 +34,7 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
     properties (Constant)
         RocMm      = 64
         ApertureMm = 64
+        PistonMm   = 20
         FreqHz     = 500e3
         AmpPa      = 60e3
         ResMm      = 0.5
@@ -43,11 +45,15 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
         %   linf      max |p - p_ref| / max(p_ref);  l2  ||p - p_ref|| / ||p_ref||
         Tol = struct( ...
             'axisym', struct('peak_rel', 0.02, 'focus_mm', 0.5, 'linf', 0.04, 'l2', 0.03), ...
-            'threed', struct('peak_rel', 0.05, 'focus_mm', 1.0, 'linf', 0.10, 'l2', 0.06))
+            'threed', struct('peak_rel', 0.05, 'focus_mm', 1.0, 'linf', 0.10, 'l2', 0.06), ...
+            'piston_axisym', struct('peak_rel', 0.02, 'focus_mm', 0.5, 'linf', 0.03, 'l2', 0.01))
+        % piston_axisym: first passing run (2026-10-02, R2023b CPU: peak 0.0 %, shift 0 mm,
+        % Linf 1.6 %, L2 0.4 %) with margin; focus searched beyond a^2/(2 lambda)
     end
 
     properties
-        Reference   % [axial x lateral] p_amp [Pa]
+        Reference   % [axial x lateral] p_amp [Pa], SC1
+        ReferenceSC2
     end
 
     methods (TestClassSetup)
@@ -60,20 +66,18 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
 
             data = getenv('PRESTUS_ITRUSST_DATA');
             tc.assumeNotEmpty(data, 'PRESTUS_ITRUSST_DATA not set — skipping ITRUSST benchmark.');
-            ref_file = fullfile(data, 'KWAVE', 'PH1-BM1-SC1_KWAVE.mat');
-            tc.assumeTrue(isfile(ref_file), sprintf('Reference not found: %s', ref_file));
-            ref = load(ref_file, 'p_amp');
-            p = double(ref.p_amp);
-            if size(p, 1) < size(p, 2)
-                p = p.';                      % -> [axial, lateral]
-            end
-            tc.Reference = p;
+            tc.Reference    = load_reference_field(tc, data, 1);
+            tc.ReferenceSC2 = load_reference_field(tc, data, 2);
         end
     end
 
     methods (Test, TestTags = {'itrusst_axisym'})
         function test_bm1_axisym(tc)
             tc.verify_against_reference(tc.run_bm1('axisym'), tc.Tol.axisym);
+        end
+
+        function test_bm1_piston_axisym(tc)
+            tc.verify_against_reference(tc.run_bm1('axisym', 2), tc.Tol.piston_axisym, 2);
         end
     end
 
@@ -85,8 +89,19 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
 
     methods (Access = private)
 
-        function plane = run_bm1(tc, geometry)
+        function p = load_reference_field(tc, data, sc)
+            ref_file = fullfile(data, 'KWAVE', sprintf('PH1-BM1-SC%d_KWAVE.mat', sc));
+            tc.assumeTrue(isfile(ref_file), sprintf('Reference not found: %s', ref_file));
+            ref = load(ref_file, 'p_amp');
+            p = double(ref.p_amp);
+            if size(p, 1) < size(p, 2)
+                p = p.';                      % -> [axial, lateral]
+            end
+        end
+
+        function plane = run_bm1(tc, geometry, sc)
             % PRESTUS field in the reference plane, [axial x lateral]
+            if nargin < 3; sc = 1; end
             [n_ax, n_lat] = size(tc.Reference);
             half = (n_lat - 1) / 2;
 
@@ -110,6 +125,10 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
             p.transducer.annular.elem_p_amp      = tc.AmpPa;
             p.transducer.annular.elem_phase_deg  = 0;
             p.transducer.annular.elem_phase_rad  = 0;
+            if sc == 2
+                p.transducer.annular.elem_od_mm     = tc.PistonMm;
+                p.transducer.annular.curv_radius_mm = Inf;   % flat: plane piston
+            end
             % Lossless water as in the benchmark
             p.medium_properties.water.sound_speed = 1500;
             p.medium_properties.water.density     = 1000;
@@ -146,25 +165,42 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
             plane = sub.';
         end
 
-        function verify_against_reference(tc, plane, tol)
-            ref = tc.Reference;
+        function verify_against_reference(tc, plane, tol, sc)
+            if nargin < 4; sc = 1; end
+            if sc == 1
+                ref = tc.Reference;
+                % Exclude the region behind the exit plane (inside the bowl)
+                ep_depth_mm = tc.RocMm - sqrt(tc.RocMm^2 - (tc.ApertureMm / 2)^2);
+                ep = ceil(ep_depth_mm / tc.ResMm) + 1;
+            else
+                ref = tc.ReferenceSC2;
+                ep  = 2;                          % piston face: skip the source plane (as the intercomparison)
+            end
             tc.assertSize(plane, size(ref));
-            % Exclude the region behind the exit plane (inside the bowl)
-            ep_depth_mm = tc.RocMm - sqrt(tc.RocMm^2 - (tc.ApertureMm / 2)^2);
-            ep = ceil(ep_depth_mm / tc.ResMm) + 1;
             ref_f = ref(ep:end, :);
             sim_f = plane(ep:end, :);
-
-            [ref_max, i_ref] = max(ref_f(:));
-            [sim_max, i_sim] = max(sim_f(:));
-            [ra, rl] = ind2sub(size(ref_f), i_ref);
-            [sa, sl] = ind2sub(size(sim_f), i_sim);
-            shift_mm = hypot(sa - ra, sl - rl) * tc.ResMm;
-            linf = max(abs(sim_f(:) - ref_f(:))) / ref_max;
+            linf = max(abs(sim_f(:) - ref_f(:))) / max(ref_f(:));
             l2   = norm(sim_f(:) - ref_f(:)) / norm(ref_f(:));
 
-            fprintf(['ITRUSST BM1: focal p %.3f MPa (ref %.3f), focus shift %.2f mm, ' ...
-                     'Linf %.1f %%, L2 %.1f %%\n'], sim_max / 1e6, ref_max / 1e6, shift_mm, ...
+            % Focus: the global maximum. For the piston every on-axis near-field
+            % maximum has the same amplitude (2 p0), so its peak position is
+            % ill-defined; search beyond half the near-field distance a^2/(2 lambda),
+            % which leaves only the last axial maximum (~ a^2/lambda).
+            fp = ep;
+            if sc == 2
+                lambda_mm = 1500 / tc.FreqHz * 1e3;
+                fp = ceil((tc.PistonMm / 2)^2 / (2 * lambda_mm) / tc.ResMm) + 1;
+            end
+            ref_p = ref(fp:end, :);
+            sim_p = plane(fp:end, :);
+            [ref_max, i_ref] = max(ref_p(:));
+            [sim_max, i_sim] = max(sim_p(:));
+            [ra, rl] = ind2sub(size(ref_p), i_ref);
+            [sa, sl] = ind2sub(size(sim_p), i_sim);
+            shift_mm = hypot(sa - ra, sl - rl) * tc.ResMm;
+
+            fprintf(['ITRUSST BM1-SC%d: focal p %.3f MPa (ref %.3f), focus shift %.2f mm, ' ...
+                     'Linf %.1f %%, L2 %.1f %%\n'], sc, sim_max / 1e6, ref_max / 1e6, shift_mm, ...
                      100 * linf, 100 * l2);
             tc.verifyEqual(sim_max, ref_max, 'RelTol', tol.peak_rel, 'Focal pressure');
             tc.verifyLessThanOrEqual(shift_mm, tol.focus_mm, 'Focal position shift [mm]');

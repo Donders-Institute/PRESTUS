@@ -225,9 +225,8 @@ function [oneil_profile, kwave_profile] = free_water_references(parameters, z_mm
         if isfield(tr, 'type') && ~isempty(tr.type); tr_type = char(tr.type); end
     end
     bowl_depth_mm = 0;
-    if ~isempty(tr_type) && isfield(tr, tr_type) && isfield(tr.(tr_type), 'curv_radius_mm') && ...
-            isfield(tr.(tr_type), 'dist_geom_ep_mm')
-        bowl_depth_mm = tr.(tr_type).curv_radius_mm - tr.(tr_type).dist_geom_ep_mm;
+    if ~isempty(tr_type) && isfield(tr, tr_type)
+        bowl_depth_mm = annular_bowl_depth_mm(tr.(tr_type));
     end
     d_bowl_mm = z_mm + bowl_depth_mm;
 
@@ -247,9 +246,23 @@ function [oneil_profile, kwave_profile] = free_water_references(parameters, z_mm
             vel = an.elem_p_amp(:)' / (rho * c);
             if isscalar(vel); vel = repmat(vel, 1, an.elem_n); end
             in_front = d_bowl_mm > 0;
-            p_ref = focusedAnnulusONeil(an.curv_radius_mm / 1e3, ...
-                [an.elem_id_mm(:)'; an.elem_od_mm(:)'] / 1e3, vel, phase_rad, ...
-                tr.freq_hz, c, rho, d_bowl_mm(in_front)' * 1e-3);
+            if isinf(an.curv_radius_mm)
+                % Flat element(s): on-axis plane-piston solution per ring,
+                % p = rho c v (exp(-ik z) - exp(-ik sqrt(z^2 + a^2))), summed coherently
+                k  = 2 * pi * tr.freq_hz / c;
+                zz = d_bowl_mm(in_front)' * 1e-3;
+                pc = zeros(size(zz));
+                for el = 1:an.elem_n
+                    ri = an.elem_id_mm(el) / 2e3; ro = an.elem_od_mm(el) / 2e3;
+                    pc = pc + rho * c * vel(el) * exp(1i * phase_rad(el)) .* ...
+                        (exp(-1i * k * sqrt(zz.^2 + ri^2)) - exp(-1i * k * sqrt(zz.^2 + ro^2)));
+                end
+                p_ref = abs(pc);
+            else
+                p_ref = focusedAnnulusONeil(an.curv_radius_mm / 1e3, ...
+                    [an.elem_id_mm(:)'; an.elem_od_mm(:)'] / 1e3, vel, phase_rad, ...
+                    tr.freq_hz, c, rho, d_bowl_mm(in_front)' * 1e-3);
+            end
             oneil_profile = NaN(size(z_mm));
             oneil_profile(in_front) = options.IsppaScale * p_ref(:).^2 / (2 * c * rho) * 1e-4;
         catch ME

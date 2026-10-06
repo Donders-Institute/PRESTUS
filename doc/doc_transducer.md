@@ -75,6 +75,18 @@ Element geometry is defined by inner/outer diameters (`elem_id_mm`, `elem_od_mm`
 **When to use:**  
 Use annular arrays when your hardware is a single-focus or multi-ring bowl transducer  with pre-calibrated per-element amplitudes and phases. This is the simpler and better-validated configuration.
 
+#### Flat elements
+
+`curv_radius_mm: .inf` makes the elements flat, e.g. a plane piston (the ITRUSST benchmark's 20 mm source). The face lies at `trans_pos`, normal to the `trans_pos` → `focus_pos` direction, and is also the exit plane (bowl depth 0); `focus_pos` only sets the beam direction. Supported with the kWaveArray source (`grid.use_kWaveArray: 1`):
+
+| Grid | Element | Rings (`elem_id_mm` > 0) |
+|---|---|---|
+| 2D axisymmetric | line across the axis (`addLineElement`) | yes |
+| 2D | line normal to the beam | no |
+| 3D | disc (`addDiscElement`) | no (single disc) |
+
+Not supported: the makeBowl source (`use_kWaveArray: 0`), BabelBrain, transducer calibration and the placement planners, which assume a bowl.
+
 ---
 
 ### Matrix array

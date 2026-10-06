@@ -220,8 +220,8 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `elem_n` | Number of transducer elements. | |
 | `elem_id_mm` | Inner diameter of each element [mm]. | |
 | `elem_od_mm` | Outer diameter of each element [mm]. | |
-| `curv_radius_mm` | Radius of curvature of the transducer bowl [mm]. | |
-| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` if not provided. |
+| `curv_radius_mm` | Radius of curvature of the transducer bowl [mm]. | `Inf` (YAML `.inf`) = flat element, e.g. a plane piston: its face at `trans_pos` is the exit plane; needs `grid.use_kWaveArray: 1`, in 3D a single disc. See [Flat elements](doc_transducer.md#flat-elements). |
+| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` if not provided (`Inf` for flat elements). |
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 
 #### Matrix Array Definition (`matrix`)

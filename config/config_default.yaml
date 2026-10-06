@@ -219,7 +219,7 @@ transducer:
     elem_od_mm: []        # Outer diameter of each element [mm]
     elem_p_amp: []          # Pressure amplitude [Pa]
     elem_phase_deg: []    # Source phase of each element [deg] (0-360)
-    curv_radius_mm: []    # Radius of curvature of the bowl [mm]
+    curv_radius_mm: []    # Radius of curvature of the bowl [mm]; .inf = flat element (plane piston; kWaveArray source only)
     dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
     depth_mm: []          # Depth of transducer used for visualization purposes [mm]
 

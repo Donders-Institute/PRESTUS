@@ -67,19 +67,21 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 | A target ISPPA on an uncalibrated transducer is met in water | 2 % |
 | With `run_water_baseline: 0`, an unmet target stops the run | error `prestus:isppa:noBaseline` |
 
-**`test_itrusst_benchmark`** — benchmark PH1-BM1-SC1 of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 points per wavelength). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
+**`test_itrusst_benchmark`** — benchmarks PH1-BM1-SC1 (focused bowl) and PH1-BM1-SC2 (20 mm plane piston, a [flat annular element](doc_transducer.md#flat-elements)) of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 points per wavelength). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
 
-| Metric | Tolerance (2D) | Result 2026-10-02 |
-|---|---|---|
-| Focal pressure | 2 % | +0.2 % |
-| Focal position shift | 0.5 mm | 0.0 mm |
-| L∞ (max abs. difference / reference max) | 4 % | 2.1 % |
-| L2 (relative norm) | 3 % | 1.5 % |
+| Metric | Bowl: tolerance (2D) | Bowl: result 2026-10-02 | Piston: tolerance (2D) | Piston: result 2026-10-02 |
+|---|---|---|---|---|
+| Focal pressure | 2 % | +0.2 % | 2 % | 0.0 % |
+| Focal position shift | 0.5 mm | 0.0 mm | 0.5 mm | 0.0 mm |
+| L∞ (max abs. difference / reference max) | 4 % | 2.1 % | 3 % | 1.6 % |
+| L2 (relative norm) | 3 % | 1.5 % | 1 % | 0.4 % |
+
+For the piston, every on-axis near-field maximum has the same amplitude (2 p₀), so the focal pressure and position are taken beyond half the near-field distance (a²/2λ), which leaves only the last axial maximum.
 
 ```matlab
 run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric), ~5 min CPU
 setenv('PRESTUS_ITRUSST_DATA', '/path/to/INTERCOMPARISON-PH1-DATA-V1.0')
-run_all_tests('itrusst')       % 2D and 3D BM1
+run_all_tests('itrusst')       % 2D BM1 bowl + piston, 3D BM1 bowl
 run_all_tests('physics_3d')    % 3D O'Neil check
 ```
 
