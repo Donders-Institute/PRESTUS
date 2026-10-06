@@ -6,13 +6,21 @@ Status: *experimental*. In place: config builder, transducer library panel, plac
 
 ## Running
 
-Requires Python ≥ 3.10, PyQt6 and PyYAML. The placement viewer also needs numpy, nibabel and matplotlib. `conda env create -f environment.yml` creates a `prestus-nexus` env with all of them.
+Install (Python ≥ 3.10; all packages are listed in `pyproject.toml`):
 
 ```bash
 cd PRESTUS/nexus
-python -m prestus_nexus                    # untitled study; File > New study… / Open…
-python -m prestus_nexus path/to/config_x.yaml
-# or: pip install -e ".[viewer]"   then   prestus-nexus
+conda env create -f environment.yml        # creates the env 'prestus-nexus' with everything
+conda activate prestus-nexus
+# without conda, in any Python ≥ 3.10 environment:  pip install -e .
+```
+
+Run:
+
+```bash
+prestus-nexus                              # untitled study; File > New study… / Open…
+prestus-nexus path/to/config_x.yaml
+python -m prestus_nexus [config_x.yaml]    # the same, from this folder
 ```
 
 From MATLAB: `prestus_nexus` or `prestus_nexus('config_x.yaml', Python='/path/to/python')`.
@@ -108,7 +116,7 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - One persistent MATLAB session (`nexus_bridge`, `matlab -batch`) serves interactive steps through JSON request/response files; it ends after 30 min idle or with the app.
    - *Transducer ▸ Calibration*: `calibration_gui`'s predict / evaluate / fit / save for the config's transducers, saving to `transducer.library_path`, predicting at the study's focal depths; k-Wave drive check as a Run-tab script. Computed by `nexus_calibration` → `calibration_fit` etc., the same functions `calibration_gui` uses.
    - *Placement ▸ Localite*: `neuronav_gui`'s detect / name / write with the study config's settings, *Use in this study*, batch ingestion (label map → `neuronav.target_labels`, `ingest_<study>.m` on the Run tab), MNI view. Computed by `nexus_neuronav`.
-5. **Retirement.** `launch_web_alignment` and `functions/gui_py` have been removed. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` with a `viewer` extra, and `environment.yml`.
+5. **Retirement.** `launch_web_alignment` and `functions/gui_py` have been removed. The MATLAB entry point is `functions/gui/prestus_nexus.m`. Packaging: `pyproject.toml` (all dependencies) and `environment.yml` (installs it with pip).
 
 ## Voxel convention note
 

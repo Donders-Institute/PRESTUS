@@ -8,11 +8,16 @@ version = "0.1.0"
 description = "Build and check PRESTUS simulation configs before running them in MATLAB"
 license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.10"
-dependencies = ["PyQt6>=6.4", "PyYAML>=6.0"]
+# Everything the Nexus uses: viewers (numpy, nibabel, matplotlib), Results ▸ Heating
+# (scipy) and Results ▸ Report (PyQt6-WebEngine).
+dependencies = [
+    "PyQt6>=6.4", "PyQt6-WebEngine>=6.4", "PyYAML>=6.0",
+    "numpy>=1.24", "nibabel>=5.0", "matplotlib>=3.7", "scipy>=1.10",
+]
 
 [project.optional-dependencies]
-viewer = ["numpy>=1.24", "nibabel>=5.0", "matplotlib>=3.7"]
-test = ["pytest>=7", "numpy>=1.24", "nibabel>=5.0", "matplotlib>=3.7"]
+viewer = []      # now part of the main dependencies; kept so ".[viewer]" still works
+test = ["pytest>=7"]
 
 [project.scripts]
 prestus-nexus = "prestus_nexus.app:main"

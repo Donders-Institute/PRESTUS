@@ -1,7 +1,7 @@
 # PyInstaller spec for a standalone PRESTUS Nexus app.
 #
 #   cd nexus
-#   pip install -e ".[viewer]" pyinstaller
+#   pip install -e . pyinstaller
 #   pyinstaller packaging/prestus_nexus.spec      # -> dist/PRESTUS Nexus(.app)
 #
 # The app does not bundle PRESTUS itself: on first start it asks for the PRESTUS

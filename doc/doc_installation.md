@@ -68,7 +68,7 @@ PRESTUS itself is MATLAB, but several optional parts run in their own Python (or
 | BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([doc_babelbrain.md](doc_babelbrain.md)) | `babelbrain.python_env` |
 | jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([doc_jwave.md](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
 | `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([doc_placement.md](doc_placement.md)) | `placement.tus_entry.env_path` |
-| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `conda env create -f nexus/environment.yml` ([doc_nexus.md](doc_nexus.md)) | `prestus_nexus(Python='<env>/bin/python')`; default `python3` |
+| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `conda env create -f nexus/environment.yml` ([doc_nexus.md](doc_nexus.md#installation)) | `prestus_nexus(Python='<env>/bin/python')`; default `python3` |
 
 The Nexus runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
 

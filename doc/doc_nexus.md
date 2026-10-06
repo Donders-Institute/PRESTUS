@@ -2,6 +2,19 @@
 
 The PRESTUS Nexus is a standalone desktop app (Python/Qt) for putting a study config together before you run it. It writes an ordinary override YAML for `load_parameters`, containing only the values that differ from `config_default.yaml`. MATLAB still does all loading, validation and simulation. The Nexus is *experimental*; the MATLAB GUI ([doc_gui.md](doc_gui.md)) remains available.
 
+## Installation
+
+One command creates a conda environment `prestus-nexus` with everything the Nexus uses (Python 3.11, PyQt6 with WebEngine, PyYAML, numpy, nibabel, matplotlib, scipy):
+
+```bash
+cd PRESTUS/nexus
+conda env create -f environment.yml
+```
+
+Then start it from MATLAB with `prestus_nexus(Python='<conda>/envs/prestus-nexus/bin/python')` (MATLAB's default `python3` usually lacks PyQt6), or from a terminal with `conda activate prestus-nexus` and `prestus-nexus`. Without conda, `pip install -e .` in `PRESTUS/nexus` installs the same packages into any Python ≥ 3.10 environment; the list lives in `nexus/pyproject.toml`. After a PRESTUS update that changes the dependencies: `conda env update -n prestus-nexus -f environment.yml`.
+
+Install Qt from pip only (as `environment.yml` does). conda's `pyqt` together with pip's `PyQt6-WebEngine` fails to load (`Library not loaded: …QtPrintSupport`). In an older environment built with conda's `pyqt`, run `conda remove pyqt` and then `pip install -e .`. Reading `-v7.3` HEAT files on the *Heating* sub-tab also needs `h5py` (not installed by default; PRESTUS saves `-v7` unless MATLAB's preference says otherwise).
+
 ## Starting
 
 From MATLAB:
@@ -18,8 +31,6 @@ From a terminal:
 cd PRESTUS/nexus
 python -m prestus_nexus [config_study.yaml]
 ```
-
-Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also needs numpy, nibabel and matplotlib. `nexus/environment.yml` creates a suitable conda environment.
 
 ## Workflow
 
@@ -177,7 +188,7 @@ When the study folder holds a copy of `config_default.yaml` (from *File ▸ New 
 
 ## Standalone app
 
-`nexus/packaging/prestus_nexus.spec` builds a standalone app with PyInstaller (`pip install -e ".[viewer]" pyinstaller`, then `pyinstaller packaging/prestus_nexus.spec` in `nexus/`). The app does not contain PRESTUS: on first start it asks for the PRESTUS folder (or use `--prestus-root` / `PRESTUS_ROOT`) and remembers it.
+`nexus/packaging/prestus_nexus.spec` builds a standalone app with PyInstaller (`pip install -e . pyinstaller`, then `pyinstaller packaging/prestus_nexus.spec` in `nexus/`). The app does not contain PRESTUS: on first start it asks for the PRESTUS folder (or use `--prestus-root` / `PRESTUS_ROOT`) and remembers it.
 
 ## Compatibility with MATLAB's YAML loader
 
