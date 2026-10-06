@@ -65,7 +65,7 @@ elseif run_baseline
         water_baseline(parameters, kgrid, source, sensor, source_labels);
     if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
         sim_source = 'jwave_water_sim';
-    else
+    else   % kwave and kwave_elastic (pstdElastic, cS = 0 in water)
         sim_source = 'kwave_simulation';
     end
     acoustic_provenance.freefield_source = sim_source;

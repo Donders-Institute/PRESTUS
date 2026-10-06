@@ -51,6 +51,7 @@ sections:
   thermal:            {label: Thermal}
   jwave:              {label: jwave backend}
   babelbrain:         {label: BabelBrain backend}
+  elastic:            {label: Elastic skull model}
   medium_properties:  {label: Medium properties, advanced: true}
 
 fields:
@@ -240,6 +241,12 @@ fields:
   jwave.use_gpu: {kind: tristate}
   jwave.precision: {choices: [single, double]}
   babelbrain: {visible_if: {key: acoustic_backend, in: [babelbrain]}}
+  elastic: {visible_if: {key: acoustic_backend, in: [kwave_elastic]}}
+  elastic.shear_mapping: {choices: [pichardo, 'off']}
+  elastic.shear_density_min: {unit: kg/m³}
+  elastic.alpha_coeff_shear: {unit: dB/(cm·MHz^y)}
+  elastic.alpha_coeff_long: {unit: dB/(cm·MHz^y)}
+  elastic.long_attenuation: {choices: [elastic, medium]}
   babelbrain.computing_backend: {choices: [auto, cuda, opencl, metal, cpu]}
   babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
   babelbrain.z_beyond_focus_mm: {unit: mm}
@@ -295,8 +302,8 @@ extra:
   acoustic_backend:
     kind: str
     default: kwave
-    choices: [kwave, babelbrain, jwave]
-    help: "Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'"
+    choices: [kwave, kwave_elastic, babelbrain, jwave]
+    help: "Acoustic solver: 'kwave' (default) | 'kwave_elastic' (shear waves in skull) | 'babelbrain' | 'jwave'"
   thermal_backend:
     kind: str
     default: kwave
@@ -425,7 +432,7 @@ tabs:
   - key: simulation
     label: Simulation
     intro: Medium and solver, the simulation grid, the sonication protocol and the thermal model.
-    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain]
+    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain, elastic]
   - key: study
     label: Study
     intro: Many subjects with per-run settings, targeting accuracy and the group report.
@@ -687,6 +694,7 @@ display:
   medium_properties: {label: Tissue acoustic & thermal properties}
   jwave: {label: jwave solver}
   babelbrain: {label: BabelBrain solver}
+  elastic: {label: Elastic (shear-wave) skull model}
 
   # Timing
   timing: {label: Sonication protocol}

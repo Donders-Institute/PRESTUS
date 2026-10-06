@@ -103,8 +103,13 @@ end
 
     c  = kwave_medium.sound_speed;
     rh = kwave_medium.density;
+    is_elastic = isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic');
     fprintf('[acoustic_wrapper] ---- k-Wave simulation summary ----\n');
-    fprintf('[acoustic_wrapper]   backend   : %s\n', code_type);
+    if is_elastic
+        fprintf('[acoustic_wrapper]   backend   : %s  (elastic: pstdElastic, shear waves in skull)\n', code_type);
+    else
+        fprintf('[acoustic_wrapper]   backend   : %s\n', code_type);
+    end
     fprintf('[acoustic_wrapper]   precision : %s\n', precision);
     fprintf('[acoustic_wrapper]   grid      : [%s] = %dk voxels\n', num2str(grid_dims), round(n_voxels/1e3));
     fprintf('[acoustic_wrapper]   grid res  : %.2f mm\n', parameters.grid.resolution_mm);
@@ -134,6 +139,11 @@ end
         comp_dims_est = grid_dims(:)' + 2 * pml_per_ax;
         comp_voxels   = prod(comp_dims_est);
         n_kwave_arrays = 40;
+        if is_elastic
+            % 9 split stress + 9 split velocity fields, Lamé/viscosity maps,
+            % staggered-grid copies and PML operators (rough upper bound)
+            n_kwave_arrays = 70;
+        end
         gpu_mem_gb  = n_kwave_arrays * comp_voxels * bytes_per_elem / 1e9;
         fprintf('[acoustic_wrapper]   est. comp grid : [%s] voxels (before FFT rounding)\n', num2str(comp_dims_est));
         fprintf('[acoustic_wrapper]   est. GPU mem   : ~%.1f GB  (%d arrays × %.0fM vox × %d B)\n', ...
@@ -183,7 +193,22 @@ end
     end
 
     % perform the acoustic simulation
-    sensor_data = acoustic_simulation(kgrid, kwave_medium, source, sensor, kwave_input_args, parameters);
+    % kwave_elastic: add shear speed/absorption in the skull. The elastic medium
+    % is a separate struct so the returned kwave_medium stays the fluid medium
+    % consumed by thermal simulation and reporting.
+    use_elastic = isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic');
+    if use_elastic
+        if contains(parameters.simulation.medium, {'layered'})
+            sim_medium = medium_elastic_properties(parameters, kwave_medium, medium_masks);
+        else
+            sim_medium = medium_elastic_properties(parameters, kwave_medium, []);
+        end
+        save_elastic_debug_maps(parameters, sim_medium);
+    else
+        sim_medium = kwave_medium;
+    end
+    sensor_data = acoustic_simulation(kgrid, sim_medium, source, sensor, kwave_input_args, parameters);
+    clear sim_medium
 
     % Extract complex pressure amplitude from the recorded steady-state time series.
     % p_complex = amp * exp(1i * phase) preserves interference information for
@@ -317,3 +342,21 @@ end
         cache_acoustic('save', filename_sensor_data, parameters, sensor_data, ...
                        kgrid, acoustic_provenance, acoustic_info, kwave_medium);
     end
+end
+
+function save_elastic_debug_maps(parameters, elastic_medium)
+% [DEBUG] Save the simulation-grid shear speed / shear absorption maps.
+    if parameters.simulation.debug ~= 1 || ~isfield(parameters.io, 'dir_debug_medium')
+        return
+    end
+    try
+        niftiwrite(single(elastic_medium.sound_speed_shear), ...
+            fullfile(parameters.io.dir_debug_medium, ['matrix_sound_speed_shear' char(parameters.io.output_affix)]), ...
+            'Compressed', true);
+        niftiwrite(single(elastic_medium.alpha_coeff_shear), ...
+            fullfile(parameters.io.dir_debug_medium, ['matrix_alpha_coeff_shear' char(parameters.io.output_affix)]), ...
+            'Compressed', true);
+    catch ME
+        warn('acoustic_wrapper:elasticDebugNifti', 'Could not save elastic debug maps: %s', ME.message);
+    end
+end

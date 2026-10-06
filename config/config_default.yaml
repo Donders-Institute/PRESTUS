@@ -12,7 +12,7 @@
 
 subject_id: 0    # Participant ID (integer, used for path substitution in path.t1_pattern and path.t2_pattern)
 platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matlab (recommended for debugging)
-# acoustic_backend: 'kwave'   # Acoustic solver: 'kwave' (default) | 'babelbrain' | 'jwave'
+# acoustic_backend: 'kwave'   # Acoustic solver: 'kwave' (default) | 'kwave_elastic' (shear waves in skull) | 'babelbrain' | 'jwave'
 # thermal_backend:  'kwave'   # Thermal solver: 'kwave' (default) | 'babelbrain' (requires acoustic_backend: 'babelbrain')
 
 #------------ Simulation type & execution
@@ -563,6 +563,20 @@ jwave:
   helmholtz_operator: conservative  # Helmholtz density term: 'conservative' (rho*div((1/rho) grad p), local-c source scaling) | 'jwave' (jwave's built-in term; ~20 % low through skull)
   precision: single         # Computational precision: 'single' | 'double'
   dry_run: false            # Write the HDF5 solver inputs only; the pipeline stops after the acoustic stage and caches nothing
+
+#------------ Elastic (shear-wave) skull model (used when acoustic_backend = 'kwave_elastic'; see doc_backend.md)
+# Applied to the skull layers (skull, skull_cortical, skull_trabecular). Attenuations are power laws
+# a*f^y [dB/(cm MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact.
+elastic:
+  shear_mapping: 'pichardo'   # Skull shear speed: 'pichardo' (cS = a(f)*rho + b(f); Pichardo et al. 2017 fits at 270 / 836 kHz, interpolated to the transducer frequency; uses layer densities without pCT) | 'off' (cS = 0: fluid skull through the elastic solver)
+  shear_density_min: 1200     # No shear support at or below this density [kg/m3]
+  poisson_min: 0.1            # Cap cS so the Poisson ratio stays >= this value (bone: ~0.2-0.35)
+  alpha_coeff_shear: 43.63    # Shear attenuation [dB/(cm MHz^y)]; power law through Pichardo et al. 2017 (57 Np/m @ 270 kHz, 373 Np/m @ 836 kHz)
+  alpha_power_shear: 1.662    # Shear attenuation power law exponent
+  alpha_coeff_long: 27.31     # Skull longitudinal attenuation for elastic runs [dB/(cm MHz^y)]; power law through the values Pichardo et al. 2017 paired with their shear fit (33 Np/m @ 270 kHz, 231 Np/m @ 836 kHz)
+  alpha_power_long: 1.722     # Longitudinal attenuation power law exponent
+  long_attenuation: 'elastic' # Skull longitudinal attenuation: 'elastic' (alpha_coeff_long) | 'medium' (keep the fluid/pCT skull alpha_coeff, which already includes effective shear losses)
+  min_ppw_shear: 6            # Warn when the slowest shear wave has fewer points per wavelength
 
 #------------ BabelBrain solver settings (used when acoustic_backend / thermal_backend = 'babelbrain'; see doc_babelbrain.md)
 babelbrain:

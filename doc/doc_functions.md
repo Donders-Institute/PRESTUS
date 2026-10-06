@@ -11,6 +11,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_fov_crop`                     | Resolve FOV settings and crop the acoustic grid if active. |
 | `acoustic_grid_fov`                     | Crop the acoustic simulation domain to a beam-axis FOV box. |
 | `acoustic_simulation`                   | Set up acoustic simulation |
+| `acoustic_simulation_elastic`           | Run a k-Wave elastic (shear-wave) simulation via pstdElastic2D/3D |
 | `acoustic_stage`                        | Run or load the acoustic pressure simulation (Stage 6). |
 | `acoustic_water_baseline`               | Decide and run the free-water baseline simulation. |
 | `acoustic_wrapper`                      | Set up acoustic simulation |
@@ -276,6 +277,7 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `fitPowerLawParamsMulti`                | Fit power law absorption parameters for highly absorbing media. |
 | `get_alpha_coeff`                       | Computes the amplitude attenuation coefficient for a given medium and frequency. |
+| `medium_elastic_properties`             | Build the k-Wave elastic medium (compressional + shear) from a fluid medium |
 | `medium_pct_attenuation`                | Skull: pCT-informed attenuation mapping |
 | `medium_pct_density`                    | Skull: pCT-informed density mapping |
 | `medium_pct_pichardo_load`              | Load and cache Pichardo 2D interpolant from BabelBrain |

@@ -3,7 +3,9 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 %
 % Selects and calls the appropriate k-Wave solver function based on
 % parameters.simulation.code_type ('matlab_cpu', 'matlab_gpu', 'cpp_cpu',
-% 'cpp_gpu') and grid dimensionality (2D, 2D axisymmetric, or 3D). Strips
+% 'cpp_gpu') and grid dimensionality (2D, 2D axisymmetric, or 3D). With
+% acoustic_backend 'kwave_elastic', hands off to ACOUSTIC_SIMULATION_ELASTIC
+% (pstdElastic2D/3D, shear waves in the skull). Strips
 % thermal-only medium fields before passing to k-Wave, sets DataCast/precision
 % for GPU/C++ paths, and configures HDF5 file I/O for C++ backends.
 %
@@ -24,7 +26,8 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 % Output:
 %   sensor_data - k-Wave sensor output (p_max_all, p_final, etc.) [Pa]
 %
-% See also: ACOUSTIC_WRAPPER, KSPACEFIRSTORDER3D, KSPACEFIRSTORDER2D, KSPACEFIRSTORDERAS
+% See also: ACOUSTIC_WRAPPER, ACOUSTIC_SIMULATION_ELASTIC, KSPACEFIRSTORDER3D,
+%           KSPACEFIRSTORDER2D, KSPACEFIRSTORDERAS
 
 arguments
     kgrid      (1,1)
@@ -70,6 +73,13 @@ end
 
 % Define scale for plotting
 input_args.PlotScale = [-1, 1] * parameters.transducer(1).(parameters.transducer(1).type).elem_p_amp(1);
+
+% Elastic (shear-wave) skull model: pstdElastic2D/3D instead of kspaceFirstOrder*.
+% Also taken by the free-water baseline, so both runs share one forward model.
+if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic')
+    sensor_data = acoustic_simulation_elastic(kgrid, medium, source, sensor, input_args, parameters);
+    return
+end
 
 % k-Wave C++ backends write large scratch .h5 files (input + output) that are
 % removed on success (DeleteData=true). Their names are deterministic

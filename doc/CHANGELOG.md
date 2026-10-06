@@ -30,6 +30,10 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 - **Async + partial FOV, joint job**: the joint thermal job cropped the medium to an acoustic FOV again while the combined field is on the full grid (`acoustic_analysis`: arrays have incompatible sizes); it now runs without the crop
 - **Async job IDs**: `[job_id, jobs] = prestus_pipeline_start(...)` returns the job IDs an async run submitted per stage (`jobs.preproc`, `.acoustic`, `.combine`, `.thermal`, `.water`), so other runs can depend on it (`hpc.depend_job_ids`); `job_id` is unchanged ([] for async)
 
+#### Elastic skull backend (draft)
+
+- **`acoustic_backend: kwave_elastic`** (draft, not yet validated in PRESTUS): models shear waves in the skull with k-Wave's `pstdElastic3D/2D`, motivated by Gao et al. (2026, IEEE TBME 73(3):1298). The pressure source becomes an equivalent normal-stress source; the free-water baseline runs through the same solver. Skull elastic properties come from the new `elastic:` section (`medium_elastic_properties`) and follow Pichardo et al. (2017), the model behind BabelBrain: density-based shear speed from their 270 and 836 kHz fits interpolated to the transducer frequency, power-law shear and longitudinal attenuation through their paired values, and a Poisson-ratio floor. MATLAB CPU/GPU only (`cpp_*` is overridden), no axisymmetric grids. See [k-Wave elastic backend](doc_backend.md#k-wave-elastic-backend-shear-waves)
+
 #### Robustness, benchmarks and documentation (2026-10 audit, part 2)
 
 - ⚠️ **Axisymmetric source amplitude**: the axisymmetric kWaveArray source kept only grid points with BLI weight > 0.25, dropping part of the band-limited footprint (incl. its negative side lobes). This raised the free-water focal pressure by 6 % at 0.5 mm and 11 % at 0.25 mm (ITRUSST BM1), i.e. 12–23 % in intensity. `source_create` now keeps every non-zero weight, as the 3D path and k-Wave do; BM1 now agrees to +0.2 % (focal pressure), 0.0 mm (focus), L∞ 2.1 %, L2 1.5 %. 3D simulations were not affected. Axisymmetric results at the drive level change; results scaled to a simulated free-water baseline change much less

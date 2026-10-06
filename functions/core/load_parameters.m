@@ -281,7 +281,7 @@ function parameters = load_parameters(varargin)
 
     %% Validate acoustic_backend value
     if isfield(parameters, 'acoustic_backend') && ~isempty(parameters.acoustic_backend)
-        valid_backends = {'kwave', 'babelbrain', 'jwave'};
+        valid_backends = {'kwave', 'kwave_elastic', 'babelbrain', 'jwave'};
         if ~any(strcmpi(parameters.acoustic_backend, valid_backends))
             error('prestus:unknownAcousticBackend', ...
                 'Unknown acoustic_backend "%s". Valid options: %s.', ...
@@ -328,6 +328,24 @@ function parameters = load_parameters(varargin)
             error('prestus:unknownBabelBrainComputingBackend', ...
                 ['Unknown babelbrain.computing_backend "%s". Valid options: auto, cuda, opencl, ' ...
                  'metal, cpu (or 1-4).'], cb);
+        end
+    end
+
+    %% kwave_elastic compatibility: no axisymmetric grids, no C++ solvers
+    % Fail at config load rather than after grid/medium setup.
+    if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic')
+        if isfield(parameters, 'grid') && isfield(parameters.grid, 'axisymmetric') && ...
+                parameters.grid.axisymmetric == 1
+            error('prestus:elasticAxisymmetric', ...
+                'acoustic_backend "kwave_elastic" does not support axisymmetric grids (set grid.axisymmetric: 0).');
+        end
+        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'code_type') && ...
+                startsWith(char(parameters.simulation.code_type), 'cpp_')
+            new_ct = strrep(char(parameters.simulation.code_type), 'cpp_', 'matlab_');
+            warning('prestus:elasticNoCpp', ...
+                ['acoustic_backend "kwave_elastic" has no C++ solver. Overriding ' ...
+                 'simulation.code_type "%s" to "%s".'], parameters.simulation.code_type, new_ct);
+            parameters.simulation.code_type = new_ct;
         end
     end
 

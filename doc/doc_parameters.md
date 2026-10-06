@@ -32,7 +32,7 @@ Top-level keys (not nested under `simulation`). Pre-processing (segmentation, me
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `babelbrain` / `jwave`. Validated in `load_parameters`. |
+| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_backend.md#k-wave-elastic-backend-shear-waves)). |
 | `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain` and no `io.external_acoustic_nifti`; invalid combinations error at config load. jwave has no thermal solver — pair it with `kwave`. |
 
 #### BabelBrain settings (`babelbrain`)
@@ -81,6 +81,22 @@ Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thick
 | `helmholtz_operator` | Density term of the Helmholtz solver. | `'conservative'` | `conservative`: ρ∇·((1/ρ)∇p), source scaled by the local sound speed. `jwave`: jwave's built-in term, which underestimates transmission through density jumps (~20 % through a skull plate). See [jwave: density term](doc_jwave.md#density-term-helmholtz_operator). |
 | `precision` | Computational precision. | `'single'` | `single` / `double` |
 | `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
+
+#### Elastic skull settings (`elastic`)
+
+Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull`, `skull_cortical`, `skull_trabecular`). Attenuations are power laws a·f^y [dB/(cm·MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact. Sources and rationale: [k-Wave elastic backend](doc_backend.md#k-wave-elastic-backend-shear-waves).
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `shear_mapping` | Skull shear speed mapping. | `'pichardo'` | `pichardo`: cS = a(f0)·ρ + b(f0), Pichardo et al. 2017 fits (a = 0.458, b = 545.52 at 270 kHz; a = 0.386, b = 815.51 at 836 kHz), interpolated linearly to the transducer frequency, extrapolated with a warning outside that range. Uses the density map (pseudo-CT or layer densities). `off`: cS = 0 (fluid skull through the elastic solver). |
+| `shear_density_min` | No shear support at or below this density [kg/m³]. | `1200` | |
+| `poisson_min` | Minimum Poisson ratio; caps cS at cL·√((1−2ν)/(2(1−ν))). | `0.1` | Bone: ν ≈ 0.2–0.35. |
+| `alpha_coeff_shear` | Shear attenuation [dB/(cm·MHz^y)]. | `43.63` | Power law through Pichardo et al. 2017 (57 Np/m at 270 kHz, 373 Np/m at 836 kHz). |
+| `alpha_power_shear` | Shear attenuation exponent y. | `1.662` | |
+| `alpha_coeff_long` | Skull longitudinal attenuation in elastic runs [dB/(cm·MHz^y)]. | `27.31` | Power law through the values Pichardo et al. 2017 paired with their shear fit (33 Np/m at 270 kHz, 231 Np/m at 836 kHz). Used with `long_attenuation: elastic`. |
+| `alpha_power_long` | Longitudinal attenuation exponent y. | `1.722` | |
+| `long_attenuation` | Source of skull longitudinal attenuation. | `'elastic'` | `elastic`: `alpha_coeff_long`. `medium`: keep the fluid/pCT skull `alpha_coeff` (effective values that already include shear losses). |
+| `min_ppw_shear` | Warn below this many points per shear wavelength. | `6` | |
 
 ---
 
