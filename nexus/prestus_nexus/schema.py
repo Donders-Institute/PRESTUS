@@ -43,6 +43,7 @@ class Node:
     maximum: float | None = None
     label: str = ""                 # display label ('' = derived from the key, see labels.py)
     advanced: bool = False          # hidden unless 'Show advanced options' (or when set)
+    tune: list[str] = field(default_factory=list)   # goals this key trades off (overlay 'tuning')
     group: str | None = None        # show in another section's form (top-level sections only)
     group_first: bool = False       # …at the top of that form (default: after its own fields)
     children: list["Node"] = field(default_factory=list)
@@ -243,6 +244,8 @@ class Schema:
         self.display_rules: dict[str, dict] = overlay.get("display", {}) or {}
         self.extra_rules: dict[str, dict] = overlay.get("extra", {}) or {}
         self.deprecated: dict[str, dict] = overlay.get("deprecated", {}) or {}
+        self.tune_goals: dict[str, dict] = overlay.get("tune_goals", {}) or {}
+        self.tuning_rules: dict[str, list] = overlay.get("tuning", {}) or {}
         self.workflow_keys = self._calibration_keys()
 
         self.root = Node(path="", is_group=True)
@@ -336,6 +339,9 @@ class Schema:
                 node.group = rule["group"]
             if "group_first" in rule:
                 node.group_first = bool(rule["group_first"])
+        for pat, goals in self.tuning_rules.items():
+            if fnmatch.fnmatchcase(node.path, pat):
+                node.tune = list(goals or [])
         if node.choices and node.kind == "yaml":
             node.kind = "str"
 
@@ -384,6 +390,9 @@ class Schema:
 
     def section_is_advanced(self, section: str) -> bool:
         return bool(self.sections.get(section, {}).get("advanced", False))
+
+    def tune_label(self, goal: str) -> str:
+        return self.tune_goals.get(goal, {}).get("label", goal.capitalize())
 
     def ancestors(self, path: str) -> list[Node]:
         """Nodes from the top-level group down to (and including) path."""

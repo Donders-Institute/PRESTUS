@@ -60,6 +60,37 @@ def test_advanced_options_toggle_and_override(window):
     assert _row(grid, "grid.pml_size").block.isVisibleTo(grid)
 
 
+def test_card_advanced_button_opens_one_card(window):
+    tab = window.tab_pages["simulation"]
+    window.tabs.setCurrentWidget(tab)
+    grid, timing = window.pages["grid"], window.pages["timing"]
+    assert grid.adv_button.isVisibleTo(grid) and "advanced" in grid.adv_button.text()
+    grid.adv_button.click()
+    assert grid.show_advanced and not timing.show_advanced and not tab.advanced.isChecked()
+    assert _row(grid, "grid.pml_size").block.isVisibleTo(grid)
+    assert not _row(timing, "timing.pt_timestep").block.isVisibleTo(timing)
+    assert grid.adv_button.text() == "Hide advanced"
+    grid.adv_button.click()
+    assert not _row(grid, "grid.pml_size").block.isVisibleTo(grid)
+
+
+def test_tune_for_goal_reveals_and_marks_keys(window):
+    tab = window.tab_pages["simulation"]
+    window.tabs.setCurrentWidget(tab)
+    grid = window.pages["grid"]
+    assert tab.tune.isVisibleTo(tab) and not (res := window.tab_pages["results"]).tune.isVisibleTo(res)
+    tab.tune.setCurrentIndex(tab.tune.findData("speed"))
+    assert window.tune_goal == "speed"
+    assert window.tab_pages["setup"].tune.currentData() == "speed"       # shared by all tabs
+    assert _row(grid, "grid.pml_size").block.isVisibleTo(grid)          # advanced, tagged speed
+    assert not _row(grid, "grid.use_kWaveArray").block.isVisibleTo(grid)  # advanced, accuracy only
+    assert "speed" in _row(grid, "grid.resolution_mm").label.text()     # basic fields are marked too
+    assert not grid.show_advanced
+    window.set_tune_goal(None)
+    assert not _row(grid, "grid.pml_size").block.isVisibleTo(grid)
+    assert "speed" not in _row(grid, "grid.resolution_mm").label.text()
+
+
 def test_goto_reveals_advanced_field(window):
     window.goto("headmodel.smooth_fwhm_mm")
     tab = window.tab_pages["simulation"]

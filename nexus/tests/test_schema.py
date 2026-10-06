@@ -31,6 +31,15 @@ def test_field_rules_match_existing_keys(schema):
     assert not stale, f"overlay 'fields' patterns match no key: {stale}"
 
 
+def test_tuning_tags_are_valid(schema):
+    paths = [n.path for n in schema.nodes()]
+    stale = [pat for pat in schema.tuning_rules if not fnmatch.filter(paths, pat)]
+    assert not stale, f"overlay 'tuning' patterns match no key: {stale}"
+    unknown = {g for goals in schema.tuning_rules.values() for g in goals} - set(schema.tune_goals)
+    assert not unknown, f"overlay 'tuning' uses goals missing from 'tune_goals': {unknown}"
+    assert set(schema.get("grid.resolution_mm").tune) == {"speed", "accuracy", "memory"}
+
+
 def test_extras_are_not_in_default(schema):
     in_default = [p for p in schema.extra_rules
                   if _in(schema.defaults, p.split("."))]

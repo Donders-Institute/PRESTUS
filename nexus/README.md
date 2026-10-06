@@ -23,7 +23,8 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 
 1. **Study config.** Opens the given config, or an untitled one. *File ▸ New study…* creates a config and can copy `config_default.yaml` into the study folder, as `prestus_config_init` does (this fixes the defaults the study is merged onto). *Open…* / *Open recent* switch configs. The subject inputs are on the Setup tab; the Issues panel checks them as you type (the T1 pattern must resolve with MATLAB's `sprintf` and glob semantics, and `m2m_sub-XXX` must exist or SimNIBS must be available to run charm).
 2. **Tabs and sections.**
-   - Six tabs (Setup, Transducer, Placement, Simulation, Study, Run) hold one card per config section; `overlay.yaml` (`tabs`, `display`) assigns sections to tabs and gives fields readable labels, advanced flags and a home section. Each tab hides its advanced settings until *Show advanced options*.
+   - Six tabs (Setup, Transducer, Placement, Simulation, Study, Run) hold one card per config section; `overlay.yaml` (`tabs`, `display`) assigns sections to tabs and gives fields readable labels, advanced flags and a home section. Advanced settings stay hidden until a card's *+ n advanced* button or the tab's *Show advanced options* is used.
+   - *Tune for* (shared by all tabs) shows and marks the keys tagged with a goal (speed, accuracy, memory, disk space) in `overlay.yaml` (`tune_goals`, `tuning`), advanced ones included.
    - Changed values are marked ●, each field has a reset button, and hovering a field (or **?**) shows its help text, taken from the comments in `config_default.yaml`, with its key and default.
    - Mode-specific fields appear only when they apply, e.g. `placement.localite.*` only for `placement.mode: localite`.
    - Advanced sections are hidden unless they contain changes.
@@ -38,7 +39,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | File | Role |
 |---|---|
 | `schema.py` | Builds the key tree from `config/config_default.yaml`: key order, defaults, and help text taken from inline comments and the comment blocks above keys. A project copy of `config_default.yaml` is merged on top, as `load_parameters` does (`stale_keys`, `pinned`). |
-| `overlay.yaml` | Adds only what the YAML can't express: widget kinds, allowed values, units, visibility rules, keys the code reads that the default omits (`extra`), and deprecated aliases. |
+| `overlay.yaml` | Adds only what the YAML can't express: widget kinds, allowed values, units, visibility rules, keys the code reads that the default omits (`extra`), deprecated aliases, and tuning goals per key (`tuning`). |
 | `model.py` | Defaults plus sparse overrides, merged like `mergestruct` + `restore_struct_arrays` in `load_parameters`. |
 | `yamlio.py` | YAML reading and writing that matches MATLAB's loader (see below). |
 | `checks.py` | Validation. Each rule notes the MATLAB source it mirrors. |
@@ -70,7 +71,7 @@ python -m pytest -q                 # everything; the MATLAB test runs if MATLAB
 python -m pytest -q -m "not matlab" # without MATLAB (~30 s)
 ```
 
-- `test_schema.py` is the drift test. It checks that every overlay rule still matches a key, that every `extra`/`deprecated` key is still referenced in `functions/`, that no `extra` key has since been added to the default, and that allowed values contain the default. MATLAB's `load_parameters` reads the same `extra`/`deprecated` lists (`config_known_extra_keys`) for its unknown-key warning, so this test also keeps that check accurate.
+- `test_schema.py` is the drift test. It checks that every overlay rule (including `tuning`) still matches a key and every tuning goal is declared, that every `extra`/`deprecated` key is still referenced in `functions/`, that no `extra` key has since been added to the default, and that allowed values contain the default. MATLAB's `load_parameters` reads the same `extra`/`deprecated` lists (`config_known_extra_keys`) for its unknown-key warning, so this test also keeps that check accurate.
 - `test_matlab_roundtrip.py` writes a study config with the Nexus, loads it with the real `load_parameters` and compares every value with the Nexus's own merge. Set `PRESTUS_MATLAB` if `matlab` is not on your `PATH`.
 - `test_real_configs.py` loads and round-trips every study config in `$PRESTUS_REAL_CONFIG_DIR` (skipped when unset).
 

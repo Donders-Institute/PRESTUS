@@ -26,6 +26,8 @@ def _tooltip(node: Node) -> str:
     parts.append(f"<span style='color:#9aa7b4'>Key: {node.path}</span>")
     if not node.is_group:
         parts.append(f"<span style='color:#9aa7b4'>Default: {display_text(node.default) or '(empty)'}</span>")
+    if node.tune:
+        parts.append(f"<span style='color:#9aa7b4'>Tuning: affects {', '.join(node.tune)}</span>")
     if node.extra:
         parts.append("<span style='color:#9aa7b4'>Not in config_default.yaml; read by PRESTUS code.</span>")
     return "<br>".join(parts)
@@ -48,6 +50,7 @@ class SectionPage(QFrame):
     """Card with the form for all keys of one top-level section."""
 
     changed = pyqtSignal()
+    advanced_toggled = pyqtSignal()     # the card's own 'advanced' button was used
 
     def __init__(self, model: ConfigModel, section: str, nodes: list[Node],
                  title: str, parent: QWidget | None = None, subtitle: str = ""):
@@ -57,6 +60,7 @@ class SectionPage(QFrame):
         self.section = section
         self.ti = 0
         self.show_advanced = False
+        self.goal: str | None = None        # 'Tune for' goal: its keys are shown even when advanced
         self.rows: list[_Row] = []
         self.groups: list[tuple[Node, QFrame]] = []
         self._top_rows: list[_Row] = []
@@ -72,6 +76,11 @@ class SectionPage(QFrame):
         self.count.setObjectName("CardSub")
         head.addWidget(self.count)
         head.addStretch(1)
+        self.adv_button = QToolButton()
+        self.adv_button.setToolTip("Show or hide this card's advanced settings: the ones most studies "
+                                   "leave at their defaults.")
+        self.adv_button.clicked.connect(self._toggle_card_advanced)
+        head.addWidget(self.adv_button)
         self.toggle = QToolButton(text="Hide")
         self.toggle.setToolTip("Collapse / expand")
         self.toggle.clicked.connect(self._toggle_body)
@@ -249,6 +258,17 @@ class SectionPage(QFrame):
         self.show_advanced = show
         self.refresh()
 
+    def _toggle_card_advanced(self) -> None:
+        self.set_show_advanced(not self.show_advanced)
+        self.advanced_toggled.emit()
+
+    def set_goal(self, goal: str | None) -> None:
+        self.goal = goal or None
+        self.refresh()
+
+    def _matches(self, node: Node) -> bool:
+        return self.goal is not None and self.goal in node.tune
+
     def _ti_for(self, node: Node) -> int:
         return self.ti if node.path.startswith(TX + ".") or node.path == TX else 0
 
@@ -256,7 +276,8 @@ class SectionPage(QFrame):
         path, ti = row.node.path, self._ti_for(row.node)
         if not self.model.is_visible(path, ti):
             return False
-        return self.show_advanced or not row.node.advanced or self.model.is_overridden(path, ti)
+        return self.show_advanced or not row.node.advanced or self.model.is_overridden(path, ti) \
+            or self._matches(row.node)
 
     def _group_shown(self, g: _Group) -> bool:
         ti = self._ti_for(g.node)
@@ -265,7 +286,15 @@ class SectionPage(QFrame):
         any_child = any(self._row_shown(r) for r in g.rows) or any(self._group_shown(s) for s in g.groups)
         if not any_child:
             return False
-        return self.show_advanced or not g.node.advanced or self._has_override(g)
+        return self.show_advanced or not g.node.advanced or self._has_override(g) or self._has_match(g)
+
+    def _has_match(self, g: _Group) -> bool:
+        return any(self._matches(r.node) for r in g.rows) or any(self._has_match(s) for s in g.groups)
+
+    def matches_goal(self) -> bool:
+        """The card holds a key tagged with the current 'Tune for' goal (in the current modes)."""
+        return any(self._matches(r.node) and self.model.is_visible(r.node.path, self._ti_for(r.node))
+                   for r in self.rows)
 
     def _has_override(self, g: _Group) -> bool:
         ti = self._ti_for(g.node)
@@ -275,15 +304,27 @@ class SectionPage(QFrame):
     def has_overrides(self) -> bool:
         return any(self.model.is_overridden(r.node.path, self._ti_for(r.node)) for r in self.rows)
 
+    def _advanced_rows(self) -> list[_Row]:
+        """Advanced fields that apply in the current modes and hold no value (the ones the
+        'advanced' switches show and hide)."""
+        return [r for r in self.rows if r.node.advanced
+                and self.model.is_visible(r.node.path, self._ti_for(r.node))
+                and not self.model.is_overridden(r.node.path, self._ti_for(r.node))]
+
     def hidden_advanced(self) -> int:
         """Fields hidden only because they are advanced."""
-        n = 0
-        for r in self.rows:
-            path, ti = r.node.path, self._ti_for(r.node)
-            if r.node.advanced and self.model.is_visible(path, ti) and not self.show_advanced \
-                    and not self.model.is_overridden(path, ti):
-                n += 1
-        return n
+        if self.show_advanced:
+            return 0
+        return sum(1 for r in self._advanced_rows() if not self._matches(r.node))
+
+    def _tune_tags(self, node: Node) -> str:
+        """' · speed, accuracy' after the label; the 'Tune for' goal highlighted."""
+        if not node.tune or not (self.show_advanced or self.goal):
+            return ""
+        schema = self.model.schema
+        tags = [f"<b style='color:#1f6fb2'>{schema.tune_label(g).lower()}</b>" if g == self.goal
+                else schema.tune_label(g).lower() for g in node.tune]
+        return f" <span style='color:#9aa7b4'>· {', '.join(tags)}</span>"
 
     def refresh(self) -> None:
         for i in range(self.extras.count()):
@@ -310,16 +351,20 @@ class SectionPage(QFrame):
                 row.editor.set_value(value, self.model.baseline(path, ti))
                 row.editor.set_error(check_value(row.node, value))
                 name = labels.label(row.node)
+                tags = self._tune_tags(row.node)
                 if self.model.is_modified(path, ti):
-                    row.label.setText(f"<b>{name}</b> <span style='color:#1f6fb2'>●</span>")
+                    row.label.setText(f"<b>{name}</b> <span style='color:#1f6fb2'>●</span>{tags}")
                 elif self.model.from_library(path, ti):
-                    row.label.setText(f"{name} <span style='color:#9aa7b4'>· from library</span>")
+                    row.label.setText(f"{name} <span style='color:#9aa7b4'>· from library</span>{tags}")
                 else:
-                    row.label.setText(name)
+                    row.label.setText(f"{name}{tags}")
                 row.reset.setVisible(self.model.is_overridden(path, ti))
         walk(self._top_rows, self._top_groups)
         n_set = sum(1 for r in self.rows if self.model.is_overridden(r.node.path, self._ti_for(r.node)))
         self.count.setText(f"· {n_set} set" if n_set else "")
+        n_hidden = self.hidden_advanced()
+        self.adv_button.setVisible(n_hidden > 0 or (self.show_advanced and bool(self._advanced_rows())))
+        self.adv_button.setText("Hide advanced" if self.show_advanced else f"+ {n_hidden} advanced")
 
     def focus_key(self, path: str, ti: int | None = None) -> None:
         """Scroll to (and focus) the row for a key; reveals advanced fields if needed."""

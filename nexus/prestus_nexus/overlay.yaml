@@ -13,6 +13,8 @@
 #   deprecated: old keys with their replacement; 'ignored: true' when PRESTUS
 #             no longer reads them at all (otherwise it still converts them).
 #   sections: display labels and advanced flags for top-level groups.
+#   tune_goals / tuning: what a key can be tuned for (speed, accuracy, …);
+#             see the end of this file.
 #
 # Keys found in config/config_calibration.yaml are recognised as belonging to
 # the calibration workflow and are not reported as unknown.
@@ -722,3 +724,54 @@ display:
   thermal.sensor_xy_halfsize: {label: Temperature sensor half-width}
   thermal.record_t_at_every_step: {label: Record every time step (memory)}
   thermal.log_thermal_updates: {label: Verbose thermal log}
+
+# ── Tuning: keys worth revisiting when optimising a run ────────────────
+# Most users never touch these. 'tuning' tags a key (same pattern rules as
+# 'fields') with the goals it trades off; the Nexus then offers them through
+# "Tune for" on each tab, which shows the tagged keys (advanced ones too) and
+# marks them. Tags describe what a key affects, not which way to move it; the
+# help text says that. Only use goals listed in 'tune_goals' (test_schema
+# checks this and that every pattern still matches a key).
+tune_goals:
+  speed:    {label: Speed, help: Run time of the simulation stages.}
+  accuracy: {label: Accuracy, help: Numerical accuracy and convergence of the simulated fields.}
+  memory:   {label: Memory, help: RAM / GPU memory needed while the simulation runs.}
+  disk:     {label: Disk space, help: Size of the outputs written per subject.}
+
+tuning:
+  simulation.code_type: [speed]
+  simulation.precision: [accuracy, memory]
+  grid.resolution_mm: [speed, accuracy, memory]
+  grid.pml_size: [speed]
+  grid.max_expand: [speed]
+  grid.source_ppw: [speed, accuracy]
+  grid.source_cfl: [speed, accuracy]
+  grid.source_limit_fraction: [speed, accuracy]
+  grid.source_ppp: [speed, accuracy]
+  grid.sim_time_us: [speed, accuracy]
+  grid.steady_state_transits: [speed, accuracy]
+  grid.steady_state_num_periods: [speed, accuracy]
+  grid.use_kWaveArray: [accuracy]
+  grid.axisymmetric: [speed, memory]
+  grid.z_beyond_focus_mm: [speed, memory]
+  grid.acoustic_fov_diameter_mm: [speed, memory]
+  grid.acoustic_fov_length_mm: [speed, memory]
+  grid.thermal_use_acoustic_fov: [speed, accuracy]
+  grid.thermal_resolution_mm: [speed, memory]
+  grid.thermal_fov_mm: [speed, memory]
+  timing.pt_timestep: [speed, accuracy]
+  timing.post_pt_timestep: [speed, accuracy]
+  thermal.sensor_xy_halfsize: [memory]
+  thermal.record_t_at_every_step: [memory]
+  jwave.use_gpu: [speed]
+  jwave.precision: [accuracy, memory]
+  jwave.gmres_maxiter: [speed, accuracy]
+  babelbrain.ppw: [speed, accuracy]
+  babelbrain.z_beyond_focus_mm: [speed, memory]
+  babelbrain.use_rayleigh_for_water: [speed]
+  babelbrain.cleanup_cache: [disk]
+  io.save_matrices: [disk]
+  io.save_acoustic_matrices: [disk]
+  io.save_thermal_matrices: [disk]
+  io.save_p_complex: [disk]
+  io.save_heatingvideo: [disk]

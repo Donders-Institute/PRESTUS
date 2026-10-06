@@ -38,7 +38,12 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - Each field has a readable name. Hovering over it or clicking **?** shows the full help from `config_default.yaml`, the config key and the default.
    - Changed values are marked ● (the tab label counts them), fields filled from the equipment library are marked *from library*, and ↺ resets a field.
    - Fields appear only when they apply to the current modes (e.g. the Localite settings only with `placement.mode: localite`).
-3. **Advanced options.** Each tab hides the settings most studies leave at their defaults, and says how many are hidden. Tick **Show advanced options** on that tab to see them. An advanced setting that holds a value is always shown. What counts as advanced:
+3. **Advanced options.** Each tab hides the settings most studies leave at their defaults, and says how many are hidden. You can ignore them until you need them:
+   - **+ n advanced** in a card's header shows that card's advanced settings (*Hide advanced* folds them again). **Show advanced options** shows them on every card of the tab, including the fully advanced sections.
+   - An advanced setting that holds a value is always shown. Jumping to an issue opens the card it is on.
+   - **Tune for** (Speed, Accuracy, Memory, Disk space) is for optimising a run. It shows the settings that affect that goal, advanced ones included, on every tab, and marks them after their label (e.g. *Grid resolution · speed, accuracy, memory*). The goal is highlighted. The tag says only what a setting affects; check its help (**?**) before changing it. Set it back to **—** to return to the normal view. Which keys count for which goal is listed under `tuning:` in `nexus/prestus_nexus/overlay.yaml`, mainly the grid, time-step, FOV, precision and solver settings and the large `io.save_*` outputs.
+
+   What counts as advanced:
    - *Setup:* extra MATLAB paths, FSL/ANTs locations, HPC modules for pseudo-CT, the individual `io.save_*` switches, external acoustic NIfTI.
    - *Transducer:* element geometry (diameters, curvature, exit-plane distance), matrix layout, bowl-referenced depths, focal-depth reference convention. Amplitude, phases and steering stay visible.
    - *Placement:* Localite ingestion details (export subfolder, pulses per series, tracker offsets), the heuristic search criteria, PlanTUS weights and outputs, TUS_entry options, neuronav naming rules.

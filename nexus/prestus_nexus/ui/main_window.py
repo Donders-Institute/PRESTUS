@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QFont, QKeySequence
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QDockWidget, QFileDialog, QFrame, QHBoxLayout,
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDockWidget, QFileDialog, QFrame, QHBoxLayout,
                              QLabel, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
                              QSplitter, QTabWidget, QToolButton, QTreeWidget, QTreeWidgetItem,
                              QVBoxLayout, QWidget)
@@ -116,6 +116,22 @@ class TabPage(QWidget):
         self.advanced.setChecked(bool(window.session.get(f"advanced_{self.key}", False)))
         self.advanced.toggled.connect(self._toggle_advanced)
         head.addWidget(self.advanced)
+        self.tune_label = QLabel("Tune for:")
+        self.tune = QComboBox()
+        self.tune.addItem("—", None)
+        schema = window.model.schema
+        for goal, spec in schema.tune_goals.items():
+            self.tune.addItem(schema.tune_label(goal), goal)
+            self.tune.setItemData(self.tune.count() - 1, spec.get("help", ""),
+                                  Qt.ItemDataRole.ToolTipRole)
+        self.tune.setToolTip("For optimising a run: show the settings that affect speed, accuracy, "
+                             "memory or disk space (advanced ones included) and mark them. "
+                             "Applies to all tabs.")
+        self.tune_label.setToolTip(self.tune.toolTip())
+        self.tune.currentIndexChanged.connect(
+            lambda i: self.window.set_tune_goal(self.tune.itemData(i)))
+        head.addWidget(self.tune_label)
+        head.addWidget(self.tune)
         outer.addLayout(head)
 
         self.split = QSplitter()
@@ -135,6 +151,7 @@ class TabPage(QWidget):
 
     def add_section(self, page: SectionPage) -> None:
         page.set_show_advanced(self.advanced.isChecked())
+        page.advanced_toggled.connect(self.refresh)
         self.sections.append(page)
         self.column.addWidget(page)
 
@@ -169,6 +186,17 @@ class TabPage(QWidget):
 
     def finish(self) -> None:
         self.column.addStretch(1)
+        tunable = any(r.node.tune for page in self.sections for r in page.rows)
+        self.tune_label.setVisible(tunable)
+        self.tune.setVisible(tunable)
+
+    def set_goal(self, goal: str | None) -> None:
+        self.tune.blockSignals(True)
+        self.tune.setCurrentIndex(max(0, self.tune.findData(goal)))
+        self.tune.blockSignals(False)
+        for page in self.sections:
+            page.set_goal(goal)
+        self.refresh()
 
     def _toggle_advanced(self, on: bool) -> None:
         self.window.session.set(f"advanced_{self.key}", on)
@@ -184,7 +212,8 @@ class TabPage(QWidget):
             page.refresh()
             sec = page.section
             visible = sec == GENERAL or self.window.model.is_visible(sec, 0)
-            if schema.section_is_advanced(sec) and not show and not page.has_overrides():
+            if schema.section_is_advanced(sec) and not show and not page.has_overrides() \
+                    and not page.matches_goal():
                 n_hidden += 1
                 visible = False
             page.setVisible(visible and any(r.block.isVisibleTo(page) for r in page.rows)
@@ -207,6 +236,7 @@ class MainWindow(QMainWindow):
         self.pages: dict[str, QWidget] = {}
         self.tab_pages: dict[str, TabPage] = {}
         self._section_tab: dict[str, str] = {}
+        self.tune_goal: str | None = None    # 'Tune for' goal, shared by all tabs (not remembered)
         self.resize(1320, 900)
 
         central = QWidget()
@@ -557,6 +587,12 @@ class MainWindow(QMainWindow):
             section = GENERAL
         return section
 
+    def set_tune_goal(self, goal: str | None) -> None:
+        """Show (and mark) the settings tagged with `goal` in overlay.yaml 'tuning', on every tab."""
+        self.tune_goal = goal
+        for tab in self.tab_pages.values():
+            tab.set_goal(goal)
+
     def goto(self, path: str, ti: int | None = None) -> None:
         section = self.display_section(path)
         page = self.pages.get(section)
@@ -568,8 +604,11 @@ class MainWindow(QMainWindow):
                 tab.subtabs.setCurrentWidget(tab.scroll)       # the field lives under 'Settings'
             tab.refresh()
             row = next((r for r in page.rows if r.node.path == path), None)
-            if not page.isVisibleTo(tab) or (row is not None and not row.block.isVisibleTo(page)):
-                tab.advanced.setChecked(True)       # the target is an advanced setting
+            if not page.isVisibleTo(tab):
+                tab.advanced.setChecked(True)       # the target is in an advanced section
+            elif row is not None and not row.block.isVisibleTo(page):
+                page.set_show_advanced(True)        # an advanced field: open only its card
+                tab.refresh()
         page.focus_key(path, ti)
 
     def _goto_issue(self, item: QTreeWidgetItem, _col: int = 0) -> None:
