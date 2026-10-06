@@ -12,6 +12,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 - **Shared calibration steps**: the computation behind `calibration_gui`'s Predict, Evaluate, Fit and Save moved out of the GUI into `calibration_desired_profiles`, `calibration_evaluate`, `calibration_fit`, `calibration_fit_entry`, `calibration_save_entry` and `calibration_focus_beyond`, used by both GUIs. `calibration_gui`'s results are unchanged
 - **`meta.fit` in user library entries**: a saved entry records how it was fitted (mode, free parameters, `FitOptions`, measured or desired depths, profile CSV, reference ISPPA, profile interpolation options, k-Wave drive check). `calibration_gui` and the Nexus restore these settings when they open the entry
+- **neuronav helpers**: `neuronav_check_target_map`, `neuronav_series_qc_flag`, `neuronav_head_surface` and `neuronav_find_mni_template` moved out of `neuronav_gui`, which uses them
 - **`load_parameters` speed**: it re-added `external/` with `genpath` on every call, because `exist('yaml.loadFile', 'file')` is 0 for package functions. It now checks with `which`; a call takes 0.1–2 s instead of 2–28 s on a network drive
 
 #### Backend accuracy (ITRUSST intercomparison)

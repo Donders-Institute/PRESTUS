@@ -715,25 +715,15 @@ drawnow;
             msg = 'Tick at least one series to write.'; return;
         end
         rows  = find(use);
-        names = cellfun(@(v) strtrim(char(v)), d(rows, 4), 'UniformOutput', false);
-        if any(cellfun(@isempty, names))
-            msg = 'Every ticked series needs a target name.'; return;
-        end
-        keys = matlab.lang.makeValidName(names);
-        if numel(unique(keys)) < numel(keys)
-            msg = 'Target names must be unique (also after conversion to JSON keys).'; return;
-        end
         for k = 1:numel(rows)
             r = rows(k);
-            col = strtrim(char(d{r, 6}));
-            if ~isempty(col) && isempty(regexp(col, '^#[0-9a-fA-F]{6}$', 'once'))
-                msg = sprintf('Colour "%s" is not a #rrggbb hex string.', col); return;
-            end
             if isempty(S.coil_ids), tid = 0; else, tid = S.coil_ids(r); end
             entry = struct('series_index', r, 'transducer_id', tid, ...
-                'target_name', names{k}, 'color', col);
+                'target_name', strtrim(char(d{r, 4})), 'color', strtrim(char(d{r, 6})));
             if isempty(target_map), target_map = entry; else, target_map(end+1) = entry; end %#ok<AGROW>
         end
+        msg = neuronav_check_target_map(target_map);
+        if ~isempty(msg), target_map = []; end
     end
 
     function show_series()
@@ -752,7 +742,7 @@ drawnow;
             else
                 d(k, :) = {true, k, coil, sprintf('series_%d', k), 'default', '', r.N_pulses, ...
                     r.position_dev_mm.mean, r.position_dev_mm.std, ...
-                    r.rotation_dev_rad.mean, r.rotation_dev_rad.std, qc_flag(r)};
+                    r.rotation_dev_rad.mean, r.rotation_dev_rad.std, neuronav_series_qc_flag(r)};
             end
         end
         h.series.Data = d;
@@ -1102,7 +1092,7 @@ drawnow;
         mni_browse(C, 3, MV.seg, 'dir', []);
         lbl(C, 4, 'Head template');
         MV.tpl = uieditfield(C, 'text', 'FontName', st.font, 'FontSize', st.fs, 'Tag', 'ed_mni_template', ...
-            'Value', find_mni_template(S.base), 'Placeholder', 'first subject''s final_tissues_MNI', ...
+            'Value', neuronav_find_mni_template(S.base), 'Placeholder', 'first subject''s final_tissues_MNI', ...
             'Tooltip', 'MNI-space NIfTI for the head outline (default: SimNIBS MNI152_T1_1mm.nii.gz)', ...
             'ValueChangedFcn', @(~,~) plot_mni());
         place(MV.tpl, 4, [2 3]);
@@ -1345,7 +1335,7 @@ drawnow;
         MV.head = struct('key', f, 'faces', [], 'vertices', []);
         if isempty(f) || ~isfile(f), return; end
         try
-            [MV.head.faces, MV.head.vertices] = head_surface(f);
+            [MV.head.faces, MV.head.vertices] = neuronav_head_surface(f);
         catch ME
             mni_status(['Head outline: ' ME.message], st.warn);
         end
@@ -1606,77 +1596,8 @@ function tf = ticked(t, names)
     tf = ismember(names, d(cell2mat(d(:, 1)), 2));
 end
 
-function f = find_mni_template(p)
-% MNI152_T1_1mm.nii.gz from the SimNIBS Python package resources; '' when
-% no SimNIBS installation is found (startup.simnibs_bin_path, the PlanTUS
-% env_path, or the default install folders).
-    f = '';
-    roots = {};
-    bin = char(get_nested(p, {'startup', 'simnibs_bin_path'}, ''));
-    if ~isempty(bin), roots = {fileparts(regexprep(bin, '[\\/]+$', '')), bin}; end
-    env = char(get_nested(p, {'placement', 'plantus', 'env_path'}, ''));
-    if ~isempty(env), roots{end+1} = env; end
-    home = getenv('HOME');
-    if isempty(home), home = getenv('USERPROFILE'); end
-    roots = [roots, {fullfile(home, 'Applications', 'SimNIBS*'), fullfile(home, 'SimNIBS*'), '/opt/SimNIBS*'}];
-    pkgs = {fullfile('simnibs_env', 'lib', 'python*', 'site-packages'), ...
-            fullfile('simnibs_env', 'Lib', 'site-packages')};
-    for r = roots
-        for k = 1:numel(pkgs)
-            hit = dir(fullfile(r{1}, pkgs{k}, 'simnibs', 'resources', 'templates', 'MNI152_T1_1mm.nii.gz'));
-            if ~isempty(hit), f = fullfile(hit(1).folder, hit(1).name); return; end
-        end
-    end
-end
 
-function [F, V] = head_surface(file)
-% Outer head surface of an MNI-space NIfTI in world mm. A label image (few
-% integer values, e.g. final_tissues_MNI) is taken as label > 0; an
-% intensity template (e.g. MNI152_T1) is thresholded at a fraction of its
-% robust maximum. Only the largest component is kept, with its cavities
-% filled, so the result is the outer shell. Sampled at ~2 mm.
-    info = niftiinfo(file);
-    vol = double(niftiread(info));
-    vol = vol(:, :, :, 1);
-    step = max(1, round(2 / mean(info.PixelDimensions(1:3))));
-    vol = vol(1:step:end, 1:step:end, 1:step:end);
-    vals = unique(vol(1:53:end));
-    if numel(vals) < 64 && all(vals == round(vals))
-        mask = vol > 0;
-    else
-        vol = smooth3(vol, 'box', 3);
-        mask = vol > 0.2 * prctile(vol(vol > 0), 98);
-    end
-    cc = bwconncomp(mask, 26);
-    if cc.NumObjects == 0, error('no head voxels in %s', file); end
-    [~, big] = max(cellfun(@numel, cc.PixelIdxList));
-    mask = false(size(mask)); mask(cc.PixelIdxList{big}) = true;
-    mask = imfill(mask, 'holes');
-    for z = 1:size(mask, 3)   % cavities open at the cut-off neck
-        mask(:, :, z) = imfill(mask(:, :, z), 'holes');
-    end
-    pad = zeros(size(mask) + 2);   % closes the surface at the volume edge
-    pad(2:end-1, 2:end-1, 2:end-1) = mask;
-    fv = isosurface(smooth3(pad, 'box', 3), 0.5);
-    fv = reducepatch(fv, min(1, 20000 / size(fv.faces, 1)));
-    % isosurface returns [column row slice] of the padded volume; the NIfTI
-    % affine takes 0-based [i j k] (as in NEURONAV_APPLY_DEFORMATION).
-    ijk = (fv.vertices(:, [2 1 3]) - 2) * step;
-    V = [ijk, ones(size(ijk, 1), 1)] * info.Transform.T;
-    V = V(:, 1:3);
-    F = fv.faces;
-end
 
-function flag = qc_flag(r)
-    P = reshape(r.matrix4d_all(:, 1:3, 4), [], 3);
-    if all(abs(P(:)) < 1e-9)
-        flag = 'untracked (all positions 0)';
-    elseif any(all(abs(P) < 1e-9, 2))
-        flag = sprintf('%d pulse(s) at origin', sum(all(abs(P) < 1e-9, 2)));
-    else
-        flag = '';
-    end
-end
 
 function rgb = hex_to_rgb(hex, fallback)
     hex = strtrim(char(hex));

@@ -299,6 +299,7 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_apply_deformation`            | Map segmentation-space RAS coordinates through a SimNIBS coordinate field |
 | `neuronav_build_deformation_cache`      | Precompute nearest-valid-voxel lookup for a SimNIBS coordinate field |
 | `neuronav_build_target_map`             | Expand a coil_map spec into a flat target_map. |
+| `neuronav_check_target_map`             | Check a target_map before NEURONAV_INGEST_MARKERS writes it |
 | `neuronav_compute_series_statistics`    | Compute mean position and variability over stimulus train |
 | `neuronav_compute_series_statistics_sequential`| NEURONAV_COMPUTE_SERIES_STATISTICS  Compute per-series position and orientation statistics |
 | `neuronav_convert_MNI_to_native`        | Transform coordinates from MNI space to native subject space |
@@ -306,8 +307,10 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_convert_trigger_to_voxels`    | Convert Localite trigger positions to voxel (image) coordinates. |
 | `neuronav_detect_series`                | Detect the recorded series of one session (QC, suggested names) without writing. |
 | `neuronav_export_session_csv`           | Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions. |
+| `neuronav_find_mni_template`            | SimNIBS' MNI152_T1_1mm.nii.gz, for head outlines in MNI views |
 | `neuronav_find_planning_t1`             | Find the planning T1 loaded into Localite (`path.localite_t1`, else `path.localite_raw`). |
 | `neuronav_get_group_mean_mni`           | Compute group-level average MNI coordinates (both mm and voxel). |
+| `neuronav_head_surface`                 | Outer head surface of an MNI-space NIfTI, for plots |
 | `neuronav_ingest_batch`                 | Ingest and export Localite targets for many subjects/sessions; writes `neuronav_ingest_summary.csv`. |
 | `neuronav_ingest_markers`               | Ingest raw Localite markers and write normalised outputs. |
 | `neuronav_label_map_from_scan`          | Build a `neuronav.target_labels` map from a label scan. |
@@ -323,6 +326,7 @@ The following documents the functions provided in PRESTUS.
 | `neuronav_resolve_target`               | Resolve each target_map entry's brain-target |
 | `neuronav_scan_sessions`                | Inventory raw Localite data and planned-target labels. |
 | `neuronav_select_localite`              | Select most recent Localite XML for a session. |
+| `neuronav_series_qc_flag`               | Tracking problem of one detected series, as text |
 | `neuronav_suggest_target_names`         | Heuristic target names for ingested series (planned target nearest the beam axis). |
 | `neuronav_summary_to_mni`               | Add MNI coordinates to a neuronav ingest summary. |
 | `position_transducer_localite`          | Determines transducer and focus positions in voxel space using Localite data and MRI header. |
