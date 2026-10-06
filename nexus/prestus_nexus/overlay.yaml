@@ -541,7 +541,7 @@ display:
   # HPC
   hpc.name: {label: Cluster profile, advanced: true}
   hpc.gpu: {label: GPU request, help: "Scheduler GPU request, e.g. 'nvidia_a100-sxm4-40gb:1' (SLURM --gres); empty = any GPU when the code type needs one."}
-  hpc.partition: {label: Partition / queue, help: "Scheduler partition; empty = 'gpu' for GPU code, the cluster default otherwise."}
+  hpc.partition: {label: Partition, help: "SLURM partition; empty = 'gpu' for GPU code, the cluster default otherwise. Ignored by qsub."}
   hpc.reservation: {label: Reservation, advanced: true, help: Scheduler reservation name (optional).}
   hpc.wait_for_job: {label: Wait for the job to finish, advanced: true, help: Block MATLAB until the submitted job has finished (otherwise MATLAB returns after submission).}
   hpc.timelimit: {label: Time limit, help: "Wall-time limit per job (HH:MM:SS)."}

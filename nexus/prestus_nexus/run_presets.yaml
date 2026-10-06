@@ -29,6 +29,10 @@ presets:
       run or a small grid; see doc_hpc.md for the srun/sbatch workflow this fills in for.
     overrides:
       hpc.name: default
+      hpc.partition: ""
+      hpc.gpu: ""
+      hpc.timelimit: "04:00:00"
+      hpc.memorylimit: 20
 
   - name: Donders HPC — GPU, high-fidelity
     description: >-

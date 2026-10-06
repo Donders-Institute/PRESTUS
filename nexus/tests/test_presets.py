@@ -38,3 +38,14 @@ def test_apply_rejects_keys_outside_hpc(schema):
     preset = presets.Preset("bad", "", {"grid.resolution_mm": 1.0})
     with pytest.raises(ValueError, match="hpc"):
         presets.apply(m, preset)
+
+
+def test_donders_default_resets_what_the_gpu_preset_sets(schema):
+    # presets only write their own keys, so 'default' must clear the GPU preset's
+    # partition/gres/limits or switching back would silently keep gpu40g.
+    by_name = {p.name: p for p in presets.load_presets()}
+    m = ConfigModel(schema)
+    presets.apply(m, by_name["Donders HPC — GPU, high-fidelity"])
+    presets.apply(m, by_name["Donders HPC — default"])
+    assert m.get("hpc.partition") == "" and m.get("hpc.gpu") == ""
+    assert m.get("hpc.timelimit") == "04:00:00" and m.get("hpc.memorylimit") == 20
