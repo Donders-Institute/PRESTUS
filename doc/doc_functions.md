@@ -57,9 +57,15 @@ The following documents the functions provided in PRESTUS.
 | `calibrate_babelbrain_phase_profile`    | Whole-profile Rayleigh fit of annular drive phases for BabelBrain |
 | `calibrate_focal_steering`              | Analytical steer that lands the FWHM/peak at a target |
 | `calibrate_library_entry`               | Calibration core: profiles at requested depths (measured or interpolated), per-depth fits, refinements, optional k-Wave drive calibration, report (no file I/O) |
+| `calibration_desired_profiles`          | Profiles on a desired-depth grid, for prediction and fitting |
+| `calibration_evaluate`                  | Geometric, library, fitted and k-Wave profiles on one set of depths |
+| `calibration_fit`                       | Interactive calibration fit: per-depth refinements or the static model |
 | `calibration_fit_depths`                | One `fit_transducer_model` fit per depth of a profile set (shared by library build, refinement, GUI, `calibration_transducer`) |
+| `calibration_fit_entry`                 | Library entry from the current entry and a CALIBRATION_FIT result |
 | `calibration_fit_options`               | Per-depth fit presets: `rayleigh_phase_gain` (default) and `oneil_phase_only` (former global-search settings) |
+| `calibration_focus_beyond`              | FLHM centre of each axial profile, ignoring the near field |
 | `calibration_pipeline_start`            | Universal launcher for calibration_transducer (MATLAB / SLURM / qsub) |
+| `calibration_save_entry`                | Write a fitted library entry to a user library folder |
 | `calibration_setup`                     | Run CALIBRATION_TRANSDUCER for every equipment combination in the calibration config |
 | `calibration_transducer`                | Config-driven calibration at chosen depths and intensities; writes a library entry and a calibration output folder |
 | `check_equipment_config`                | Validate equipment configuration YAML files |

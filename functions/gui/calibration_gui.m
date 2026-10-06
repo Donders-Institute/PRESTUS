@@ -29,8 +29,15 @@ function fig = calibration_gui(options)
 % in the equipment folder, with a live geometry preview, after
 % CHECK_EQUIPMENT_CONFIG. Matrix transducers are geometry only: prediction
 % and fitting support annular arrays. All computation goes through
-% FIT_TRANSDUCER_MODEL and the library helpers, so results match
-% REFINE_TRANSDUCER_LIBRARY / BUILD_TRANSDUCER_LIBRARY exactly.
+% CALIBRATION_DESIRED_PROFILES, CALIBRATION_EVALUATE, CALIBRATION_FIT and
+% CALIBRATION_SAVE_ENTRY (shared with the Calibration page of the PRESTUS
+% Nexus) and through them FIT_TRANSDUCER_MODEL and the library helpers, so
+% results match REFINE_TRANSDUCER_LIBRARY / BUILD_TRANSDUCER_LIBRARY exactly.
+%
+% A saved entry records how it was fitted (meta.fit: mode, free parameters,
+% fit options, depths, profile CSV, reference ISPPA, k-Wave drive check).
+% Loading an entry that has meta.fit restores those settings, so a refit
+% starts where the last one ended.
 %
 % Use as:
 %   calibration_gui()
@@ -52,7 +59,8 @@ function fig = calibration_gui(options)
 % Output:
 %   fig - uifigure handle
 %
-% See also: FIT_TRANSDUCER_MODEL, EVALUATE_LIBRARY_ENTRY, INTERPOLATE_AXIAL_PROFILES,
+% See also: CALIBRATION_FIT, CALIBRATION_EVALUATE, CALIBRATION_SAVE_ENTRY,
+%           FIT_TRANSDUCER_MODEL, EVALUATE_LIBRARY_ENTRY, INTERPOLATE_AXIAL_PROFILES,
 %           LIBRARY_SETTINGS_TABLE, REFINE_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY,
 %           CHECK_EQUIPMENT_CONFIG, KWAVE_CALIBRATE_DRIVE
 
@@ -67,9 +75,9 @@ function fig = calibration_gui(options)
     st.meas = [];           % measured profiles (READ_AXIAL_PROFILES), [] = none loaded
     st.prof = [];           % profiles on view: st.meas, or the desired depths of Predict with
                             % their measured/derived profiles (.profile_type)
-    st.lib = []; st.res = struct(); st.fit_model = []; st.fit_mode = '';
-    st.fit_prof = [];       % profiles the current fit was fitted to (.profile_type per depth)
-    st.kw = [];   % k-Wave drive calibration of the current per-depth fit: .lib, .report, .sims, .res
+    st.lib = []; st.res = struct();
+    st.fit = [];  % current (unsaved) fit: CALIBRATION_FIT result (.mode, .model, .prof, .entry, .record)
+    st.kw = [];   % k-Wave drive calibration of the current per-depth fit: .lib, .report, .sims, .settings
     st.predicted = false;   % true: st.prof is the desired-depth grid
     st.adv = struct();      % advanced FIT_TRANSDUCER_MODEL options ("Advanced…"); empty = defaults
 
@@ -228,7 +236,7 @@ function fig = calibration_gui(options)
         tran = st.equip.trans.(ui.tran.Value);
         ds   = ui.ds.Value;
         ui.csv.Value = '';
-        st.meas = []; st.prof = []; st.predicted = false; st.res = struct(); st.fit_model = []; st.fit_prof = []; st.kw = [];
+        st.meas = []; st.prof = []; st.predicted = false; st.res = struct(); st.fit = []; st.kw = [];
         ui.depths.Items = {};
         if is_matrix(tran)
             st.lib = [];
@@ -246,6 +254,7 @@ function fig = calibration_gui(options)
         st.lib = load_entry();
         say(sprintf('%s: %s', combo_name(), ternary(isempty(st.lib), 'no library entry', ...
             sprintf('library entry (%s)', char(string(get_field(get_field(st.lib, 'meta', []), 'calibration_type', '?')))))));
+        apply_fit_record(st.lib);
         if ~isempty(ui.csv.Value); on_load(); else; on_predict(); end
     end
 
@@ -268,7 +277,7 @@ function fig = calibration_gui(options)
         end
         items = depth_items(st.meas.depths_ep_mm);
         ui.depths.Items = items; ui.depths.Value = items;
-        st.fit_model = []; st.fit_prof = []; st.kw = [];
+        st.fit = []; st.kw = [];
         say(sprintf('Loaded %d depths (%.1f–%.1f mm) from %s', numel(items), ...
             min(st.meas.depths_ep_mm), max(st.meas.depths_ep_mm), ui.csv.Value));
         show_measured();
@@ -297,12 +306,10 @@ function fig = calibration_gui(options)
         if ok; dep = unique(round(dep(:)', 2)); end
     end
 
-    function p = desired_profiles(dep)
-        % Profiles at the desired depths from the measurements: measured,
-        % interpolated or extrapolated (INTERPOLATE_AXIAL_PROFILES); NaN where
-        % none can be derived
-        p = interpolate_axial_profiles(st.meas, dep, struct('Align', ui.align.Value, ...
-            'MaxExtrapolationMm', ui.extrap.Value, 'NearFieldSkipMm', ui.skip.Value));
+    function o = profile_options()
+        % INTERPOLATE_AXIAL_PROFILES options for profiles at desired depths
+        o = struct('Align', ui.align.Value, 'MaxExtrapolationMm', ui.extrap.Value, ...
+                   'NearFieldSkipMm', ui.skip.Value);
     end
 
     function on_predict()
@@ -314,22 +321,9 @@ function fig = calibration_gui(options)
         if is_matrix(tran); say('Prediction supports annular arrays only.'); return; end
         [dep, ok] = desired_depths();
         if ~ok; say('Desired depths: enter depths such as 20:5:60 or 30, 42.5, 50.'); return; end
-        zmax = ceil(1.5 * max([dep, tran.transducer.annular.dist_geom_ep_mm]));
-        if isempty(st.meas)
-            z = (0:0.25:zmax)';
-            p = struct('depths_ep_mm', dep, 'z_ep_mm', z, 'I', nan(numel(z), numel(dep)), 'source', '');
-            p.profile_type = repmat({'unavailable'}, 1, numel(dep));
-        else
-            p  = desired_profiles(dep);
-            z  = p.z_ep_mm; dz = median(diff(z));
-            if z(end) < zmax                              % model beyond the scan; no profile there
-                zx = (z(end) + dz:dz:zmax)';
-                p.z_ep_mm = [z; zx]; p.I = [p.I; nan(numel(zx), numel(dep))];
-            end
-        end
-        st.prof = p;
+        st.prof = calibration_desired_profiles(tran, st.meas, dep, profile_options());
         st.predicted = true;
-        items = depth_items(dep);
+        items = depth_items(st.prof.depths_ep_mm);
         ui.show.Items = [{'All depths'}, items]; ui.show.Value = 'All depths';
         on_evaluate();
     end
@@ -340,75 +334,18 @@ function fig = calibration_gui(options)
         if is_matrix(st.equip.trans.(ui.tran.Value)); say('Evaluation supports annular arrays only.'); return; end
         if isempty(st.prof); on_predict(); return; end
         tran = st.equip.trans.(ui.tran.Value);
-        base = base_options();
-        if st.predicted; base.NearFieldSkipMm = 0; end   % show the full modelled profile
-        geo = base; geo.EvaluateOnly = true;
-        rt  = base; rt.IsppaWcm2 = ui.isppa.Value;      % runtime path, drive at the reference ISPPA
-        res = struct();
-        has = any(isfinite(st.prof.I) & st.prof.I > 0, 1);   % depths with a (measured or derived) profile
-        pg = st.prof; pg.I(:, ~has) = 1;                 % flat placeholder: the model scale is fitted to it
-        res.geometric = pack(fit_transducer_model(tran, pg, geo));
-        if ~isempty(st.lib)
-            res.library = pack(evaluate_library_entry(tran, st.lib, st.prof, rt));
-        end
-        if ~isempty(st.fit_model)
-            if st.predicted || fit_on_derived()
-                % As a study resolves it (on the measured depths too, when the
-                % fit was calibrated on desired depths)
-                res.fit = pack(evaluate_library_entry(tran, fitted_entry(), st.prof, rt));
-            elseif iscell(st.fit_model)
-                res.fit = pack_many(st.fit_model);
-                if ~isempty(st.kw); res.kwave = st.kw.res; end
-            else
-                res.fit = pack(st.fit_model);
-            end
-        end
-        if st.predicted
-            % The full profile is shown; R² and focus are taken beyond the near
-            % field as in the fit (a near-field peak would otherwise count as
-            % the focus), R² against the measured or derived profile
-            zmax = inf; if ~isempty(st.meas); zmax = max(st.meas.z_ep_mm); end
-            for f = fieldnames(res)'
-                r = res.(f{1});
-                r.Imeas(:, ~has) = NaN;
-                r.focus = focus_beyond(r.Imod, r.z, ui.skip.Value);
-                r.r2 = r2_beyond(r.Imod, r.Imeas, r.z, ui.skip.Value, zmax);
-                res.(f{1}) = r;
-            end
-        end
-        st.res = res;
-        has_lib = isfield(st.res, 'library');
-        has_fit = isfield(st.res, 'fit');
-        if st.predicted
-            ferr = @(r) median(abs(r.focus - r.depths));
-            txt = sprintf('geometric %.1f mm', ferr(st.res.geometric));
-            if has_lib; txt = [txt sprintf(' | library %.1f mm', ferr(st.res.library))]; end
-            if has_fit; txt = [txt sprintf(' | fit (unsaved) %.1f mm', ferr(st.res.fit))]; end
-            pt = st.prof.profile_type;
-            say(sprintf(['Predicted %d depths (profiles: %d measured, %d interpolated, %d extrapolated, ' ...
-                '%d none). Median |focus − target|: %s'], numel(st.prof.depths_ep_mm), ...
-                nnz(strcmp(pt, 'measured')), nnz(strcmp(pt, 'interpolated')), ...
-                nnz(strcmp(pt, 'extrapolated')), nnz(strcmp(pt, 'unavailable')), txt));
-            [src, label] = settings_source();
-            if ~isempty(src)
-                pm = {st.res.(src).settings.phase_model};
-                r2 = st.res.(src).r2;
-                say(sprintf(['%s at the desired depths: %d refined (within the refined span), %d blended ' ...
-                    'back to the static model, %d static/geometric; median R² %.3f on %d profiles ' ...
-                    '(phases and drive at %g W/cm² in the table).'], label, ...
-                    nnz(strcmp(pm, 'refined')), nnz(strcmp(pm, 'blend')), nnz(~ismember(pm, {'refined', 'blend'})), ...
-                    median(r2, 'omitnan'), nnz(isfinite(r2)), ui.isppa.Value));
-            end
-        else
-            lib_txt = '';
-            if has_lib; lib_txt = sprintf(' | library %.3f', median(st.res.library.r2, 'omitnan')); end
-            say(sprintf('Geometric median R² %.3f%s', median(st.res.geometric.r2, 'omitnan'), lib_txt));
-        end
+        eo = struct('Predicted', st.predicted, 'Library', st.lib, 'Fit', st.fit, ...
+            'FitOptions', base_options(), 'IsppaWcm2', ui.isppa.Value);
+        if ~isempty(st.fit); eo.FitEntry = fitted_entry(); end
+        if ~isempty(st.kw); eo.Kwave = st.kw; end
+        if ~isempty(st.meas); eo.MeasuredZmaxMm = max(st.meas.z_ep_mm); end
+        [st.res, msg] = calibration_evaluate(tran, st.prof, eo);
+        cellfun(@say, msg);
         draw();
     end
 
     function tf = fit_on_derived()
-        tf = ~isempty(st.fit_prof) && any(~strcmp(st.fit_prof.profile_type, 'measured'));
+        tf = ~isempty(st.fit) && any(~strcmp(st.fit.prof.profile_type, 'measured'));
     end
 
     function on_fit()
@@ -418,56 +355,43 @@ function fig = calibration_gui(options)
         if at_desired
             [dep, ok] = desired_depths();
             if ~ok; say('Desired depths: enter depths such as 20:5:60 or 30, 42.5, 50.'); return; end
-            sel  = desired_profiles(dep);
+            sel  = calibration_desired_profiles(tran, st.meas, dep, profile_options());
             none = strcmp(sel.profile_type, 'unavailable');
             if any(none)
                 say(sprintf(['No profile at %s mm (outside the measured range %.1f–%.1f mm; ' ...
                     'raise "extrapolate ≤" to include them): skipped.'], mat2str(sel.depths_ep_mm(none)), ...
                     min(st.meas.depths_ep_mm), max(st.meas.depths_ep_mm)));
-                sel = profile_subset(sel, ~none);
             end
-            if isempty(sel.depths_ep_mm); say('None of the desired depths has a profile to calibrate on.'); return; end
+            if all(none); say('None of the desired depths has a profile to calibrate on.'); return; end
         else
             sel = selected_profiles();
             if isempty(sel.depths_ep_mm); say('Select at least one depth.'); return; end
-        end
-        fo   = base_options();
-        if startsWith(ui.mode.Value, 'Static') && ~strcmp(get_field(fo, 'PhaseConstraint', 'none'), 'none')
-            say('Phase constraints act on one depth at a time: use per-depth refinement (Advanced…).'); return;
         end
         % No z shift: it is not applied at run time, so phases fitted with it
         % would match the measurement only after a shift the entry never gets
         free = {'phase', 'amp', 'c_steer'};
         free = free([ui.fp_phase.Value, ui.fp_amp.Value, ui.fp_c.Value]);
+        mode = ternary(startsWith(ui.mode.Value, 'Static'), 'static', 'per_depth');
         dlg  = uiprogressdlg(fig, 'Title', 'Fitting', 'Indeterminate', 'on');
         cleanup = onCleanup(@() close(dlg));
-        t0 = tic;
-        st.kw = [];
-        if startsWith(ui.mode.Value, 'Static')
-            fo.FreeParams = free;
-            st.fit_model = fit_transducer_model(tran, sel, fo);
-            st.fit_mode  = 'static';
-            r2 = st.fit_model.metrics.r2;
-        else
-            % z shift stays at 0 (also for the prior). The prior only pins the
-            % unobservable common phase (default Lambda): a stronger pull stops
-            % the fit from reaching split-focus / near-field-peak solutions.
-            fo.FreeParams = intersect(free, {'phase', 'amp'}, 'stable');
-            if ~isempty(st.lib); fo.Prior = library_static_model(st.lib); end
-            fo.Prior.z_shift_mm = 0;
-            models = calibration_fit_depths(tran, sel, fo, @(k, n, d, pt) set_msg(dlg, ...
+        fo = struct('Mode', mode, 'FreeParams', {free}, 'FitOptions', base_options(), ...
+            'Library', st.lib, 'IsppaWcm2', ui.isppa.Value, 'TranSerial', ui.tran.Value, ...
+            'DrivingSystem', ternary(strcmp(ui.ds.Value, '(none)'), '', ui.ds.Value), ...
+            'Source', ui.csv.Value, 'CalibrateAt', ternary(at_desired, 'desired', 'measured'), ...
+            'Tool', 'calibration_gui', 'Progress', @(k, n, d, pt) set_msg(dlg, ...
                 sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
-            st.fit_model = models;
-            st.fit_mode  = 'per_depth';
-            r2 = cellfun(@(m) m.metrics.r2, models);
+        if at_desired
+            po = profile_options(); fo.ProfileOptions = rmfield(po, 'NearFieldSkipMm');
         end
-        st.fit_prof = sel;
-        pt = sel.profile_type;
-        say(sprintf('Fit (%s, %s) on %d profiles (%d measured, %d interpolated, %d extrapolated) in %.1f s: median R² %.3f, min %.3f', ...
-            st.fit_mode, strjoin(fo.FreeParams, '+'), numel(pt), nnz(strcmp(pt, 'measured')), ...
-            nnz(strcmp(pt, 'interpolated')), nnz(strcmp(pt, 'extrapolated')), toc(t0), median(r2), min(r2)));
-        if strcmp(st.fit_mode, 'per_depth') && ui.kw.Value
-            run_kwave_drive_calibration(sel, dlg);
+        st.kw = [];
+        try
+            [st.fit, msg] = calibration_fit(tran, sel, fo);
+        catch ME
+            say(ME.message); return;
+        end
+        say(msg);
+        if strcmp(st.fit.mode, 'per_depth') && ui.kw.Value
+            run_kwave_drive_calibration(st.fit.prof, dlg);
         end
         if at_desired || st.predicted
             on_predict();    % show the result on the desired depths, as a study resolves it
@@ -486,12 +410,12 @@ function fig = calibration_gui(options)
         if ~isempty(strtrim(ui.simcfg.Value)); ko.SimConfig = strtrim(ui.simcfg.Value); end
         t1 = tic;
         try
-            [lib, rep, sims] = kwave_calibrate_drive(entry_from_fit(), sel, ko);
+            [lib, rep, sims] = kwave_calibrate_drive(st.fit.entry, sel, ko);
         catch ME
             say(['k-Wave drive calibration failed: ' ME.message]); return;
         end
-        st.kw = struct('lib', lib, 'report', rep, 'sims', sims, ...
-            'res', pack_kwave(sims, rep, st.fit_model{1}.z_ep_mm, ui.skip.Value));
+        st.kw = struct('lib', lib, 'report', rep, 'sims', sims, 'settings', struct( ...
+            'grid', ui.kw_grid.Value, 'sim_config', strtrim(ui.simcfg.Value)));
         say(sprintf(['k-Wave drive calibration (%d depths, %.0f s): ISPPA %s W/cm² at the analytical drive ' ...
             '(target %g) → drive ×%s; median R² %.3f'], height(rep), toc(t1), ...
             strjoin(compose('%.1f', rep.isppa_kwave_wcm2'), ' '), ui.isppa.Value, ...
@@ -499,38 +423,32 @@ function fig = calibration_gui(options)
     end
 
     function on_save()
-        if isempty(st.fit_model); say('Nothing to save — run a fit first.'); return; end
+        if isempty(st.fit); say('Nothing to save — run a fit first.'); return; end
         out = ui.out.Value;
         if isempty(out); on_browse_out(); out = ui.out.Value; end
         if isempty(out); return; end
+        so = struct('ShippedLibraryPath', st.lib_path);
         if strcmp(canonical(out), canonical(st.lib_path))
             sel = uiconfirm(fig, ['This overwrites the SHIPPED library entry. ' ...
                 'Use a user folder and transducer.library_path unless you maintain the library.'], ...
                 'Shipped library', 'Options', {'Overwrite shipped entry', 'Cancel'}, 'DefaultOption', 2);
             if ~strcmp(sel, 'Overwrite shipped entry'); return; end
+            so.AllowShipped = true;
         end
-        lib = fitted_entry();
-        lib.meta.calibration_type = 'user_empirical';
-        lib.meta.refinement_mode  = st.fit_mode;
-        lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
-        try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
-        if ~isfolder(out); mkdir(out); end
-        if fit_on_derived()
-            % The profiles the entry was fitted to, next to it (as REFINE_TRANSDUCER_LIBRARY)
-            pcsv = fullfile(out, [combo_name() '_calibration_profiles.csv']);
-            write_axial_profiles(st.fit_prof, pcsv, struct('combo', combo_name()));
-            if strcmp(st.fit_mode, 'per_depth'); lib.refinement.calibration_profiles_csv = pcsv; end
-            say(sprintf('Calibration profiles (measured + derived): %s', pcsv));
+        if ~isempty(st.kw); so.Kwave = st.kw.settings; end
+        try
+            [f, pcsv] = calibration_save_entry(fitted_entry(), st.fit, out, so);
+        catch ME
+            say(['Could not save: ' ME.message]); return;
         end
-        f = fullfile(out, [combo_name() '.yaml']);
-        yaml.dumpFile(f, lib);
+        if ~isempty(pcsv); say(sprintf('Calibration profiles (measured + derived): %s', pcsv)); end
         say(sprintf('Saved %s — set transducer.library_path: %s', f, out));
     end
 
     function on_export_profiles()
         % The profiles of the last fit, else the desired-depth profiles on view
-        if ~isempty(st.fit_prof)
-            p = st.fit_prof; what = 'calibration';
+        if ~isempty(st.fit)
+            p = st.fit.prof; what = 'calibration';
         elseif st.predicted && any(~strcmp(st.prof.profile_type, 'unavailable'))
             p = st.prof; p.I = p.I(1:numel(st.meas.z_ep_mm), :); p.z_ep_mm = st.meas.z_ep_mm; what = 'desired';
         else
@@ -548,7 +466,7 @@ function fig = calibration_gui(options)
         % Per-depth runtime settings of the fit (else the library entry) at the depths on view
         if isempty(st.prof); say('Nothing on view: load a CSV or Predict first.'); return; end
         tran = st.equip.trans.(ui.tran.Value);
-        if ~isempty(st.fit_model)
+        if ~isempty(st.fit)
             lib = fitted_entry(); what = 'fit';
         elseif ~isempty(st.lib)
             lib = st.lib; what = 'library';
@@ -577,21 +495,8 @@ function fig = calibration_gui(options)
 
     function lib = fitted_entry()
         % The entry Save would write: the per-depth fit with k-Wave-corrected
-        % drives if checked, else the analytical fit
-        if ~isempty(st.kw); lib = st.kw.lib; else; lib = entry_from_fit(); end
-    end
-
-    function lib = entry_from_fit()
-        % Library entry from the current entry and fit (not yet written)
-        lib = st.lib;
-        if isempty(lib); lib = struct(); end
-        lib.meta.tran_serial = ui.tran.Value;
-        if ~strcmp(ui.ds.Value, '(none)'); lib.meta.driving_system = ui.ds.Value; end
-        if strcmp(st.fit_mode, 'static')
-            lib = library_entry_from_model(lib, st.fit_model, ui.isppa.Value);
-        else
-            lib = library_refinement_from_fits(lib, st.fit_model, ui.isppa.Value, [], ui.csv.Value);
-        end
+        % drives if checked, else the analytical fit (CALIBRATION_FIT_ENTRY)
+        if ~isempty(st.kw); lib = st.kw.lib; else; lib = st.fit.entry; end
     end
 
     function on_view_transducer()
@@ -979,7 +884,7 @@ function fig = calibration_gui(options)
                          'extrapolated', 'none', 'Extrapolated profile'}'
                     jt = jm(strcmp(pt, t{1}));
                     if isempty(jt); continue; end
-                    fm = focus_beyond(r.Imeas(:, jt), r.z, ui.skip.Value);
+                    fm = calibration_focus_beyond(r.Imeas(:, jt), r.z, ui.skip.Value);
                     plot(ax, r.depths(jt), fm, 'kp', 'MarkerFaceColor', t{2}, 'MarkerSize', 9, 'DisplayName', t{3});
                 end
             end
@@ -1004,8 +909,8 @@ function fig = calibration_gui(options)
         if st.predicted
             draw_settings(); return;
         end
-        m = st.fit_model;
-        if isempty(m); ui.params.Data = {}; return; end
+        if isempty(st.fit); ui.params.Data = {}; return; end
+        m = st.fit.model;
         if iscell(m)
             ph = cell2mat(cellfun(@(x) x.elem_phase_correction_deg(:), m, 'UniformOutput', false));
             ui.params.ColumnName = [{'Element'}, arrayfun(@(x) sprintf('%.1f mm', x.fit_depths_ep_mm), ...
@@ -1073,10 +978,7 @@ function fig = calibration_gui(options)
     function on_advanced()
         % Advanced FIT_TRANSDUCER_MODEL options. Only values that differ from the
         % fitter defaults are stored (st.adv), so "Reset" restores the default fit.
-        D = struct('PhaseConstraint', 'none', 'PhaseStepBounds', [], 'AmplitudeFit', 'shape', ...
-                   'SharedVelocity', false, 'Optimizer', 'lsqnonlin', 'PopSize', 5000, ...
-                   'MaxFunEvals', 2e5, 'Polish', true, 'FocalWeight', 0, 'FitWindowMm', [], ...
-                   'Lambda', 1e-3, 'LambdaAmp', 1e-2, 'ZShiftBounds', [-3 3]);
+        D = advanced_defaults();
         cur = D; for f = fieldnames(st.adv)'; cur.(f{1}) = st.adv.(f{1}); end
         d = uifigure('Name', 'Advanced fit options', 'Position', [200 200 430 470], 'WindowStyle', 'modal');
         G = uigridlayout(d, [15 2], 'RowHeight', repmat({24}, 1, 15), 'ColumnWidth', {190, '1x'});
@@ -1142,6 +1044,47 @@ function fig = calibration_gui(options)
         end
     end
 
+    function apply_fit_record(lib)
+        % Start from the settings this entry was fitted with (meta.fit, written
+        % by CALIBRATION_SAVE_ENTRY); entries without it keep the current settings
+        rec = get_field(get_field(lib, 'meta', []), 'fit', []);
+        if ~isstruct(rec); return; end
+        fo = get_field(rec, 'fit_options', struct());
+        static = strcmp(char(get_field(rec, 'mode', 'per_depth')), 'static');
+        ui.mode.Value = ui.mode.Items{1 + static};
+        free = cellstr(get_field(fo, 'FreeParams', {'phase', 'amp'}));
+        ui.fp_phase.Value = ismember('phase', free);
+        ui.fp_amp.Value   = ismember('amp', free);
+        ui.fp_c.Value     = ismember('c_steer', free);
+        for c = {'ForwardModel', 'fwd'; 'Domain', 'domain'}'
+            v = char(get_field(fo, c{1}, ''));
+            if any(strcmp(ui.(c{2}).Items, v)); ui.(c{2}).Value = v; end
+        end
+        for c = {'NearFieldSkipMm', 'skip'; 'HuberDelta', 'huber'; 'NStarts', 'nstarts'}'
+            if isfield(fo, c{1}); ui.(c{2}).Value = double(fo.(c{1})); end
+        end
+        ui.isppa.Value = double(get_field(rec, 'isppa_wcm2', ui.isppa.Value));
+        po = get_field(rec, 'profile_options', struct());
+        if any(strcmp(ui.align.Items, char(get_field(po, 'Align', '')))); ui.align.Value = char(po.Align); end
+        if isfield(po, 'MaxExtrapolationMm'); ui.extrap.Value = double(po.MaxExtrapolationMm); end
+        desired = strcmp(char(get_field(rec, 'calibrate_at', 'measured')), 'desired');
+        ui.calat.Value = ui.calat.Items{1 + desired};
+        if desired
+            ui.pred.Value = strjoin(compose('%g', double(rec.depths_ep_mm(:)')), ', ');
+        end
+        D = advanced_defaults(); st.adv = struct();
+        for f = fieldnames(D)'
+            if isfield(fo, f{1}) && ~isequal(double_if_numeric(fo.(f{1})), D.(f{1}))
+                st.adv.(f{1}) = fo.(f{1});
+            end
+        end
+        n = numel(fieldnames(st.adv));
+        ui.adv_btn.Text = ternary(n > 0, sprintf('Advanced (%d)', n), 'Advanced…');
+        on_mode();
+        say(sprintf('Fit settings taken from the entry (meta.fit: %s, %s, %s).', char(get_field(rec, 'mode', '')), ...
+            char(get_field(rec, 'tool', '')), char(string(get_field(lib.meta, 'last_updated', '')))));
+    end
+
     function p = selected_profiles()
         % Selected measured depths, in the profile form of INTERPOLATE_AXIAL_PROFILES
         d = str2double(ui.depths.Value);
@@ -1171,35 +1114,6 @@ function fig = calibration_gui(options)
 end
 
 %% ==========================================================================
-function r = pack(m)
-    r = struct('depths', m.fit_depths_ep_mm(:)', 'z', m.z_ep_mm, 'Imeas', m.I_meas, ...
-               'Imod', m.I_model, 'r2', m.metrics.r2(:)');
-    r.focus = arrayfun(@(j) compute_flhm_center(m.I_model(:, j), m.z_ep_mm), 1:size(m.I_model, 2));
-    r.settings = [];   % runtime settings per depth (EVALUATE_LIBRARY_ENTRY results only)
-    if isfield(m, 'settings'); r.settings = m.settings; end
-end
-
-function r = pack_kwave(sims, rep, z, skip_mm)
-% k-Wave on-axis profiles on the fit's z grid, peak-normalised beyond the near field
-    r = struct('depths', [sims.depth_ep_mm], 'z', z, 'Imeas', [], 'Imod', zeros(numel(z), numel(sims)), ...
-               'r2', rep.r2_kwave(:)');
-    for k = 1:numel(sims)
-        I = interp1(sims(k).z_ep_mm, sims(k).I_wcm2, z, 'linear', 0);
-        r.Imod(:, k) = I / max(max(I(z >= skip_mm)), eps);
-    end
-    r.focus = arrayfun(@(j) compute_flhm_center(r.Imod(:, j), z), 1:numel(sims));
-    r.settings = [];
-end
-
-function r = pack_many(models)
-    r = pack(models{1});
-    for k = 2:numel(models)
-        q = pack(models{k});
-        r.depths = [r.depths, q.depths]; r.Imeas = [r.Imeas, q.Imeas];
-        r.Imod = [r.Imod, q.Imod]; r.r2 = [r.r2, q.r2]; r.focus = [r.focus, q.focus];
-    end
-end
-
 function s = result_styles()
 % Result field, colour, legend name
     s = {'geometric', [0.6 0.6 0.6], 'Geometric'; 'library', [0.0 0.45 0.70], 'Library'; ...
@@ -1212,33 +1126,17 @@ function txt = phase_label(s)
     if strcmp(txt, 'blend'); txt = sprintf('blend w=%.2f', s.refinement_weight); end
 end
 
-function f = focus_beyond(I, z, skip_mm)
-% FLHM centre of each column of I, ignoring z < skip_mm (near field)
-    k = z >= skip_mm;
-    f = arrayfun(@(j) compute_flhm_center(I(k, j), z(k)), 1:size(I, 2));
+function D = advanced_defaults()
+% Advanced FIT_TRANSDUCER_MODEL options and their fitter defaults ("Advanced…")
+    D = struct('PhaseConstraint', 'none', 'PhaseStepBounds', [], 'AmplitudeFit', 'shape', ...
+               'SharedVelocity', false, 'Optimizer', 'lsqnonlin', 'PopSize', 5000, ...
+               'MaxFunEvals', 2e5, 'Polish', true, 'FocalWeight', 0, 'FitWindowMm', [], ...
+               'Lambda', 1e-3, 'LambdaAmp', 1e-2, 'ZShiftBounds', [-3 3]);
 end
 
-function r2 = r2_beyond(Imod, Imeas, z, skip_mm, zmax)
-% Profile-shape R² (peak-normalised intensity) beyond the near field and
-% within the measured scan, as FIT_TRANSDUCER_MODEL; NaN without a profile
-    k  = z >= skip_mm & z <= zmax;
-    r2 = nan(1, size(Imod, 2));
-    for j = 1:size(Imod, 2)
-        yt = Imeas(k, j); ym = Imod(k, j);
-        ok = isfinite(yt);
-        if ~any(ok) || max(yt(ok)) <= 0; continue; end
-        yt = yt(ok) / max(yt(ok)); ym = ym(ok) / max(max(ym(ok)), eps);
-        r2(j) = 1 - sum((yt - ym).^2) / max(sum((yt - mean(yt)).^2), eps);
-    end
-end
-
-function p = profile_subset(p, keep)
-    p.depths_ep_mm  = p.depths_ep_mm(keep);
-    p.I             = p.I(:, keep);
-    p.profile_type  = p.profile_type(keep);
-    p.source_depths = p.source_depths(keep, :);
-    p.weights       = p.weights(keep, :);
-    p.shift_mm      = p.shift_mm(keep, :);
+function v = double_if_numeric(v)
+% Values loaded from YAML in the form of advanced_defaults (char, double rows)
+    if isstring(v); v = char(v); elseif isnumeric(v); v = double(v(:)'); end
 end
 
 function items = depth_items(depths)
