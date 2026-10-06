@@ -208,6 +208,7 @@ bb = apply_default(bb, 'tx_mech_adjust_z_m', 0.0);  % 0: geometry already in NIf
 bb = apply_default(bb, 'z_steering_m',       []);   % empty = auto-derived below
 bb = apply_default(bb, 'root',               '');
 bb = apply_default(bb, 'ct_mapping',         '');   % empty = label-based path
+bb.ct_mapping = char(bb.ct_mapping);   % a YAML '' can arrive as string "", which isempty() treats as set
 bb = apply_default(bb, 'ct_use_petra',       false);
 bb = apply_default(bb, 'air_regions',        false);   % pseudoCT path: internal air as reflector
 bb = apply_default(bb, 'air_hu_window',      [-1200 -400]);
