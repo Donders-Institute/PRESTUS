@@ -206,8 +206,8 @@ transducer:
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
   focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]
-  focal_distance_ep: []      # Expected focal distance from transducer exit plane [mm]
-  focal_distance_bowl: []    # Expected focal distance from transducer bowl [mm]
+  focal_distance_ep: []      # Focal depth setting: depth the device is set to focus at, from the exit plane [mm]; [] = trans_pos→focus_pos distance
+  focal_distance_bowl: []    # Focal depth setting from the bowl apex [mm]
   focal_distance_offset: []  # Offset between bowl and exit plane [mm] [DERIVED]
   
   # --------------------------

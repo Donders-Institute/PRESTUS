@@ -58,6 +58,10 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
    - Click to set the focus or the transducer (bowl apex), or switch to **Click to browse** to just
      move the crosshair without writing anything (scrolling always just browses). The bowl is drawn
      from the device geometry.
+   - With several transducers, every bowl, beam axis and acoustic FOV box is drawn; the ones not
+     selected are dimmed. Each FOV box is resolved from its own transducer (`'auto'` diameter and
+     length), as PRESTUS does: coherent coupling simulates their union, async coupling one box
+     per transducer ([details](doc_multitransducer.md#partial-acoustic-fov)).
    - **+**/**−** by the transducer selector add or remove a transducer without switching to the
      Transducer tab; with several transducers, transducer 2 and later inherit transducer 1's values
      unless set (see *Transducer* below).
@@ -80,7 +84,8 @@ Requirements: Python ≥ 3.10 with PyQt6 and PyYAML. The placement viewer also n
      mni` still writes MNI values
      directly (PRESTUS converts them at placement-stage runtime) and is not shown in the viewer;
      type an MNI point and use **Go to** here just to look at the matching subject-space location.
-   - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Match focal distance* then sets `focal_distance_ep` to fit.
+   - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Transducer at focal depth* instead puts the transducer where the focal depth setting lands on the target.
+   - The readout keeps two depths apart: the **target depth** (exit plane → `focus_pos`, from the placement) and the **focal depth setting** (`focal_distance_ep`, the depth set on the equipment). For annular arrays the setting selects the calibrated phases, so the simulated focus lands at the setting even when the target is deeper or shallower; the readout gives the difference (red above 2 mm). *Set focal depth to target* copies the target depth into the setting.
    - Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
    - Positions are written in the space set by `placement.manual.coordinate_space` (`voxel` or `ras`). See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
    - Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`, written by `write_placement_positions`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.

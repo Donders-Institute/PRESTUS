@@ -560,9 +560,13 @@ display:
   transducer.freq_hz: {label: Frequency}
   transducer.target_isppa_wcm2: {label: Target free-water Isppa}
   transducer.trans_pos: {label: Transducer position (bowl apex)}
-  transducer.focus_pos: {label: Focus position}
-  transducer.focal_distance_ep: {label: Focal depth from exit plane}
-  transducer.focal_distance_bowl: {label: Focal depth from bowl, advanced: true}
+  transducer.focus_pos:
+    label: Target position
+    help: "The planned target (focus_pos). With trans_pos it sets the beam axis; its distance from the exit plane is the planned target depth, which the placement viewer shows next to the focal depth setting."
+  transducer.focal_distance_ep:
+    label: Focal depth setting (exit plane)
+    help: "The depth the device is set to focus at, from the exit plane: the value set on the equipment. For annular arrays it selects the calibrated phases and drive, so the simulated focus lands here even when the target (focus_pos) is deeper or shallower. Use Set to target depth in the placement viewer to make them equal."
+  transducer.focal_distance_bowl: {label: Focal depth setting (bowl apex), advanced: true}
   transducer.focal_distance_offset: {label: Bowl-to-exit-plane offset, advanced: true}
   transducer.serial: {label: Equipment serial}
   transducer.library_path: {label: Own calibration library}

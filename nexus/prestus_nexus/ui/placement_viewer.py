@@ -90,16 +90,18 @@ class PlacementPage(QWidget):
         v.addLayout(bar)
 
         tools = QHBoxLayout()
-        b_axis = QPushButton("Transducer at focal distance")
-        b_axis.setToolTip("Keep the beam direction; put the bowl apex focal_distance_bowl from the focus")
+        b_axis = QPushButton("Transducer at focal depth")
+        b_axis.setToolTip("Keep the beam direction; put the transducer where the focal depth setting "
+                          "lands on the target (bowl apex focal_distance_bowl from it)")
         b_axis.clicked.connect(self._place_on_axis)
         self.gap = QDoubleSpinBox(minimum=-20, maximum=50, value=5, singleStep=0.5, suffix=" mm")
         self.gap.setToolTip("Distance between scalp and exit plane")
         b_snap = QPushButton("Snap to scalp")
         b_snap.setToolTip("Keep the beam direction; put the exit plane this far outside the scalp")
         b_snap.clicked.connect(self._snap)
-        b_match = QPushButton("Match focal distance")
-        b_match.setToolTip("Set focal_distance_ep to the exit plane → focus distance of this placement")
+        b_match = QPushButton("Set focal depth to target")
+        b_match.setToolTip("Set the focal depth setting (focal_distance_ep) to this placement's target "
+                           "depth (exit plane → target)")
         b_match.clicked.connect(self._match_focal_distance)
         b_traj = QPushButton("Import trajectory…")
         b_traj.setToolTip("Brainsight target export (NIfTI coordinates) or 3D Slicer transform")
@@ -262,6 +264,18 @@ class PlacementPage(QWidget):
                     if rec else ""
             return found
         return out[0], out[1]
+
+    def target_depth_ep(self, ti: int) -> float | None:
+        """Planned target depth of transducer ti: exit plane -> focus_pos along the beam [mm],
+        from the positions this viewer shows (loads the T1 if the tab was never opened)."""
+        self._load_images()
+        source = self.position_source
+        trans, focus = self._positions_for(ti)
+        self.position_source = source           # keep the banner of the shown transducer
+        bowl = self._bowl_for(ti)
+        if trans is None or focus is None or bowl is None:
+            return None
+        return float(np.linalg.norm(focus - trans)) - bowl.offset
 
     def _recorded_positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
         """Positions a previous run's placement stage resolved (sub-XXX_placement<affix>.json,
@@ -573,12 +587,14 @@ class PlacementPage(QWidget):
             dist = float(np.linalg.norm(axis))
             exp = self._expected_bowl_distance()
             ep = dist - bowl.offset
-            line = f"<b>Bowl → focus:</b> {dist:.2f} mm (exit plane → focus {ep:.2f} mm)"
+            line = f"<b>Target depth:</b> {ep:.2f} mm from the exit plane (bowl apex → target {dist:.2f} mm)"
             if exp is not None:
                 diff = dist - exp
                 colour = "#3c763d" if abs(diff) <= 2 else "#c9302c"
-                line += (f"<br>Configured focal distance (bowl): {exp:.2f} mm — "
-                         f"<span style='color:{colour}'>Δ {diff:+.2f} mm</span>")
+                where = (f"target {abs(diff):.2f} mm {'beyond' if diff > 0 else 'short of'} the focus"
+                         if abs(diff) >= 0.005 else "on target")
+                line += (f"<br>Focal depth setting: {exp - bowl.offset:.2f} mm from the exit plane — "
+                         f"<span style='color:{colour}'>{where}</span>")
             dev = self.model.device(self.ti)
             if dev is not None and dev.min_foc is not None and dev.max_foc is not None:
                 ok = dev.min_foc <= ep <= dev.max_foc
@@ -781,7 +797,7 @@ class PlacementPage(QWidget):
         d, dist = self._direction(), self._expected_bowl_distance()
         if d is None or dist is None:
             QMessageBox.information(self, "Placement", "Needs a beam direction (transducer, trajectory "
-                                    "or segmentation) and focal_distance_ep or _bowl.")
+                                    "or segmentation) and a focal depth setting (focal_distance_ep or _bowl).")
             return
         self._write("trans_pos", pl.place_on_axis(self.positions()[1], d, dist))
         self.refresh()
@@ -836,7 +852,7 @@ class PlacementPage(QWidget):
         QMessageBox.information(self, "Import trajectory",
                                 f"{traj.source} target '{traj.name}' imported"
                                 + ("" if dist is not None else
-                                   ". Set focal_distance_ep to place the transducer on its axis") + ".")
+                                   ". Set the focal depth setting (focal_distance_ep) to place the transducer on its axis") + ".")
 
     def _use_manual(self) -> None:
         self.model.set("placement.mode", "manual")
