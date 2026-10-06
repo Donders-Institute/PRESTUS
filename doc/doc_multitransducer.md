@@ -264,6 +264,14 @@ This produces three combine+thermal pairs (sweep 1: A→3.0, B→2.0; sweep 2: A
                Affixes: _desc-asyncJoint (M=1) or _desc-asyncJointS01… (M>1)
 ```
 
+`prestus_pipeline_start` returns the submitted job IDs per stage as a second output, so later jobs can wait for an async run, e.g. runs that reuse its grid and per-transducer fields:
+
+```matlab
+[~, jobs] = prestus_pipeline_start(parameters);   % jobs.preproc, .acoustic, .combine, .thermal, .water
+next.hpc.depend_job_ids = [jobs.preproc, jobs.acoustic];
+prestus_pipeline_start(next);
+```
+
 On HPC (SLURM/qsub): in `shared` mode, all N acoustic stages are submitted simultaneously after the
 one preproc job; in `per_transducer` mode, N preproc jobs are submitted simultaneously and each
 acoustic job depends only on its own transducer's preproc job (not on the others). Each combine

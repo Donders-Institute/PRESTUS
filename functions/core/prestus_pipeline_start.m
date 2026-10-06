@@ -1,4 +1,4 @@
-function job_id = prestus_pipeline_start(parameters, options)
+function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 % PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher for MATLAB, SLURM, and qsub
 %
 % Auto-detects the execution platform (matlab / slurm / qsub) via
@@ -15,6 +15,7 @@ function job_id = prestus_pipeline_start(parameters, options)
 %   prestus_pipeline_start(parameters, options)
 %   job_id = prestus_pipeline_start(parameters)
 %   job_id = prestus_pipeline_start(parameters, options)
+%   [job_id, jobs] = prestus_pipeline_start(...)
 %
 % Input:
 %   parameters - PRESTUS config; must contain subject_id; platform field
@@ -23,7 +24,12 @@ function job_id = prestus_pipeline_start(parameters, options)
 %                .sequential_configs — cell array of config paths for sequential runs
 %
 % Output:
-%   job_id     - HPC scheduler job ID; [] when platform is 'matlab'
+%   job_id     - HPC scheduler job ID; [] when platform is 'matlab' and for
+%                pipelines that submit a job graph (async, multi-ISPPA, uncertainty)
+%   jobs       - async multi-transducer mode on HPC: the job IDs submitted per
+%                stage (fields preproc, acoustic, combine, thermal, water; see
+%                ASYNC_TRANSDUCER_PIPELINE), e.g. to make later jobs depend on
+%                the acoustic fields. struct() (no fields) otherwise.
 %
 % See also: PRESTUS_PIPELINE, UNCERTAINTY_PIPELINE, LOAD_PARAMETERS, PATH_LOG_SETUP
 
@@ -32,6 +38,7 @@ function job_id = prestus_pipeline_start(parameters, options)
         options struct = struct()
     end
 
+    jobs = struct();
     if ~isfield(parameters, 'subject_id')
         error('parameters.subject_id must be set before calling prestus_pipeline_start.');
     end
@@ -87,7 +94,7 @@ function job_id = prestus_pipeline_start(parameters, options)
             % own acoustic job; combine and thermal stages follow with
             % scheduler dependencies.
             if is_async_mode(parameters)
-                async_transducer_pipeline(parameters, options);
+                jobs = async_transducer_pipeline(parameters, options);
                 job_id = [];
                 return;
             end

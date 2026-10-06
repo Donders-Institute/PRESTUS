@@ -28,6 +28,7 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 - **Docs**: `doc_multitransducer.md` gave the async affixes as `_desc-t01` / `_desc-asyncThermal`; the code writes `_trans-01` / `_desc-asyncJoint` (and `…_report_desc-asyncJoint.html`). New sections on partial FOV with several transducers, complex superposition and how BabelBrain combines multi-point fields (per-voxel maximum and time-multiplexed heating of magnitude fields, not complex addition)
 - ⚠️ **Partial FOV for an oblique beam**: the FOV box assumed the beam runs along the grid z axis (lateral extent centred on the focus). On an async shared grid aligned to transducer 1, transducer 2's beam can be far off that axis (42° in a bilateral setup), its bowl fell outside the box and the run stopped (`source.p_mask must … have at least one element`). A beam more than 2° off the axis now gets a box around its own beam axis
 - **Async + partial FOV, joint job**: the joint thermal job cropped the medium to an acoustic FOV again while the combined field is on the full grid (`acoustic_analysis`: arrays have incompatible sizes); it now runs without the crop
+- **Async job IDs**: `[job_id, jobs] = prestus_pipeline_start(...)` returns the job IDs an async run submitted per stage (`jobs.preproc`, `.acoustic`, `.combine`, `.thermal`, `.water`), so other runs can depend on it (`hpc.depend_job_ids`); `job_id` is unchanged ([] for async)
 
 #### Robustness, benchmarks and documentation (2026-10 audit, part 2)
 

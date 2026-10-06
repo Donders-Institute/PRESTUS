@@ -1,4 +1,4 @@
-function async_transducer_pipeline(parameters, options)
+function jobs = async_transducer_pipeline(parameters, options)
 % ASYNC_TRANSDUCER_PIPELINE  Simulate N asynchronously firing transducers
 %                            with independent acoustic fields and a joint
 %                            thermal model.
@@ -55,12 +55,14 @@ function async_transducer_pipeline(parameters, options)
 % Use as:
 %   async_transducer_pipeline(parameters)
 %   async_transducer_pipeline(parameters, options)
+%   jobs = async_transducer_pipeline(...)
 %
 % Input:
 %   parameters - PRESTUS config with parameters.transducer as a struct array
 %                (N ≥ 2) and simulation.transducer_coupling = 'async'.
 %                Each transducer may carry a scalar or vector
-%                target_isppa_wcm2.  Do NOT set io.output_affix.
+%                target_isppa_wcm2.  io.output_affix, if set, prefixes every
+%                stage's affix (e.g. _desc-run1_trans-01, _desc-run1_desc-asyncJoint).
 %                simulation.async_grid_mode (optional): 'shared' (default) —
 %                one grid sized/aligned to fit every transducer; or
 %                'per_transducer' — each transducer gets its own optimally
@@ -72,6 +74,12 @@ function async_transducer_pipeline(parameters, options)
 %                .thermal_timelimit    wall time per thermal job  ('04:00:00')
 %                .acoustic_memorylimit / combine_memorylimit / thermal_memorylimit
 %                .acoustic_partition  / combine_partition  / thermal_partition
+%
+% Output:
+%   jobs       - scheduler job IDs submitted per stage (fields preproc,
+%                acoustic, combine, thermal, water; [] for stages that were
+%                skipped because their output exists, and all [] when run in
+%                MATLAB). Lets a caller make later jobs depend on this run.
 %
 % See also: PRESTUS_PIPELINE_START, COMBINE_ASYNC_INTENSITY,
 %           IS_ASYNC_MODE, MULTI_ISPPA_PIPELINE
@@ -300,6 +308,8 @@ fprintf('╚══════════════════════�
 %% Execute
 % =========================================================================
 
+jobs = struct('preproc', [], 'acoustic', [], 'combine', [], 'thermal', [], 'water', []);
+
 switch platform
 
     % ---------------------------------------------------------------------
@@ -413,6 +423,8 @@ switch platform
         fprintf('\n');
 
         pending_acoustic = job_ids_acoustic(acoustic_submitted);
+        jobs.preproc  = unique(job_ids_preproc(preproc_submitted));
+        jobs.acoustic = pending_acoustic;
 
         % ── Stages N+1…N+M: Combine per sweep point ──────────────────────
         job_ids_combine   = zeros(1, n_points);
@@ -443,6 +455,7 @@ switch platform
             end
         end
         fprintf('\n');
+        jobs.combine = job_ids_combine(combine_submitted);
 
         % ── Stages N+M+1…N+2M: Thermal per sweep point ───────────────────
         for j = 1:n_points
@@ -464,6 +477,7 @@ switch platform
                     pt.hpc.depend_job_ids = job_ids_combine(j);
                 end
                 job_id_th = prestus_pipeline_start(pt);
+                jobs.thermal(end+1) = job_id_th;
                 fprintf('           → job %s\n', num2str(job_id_th));
             end
         end
@@ -489,6 +503,7 @@ switch platform
                         pw.hpc.depend_job_ids = pending_for_water;
                     end
                     job_id_wv = prestus_pipeline_start(pw);
+                    jobs.water(end+1) = job_id_wv;
                     fprintf('           → job %s\n', num2str(job_id_wv));
                 end
             end
