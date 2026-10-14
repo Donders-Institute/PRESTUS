@@ -161,8 +161,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
              'Check parameters.path.seg and subject_id.'], mesh_path);
     end
 
-    work_dir  = fullfile(parameters.path.seg, 'PlanTUS', ...
-        sprintf('sub-%03d', parameters.subject_id), target_name);
+    work_dir  = placement_run_dir(parameters, 'plantus');
     if ~isfolder(work_dir), mkdir(work_dir); end
 
     mask_path     = fullfile(work_dir, sprintf('sub-%03d_%s_mask.nii.gz', ...

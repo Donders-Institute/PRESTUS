@@ -49,6 +49,7 @@ python -m prestus_nexus [config_study.yaml]
    - Each field has a readable name. Hovering over it or clicking **?** shows the full help from `config_default.yaml`, the config key and the default.
    - Changed values are marked ● (the tab label counts them), fields filled from the equipment library are marked *from library*, and ↺ resets a field.
    - Fields appear only when they apply to the current modes (e.g. the Localite settings only with `placement.mode: localite`).
+   - *Placement mode* marks each mode for the configured subject: **unavailable** (greyed out; the tooltip names the missing input) when PRESTUS cannot produce an input it needs — no T1, no SimNIBS segmentation (PlanTUS: also the mesh `sub-XXX.msh`) and no `startup.simnibs_bin_path` to run charm, or no recorded Localite poses; **needs setup** when charm will run first or the mode's tool paths are still empty. Tool paths never grey a mode out, since they are only shown once it is selected; the mode in use always stays selectable.
 3. **Advanced options.** Each tab hides the settings most studies leave at their defaults, and says how many are hidden. You can ignore them until you need them:
    - **+ n advanced** in a card's header shows that card's advanced settings (*Hide advanced* folds them again). **Show advanced options** shows them on every card of the tab, including the fully advanced sections.
    - An advanced setting that holds a value is always shown. Jumping to an issue opens the card it is on.

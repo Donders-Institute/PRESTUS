@@ -429,8 +429,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             % and writes the expected Localite mat so the function completes.
             [~, ~, ~, ~] = position_transducer_plantus(p, t1_hdr);
 
-            yaml_echo = fullfile(tc.TmpDir, 'PlanTUS', 'sub-001', ...
-                'test_thal', 'yaml_fields.txt');
+            yaml_echo = fullfile(placement_run_dir(p, 'plantus'), 'yaml_fields.txt');
             tc.assumeTrue(isfile(yaml_echo), ...
                 'check_yaml wrapper did not produce yaml_fields.txt — skipping YAML field check.');
 
@@ -470,8 +469,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
 
             position_transducer_plantus(p, t1_hdr);
 
-            mask_path = fullfile(tc.TmpDir, 'PlanTUS', 'sub-001', ...
-                'test_thal', 'sub-001_test_thal_mask.nii.gz');
+            mask_path = fullfile(placement_run_dir(p, 'plantus'), 'sub-001_test_thal_mask.nii.gz');
             tc.verifyTrue(isfile(mask_path), 'Target mask NIfTI must be written to disk.');
 
             mask_info = niftiinfo(mask_path);

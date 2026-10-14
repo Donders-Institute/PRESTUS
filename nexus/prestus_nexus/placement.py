@@ -250,6 +250,94 @@ def snap_to_scalp(seg: Volume, focus, towards_transducer, bowl: Bowl, gap_mm: fl
     return exit_pt + d * (gap_mm + bowl.offset)
 
 
+# ── Beam QC (same measures as the placement comparison) ──────────────────
+
+BONE_LABELS = (4, 7, 8)       # SimNIBS charm: bone, compact bone, spongy bone
+EYE_LABEL = 6
+INTRACRANIAL_LABELS = (1, 2, 3)  # WM, GM, CSF: inside the skull
+
+
+def _inward_normal(seg: Volume, p: np.ndarray, labels, radius: float = 5.0) -> np.ndarray | None:
+    """Unit normal of the tissue surface at p, pointing into the tissue: from the
+    centroid of the surrounding non-tissue samples to that of the tissue samples."""
+    g = np.arange(-radius, radius + 1e-9, 1.0)
+    off = np.stack(np.meshgrid(g, g, g, indexing="ij"), -1).reshape(-1, 3)
+    off = off[np.linalg.norm(off, axis=1) <= radius]
+    inside = np.isin(seg.sample(p + off), labels)
+    if inside.all() or not inside.any():
+        return None
+    n = off[inside].mean(axis=0) - off[~inside].mean(axis=0)
+    return n / np.linalg.norm(n) if np.linalg.norm(n) > 0 else None
+
+
+def beam_qc(seg: Volume, trans, focus, bowl: Bowl, step: float = 0.25) -> dict[str, float]:
+    """Geometry of a placement along its beam, from the tissue labels
+    (code/report/02_placement/placement_geometry_metrics.m uses the same measures):
+
+    skull_path_mm               bone on the central ray, exit plane -> focus
+    skull_incidence_deg         beam vs skull normal where the central ray enters bone
+    beam_skull_path_mean/sd_mm  bone on 37 rays from the aperture (centre + 3 rings x 12)
+    beam_skull_incidence_mean_deg   to the focus, and their mean incidence angle
+    rim_gap_mean/sd/min_mm      exit-plane rim -> scalp along the beam (36 points);
+                                SD = coupling evenness, min < 0 = the rim cuts into the head
+    eye_in_beam                 fraction of the 37 rays that pass an eye
+    Values are NaN where they cannot be measured. Incidence uses the outer skull
+    normal from a 5 mm neighbourhood; it can differ by a few degrees from the
+    MATLAB evaluator, which takes the gradient of a smoothed bone mask."""
+    trans, focus = np.asarray(trans, float), np.asarray(focus, float)
+    axis = _unit(focus - trans)
+    ep = trans + axis * bowl.offset
+    u, v = _orthonormal(axis)
+    nan = float("nan")
+    out: dict[str, float] = {}
+
+    def ray(origin, target):
+        d = target - origin
+        L = float(np.linalg.norm(d))
+        d = d / L
+        s = np.arange(0, L, step)
+        pts = origin + np.outer(s, d)
+        lab = seg.sample(pts)
+        bone = np.isin(lab, BONE_LABELS)
+        inc = nan
+        if bone.any():
+            # outer skull surface: bone and everything inside it count as inside,
+            # so a thin skull does not see the brain side as 'outside'
+            n = _inward_normal(seg, pts[np.argmax(bone)], BONE_LABELS + INTRACRANIAL_LABELS)
+            if n is not None:
+                inc = float(np.degrees(np.arccos(min(1.0, abs(float(n @ d))))))
+        return step * float(bone.sum()), inc, bool((lab == EYE_LABEL).any())
+
+    out["skull_path_mm"], out["skull_incidence_deg"], _ = ray(ep, focus)
+
+    R = bowl.aperture / 2
+    origins = [ep]
+    for r in (R / 3, 2 * R / 3, R):
+        for a in np.radians(np.arange(0, 360, 30)):
+            origins.append(ep + r * (np.cos(a) * u + np.sin(a) * v))
+    res = [ray(o, focus) for o in origins]
+    paths = np.array([r[0] for r in res])
+    incs = np.array([r[1] for r in res])
+    out["beam_skull_path_mean_mm"] = float(paths.mean())
+    out["beam_skull_path_sd_mm"] = float(paths.std(ddof=1))
+    out["beam_skull_incidence_mean_deg"] = float(np.nanmean(incs)) if np.isfinite(incs).any() else nan
+    out["eye_in_beam"] = float(np.mean([r[2] for r in res]))
+
+    back = 30.0
+    t = np.arange(-back, 60, step)
+    gaps = []
+    for a in np.radians(np.arange(0, 360, 10)):
+        rim = ep + R * (np.cos(a) * u + np.sin(a) * v)
+        head = seg.sample(rim + np.outer(t, axis)) > 0
+        gaps.append(float(t[np.argmax(head)]) if head.any() else nan)
+    gaps = np.array(gaps)
+    ok = np.isfinite(gaps)
+    out["rim_gap_mean_mm"] = float(gaps[ok].mean()) if ok.any() else nan
+    out["rim_gap_sd_mm"] = float(gaps[ok].std(ddof=1)) if ok.sum() > 1 else nan
+    out["rim_gap_min_mm"] = float(gaps[ok].min()) if ok.any() else nan
+    return out
+
+
 # ── Trajectory files (Brainsight, 3D Slicer) ─────────────────────────────
 
 @dataclass

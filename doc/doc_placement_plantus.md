@@ -311,8 +311,8 @@ For the best vertex *v*:
    - Columns 1–2 = orthonormal frame computed via Gram–Schmidt
 
 4. Save outputs to `<output_dir>/vtx<N>/`, where `<output_dir>` is the
-   per-target work directory PRESTUS passes to both launchers,
-   `<path.seg>/PlanTUS/sub-XXX/<target_name>/`:
+   per-target [placement run folder](doc_outputs.md#where-outputs-live) PRESTUS
+   passes to both launchers, `<path.placement>/sub-XXX/plantus/<target_name>/`:
 
    | File | Contents |
    |------|----------|
@@ -338,7 +338,7 @@ For the best vertex *v*:
 ### 7  PRESTUS reads the output
 
 `position_transducer_plantus.m` searches for the most recent `*Localite.mat`
-under this target's work directory (`<path.seg>/PlanTUS/sub-XXX/<target_name>/`),
+under this target's work directory (`<path.placement>/sub-XXX/plantus/<target_name>/`),
 considering only files written during the current run: `*Localite.mat` files
 that already existed before the launch (e.g. from an earlier run or another
 vertex) are ignored unless they were modified since. If no new file is found it

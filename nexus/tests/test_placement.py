@@ -166,3 +166,33 @@ def test_mni_to_subject_missing_tool_or_m2m(tmp_path):
     _fake_mni2subject_coords(bin_dir)
     with pytest.raises(pl.SimnibsCoordError, match="not found"):
         pl.mni_to_subject([0, 0, 0], tmp_path / "no_m2m", str(bin_dir))
+
+
+def test_beam_qc_layered_sphere(tmp_path):
+    # 1 mm grid: brain r <= 40 (label 2), skull 40-46 (4), scalp 46-50 (5)
+    shape = (121, 121, 121)
+    affine = np.eye(4)
+    affine[:3, 3] = -60
+    g = np.indices(shape).reshape(3, -1).T - 60
+    r = np.linalg.norm(g, axis=1)
+    lab = np.zeros(len(r), np.uint8)
+    lab[r <= 50] = 5
+    lab[r <= 46] = 4
+    lab[r <= 40] = 2
+    path = tmp_path / "seg.nii.gz"
+    nib.save(nib.Nifti1Image(lab.reshape(shape), affine), str(path))
+    seg = pl.Volume(path)
+    bowl = pl.Bowl(63.2, 64, 52.38)
+    apex = pl.snap_to_scalp(seg, [0, 0, 0], [0, 0, 1], bowl, gap_mm=5)
+    q = pl.beam_qc(seg, apex, [0, 0, 0], bowl)
+    assert q["skull_path_mm"] == pytest.approx(6, abs=1)
+    assert q["skull_incidence_deg"] < 8                    # radial beam: normal incidence
+    assert q["beam_skull_path_mean_mm"] >= q["skull_path_mm"] - 0.5
+    # rim (radius 32) above a sphere of radius 50: scalp at z = sqrt(50^2 - 32^2)
+    exit_z = apex[2] - bowl.offset
+    assert q["rim_gap_mean_mm"] == pytest.approx(exit_z - math.sqrt(50 ** 2 - 32 ** 2), abs=1)
+    assert q["rim_gap_sd_mm"] < 1                          # symmetric: even contact (voxel staircase only)
+    assert q["eye_in_beam"] == 0
+    # transducer pushed into the head: the rim cuts into the scalp
+    q = pl.beam_qc(seg, np.asarray(apex) - [0, 0, 20], [0, 0, 0], bowl)
+    assert q["rim_gap_min_mm"] < 0

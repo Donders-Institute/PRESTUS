@@ -84,7 +84,7 @@ try
     };
     if strcmp(mode, 'plantus')
         sections(end+1, :) = {'PlanTUS criteria evaluation', ...
-            @() build_plantus_section(parameters, target), true, 'plantus'};
+            @() build_plantus_section(parameters), true, 'plantus'};
     end
     sections(end+1, :) = {'Placement configuration', ...
         @() build_config_section(parameters), false, 'config'};
@@ -196,9 +196,8 @@ function html = build_overlay_section(parameters, mode, affix)
 end
 
 % ── PlanTUS evaluation ──────────────────────────────────────────────────
-function html = build_plantus_section(parameters, target)
-    eval_dir = fullfile(parameters.path.seg, 'PlanTUS', ...
-        sprintf('sub-%03d', parameters.subject_id), target.name);
+function html = build_plantus_section(parameters)
+    eval_dir = placement_run_dir(parameters, 'plantus');
     eval_file = fullfile(eval_dir, 'plantus_evaluation.json');
     if ~isfile(eval_file)
         html = sprintf(['<p class="placeholder">No PlanTUS evaluation found at %s. ' ...

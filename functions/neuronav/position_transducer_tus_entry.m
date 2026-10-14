@@ -40,11 +40,15 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 %
 % Required configuration (parameters.placement.tus_entry):
 %   script_path      - Path to TUS_entry.R (full path to the R script file)
-%   scalp_mask       - Path to binary NIfTI scalp mask (same space as T1)
 %   env_path         - Path to conda env containing Rscript (e.g.
 %                      /home/user/.conda/envs/tus_entry)
 %
 % Optional configuration (parameters.placement.tus_entry):
+%   scalp_mask       - NIfTI head/scalp mask in the T1 grid; nonzero = head.
+%                      Default: <path.seg>/m2m_sub-XXX/final_tissues.nii.gz.
+%                      Either way it is filled into a solid head mask (TUS_entry
+%                      needs one) written to the work directory; the source is
+%                      only read.
 %   target_mask      - Path to binary NIfTI target mask. When empty, a
 %                      spherical mask is generated from the focus position.
 %   target_mask_radius_mm - Radius [mm] for auto-generated sphere (default 5)
@@ -52,13 +56,16 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 %   minimal_distance_cm  - Minimum scalp-to-target distance [cm] (default 4.24)
 %   maximal_distance_cm  - Maximum scalp-to-target distance [cm] (default 7.46)
 %   transducer_size_cm   - Transducer outer diameter [cm] (default 6.4)
-%   voxel_size_cm        - Voxel size [cm/voxel] (default 0.1)
+%   voxel_size_cm        - Voxel size [cm/voxel] (default: mean T1 voxel size
+%                          from t1_header; TUS_entry assumes isotropic voxels)
 %   resolution_cm        - Spatial decimation step [cm] (default 0.33)
 %   return_candidates    - Return full ranked candidate list (default false)
 %   target_name          - Label for output files (default 'target')
 %   work_dir             - Override working directory for TUS_entry outputs
+%                          (default <placement dir>/tus_entry/<target_name>, PLACEMENT_RUN_DIR)
 %
-% See also: PREPROC_TRANSDUCER_PLACEMENT, RAS_TO_GRID, TRANSFORM_COORDINATES
+% See also: PREPROC_TRANSDUCER_PLACEMENT, PLACEMENT_RUN_DIR, RAS_TO_GRID,
+%           TRANSFORM_COORDINATES
 
     arguments
         parameters (1,1) struct
@@ -69,20 +76,30 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     % ── Validate required fields ──────────────────────────────────────────────
 
-    validate_required_fields(te, {'script_path', 'scalp_mask', 'env_path'}, ...
+    validate_required_fields(te, {'script_path', 'env_path'}, ...
         'PRESTUS:tus_entry:missingConfig', 'placement.tus_entry');
 
     script_path = char(te.script_path);
-    scalp_mask  = char(te.scalp_mask);
     env_path    = char(te.env_path);
 
     if ~isfile(script_path)
         error('PRESTUS:tus_entry:notFound', ...
             'TUS_entry.R not found at placement.tus_entry.script_path:\n  %s', script_path);
     end
-    if ~isfile(scalp_mask)
+
+    % Source of the head mask: the configured scalp mask, else the CHARM
+    % segmentation. Either is only read; the solid copy goes to the run folder.
+    if isfield(te, 'scalp_mask') && ~isempty(te.scalp_mask)
+        mask_source = char(te.scalp_mask);
+        mask_field  = 'placement.tus_entry.scalp_mask';
+    else
+        mask_source = fullfile(parameters.path.seg, ...
+            sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz');
+        mask_field  = 'the SimNIBS segmentation (placement.tus_entry.scalp_mask unset)';
+    end
+    if ~isfile(mask_source)
         error('PRESTUS:tus_entry:notFound', ...
-            'Scalp mask not found at placement.tus_entry.scalp_mask:\n  %s', scalp_mask);
+            'Head mask source not found (%s):\n  %s', mask_field, mask_source);
     end
 
     % ── Locate Rscript binary ─────────────────────────────────────────────────
@@ -94,7 +111,16 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
     min_dist  = get_opt(te, 'minimal_distance_cm',   4.24);
     max_dist  = get_opt(te, 'maximal_distance_cm',   7.46);
     tx_size   = get_opt(te, 'transducer_size_cm',    6.4);
-    vox_size  = get_opt(te, 'voxel_size_cm',         0.1);
+    % TUS_entry measures distances in voxels x voxel_size (isotropic); the
+    % head and target masks are on the T1 grid, so take the size from it.
+    t1_vox_mm = double(t1_header.PixelDimensions(1:3));
+    vox_size  = get_opt(te, 'voxel_size_cm',         mean(t1_vox_mm) / 10);
+    if max(t1_vox_mm) / min(t1_vox_mm) > 1.05
+        warning('PRESTUS:tus_entry:anisotropic', ...
+            ['T1 voxels are anisotropic (%s mm); TUS_entry assumes isotropic voxels ' ...
+             '(voxel_size %.4g cm), so its distances are approximate.'], ...
+            mat2str(t1_vox_mm, 3), vox_size);
+    end
     res_cm    = get_opt(te, 'resolution_cm',         0.33);
     target_name = char(get_opt(te, 'target_name',    'target'));
     return_candidates = logical(get_opt(te, 'return_candidates', false));
@@ -111,13 +137,21 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 
     % ── Working directory ─────────────────────────────────────────────────────
 
-    if isfield(te, 'work_dir') && ~isempty(te.work_dir)
-        work_dir = char(te.work_dir);
-    else
-        work_dir = fullfile(parameters.path.seg, 'TUS_entry', ...
-            sprintf('sub-%03d', parameters.subject_id), target_name);
-    end
+    work_dir = placement_run_dir(parameters, 'tus_entry');
     if ~isfolder(work_dir), mkdir(work_dir); end
+
+    % ── Solid head mask (run folder) ──────────────────────────────────────────
+    %
+    % TUS_entry walks each candidate ray from outside the head towards the
+    % target and takes the last voxel with scalp == 0 as the entry point, so
+    % the mask must be solid. A skin shell (e.g. CHARM label 5) leaves the
+    % head interior at 0: the "entry" collapses onto the target, every
+    % candidate has distance 0 and TUS_entry crashes on an empty table.
+
+    scalp_mask = fullfile(work_dir, ...
+        sprintf('sub-%03d_tus_entry_head_mask.nii.gz', parameters.subject_id));
+    head = write_head_mask(mask_source, scalp_mask, t1_header);
+    fprintf('TUS_entry: solid head mask from %s:\n  %s\n', mask_source, scalp_mask);
 
     % ── Resolve / write target mask ───────────────────────────────────────────
 
@@ -138,6 +172,25 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
             target_ras, target_mask, radius_mm);
         fprintf('TUS_entry: spherical target mask written (r=%.1f mm):\n  %s\n', ...
             radius_mm, target_mask);
+    end
+
+    % TUS_entry reports an unreachable target as an opaque data.frame error;
+    % catch the geometric cause here.
+    target_vol = squeeze(niftiread(target_mask)) ~= 0;
+    if ~isequal(size(target_vol), size(head))
+        error('PRESTUS:tus_entry:gridMismatch', ...
+            'Target mask grid %s differs from head mask grid %s:\n  %s', ...
+            mat2str(size(target_vol)), mat2str(size(head)), target_mask);
+    end
+    [ti, tj, tk] = ind2sub(size(target_vol), find(target_vol));
+    if isempty(ti)
+        error('PRESTUS:tus_entry:emptyTarget', 'Target mask is empty:\n  %s', target_mask);
+    end
+    centroid = round(mean([ti, tj, tk], 1));
+    if ~head(centroid(1), centroid(2), centroid(3))
+        error('PRESTUS:tus_entry:targetOutsideHead', ...
+            'Target centroid (voxel [%d %d %d]) lies outside the head mask:\n  %s', ...
+            centroid, scalp_mask);
     end
 
     % ── Write runner R script ─────────────────────────────────────────────────
@@ -345,6 +398,38 @@ function write_target_mask(t1_path, target_ras, mask_path, radius_mm)
     niftiwrite(vol, nii_path, info);
     gzip(nii_path);
     delete(nii_path);
+end
+
+function head = write_head_mask(source_path, mask_path, t1_header)
+% Read a scalp/head mask or segmentation, make it a solid head and write it
+% (uint8) to mask_path. The source file is never modified.
+%
+% Any nonzero voxel counts as head, so CHARM final_tissues (all labels) and a
+% skin shell both work. A skin shell is open at the neck, so a 3D hole fill
+% alone does not close it; fill slice-wise along each axis as well (axial
+% slices through the head are closed rings).
+    hdr  = niftiinfo(source_path);
+    head = squeeze(niftiread(hdr)) ~= 0;
+    if ~isequal(size(head), t1_header.ImageSize(1:3))
+        error('PRESTUS:tus_entry:gridMismatch', ...
+            'Head mask source grid %s differs from the T1 grid %s:\n  %s', ...
+            mat2str(size(head)), mat2str(t1_header.ImageSize(1:3)), source_path);
+    end
+    head = imfill(head, 'holes');
+    for d = 1:3
+        order = [setdiff(1:3, d), d];
+        h = permute(head, order);
+        for s = 1:size(h, 3)
+            h(:, :, s) = imfill(h(:, :, s), 'holes');
+        end
+        head = ipermute(h, order);
+    end
+
+    hdr.ImageSize       = size(head);
+    hdr.PixelDimensions = hdr.PixelDimensions(1:3);
+    hdr.Datatype        = 'uint8';
+    hdr.BitsPerPixel    = 8;
+    niftiwrite(uint8(head), regexprep(mask_path, '\.nii\.gz$', ''), hdr, 'Compressed', true);
 end
 
 function rscript_bin = find_rscript(env_path)

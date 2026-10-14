@@ -417,7 +417,7 @@ extra:
     kind: file
     default: ''
     visible_if: {key: placement.mode, in: [tus_entry]}
-    help: Binary NIfTI scalp mask in T1 space (typically SimNIBS skin.nii.gz).
+    help: Optional NIfTI head/scalp mask in the T1 grid (nonzero = head); default SimNIBS final_tissues.nii.gz. Filled into a solid head mask in the cache.
   placement.tus_entry.target_mask:
     kind: file
     default: ''
@@ -434,6 +434,52 @@ extra:
     default: false
     visible_if: {key: placement.mode, in: [tus_entry]}
     help: Save the full ranked candidate list as RDS.
+  placement.tus_entry.target_name:
+    kind: str
+    default: 'target'
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Target label, used in the run folder and file names.
+  placement.tus_entry.target_mask_radius_mm:
+    kind: number
+    default: 5
+    unit: mm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Radius of the spherical target mask built when target_mask is empty.
+  placement.tus_entry.exclu_mask:
+    kind: file
+    default: ''
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Optional binary NIfTI of regions trajectories must avoid (T1 grid).
+  placement.tus_entry.minimal_distance_cm:
+    kind: number
+    default: 4.24
+    unit: cm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Smallest scalp-target depth. Set to the transducer's steering range.
+  placement.tus_entry.maximal_distance_cm:
+    kind: number
+    default: 7.46
+    unit: cm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Largest scalp-target depth. Set to the transducer's steering range.
+  placement.tus_entry.transducer_size_cm:
+    kind: number
+    default: 6.4
+    unit: cm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Transducer outer diameter (rim used for the coupling score).
+  placement.tus_entry.voxel_size_cm:
+    kind: number
+    default: []
+    unit: cm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Voxel size TUS_entry uses for distances; empty = the mean T1 voxel size.
+  placement.tus_entry.resolution_cm:
+    kind: number
+    default: 0.33
+    unit: cm
+    visible_if: {key: placement.mode, in: [tus_entry]}
+    help: Spatial decimation step of the candidate search.
 
 # ── Tabs of the main window ────────────────────────────────────────────
 # Each tab shows its sections as collapsible groups. Sections marked
@@ -676,6 +722,9 @@ display:
   placement.tus_entry.target_mask: {label: Target mask}
   placement.tus_entry.mni_target_mm: {label: Target (MNI)}
   placement.tus_entry.return_candidates: {label: Save ranked candidates}
+  placement.tus_entry.minimal_distance_cm: {advanced: false}
+  placement.tus_entry.maximal_distance_cm: {advanced: false}
+  placement.tus_entry.transducer_size_cm: {advanced: false}
 
   neuronav: {label: Localite ingestion (neuronav_gui)}
   neuronav.*: {advanced: true}

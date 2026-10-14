@@ -399,13 +399,16 @@ See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactiv
 |---|---|---|---|
 | `script_path` | PlanTUS installation directory (contains `code/PlanTUS.py`). | `''` | Required. |
 | `env_path` | SimNIBS installation or conda env whose Python runs PlanTUS. | `''` | Required. |
-| `target_name` | Target label, used in output folder and file names. | `''` | Required. Outputs go to `<path.seg>/PlanTUS/sub-XXX/<target_name>/`. |
+| `target_name` | Target label, used in output folder and file names. | `''` | Required. Outputs go to `<path.placement>/sub-XXX/plantus/<target_name>/`. |
 | `mni_target_mm` | Target [MNI mm]. | `[]` | Empty = use `transducer.focus_pos` (voxels). |
 | `focal_distance_list` | Focal distances from the calibration [mm]. | `[]` | Required. Set the eligible and optimal skin–target distance. |
 | `flhm_list` | Focal length at half maximum per entry of `focal_distance_list` [mm]. | `[]` | Required. |
 | `additional_offset_mm` | Extra standoff between skin and exit plane [mm]. | `0` | e.g. gel pad. |
 | `max_angle_deg` | Maximum transducer tilt [deg]. | `10` | |
 | `mask_radius_mm` | Radius of the spherical target mask [mm]. | `2` | |
+| `min_distance_mm` | Smallest eligible skin–target distance [mm]. | `[]` | `[]` = `min(focal_distance_list) − max(flhm_list)`. For a steerable array, set it and `max_distance_mm` to the steering range; the default margin otherwise admits spots the focus cannot reach. |
+| `max_distance_mm` | Largest eligible skin–target distance [mm]. | `[]` | `[]` = `max(focal_distance_list) + max(flhm_list)`. |
+| `optimal_distance_mm` | Optimum of the distance criterion [mm]. | `[]` | `[]` = `mean(focal_distance_list)`. |
 | `weight_skin_target_distances` | Weight: deviation of skin–target distance from the optimal distance. | `0.2` | The five weights should sum to 1. See [composite scoring](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
 | `weight_skin_target_angles` | Weight: angle between skin normal and direction to target. | `0.2` | |
 | `weight_skin_target_intersections` | Weight: beam path length inside the target (higher is better). | `0.2` | |
@@ -414,6 +417,28 @@ See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactiv
 | `save_metrics` | Write per-vertex criteria, score and selected vertex to `plantus_metrics.mat`. | `true` | Both modes. Used by the criteria evaluation and offline re-scoring. |
 | `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
 | `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed unless `wb_command` is on PATH or in the env's `bin/`; interactive mode also needs `wb_view`. |
+
+#### `placement.tus_entry`
+
+See [TUS_entry placement](doc_placement_tus_entry.md). Not in `config_default.yaml`; the keys are listed in `nexus/prestus_nexus/overlay.yaml`.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `script_path` | Full path to `TUS_entry.R`. | — | Required. |
+| `env_path` | Conda environment containing `Rscript`. | — | Required. |
+| `scalp_mask` | Head or scalp mask in the T1 grid (nonzero = head). | SimNIBS `final_tissues.nii.gz` | Filled into a solid head mask in the work directory. |
+| `target_mask` | Binary NIfTI target mask. | *(auto)* | Empty: a sphere around `focus_pos` or `mni_target_mm`. |
+| `target_mask_radius_mm` | Radius of the auto-generated target sphere [mm]. | `5` | |
+| `mni_target_mm` | Target [MNI mm]. | *(from `focus_pos`)* | Converted to subject space with SimNIBS. |
+| `exclu_mask` | Binary NIfTI exclusion zone (e.g. ventricles, vessels). | `''` | |
+| `minimal_distance_cm` | Minimum scalp-to-target depth [cm]. | `4.24` | |
+| `maximal_distance_cm` | Maximum scalp-to-target depth [cm]. | `7.46` | |
+| `transducer_size_cm` | Transducer outer diameter [cm]. | `6.4` | |
+| `voxel_size_cm` | Voxel size [cm]. | *(T1 voxel size)* | TUS_entry assumes isotropic voxels. |
+| `resolution_cm` | Spatial decimation step [cm]. | `0.33` | |
+| `return_candidates` | Save the ranked candidate list as RDS. | `false` | |
+| `target_name` | Label for output folder and file names. | `'target'` | |
+| `work_dir` | Output directory override. | *(auto)* | Default `<path.placement>/sub-XXX/tus_entry/<target_name>/`. |
 
 ---
 

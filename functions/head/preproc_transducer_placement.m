@@ -1,7 +1,7 @@
 function parameters = preproc_transducer_placement(parameters)
 % PREPROC_TRANSDUCER_PLACEMENT  Resolve transducer and focus positions
 %
-% Dispatches transducer placement to one of three modes controlled by
+% Dispatches transducer placement to one of six modes controlled by
 % parameters.placement.mode:
 %
 %   'manual'    Use trans_pos / focus_pos already in parameters (default).
@@ -48,8 +48,31 @@ function parameters = preproc_transducer_placement(parameters)
 %               pre-set transducer.focus_pos. PlanTUS must be installed
 %               separately (see https://github.com/mlueckel/PlanTUS).
 %
+%   'tus_entry' Call the external TUS_entry R toolbox (Atkinson et al.), which
+%               picks the scalp entry with the most even transducer-rim to
+%               scalp distance (flattest contact) within a scalp-target depth
+%               range. Requires placement.tus_entry.script_path and
+%               placement.tus_entry.env_path (conda env with Rscript); the
+%               target is placement.tus_entry.mni_target_mm, a target mask or
+%               transducer.focus_pos. The head mask defaults to the SimNIBS
+%               segmentation. See POSITION_TRANSDUCER_TUS_ENTRY.
+%
 % The resolved positions are written into parameters.transducer(ti).trans_pos
 % and parameters.transducer(ti).focus_pos for every configured transducer.
+%
+% heuristic, plantus and tus_entry write everything they produce to their
+% placement run folder, <placement dir>/<mode>/<target_name>/
+% (PLACEMENT_RUN_DIR), and finish with a run record (placement_run.json
+% sidecar: resolved positions + the settings they depend on). placement.reuse
+% decides whether a recorded run is used instead of running the mode again,
+% independent of io.overwrite_files (which governs the within-run caches):
+%   auto   (default) reuse a record whose settings match the current ones;
+%          otherwise run again and replace the record. Under
+%          io.overwrite_files: never a mismatch is handled like 'always'.
+%   always require a record; a settings mismatch is handled per
+%          io.cache_signature_check (error | warn | off).
+%   never  always run the mode.
+% Records written as placement_run.mat by earlier versions are still read.
 %
 % Use as:
 %   parameters = preproc_transducer_placement(parameters)
@@ -62,7 +85,8 @@ function parameters = preproc_transducer_placement(parameters)
 %                return (pipeline exits after job submission)
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, POSITION_TRANSDUCER_PLANTUS,
-%           TRANSDUCER_POSITIONING_START, NEURONAV_LOCALITE_POSE
+%           POSITION_TRANSDUCER_TUS_ENTRY, TRANSDUCER_POSITIONING_START, NEURONAV_LOCALITE_POSE,
+%           PLACEMENT_RUN_DIR, GET_PLACEMENT_DIR
 
 arguments
     parameters (1,1) struct
@@ -288,7 +312,7 @@ function parameters = run_heuristic_placement(parameters)
     pn.sim_path  = parameters.path.sim;
 
     % Expected output file from tp_select_heuristic_position (rows2vars txt)
-    tpos_file = fullfile(parameters.io.dir_output, ...
+    tpos_file = fullfile(placement_run_dir(parameters, 'heuristic'), ...
         sprintf('sub-%03d_%s.txt', parameters.subject_id, target_name));
 
     % Detect platform
@@ -458,8 +482,7 @@ function parameters = run_plantus_placement(parameters)
         parameters.transducer(1).focus_pos, 'plantus');
 
     pt_target_name = char(parameters.placement.plantus.target_name);
-    traj_path = fullfile(parameters.path.seg, 'PlanTUS', ...
-        sprintf('sub-%03d', parameters.subject_id), pt_target_name, ...
+    traj_path = fullfile(placement_run_dir(parameters, 'plantus'), ...
         sprintf('sub-%03d_%s_trajectory.txt', parameters.subject_id, pt_target_name));
     export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, pt_target_name, traj_path);
 end
@@ -494,8 +517,7 @@ function parameters = run_tus_entry_placement(parameters)
     if isfield(te, 'target_name') && ~isempty(te.target_name)
         tus_target_name = char(te.target_name);
     end
-    traj_path = fullfile(parameters.path.seg, 'TUS_entry', ...
-        sprintf('sub-%03d', parameters.subject_id), tus_target_name, ...
+    traj_path = fullfile(placement_run_dir(parameters, 'tus_entry'), ...
         sprintf('sub-%03d_%s_trajectory.txt', parameters.subject_id, tus_target_name));
     export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, tus_target_name, traj_path);
 end

@@ -40,6 +40,8 @@ path:
   anat: ''              # Location of the structural input data [full path]
   sim: ''               # Location of the simulation outputs [full path or folder name in path.anat]
   seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
+  placement: ''         # Placement outputs (heuristic, PlanTUS, TUS_entry runs): <placement>/sub-XXX/<mode>/<target_name>/.
+                        # Empty = <sim>/placement. Point several setups at one folder to share placements across them.
   t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
   t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
   # Localite neuronavigation (see doc_placement_neuronav.md, "Localite I/O")
@@ -120,7 +122,7 @@ calibration:
 #------------ Module execution
 
 modules:
-  run_transducer_placement: 1 # Resolve trans_pos/focus_pos via placement.mode (manual/localite/heuristic)?
+  run_transducer_placement: 1 # Resolve trans_pos/focus_pos via placement.mode (manual/localite/heuristic/mni/plantus/tus_entry)?
   run_grid_setup: 1           # Setup grid and run head processing? Mandatory for simulations.
   run_medium_setup: 1         # Map medium acoustic properties? Mandatory for simulations.
   run_source_setup: 1         # Set up acoustic source? Mandatory for simulations.

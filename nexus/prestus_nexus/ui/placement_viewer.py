@@ -318,7 +318,7 @@ class PlacementPage(QWidget):
     def _heuristic_positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
         if ti > 0:
             return None, None            # transducer_positioning writes one target per run
-        base = dir_output(self.model)
+        base = dir_placement_run(self.model, "heuristic")
         sid = self.model.get("subject_id")
         target = self.model.get("placement.heuristic.target_name")
         if base is None or is_empty(target) or not isinstance(sid, (int, float)) or isinstance(sid, bool):
@@ -348,7 +348,7 @@ class PlacementPage(QWidget):
         for the current subject/target; empty arrays if not heuristic mode / not found."""
         if self.model.get("placement.mode") != "heuristic" or self.t1 is None:
             return np.empty((0, 3)), np.empty(0)
-        base = dir_output(self.model)
+        base = dir_placement_run(self.model, "heuristic")
         sid = self.model.get("subject_id")
         target = self.model.get("placement.heuristic.target_name")
         if base is None or is_empty(target) or not isinstance(sid, (int, float)) or isinstance(sid, bool):
@@ -409,7 +409,7 @@ class PlacementPage(QWidget):
                             "(read-only here — PRESTUS resolves it again at run time).")
             else:
                 where = {"localite": "path.localite_post, placement.localite.session/.target",
-                         "heuristic": "placement.heuristic.target_name and io.dir_output (tpars_*.csv)"
+                         "heuristic": "the heuristic placement run folder (tpars_*.csv)"
                          }.get(mode, "")
                 where = (where + " and " if where else "") + "sub-XXX_placement*.json in io.dir_output"
                 msgs.append(f"placement.mode is <b>{mode}</b>: no resolved position found yet "

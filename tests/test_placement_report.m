@@ -78,7 +78,8 @@ classdef test_placement_report < matlab.unittest.TestCase
             tc.assumeNotEmpty(py, 'No Python 3 with numpy/scipy/matplotlib — skipping.');
 
             p = make_params(tc.TmpDir, 'plantus');
-            eval_dir = fullfile(p.path.seg, 'PlanTUS', 'sub-001', 'test_target');
+            p.path.sim = tc.TmpDir;                   % placement runs: <sim>/placement/...
+            eval_dir = placement_run_dir(p, 'plantus');
             mkdir(eval_dir);
             metrics = fullfile(eval_dir, 'plantus_metrics.mat');
             write_sphere_metrics(metrics);

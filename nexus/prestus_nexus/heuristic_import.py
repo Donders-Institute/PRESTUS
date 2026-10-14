@@ -7,7 +7,8 @@ tpars_sub-XXX_<target>.csv  - candidate positions (transducer_positioning.m:61-9
 sub-XXX_<target>.txt        - the selected position (tp_select_heuristic_position.m:170),
                               a key/value TSV (no header) with voxel, Localite mm and
                               RAS mm coordinates for the transducer and the target.
-Both live in parameters.io.dir_output, i.e. outputs.dir_output(model).
+Both live in the heuristic's placement run folder (placement_run_dir.m),
+i.e. outputs.dir_placement_run(model, "heuristic").
 """
 
 from __future__ import annotations
@@ -40,16 +41,16 @@ class Selected:
     focus_ras: np.ndarray | None    # RAS mm
 
 
-def _candidates_path(dir_output: Path, subject_id: int, target_name: str) -> Path:
-    return Path(dir_output) / f"tpars_sub-{subject_id:03d}_{target_name}.csv"
+def _candidates_path(run_dir: Path, subject_id: int, target_name: str) -> Path:
+    return Path(run_dir) / f"tpars_sub-{subject_id:03d}_{target_name}.csv"
 
 
-def _selected_path(dir_output: Path, subject_id: int, target_name: str) -> Path:
-    return Path(dir_output) / f"sub-{subject_id:03d}_{target_name}.txt"
+def _selected_path(run_dir: Path, subject_id: int, target_name: str) -> Path:
+    return Path(run_dir) / f"sub-{subject_id:03d}_{target_name}.txt"
 
 
-def candidates(dir_output: str | Path, subject_id: int, target_name: str) -> list[Candidate]:
-    path = _candidates_path(Path(dir_output), subject_id, target_name)
+def candidates(run_dir: str | Path, subject_id: int, target_name: str) -> list[Candidate]:
+    path = _candidates_path(Path(run_dir), subject_id, target_name)
     if not path.is_file():
         return []
     out = []
@@ -72,8 +73,8 @@ def candidates(dir_output: str | Path, subject_id: int, target_name: str) -> lis
     return out
 
 
-def selected(dir_output: str | Path, subject_id: int, target_name: str) -> Selected | None:
-    path = _selected_path(Path(dir_output), subject_id, target_name)
+def selected(run_dir: str | Path, subject_id: int, target_name: str) -> Selected | None:
+    path = _selected_path(Path(run_dir), subject_id, target_name)
     if not path.is_file():
         return None
     kv: dict[str, float] = {}
