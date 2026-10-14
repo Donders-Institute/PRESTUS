@@ -81,10 +81,13 @@ end
 
     %% Convert element diameters from mm to grid points (for all transducers)
 
-    tr_arr = parameters.transducer;
+    % Read every transducer from parameters.transducer: tr_arr is re-created
+    % from transducer 1 at it == 1 (to hold the added fields), so reading from
+    % it would turn transducers 2..N into copies of transducer 1.
+    tr_in = parameters.transducer;
 
     for it = 1:transducer_N
-        tr = tr_arr(it);
+        tr = tr_in(it);
 
         if strcmp(tr.type, 'annular')
             tr.annular.Elements_OD = 2 * floor(tr.annular.elem_od_mm / parameters.grid.resolution_mm / 2) + 1;

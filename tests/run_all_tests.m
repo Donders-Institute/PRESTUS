@@ -120,11 +120,13 @@ function run_all_tests(level)
     %   test_babelbrain.m, test_jwave.m
     % test_suite_wiring checks that every tests/test_*.m appears in this file.
 
-    % Slower checks that still need no data: optimiser fits and the mocked
-    % PlanTUS subprocess run (skipped without Python 3).
+    % Slower checks that still need no data: optimiser fits, the mocked
+    % PlanTUS subprocess run (skipped without Python 3) and a two-transducer
+    % kWaveArray source build.
     extended_suites = [ ...
         testsuite(fullfile(here, 'test_transducer_model.m'), 'Tag', 'fit'), ...
-        testsuite(fullfile(here, 'test_plantus_placement.m'), 'Tag', 'integration')];
+        testsuite(fullfile(here, 'test_plantus_placement.m'), 'Tag', 'integration'), ...
+        testsuite(fullfile(here, 'test_source_multi_transducer.m'))];   % k-Wave source build, ~30 s
 
     integration_file  = fullfile(here, 'test_integration_pipeline.m');
     water_test_file   = fullfile(here, 'test_integration_water.m');
