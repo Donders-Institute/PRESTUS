@@ -12,6 +12,14 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 - ⚠️ **Fix:** `pct_skullmapping_fit` took the quarter-max crossings around the global maximum of each histogram, not around the peaks it identified. When charm's trabecular label holds many voxels with air-like UTE (a near-zero mode that is the histogram maximum), the "upper trabecular crossing" landed below the crossover (sub-109 of the pCT database: points 0.03 / 0.63 / 0.20 → −1426·u + 1376 instead of about −1600·u + 1880). The crossings are now taken around the cortical peak and the x-weighted trabecular peak, and a warning is issued when the three points are not in ascending order. Fits whose histogram maxima are the identified peaks are unchanged. **Rerun `kosciessa` pCTs that warn or whose `pCT_skull_mapping.png` shows a near-zero trabecular mode.**
 
+#### Pseudo-CT: never written into the SimNIBS folder
+
+- **Fix:** with `path.pct` empty, the pseudo-CT was written into `m2m_sub-NNN` but read from `<parent of path.seg>/pct/sub-NNN`, so the simulation did not find it (`pct_create_pCT_run` checked `io.pct_dir` instead of `io.dir_pct`). With `path.pct` set, the "already generated" check looked in `<path.pct>/m2m_sub-NNN`, so the pseudo-CT was regenerated on every run. Writer, check and reader now share one resolver, `get_pct_dir`: `<path.pct>/sub-NNN`, or `<parent of path.seg>/pct/sub-NNN` when empty
+- **Fix:** `pct_create_pseudoCT.sh` renamed SimNIBS's `T2_reg.nii.gz` to `UTE_reg.nii.gz` inside `m2m_sub-NNN`. It now reads either name and leaves the SimNIBS folder unchanged; its default output, when called directly, is `<parent of the SimNIBS folder>/pct/sub-NNN`. Cluster job logs moved from `path.seg/log_hpc` to `<pct folder>/log_hpc`
+- **Legacy files:** a pseudo-CT that older versions wrote into `m2m_sub-NNN` is still used (`find_pseudoct_dir`), with the warning `PRESTUS:pct:legacyLocation` to move it; the Nexus pseudo-CT page shows the same note
+- **Fix (defacing):** `preproc_deface_m2m` now also defaces `T2_reg.nii.gz` (a registered T2 or UTE), not only the renamed `UTE_reg.nii.gz`
+- **Tests**: `test_pct_paths` (unit level); `nexus/tests/test_heuristic_import.py`. The demo-input checks accept `pct/sub-009` or the old `m2m` location
+
 #### Placement outputs: `path.placement` and run folders
 
 - **New `path.placement`** (default `<path.sim>/placement`): heuristic, PlanTUS and TUS_entry runs write everything they produce to `<path.placement>/sub-XXX/<mode>/<target_name>/` (`placement_run_dir`). A placement does not depend on the acoustic setup, so several setups can share one folder. See [Where outputs live](doc_outputs.md#where-outputs-live), which also sets out the levels inputs → subject derivatives → placement → simulation

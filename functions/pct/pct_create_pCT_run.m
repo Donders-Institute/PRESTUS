@@ -7,8 +7,9 @@ function pct_create_pCT_run(parameters)
 % parameters.platform.
 %
 % SimNIBS charm must have completed before calling this function (the UTE
-% image must have been passed as the T2 input so that UTE_reg.nii.gz or
-% T2_reg.nii.gz is present in the m2m folder).
+% image must have been passed as the T2 input so that T2_reg.nii.gz, or the
+% UTE_reg.nii.gz older versions renamed it to, is present in the m2m folder;
+% the m2m folder is only read).
 %
 % The pseudoCT pipeline requires FSL (fslmaths), ANTs (N4BiasFieldCorrection,
 % SmoothImage), and MATLAB on PATH. Set startup.fsl_bin_path and
@@ -21,11 +22,12 @@ function pct_create_pCT_run(parameters)
 % Input:
 %   parameters - (1,1) simulation configuration struct with fields:
 %     .subject_id               - numeric subject identifier
-%     .path.seg                 - base SimNIBS output directory
-%     .path.pct                 - (optional) base directory for pCT outputs; empty →
-%                                 path.seg/m2m_sub-NNN/, non-empty → path.pct/sub-NNN/
-%     .io.dir_pct               - (optional) pre-resolved subject pCT dir set by path_log_setup
-%     .pct.skull_mapping        - UTE→HU algorithm (default: 'kosciessa')
+%     .path.seg                 - base SimNIBS output directory (only read)
+%     .path.pct                 - (optional) base directory for pCT outputs (GET_PCT_DIR):
+%                                 path.pct/sub-NNN/, or <parent of path.seg>/pct/sub-NNN/
+%                                 when empty
+%     .pct.skull_mapping        - UTE→HU algorithm (default: 'kosciessa'); 'custom' uses
+%                                 .pct.custom_slope / .pct.custom_intercept (HU = slope·UTE + intercept)
 %     .pct.debug                - keep intermediate images (default: 1)
 %     .platform                 - 'matlab'/'slurm'/'qsub'/'auto'
 %     .startup.matlab_bin_path  - MATLAB binary (required on HPC; local falls back to matlabroot)
@@ -75,8 +77,8 @@ end
     % Path to the bash script
     script_path = fullfile(path_fun, 'pct', 'pct_create_pseudoCT.sh');
 
-    % Log directory
-    log_dir = fullfile(path_seg, 'log_hpc');
+    % Log directory (with the pCT outputs, not in the segmentation folder)
+    log_dir = fullfile(path_pct_out, 'log_hpc');
     if ~isfolder(log_dir)
         mkdir(log_dir);
     end

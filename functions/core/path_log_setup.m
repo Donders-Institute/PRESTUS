@@ -160,16 +160,11 @@ end
         mkdir(parameters.path.seg);
     end
 
-    % Resolve the subject-specific pCT output directory into parameters.io.dir_pct.
-    % path.pct is a user-configured base directory (preserved as-is).
-    %   empty    → io.dir_pct = {parent of path.seg}/pct/sub-NNN/  (parallel to seg folder)
-    %   non-empty → io.dir_pct = {path.pct}/sub-NNN/               (dedicated dir, PRESTUS naming)
+    % Resolve the subject-specific pCT output directory into parameters.io.dir_pct
+    % (GET_PCT_DIR): {path.pct}/sub-NNN, or {parent of path.seg}/pct/sub-NNN when
+    % path.pct is empty. Never the SimNIBS m2m folder.
     if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
-        if ~isfield(parameters.path, 'pct') || isempty(parameters.path.pct)
-            parameters.io.dir_pct = fullfile(fileparts(parameters.path.seg), 'pct', sprintf('sub-%03d', subject_id));
-        else
-            parameters.io.dir_pct = fullfile(parameters.path.pct, sprintf('sub-%03d', subject_id));
-        end
+        parameters.io.dir_pct = get_pct_dir(parameters);
         % Only create the directory when pCT is actually enabled; an unconditional
         % mkdir here (after cd(prestus_path) above) would create sub-NNN in the
         % PRESTUS root if path.pct is a relative path.

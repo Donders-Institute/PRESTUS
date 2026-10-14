@@ -51,9 +51,12 @@ path:
   localite_t1_pattern: '%s_*T1*.nii*' # sprintf template for the planning T1 file name; %s = 'sub-XXX'
   localite_export: ''   # Output folder for files to import into Localite (heuristic placement); per subject: <localite_export>/sub-XXX/
   localite: ''          # DEPRECATED: read as localite_raw when that is empty, and as localite_export when that is empty
-  pct: ''               # Base output directory for pseudoCT files. Leave empty to write pseudoCT
-                        # outputs into the SimNIBS m2m folder (path.seg/m2m_sub-NNN/). When set,
-                        # outputs go to path.pct/sub-NNN/ using the PRESTUS subject naming.
+  pct: ''               # Base output directory for pseudoCT files: <pct>/sub-NNN/. Empty = <parent of seg>/pct/sub-NNN/
+                        # (next to the SimNIBS folder; the m2m folders are only read).
+  acoustic_input: ''    # Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this
+                        # subject's T1w space, e.g. an earlier run's nii/T1w/*_pressure.nii.gz. Its .json sidecar is
+                        # used to check the settings and rescale to transducer.target_isppa_wcm2; acoustic analysis
+                        # and thermal simulation then run as usual. Empty = simulate.
 
 #------------ Startup (environment & toolbox paths)
 

@@ -27,16 +27,49 @@ def dir_output(model: ConfigModel) -> Path | None:
     return Path(sim) / f"sub-{sid:03d}"
 
 
+def dir_placement_run(model: ConfigModel, mode: str) -> Path | None:
+    """Folder of one placement run (placement_run_dir.m): placement.<mode>.work_dir if set,
+    else <path.placement or path.sim/placement>/sub-XXX/<mode>/<target_name>."""
+    work_dir = model.get(f"placement.{mode}.work_dir")
+    if not is_empty(work_dir):
+        return Path(work_dir)
+    sid = _subject_id(model)
+    root = model.get("path.placement")
+    if is_empty(root):
+        sim = model.get("path.sim")
+        root = None if is_empty(sim) else Path(sim) / "placement"
+    if root is None or sid is None:
+        return None
+    target = model.get(f"placement.{mode}.target_name")
+    return Path(root) / f"sub-{sid:03d}" / mode / ("target" if is_empty(target) else str(target))
+
+
 def dir_pct(model: ConfigModel) -> Path | None:
-    """Where pseudoCT.nii.gz lives: path.pct/sub-XXX if set, else the SimNIBS m2m folder."""
-    sid = model.get("subject_id")
-    pct, seg_root = model.get("path.pct"), model.get("path.seg") or model.get("path.anat")
+    """Where the pseudo-CT is written (get_pct_dir.m): path.pct/sub-XXX if set, else
+    <parent of path.seg>/pct/sub-XXX, next to (never inside) the SimNIBS folder."""
+    pct, seg_root = model.get("path.pct"), model.get("path.seg")
     sid = _subject_id(model)
     if sid is None:
         return None
-    if is_empty(pct):
-        return None if is_empty(seg_root) else m2m_dir(seg_root, sid)
-    return Path(pct) / f"sub-{sid:03d}"
+    if not is_empty(pct):
+        return Path(pct) / f"sub-{sid:03d}"
+    if is_empty(seg_root):
+        return None
+    return Path(str(seg_root).rstrip("/\\")).parent / "pct" / f"sub-{sid:03d}"
+
+
+def pseudoct_file(model: ConfigModel) -> tuple[Path | None, bool]:
+    """(existing pseudoCT.nii.gz, found in the legacy SimNIBS m2m location?), as
+    find_pseudoct_dir.m; (None, False) when there is none yet."""
+    pct_dir = dir_pct(model)
+    if pct_dir is not None and (pct_dir / "pseudoCT.nii.gz").is_file():
+        return pct_dir / "pseudoCT.nii.gz", False
+    seg_root, sid = model.get("path.seg"), _subject_id(model)
+    if not is_empty(seg_root) and sid is not None:
+        legacy = m2m_dir(seg_root, sid) / "pseudoCT.nii.gz"
+        if legacy.is_file():
+            return legacy, True
+    return None, False
 
 
 def placement_record(model: ConfigModel) -> dict | None:

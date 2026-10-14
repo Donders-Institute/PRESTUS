@@ -54,8 +54,11 @@ function pct_skullexpand(seg_path, path_pct)
     parameters.path.seg   = seg_path;
     parameters.debug_path = path_pct;
 
-    % If you use this elsewhere in your pipeline, keep it consistent:
-    parameters.path.t1_pattern = 'T1.nii.gz';
+    % skull_rubber_wrap resolves a header reference from path.anat/t1_pattern;
+    % final_tissues is on the same grid and always present in seg_path
+    parameters.path.anat       = seg_path;
+    parameters.path.t1_pattern = 'final_tissues.nii.gz';
+    parameters.subject_id      = '';
 
     parameters.headmodel.skull_wrap_radius = 10;
     parameters.headmodel.skull_wrap_visualize = 0;

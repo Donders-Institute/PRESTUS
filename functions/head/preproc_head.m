@@ -95,10 +95,13 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     transducer = parameters.transducer;
 
     if parameters.pct.enabled == 1
-        % Load pseudoCT from the resolved pCT directory (parameters.io.dir_pct).
-        % path_log_setup sets this to the SimNIBS m2m folder by default, or to
-        % {path.pct}/sub-NNN/ when a dedicated pCT base directory is configured.
-        pct_dir = parameters.io.dir_pct;
+        % Load pseudoCT from the pCT folder (GET_PCT_DIR; a pseudo-CT that older
+        % versions wrote into the SimNIBS m2m folder is still found, with a warning).
+        pct_dir = find_pseudoct_dir(parameters);
+        if isempty(pct_dir)
+            error('PRESTUS:pct:notFound', ...
+                'pct.enabled = 1 but no pseudoCT.nii.gz was found in:\n  %s', get_pct_dir(parameters));
+        end
         filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
         pseudoCT_image = niftiread(filename_pseudoCT);
         pseudoCT_header = niftiinfo(filename_pseudoCT);

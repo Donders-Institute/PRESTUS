@@ -13,23 +13,23 @@ function pct_create_pseudoCT()
     local sub_id="$1"        # Subject ID (without 'sub-')
     local path_simnibs="$2"  # Path to SimNIBS folder
     local path_matlab="$3"   # Path to MATLAB executable (e.g., "/opt/matlab/R2022b/bin/matlab")
-    local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default)]
+    local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default); "custom:<slope>:<intercept>"]
     local debug=${5:-"1"}    # Save intermediate images [yes: "1" (default); no: "0"]
     local path_fun="${6:-$(dirname "$(realpath "$0")")}" # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
-    local path_pct_out="${7:-}"  # Dedicated pCT output directory; defaults to m2m subject folder when empty
+    local path_pct_out="${7:-}"  # pCT output directory; empty = <parent of path_simnibs>/pct/sub-<id> (as get_pct_dir.m)
     local path_fun_pct="${path_fun}/pct"
     local path_fun_head="${path_fun}/head"
 
-    # shift simnibs path to sub-id
-    path_simnibs="${path_simnibs}/m2m_sub-${sub_id}"
-
-    # Determine output root: use path_pct_out when provided, otherwise default to
-    # the SimNIBS m2m folder (legacy fallback when called without PRESTUS pipeline).
+    # Output root: path_pct_out when provided, otherwise a pct/ folder next to
+    # the SimNIBS folder. The SimNIBS m2m folder itself is only read.
     if [ -n "$path_pct_out" ]; then
         path_pct_root="$path_pct_out"
     else
-        path_pct_root="${path_simnibs}"
+        path_pct_root="$(dirname "${path_simnibs%/}")/pct/sub-${sub_id}"
     fi
+
+    # shift simnibs path to sub-id
+    path_simnibs="${path_simnibs}/m2m_sub-${sub_id}"
 
     # Final outputs (pseudoCT.nii.gz, tissues_mask.nii.gz) go directly in path_pct_root.
     # All intermediate/debug files go into a debug_pct/ subdirectory.
@@ -57,9 +57,16 @@ function pct_create_pseudoCT()
     pCT="${path_pct_root}/pseudoCT.nii.gz"
     tissues_mask="${path_pct_root}/tissues_mask.nii.gz"
 
+    # The registered UTE is charm's T2_reg.nii.gz (the UTE is passed to charm as
+    # the T2). Older versions renamed it in place to UTE_reg.nii.gz; read
+    # whichever exists, without touching the SimNIBS folder.
+    if [ -f "${path_simnibs}/UTE_reg.nii.gz" ]; then
+        ute_reg="${path_simnibs}/UTE_reg.nii.gz"
+    else
+        ute_reg="${path_simnibs}/T2_reg.nii.gz"
+    fi
+
     # Temporary file names
-    t2w_reg="${path_simnibs}/T2_reg.nii.gz"
-    ute_reg="${path_simnibs}/UTE_reg.nii.gz"
     ute_reg_thr0="${path_pct}/UTE_reg_thr0.nii.gz"
     ute_reg_thr0_corr="${path_pct}/UTE_reg_thr0_corr.nii.gz"
     ute_reg_bias="${path_pct}/UTE_thr0_BiasField.nii.gz"
@@ -75,14 +82,11 @@ function pct_create_pseudoCT()
     # Change directory to the pCT folder
     cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 
-    # Check if UTE_reg.nii.gz already exists. If it exists, skip renaming the file.
-    if [ -f $ute_reg ]; then
-        echo "UTE_reg.nii.gz already exists. Skipping renaming."
-    else
-        # Rename T2_reg.nii.gz to UTE_reg.nii.gz to use the PETRA UTE image instead of T2
-        mv $t2w_reg $ute_reg
-        echo "Renamed T2_reg.nii.gz to UTE_reg.nii.gz"
+    if [ ! -f "$ute_reg" ]; then
+        echo "Registered UTE not found: ${path_simnibs}/T2_reg.nii.gz (run charm with the UTE as T2)"
+        exit 1
     fi
+    echo "Registered UTE: $ute_reg"
 
     echo "========================================================================="
     echo "SKULL MASK"

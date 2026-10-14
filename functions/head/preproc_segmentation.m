@@ -95,15 +95,15 @@ end
 
     parameters = simnibs_version(segmentation_folder, parameters);
 
-    pct_folder = fullfile(parameters.path.pct, sprintf('m2m_sub-%03d', parameters.subject_id));
-    filename_pseudoCT = fullfile(pct_folder, 'pseudoCT.nii.gz');
 
     if parameters.pct.enabled == 1
         if isempty(filename_t2)
             error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
         end
-        if exist(filename_pseudoCT, 'file')
+        pct_dir = find_pseudoct_dir(parameters);
+        if ~isempty(pct_dir)
             fprintf('[preproc_segmentation] %s\n', 'pseudoCT available...');
+            check_pct_sidecar(pct_dir, parameters);
         else
             fprintf('[preproc_segmentation] %s\n', 'Starting pseudoCT generation...');
             pct_create_pCT_run(parameters);

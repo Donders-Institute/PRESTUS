@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .. import placement as pl
 from ..model import is_empty
-from ..outputs import dir_output, dir_pct
+from ..outputs import dir_output, dir_pct, pseudoct_file
 from ..yamlio import load_file
 from .ortho_view import OrthoViewer
 
@@ -99,10 +99,14 @@ class PctPage(QWidget):
             msgs.append("<span style='color:#c9302c'>No T1 image found. Set subject_id, "
                         "path.anat and path.t1_pattern.</span>")
         pct_dir = dir_pct(self.model)
-        pct_file = pct_dir / "pseudoCT.nii.gz" if pct_dir is not None else None
-        if pct_file is not None and pct_file.is_file():
+        pct_file, legacy = pseudoct_file(self.model)
+        if pct_file is not None:
             self.viewer.set_overlay(pct_file)
             msgs.append(f"pseudo-CT: {pct_file}")
+            if legacy:
+                msgs.append("<span style='color:#c9302c'>This pseudo-CT is in the SimNIBS folder, "
+                            "where PRESTUS no longer writes. Move it (with tissues_mask.nii.gz) to "
+                            f"{pct_dir}.</span>")
         else:
             self.viewer.set_overlay(None)
             if bool(self.model.get("pct.enabled")):

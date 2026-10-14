@@ -129,8 +129,8 @@ function checks = build_checklist(root, sub_str, ses_str)
         'SimNIBS m2m folder'                        m2m_dir                                         true
         'final_tissues.nii.gz'                      fullfile(m2m_dir, 'final_tissues.nii.gz')       false
         'T1.nii.gz (in m2m)'                        fullfile(m2m_dir, 'T1.nii.gz')                  false
-        'pseudoCT.nii.gz'                           fullfile(m2m_dir, 'pseudoCT.nii.gz')            false
-        'UTE_reg.nii.gz'                            fullfile(m2m_dir, 'UTE_reg.nii.gz')             false
+        'pseudoCT.nii.gz'                           demo_pct_file(root, m2m_dir, sub_str)           false
+        'registered UTE (in m2m)'                   demo_ute_file(m2m_dir)                          false
         'toMNI/ folder'                             fullfile(m2m_dir, 'toMNI')                      true
         'Conform2MNI_nonl.nii.gz'                   fullfile(m2m_dir, 'toMNI', 'Conform2MNI_nonl.nii.gz') false
         'Localite session folder'                   loc_dir                                         true
@@ -158,4 +158,22 @@ function checks = build_checklist(root, sub_str, ses_str)
     checks(n).label     = 'TriggerMarkers XML (Coil0)';
     checks(n).path      = trig_path;
     checks(n).is_folder = false;
+end
+
+% -------------------------------------------------------------------------
+function f = demo_pct_file(root, m2m_dir, sub_str)
+% <root>/pct/sub-XXX (GET_PCT_DIR with path.pct empty), else the legacy m2m location
+    f = fullfile(root, 'pct', sub_str, 'pseudoCT.nii.gz');
+    if ~isfile(f)
+        legacy = fullfile(m2m_dir, 'pseudoCT.nii.gz');
+        if isfile(legacy); f = legacy; end
+    end
+end
+
+function f = demo_ute_file(m2m_dir)
+% charm's registered UTE, T2_reg.nii.gz; older pCT versions renamed it to UTE_reg.nii.gz
+    f = fullfile(m2m_dir, 'T2_reg.nii.gz');
+    if ~isfile(f) && isfile(fullfile(m2m_dir, 'UTE_reg.nii.gz'))
+        f = fullfile(m2m_dir, 'UTE_reg.nii.gz');
+    end
 end

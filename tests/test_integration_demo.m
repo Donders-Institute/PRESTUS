@@ -155,15 +155,15 @@ classdef test_integration_demo < matlab.unittest.TestCase
         end
 
         function test_pct_pseudoCT_exists(tc)
-            f = fullfile(tc.data_root, 'simnibs', ...
-                sprintf('m2m_sub-%03d', tc.SUBJECT_ID), 'pseudoCT.nii.gz');
+            f = test_integration_demo.demo_pseudoct(tc.data_root, tc.SUBJECT_ID);
             tc.verifyTrue(isfile(f), ['pseudoCT.nii.gz not found: ' f]);
         end
 
         function test_pct_ute_reg_exists(tc)
-            f = fullfile(tc.data_root, 'simnibs', ...
-                sprintf('m2m_sub-%03d', tc.SUBJECT_ID), 'UTE_reg.nii.gz');
-            tc.verifyTrue(isfile(f), ['UTE_reg.nii.gz not found: ' f]);
+            % charm's registered UTE: T2_reg.nii.gz (older pCT versions renamed it to UTE_reg.nii.gz)
+            m2m = fullfile(tc.data_root, 'simnibs', sprintf('m2m_sub-%03d', tc.SUBJECT_ID));
+            tc.verifyTrue(isfile(fullfile(m2m, 'T2_reg.nii.gz')) || isfile(fullfile(m2m, 'UTE_reg.nii.gz')), ...
+                ['Neither T2_reg.nii.gz nor UTE_reg.nii.gz found in: ' m2m]);
         end
 
         function test_mni_transforms_exist(tc)
@@ -285,8 +285,7 @@ classdef test_integration_demo < matlab.unittest.TestCase
         end
 
         function test_pseudoCT_nifti_readable(tc)
-            f = fullfile(tc.data_root, 'simnibs', ...
-                sprintf('m2m_sub-%03d', tc.SUBJECT_ID), 'pseudoCT.nii.gz');
+            f = test_integration_demo.demo_pseudoct(tc.data_root, tc.SUBJECT_ID);
             tc.assumeTrue(isfile(f));
             hdr = niftiinfo(f);
             tc.verifyEqual(numel(hdr.ImageSize), 3, ...
@@ -405,6 +404,15 @@ classdef test_integration_demo < matlab.unittest.TestCase
             p.modules.run_nifti_creation     = 0;
             p.modules.run_posthoc_water_sims = 0;
             p.modules.generate_report        = 0;
+        end
+
+        function f = demo_pseudoct(data_root, subject_id)
+            % <root>/pct/sub-NNN (GET_PCT_DIR with path.pct empty), else the
+            % legacy SimNIBS m2m location of older demo datasets
+            f = fullfile(data_root, 'pct', sprintf('sub-%03d', subject_id), 'pseudoCT.nii.gz');
+            if ~isfile(f)
+                f = fullfile(data_root, 'simnibs', sprintf('m2m_sub-%03d', subject_id), 'pseudoCT.nii.gz');
+            end
         end
     end
 

@@ -29,7 +29,7 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
 
     **Dependencies.** pseudoCT generation requires **FSL** (`fslmaths`), **ANTs** (`N4BiasFieldCorrection`, `SmoothImage`), and **MATLAB** on `PATH`. Set `startup.fsl_bin_path` and `startup.ants_bin_path` in your config so PRESTUS can prepend these to `PATH` at runtime. On HPC, also set `startup.matlab_bin_path`.
 
-    **Automated (default).** When `pct.enabled = 1`, PRESTUS calls `pct_create_pseudoCT.sh` automatically after SimNIBS segmentation — but only if `pseudoCT.nii.gz` is not already present in the `m2m_sub-XXX/` folder. The UTE image is identified via `path.t2_pattern` (the same field used to pass it as the second SimNIBS input). The resulting `pseudoCT.nii.gz` and `tissues_mask.nii.gz` are deposited in `m2m_sub-XXX/`.
+    **Automated (default).** When `pct.enabled = 1`, PRESTUS calls `pct_create_pseudoCT.sh` automatically after SimNIBS segmentation — but only if `pseudoCT.nii.gz` does not exist yet. The UTE image is identified via `path.t2_pattern` (the same field used to pass it as the second SimNIBS input); SimNIBS registers it to the T1 as `m2m_sub-XXX/T2_reg.nii.gz`, which is only read. The resulting `pseudoCT.nii.gz`, `tissues_mask.nii.gz` and `pseudoCT.json` are written to `<path.pct>/sub-XXX/`, or to `<parent of path.seg>/pct/sub-XXX/` when `path.pct` is empty, next to the SimNIBS folder rather than inside it. Intermediate images and the log go to its `debug_pct/` subfolder, cluster job logs to `log_hpc/`. The `pseudoCT.json` sidecar records how the pseudo-CT was made (skull mapping, segmentation folder, PRESTUS version).
 
     Minimum config to enable the fully automated workflow:
     ```yaml

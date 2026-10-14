@@ -174,7 +174,7 @@ Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull
 | `dir_debug_preproc` | Debug subfolder for preprocessing (`debug/preproc/`). |
 | `dir_debug_medium` | Debug subfolder for medium setup (`debug/medium/`). |
 | `dir_debug_source` | Debug subfolder for source setup (`debug/source/`). |
-| `dir_pct` | Resolved subject pCT directory. Set from `path.seg` or `path.pct`. |
+| `dir_pct` | Resolved subject pCT directory (`get_pct_dir`): `<path.pct>/sub-NNN`, or `<parent of path.seg>/pct/sub-NNN`. |
 | `dir_localite_export` | Per-subject Localite export folder (`<path.localite_export>/sub-XXX/`, fallback `path.localite`); `''` if unset. |
 | `filename_table` | Path to the per-subject CSV results table. |
 | `filename_kwave_source` | Path to cached k-Wave source `.mat` file. Set by `source_sensor_setup`. |
