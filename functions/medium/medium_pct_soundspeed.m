@@ -94,7 +94,7 @@ switch algorithm
         % Requires external/BabelBrain submodule and parameters.transducer(1).freq_hz.
         freq_hz = parameters.transducer(1).freq_hz;
         [F_sos, ~] = medium_pct_pichardo_load(parameters);
-        sound_speed(skull_idx) = F_sos(density(skull_idx), freq_hz / 1e6);
+        sound_speed(skull_idx) = F_sos(density(skull_idx), repmat(freq_hz / 1e6, size(density(skull_idx))));
         sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));
 
     case 'mcdannold'

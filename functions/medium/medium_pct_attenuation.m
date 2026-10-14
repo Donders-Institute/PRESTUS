@@ -122,7 +122,7 @@ switch algorithm
         freq_hz  = parameters.transducer(1).freq_hz;
         freq_MHz = freq_hz / 1e6;
         [~, F_att] = medium_pct_pichardo_load(parameters);
-        att_Npm = F_att(density(skull_idx), freq_MHz);
+        att_Npm = F_att(density(skull_idx), repmat(freq_MHz, size(density(skull_idx))));
         att_dBcm = att_Npm * 0.08686;
         alpha_coeff(skull_idx) = att_dBcm ./ freq_MHz;  % normalise to 1 MHz, alpha_power = 1
         alpha_power(skull_idx) = 1;

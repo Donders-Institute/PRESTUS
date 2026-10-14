@@ -230,7 +230,7 @@ Mapping algorithm is governed by `pct_mapping_soundspeed`.
 
 - `pichardo` | Frequency-dependent ρ→c from Pichardo et al. 2D interpolation map <br>
 
-    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal speed of sound [m/s] as a function of tissue density [kg/m³] and frequency [MHz]. Interpolation is bilinear with nearest-neighbour extrapolation.
+    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal speed of sound [m/s] as a function of tissue density [kg/m³] and frequency [MHz]. Interpolation is bilinear with nearest-neighbour extrapolation. MATLAB cannot read the Blosc-compressed H5 without the filter plugin, so PRESTUS falls back to the same table in `functions/medium/MapPichardo.mat`.
 
     Requires:
     - `pct_mapping_density: air-tissue` (or another density algorithm run first)

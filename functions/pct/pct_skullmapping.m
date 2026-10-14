@@ -180,7 +180,7 @@ end
         pCT_miscouridou = -2085 * xx1 + 2329;
         pCT_carpino = -2194 * xx1 + 2236;
         pCT_wiesinger = -2000 * (xx1 - 1) + 42; % Adjusted for (UTE-1)
-        pCT_treeby = -2929.6 * xx1 + 3247.9;
+        pCT_treeby = -2929.6 * xx1 + 3274.9;
         xx2 = linspace(1,1.5,5000);
         yy2 = 0.*xx2+42;
         plot(xx,yy, 'LineWidth', 2, 'Color', [.5 .5 .5]);
