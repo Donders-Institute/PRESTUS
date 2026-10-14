@@ -31,8 +31,9 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 % (full_ac_dims) first. In shared grid mode that full grid is the reference
 % grid; in per_transducer mode it is then remapped like any other grid (below).
 % FOV and full-grid caches can be mixed. The combined output is always on the
-% full grid; fov_offset_ac is cleared in the combined provenance so the
-% downstream thermal pipeline needs no changes.
+% full grid; fov_offset_ac is cleared in the combined provenance, and kgrid and
+% acoustic_grid_dims describe the full grid, so the downstream thermal
+% pipeline needs no changes (kwave_medium stays file 1's crop).
 %
 % Grid remapping
 % --------------
@@ -307,19 +308,24 @@ end
 
 fprintf('Saving combined acoustic cache:\n  %s\n', file_out);
 
-kgrid         = data_ref.kgrid;         %#ok<NASGU>
+kgrid         = data_ref.kgrid;
+if ~isequal([kgrid.Nx, kgrid.Ny, kgrid.Nz], full_ac_dims)
+    % File 1 was a partial-FOV run: its kgrid is the crop. The thermal stage
+    % uses this kgrid with the full-grid field, so rebuild it at full size.
+    kgrid_fov = kgrid;
+    kgrid = kWaveGrid(full_ac_dims(1), kgrid_fov.dx, full_ac_dims(2), kgrid_fov.dy, ...
+                      full_ac_dims(3), kgrid_fov.dz);
+    kgrid.setTime(kgrid_fov.Nt, kgrid_fov.dt);
+    clear kgrid_fov;
+end
 kwave_medium  = data_ref.kwave_medium;  %#ok<NASGU>
 acoustic_info = data_ref.acoustic_info; %#ok<NASGU>
-if isfield(data_ref, 'acoustic_grid_dims')
-    acoustic_grid_dims = data_ref.acoustic_grid_dims; %#ok<NASGU>
-    save(file_out, ...
-        'sensor_data', 'kgrid', 'kwave_medium', 'acoustic_info', ...
-        'acoustic_provenance', 'acoustic_grid_dims', '-v7.3');
-else
-    save(file_out, ...
-        'sensor_data', 'kgrid', 'kwave_medium', 'acoustic_info', ...
-        'acoustic_provenance', '-v7.3');
-end
+% The grid the combined field is on (the full grid): CACHE_ACOUSTIC compares it
+% with the loading run's grid. File 1's own value is its partial-FOV crop.
+acoustic_grid_dims = full_ac_dims; %#ok<NASGU>
+save(file_out, ...
+    'sensor_data', 'kgrid', 'kwave_medium', 'acoustic_info', ...
+    'acoustic_provenance', 'acoustic_grid_dims', '-v7.3');
 
 fprintf('Done — combined cache written from %d transducers.\n', N);
 end

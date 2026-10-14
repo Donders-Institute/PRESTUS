@@ -10,7 +10,8 @@ function sig = cache_signature(parameters, kind)
 % Paths, I/O, HPC and module flags are excluded (moving data or changing what
 % is run downstream does not change the cached result), as are the drive level
 % (target_isppa_wcm2, tx_calibration: they scale the acoustic field, not the
-% grid or medium).
+% grid or medium) and, for grid and medium caches, the partial acoustic FOV
+% (grid.acoustic_fov_*: cropped after these stages).
 %
 % Both the writing and the reusing run compute the signature at the same point
 % of the pipeline, so settings that earlier stages derive (e.g. transducer
@@ -19,10 +20,11 @@ function sig = cache_signature(parameters, kind)
 % Use as:
 %   sig = cache_signature(parameters, 'grid')
 %   sig = cache_signature(parameters, 'medium')
+%   sig = cache_signature(parameters, 'acoustic')
 %
 % Input:
 %   parameters - PRESTUS parameter struct
-%   kind       - 'grid' or 'medium'
+%   kind       - 'grid', 'medium' or 'acoustic' (sidecar of a reusable pressure map)
 %
 % Output:
 %   sig - struct of the relevant settings
@@ -39,10 +41,22 @@ function sig = cache_signature(parameters, kind)
 
     switch kind
         case 'grid'
+            sig.grid = drop_acoustic_fov(sig.grid);
         case 'medium'
+            sig.grid = drop_acoustic_fov(sig.grid);
             sig.medium_properties = get_field(parameters, {'medium_properties'});
+        case 'acoustic'
+            % A pressure map reused by a later run (path.acoustic_input): its
+            % grid and medium, but not the thermal-only grid settings, so the
+            % thermal stage can be re-run on another grid.
+            sig.subject_id = get_field(parameters, {'subject_id'});
+            sig.medium_properties = get_field(parameters, {'medium_properties'});
+            if isstruct(sig.grid)
+                g = fieldnames(sig.grid);
+                sig.grid = rmfield(sig.grid, g(startsWith(g, 'thermal_')));
+            end
         otherwise
-            error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium).', kind);
+            error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic).', kind);
     end
 end
 
@@ -56,6 +70,16 @@ function v = get_field(s, path)
         s = s(1).(path{i});
     end
     v = s;
+end
+
+function g = drop_acoustic_fov(g)
+% The partial acoustic FOV is cropped after the grid and medium stages
+% (ACOUSTIC_GRID_FOV), so their caches serve runs with or without one.
+    if ~isstruct(g)
+        return
+    end
+    names = fieldnames(g);
+    g = rmfield(g, names(startsWith(names, 'acoustic_fov_')));
 end
 
 function t = strip_drive(t)

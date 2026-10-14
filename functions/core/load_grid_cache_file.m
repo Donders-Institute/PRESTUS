@@ -9,7 +9,9 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 %
 % Both branches need identical logic:
 %   - load the .mat file into a local scope (not the caller's workspace)
-%   - restore parameters.grid from the cache
+%   - restore the grid keys the grid stage computes (dims, default_dims,
+%     resolution_mm, display_orientation) from the cache; other grid keys
+%     keep the caller's settings
 %   - conditionally restore parameters.transducer: keep the caller's array
 %     when the cache was built with MORE transducers (async shared preproc),
 %     otherwise use the cached array.
@@ -31,8 +33,8 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 %                reflects the caller's per-transducer selection)
 %
 % Output:
-%   parameters   - updated: parameters.grid from cache; parameters.transducer
-%                  preserved or restored (see above)
+%   parameters   - updated: grid-stage keys of parameters.grid from cache;
+%                  parameters.transducer preserved or restored (see above)
 %   planimg      - planning image loaded from cache
 %   medium_masks - tissue mask struct loaded from cache
 %   segmentation - segmentation volume loaded from cache
@@ -45,7 +47,16 @@ transducer_before_load = parameters.transducer;
 
 cached = load(filename);
 
+% The cache supplies what the grid stage computed; every other grid key keeps
+% the caller's value. A run that reuses another run's grid (io.preproc_affix)
+% may differ in settings the grid stage does not use, e.g. a partial acoustic
+% FOV (grid.acoustic_fov_*) or none for a job reading a back-projected field.
+grid_settings = parameters.grid;
 parameters.grid = cached.grid_cache_info.parameters.grid;
+keep = setdiff(fieldnames(grid_settings), grid_stage_outputs());
+for k = 1:numel(keep)
+    parameters.grid.(keep{k}) = grid_settings.(keep{k});
+end
 
 % Preserve the caller's transducer array when the cache was built with more
 % transducers (async shared preproc). Restoring the full array would
@@ -129,4 +140,10 @@ if isfield(parameters, 'grid') && ~isfield(parameters.grid, 'display_orientation
     parameters.grid.display_orientation = ori;
 end
 
+end
+
+function names = grid_stage_outputs()
+% Grid keys the grid stage sets (GRID_TISSUE_SETUP, PREPROC_HEAD,
+% AUTOPAD_GRID_FOR_TRANSDUCERS): restored from the cache, not from the caller.
+names = {'dims', 'default_dims', 'resolution_mm', 'display_orientation'};
 end

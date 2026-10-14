@@ -115,8 +115,16 @@ elseif exist(filename_sensor_data, 'file')
         [sensor_data, kgrid, acoustic_provenance, ~, parameters] = ...
             cache_acoustic('load', filename_sensor_data, parameters);
         acoustic_provenance = fill_baseline_from_live(acoustic_provenance, live_provenance);
+        acoustic_provenance.input_signature = input_signature;
     catch ME
-        if strcmp(ME.identifier, 'cache_acoustic:staleGrid')
+        if strcmp(ME.identifier, 'cache_acoustic:staleGrid') && isempty(source)
+            % No source to re-simulate with (e.g. a job that only reads a
+            % combined field): the grid settings differ from the cache's run.
+            error('acoustic_stage:staleCacheNoSource', ...
+                ['%s\nThis run sets up no source (modules.run_source_setup = 0), so it cannot ' ...
+                 're-simulate. Check that its grid settings (e.g. grid.acoustic_fov_*) match ' ...
+                 'the run that wrote the cache.'], ME.message);
+        elseif strcmp(ME.identifier, 'cache_acoustic:staleGrid')
             % Re-run with the configured backend (not unconditionally k-Wave),
             % scaled exactly like a fresh run.
             fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation (%s backend).\n', ...

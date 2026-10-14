@@ -109,8 +109,12 @@ classdef test_multitransducer_fov < matlab.unittest.TestCase
             f2 = write_cache(fullfile(d, 'b.mat'), 3 * ones(4, 4, 4), [4 4 4], full);
             out = fullfile(d, 'c.mat');
             evalc('combine_async_intensity({f1, f2}, out);');
-            s = load(out, 'sensor_data', 'acoustic_provenance');
+            s = load(out, 'sensor_data', 'acoustic_provenance', 'kgrid', 'acoustic_grid_dims');
             tc.verifySize(s.sensor_data.p_max_async, full);
+            % grid metadata describe the full grid the combined field is on
+            tc.verifyEqual(s.acoustic_grid_dims, full);
+            tc.verifyEqual([s.kgrid.Nx, s.kgrid.Ny, s.kgrid.Nz], full);
+            tc.verifyEqual([s.kgrid.Nt, s.kgrid.dt], [10, 1e-7]);
             tc.verifyEqual(s.sensor_data.p_max_async(5, 5, 5), 3, 'AbsTol', 1e-12);   % overlap
             tc.verifyEqual(s.sensor_data.p_max_async(2, 2, 2), 2, 'AbsTol', 1e-12);
             tc.verifyEqual(s.sensor_data.p_max_all(5, 5, 5), sqrt(13), 'AbsTol', 1e-12);
@@ -225,7 +229,8 @@ function f = write_cache(f, p, offset, full)
 % Minimal acoustic cache as combine_async_intensity reads it (no planimg: no affine).
 sensor_data.p_max_all = p;
 sensor_data.p_min_all = -p;
-kgrid = struct('dx', 1e-3, 'dy', 1e-3, 'dz', 1e-3); %#ok<NASGU>
+kgrid = kWaveGrid(size(p, 1), 1e-3, size(p, 2), 1e-3, size(p, 3), 1e-3);   % the simulated (cropped) grid
+kgrid.setTime(10, 1e-7);
 kwave_medium = struct('sound_speed', 1500); %#ok<NASGU>
 acoustic_provenance = struct();
 if ~isempty(offset)

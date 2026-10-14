@@ -62,6 +62,24 @@ classdef test_cache_signature < matlab.unittest.TestCase
                 cache_signature(q, 'grid'), q));
         end
 
+        function test_acoustic_fov_does_not_invalidate_grid_or_medium(tc)
+            % The partial FOV is cropped after the grid and medium stages
+            p = tc.params(); q = p;
+            q.grid.acoustic_fov_diameter_mm = 'auto';
+            q.grid.acoustic_fov_length_mm   = 'auto';
+            for kind = {'grid', 'medium'}
+                tc.verifyTrue(check_cache_signature('x.mat', cache_signature(p, kind{1}), ...
+                    cache_signature(q, kind{1}), q));
+            end
+            % a cache written while the signature still recorded them
+            old = cache_signature(p, 'grid');
+            old.grid.acoustic_fov_length_mm = 'auto';
+            tc.verifyTrue(check_cache_signature('x.mat', old, cache_signature(p, 'grid'), p));
+            % a reused pressure map does depend on it
+            tc.verifyError(@() check_cache_signature('x.mat', cache_signature(p, 'acoustic'), ...
+                cache_signature(q, 'acoustic'), q), 'prestus:cache:signatureMismatch');
+        end
+
         function test_medium_properties_only_in_medium_signature(tc)
             p = tc.params(); q = p;
             q.medium_properties.skull.sound_speed = 3000;
