@@ -35,6 +35,13 @@ except ImportError:          # pragma: no cover
 VIEWS = [("Axial", 2, (0, 1)), ("Coronal", 1, (0, 2)), ("Sagittal", 0, (1, 2))]
 COLORMAPS = ["hot", "plasma", "viridis", "jet", "coolwarm"]
 
+def _fmt(v: float | None) -> str:
+    """A map value for the readout: 3 significant digits, no exponent below 1e5."""
+    if v is None:
+        return ""
+    return f"{v:.3g}" if abs(v) < 1e5 else f"{v:.3e}"
+
+
 # ── volume cache ─────────────────────────────────────────────────────────
 _CACHE_SIZE = 6              # a T1 plus a few maps; each holds its data in memory
 _cache: "OrderedDict[tuple, pl.Volume]" = OrderedDict()
@@ -121,6 +128,9 @@ class OrthoViewer(QWidget):
         self._peak: dict[int, np.ndarray | None] = {}   # id(overlay) -> RAS of its maximum
         self._pending: dict[str, object] = {}     # role ('anat'/'overlay') -> load token
         self._when_loaded: list = []              # callbacks once nothing is pending
+        self.unit = ""                            # overlay unit, for the colour bar and readout
+        self.zero_based = False                   # colour scale 0..max instead of 1..99th percentile
+        self._colorbar = None
         self._relay = _Relay(self)
         self._relay.done.connect(self._loaded, Qt.ConnectionType.QueuedConnection)
 
@@ -140,6 +150,16 @@ class OrthoViewer(QWidget):
         self.alpha.setMaximumWidth(140)
         self.alpha.valueChanged.connect(self._request_draw)
         tb.addWidget(self.alpha)
+        tb.addWidget(QLabel("Hide below"))
+        self.threshold = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=90, value=0,
+                                 singleStep=5, pageStep=10)
+        self.threshold.setMaximumWidth(120)
+        self.threshold.setToolTip("Hide overlay values below this share of the colour scale's top")
+        self.threshold.valueChanged.connect(self._request_draw)
+        tb.addWidget(self.threshold)
+        self.threshold_label = QLabel()
+        self.threshold_label.setMinimumWidth(110)
+        tb.addWidget(self.threshold_label)
         tb.addStretch(1)
         self.status = QLabel()
         self.status.setStyleSheet("color: gray;")
@@ -151,11 +171,17 @@ class OrthoViewer(QWidget):
         self._draw_timer.timeout.connect(self._draw)
 
         if HAVE_MPL:
-            self.fig = Figure(figsize=(9, 3.2), tight_layout=True)
+            self.fig = Figure(figsize=(9, 3.2))
             self.canvas = FigureCanvasQTAgg(self.fig)
             self.axes = [self.fig.add_subplot(1, 3, i + 1) for i in range(3)]
+            # fixed margins (not tight_layout): room for the colour bar below the slices
+            self.fig.subplots_adjust(left=0.02, right=0.98, top=0.93, bottom=0.14, wspace=0.06)
             self.canvas.mpl_connect("scroll_event", self._scrolled)
+            self.canvas.mpl_connect("button_press_event", self._clicked)
             v.addWidget(self.canvas, 1)
+            self.readout = QLabel()
+            self.readout.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            v.addWidget(self.readout)
         else:
             v.addWidget(QLabel("Install matplotlib and nibabel to use this viewer."), 1)
 
@@ -164,8 +190,19 @@ class OrthoViewer(QWidget):
         """Show this anatomy (loaded in the background unless cached)."""
         self._request("anat", path)
 
-    def set_overlay(self, path: str | Path | None) -> None:
-        """Show this colour overlay (loaded in the background unless cached)."""
+    def set_overlay(self, path: str | Path | None, unit: str | None = None,
+                    zero_based: bool | None = None, threshold_pct: int | None = None) -> None:
+        """Show this colour overlay (loaded in the background unless cached). ``unit`` labels
+        the colour bar and readout; ``zero_based`` scales colours from 0 to the map's
+        maximum (intensity, pressure: the peak is not clipped) instead of its 1st..99th
+        percentile; ``threshold_pct`` sets 'Hide below'."""
+        if unit is not None:
+            self.unit = unit
+        if zero_based is not None and zero_based != self.zero_based:
+            self.zero_based = zero_based
+            self.overlay = None                   # recompute the colour limits
+        if threshold_pct is not None:
+            self.threshold.setValue(int(threshold_pct))
         self._request("overlay", path)
 
     def when_loaded(self, callback) -> None:
@@ -254,7 +291,9 @@ class OrthoViewer(QWidget):
             if vol is not None:
                 d = vol.data
                 nz = d[(d != 0) & np.isfinite(d)]
-                if nz.size:
+                if nz.size and self.zero_based:
+                    self._over_lim = (0.0, float(nz.max()))
+                elif nz.size:
                     lo, hi = np.percentile(nz, [1, 99])
                     self._over_lim = (float(lo), float(hi))
             self._match_grids()
@@ -338,6 +377,11 @@ class OrthoViewer(QWidget):
         c = self.anat.ras_to_canon(self.cursor)[0]
         alpha = self.alpha.value() / 100
         show_over = alpha > 0 and self._over_lim is not None and self._over_lim[1] > self._over_lim[0]
+        thr = None
+        if show_over and self.threshold.value() > 0:
+            lo, hi = self._over_lim
+            thr = lo + (hi - lo) * self.threshold.value() / 100
+        self.threshold_label.setText(f"≥ {_fmt(thr)} {self.unit}".rstrip() if thr is not None else "")
         if self._artists is None:
             self._artists = []
             for ax, (title, plane, (h, w)) in zip(self.axes, VIEWS):
@@ -351,10 +395,13 @@ class OrthoViewer(QWidget):
                                     interpolation="nearest")
                 over_im = ax.imshow(np.full_like(blank, np.nan, dtype=float), origin="lower",
                                     aspect=vs[w] / vs[h], interpolation="nearest")
+                hline = ax.axhline(0, color="#4fa3e0", lw=0.6, alpha=0.6)
+                vline = ax.axvline(0, color="#4fa3e0", lw=0.6, alpha=0.6)
                 ax.set_title(title, fontsize=9)
                 ax.set_xlim(-0.5, shape2d[0] - 0.5)
                 ax.set_ylim(-0.5, shape2d[1] - 0.5)
-                self._artists.append({"anat": anat_im, "over": over_im, "k": None, "marks": []})
+                self._artists.append({"anat": anat_im, "over": over_im, "k": None, "marks": [],
+                                      "cross": (hline, vline)})
         for ax, art, (title, plane, (h, w)) in zip(self.axes, self._artists, VIEWS):
             k = int(np.clip(round(c[plane]), 0, data.shape[plane] - 1))
             if art["k"] != k:
@@ -364,6 +411,9 @@ class OrthoViewer(QWidget):
                 art["shape"] = sl.shape
             over = self._overlay_slice(plane, k, art["shape"]) if show_over else None
             if over is not None:
+                if thr is not None:
+                    with np.errstate(invalid="ignore"):
+                        over = np.where(over >= thr, over, np.nan)
                 art["over"].set_data(over.T)
                 art["over"].set_cmap(self.cmap.currentText())
                 art["over"].set_clim(*self._over_lim)
@@ -371,6 +421,8 @@ class OrthoViewer(QWidget):
                 art["over"].set_visible(True)
             else:
                 art["over"].set_visible(False)
+            art["cross"][0].set_ydata([c[w], c[w]])
+            art["cross"][1].set_xdata([c[h], c[h]])
             for line in art["marks"]:
                 line.remove()
             art["marks"] = []
@@ -380,7 +432,50 @@ class OrthoViewer(QWidget):
                 art["marks"] += ax.plot(m[h], m[w], marker, color=colour, markersize=8 if near else 6,
                                         markeredgewidth=1.5, alpha=1.0 if near else 0.35,
                                         linestyle="none")
+        self._update_colorbar(show_over)
+        self._update_readout()
         self.canvas.draw_idle()
+
+    def _update_colorbar(self, show: bool) -> None:
+        """One horizontal colour bar under the slices, with the overlay's unit."""
+        if not show:
+            if self._colorbar is not None:
+                self._colorbar.ax.set_visible(False)
+            return
+        mappable = self._artists[0]["over"]
+        if self._colorbar is None:
+            cax = self.fig.add_axes([0.35, 0.04, 0.3, 0.03])
+            self._colorbar = self.fig.colorbar(mappable, cax=cax, orientation="horizontal")
+            self._colorbar.ax.tick_params(labelsize=8)
+        else:
+            self._colorbar.update_normal(mappable)
+        self._colorbar.ax.set_visible(True)
+        self._colorbar.set_alpha(1.0)
+        self._colorbar.set_label(self.unit, fontsize=8)
+
+    def _update_readout(self) -> None:
+        """RAS of the crosshair and the overlay's value there."""
+        if self.anat is None:
+            self.readout.setText("")
+            return
+        r = self.cursor
+        text = f"Crosshair RAS [{r[0]:.1f}, {r[1]:.1f}, {r[2]:.1f}] mm"
+        if self.overlay is not None:
+            value = float(np.asarray(self.overlay.sample(r[None]), dtype=float).ravel()[0])
+            text += (f" · overlay {_fmt(value)} {self.unit}".rstrip() if np.isfinite(value)
+                     else " · overlay: outside the map")
+        text += "  (click a slice to move the crosshair)"
+        self.readout.setText(text)
+
+    def _clicked(self, event) -> None:
+        """A click moves the crosshair to that point (view only; nothing is written)."""
+        if self.anat is None or event.inaxes not in self.axes or event.xdata is None:
+            return
+        _, plane, (h, w) = VIEWS[self.axes.index(event.inaxes)]
+        c = self.anat.ras_to_canon(self.cursor)[0]
+        c[h], c[w] = event.xdata, event.ydata
+        self.cursor = self.anat.canon_to_ras(c[None])[0]
+        self._request_draw()
 
     def _scrolled(self, event) -> None:
         if self.anat is None or event.inaxes not in self.axes:

@@ -106,3 +106,25 @@ def test_at_depth_without_calibration_is_none():
     from prestus_nexus.equipment import Calibration
     cal = Calibration(path=None, key="nope")
     assert cal.at_depth(50) is None
+
+
+def test_parsed_entries_are_cached(prestus_root, monkeypatch):
+    """A second start reuses the parsed equipment YAMLs (network drives: ~8 s)."""
+    first = EquipmentLibrary(prestus_root)
+    from prestus_nexus import yamlio
+
+    def no_read(path):
+        raise AssertionError(f"read {path} although it is unchanged")
+    monkeypatch.setattr(yamlio, "load_file", no_read)
+    second = EquipmentLibrary(prestus_root)
+    assert set(second.devices) == set(first.devices) and first.devices
+
+
+def test_changed_entry_is_read_again(tmp_path):
+    eq = tmp_path / "config" / "equipment"
+    eq.mkdir(parents=True)
+    entry = eq / "TX_1.yaml"
+    entry.write_text("type: 'transducer'\nserial: 'TX_1'\nname: 'first'\n")
+    assert EquipmentLibrary(tmp_path).get("TX_1").name == "first"
+    entry.write_text("type: 'transducer'\nserial: 'TX_1'\nname: 'second one'\n")
+    assert EquipmentLibrary(tmp_path).get("TX_1").name == "second one"

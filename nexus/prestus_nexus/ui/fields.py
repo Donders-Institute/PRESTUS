@@ -180,6 +180,26 @@ class ChoiceEditor(FieldEditor):
             return
         self.edited.emit(self._items[index])
 
+    def set_item_status(self, status: dict) -> None:
+        """Mark choices by availability (checks.ModeStatus per value): 'unavailable'
+        items are disabled, 'pending' ones get a note; the reason is the tooltip.
+        The current value always stays selectable."""
+        model = self.combo.model()
+        current = self._items[self.combo.currentIndex()] if self.combo.currentIndex() >= 0 else None
+        for i, v in enumerate(self._items):
+            st = status.get(v) if isinstance(v, str) else None
+            item = model.item(i) if hasattr(model, "item") else None
+            if st is None or item is None:
+                continue
+            label = str(v)
+            if st.state == "unavailable":
+                label += "  (unavailable)"
+                item.setEnabled(v == current)
+            elif st.state == "pending":
+                label += "  (needs setup)"
+            item.setText(label)
+            item.setToolTip(st.reason or "All inputs found")
+
 
 class CheckEditor(FieldEditor):
     """Checkbox; 'flag' writes 0/1, 'bool' writes true/false."""

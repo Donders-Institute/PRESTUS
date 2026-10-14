@@ -8,6 +8,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPalette, QPixmap
 from PyQt6.QtWidgets import QApplication
 
+from ..paths import package_dir
+
 # Palette of the report skin (functions/report/css_styles_base.m, light theme).
 # "accent" is the acoustic-content colour (acoustic = cool/blue, thermal = warm) and stays
 # reserved for acoustic data (transducer_view, timing_view) — it is not the brand colour.
@@ -49,7 +51,7 @@ def is_dark() -> bool:
 
 
 def logo_path(prestus_root: Path | None) -> Path | None:
-    for root in [prestus_root, Path(__file__).resolve().parents[3]]:
+    for root in [prestus_root, package_dir().parents[1]]:
         if root is None:
             continue
         p = Path(root) / "functions" / "report" / "assets" / "logo_PRESTUS.png"

@@ -17,6 +17,7 @@ from typing import Any, Iterator
 
 from . import yamlio
 from .merge import is_empty, mergestruct
+from .paths import package_dir
 
 OVERLAY_PATH = Path(__file__).with_name("overlay.yaml")
 
@@ -155,7 +156,7 @@ def infer_kind(value: Any) -> str:
 
 # ── Schema ───────────────────────────────────────────────────────────────
 
-TOOLBOX_DEFAULT = Path(__file__).resolve().parents[2] / "config" / "config_default.yaml"
+TOOLBOX_DEFAULT = package_dir().parents[1] / "config" / "config_default.yaml"
 
 
 def _same_file(a: Path, b: Path) -> bool:
@@ -262,7 +263,7 @@ class Schema:
         The file has no top-level 'calibration:' key; the calibration workflow
         loads it into parameters.calibration (examples/calibration_standalone.m).
         """
-        for folder in (self.default_path.parent, Path(__file__).resolve().parents[2] / "config"):
+        for folder in (self.default_path.parent, package_dir().parents[1] / "config"):
             cal = folder / "config_calibration.yaml"
             if cal.is_file():
                 data = yamlio.load_file(cal) or {}

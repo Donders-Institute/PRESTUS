@@ -126,6 +126,12 @@ def test_results_page_lists_runs(schema, tmp_path):
     assert page.parts.count() == 3                            # joint, transducer 1, transducer 2
     assert len(page.acoustic.viewer.markers) == 4             # 2 transducers + 2 foci
     assert np.allclose(page.acoustic.viewer.cursor, [2, 3, 4])   # centred on the map's peak
+    viewer = page.acoustic.viewer                             # ISPPA: 0..peak, in W/cm², read out
+    viewer._draw()
+    assert viewer._over_lim == (0.0, 5.0) and viewer.threshold.value() == 10
+    assert "≥ 0.5 W/cm²" in viewer.threshold_label.text()
+    assert "overlay 5 W/cm²" in viewer.readout.text()
+    assert viewer._colorbar is not None and viewer._colorbar.ax.get_visible()
     page.parts.setCurrentIndex(2)
     page.acoustic.viewer.wait()
     assert page.acoustic.viewer.overlay.path.name.endswith("_trans-02_intensity.nii.gz")

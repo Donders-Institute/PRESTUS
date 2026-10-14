@@ -140,3 +140,23 @@ def test_localite_dialog_builds_bilateral_runs(window, tmp_path):
     assert len(dlg.result_manifest.rows) == 3
     study = window.show_special(STUDY)
     assert window.tabs.currentWidget().key == "study" and study.isVisibleTo(window)
+
+
+def test_placement_modes_greyed_without_segmentation(window, tmp_path):
+    anat = tmp_path / "anat"
+    anat.mkdir()
+    (anat / "sub-003_T1w.nii.gz").write_bytes(b"")
+    window.model.set("subject_id", 3)
+    window.model.set("path.anat", str(anat))
+    page = window.pages["placement"]
+    page.refresh()
+    ed = _row(page, "placement.mode").editor
+    items = {v: ed.combo.model().item(i) for i, v in enumerate(ed._items)}
+    assert items["manual"].isEnabled()
+    assert not items["heuristic"].isEnabled()                 # no m2m, no SimNIBS
+    assert "unavailable" in items["heuristic"].text()
+    assert "simnibs_bin_path" in items["plantus"].toolTip()
+    window.model.set("placement.mode", "heuristic")             # current value stays selectable
+    page.refresh()
+    ed = _row(page, "placement.mode").editor
+    assert ed.combo.model().item(ed._items.index("heuristic")).isEnabled()

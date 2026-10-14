@@ -88,3 +88,76 @@ def test_value_checks(schema):
     assert ("transducer.trans_pos", "error") in found
     assert ("simulation.medium", "error") in found
     assert ("subject_id", "error") not in found            # 12.0 is an integer to MATLAB
+
+
+def _subject(schema, tmp_path, *, m2m=(), simnibs=False):
+    """Model for sub-003 with a T1 and the given m2m_sub-003 files."""
+    anat = tmp_path / "anat"
+    anat.mkdir(parents=True)
+    (anat / "sub-003_T1w.nii.gz").write_bytes(b"")
+    for rel in m2m:
+        f = anat / "m2m_sub-003" / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(b"")
+    m = ConfigModel(schema)
+    for key, value in {"subject_id": 3, "path.anat": str(anat), "path.sim": str(tmp_path / "sim")}.items():
+        m.set(key, value)
+    if simnibs:
+        (tmp_path / "simnibs").mkdir()
+        m.set("startup.simnibs_bin_path", str(tmp_path / "simnibs"))
+    return m
+
+
+SEG = ("final_tissues.nii.gz", "toMNI/MNI2Conform_nonl.nii.gz")
+
+
+def test_mode_status_without_segmentation(schema, tmp_path):
+    st = checks.placement_mode_status(_subject(schema, tmp_path))
+    assert st["manual"].state == "ready"
+    for mode in ("heuristic", "mni", "plantus", "tus_entry"):
+        assert st[mode].state == "unavailable"
+        assert "simnibs_bin_path" in st[mode].reason
+    assert st["localite"].state == "unavailable"
+
+
+def test_mode_status_segmentation_runs_first(schema, tmp_path):
+    st = checks.placement_mode_status(_subject(schema, tmp_path, simnibs=True))
+    assert st["heuristic"].state == "pending"
+    assert "charm runs first" in st["heuristic"].reason
+
+
+def test_mode_status_plantus_needs_mesh_and_paths(schema, tmp_path):
+    m = _subject(schema, tmp_path, m2m=SEG)
+    st = checks.placement_mode_status(m)
+    assert st["heuristic"].state == "ready"
+    assert st["plantus"].state == "unavailable"            # no sub-003.msh, no SimNIBS
+    assert "sub-003.msh" in st["plantus"].reason
+    m = _subject(schema, tmp_path / "b", m2m=SEG + ("sub-003.msh",))
+    st = checks.placement_mode_status(m)
+    assert st["plantus"].state == "pending"                # tool paths not set: still selectable
+    assert "script_path" in st["plantus"].reason
+
+
+def test_mode_status_localite(schema, tmp_path):
+    m = _subject(schema, tmp_path)
+    post = tmp_path / "post"
+    (post / "sub-003").mkdir(parents=True)
+    m.set("path.localite_post", str(post))
+    assert checks.placement_mode_status(m)["localite"].state == "ready"
+
+
+def test_placement_issues(schema, tmp_path):
+    m = _subject(schema, tmp_path)
+    m.set("placement.mode", "heuristic")
+    found = _msgs(checks.placement_issues(m), "error")
+    assert ("placement.mode", "error") in found                       # no segmentation
+    m = _subject(schema, tmp_path / "b", m2m=SEG + ("sub-003.msh",))
+    m.set("placement.mode", "plantus")
+    found = _msgs(checks.placement_issues(m), "error")
+    assert ("placement.plantus.script_path", "error") in found
+    assert ("placement.plantus.focal_distance_list", "error") in found
+    assert ("placement.mode", "error") not in found
+    m.set("placement.mode", "tus_entry")
+    m.set("placement.tus_entry.script_path", str(tmp_path / "missing.R"))
+    found = _msgs(checks.placement_issues(m), "error")
+    assert found[("placement.tus_entry.script_path", "error")] == "File not found"

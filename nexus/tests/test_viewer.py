@@ -69,6 +69,27 @@ def test_place_snap_and_match(app, schema, prestus_root, subject, space):
     assert ep == pytest.approx(np.linalg.norm(trans - focus) - bowl.offset, abs=0.05)
     page._draw()                                   # renders without error
     assert "Exit plane vs scalp" in page.info.text()
+    assert "rim to scalp" in page.info.text()          # beam QC (placement.beam_qc)
+
+
+def test_qc_issues_flag_depth_mismatch_and_exit_plane_in_scalp(app, schema, prestus_root, subject):
+    """The viewer's red flags reach the Issues panel (MainWindow adds page.qc_issues())."""
+    m, page = _page(app, schema, prestus_root, subject, "ras")
+    page._write("focus_pos", np.array([0.0, 0.0, 10.0]))
+    page.direction = np.array([0.0, 0.0, 1.0])
+    page._snap()
+    page._match_focal_distance()
+    assert page.qc_issues() == []                  # on target, 5 mm outside the scalp
+    m.set("transducer.focal_distance_ep", m.get("transducer.focal_distance_ep") + 10)
+    msgs = [i.message for i in page.qc_issues()]
+    assert len(msgs) == 1 and "short of the focus" in msgs[0]
+    page.gap.setValue(-8)                          # exit plane 8 mm inside the scalp
+    page._snap()
+    page._match_focal_distance()
+    msgs = [i.message for i in page.qc_issues()]
+    assert len(msgs) == 1 and "inside the scalp" in msgs[0]
+    m.set("placement.mode", "localite")            # resolved at run time: not checked here
+    assert page.qc_issues() == []
 
 
 def _fake_mni2subject_coords(bin_dir, fail_for: str | None = None, offset=5.0):

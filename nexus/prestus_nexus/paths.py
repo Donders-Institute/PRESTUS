@@ -15,9 +15,16 @@ def is_prestus_root(path: str | Path) -> bool:
     return (p / "config" / DEFAULT_NAME).is_file() and (p / "functions").is_dir()
 
 
+def package_dir() -> Path:
+    """This package's folder in the PRESTUS checkout (nexus/prestus_nexus), also when the
+    Nexus runs from a local copy of it (localcopy.py), which sets $PRESTUS_NEXUS_SOURCE."""
+    source = os.environ.get("PRESTUS_NEXUS_SOURCE")
+    return Path(source) if source else Path(__file__).resolve().parent
+
+
 def find_prestus_root(hint: str | Path | None = None) -> Path | None:
     """PRESTUS root: explicit hint, $PRESTUS_ROOT, or the checkout this package lives in."""
-    candidates = [hint, os.environ.get("PRESTUS_ROOT"), Path(__file__).resolve().parents[2]]
+    candidates = [hint, os.environ.get("PRESTUS_ROOT"), package_dir().parents[1]]
     for cand in candidates:
         if cand and is_prestus_root(cand):
             return Path(cand).resolve()

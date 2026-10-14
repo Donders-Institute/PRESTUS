@@ -8,12 +8,16 @@ transducer.library_path (if it holds an entry) or config/calibration.
 
 from __future__ import annotations
 
+import hashlib
+import os
+import pickle
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from . import yamlio
+from .localcopy import cache_root
 
 
 @dataclass
@@ -140,15 +144,7 @@ class EquipmentLibrary:
         self._load()
 
     def _load(self) -> None:
-        if not self.equipment_dir.is_dir():
-            return
-        for path in sorted(self.equipment_dir.glob("*.yaml")):
-            if path.name == "equipment_info.yaml":
-                continue
-            try:
-                data = yamlio.load_file(path) or {}
-            except Exception:
-                continue
+        for name, data in sorted(self._read_entries().items()):
             if not isinstance(data, dict) or data.get("type") != "transducer" or "serial" not in data:
                 continue
             combos = {}
@@ -161,6 +157,41 @@ class EquipmentLibrary:
                 manufact=str(data.get("manufact", "")), n_elem=data.get("n_elem"),
                 min_foc=data.get("min_foc"), max_foc=data.get("max_foc"),
                 geometry=data.get("transducer", {}) or {}, combos=combos)
+
+    def _read_entries(self) -> dict[str, Any]:
+        """file name -> parsed YAML of config/equipment/*.yaml. The parsed files are kept in
+        the user's cache folder and reused while a file's size and modification time are
+        unchanged: on a network drive, reading the ~20 YAML files took ~8 s per start."""
+        try:
+            with os.scandir(self.equipment_dir) as it:
+                stamps = {e.name: (e.stat().st_size, e.stat().st_mtime_ns) for e in it
+                          if e.is_file() and e.name.endswith(".yaml") and e.name != "equipment_info.yaml"}
+        except OSError:
+            return {}
+        cache = cache_root() / ("equipment-" + hashlib.sha1(
+            str(self.equipment_dir.resolve()).encode()).hexdigest()[:10] + ".pkl")
+        try:
+            old = pickle.loads(cache.read_bytes())
+        except Exception:
+            old = {}
+        entries, fresh = {}, {}
+        for name, stamp in stamps.items():
+            hit = old.get(name)
+            if hit is not None and hit[0] == stamp:
+                fresh[name] = hit
+            else:
+                try:
+                    fresh[name] = (stamp, yamlio.load_file(self.equipment_dir / name) or {})
+                except Exception:
+                    continue
+            entries[name] = fresh[name][1]
+        if fresh != old:
+            try:
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_bytes(pickle.dumps(fresh))
+            except Exception:
+                pass
+        return entries
 
     def get(self, serial: Any) -> Device | None:
         return self.devices.get(str(serial)) if serial else None

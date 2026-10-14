@@ -8,6 +8,8 @@ MATLAB's load_parameters stays the final authority.
 from __future__ import annotations
 
 import os
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -143,13 +145,18 @@ def subject_issues(model: ConfigModel) -> list[Issue]:
 
     seg = g("path.seg")
     seg_root = anat if is_empty(seg) else seg      # load_parameters: seg defaults to anat
-    needs_m2m = layered or g("placement.mode") in ("mni", "heuristic") or \
+    mode = g("placement.mode")
+    needs_m2m = layered or mode in SEGMENTATION_MODES or \
         g("placement.manual.coordinate_space") == "mni"
     if needs_m2m and sid is not None and not is_empty(seg_root):
         m2m = m2m_dir(seg_root, sid)
         simnibs = g("startup.simnibs_bin_path")
         if m2m.is_dir():
             issues.append(Issue("info", "path.seg", f"Segmentation found: {m2m}"))
+            mesh = m2m / f"sub-{sid:03d}.msh"
+            if mode == "plantus" and not mesh.is_file():
+                issues.append(Issue("error", "path.seg",
+                                    f"PlanTUS needs the SimNIBS mesh {mesh.name}, not found in {m2m.name}"))
         elif is_empty(simnibs):
             issues.append(Issue("error", "startup.simnibs_bin_path",
                                 f"{m2m.name} not found and no SimNIBS path set to run charm"))
@@ -157,6 +164,224 @@ def subject_issues(model: ConfigModel) -> list[Issue]:
             issues.append(Issue("info", "path.seg", f"{m2m.name} not found; charm will run"))
         if not is_empty(simnibs) and not Path(simnibs).is_dir():
             issues.append(Issue("error", "startup.simnibs_bin_path", "Folder not found"))
+    return issues
+
+
+# ── Placement modes: availability for the configured subject ─────────────
+
+PLACEMENT_MODES = ("manual", "localite", "heuristic", "mni", "plantus", "tus_entry")
+# Modes that read the SimNIBS m2m folder (segmentation and/or MNI transforms)
+SEGMENTATION_MODES = ("mni", "heuristic", "plantus", "tus_entry")
+_RANK = {"ready": 0, "pending": 1, "unavailable": 2}
+
+
+@dataclass(frozen=True)
+class ModeStatus:
+    """Whether a placement mode can run for the configured subject.
+
+    state  'ready'        all inputs found
+           'pending'      selectable: something runs first (SimNIBS charm) or a setting
+                          of the mode itself is still to be filled in (see reason)
+           'unavailable'  an input is missing that PRESTUS cannot produce (no T1; no
+                          segmentation and no SimNIBS to make one; no recorded poses)
+    Settings that are only shown once the mode is selected (tool paths, targets)
+    never make a mode unavailable, or it could not be selected to fill them in.
+    """
+    state: str
+    reason: str = ""
+
+
+def _worst(*parts: ModeStatus) -> ModeStatus:
+    state = max((p.state for p in parts), key=_RANK.__getitem__)
+    reasons = [p.reason for p in parts if p.state != "ready" and p.reason]
+    if state == "ready":
+        reasons = [p.reason for p in parts if p.reason]
+    return ModeStatus(state, "; ".join(reasons))
+
+
+def _subject_id(model: ConfigModel) -> int | None:
+    sid = model.get("subject_id")
+    return int(sid) if _is_num(sid) and float(sid) == int(sid) and sid >= 0 else None
+
+
+def _t1_status(model: ConfigModel) -> ModeStatus:
+    g = model.get
+    sid, anat = _subject_id(model), g("path.anat")
+    if sid is None or is_empty(anat):
+        return ModeStatus("pending", "set subject_id and path.anat to find the T1")
+    if not resolve_pattern(anat, g("path.t1_pattern") or "", sid):
+        return ModeStatus("unavailable", "no T1 matches path.anat / path.t1_pattern")
+    return ModeStatus("ready")
+
+
+def _segmentation_status(model: ConfigModel, mesh: bool = False) -> ModeStatus:
+    """The SimNIBS m2m folder: tissue labels, MNI warps and (mesh=True) the head mesh."""
+    g = model.get
+    sid = _subject_id(model)
+    seg_root = g("path.seg") if not is_empty(g("path.seg")) else g("path.anat")
+    if sid is None or is_empty(seg_root):
+        return ModeStatus("pending", "set subject_id and path.seg (or path.anat) to find the segmentation")
+    m2m = m2m_dir(seg_root, sid)
+    need = [m2m / "final_tissues.nii.gz", m2m / "toMNI" / "MNI2Conform_nonl.nii.gz"]
+    if mesh:
+        need.append(m2m / f"sub-{sid:03d}.msh")
+    missing = [p.relative_to(m2m).as_posix() for p in need if not p.is_file()]
+    if not missing:
+        return ModeStatus("ready")
+    simnibs = g("startup.simnibs_bin_path")
+    what = f"{m2m.name}: {', '.join(missing)} not found"
+    if not is_empty(simnibs) and Path(simnibs).is_dir():
+        return ModeStatus("pending", f"{what}; SimNIBS charm runs first")
+    return ModeStatus("unavailable", f"{what}, and no startup.simnibs_bin_path to run charm")
+
+
+def _localite_status(model: ConfigModel) -> ModeStatus:
+    from .localite import post_root, raw_root   # avoids an import cycle at module load
+    g = model.get
+    f = g("placement.localite.file")
+    if not is_empty(f):
+        return ModeStatus("ready") if Path(str(f)).is_file() else \
+            ModeStatus("pending", "placement.localite.file not found")
+    sid = _subject_id(model)
+    if sid is None:
+        return ModeStatus("pending", "set subject_id to find the recorded poses")
+    sub = f"sub-{sid:03d}"
+    if (post := post_root(model)) and (Path(post) / sub).is_dir():
+        return ModeStatus("ready", f"ingested poses in {Path(post) / sub}")
+    if (raw := raw_root(model)) and (Path(raw) / sub).is_dir():
+        return ModeStatus("ready", f"raw exports in {Path(raw) / sub}; ingested on first use")
+    return ModeStatus("unavailable", f"no recorded poses for {sub} (placement.localite.file, "
+                                     "path.localite_post or path.localite_raw)")
+
+
+def _tool_status(model: ConfigModel, mode: str) -> ModeStatus:
+    """External tools: only 'pending' (to be set or fixed in the mode's own settings)."""
+    g = model.get
+    todo = []
+    if mode == "plantus":
+        if is_empty(g("placement.plantus.script_path")) or is_empty(g("placement.plantus.env_path")):
+            todo.append("set the PlanTUS paths (placement.plantus.script_path, env_path)")
+        if is_empty(g("placement.plantus.focal_distance_list")):
+            todo.append("set placement.plantus.focal_distance_list / flhm_list")
+    elif mode == "tus_entry":
+        if is_empty(g("placement.tus_entry.script_path")) or is_empty(g("placement.tus_entry.env_path")):
+            todo.append("set the TUS_entry paths (placement.tus_entry.script_path, env_path)")
+    return ModeStatus("pending", "; ".join(todo)) if todo else ModeStatus("ready")
+
+
+# Settings placement_mode_status reads. Its answer is reused for _STATUS_TTL_S while
+# these are unchanged: it looks for files (T1, m2m, poses), ~1 s on a network drive, and
+# the Issues panel and the Placement card both ask after every edit.
+_STATUS_KEYS = ("subject_id", "path.anat", "path.t1_pattern", "path.seg", "startup.simnibs_bin_path",
+                "placement.manual.coordinate_space", "placement.localite.file", "path.localite_post",
+                "path.localite_raw", "path.localite", "placement.plantus.script_path",
+                "placement.plantus.env_path", "placement.plantus.focal_distance_list",
+                "placement.tus_entry.script_path", "placement.tus_entry.env_path")
+_STATUS_TTL_S = 5.0
+_status_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+def clear_status_cache() -> None:
+    _status_cache.clear()
+
+
+def placement_mode_status(model: ConfigModel) -> dict[str, ModeStatus]:
+    """Availability of every placement mode for the configured subject
+    (preproc_transducer_placement.m and the position_transducer_* functions)."""
+    key = tuple(repr(model.get(k)) for k in _STATUS_KEYS)
+    hit = _status_cache.get(key)
+    if hit is not None and time.monotonic() - hit[0] < _STATUS_TTL_S:
+        return hit[1]
+    status = _placement_mode_status(model)
+    _status_cache.clear()
+    _status_cache[key] = (time.monotonic(), status)
+    return status
+
+
+def _placement_mode_status(model: ConfigModel) -> dict[str, ModeStatus]:
+    t1 = _t1_status(model)
+    seg = _segmentation_status(model)
+    manual = t1
+    if model.get("placement.manual.coordinate_space") == "mni":
+        manual = _worst(t1, seg)
+    return {
+        "manual":    manual,
+        "localite":  _worst(t1, _localite_status(model)),
+        "heuristic": _worst(t1, seg),
+        "mni":       _worst(t1, seg),
+        "plantus":   _worst(t1, _segmentation_status(model, mesh=True), _tool_status(model, "plantus")),
+        "tus_entry": _worst(t1, seg, _tool_status(model, "tus_entry")),
+    }
+
+
+def placement_issues(model: ConfigModel) -> list[Issue]:
+    """The selected placement mode: availability and its tool settings
+    (position_transducer_plantus.m, position_transducer_tus_entry.m)."""
+    issues: list[Issue] = []
+    g = model.get
+    mode = g("placement.mode") or "manual"
+    st = placement_mode_status(model).get(mode)
+    if st is not None and st.state == "unavailable":
+        issues.append(Issue("error", "placement.mode", f"'{mode}' cannot run: {st.reason}"))
+
+    if mode == "plantus":
+        script, env = g("placement.plantus.script_path"), g("placement.plantus.env_path")
+        if is_empty(script):
+            issues.append(Issue("error", "placement.plantus.script_path", "Required for PlanTUS"))
+        elif not (Path(script) / "code" / "PlanTUS.py").is_file():
+            issues.append(Issue("error", "placement.plantus.script_path", "code/PlanTUS.py not found here"))
+        if is_empty(env):
+            issues.append(Issue("error", "placement.plantus.env_path",
+                                "Required: the SimNIBS (or PRESTUS) Python environment"))
+        elif not Path(env).is_dir():
+            issues.append(Issue("error", "placement.plantus.env_path", "Folder not found"))
+        wb = g("placement.plantus.connectome_wb_path")
+        if not is_empty(wb) and not Path(wb).is_dir():
+            issues.append(Issue("warning", "placement.plantus.connectome_wb_path", "Folder not found"))
+        fd, flhm = g("placement.plantus.focal_distance_list"), g("placement.plantus.flhm_list")
+        if is_empty(fd):
+            issues.append(Issue("error", "placement.plantus.focal_distance_list",
+                                "Required: focal depth(s) of the transducer [mm]"))
+        elif not is_empty(flhm):
+            n_fd = len(fd) if isinstance(fd, list) else 1
+            n_fl = len(flhm) if isinstance(flhm, list) else 1
+            if n_fd != n_fl:
+                issues.append(Issue("error", "placement.plantus.flhm_list",
+                                    f"{n_fl} value(s) for {n_fd} focal distance(s)"))
+        lo, hi = g("placement.plantus.min_distance_mm"), g("placement.plantus.max_distance_mm")
+        if _is_num(lo) and _is_num(hi) and lo >= hi:
+            issues.append(Issue("error", "placement.plantus.max_distance_mm",
+                                "Must be larger than min_distance_mm"))
+        if is_empty(g("placement.plantus.mni_target_mm")) and \
+                all(is_empty(t.get("focus_pos")) for t in model.effective_transducers()):
+            issues.append(Issue("error", "placement.plantus.mni_target_mm",
+                                "Set the target: mni_target_mm or transducer.focus_pos"))
+
+    if mode == "tus_entry":
+        script, env = g("placement.tus_entry.script_path"), g("placement.tus_entry.env_path")
+        if is_empty(script):
+            issues.append(Issue("error", "placement.tus_entry.script_path", "Required for TUS_entry"))
+        elif not Path(script).is_file():
+            issues.append(Issue("error", "placement.tus_entry.script_path", "File not found"))
+        if is_empty(env):
+            issues.append(Issue("error", "placement.tus_entry.env_path",
+                                "Required: conda environment with Rscript"))
+        elif not Path(env).is_dir():
+            issues.append(Issue("error", "placement.tus_entry.env_path", "Folder not found"))
+        elif not any((Path(env) / p).is_file() for p in ("bin/Rscript", "Rscript", "bin/Rscript.exe")):
+            issues.append(Issue("warning", "placement.tus_entry.env_path", "No Rscript found in this environment"))
+        for key in ("scalp_mask", "target_mask", "exclu_mask"):
+            v = g(f"placement.tus_entry.{key}")
+            if not is_empty(v) and not Path(str(v)).is_file():
+                issues.append(Issue("error", f"placement.tus_entry.{key}", "File not found"))
+        if is_empty(g("placement.tus_entry.target_mask")) and is_empty(g("placement.tus_entry.mni_target_mm")) \
+                and all(is_empty(t.get("focus_pos")) for t in model.effective_transducers()):
+            issues.append(Issue("error", "placement.tus_entry.mni_target_mm",
+                                "Set the target: target_mask, mni_target_mm or transducer.focus_pos"))
+        lo, hi = g("placement.tus_entry.minimal_distance_cm"), g("placement.tus_entry.maximal_distance_cm")
+        if _is_num(lo) and _is_num(hi) and lo >= hi:
+            issues.append(Issue("error", "placement.tus_entry.maximal_distance_cm",
+                                "Must be larger than minimal_distance_cm"))
     return issues
 
 
@@ -340,6 +565,6 @@ def defaults_issues(model: ConfigModel) -> list[Issue]:
 def all_issues(model: ConfigModel) -> list[Issue]:
     order = {"error": 0, "warning": 1, "info": 2}
     issues = (value_issues(model) + model.unknown_keys()
-              + subject_issues(model) + rule_issues(model) + library_issues(model)
-              + isppa_issues(model) + defaults_issues(model))
+              + subject_issues(model) + rule_issues(model) + placement_issues(model)
+              + library_issues(model) + isppa_issues(model) + defaults_issues(model))
     return sorted(issues, key=lambda i: order.get(i.level, 3))

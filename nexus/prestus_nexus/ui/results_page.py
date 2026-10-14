@@ -47,6 +47,7 @@ class _OverlayPanel(QWidget):
         tb = QHBoxLayout()
         tb.addWidget(QLabel("Map"))
         self.combo = QComboBox()
+        self.combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.combo.currentTextChanged.connect(self._load_overlay)
         tb.addWidget(self.combo)
         self.peak = QPushButton("Go to peak")
@@ -78,7 +79,8 @@ class _OverlayPanel(QWidget):
 
     def _load_overlay(self, label: str, centre: bool = False) -> None:
         path = self._run.maps.get(label) if self._run is not None else None
-        self.viewer.set_overlay(path)
+        unit, zero_based, threshold = rs.MAP_DISPLAY.get(label, ("", False, 0))
+        self.viewer.set_overlay(path, unit=unit, zero_based=zero_based, threshold_pct=threshold)
         if centre:
             self.viewer.when_loaded(lambda: self.viewer.centre_on(self.viewer.overlay_peak()))
 

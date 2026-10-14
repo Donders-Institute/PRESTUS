@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialo
 
 from .. import checks, neuronav_import as ni, paths, placement as pl
 from ..heuristic_import import candidates as heuristic_candidates, selected as heuristic_selected
-from ..model import TX, ConfigModel, is_empty
-from ..outputs import dir_output, placement_record
+from ..model import TX, ConfigModel, Issue, is_empty
+from ..outputs import dir_placement_run, placement_record
 
 try:        # matplotlib is optional: the page explains what is missing
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -23,6 +23,10 @@ try:        # matplotlib is optional: the page explains what is missing
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
     HAVE_MPL = False
+
+
+QC_PATH = "placement viewer"     # Issue.path of the viewer's checks (MainWindow opens the viewer)
+DEPTH_TOL_MM = 2.0               # target vs focal depth setting: red / a warning above this
 
 
 # SimNIBS charm labels (final_tissues.nii.gz) and display colours
@@ -377,9 +381,10 @@ class PlacementPage(QWidget):
             length = None
         return diameter, length, diam_auto, len_auto
 
-    def _expected_bowl_distance(self) -> float | None:
-        tx = self.model.effective_transducers()[self.ti]
-        bowl = self._bowl()
+    def _expected_bowl_distance(self, ti: int | None = None) -> float | None:
+        ti = self.ti if ti is None else ti
+        tx = self.model.effective_transducers()[ti]
+        bowl = self._bowl_for(ti)
         ep, fb = tx.get("focal_distance_ep"), tx.get("focal_distance_bowl")
         if isinstance(fb, (int, float)) and not isinstance(fb, bool):
             return float(fb)
@@ -590,7 +595,7 @@ class PlacementPage(QWidget):
             line = f"<b>Target depth:</b> {ep:.2f} mm from the exit plane (bowl apex → target {dist:.2f} mm)"
             if exp is not None:
                 diff = dist - exp
-                colour = "#3c763d" if abs(diff) <= 2 else "#c9302c"
+                colour = "#3c763d" if abs(diff) <= DEPTH_TOL_MM else "#c9302c"
                 where = (f"target {abs(diff):.2f} mm {'beyond' if diff > 0 else 'short of'} the focus"
                          if abs(diff) >= 0.005 else "on target")
                 line += (f"<br>Focal depth setting: {exp - bowl.offset:.2f} mm from the exit plane — "
@@ -610,6 +615,7 @@ class PlacementPage(QWidget):
                     colour = "#3c763d" if gap >= 0 else "#c9302c"
                     lines.append(f"<b>Exit plane vs scalp:</b> <span style='color:{colour}'>"
                                  f"{gap:+.1f} mm</span> ({'outside' if gap >= 0 else 'inside the head'})")
+                lines.append(self._beam_qc_text(trans, focus, bowl))
         fov_diam, fov_len, fov_diam_auto, fov_len_auto = self._resolved_fov(trans, focus, bowl)
         if fov_diam and fov_len:
             lines.append(f"<b>Acoustic FOV (transducer {self.ti + 1}):</b> "
@@ -625,6 +631,107 @@ class PlacementPage(QWidget):
                 line += " · <span style='color:#c9302c'>frequencies differ</span>"
             lines.append(line)
         self.info.setText("<br><br>".join(lines))
+
+    def _beam_qc(self, trans, focus, bowl: pl.Bowl) -> dict[str, float]:
+        """placement.beam_qc, cached per placement (and shared with qc_issues)."""
+        key = (tuple(np.round(trans, 2)), tuple(np.round(focus, 2)),
+               (bowl.curv_radius, bowl.aperture, bowl.dist_geom_ep), str(self.seg.path))
+        cache = self.__dict__.setdefault("_qc_cache", {})
+        if key not in cache:
+            if len(cache) > 16:
+                cache.clear()
+            cache[key] = pl.beam_qc(self.seg, trans, focus, bowl)
+        return cache[key]
+
+    def qc_issues(self) -> list[Issue]:
+        """The viewer's red flags as Issues-panel warnings, for every transducer: the target
+        away from the focal depth setting, the exit-plane rim inside the scalp, and beam rays
+        through an eye. Manual placement only (other modes are resolved again at run time),
+        and only once the images are loaded (the viewer or the Run tab loaded them), so
+        editing never waits for a NIfTI."""
+        if self._loaded_for is None or self.model.get("placement.mode") not in ("manual", None, ""):
+            return []
+        self._load_images()                    # follows a changed subject or path
+        if self.t1 is None:
+            return []
+        issues: list[Issue] = []
+        source = self.position_source
+        n = self.model.n_transducers
+        try:
+            for ti in range(n):
+                trans, focus = self._positions_for(ti)
+                bowl = self._bowl_for(ti)
+                if trans is None or focus is None or bowl is None:
+                    continue
+                dist = float(np.linalg.norm(focus - trans))
+                if dist <= 0:
+                    continue
+                who = f"Transducer {ti + 1}: " if n > 1 else ""
+                exp = self._expected_bowl_distance(ti)
+                if exp is not None and abs(dist - exp) > DEPTH_TOL_MM:
+                    issues.append(Issue(
+                        "warning", QC_PATH,
+                        f"{who}the target is {abs(dist - exp):.1f} mm "
+                        f"{'beyond' if dist > exp else 'short of'} the focus (target depth "
+                        f"{dist - bowl.offset:.1f} mm, focal depth setting {exp - bowl.offset:.1f} mm). "
+                        "'Set focal depth to target' or move the transducer.", ti))
+                if self.seg is None:
+                    continue
+                q = self._beam_qc(trans, focus, bowl)
+                # the exit plane's centre on the axis ('Exit plane vs scalp') and its rim
+                # (beam QC): on a curved head either can be the one inside
+                gaps = [q["rim_gap_min_mm"]]
+                scalp = pl.scalp_exit(self.seg, focus, trans - focus)
+                if scalp is not None:
+                    gaps.append(float(np.dot(trans + (focus - trans) / dist * bowl.offset - scalp,
+                                             (trans - focus) / dist)))
+                worst = min((g for g in gaps if np.isfinite(g)), default=np.nan)
+                if np.isfinite(worst) and worst < 0:
+                    issues.append(Issue(
+                        "warning", QC_PATH,
+                        f"{who}the exit plane is up to {-worst:.1f} mm inside the scalp "
+                        "(the transducer cuts into the head). 'Snap to scalp' or move it.", ti))
+                if q["eye_in_beam"] > 0:
+                    issues.append(Issue(
+                        "warning", QC_PATH,
+                        f"{who}{100 * q['eye_in_beam']:.0f}% of the beam rays pass an eye.", ti))
+        finally:
+            self.position_source = source
+        return issues
+
+    def ensure_images(self) -> None:
+        """Load the T1 and segmentation (if not yet), so qc_issues can check the placement."""
+        self._load_images()
+
+    def show_transducer(self, ti: int) -> None:
+        if 0 <= ti < self.model.n_transducers:
+            self.tx_combo.setCurrentIndex(ti)
+
+    def _beam_qc_text(self, trans, focus, bowl: pl.Bowl) -> str:
+        """Skull and coupling along the beam (placement.beam_qc), cached per placement."""
+        q = self._beam_qc(trans, focus, bowl)
+
+        def c(text, bad=False, warn=False):
+            colour = "#c9302c" if bad else ("#b8860b" if warn else "#3c763d")
+            return f"<span style='color:{colour}'>{text}</span>"
+
+        inc = q["beam_skull_incidence_mean_deg"]
+        rim_min = q["rim_gap_min_mm"]
+        parts = [
+            f"skull {q['beam_skull_path_mean_mm']:.1f} ± {q['beam_skull_path_sd_mm']:.1f} mm "
+            f"(central ray {q['skull_path_mm']:.1f} mm)",
+            "incidence " + (c(f"{inc:.0f}°", warn=inc > 20) if np.isfinite(inc) else "n/a")
+            + " (beam mean)",
+            "rim to scalp " + (c(f"{q['rim_gap_mean_mm']:.1f} ± {q['rim_gap_sd_mm']:.1f} mm, "
+                                 f"min {rim_min:+.1f} mm", bad=rim_min < 0)
+                               if np.isfinite(rim_min) else "n/a"),
+        ]
+        if q["eye_in_beam"] > 0:
+            parts.append(c(f"{100 * q['eye_in_beam']:.0f}% of beam rays pass an eye", bad=True))
+        tip = ("Rays from the aperture (centre + 3 rings) to the focus; rim gap: exit-plane rim "
+               "to scalp along the beam (min < 0: the transducer cuts into the head; "
+               "large SD: uneven contact)")
+        return f"<b title='{tip}'>Beam:</b> " + " · ".join(parts)
 
     def _tissue_at(self, ras) -> str:
         if self.seg is None:

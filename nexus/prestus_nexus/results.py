@@ -36,6 +36,22 @@ MAPS: dict[str, tuple[str, ...]] = {
 }
 THERMAL_MAPS = ("Max temperature", "Max temperature rise", "Temperature at end", "CEM43")
 
+# How each map is shown: label -> (unit, colours from 0 to the maximum, 'Hide below' [%]).
+# Units as nifti_acoustic.m / nifti_thermal.m write them. Maps whose peak matters start
+# at 0 and hide the lowest 10 %, so the focus is not clipped and the field does not wash
+# over the whole head; absolute temperatures keep the percentile scale (37 °C baseline).
+MAP_DISPLAY: dict[str, tuple[str, bool, int]] = {
+    "Intensity (ISPPA)": ("W/cm²", True, 10),
+    "Pulse-average intensity": ("W/cm²", True, 10),
+    "Pressure (peak)": ("Pa", True, 10),
+    "Mechanical index": ("", True, 10),
+    "Focal volume (-6 dB)": ("", True, 0),
+    "Max temperature": ("°C", False, 0),
+    "Max temperature rise": ("°C", True, 10),
+    "Temperature at end": ("°C", False, 0),
+    "CEM43": ("min", True, 0),
+}
+
 # CSV columns shown when runs are compared side by side.
 COMPARE_COLUMNS = (
     ("Isppa_brain", "ISPPA brain [W/cm²]"),

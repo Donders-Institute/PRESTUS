@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel
                              QScrollArea, QToolButton, QToolTip, QVBoxLayout, QWidget)
 
 from .. import labels
-from ..checks import check_value
+from ..checks import check_value, placement_mode_status
 from ..model import TX, ConfigModel
 from ..schema import Node
 from .fields import FieldEditor, display_text, make_editor
@@ -196,9 +196,13 @@ class SectionPage(QFrame):
         bar = QHBoxLayout()
         self.tx_combo = QComboBox()
         self.tx_combo.currentIndexChanged.connect(self._select_transducer)
-        add = QPushButton("Add transducer")
+        add = QPushButton("+")
+        add.setToolTip("Add a transducer")
+        add.setMaximumWidth(28)
         add.clicked.connect(self._add_transducer)
-        self.tx_remove = QPushButton("Remove")
+        self.tx_remove = QPushButton("−")
+        self.tx_remove.setToolTip("Remove this transducer")
+        self.tx_remove.setMaximumWidth(28)
         self.tx_remove.clicked.connect(self._remove_transducer)
         self.tx_note = QLabel()
         self.tx_note.setObjectName("CardSub")
@@ -350,6 +354,8 @@ class SectionPage(QFrame):
                 value = self.model.get(path, ti)
                 row.editor.set_value(value, self.model.baseline(path, ti))
                 row.editor.set_error(check_value(row.node, value))
+                if path == "placement.mode" and hasattr(row.editor, "set_item_status"):
+                    row.editor.set_item_status(placement_mode_status(self.model))
                 name = labels.label(row.node)
                 tags = self._tune_tags(row.node)
                 if self.model.is_modified(path, ti):

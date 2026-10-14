@@ -20,6 +20,7 @@ from ..project_defaults import carry_pinned_values, replace_project_default
 from ..schema import GENERAL, Schema
 from ..session import Session
 from . import style
+from .placement_viewer import QC_PATH
 from .section import SectionPage
 
 REVIEW = "__review__"
@@ -510,7 +511,9 @@ class MainWindow(QMainWindow):
                 self.pages[RESULTS] = results
                 self._section_tab[RESULTS] = key
                 tab.set_full_tab(results, "Results")
+                tab.subtabs.blockSignals(True)          # scanned when the tab is first shown
                 tab.subtabs.setCurrentWidget(results)   # skip the empty 'Settings' pane
+                tab.subtabs.blockSignals(False)
             tab.finish()
             self.tab_pages[key] = tab
             self.tabs.addTab(tab, spec.get("label", key))
@@ -598,9 +601,17 @@ class MainWindow(QMainWindow):
             tab.refresh()
             if tab.key == "placement" and VIEWER in self.pages:
                 self.pages[VIEWER].refresh()
+                self._issue_timer.start()           # the viewer's checks, now its images are loaded
             if tab.key == "simulation" and PCT in self.pages:
                 self.pages[PCT].refresh()
             if tab.key == "run":
+                if VIEWER in self.pages and self.model.get("placement.mode") in ("manual", None, ""):
+                    QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+                    try:                            # check the placement before a run
+                        self.pages[VIEWER].ensure_images()
+                    finally:
+                        QApplication.restoreOverrideCursor()
+                    self._refresh_issues()
                 self.run_side.currentWidget().refresh()
             if tab.key == "results" and RESULTS in self.pages:
                 self.pages[RESULTS].refresh()
@@ -662,7 +673,11 @@ class MainWindow(QMainWindow):
 
     def _goto_issue(self, item: QTreeWidgetItem, _col: int = 0) -> None:
         issue = item.data(0, Qt.ItemDataRole.UserRole)
-        if issue is not None:
+        if issue is None:
+            return
+        if issue.path == QC_PATH:
+            self.show_special(VIEWER).show_transducer(issue.transducer or 0)
+        else:
             self.goto(issue.path, issue.transducer)
 
     # ── state ───────────────────────────────────────────────────────────
@@ -707,6 +722,8 @@ class MainWindow(QMainWindow):
 
     def _refresh_issues(self) -> None:
         self.issues = checks.all_issues(self.model)
+        if VIEWER in self.pages:
+            self.issues += self.pages[VIEWER].qc_issues()
         self.issue_tree.clear()
         palette = style.active()
         for issue in self.issues:

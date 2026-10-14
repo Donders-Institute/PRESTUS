@@ -21,6 +21,14 @@ def schema(prestus_root) -> Schema:
 
 
 @pytest.fixture(autouse=True)
+def _fresh_caches(monkeypatch, tmp_path_factory):
+    """Each test sees the file system as it is now, and nothing is cached outside tmp."""
+    from prestus_nexus import checks
+    checks.clear_status_cache()
+    monkeypatch.setenv("PRESTUS_NEXUS_CACHE", str(tmp_path_factory.mktemp("nexus_cache")))
+
+
+@pytest.fixture(autouse=True)
 def _no_modal_dialogs(monkeypatch):
     """Offscreen, a modal dialog would block forever: fail instead.
 
