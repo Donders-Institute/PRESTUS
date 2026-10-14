@@ -142,6 +142,7 @@ All values in the output folder are resolved from the library entry (`library_mo
 | `opt_limits` | [min max] fitted window, mm from the bowl apex (`FitWindowMm`, converted to the exit plane) |
 | `skip_front_peak_mm` | Near field ignored in fit and metrics (`NearFieldSkipMm`) |
 | `profile_align`, `max_extrapolation_mm`, `max_gap_mm` | Profile interpolation at unmeasured depths |
+| `ring_profile` | `auto` (default: keep the entry's) · `fit`: within-ring velocity profile shared by all depths (`fit_ring_profile`) · `none`: uniform rings; `ring_profile_n_sub` (4), `ring_profile_smooth` (0.3), `ring_profile_near_field_skip_mm` (4). See [Within-ring velocity profile](doc_transducer_library.md#optional-within-ring-velocity-profile) |
 | `add_FDO` | 1 (default): profile distances are from the exit plane · 0: from the bowl apex |
 | `kwave_drive_calibration` | Free-water k-Wave simulation per depth that rescales the stored drive to the simulated ISPPA (default true; former name `run_free_water_sim`); `force_kwavearray`, `axisymmetric2D` set up its grid |
 | `opt_method`, `opt_seed` | Optimiser and seed of the `oneil_phase_only` preset |

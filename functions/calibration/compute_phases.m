@@ -41,6 +41,9 @@ end
 
     % Mid-radius of each ring [mm]
     r_mid = (elem_id_mm / 2 + elem_od_mm / 2) / 2;
+    if isfield(tran.transducer.annular, 'steer_r_mid_mm') && ~isempty(tran.transducer.annular.steer_r_mid_mm)
+        r_mid = tran.transducer.annular.steer_r_mid_mm(:)';   % sub-rings steer with their ring (RING_PROFILE_TRANSDUCER)
+    end
 
     % Convert focal distance relative to exit plane to relative to natural focus.
     % Bowl apex is at z = -R_c; target at z = aim_wrt_natural_focus.

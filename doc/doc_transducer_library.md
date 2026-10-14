@@ -239,11 +239,52 @@ Before saving, **Predict** shows what the fit gives at the depths you will stimu
 
 The same steps are on the PRESTUS Nexus's *Transducer ▸ Calibration* page, for the transducers of a study config: it saves to the study's `transducer.library_path` and can predict at the study's own focal depths ([Calibration page](doc_nexus.md#calibration-page)). Both use `calibration_desired_profiles`, `calibration_evaluate`, `calibration_fit` and `calibration_save_entry`, so they give the same results. A saved entry records how it was fitted in `meta.fit`: the fit mode, free parameters and `FitOptions`, whether it was calibrated at measured or desired depths (and those depths), the profile CSV, the reference ISPPA, the profile interpolation options and, if run, the k-Wave drive check settings. When `calibration_gui` or the Nexus opens an entry with `meta.fit`, they restore these settings, so a refit starts from the last one.
 
-Fit settings are passed through `FitOptions` (see `help fit_transducer_model`). `Mode = 'static'` (GUI: **Static model (joint, debug)**) refits one depth-independent model over all selected depths instead. It is kept for debugging and comparison, not as the default.
+Fit settings are passed through `FitOptions` (see `help fit_transducer_model`).
+
+#### Optional: within-ring velocity profile
+
+The library models each ring as a uniformly vibrating piston. For several Sonic Concepts CTX transducers that model cannot reproduce the measured axial profiles, whatever phases and gains are chosen: in particular the ratio of the near-field peak to the focal peak. On CTX-500-026, the measured near-field peak (8–12 mm from the exit plane, 0.4–0.6 of the focal intensity at deep settings, reproduced by in-house and manufacturer measurements) comes out about 7× too weak. Imasonic transducers are matched well by uniform rings.
+
+The ring profile describes how each ring vibrates across its width. Every ring is split into `n_sub` sub-rings with a complex weight that is the **same at every focal depth** (a property of the hardware), while each depth keeps only what the driver controls: one phase and gain per channel. `fit_ring_profile` fits the weights jointly over all measured depths, with a smoothness penalty between neighbouring sub-rings, and the near field included from 4 mm. Each ring's area-weighted mean weight is 1, so its level and phase stay with the channel drive.
+
+| | Uniform rings | Ring profile, depth held out |
+|---|---|---|
+| CTX-500-026 (4 rings), median R² (worst) | 0.957 (0.79) | 0.989 (0.93) |
+| CTX-250-009 (2 rings) | 0.894 (0.87) | 0.980 (0.95) |
+| CTX-250-001 (4 rings) | 0.978 (0.96) | 0.980 (0.96) |
+| CTX-500-026 near-field / focal ratio error | 7× | 33 % |
+
+(Exploratory analysis, 2026-10-08; peak-normalised intensity from 4 mm, held-out depth with its channel drive refitted. "Uniform rings" here is an unregularised per-depth fit, not the shipped library fit, which regularises the ring gains and penalises a near field hotter than measured; see the off-axis comparison below. The benchmark `code/diagnostics/calib_ring_profile` repeats this for all combos, including prediction between measured depths.)
+
+Use it from:
+
+- **`calibration_gui`** and the Nexus *Calibration* page: **Ring profile** → *fit (shared by all depths)*; the GUI also shows the fitted profile (`plot_ring_profile`).
+- **`refine_transducer_library`** / **`calibrate_library_entry`**: `RingProfile = 'fit'` (`RingProfileOptions`: `NSub`, `Smooth`, `NearFieldSkipMm`, `HeldOut`); with `Plot`, the profile figure is saved next to the entry.
+- **`config_calibration.yaml`** (`calibration_transducer`): `ring_profile: fit`, `ring_profile_n_sub`, `ring_profile_smooth`, `ring_profile_near_field_skip_mm`.
+- **`build_transducer_library`**: `RING_PROFILE = 'fit'` or a list of combos (default `'none'`).
+
+`'auto'` (the default everywhere) keeps an entry's profile if it has one; `'none'` removes it.
+
+**What changes.** The profile is stored in `global_model.ring_profile` (`n_sub`, `weight_abs`, `weight_phase_deg` per sub-ring, `smooth`, `near_field_skip_mm`, fit quality). All per-element arrays of the entry then refer to the sub-rings, so adding, removing or refitting a profile drops the entry's refinements (with a warning) and only the depths calibrated then are stored. Every function that combines an entry with the equipment geometry resolves it through `library_transducer`, so the profile is used consistently: the analytical models apply the weights in `axial_transfer_matrix`, and `load_transducer_from_library` hands the simulation an annular source of sub-rings, each driven with its channel's phase and drive times its weight (`ring_profile_drive`; `transducer.tx_calibration.ring_profile` records it). Sub-rings are steered with their ring (`annular.steer_r_mid_mm`). Inline `elem_phase_deg` / `elem_p_amp` in a study config refer to the equipment rings and bypass the profile; dephased conditions are not supported with a profile.
+
+**Limitation and off-axis data.** On-axis profiles do not determine the surface vibration uniquely: refitting a known smooth profile from synthetic axial profiles reproduces the profiles almost perfectly (R² > 0.998) but not the weights. Off-axis measurements constrain it. `fit_ring_profile` accepts them through `OffAxis` (points r, z with intensity at a focal setting, e.g. the azimuthally averaged radial profile of a transverse hydrophone plane), modelled with `field_transfer_matrix` (the Rayleigh integral at points off the axis) and fitted together with the axial profiles. Validation on CTX-500-026 hydrophone planes at the 40 mm setting (`code/report/01_calibration/ring_profile_validation_*`, project repository; R² of intensity normalised by the axial peak, planes held out of the fit):
+
+| Model (fitted to 12 axial profiles) | Axis (40 mm) | Sagittal XZ (z < 25 mm) | XY 35 mm | XY 40 mm (focus) | −3 dB width |
+|---|---|---|---|---|---|
+| Shipped library fit (uniform rings, `rayleigh_phase_gain`) | 0.87 | 0.89 (0.26) | 0.96 | 0.97 | 2.7 mm |
+| Same, gain regularisation 10× weaker (`LambdaAmp` 1e-3) | 0.89 | 0.90 (0.33) | 0.94 | 0.96 | 2.6 mm |
+| Uniform rings, unregularised | 0.90 | 0.86 (0.31) | 0.90 | 0.90 | 2.4 mm |
+| Ring profile, axial | 0.97 | 0.88 (0.64) | 0.88 | 0.87 | 2.4 mm |
+| Ring profile, axial + XY 35 mm plane | 0.97 | 0.94 (0.65) | 0.95 (fitted) | 0.98 | 2.9 mm |
+| Hydrophone | | | | | 2.8 mm |
+
+The shipped library fit predicts the transverse planes and the focal width well: its gain regularisation keeps the ring gains near equal, which costs on-axis fit but keeps the off-axis field right (unregularised fits match the axis better and the planes worse). Its shortfall is the axis and the near field. A ring profile fitted to axial profiles only improves those but loses the transverse planes; with one transverse plane added, it improves the axis and the near field and keeps the focal plane. Without off-axis data, keep the library fit and treat the off-axis field of a ring profile as unvalidated.
 
 #### Optional: free-water k-Wave drive calibration
 
 The analytical fit (Rayleigh) sets the phases and the drive for each refined depth. `kwave_calibrate_drive` simulates every refined depth in free-water k-Wave exactly as a study would resolve it from the entry (serial, driving system, depth, target ISPPA; in-pipeline ISPPA targeting off), and rescales the stored drive so that the simulation hits the reference ISPPA (`elem_p_amp × √(I_ref / I_kWave)`, `amp_source: kwave`). It also reports the simulated ISPPA, R² and FLHM-centre error against the hydrophone profile. Phases are not changed: k-Wave calibrates the amplitude of the analytical fit and validates its phases; it is not a phase optimiser. (Former name: `kwave_check_refinement`, kept as a deprecated wrapper.)
+
+The report also scores the **absolute** profile (`kwave_drive_metrics`), because the peak-normalised R² cannot show a wrong level: `isppa_err_pct` is how far the analytical drive misses the reference ISPPA in k-Wave, `i_at_target_ratio` the simulated intensity at the measured FLHM centre relative to the reference, `kwave_over_analytical` the k-Wave ISPPA over the Rayleigh ISPPA at the same drive (the Rayleigh ISPPA of a shipped drive equals the reference to within 2 %), and `nrmse_before` / `nrmse_after` the RMS difference from the hydrophone profile scaled to the reference ISPPA, before and after the drive correction (what remains after is shape). `sim_seconds` and `grid_points` record the cost. `GridDims` (`kwave_grid_dims` in `config_calibration.yaml`) selects the free-water grid: `'auto'` sizes it to the aperture and focus (`grid.default_dims: 'auto'`).
 
 ```matlab
 refine_transducer_library('CTX_250_001_SC_105_010', 'my_profiles.csv', lib, struct( ...

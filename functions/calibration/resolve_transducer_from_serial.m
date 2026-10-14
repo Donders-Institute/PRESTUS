@@ -162,6 +162,29 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
         tr.annular.elem_p_amp = lib_params.transducer.annular.elem_p_amp;
     end
 
+    % Ring profile: the library drive refers to sub-rings, so the geometry
+    % comes from the entry too (inline drives refer to the equipment rings)
+    rp_lib = [];
+    if isfield(lib_params.transducer.tx_calibration, 'ring_profile')
+        rp_lib = lib_params.transducer.tx_calibration.ring_profile;
+    end
+    if ~isempty(rp_lib)
+        if ~phases_present && ~amp_present
+            for f = {'elem_n', 'elem_id_mm', 'elem_od_mm', 'steer_r_mid_mm'}
+                tr.annular.(f{1}) = lib_params.transducer.annular.(f{1});
+            end
+            tr.tx_calibration.ring_profile = rp_lib;
+        elseif phases_present && amp_present
+            warning('resolve_transducer_from_serial:ringProfileInline', ...
+                ['Transducer %d: the library entry ''%s'' has a ring profile, but elem_phase_deg and ' ...
+                 'elem_p_amp are given inline for the equipment rings; the ring profile is not used.'], t_i, lib_key);
+        else
+            error('resolve_transducer_from_serial:ringProfileInline', ...
+                ['Transducer %d: the library entry ''%s'' has a ring profile (drives per sub-ring). Give both ' ...
+                 'elem_phase_deg and elem_p_amp inline (equipment rings), or neither.'], t_i, lib_key);
+        end
+    end
+
     fprintf(['[transducer %d] Resolved from library: %s | focal %.1f mm ' ...
         '(%s) | %.1f W/cm²\n'], ...
         t_i, lib_key, tr.focal_distance_ep, lib_params.transducer.tx_calibration.phase_model, ...

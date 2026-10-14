@@ -52,16 +52,23 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
 %     .KWaveDriveOptions  - options for KWAVE_CALIBRATE_DRIVE (former name
 %                           KWaveOptions, still read)
 %     .EquipParam         - struct from load_equipment_config (passed to the k-Wave drive calibration)
+%     .RingProfile        - within-ring velocity profile: 'auto' (default: keep the
+%                           entry's profile, if any) | 'fit' (FIT_RING_PROFILE on all
+%                           measured depths) | 'none' (uniform rings) | a profile struct.
+%                           A changed profile changes the geometry: the entry's
+%                           refinements and static offsets are dropped (warning)
+%     .RingProfileOptions - options for FIT_RING_PROFILE (NSub, Smooth, NearFieldSkipMm, ...)
 %     .ProgressFcn        - @(k, n, depth_ep_mm, profile_type) before each fit
 %
 % Output:
 %   lib    - calibrated entry (meta is left to the caller)
-%   fits   - per_depth/geometric: {1 x N} FIT_TRANSDUCER_MODEL results; static: one model
+%   fits   - {1 x N} FIT_TRANSDUCER_MODEL results, one per depth
 %   report - table per calibrated depth: depth_ep_mm, profile_type, r2_library,
 %            r2_refined, abs_focal_err_library_mm, abs_focal_err_refined_mm,
 %            nearfield_excess_refined, source_gap_mm (NaN unless interpolated)
 %   prof   - the profiles the entry was calibrated on (with profile_type)
-%   diag   - .before (EVALUATE_LIBRARY_ENTRY of the base entry), .z_after,
+%   diag   - .ring_profile (second output of FIT_RING_PROFILE, or []),
+%            .before (EVALUATE_LIBRARY_ENTRY of the base entry), .z_after,
 %            .I_after (modelled profiles after calibration), .kwave (k-Wave
 %            report table or []), .fit_options (options actually used)
 %
@@ -125,61 +132,65 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
     end
 
     %% Base entry as a study resolves it (for the report) ------------------
-    eval_opt = struct();
-    if isfield(fit_opts, 'ForwardModel'); eval_opt.ForwardModel = fit_opts.ForwardModel; end
-    if ~strcmp(mode, 'static')
-        fo = calibration_fit_options(preset, fit_opts);
-        eval_opt.ForwardModel = fo.ForwardModel;
+    fo = calibration_fit_options(preset, fit_opts);
+    before = evaluate_library_entry(tran, lib, prof, struct('ForwardModel', fo.ForwardModel));
+
+    %% Ring profile -----------------------------------------------------------
+    rp_info = [];
+    rp_mode = opt(options, 'RingProfile', 'auto');
+    if isstruct(rp_mode) || any(strcmp(rp_mode, {'fit', 'none'}))
+        if isstruct(rp_mode)
+            rp = rp_mode;
+        elseif strcmp(rp_mode, 'fit')
+            ro = opt(options, 'RingProfileOptions', struct());
+            if ~isfield(ro, 'ForwardModel'); ro.ForwardModel = fo.ForwardModel; end
+            [rp, rp_info] = fit_ring_profile(tran, meas, ro);
+            fprintf('calibrate_library_entry: ring profile (%d sub-rings) median R² %.3f → %.3f (z >= %g mm)\n', ...
+                rp.n_sub, rp.r2_uniform_median, rp.r2_profile_median, rp.near_field_skip_mm);
+        else
+            rp = [];
+        end
+        lib = library_set_ring_profile(lib, rp);
+    elseif ~strcmp(rp_mode, 'auto')
+        error('calibrate_library_entry:ringProfile', 'RingProfile must be ''auto'', ''fit'', ''none'' or a struct.');
     end
-    before = evaluate_library_entry(tran, lib, prof, eval_opt);
+    tran = library_transducer(tran, lib);
+    if isfield(tran.transducer.annular, 'ring_profile') && ~isfield(fit_opts, 'NearFieldSkipMm')
+        % The profile is fitted with the near field; calibrate the channels on the same range
+        fo.NearFieldSkipMm = tran.transducer.annular.ring_profile.near_field_skip_mm;
+    end
 
     %% Fit -------------------------------------------------------------------
-    switch mode
-        case 'static'
-            fo = fit_opts;
-            if ~isfield(fo, 'FreeParams'); fo.FreeParams = {'phase', 'amp'}; end
-            fits = fit_transducer_model(tran, prof, fo);
-            lib  = library_entry_from_model(lib, fits, intensity);
-
-        otherwise
-            % Regularise towards the entry's static model. z shift stays 0:
-            % the loader does not apply a fitted shift, and phases fitted with
-            % one match the hydrophone only after that shift
-            if ~isfield(fo, 'Prior') || isempty(fo.Prior); fo.Prior = library_static_model(lib); end
-            fo.Prior.z_shift_mm = 0;
-            if strcmp(mode, 'geometric')
-                fo.EvaluateOnly = true;
-            end
-            fits = calibration_fit_depths(tran, prof, fo, opt(options, 'ProgressFcn', []));
-            lib  = library_refinement_from_fits(lib, fits, intensity, blend_mm, source);
+    % Regularise towards the entry's global model (static offset of a legacy
+    % entry, else geometric steering). z shift stays 0: the loader does not
+    % apply a fitted shift, and phases fitted with one match the hydrophone
+    % only after that shift
+    if ~isfield(fo, 'Prior') || isempty(fo.Prior); fo.Prior = library_static_model(lib); end
+    fo.Prior.z_shift_mm = 0;
+    if strcmp(mode, 'geometric')
+        fo.EvaluateOnly = true;
     end
+    fits = calibration_fit_depths(tran, prof, fo, opt(options, 'ProgressFcn', []));
+    lib  = library_refinement_from_fits(lib, fits, intensity, blend_mm, source);
 
     %% Optional k-Wave drive calibration --------------------------------------
     kw = [];
     if opt(options, 'KWaveDriveCalibration', opt(options, 'KWave', false))
-        if strcmp(mode, 'static')
-            warning('calibrate_library_entry:kwaveStatic', ...
-                'The k-Wave drive calibration applies to per-depth refinements; skipped for Mode ''static''.');
-        else
-            ko = opt(options, 'KWaveDriveOptions', opt(options, 'KWaveOptions', struct()));
-            if isfield(options, 'EquipParam') && ~isfield(ko, 'EquipParam'); ko.EquipParam = options.EquipParam; end
-            [lib, kw] = kwave_calibrate_drive(lib, prof, ko);
-            disp(kw);
-        end
+        ko = opt(options, 'KWaveDriveOptions', opt(options, 'KWaveOptions', struct()));
+        if isfield(options, 'EquipParam') && ~isfield(ko, 'EquipParam'); ko.EquipParam = options.EquipParam; end
+        [lib, kw] = kwave_calibrate_drive(lib, prof, ko);
+        disp(kw);
     end
 
     %% Report ------------------------------------------------------------------
-    if strcmp(mode, 'static')
-        after = fits.metrics; I_after = fits.I_model; z_after = fits.z_ep_mm;
-    else
-        after = vertcat_metrics(fits);
-        I_after = cell2mat(cellfun(@(f) f.I_model, fits, 'UniformOutput', false)); z_after = fits{1}.z_ep_mm;
-    end
+    after = vertcat_metrics(fits);
+    I_after = cell2mat(cellfun(@(f) f.I_model, fits, 'UniformOutput', false)); z_after = fits{1}.z_ep_mm;
     report = table(prof.depths_ep_mm(:), string(prof.profile_type(:)), before.metrics.r2, after.r2, ...
         abs(before.metrics.focal_err_mm), abs(after.focal_err_mm), after.nearfield_excess, gap(:), ...
         'VariableNames', {'depth_ep_mm', 'profile_type', 'r2_library', 'r2_refined', 'abs_focal_err_library_mm', ...
         'abs_focal_err_refined_mm', 'nearfield_excess_refined', 'source_gap_mm'});
-    diag = struct('before', before, 'z_after', z_after, 'I_after', I_after, 'kwave', kw, 'fit_options', fo);
+    diag = struct('before', before, 'z_after', z_after, 'I_after', I_after, 'kwave', kw, 'fit_options', fo, ...
+        'ring_profile', rp_info);
 end
 
 function p = profile_subset(p, keep)

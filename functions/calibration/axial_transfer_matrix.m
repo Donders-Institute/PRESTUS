@@ -22,6 +22,9 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
 % Output:
 %   H - [N_z x N_elem] complex transfer matrix
 %
+% A within-ring velocity profile (annular.elem_weight, set by
+% RING_PROFILE_TRANSDUCER) multiplies each column by its complex weight.
+%
 % Notes:
 %   'rayleigh' reproduces RAYLEIGH_AXIAL_INTENSITY (same quadrature and bowl
 %   sagitta) but vectorised: |H*w|.^2/(2*rho*c)*1e-4 equals
@@ -67,6 +70,12 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
             end
         otherwise
             error('axial_transfer_matrix: unknown forward model ''%s''.', forward_model);
+    end
+
+    % Within-ring velocity profile (RING_PROFILE_TRANSDUCER): fixed complex
+    % weight per (sub-)ring, so the drive w stays per channel
+    if isfield(ann, 'elem_weight') && ~isempty(ann.elem_weight)
+        H = H .* reshape(ann.elem_weight, 1, []);
     end
 end
 

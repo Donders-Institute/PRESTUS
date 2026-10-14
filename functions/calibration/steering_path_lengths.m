@@ -20,6 +20,9 @@ function d = steering_path_lengths(tran, depths_ep_mm)
     ann   = tran.transducer.annular;
     R_c   = ann.curv_radius_mm;
     r_mid = (ann.elem_id_mm(:)' / 2 + ann.elem_od_mm(:)' / 2) / 2;
+    if isfield(ann, 'steer_r_mid_mm') && ~isempty(ann.steer_r_mid_mm)
+        r_mid = ann.steer_r_mid_mm(:)';   % sub-rings steer with their ring (RING_PROFILE_TRANSDUCER)
+    end
     z_t   = (depths_ep_mm(:) - ann.dist_geom_ep_mm) / 1000;   % aim w.r.t. natural focus [m]
     ex    = r_mid / 1000;
     ez    = -sqrt(R_c^2 - r_mid.^2) / 1000;

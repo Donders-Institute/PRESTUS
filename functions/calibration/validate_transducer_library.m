@@ -102,6 +102,12 @@ function report = validate_transducer_library(library_path, equipment_path)
             rec.issues{end+1} = sprintf('Equipment entry for ''%s'' not found', tran_serial);
         end
 
+        % A ring profile splits every ring into n_sub sub-rings (RING_PROFILE_TRANSDUCER)
+        if ~isnan(n_elem_equip) && isfield(lib, 'global_model') && isfield(lib.global_model, 'ring_profile') ...
+                && isstruct(lib.global_model.ring_profile) && isfield(lib.global_model.ring_profile, 'n_sub')
+            n_elem_equip = n_elem_equip * double(lib.global_model.ring_profile.n_sub);
+        end
+
         %% Static offset --------------------------------------------------
         gm = struct();
         if isfield(lib, 'global_model') && isstruct(lib.global_model); gm = lib.global_model; end

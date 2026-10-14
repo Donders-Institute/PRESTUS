@@ -45,7 +45,11 @@ function [lib, report, out] = calibration_transducer(...
 %                       plane | 0: from the bowl apex
 %   kwave_drive_calibration - free-water k-Wave drive calibration per depth
 %                       (default true; former name run_free_water_sim);
-%                       force_kwavearray, axisymmetric2D set up its grid
+%                       force_kwavearray, axisymmetric2D, kwave_grid_dims set up its grid
+%   ring_profile      - within-ring velocity profile (FIT_RING_PROFILE): 'auto'
+%                       (default: keep the entry's) | 'fit' | 'none';
+%                       ring_profile_n_sub (4), ring_profile_smooth (0.3),
+%                       ring_profile_near_field_skip_mm (4) set the fit
 %   library_path      - library endpoint (default {path_output}/library)
 %   path_output_profiles - calibration output folder (default {path_output}/profiles)
 %
@@ -107,15 +111,19 @@ function [lib, report, out] = calibration_transducer(...
         'Source', source, 'EquipParam', equip, 'MaxGapMm', get_or(cal, 'max_gap_mm', 10), ...
         'InterpolateOptions', struct('Align', char(get_or(cal, 'profile_align', 'label')), ...
             'MaxExtrapolationMm', get_or(cal, 'max_extrapolation_mm', 0)));
-    co.KWaveDriveCalibration = logical(get_or(cal, 'kwave_drive_calibration', get_or(cal, 'run_free_water_sim', true))) && ...
-        ~strcmp(mode, 'static');
+    co.KWaveDriveCalibration = logical(get_or(cal, 'kwave_drive_calibration', get_or(cal, 'run_free_water_sim', true)));
     if co.KWaveDriveCalibration
         sim_cfg = parameters;
         if get_or(cal, 'force_kwavearray', 0) == 1; sim_cfg.grid.use_kWaveArray = 1; end
         co.KWaveDriveOptions = struct('SimConfig', sim_cfg, 'EquipParam', equip, ...
             'Axisymmetric', logical(get_or(cal, 'axisymmetric2D', 0)), ...
+            'GridDims', get_or(cal, 'kwave_grid_dims', []), ...
             'WorkDir', fullfile(cal.path_output, sprintf('sub-%03d', sim_id), 'kwave_drive_calibration'));
     end
+    co.RingProfile = char(get_or(cal, 'ring_profile', 'auto'));
+    co.RingProfileOptions = struct('NSub', get_or(cal, 'ring_profile_n_sub', 4), ...
+        'Smooth', get_or(cal, 'ring_profile_smooth', 0.3), ...
+        'NearFieldSkipMm', get_or(cal, 'ring_profile_near_field_skip_mm', 4));
     warn_obsolete(cal);
 
     %% Base entry: user library, else shipped, else new ----------------------
@@ -157,10 +165,9 @@ function [lib, report, out] = calibration_transducer(...
         for I = intensities
             m = library_model_at_depth(lib, tran, d, I, out_file);
             p = parameters;
-            p.transducer = tran.transducer;
-            p.transducer.annular.elem_phase_deg = m.elem_phase_deg;
-            p.transducer.annular.elem_phase_rad = m.elem_phase_rad;
-            p.transducer.annular.elem_p_amp     = m.elem_p_amp;
+            tl = library_transducer(tran, lib);   % sub-rings if the entry has a ring profile
+            p.transducer = tl.transducer;
+            p.transducer.annular = ring_profile_drive(p.transducer.annular, m.elem_phase_deg, m.elem_p_amp);
             p.calibration.path_output_profiles  = out_dir;
             p.calibration.filename_calibrated_CSV = csv_name;
             p.calibration.equipment_name        = combo;
@@ -181,6 +188,10 @@ function [lib, report, out] = calibration_transducer(...
     write_axial_profiles(prof, fullfile(out_dir, [combo '_calibration_profiles.csv']), struct('combo', combo));
     out.report_file = fullfile(out_dir, [combo '_calibration_report.csv']);
     writetable(report, out.report_file);
+    if ~isempty(diag.ring_profile)
+        plot_ring_profile(tran, lib.global_model.ring_profile, diag.ring_profile, ...
+            fullfile(out_dir, [combo '_ring_profile.png']));
+    end
     if ~isempty(diag.kwave)
         writetable(diag.kwave, fullfile(out_dir, [combo '_kwave_drive_calibration.csv']));
     end

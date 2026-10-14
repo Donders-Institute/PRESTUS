@@ -60,6 +60,7 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
 %           KWAVE_CALIBRATE_DRIVE
 
     if nargin < 5 || isempty(source_label); source_label = '(in-memory entry)'; end
+    tran   = library_transducer(tran, lib);   % sub-ring geometry if the entry has a ring profile
     n_elem = tran.transducer.annular.elem_n;
     tran.n_elem = n_elem;   % one phase per ring, as LOAD_TRANSDUCER_FROM_LIBRARY
 

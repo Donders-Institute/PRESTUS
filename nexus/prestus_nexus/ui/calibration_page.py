@@ -224,16 +224,20 @@ class CalibrationPage(QWidget):
         self.calat.addItem("Fit depths (measured)", "measured")
         self.calat.addItem("Desired depths", "desired")
         form.addRow("Calibrate at", self.calat)
-        self.mode = QComboBox()
-        self.mode.addItem("Per-depth refinement", "per_depth")
-        self.mode.addItem("Static model (joint, debug)", "static")
-        self.mode.currentIndexChanged.connect(self._mode_changed)
-        form.addRow("Fit mode", self.mode)
+        self.ring = QComboBox()
+        self.ring.addItem("keep the entry's", "auto")
+        self.ring.addItem("fit (shared by all depths)", "fit")
+        self.ring.addItem("uniform rings", "none")
+        self.ring.setToolTip(
+            "How each ring vibrates across its width (fit_ring_profile). Fit: every ring split into sub-rings "
+            "with weights shared by all measured depths, then phases, gains and drive per depth; the near field "
+            "from 4 mm is then fitted too. Improves transducers whose near-field / focal peak ratio uniform rings "
+            "cannot reproduce (e.g. CTX). Fitted on axial profiles only: the off-axis field is not validated.")
+        form.addRow("Ring profile", self.ring)
         fp = QHBoxLayout()
         self.fp_phase = QCheckBox("phase", checked=True)
         self.fp_amp = QCheckBox("gain", checked=True)
-        self.fp_c = QCheckBox("c steer")
-        for w in (self.fp_phase, self.fp_amp, self.fp_c):
+        for w in (self.fp_phase, self.fp_amp):
             fp.addWidget(w)
         form.addRow("Free parameters", fp)
         self.fwd = QComboBox()
@@ -605,7 +609,7 @@ class CalibrationPage(QWidget):
             self._say("Fitting needs measured profiles: load a CSV first.")
             return
         s = self.settings()
-        args = {"settings": s.bridge_settings(), "mode": s.mode, "free_params": s.free_params,
+        args = {"settings": s.bridge_settings(), "free_params": s.free_params, "ring_profile": s.ring_profile,
                 "calibrate_at": s.calibrate_at,
                 "predicted": bool(self.view and self.view.get("predicted"))}
         depths = cal.parse_depths(self.depths.text())

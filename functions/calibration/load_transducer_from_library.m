@@ -119,6 +119,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
         error('load_transducer_from_library: transducer ''%s'' not found in equip_param.', tran_serial);
     end
     tran        = equip_param.trans.(tran_serial);
+    tran        = library_transducer(tran, lib);   % sub-rings if the entry has a ring profile
     n_elem      = tran.transducer.annular.elem_n;
     tran.n_elem = n_elem;
     parameters.transducer = tran.transducer;
@@ -127,6 +128,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     if isempty(condition)
         m = library_model_at_depth(lib, tran, focal_distance_ep, desired_intensity, yaml_path);
     else
+        assert(~isfield(tran.transducer.annular, 'elem_weight'), 'load_transducer_from_library:conditionProfile', ...
+            'Dephased conditions are not supported for entries with a ring profile (%s).', yaml_path);
         m = library_condition(lib, tran, condition, desired_intensity, yaml_path);
         if isempty(focal_distance_ep) || isnan(focal_distance_ep)
             focal_distance_ep = m.setpoint_ep_mm;
@@ -137,6 +140,17 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     if ~isempty(m.elem_p_amp)
         parameters.transducer.annular.elem_p_amp = m.elem_p_amp;
     end
+    % Ring profile: each sub-ring is driven with its channel's phase and drive
+    % times its fixed weight, so the simulated source vibrates as the profile
+    % model does (the analytical models apply annular.elem_weight instead)
+    ring_profile = [];
+    if isfield(parameters.transducer.annular, 'ring_profile')
+        rp = parameters.transducer.annular.ring_profile;
+        ring_profile = struct('n_sub', rp.n_sub, 'smooth', field_or(rp, 'smooth', NaN), ...
+            'r2_profile_median', field_or(rp, 'r2_profile_median', NaN));
+    end
+    parameters.transducer.annular = ring_profile_drive(parameters.transducer.annular, ...
+        m.elem_phase_deg, m.elem_p_amp);
     phase_model = m.phase_model;
     w           = m.refinement_weight;
     amp_source  = m.amplitude_source;
@@ -152,6 +166,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.tx_calibration.condition         = condition;
     parameters.transducer.tx_calibration.phase_source      = 'library';
     parameters.transducer.tx_calibration.phase_model       = phase_model;
+    parameters.transducer.tx_calibration.ring_profile      = ring_profile;   % [] = uniform rings
     parameters.transducer.tx_calibration.refinement_weight = w;
     parameters.transducer.tx_calibration.isppa_source      = 'library';
     parameters.transducer.tx_calibration.amplitude_source  = amp_source;   % 'global' | 'refinement' | 'blend'
@@ -191,4 +206,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     end
     fprintf('Library loaded (%s, %s): %s | focal %.1f mm | %s (w=%.2f) | %s\n', ...
         phase_model, cal_type, combo_name, focal_distance_ep, phase_model, w, amp_str);
+end
+
+function v = field_or(s, f, d)
+    if isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
 end

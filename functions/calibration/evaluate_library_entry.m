@@ -47,6 +47,7 @@ function ev = evaluate_library_entry(tran, lib, prof, options)
 %           CALIBRATION_GUI
 
     if nargin < 4; options = struct(); end
+    tran  = library_transducer(tran, lib);    % sub-ring geometry if the entry has a ring profile
     isppa = NaN;
     if isfield(options, 'IsppaWcm2') && ~isempty(options.IsppaWcm2); isppa = options.IsppaWcm2; end
     fo = rmfield_if(options, {'IsppaWcm2', 'FreeParams', 'Prior', 'EvaluateOnly', 'ChannelGroups'});

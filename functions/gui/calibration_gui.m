@@ -130,16 +130,18 @@ function fig = calibration_gui(options)
         ['Fit depths: the measured depths selected above. Desired depths: the desired depths, ' ...
          'on their measured or interpolated/extrapolated profiles']), 12, 2);
 
-    lab('Fit mode', 13);
-    ui.mode = at(uidropdown(L, 'Items', {'Per-depth refinement', 'Static model (joint, debug)'}, ...
-        'Tooltip', ['Per-depth: phases, gains and drive at each selected depth (default). ' ...
-                    'Static: one depth-independent model over all selected depths, for debugging.'], ...
-        'ValueChangedFcn', @(~,~) on_mode()), 13, 2);
+    lab('Ring profile', 13);
+    ui.ring = at(uidropdown(L, 'Items', {'keep the entry''s', 'fit (shared by all depths)', 'uniform rings'}, ...
+        'ItemsData', {'auto', 'fit', 'none'}, 'Tooltip', ...
+        ['How each ring vibrates across its width (FIT_RING_PROFILE). Fit: every ring split into ' ...
+         'sub-rings with weights shared by all measured depths, then phases, gains and drive per depth; ' ...
+         'the near field from 4 mm is then fitted too. Improves transducers whose near-field / focal ' ...
+         'peak ratio uniform rings cannot reproduce (e.g. CTX). Fitted on axial profiles only: ' ...
+         'the off-axis field it implies is not validated.']), 13, 2);
     lab('Free parameters', 14);
     fp = at(uigridlayout(L, [2 2], 'Padding', 0, 'RowHeight', {20, 20}, 'RowSpacing', 4), [14 15], 2);
     ui.fp_phase = uicheckbox(fp, 'Text', 'phase', 'Value', true);
     ui.fp_amp   = uicheckbox(fp, 'Text', 'gain', 'Value', true);
-    ui.fp_c     = uicheckbox(fp, 'Text', 'c steer', 'Value', false);
     lab('Forward model', 16);
     ui.fwd     = at(uidropdown(L, 'Items', {'rayleigh', 'oneil'}), 16, 2);
     lab('Near-field skip (mm)', 17);
@@ -357,17 +359,16 @@ function fig = calibration_gui(options)
         end
         % No z shift: it is not applied at run time, so phases fitted with it
         % would match the measurement only after a shift the entry never gets
-        free = {'phase', 'amp', 'c_steer'};
-        free = free([ui.fp_phase.Value, ui.fp_amp.Value, ui.fp_c.Value]);
-        mode = ternary(startsWith(ui.mode.Value, 'Static'), 'static', 'per_depth');
+        free = {'phase', 'amp'};
+        free = free([ui.fp_phase.Value, ui.fp_amp.Value]);
         dlg  = uiprogressdlg(fig, 'Title', 'Fitting', 'Indeterminate', 'on');
         cleanup = onCleanup(@() close(dlg));
-        fo = struct('Mode', mode, 'FreeParams', {free}, 'FitOptions', base_options(), ...
+        fo = struct('FreeParams', {free}, 'FitOptions', base_options(), ...
             'Library', st.lib, 'IsppaWcm2', ui.isppa.Value, 'TranSerial', ui.tran.Value, ...
             'DrivingSystem', ternary(strcmp(ui.ds.Value, '(none)'), '', ui.ds.Value), ...
             'Source', ui.csv.Value, 'CalibrateAt', ternary(at_desired, 'desired', 'measured'), ...
-            'Tool', 'calibration_gui', 'Progress', @(k, n, d, pt) set_msg(dlg, ...
-                sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
+            'Tool', 'calibration_gui', 'RingProfile', ui.ring.Value, 'Measured', st.meas, ...
+            'Progress', @(k, n, d, pt) set_msg(dlg, sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
         if at_desired
             po = profile_options(); fo.ProfileOptions = rmfield(po, 'NearFieldSkipMm');
         end
@@ -378,7 +379,10 @@ function fig = calibration_gui(options)
             say(ME.message); return;
         end
         say(msg);
-        if strcmp(st.fit.mode, 'per_depth') && ui.kw.Value
+        if ~isempty(st.fit.ring_profile)
+            plot_ring_profile(tran, st.fit.entry.global_model.ring_profile, st.fit.ring_profile);
+        end
+        if ui.kw.Value
             run_kwave_drive_calibration(st.fit.prof, dlg);
         end
         if at_desired || st.predicted
@@ -1030,12 +1034,10 @@ function fig = calibration_gui(options)
         rec = get_field(get_field(lib, 'meta', []), 'fit', []);
         if ~isstruct(rec); return; end
         fo = get_field(rec, 'fit_options', struct());
-        static = strcmp(char(get_field(rec, 'mode', 'per_depth')), 'static');
-        ui.mode.Value = ui.mode.Items{1 + static};
+        ui.ring.Value = 'auto';   % refits keep the entry's ring profile unless changed
         free = cellstr(get_field(fo, 'FreeParams', {'phase', 'amp'}));
         ui.fp_phase.Value = ismember('phase', free);
         ui.fp_amp.Value   = ismember('amp', free);
-        ui.fp_c.Value     = ismember('c_steer', free);
         for c = {'ForwardModel', 'fwd'; 'Domain', 'domain'}'
             v = char(get_field(fo, c{1}, ''));
             if any(strcmp(ui.(c{2}).Items, v)); ui.(c{2}).Value = v; end

@@ -121,8 +121,8 @@ def describe_depths(settings: list[float], targets: dict[int, float]) -> str:
 @dataclass
 class FitSettings:
     """The Calibration page's controls, in nexus_calibration.m's 'settings' form."""
-    mode: str = "per_depth"
     free_params: list[str] = field(default_factory=lambda: ["phase", "amp"])
+    ring_profile: str = "auto"                        # 'auto' (keep the entry's) | 'fit' | 'none'
     forward_model: str = "rayleigh"
     near_field_skip_mm: float = 10.0
     domain: str = "intensity"
@@ -159,9 +159,10 @@ def settings_from_record(rec: dict | None, current: FitSettings) -> tuple[FitSet
     fo = rec.get("fit_options") or {}
     s = FitSettings(**{k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
                        for k, v in current.__dict__.items()})
-    s.mode = "static" if rec.get("mode") == "static" else "per_depth"
+    s.ring_profile = "auto"                            # a refit keeps the entry's ring profile
     free = fo.get("FreeParams", ["phase", "amp"])
-    s.free_params = [free] if isinstance(free, str) else list(free)
+    free = [free] if isinstance(free, str) else list(free)
+    s.free_params = [p for p in free if p in ("phase", "amp")] or ["phase", "amp"]
     s.forward_model = str(fo.get("ForwardModel", s.forward_model))
     s.domain = str(fo.get("Domain", s.domain))
     for key, attr in (("NearFieldSkipMm", "near_field_skip_mm"), ("HuberDelta", "huber_delta")):

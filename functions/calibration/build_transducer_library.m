@@ -257,6 +257,19 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
     n_d  = numel(prof.depths_ep_mm);
     fprintf('  Depths: %s mm\n', mat2str(prof.depths_ep_mm));
 
+    % Optional ring profile: the whole entry (global model, refinements) then
+    % refers to the sub-ring geometry
+    rp = [];
+    if ~isempty(rp_opts)
+        rp = fit_ring_profile(tran, prof, rp_opts);
+        fprintf('  Ring profile (%d sub-rings): median R² %.3f → %.3f (z >= %g mm)\n', rp.n_sub, ...
+            rp.r2_uniform_median, rp.r2_profile_median, rp.near_field_skip_mm);
+        tran = ring_profile_transducer(tran, rp);
+        if ~isfield(fit_options, 'NearFieldSkipMm') || isequal(fit_options.NearFieldSkipMm, 10)
+            fit_options.NearFieldSkipMm = rp.near_field_skip_mm;
+        end
+    end
+
     ev  = struct('EvaluateOnly', true);
     for f = {'ForwardModel', 'Domain', 'NearFieldSkipMm'}
         if isfield(fit_options, f{1}); ev.(f{1}) = fit_options.(f{1}); end
@@ -313,6 +326,12 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
     lib.global_model.elem_phase_correction_deg = [];           % pure geometric steering outside the refinements
     lib.global_model = rmfield(lib.global_model, {'elem_amp_weight', 'free_params', 'fit_z_shift_mm'});
     lib = library_refinement_from_fits(lib, fits, ref_intensity, [], char_rel);
+    if ~isempty(rp)
+        lib.global_model.ring_profile = rp;
+        lib.meta.ring_profile = true;
+    elseif isfield(lib.meta, 'ring_profile')
+        lib.meta = rmfield(lib.meta, 'ring_profile');
+    end
     yaml.dumpFile(out_file, lib);
     fprintf('  Written: %s\n', out_file);
 end
