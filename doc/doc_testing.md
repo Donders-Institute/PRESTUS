@@ -6,7 +6,7 @@ PRESTUS is tested at five levels, from checks that take seconds and run on every
 |---|---|---|---|---|---|
 | 0 Static | Docs match the code, the site builds, the Nexus works | see [Level 0](#level-0-static-checks) | Python | ~2 min | CI, every push |
 | 1 Unit | Every function's logic, incl. config, placement, scaling, caches, HPC parsing, reports | `run_all_tests('unit')` | MATLAB | ~5 min | CI, every push |
-| 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~5 min (2D) | CI weekly; 3D on a GPU node before a release |
+| 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~10 min (2D) | CI weekly; 3D on a GPU node before a release |
 | 3 Pipeline | Whole pipeline on synthetic and real data, numbers stable against a reference | `run_all_tests('water')` … `('demo_golden')` | k-Wave CPU; SimNIBS outputs; demo data | 10 min – hours | before a release |
 | 4 Backends | jwave / BabelBrain agree with k-Wave; Nexus ↔ MATLAB round trip | `runtests('tests/test_jwave.m')` etc. | conda envs, GPU, MATLAB | 10–60 min | after backend or environment changes |
 
@@ -64,6 +64,7 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 | Focal position on axis | 0.5 mm |
 | Focal peak pressure | 2 % |
 | −3 dB (intensity) axial focal length | 5 % |
+| Four-ring annular array in phase (CTX-500 ring diameters on the same bowl) against O'Neil summed over the rings: focal position / peak pressure / −3 dB length | 1 mm / 2 % / 5 % (2026-10-08: 0.50 mm, +0.10 %, +0.04 %; the summed peak is flat, ±0.5 mm costs 0.08 % pressure) |
 | Doubling the drive doubles the pressure | 1 % |
 | A target ISPPA on an uncalibrated transducer is met in water | 2 % |
 | With `run_water_baseline: 0`, an unmet target stops the run | error `prestus:isppa:noBaseline` |
@@ -80,7 +81,7 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 For the piston, every on-axis near-field maximum has the same amplitude (2 p₀), so the focal pressure and position are taken beyond half the near-field distance (a²/2λ), which leaves only the last axial maximum.
 
 ```matlab
-run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric), ~5 min CPU
+run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric), ~10 min CPU
 setenv('PRESTUS_ITRUSST_DATA', '/path/to/INTERCOMPARISON-PH1-DATA-V1.0')
 run_all_tests('itrusst')       % 2D BM1 bowl + piston, 3D BM1 bowl
 run_all_tests('physics_3d')    % 3D O'Neil check
@@ -88,7 +89,7 @@ run_all_tests('physics_3d')    % 3D O'Neil check
 
 The 3D variants (tags `physics_3d`, `itrusst_3d`; ~6 M voxels at 0.5 mm) belong on a GPU node: set `PRESTUS_PHYSICS_CODE_TYPE` (e.g. `cpp_gpu`) and submit the MATLAB call as a job. Their tolerances are provisional (focal pressure 5 %, position 1 mm) until their first run on the reference node.
 
-**Tolerance policy.** A benchmark's tolerances are set from its first passing run on the reference machine plus a margin, recorded with that run's values in the test file, and then kept fixed. Loosen a tolerance only together with an explanation in the changelog; a benchmark that starts failing after a change is a finding, not a test to adjust. (These benchmarks found that the axisymmetric source dropped part of its band-limited footprint and raised the focal pressure by 6–11 %; see the changelog.)
+**Tolerance policy.** A benchmark's tolerances are set from its first passing run on the reference machine plus a margin, recorded with that run's values in the test file, and then kept fixed. Loosen a tolerance only together with an explanation in the changelog; a benchmark that starts failing after a change is a finding, not a test to adjust. (These benchmarks found that the axisymmetric source dropped part of its band-limited footprint and raised the focal pressure by 6–11 %, and that it placed the rings of an annular array at the apex plane instead of on the bowl; see the changelog.)
 
 ---
 

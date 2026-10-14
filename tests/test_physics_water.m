@@ -8,7 +8,10 @@ classdef test_physics_water < matlab.unittest.TestCase
 %   - focal position (on-axis pressure maximum)       within FocusTolMm
 %   - focal peak pressure                             within PeakRelTol
 %   - -3 dB (intensity) axial focal length            within LengthRelTol
-% plus two invariants of the linear solver and the ISPPA targeting:
+% a multi-ring annular array (in phase) against the O'Neil solution summed over
+% its rings (axisymmetric; regression for rings placed at the apex plane instead
+% of on the bowl, fixed 2026-10), plus two invariants of the linear solver and
+% the ISPPA targeting:
 %   - doubling the drive doubles the pressure          (axisymmetric)
 %   - a target ISPPA on an uncalibrated transducer is met in water, and with
 %     modules.run_water_baseline = 0 the run stops instead (axisymmetric)
@@ -32,11 +35,18 @@ classdef test_physics_water < matlab.unittest.TestCase
         ApertureMm   = 64
         FreqHz       = 500e3
         AmpPa        = 60e3
+        % Ring array for the multi-element case: CTX-500 ring diameters [mm]
+        RingsIdMm    = [0, 31.6988, 44.2688, 53.6688]
+        RingsOdMm    = [31.14, 43.71, 53.11, 60.83]
         % Tolerances per geometry. Axisymmetric: from the first passing run
         % (2026-10-02, R2023b CPU: focus 0.06 mm, peak +0.2 %) with margin.
         % 3D: provisional until its first run on the reference GPU node.
+        % Rings: the summed O'Neil peak is flat (±0.5 mm costs 0.08 % pressure),
+        % so the peak position is fixed to within a grid step only (first run
+        % 2026-10-08, R2023b CPU: focus 0.50 mm, peak +0.10 %, length +0.04 %).
         Tol = struct( ...
             'axisym', struct('focus_mm', 0.5, 'peak_rel', 0.02, 'length_rel', 0.05), ...
+            'axisym_rings', struct('focus_mm', 1.0, 'peak_rel', 0.02, 'length_rel', 0.05), ...
             'threed', struct('focus_mm', 1.0, 'peak_rel', 0.05, 'length_rel', 0.10))
     end
 
@@ -56,6 +66,12 @@ classdef test_physics_water < matlab.unittest.TestCase
         function test_axisym_matches_oneil(tc)
             out = tc.run_case('axisym', struct());
             tc.verify_against_oneil(out, tc.Tol.axisym);
+        end
+
+        function test_axisym_annular_rings_match_oneil(tc)
+            rings = [tc.RingsIdMm; tc.RingsOdMm];
+            out = tc.run_case('axisym', struct('rings', rings));
+            tc.verify_against_oneil(out, tc.Tol.axisym_rings, rings);
         end
 
         function test_axisym_pressure_is_linear_in_drive(tc)
@@ -99,6 +115,8 @@ classdef test_physics_water < matlab.unittest.TestCase
             if ~isfield(opts, 'amp');      opts.amp = tc.AmpPa; end
             if ~isfield(opts, 'target');   opts.target = NaN; end
             if ~isfield(opts, 'baseline'); opts.baseline = 'auto'; end
+            if ~isfield(opts, 'rings');    opts.rings = [0; tc.ApertureMm]; end   % [ID; OD] [mm] per element
+            n_el = size(opts.rings, 2);
 
             sim_dir = tempname;
             mkdir(sim_dir);
@@ -111,11 +129,14 @@ classdef test_physics_water < matlab.unittest.TestCase
             p.modules.store_acoustic_results = 1;
             p.modules.run_water_baseline     = opts.baseline;
             p.transducer.annular.curv_radius_mm = tc.RocMm;
-            p.transducer.annular.elem_od_mm     = tc.ApertureMm;
-            p.transducer.annular.elem_id_mm     = 0;
+            p.transducer.annular.elem_n         = n_el;
+            p.transducer.annular.elem_id_mm     = opts.rings(1, :);
+            p.transducer.annular.elem_od_mm     = opts.rings(2, :);
+            p.transducer.annular.elem_phase_deg = zeros(1, n_el);
+            p.transducer.annular.elem_phase_rad = zeros(1, n_el);
             p.transducer.annular.dist_geom_ep_mm = [];   % derived from ROC and aperture
             p.transducer.freq_hz                = tc.FreqHz;
-            p.transducer.annular.elem_p_amp     = opts.amp;
+            p.transducer.annular.elem_p_amp     = repmat(opts.amp, 1, n_el);
             p.transducer.target_isppa_wcm2      = opts.target;
             p.medium_properties.water.sound_speed = 1500;   % lossless water, as O'Neil
             p.medium_properties.water.density     = 1000;
@@ -161,11 +182,16 @@ classdef test_physics_water < matlab.unittest.TestCase
             out.c       = q.medium_properties.water.sound_speed;
         end
 
-        function verify_against_oneil(tc, out, tol)
+        function verify_against_oneil(tc, out, tol, rings)
             u0 = tc.AmpPa / (out.rho * out.c);              % source particle velocity
             z_fine = (1:0.05:out.z_mm(end))';               % mm
-            p_an = focusedBowlONeil(tc.RocMm * 1e-3, tc.ApertureMm * 1e-3, u0, ...
-                tc.FreqHz, out.c, out.rho, z_fine * 1e-3, []);
+            if nargin < 4
+                p_an = focusedBowlONeil(tc.RocMm * 1e-3, tc.ApertureMm * 1e-3, u0, ...
+                    tc.FreqHz, out.c, out.rho, z_fine * 1e-3, []);
+            else
+                p_an = oneil_rings_axial(tc.RocMm * 1e-3, rings * 1e-3, u0, ...
+                    tc.FreqHz, out.c, out.rho, z_fine * 1e-3);
+            end
             p_an = abs(p_an(:));
 
             % Compare beyond the near field (z > ROC / 2)
@@ -193,6 +219,27 @@ classdef test_physics_water < matlab.unittest.TestCase
 
     end
 
+end
+
+function p = oneil_rings_axial(R, rings, u0, f, c, rho, z)
+% On-axis O'Neil pressure of in-phase rings on one spherical bowl: each ring
+% [ID; OD] [m] is the cap of its outer minus the cap of its inner aperture,
+% P = sum(exp(-ik r_e(Ri)) - exp(-ik r_e(Ro))) / (1 - z/R), with
+% r_e(a) = sqrt((z - h(a))^2 + a^2) and h(a) = R - sqrt(R^2 - a^2)
+% (focusedBowlONeil for a single cap, ID = 0).
+    k  = 2 * pi * f / c;
+    h  = @(a) R - sqrt(R^2 - a.^2);
+    re = @(a) sqrt((z - h(a)).^2 + a.^2);
+    P = zeros(size(z));
+    P_R = 0;                                        % limit at the centre of curvature
+    for i = 1:size(rings, 2)
+        ri = rings(1, i) / 2; ro = rings(2, i) / 2;
+        P = P + exp(-1i * k * re(ri)) - exp(-1i * k * re(ro));
+        P_R = P_R + k * (h(ro) - h(ri));
+    end
+    P = P ./ (1 - z / R);
+    P(abs(z - R) < eps) = P_R;
+    p = rho * c * u0 * abs(P);
 end
 
 function [z_peak, p_peak] = refine_peak(z, p)

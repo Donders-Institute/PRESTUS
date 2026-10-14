@@ -18,9 +18,11 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 %       2. Each element is placed on the bilateral grid according to its
 %          radial position: central disks (inner_diam == 0) are placed at
 %          y=0 with diameter = outer_diam; annular rings (inner_diam > 0)
-%          are placed at y = (r_inner + r_outer)/2 with diameter = r_outer - r_inner.
-%          The focus direction sets arc orientation; focal depth is set by
-%          curv_radius_mm.
+%          are the segment of the bowl's arc between r_inner and r_outer:
+%          midpoint on the bowl surface at the mid polar angle (set back
+%          from the apex plane by the sagitta), diameter = chord between the
+%          ring edges. All elements are aimed at the bowl's centre of
+%          curvature (curv_radius_mm along trans_pos -> focus_pos).
 %       3. Element weights are computed on the full bilateral grid, then
 %          cropped to columns kgrid.Ny:end → [Nx x Ny] where column 1 = r=0.
 %
@@ -271,10 +273,15 @@ end
                 tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
-            karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', 0.01, 'UpsamplingRate', 100);
+            karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', bli(1), 'UpsamplingRate', bli(2));
 
             x_trans_m      = kgrid.x_vec(trans_pos_1(1));
-            focus_pos_full = [kgrid.x_vec(focus_pos_1(1)), 0+eps];
+            ax_dir         = sign(kgrid.x_vec(focus_pos_1(1)) - x_trans_m);   % +1 / -1: axial direction to the focus
+            curv_r_m       = tr.annular.curv_radius_mm * 1e-3;
+            % Rings are aimed at the bowl's centre of curvature (geometric focus),
+            % not at the (steered) focus: a ring off the axis aimed at the focus
+            % is tilted away from the bowl surface
+            geom_focus     = [x_trans_m + ax_dir * curv_r_m, 0+eps];
 
             for el_i = 1:tr.annular.elem_n
                 inner_r_m = tr.annular.elem_id_mm(el_i) / 2 * 1e-3;
@@ -294,11 +301,18 @@ end
                     element_pos   = [x_trans_m, 0+eps];
                     el_diameter_m = 2 * outer_r_m;
                 else
-                    center_r_m    = (inner_r_m + outer_r_m) / 2;
-                    element_pos   = [x_trans_m, center_r_m];
-                    el_diameter_m = outer_r_m - inner_r_m;
+                    % Ring = the segment of the bowl's arc between polar angles
+                    % asin(Ri/R) and asin(Ro/R) about the centre of curvature:
+                    % midpoint on the bowl surface (set back from the apex plane by
+                    % the sagitta, ~1-2 wavelengths for the outer CTX/IGT rings),
+                    % diameter = chord between the ring edges
+                    th_in         = asin(inner_r_m / curv_r_m);
+                    th_out        = asin(outer_r_m / curv_r_m);
+                    th_mid        = (th_in + th_out) / 2;
+                    element_pos   = [x_trans_m + ax_dir * curv_r_m * (1 - cos(th_mid)), curv_r_m * sin(th_mid)];
+                    el_diameter_m = 2 * curv_r_m * sin((th_out - th_in) / 2);
                 end
-                karray_full.addArcElement(element_pos, tr.annular.curv_radius_mm * 1e-3, el_diameter_m, focus_pos_full);
+                karray_full.addArcElement(element_pos, curv_r_m, el_diameter_m, geom_focus);
             end
 
             source_mask_full = false(kgrid_mirrored.Nx, kgrid_mirrored.Ny);
