@@ -63,6 +63,9 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %                     — it only costs more GMRES iterations/memory for no benefit.
 %   .precision      - 'single' (default) | 'double'
 %   .dry_run        - true to write inputs and exit without simulating (default false)
+%   .cleanup_cache  - true (default) to delete the HDF5 input after a successful
+%                     run; it is rewritten on every run and never reused. Kept
+%                     on dry runs and when the run errors (for debugging).
 %   .convergence_threshold - relative Helmholtz spectral residual above which the
 %                     result is rejected (default: 0.05; helmholtz only). Above
 %                     threshold, jwave_wrapper ERRORS (not just warns) because an
@@ -151,6 +154,7 @@ gmres_tol      = get_field(jw, 'gmres_tol',       1e-3);
 helmholtz_operator = get_field(jw, 'helmholtz_operator', 'conservative');
 precision      = get_field(jw, 'precision',       'single');
 dry_run        = get_field(jw, 'dry_run',         false);
+cleanup_cache  = get_field(jw, 'cleanup_cache',   true);
 
 valid_solvers = {'helmholtz', 'pseudo_spectral', 'finite_differences'};
 if ~any(strcmp(solver, valid_solvers))
@@ -418,6 +422,9 @@ is_debug = isfield(parameters, 'simulation') && isfield(parameters.simulation, '
 if is_debug
     jwave_argv = [jwave_argv, {'--debug'}];
 end
+% YAML/config values can arrive as string scalars; strjoin and run_command
+% need a cellstr.
+jwave_argv = cellfun(@char, jwave_argv, 'UniformOutput', false);
 
 fprintf('[jwave_wrapper] Launching jwave simulation...\n');
 fprintf('[jwave_wrapper] Command:\n  %s\n', strjoin(jwave_argv, ' '));
@@ -513,6 +520,23 @@ for chk_ = {'p_max_all', 'p_min_all', 'p_final'}
         error(['jwave_wrapper: output %s has size [%s] but expected PRESTUS grid [%s].\n' ...
             'Check dimension transpositions in run_jwave_sim.py.'], ...
             chk_{1}, num2str(size(arr)), num2str(expected_dims));
+    end
+end
+
+% -------------------------------------------------------------------------
+% 6. Optional cache cleanup
+% -------------------------------------------------------------------------
+% The HDF5 input (medium maps + source, GBs for a head grid) is rewritten on
+% every run, so once the output has been read and checked it is dead weight.
+% Reached only after a successful, converged run; failures keep it.
+if cleanup_cache && isfile(input_h5)
+    try
+        delete(input_h5);
+        sensor_data.jwave_input_h5 = '';
+        fprintf('[jwave_wrapper] Deleted HDF5 input (jwave.cleanup_cache): %s\n', input_h5);
+    catch ME
+        warning('jwave_wrapper:cleanupFailed', ...
+            'Could not delete HDF5 input %s: %s', input_h5, ME.message);
     end
 end
 

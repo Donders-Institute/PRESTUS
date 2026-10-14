@@ -81,6 +81,7 @@ Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thick
 | `helmholtz_operator` | Density term of the Helmholtz solver. | `'conservative'` | `conservative`: ρ∇·((1/ρ)∇p), source scaled by the local sound speed. `jwave`: jwave's built-in term, which underestimates transmission through density jumps (~20 % through a skull plate). See [jwave: density term](doc_jwave.md#density-term-helmholtz_operator). |
 | `precision` | Computational precision. | `'single'` | `single` / `double` |
 | `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
+| `cleanup_cache` | Delete the HDF5 solver input after a successful run. | `true` | The input is rewritten on every run and never reused. Kept on dry runs and failed runs; set `false` to keep it for debugging. |
 
 #### Elastic skull settings (`elastic`)
 

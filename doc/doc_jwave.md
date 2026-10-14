@@ -240,6 +240,7 @@ Finite-difference time-domain solver. Use `jwave.fd_accuracy` to set the spatial
 | `python_env_gpu` | string | `''` | Full path to the **bin directory** of the GPU (CUDA) jwave environment. Empty = always use CPU env. |
 | `use_gpu` | bool/empty | `[]` | GPU selection override. `[]` = auto-detect via `nvidia-smi`; `true` = force GPU env (errors if `python_env_gpu` unset); `false` = force CPU env. |
 | `dry_run` | bool | `false` | If true, write HDF5 inputs but skip the simulation. The pipeline then stops after the acoustic stage (no analysis, thermal or report) and nothing is cached. Useful for inspecting the grid before running. |
+| `cleanup_cache` | bool | `true` | Delete the HDF5 input (`*_jwave_input*.h5`, several GB for a head grid) from `io.dir_cache` after a successful run. It is rewritten on every run, so it is never reused. Dry runs and runs that error (e.g. Helmholtz residual above threshold) keep it. |
 | `gmres_restart` | int | `10` | GMRES Krylov subspace size. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `gmres_maxiter` | int | `1000` | Maximum GMRES outer iterations. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `helmholtz_operator` | string | `'conservative'` | Density term: `'conservative'` or `'jwave'` (jwave's built-in). Helmholtz solver only. See [Density term](#density-term-helmholtz_operator). |
@@ -273,7 +274,7 @@ thickness.
 | `p_max_all` | `[Nx Ny Nz]` double [Pa] | Peak positive pressure |
 | `p_min_all` | `[Nx Ny Nz]` double [Pa] | Peak negative (rarefaction) pressure |
 | `p_final` | `[Nx Ny Nz]` double [Pa] | Pressure at final time step (or Re(P) for Helmholtz) |
-| `jwave_input_h5` | string | Path to the HDF5 file written to `io.dir_cache` |
+| `jwave_input_h5` | string | Path to the HDF5 file written to `io.dir_cache`; empty once deleted by `cleanup_cache` |
 | `jwave_output_h5` | string | Path to the HDF5 file read from `io.dir_cache` |
 
 ---
