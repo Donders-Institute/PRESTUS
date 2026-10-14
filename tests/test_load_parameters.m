@@ -153,6 +153,17 @@ classdef test_load_parameters < matlab.unittest.TestCase
             tc.verifyEqual(p.thermal_backend, 'babelbrain');
         end
 
+        function test_babelbrain_thermal_forces_cem43_iso_off(tc)
+            % BabelBrain has no ISO CEM43 maps: the request is reset with a warning.
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            override.acoustic_backend = 'babelbrain';
+            override.thermal_backend  = 'babelbrain';
+            override.thermal.cem43_iso = 1;
+            p = tc.verifyWarning(@() load_parameters(override), 'prestus:cem43IsoBabelBrain');
+            tc.verifyEqual(p.thermal.cem43_iso, 0);
+        end
+
         function test_computing_backend_name_normalised(tc)
             override = tc.quiet();
             override.simulation.interactive = 0;

@@ -117,6 +117,10 @@ classdef test_reports < matlab.unittest.TestCase
             end
             tc.verifyNotEmpty(strfind(txt, '10.5281/zenodo.15095860'), 'PRESTUS reference missing');
             tc.verifyNotEmpty(strfind(txt, '10.1016/j.brs.2024.04.013'), 'Martin et al. 2024 DOI wrong');
+            % ISO CEM43 form (cem43_iso = 1) cites its sources and lists ISO 14708-3.
+            tc.verifyNotEmpty(strfind(methods, 'ISO&#8201;14708-3:2017, Formula&#8201;1'), 'ISO CEM43 form must cite ISO 14708-3');
+            tc.verifyNotEmpty(strfind(methods, 'Aubry et al., 2025; Sapareto'), 'ISO CEM43 form must cite Aubry et al. 2025');
+            tc.verifyNotEmpty(strfind(txt, 'iso.org/standard/60539'), 'ISO 14708-3 reference missing');
         end
 
         function test_methods_text_babelbrain_matches_bridge(tc)
@@ -140,6 +144,23 @@ classdef test_reports < matlab.unittest.TestCase
                 tc.verifyNotEmpty(strfind(methods, m{1}), sprintf('methods text missing %s', m{1}));
             end
             tc.verifyEmpty(strfind(txt, 'Goss, S. A.'), 'uncited BabelBrain table reference listed');
+        end
+
+        function test_babelbrain_thermal_reports_kwave_cem43(tc)
+            % cem43_iso = 1 in the fixture; BabelBrain thermal has no ISO maps,
+            % so the report must describe and cite BabelBrain's own CEM43.
+            p = local_make_subject_params(tc.tmp);
+            p.acoustic_backend = 'babelbrain';
+            p.thermal_backend  = 'babelbrain';
+            p.babelbrain = struct('ppw', 12, 'tx_system', 'CTX_500', 'computing_backend', 'metal', ...
+                'ct_mapping', '', 'q_correction', [], 'water_amp_calibration', true);
+            txt = fileread(generate_simulation_report(p));
+            iStart = strfind(txt, 'id="methods-text"');
+            iRefs  = strfind(txt, 'id="methods-refs"');
+            methods = txt(iStart(1):iRefs(1));
+            tc.verifyEmpty(strfind(methods, 'ISO'), 'BabelBrain thermal run must not claim the ISO CEM43 form');
+            tc.verifyNotEmpty(strfind(methods, 'R&#8201;=&#8201;0.25 for T&#8201;&lt;&#8201;43'), 'BabelBrain CEM43 formula missing');
+            tc.verifyEmpty(strfind(txt, 'iso.org/standard/60539'), 'ISO 14708-3 listed without the ISO form');
         end
 
         function test_methods_text_jwave_states_resolved_pml(tc)

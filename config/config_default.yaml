@@ -542,7 +542,7 @@ timing:
 #------------ Thermal parameters
 
 thermal:
-  cem43_iso: 0
+  cem43_iso: 0 # CEM43 form used in the HTML report: 1 = ISO 14708-3 / ITRUSST, 0 = k-Wave kWaveDiffusion. Both are always computed and saved (see doc_simulations-thermal.md)
   temp_0: #[deg C] initial temperature
     water: 37
     skull: 37

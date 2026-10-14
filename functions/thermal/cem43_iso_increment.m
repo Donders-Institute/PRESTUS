@@ -10,9 +10,12 @@ function inc = cem43_iso_increment(T, T_max, dt_s)
 %   R = 0.25  39 <= T < 43 °C and the voxel has never reached 43 °C
 %   R = 0.5   T >= 43 °C, or the voxel has reached 43 °C before (T_max >= 43)
 %
-% R uses T_max so that a voxel that has once exceeded 43 °C keeps accumulating
-% at R = 0.5 after cooling. A voxel that reaches 57 °C (irreversible damage) is
-% assigned Inf. See doc_simulations-thermal.md.
+% R values and the 39-57 °C validity range follow ISO 14708-3:2017, Clause
+% 17.1, Formula (1). R uses T_max so that a voxel that has once exceeded 43 °C
+% keeps accumulating at R = 0.5 after cooling (ITRUSST biophysical safety
+% consensus, Aubry et al., 2025, citing Sapareto & Dewey, 1984). A voxel that
+% reaches 57 °C is assigned Inf; this is a PRESTUS choice for the range where
+% the formula is not valid. See doc_simulations-thermal.md.
 %
 % Use as:
 %   inc = cem43_iso_increment(T, T_max, dt_s)

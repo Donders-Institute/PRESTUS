@@ -686,8 +686,8 @@ end
         sec(gl, 12, 'CEM43 Thermal Dose');
         lbl(gl, 13, 1, 'ISO CEM43');
         chk(gl, 13, 2, 'thermal.cem43_iso', false, ...
-            'Use ISO definition (R=0.5 above 43°C; zero below 39°C; ∞ above 57°C)');
-        note_lbl(gl, 14, 'Default uses k-Wave kWaveDiffusion built-in formula (R=0.25 for T<43, R=0.5 for T≥43, Sapareto-Dewey).');
+            'Report the ISO 14708-3 / ITRUSST form (zero below 39°C; R=0.5 once 43°C was reached; ∞ from 57°C)');
+        note_lbl(gl, 14, 'Both forms are always computed and saved; this selects the one the HTML report uses. Default: k-Wave kWaveDiffusion (R=0 below 37°C, 0.25 for 37≤T<43, 0.5 for T≥43).');
         sp(gl, 15);
 
         sec(gl, 16, 'Sensor & Recording');

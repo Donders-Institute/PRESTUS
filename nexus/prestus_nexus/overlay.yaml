@@ -740,7 +740,7 @@ display:
   # Thermal
   thermal: {label: Thermal model}
   thermal.*: {advanced: true}
-  thermal.cem43_iso: {label: ISO CEM43 variant, help: Also compute the ISO variant of the CEM43 thermal dose.}
+  thermal.cem43_iso: {label: ISO CEM43 variant, help: Use the ISO 14708-3 / ITRUSST form of CEM43 in the HTML report. Both forms are always computed and saved.}
   thermal.temp_0: {label: Initial temperatures}
   thermal.sensor_xy_halfsize: {label: Temperature sensor half-width}
   thermal.record_t_at_every_step: {label: Record every time step (memory)}
