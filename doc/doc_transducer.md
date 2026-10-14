@@ -1,6 +1,11 @@
 ## Transducer modeling
 
-PRESTUS does not provide default transducer calibrations. Instead, it encourages users to set up transducers and optimize settings to match their empirical setup.
+!!! note "At a glance"
+    - **What:** The fields that define a transducer: type, frequency, element geometry, drive, phases and position.
+    - **When you need it:** When your device is not in the [transducer library](doc_transducer_library.md), or to understand the fields the library fills in. With `transducer.serial` you rarely set these yourself.
+    - **Before you start:** The geometry of your device (from the manufacturer).
+
+A transducer can be taken from the shipped [transducer library](doc_transducer_library.md) (`transducer.serial`: geometry, phases and drive are filled in) or defined in full in the study config. This page describes the fields; the library and calibration pages describe where calibrated values come from.
 
 See the full [parameter documentation](doc_parameters.md#transducer-specification-transducer).
 
@@ -40,11 +45,11 @@ See also [transducer placement](doc_placement.md).
 In `water` simulations in combination with annular arrays, the placement will be automatically determined based on the edge of the PML layer.
 
 `transducer.trans_pos`  
-Position of transducer bowl (XYZ, T1 grid voxel space).
+Position of transducer bowl (XYZ; T1 voxels by default, or RAS/MNI mm via `placement.manual.coordinate_space`).
 Used for placement and **phase calculation in matrix arrays**.
 
 `transducer.focus_pos`  
-Position of stimulation target (XYZ, T1 grid voxel space).
+Position of stimulation target (XYZ; same coordinate space as `trans_pos`).
 Defines the focal point and is used for **automatic steering in matrix arrays**.
 
 #### Transducer-target distance specification
@@ -106,7 +111,7 @@ Element orientation and phase delay computation (`create_matrix_karray`) assumes
 
 ## Transducer modeling: kWaveArray vs. simple elements
 
-The `setup_source` function creates the acoustic source for k-Wave simulations. Two implementations are supported:
+The `source_create` function creates the acoustic source for k-Wave simulations. Two implementations are supported:
 
 1. **Realistic kWaveArray elements** (`use_kWaveArray = 1`, recommended)  
    Uses the k-Wave `kWaveArray` class to define transducer elements via physical parameters (position, radius, apodization) rather than discrete grid voxels. Elements render smoothly at any grid resolution. Independent per-element delays and weights enable dynamic focusing. Element overlap is handled automatically through weighted contributions. Supports annular rings, axisymmetric 2D simulations, matrix arrays, and GPU acceleration.

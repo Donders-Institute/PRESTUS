@@ -1,8 +1,13 @@
 # Medium properties
 
+!!! note "At a glance"
+    - **What:** The three kinds of medium (`water`, `layered`, `phantom`) and the default acoustic and thermal properties of each tissue.
+    - **When you need it:** To choose between a free-water and a head simulation, or to change tissue properties (e.g. for a more conservative estimate).
+    - **Before you start:** Nothing; the defaults apply until you change them.
+
 ### Medium specification
 
-PRESTUS supports homo- and heterogeneous medium configurations. These can be specified with `parameter.simulation_medium`. The following options are supported out of the box.
+PRESTUS supports homo- and heterogeneous medium configurations. These can be specified with `simulation.medium`. The following options are supported out of the box.
 
 - `water`
 
@@ -19,7 +24,7 @@ PRESTUS supports homo- and heterogeneous medium configurations. These can be spe
     - cortical skull bone 
     - trabecular skull bone
     
-    Tissue can be removed (or added if more detailed segmentations and medium acoustic properties are included) via the ```layers``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see ```doc_pseudoCT```). The pCT implementation is a subtype of a `layered` simulation with a unified skull layer. If the segmentation for any requested layer is not available, requested layers will be removed from the specification. The output HTML provides an overview of which layers were modeled, along with their acoustic properties.
+    Tissue can be removed (or added if more detailed segmentations and medium acoustic properties are included) via the ```layers``` configuration fields. The skull layer of a layered simulation can be informed by (pseudo-)CT images (see [pseudo-CT](doc_pseudoCT.md)). The pCT implementation is a subtype of a `layered` simulation with a unified skull layer. If the segmentation for any requested layer is not available, requested layers will be removed from the specification. The output HTML provides an overview of which layers were modeled, along with their acoustic properties.
     <n>
     `Layered` media will be [preprocessed](doc_preproc.md) during grid setup.
     <br>
@@ -37,7 +42,7 @@ PRESTUS supports homo- and heterogeneous medium configurations. These can be spe
 
 Accurate modeling of wave propagation through heterogeneous media requires valid assignment of acoustic parameters such as speed of sound, density, and attenuation to the separate tissue media. PRESTUS provides defaults based on the literature, while providing flexibility to alter assigned parameter values, e.g., to implement more conservative or liberal assumptions. 
 
-The following default medium properties applt in a full layered simulation. Parameters are specified in the config_default.yaml file (see doc_parameters.md). While PRESTUS’s default parameters are chosen to align with commercially available tools and prior benchmarks, these should not be regarded as ground truths, and may need to be adjusted according to the goals at hand (e.g., a more conservative assessment of intensity and/or heating).
+The following default medium properties apply in a full layered simulation. They are set under `medium_properties` in `config_default.yaml` (see [Parameters](doc_parameters.md#tissue-acoustic-thermal-properties-medium_properties)). While PRESTUS’s default parameters are chosen to align with commercially available tools and prior benchmarks, these should not be regarded as ground truths, and may need to be adjusted according to the goals at hand (e.g., a more conservative assessment of intensity and/or heating).
 
 | Tissue           | Density [kg/m³] | Sound Speed [m/s] | Attenuation Coefficient [dB/(cm·MHzy)]      | Attenuation Power Law (y)| Thermal Conductivity [W/(m·K)]| Specific Heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption Fraction |
 |-----------------------|--------|----------|----------|-------|--------|------|-------|---|

@@ -1,5 +1,10 @@
 # Modules
 
+!!! note "At a glance"
+    - **What:** The pipeline stages and the switches that turn each on or off.
+    - **When you need it:** To run only part of the pipeline, e.g. segmentation first, or heating on top of an earlier acoustic run.
+    - **Before you start:** Nothing.
+
 `prestus_pipeline` is composed of discrete, independently toggleable modules. Each module corresponds to a stage of the TUS simulation workflow and can be enabled or disabled via `modules.*` flags in the config. This allows partial runs — for example, re-running only analysis after changing output thresholds, or stopping after segmentation before committing to a full simulation.
 
 ---

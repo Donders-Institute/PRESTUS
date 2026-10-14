@@ -1,12 +1,17 @@
 # Thermal simulations
 
+!!! note "At a glance"
+    - **What:** How to describe the sonication protocol (pulses, trains, repetitions) and how heating and thermal dose are computed.
+    - **When you need it:** Whenever you simulate heating (`modules.run_heating_sims: 1`).
+    - **Before you start:** A working acoustic simulation, and the timing of your protocol.
+
 Thermal simulations depend on the output of the acoustic simulations. As such, running thermal simulations without first running acoustic simulations is not an option.
 
 Thermal simulations run in k-Wave by default. With `acoustic_backend: babelbrain`, BabelBrain's own Pennes solver can be used instead (`thermal_backend: babelbrain`). See [Simulation backends](doc_backend.md) for valid combinations and how the results compare, and [BabelBrain thermal](doc_babelbrain.md#thermal-simulation) for the timing mapping and tissue-property differences. **Known limitation:** BabelBrain thermal uses its own built-in tissue thermal properties, so the thermal fields in `medium_properties` apply only to the k-Wave thermal backend.
 
-Protocol timing is oriented after the nomencalture in the [TUS Calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/). You can use this tool to specify the desired protocol. Note that all three levels of the nesting (pulse, pule train, pulse train, pulse train repetition) have to be specified. If you only want to simulate a pulse train without repetitions, set PTRI and PTRD to be equal to the PTD.
+Protocol timing follows the nomenclature of the [TUS Calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/). You can use this tool to specify the desired protocol. Note that all three levels of the nesting (pulse, pulse train, pulse train repetition) have to be specified. If you only want to simulate a pulse train without repetitions, set PTRI and PTRD to be equal to the PTD.
 
-For protocols with long intervals between successive pulse trains, a coarser temporal sampling resolution may be suffient. This can be specified with `post_pt_timestep`.
+For protocols with long intervals between successive pulse trains, a coarser temporal sampling resolution may be sufficient. This can be specified with `post_pt_timestep`.
 
 ### Example: Timing Specification
 
@@ -36,7 +41,7 @@ In this scenario, you can model a single longer pulse train. Modeling a long PTR
 - `post_ptri_dur` | 0
 - `post_pt_timestep` | 1
 
-Heat dissipation continues beyond the final ultrasound pulse. To capture delayed heating, it is advised to run simulations until a steady-state has been reached. This can be specified via ```parameters.thermal.post_ptri_dur```. This acquires the corresponding duration following the end of the protocol. Time steps for the post-stimulation duration can be defined to be different from the time steps of the main simulation ```pt_timestep``` (by default they are equal, unless explicitly specified via ```parameters.thermal.post_pt_timestep```). Alternatively, for a continuous pulse train, a steady-state phase could be included as part of an extended PTR interval. The former option enables a steady-state phase also for protocols with PTRs.
+Heat dissipation continues beyond the final ultrasound pulse. To capture delayed heating, it is advised to run simulations until a steady-state has been reached. This can be specified via `timing.post_ptri_dur`. This acquires the corresponding duration following the end of the protocol. Time steps for the post-stimulation duration can be defined to be different from the time steps of the main simulation ```pt_timestep``` (set separately via `timing.post_pt_timestep`). Alternatively, for a continuous pulse train, a steady-state phase could be included as part of an extended PTR interval. The former option enables a steady-state phase also for protocols with PTRs.
 
 ### Additional parameters
 
@@ -53,11 +58,13 @@ These parameters influence the underlying mechanisms of how the thermal simulati
 
 ### Thermal dose (CEM43) calculation
 
-PRESTUS always computes **both** CEM43 formulations in every thermal simulation run. Both are written to the CSV output, exported as NIfTI volumes, and shown as separate figures. The HTML report displays the formulation selected by `parameters.thermal.cem43_iso`.
+PRESTUS always computes **both** CEM43 formulations in every k-Wave thermal simulation run. Both are written to the CSV output, exported as NIfTI volumes, and shown as separate figures. The HTML report (dashboard, safety verdict, methods text) uses the formulation selected by `parameters.thermal.cem43_iso`. With the BabelBrain thermal backend only BabelBrain's own dose is available (R = 0.25 below 43 °C, 0.5 at or above 43 °C): the ISO maps are NaN, and `load_parameters` sets `cem43_iso` to 0 with a warning, so the report uses BabelBrain's dose.
+
+Both forms are based on the thermal isoeffective dose of Sapareto & Dewey (1984), CEM43 = Σ Δt · R^(43 − T).
 
 #### kWave form (default)
 
-CEM43 as implemented in k-Wave's `kWaveDiffusion`:
+CEM43 as implemented in k-Wave's `kWaveDiffusion`: R = 0.25 for 37 ≤ T < 43 °C, R = 0.5 for T ≥ 43 °C, and no dose below 37 °C.
 
 ```
 cem43 = cem43 + ...
@@ -68,16 +75,27 @@ cem43 = cem43 + ...
 
 #### ISO form
 
-Set `parameters.thermal.cem43_iso = 1` to display the ISO variant in the HTML report. The ISO form defines CEM43 as zero below 39 °C, infinite above 57 °C, and applies R = 0.5 to all voxels that have previously exceeded 43 °C (tracked via T_max), not just to those currently above 43 °C.
+Set `parameters.thermal.cem43_iso = 1` to use this form in the HTML report. It is computed by `cem43_iso_increment` and combines:
+
+- **ISO 14708-3:2017**, Clause 17.1, Formula (1): R = 0.25 for T < 43 °C and R = 0.5 for T ≥ 43 °C, "valid for temperatures between 39 °C and 57 °C". Table 101 gives the tissue thresholds brain 2, bone 16 and skin 21 CEM43, which ITRUSST adopts (Aubry et al., 2025) and PRESTUS uses as reference levels (`get_risk_limits`).
+- **ITRUSST biophysical safety consensus** (Aubry et al., 2025): dose is accumulated over the whole time the tissue is above 39 °C, including cooling; and because thermotolerance "is not maintained beyond 43 °C, nor does it return upon cooling", R = 0.5 is used for all time steps after 43 °C has been reached (citing Sapareto & Dewey, 1984). PRESTUS tracks this with T_max.
+- **PRESTUS choice**: voxels that reach 57 °C (current T or T_max) are set to CEM43 = ∞. ISO 14708-3 only states that the formula is not valid above 57 °C; ∞ is a conservative flag for that range, not taken from either source.
 
 ```
 cem43_iso = cem43_iso + ...
         dt ./ 60 .* ...
         (0    .* (T < 39  & T_max < 43) + ...
          0.25 .* (T >= 39 & T < 43 & T_max < 43) + ...
-         0.5  .* (T >= 43 | T_max >= 43) + ...
-         Inf  .* (T >= 57)).^(43 - T);
+         0.5  .* (T >= 43 | T_max >= 43)).^(43 - T);
+cem43_iso(T >= 57 | T_max >= 57) = Inf;
 ```
+
+#### References
+
+- Sapareto SA, Dewey WC (1984). Thermal dose determination in cancer therapy. *Int J Radiat Oncol Biol Phys* 10:787–800. https://doi.org/10.1016/0360-3016(84)90379-1
+- ISO 14708-3:2017. Implants for surgery — Active implantable medical devices — Part 3: Implantable neurostimulators. Clause 17.1, Formula (1), Table 101. https://www.iso.org/standard/60539.html
+- Aubry J-F, Attali D, et al. (2025). ITRUSST consensus on biophysical safety for transcranial ultrasound stimulation. *Brain Stimul* 18:1896–1905. https://doi.org/10.1016/j.brs.2025.10.007
+- Martin E, et al. (2024). ITRUSST consensus on standardised reporting for transcranial ultrasound stimulation. *Brain Stimul* 17:607–615 (Eq. 5: Sapareto & Dewey form only). https://doi.org/10.1016/j.brs.2024.04.013
 
 #### Output naming
 

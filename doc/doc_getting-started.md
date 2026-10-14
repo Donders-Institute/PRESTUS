@@ -1,96 +1,109 @@
-# Quick Start Guide
+# Your first simulation
 
-### Install PRESTUS and dependencies
+This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no SimNIBS, a few minutes on a CPU) and then points to what changes for a head simulation.
 
-See [Installation](doc_installation.md).
+Before you start, install PRESTUS and its MATLAB dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_concepts.md#glossary) open alongside.
 
-### [Optional] Explore demos
+---
 
-A simplified 2D benchmarking example can be found [here](https://github.com/jkosciessa/PRESTUS_2D_demo). It is a lightweight example that is designed to run on local CPU ressources.   
+## 1. A free-water simulation
 
-A 3D demo using SimNIBS' Ernie template is provided as a [DataLad dataset](https://gin.g-node.org/PRESTUS/sim_ernie/). [Note: This example is based on a prior PRESTUS version. It still has to be updated, but provides a practical example of a possible data management scheme.]     
-
-A (currently outdated) demo that focuses on transducer calibration can be found [here](https://github.com/jkosciessa/PRESTUS_bin/blob/main/tutorial/PRESTUS_intro_tutorial.md).
-
-### Create virtual transducer settings
-
-See [Transducer](doc_transducer.md) and [Calibration](doc_calibration.md).
-
-### Create a study-specific config file
-
-Configuration metadata must be fully specified in (a set of) config files (in the .yaml format). See [the configuration overview](doc_parameters.md) for all available parameters.
-
-**Recommended:** Keep a project-specific config directory outside the PRESTUS toolbox. Use `prestus_config_init` to copy the current toolbox defaults:
+Free water needs no images: the transducer sits in a homogeneous water grid. The settings below are the ones the pipeline test `tests/test_integration_water.m` runs (a single-element 250 kHz bowl on a small 1 mm grid).
 
 ```matlab
-% Copy config_default.yaml to your project config dir and create a project override file
-prestus_config_init('/path/to/project/config', project_name='projectX');
+% from the PRESTUS root folder
+addpath(genpath('functions')); addpath(genpath('config')); addpath(genpath('external'));
+
+out = fullfile(tempdir, 'prestus_first');  mkdir(out);
+
+parameters = load_parameters();               % toolbox defaults only
+parameters.subject_id = 1;
+parameters.platform   = 'matlab';             % run in this MATLAB session
+parameters.path.sim   = out;                  % outputs
+parameters.path.anat  = out;                  % not used in water, but must be set
+parameters.path.seg   = out;
+
+parameters.simulation.medium    = 'water';
+parameters.simulation.code_type = 'matlab_cpu';   % 'matlab_gpu' with a GPU
+
+parameters.grid.resolution_mm = 1.0;          % coarse grid for speed
+parameters.grid.default_dims  = [72, 72, 128];
+parameters.modules.run_posthoc_water_sims = 0;
+
+% single-element annular bowl, driven at elem_p_amp (no ISPPA scaling)
+parameters.transducer.type = 'annular';
+parameters.transducer.freq_hz = 250e3;
+parameters.transducer.annular.elem_n          = 1;
+parameters.transducer.annular.elem_id_mm      = 0;
+parameters.transducer.annular.elem_od_mm      = 32.0;
+parameters.transducer.annular.curv_radius_mm  = 63.2;
+parameters.transducer.annular.dist_geom_ep_mm = 52.38;
+parameters.transducer.annular.elem_p_amp      = 91590;
+parameters.transducer.annular.elem_phase_deg  = 0;
+parameters.transducer.target_isppa_wcm2       = [];
+
+% transducer (bowl apex) and focus in grid voxels, beam along z
+parameters.transducer.trans_pos = [36, 36, 5];
+parameters.transducer.focus_pos = [36, 36, 64];
+
+prestus_pipeline_start(parameters);
 ```
 
-This copies `config_default.yaml` from the toolbox into your project directory and creates an empty `config_projectX.yaml` for your overrides. Edit `config_projectX.yaml` to specify only the parameters that differ from the defaults (see [the configuration overview](doc_parameters.md)). To review and adjust parameters interactively, pass `open_gui=true`:
+When it finishes, `out/sub-001/` holds the results:
+
+- `sub-001_water.csv`: the metrics table (ISPPA, focal distance, focal volume, …);
+- `sub-001_water_report.html`: the HTML report with the safety dashboard and figures;
+- `nii/`, `img/`, `log/` and `cache/`: maps, figures, the run log and intermediate files.
+
+[Reading your results](doc_results.md) explains what to check first; [Outputs](doc_outputs.md) lists every file and column.
+
+## 2. Use a transducer from the library
+
+Real studies rarely type in element geometry and drive. PRESTUS ships an equipment and calibration library: name the transducer and its driving system, set the focal depth and the free-water intensity you want, and PRESTUS fills in geometry, phases and drive. The library is resolved when the config is loaded, so put these keys in a YAML file rather than setting them in MATLAB afterwards:
+
+```yaml
+# config_first.yaml
+transducer:
+  serial: CTX_500_026            # config/equipment/CTX_500_026.yaml
+  combo:
+    ds_serial: SC_203_035        # config/calibration/CTX_500_026_SC_203_035.yaml
+  focal_distance_ep: 50          # focal depth setting, mm from the exit plane
+  target_isppa_wcm2: 30          # report results at 30 W/cm² free-water ISPPA
+```
 
 ```matlab
-prestus_config_init('/path/to/project/config', project_name='projectX', open_gui=true);
+parameters = load_parameters('config_first.yaml', pwd);
+% ... then the same subject, path, simulation and grid settings as in step 1
+%     (without the transducer geometry lines), and prestus_pipeline_start(parameters)
 ```
 
-To load parameters in your scripts:
+With a target ISPPA set, PRESTUS also runs a short free-water baseline and scales the field to that intensity ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). The available devices, how the library works and how to calibrate your own are described in [Transducer Library](doc_transducer_library.md).
 
-```matlab
-parameters = load_parameters('config_projectX.yaml', '/path/to/project/config');
-```
+## 3. A head simulation
 
-`load_parameters` always uses `config_default.yaml` as the base (resolved from your project directory if present, otherwise from the toolbox), then deep-merges the project-specific config on top. This means your project config only needs to contain the parameters you want to override.
+A head (`layered`) simulation adds an MRI, a SimNIBS segmentation and a target. Compared to step 2 you need:
 
-> **Note:** `config_default.yaml` is not intended to be edited directly in the toolbox. Keeping a project-specific copy also pins the baseline parameter set for reproducibility across toolbox updates.
+| What | Where it is set | See |
+|---|---|---|
+| T1 (optionally T2/UTE) per subject | `path.anat`, `path.t1_pattern`, `path.t2_pattern` | [Configuring a study](doc_configuration.md) |
+| SimNIBS installation and segmentation folder | `startup.simnibs_bin_path`, `path.seg` | [Installation](doc_installation.md#simnibs-installation) |
+| Medium | `simulation.medium: layered` | [Medium Setup](doc_medium.md) |
+| Transducer position and target | `transducer.trans_pos`/`focus_pos`, or a `placement.mode` | [Placement](doc_placement.md) |
+| Sonication protocol (for heating) | `timing.*`, `modules.run_heating_sims: 1` | [Thermal](doc_simulations-thermal.md) |
 
-### Choose the Simulation Medium
+On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: matlab_gpu` or `cpp_gpu`, see [Backend](doc_backend.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
 
-See [Medium Setup](doc_medium.md).
+## 4. Next steps
 
-### Choose the Simulation Backend
+- Keep your settings in a project folder and a study config: [Configuring a study](doc_configuration.md).
+- Prefer forms to YAML: [MATLAB GUI](doc_gui.md) or [PRESTUS Nexus](doc_nexus.md).
+- Use subject-specific skull properties from a UTE scan: [pseudo-CT](doc_pseudoCT.md).
+- Re-run only part of the pipeline: [Modules](doc_modules.md).
+- Many subjects or conditions: [Group analysis](doc_group.md#study-setup).
+- Sweeps over intensities, several transducers, sequences or tissue-property uncertainty: [Advanced modes](doc_advanced.md).
 
-See [Backend](doc_backend.md).
+## Demos
 
-### Specify I/O and Planning Images
-
-Specify folder management for inputs, segmentations, and simulations:
-
-```
-parameters.ld_library_path
-parameters.data_path
-parameters.seg_path
-parameters.sim_path
-parameters.paths_to_add = {pn.kwave, pn.minimize};
-parameters.simnibs_bin_path = fullfile('.conda', 'envs', 'simnibs_env', 'bin');
-```
-
-For `layered` simulations, specify at least one T1w planning image (and optionally a T2w/UTE image) for the segmentation.
-
-```
-parameters.path.t1_pattern = 'sub-%03d_T1w.nii.gz';
-parameters.path.t2_pattern = 'sub-%03d_UTE.nii.gz';  % optional: T2w or PETRA UTE image
-```
-
-### Specify a transducer and target location
-
-For `layered` simulations, specify locations via `parameters.transducer.trans_pos` and `parameters.transducer.focus_pos`. 
-
-See [Placement](doc_placement.md).
-
-### [Optional] One-shot SimNIBS segmentation
-
-It may be desirable to run an intial SimNIBS call prior to running the full pipeline incl. segmentation postprocessing, source setup, acoustic and thermal simulations. By default, existing segmentations will be reused and not overwritten unless explicitly requested with `overwrite_simnibs` (regardless of `overwrite_files`).
-
-Set `modules.segmentation_only = 1` to stop the pipeline immediately after segmentation, skipping all subsequent steps.
-
-### [Optional] Use a pseudoCT for subject-specific skull properties
-
-Point `path.t2_pattern` to a PETRA UTE image and set `pct.enabled = 1`. PRESTUS will pass the UTE image to SimNIBS during segmentation and then automatically generate a pseudoCT (`pseudoCT.nii.gz`) in the SimNIBS output folder. If a pseudoCT already exists in the SimNIBS `m2m` folder, generation is skipped.
-
-See [pseudoCT](doc_pseudoCT.md) for algorithm choices.
-
-### Run the prestus_pipeline | [Optional] iterate across parameters
-
-When the configuration is fully specified, the full pipeline only needs a subject id (a number consisting of no more than 3 digits). To run multiple subjects or setups in parallel, the `prestus_pipeline` can be submitted using high performance computing jobs as a part of `prestus_pipeline_start` (see [HPC documentation](doc_hpc.md)).
-
-PRESTUS can be parallelized across-subject and within-subject across treatment setups, e.g., by iterating across different transducers, transducer placement and target coordinates, or amplitudes and/or focal depth settings (requiring either dynamic [recalibration](doc_calibration.md) using `transducer_calibration` or a precomputed lookup table) via custom MATLAB scripts.
+- A simplified 2D benchmarking example: [PRESTUS_2D_demo](https://github.com/jkosciessa/PRESTUS_2D_demo) (runs on a local CPU).
+- A 3D demo on SimNIBS' Ernie head as a [DataLad dataset](https://gin.g-node.org/PRESTUS/sim_ernie/). It was made with an earlier PRESTUS version, but shows one way to organise data.
+- `examples/` in the toolbox holds runnable scripts (calibration, Localite, pseudo-CT, uncertainty); see `examples/README.md`.

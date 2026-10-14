@@ -1,5 +1,10 @@
 # MNI Transducer Placement
 
+!!! note "At a glance"
+    - **What:** Placement from a transducer position and a target given in MNI coordinates.
+    - **When you need it:** When you know both points in template space, e.g. from a group target and a standard scalp position.
+    - **Before you start:** A SimNIBS segmentation of the subject (for the MNI-to-subject transforms).
+
 The `mni` placement mode lets you specify **both** the transducer position and
 the focus directly in MNI (MNI152, mm) coordinates. Unlike the
 [heuristic](doc_placement_heuristic.md) mode — which takes only an MNI *target*

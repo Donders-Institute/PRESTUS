@@ -1,5 +1,10 @@
 # (pseudo-)CT
 
+!!! note "At a glance"
+    - **What:** Optional subject-specific skull properties: a pseudo-CT estimated from a UTE/PETRA MRI replaces the single skull value of each layer.
+    - **When you need it:** When you have a UTE/PETRA scan and want skull properties that follow the individual skull.
+    - **Before you start:** A UTE/PETRA image per subject, FSL and ANTs.
+
 ![pct_ute_density](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ute_pct_density.png)
 
 PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 

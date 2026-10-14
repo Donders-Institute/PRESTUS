@@ -1,5 +1,10 @@
 # PRESTUS GUI
 
+!!! note "At a glance"
+    - **What:** A point-and-click editor for PRESTUS configs that can also start a run and show its results.
+    - **When you need it:** If you prefer forms to editing YAML files.
+    - **Before you start:** A MATLAB desktop session. A config made here is an ordinary YAML file ([Configuring a study](doc_configuration.md)).
+
 The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click front-end to the pipeline. Every field maps directly to a YAML parameter — see [doc_parameters.md](doc_parameters.md) for the full reference.
 
 > A standalone config builder with a placement viewer, the **PRESTUS Nexus**, is available as an experimental alternative: see [doc_nexus.md](doc_nexus.md).
@@ -18,12 +23,9 @@ If no telemetry decision has been recorded yet, a modal dialog asks whether to e
 
 ### Configuration loading
 
-The GUI and the pipeline share the same two-layer loading logic:
+The GUI loads configs the way the pipeline does: defaults first, your study YAML merged on top ([Configuring a study](doc_configuration.md#how-a-config-is-assembled)).
 
-1. `config_default.yaml` is always loaded first and provides values for every parameter.
-2. A study-specific YAML is merged on top via `MergeStruct` — only keys present in the study file overwrite the defaults; everything else retains its default value.
-
-**In the GUI**, clicking **⬆ Load** calls `apply_params_to_gui` on the loaded file directly (no prior reset to defaults). This means:
+Clicking **⬆ Load** calls `apply_params_to_gui` on the loaded file directly (no prior reset to defaults). This means:
 
 - Fields present in the loaded YAML are updated.
 - Fields **not** present in the loaded YAML keep whatever value is currently shown.

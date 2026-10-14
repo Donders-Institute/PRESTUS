@@ -1,5 +1,10 @@
 # Neuronavigation read-in
 
+!!! note "At a glance"
+    - **What:** Simulating the transducer pose that was recorded with Localite neuronavigation during the experiment.
+    - **When you need it:** After a session, to simulate where the transducer actually was.
+    - **Before you start:** Localite exports of the session and the planning T1 that was loaded into Localite.
+
 Extracting neuronavigation coordinates for post-hoc ultrasound simulations is critical to verify and predict the focus of the realized stimulation sites during neuromodulation experiments. Neuronavigation systems provide spatial tracking of the ultrasound transducer position relative to the individual subject’s anatomy in real-time. 
 
 PRESTUS provides functions that aim to facilitate the read-in and preprocessing of positions recorded with the Localite system. 

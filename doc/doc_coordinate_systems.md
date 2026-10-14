@@ -1,5 +1,10 @@
 # Coordinate Reference Systems
 
+!!! note "At a glance"
+    - **What:** Reference for the coordinate spaces PRESTUS uses (voxel, RAS, MNI, simulation grid) and how it converts between them.
+    - **When you need it:** When positions end up in the wrong place, or before changing any coordinate transform in the code.
+    - **Before you start:** Nothing; for the basic idea see [Concepts](doc_concepts.md#head-model).
+
 ## Canonical convention
 
 **RAS (Right-Anterior-Superior) mm is the canonical *entry-point* space in PRESTUS.**

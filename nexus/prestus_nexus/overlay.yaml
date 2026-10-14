@@ -214,7 +214,7 @@ fields:
   segmentation.debug: {kind: flag}
 
   headmodel.head_pad_mm: {unit: mm}
-  headmodel.csf_expansion: {unit: voxels}
+  headmodel.csf_expansion: {unit: mm}
   headmodel.smooth_method: {choices: [gaussian, box]}
   headmodel.smooth_fwhm_mm: {unit: mm}
   headmodel.skull_fill_method: {choices: [rubberwrap, imclose]}

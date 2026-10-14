@@ -1,5 +1,10 @@
 # Heuristic Transducer Placement
 
+!!! note "At a glance"
+    - **What:** An automatic search for a transducer position on the scalp from an MNI target.
+    - **When you need it:** When you have a target but no planned transducer position, e.g. for many subjects at once.
+    - **Before you start:** A SimNIBS segmentation and an MNI target.
+
 The function `transducer_positioning` identifies heuristic locations for transducer placement. It can be called with `transducer_positioning_start`.
 
 The function targets brain regions specified by MNI coordinates, converting them to subject-native space using SimNIBS tools. It aims to identify candidate transducer positions where the geometric focus aligns with a target within a user-defined focal distance range. For each position, it computes the intersection proportion between the transducer and skin, mean/variance distances to skin and skull, and geometric focus/exit plane positions. It (optionally removes) areas including ears and selects a heuristic position based on user-defined criteria. Besides target MNI coordinates, the function does not require manual intervention, enabling automatic end-to-end workflows.
@@ -13,6 +18,8 @@ For parameters, see the [overview](doc_parameters.md#placementheuristic).
 - Calculate criteria for each location: target distance, intersection with skin, mean distance to skull, variance in distance to skin & skull
 
 #### Table: Candidate Coordinates
+
+Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/` (a copy of the selected position also goes to `path.localite_export` when set).
 
 The `tpars_sub-XXX_target.csv` table contains transducer position candidates with the following columns. This information can be used to select a suitable candidate (e.g., by selecting a position with low intersection of the transducer and head tissue (prop_intersect < 0.05) and minimal Euclidean distance to the target; often supported by visual inspection).
 
@@ -31,7 +38,6 @@ The `tpars_sub-XXX_target.csv` table contains transducer position candidates wit
 |`var_dist_skin`  | Variance of distances from non‑intersecting voxels to the skin boundary. | Higher variance → surface curvature or oblique intersection. |
 |`mean_dist_skull`| Mean distance from **all** voxels in the plane to the nearest skull boundary. | Shows average clearance between the plane and skull. |
 |`var_dist_skull` | Variance of distances to the skull boundary. | Quantifies irregularity of skull spacing within the beam footprint. |
-
 
 ### Remove ear locations
 

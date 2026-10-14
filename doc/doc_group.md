@@ -1,5 +1,10 @@
 # Group analysis
 
+!!! note "At a glance"
+    - **What:** Running many subjects or conditions from one table, and summarising them in group maps and a group report.
+    - **When you need it:** For studies with more than a handful of runs.
+    - **Before you start:** A study config that works for one subject.
+
 PRESTUS supports multi-subject studies end to end:
 
 - **[Study setup](#study-setup)**: a *study manifest* lists every run (a subject, optionally under a named condition) with its own settings: placement, target, depth, intensity, transducer, … `prestus_study_start` runs all rows locally or on HPC.

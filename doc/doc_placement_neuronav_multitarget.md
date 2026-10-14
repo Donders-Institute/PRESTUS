@@ -1,5 +1,10 @@
 # Multi-target extraction toolkit
 
+!!! note "At a glance"
+    - **What:** Tools to extract several planned targets from Localite exports in one go.
+    - **When you need it:** Advanced: for studies with several targets per session. Most users need only [Localite ingestion](doc_placement_neuronav_workflows.md).
+    - **Before you start:** Localite exports with planned targets.
+
 This is a toolkit, not a pipeline mode: a set of functions your own
 extraction script calls to resolve **named, per-session brain-target
 coordinates** (e.g. "this subject's `L_PUL` on `ses-03`") from whichever

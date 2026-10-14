@@ -1,12 +1,17 @@
 ## Transducer Calibration
 
+!!! note "At a glance"
+    - **What:** How the phases and drive of a simulated transducer are fitted to measurements of the real device, and how calibration relates to intensity targeting.
+    - **When you need it:** Only if your device is not in the [transducer library](doc_transducer_library.md) or you calibrate at depths and intensities of your own.
+    - **Before you start:** Hydrophone axial profiles of the device in free water.
+
 To emulate transducers, PRESTUS calibrates the phase and amplitude settings of virtual transducers so that their analytically predicted focal axis profiles match measurements made with real driving system–transducer setups in free water (measured in-house via hydrophones or provided by device manufacturers). Calibrated settings are stored in a transducer library and loaded at runtime.
 
 Transducer calibration relies on an additional config (`calibration_config`) that should be loaded as `parameters.calibration` (see the example `calibration_standalone`).
 
 ---
 
-## Calibration levels
+## Calibration methods
 
 The transducer library stores, for each measured depth, per-ring phase offsets, gains and the drive that reproduce the hydrophone profile (per-depth refinement, the default). Between measured depths they are interpolated; beyond them, geometric steering is used. See [doc_transducer_library.md](doc_transducer_library.md) for the model, the schema and the entry points.
 
@@ -157,82 +162,18 @@ The library YAML schema (`meta`, `global_model`, `refinement`, and the legacy fo
 
 ---
 
-## In-pipeline ISPPA targeting
+## Calibration and ISPPA targeting
 
-Rather than scaling `elem_p_amp` before the acoustic simulation, PRESTUS uses a two-step approach: a **water baseline measurement** records the free-water ISPPA at the current drive level, and **post-hoc pressure scaling** is applied when loading the cached acoustic results for thermal analysis. This means the acoustic simulation never needs to be repeated when changing the target intensity.
+Calibration and intensity targeting are separate steps:
 
 | | Calibration (`calibration_transducer`, library) | ISPPA targeting |
 |---|---|---|
-| **When** | Once per transducer/depth/intensity, before any study | Per subject, at analysis time |
-| **What is optimized** | Phases **and** amplitude | Neither — scaling is post-hoc |
-| **Input** | Empirical hydrophone profile + target intensity [W/cm²] | Target free-water ISPPA [W/cm²] |
-| **Output** | Calibrated YAML config ready for study use | Scaled pressure field fed into thermal sim |
-| **Typical use** | Build a calibration library | Target a specific sonication intensity |
+| **When** | Once per transducer/depth, before any study | Every run, after the acoustic simulation |
+| **What is set** | Phases **and** drive per focal depth | Neither — the simulated field is scaled |
+| **Input** | Hydrophone axial profiles | `transducer.target_isppa_wcm2` (free-water ISPPA, W/cm²; default 30) |
+| **Output** | Library entry (YAML) used by studies | Pressure field scaled by √(target / free-water baseline) |
 
----
-
-### Step 1 — Water baseline measurement
-
-**Function: `water_baseline`**
-
-Runs a fast homogeneous water simulation at the current `elem_p_amp` (after source setup, before the main acoustic simulation). The peak free-water ISPPA is computed from the sensor output and stored as `acoustic_provenance.freefield_isppa_wcm2` alongside the acoustic cache file. The free-water intensity along each transducer's beam axis (bowl apex → grid edge, distances from the apex) is stored as `acoustic_provenance.freefield_axial`. Combined async / FOV caches drop it, because the combined field is scaled per source.
-
-The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3-D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical O'Neil profile for a single annular transducer (always). Both are drawn at the drive level of the plotted field (after post-hoc scaling, below). They are omitted for combined async / FOV fields and the BabelBrain backend.
-
-This step is **disabled by default** (`modules.run_water_baseline = 0`). Enable it when ISPPA scaling provenance is needed. It adds a few minutes on a typical workstation (no tissue mapping, uses the configured `code_type`):
-
-```yaml
-modules:
-  run_water_baseline: 1
-```
-
-> If `run_water_baseline` is disabled, `transducer.target_isppa_wcm2` will have no effect and a warning is issued.
-
----
-
-### Step 2 — Post-hoc pressure scaling
-
-When `transducer.target_isppa_wcm2` is set and the acoustic cache contains valid provenance, the pipeline scales `sensor_data.p_max_all` before acoustic analysis and thermal simulation:
-
-$$p_\mathrm{scaled} = p_\mathrm{cached} \times \sqrt{\frac{I_\mathrm{target}}{I_\mathrm{baseline}}}$$
-
-Intensity-derived fields (used in thermal simulation) then scale as $I \propto p^2$, so heat deposition is correctly proportional to the target intensity without rerunning the skull simulation.
-
-A warning is issued if the scale factor exceeds 4× or is below 0.25×, indicating that the target is far from the simulated amplitude and the linear assumption may not hold.
-
-### Configuration
-
-`target_isppa_wcm2` is set **per transducer** in the transducer block:
-
-```yaml
-transducer:
-  target_isppa_wcm2: 30   # Target free-water ISPPA [W/cm²]
-  elem_p_amp: ...
-  # ... other transducer fields
-```
-
-`modules.run_water_baseline` defaults to `0` and must be explicitly enabled to record free-water ISPPA provenance. The acoustic simulation runs at whatever `elem_p_amp` is configured; `target_isppa_wcm2` controls only the analysis and thermal stages.
-
-> **Backwards compatibility:** The older form `calibration.target_isppa_wcm2` is still accepted and is automatically migrated to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning. Update configs to use the per-transducer form.
-
-### Multiple targets (multi-ISPPA mode)
-
-Setting `target_isppa_wcm2` to a vector automatically triggers the multi-ISPPA pipeline, which runs one thermal job per target in parallel without repeating the acoustic simulation:
-
-```yaml
-transducer:
-  target_isppa_wcm2: [10, 20, 30, 50]   # W/cm² — triggers multi-ISPPA mode
-```
-
-See [doc_multiintensity.md](doc_multiintensity.md) for full details.
-
-### Provenance fields
-
-The following fields are saved in the acoustic cache alongside `sensor_data`:
-
-| Field | Description |
-|---|---|
-| `acoustic_provenance.freefield_isppa_wcm2` | Free-water ISPPA measured at the drive level used for the acoustic simulation [W/cm²] |
+The acoustic simulation runs at the drive `elem_p_amp`. A short free-water baseline of the same source (`modules.run_water_baseline: auto`, the default) gives the free-water ISPPA of that drive, and the field is scaled to the target, so changing the target never re-runs the head simulation. A target that cannot be met stops the run; it is never reported unscaled. [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting) describes the rules, the provenance fields and the error messages; [Multi-intensity](doc_multiintensity.md) runs several targets from one acoustic simulation.
 
 ### Relationship to calibration
 
@@ -240,4 +181,4 @@ The typical workflow is:
 
 1. **Once per transducer (library build)**: Run `build_transducer_library.m` to fit every measured depth. Results are stored in `config/calibration/{combo_name}.yaml`.
 2. **Optionally, at chosen depths**: Run `calibration_transducer` (or `refine_transducer_library`) with your own profiles or at unmeasured depths, writing a user library entry (`transducer.library_path`). Calibrated depths are used exactly there and blended into the rest of the entry within `blend_mm`.
-3. **Per subject simulation**: Load calibrated parameters via `load_transducer_from_library`. Set `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and post-hoc scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.
+3. **Per subject simulation**: set `transducer.serial`, `combo.ds_serial` and `focal_distance_ep` (PRESTUS loads the calibrated parameters via `load_transducer_from_library`) and `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and scaling handle the rest — no need to re-run the acoustic simulation when changing the target intensity.

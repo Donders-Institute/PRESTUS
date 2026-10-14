@@ -1,5 +1,10 @@
 # Installation Guide
 
+!!! note "At a glance"
+    - **What:** What you need depends on how far you go: MATLAB, PRESTUS and k-Wave are enough for a free-water simulation; SimNIBS adds head simulations; the Python environments further down are only for optional features.
+    - **When you need it:** Before your [first simulation](doc_getting-started.md).
+    - **Before you start:** MATLAB (R2023b is the current default; see below). Installing SimNIBS takes the most time, so start with the free-water simulation if you only want to try PRESTUS.
+
 ## PRESTUS installation
 
 Download and install these tools:
@@ -7,7 +12,7 @@ Download and install these tools:
 - `MATLAB (R2023b)`. Other versions may work as well, but R2023b is the current default deployment. Especially on HPCs with GPUs, more recent MATLAB versions can cause issues. The HPC scripts currently hardcode the MATLAB R2023b module on the Donders HPC.
 - [`SimNIBS 4`](https://github.com/simnibs/simnibs) (see [SimNIBS installation](#simnibs-installation))
 - external | They are automatically included as submodules if this repository is recursively cloned (see below). They must be added on MATLAB startup.
-    - [`k-Wave (1.4.1)`](https://github.com/ucl-bug/k-wave.git). While k-Wave 1.4 is supported, version 1.4.1 (currently [GitHub exclusive](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) introduced GPU support for thermal simulations with kWaveDiffusion. We therefore recommend cloning k-Wvae 1.4.1 from GitHub.
+    - [`k-Wave (1.4.1)`](https://github.com/ucl-bug/k-wave.git). While k-Wave 1.4 is supported, version 1.4.1 (currently [GitHub exclusive](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) introduced GPU support for thermal simulations with kWaveDiffusion. We therefore recommend cloning k-Wave 1.4.1 from GitHub.
     - [`export_fig`](https://github.com/altmany/export_fig)
     - [`FEX-minimize`](https://github.com/rodyo/FEX-minimize.git)
     - [`xml2struct`](https://github.com/joe-of-all-trades/xml2struct)
@@ -38,11 +43,7 @@ Ensure that the paths and subfolders are added in MATLAB. See `simple_main.m` fo
 
 When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. Note that this may not be the most recent version of either the `main` or `development` branch.
 
-Type `module load simnibs/4.0.0` (or add the command to your .bashrc so that it is executed automatically once you login) and add `addpath('/opt/prestus/dev')` to your matlab path. If you want to use an older version you can also use `addpath('/opt/prestus/0.2.0')`, or older versions. Now you can start matlab R2022b.
-
-> `simnibs/4.0.0` and `simnibs/4.1.0` are currently available on the Donders HPC.
-
-> `/opt/prestus/0.1.0`, `/opt/prestus/0.2.0`, and (an outdated) `/opt/prestus/dev` are currently available on the Donders HPC.
+Load a SimNIBS module (`module avail simnibs` lists the installed versions; add the `module load` line to your `.bashrc` to load it at login) and add an installed PRESTUS version to your MATLAB path, e.g. `addpath('/opt/prestus/dev')` (`ls /opt/prestus` lists the versions). The centrally installed versions lag behind `main` and `development`; for current features, clone PRESTUS yourself as described above.
 
 For more information on HPC usage, see the [HPC guide](doc_hpc.md)
 
@@ -168,10 +169,10 @@ Exit out of everything and following the steps below for starting SimNIBS after 
 
 #### Specifying SimNIBS paths in PRESTUS
 
-In PRESTUS, specify either in the config or directly in MATLAB both the path to the SimNIBS binaries, and the path to shared libraries for GCC 7.2.0:
+In PRESTUS, specify (in the config, or in MATLAB as below) the path to the SimNIBS binaries and, if needed, the path to shared libraries for GCC 7.2.0:
 ```
-parameters.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.conda', 'envs', 'simnibs_v4.6.0', 'bin');
-parameters.ld_library_path = "/opt/gcc/7.2.0/lib64";
+parameters.startup.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.conda', 'envs', 'simnibs_v4.6.0', 'bin');
+parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";   % only if charm reports 'undefined symbol' errors
 ```
 
 #### [Optional: PlanTUS dependencies]
@@ -193,7 +194,7 @@ python -c "import nilearn; import vtk; import h5py; import pynput; print('PlanTU
 
 #### [Optional: Defacing dependencies]
 
-If you intend to use MRI defacing (`modules.deface_m2m = 1`), `pydeface` must be installed in the SimNIBS environment:
+If you intend to use MRI defacing (`segmentation.deface: 1`), `pydeface` must be installed in the SimNIBS environment:
 
 ```bash
 source activate simnibs_v4.6.0

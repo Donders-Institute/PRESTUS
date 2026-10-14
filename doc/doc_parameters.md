@@ -1,6 +1,6 @@
 ## PRESTUS parameters
 
-Parameters are organised in nested structs that map directly to YAML keys. PRESTUS uses a two-layer configuration system: `config_default.yaml` defines all parameters and their default values and should not be edited. A study-specific config (e.g. `config_study.yaml`) is loaded on top and only needs to specify values that differ from the defaults. Parameters can also be set or overridden programmatically in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
+Parameters are organised in nested structs that map directly to YAML keys. `config_default.yaml` defines all parameters and their default values and should not be edited; a study config is merged on top and only needs the values that differ (see [Configuring a study](doc_configuration.md) for the full layering, project defaults and overrides). Parameters can also be set in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
 
 ---
 
@@ -9,7 +9,7 @@ Parameters are organised in nested structs that map directly to YAML keys. PREST
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `subject_id` | Subject identifier used for file naming and folder management. | — | Mandatory. Set before calling `prestus_pipeline_start(parameters)`. |
-| `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab` |
+| `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab`. `auto` detects SLURM or qsub and errors when neither is installed; use `matlab` to run in the current session. See [HPC](doc_hpc.md#where-a-run-executes). |
 
 ---
 
@@ -489,7 +489,7 @@ See [doc_preproc.md](doc_preproc.md).
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `head_pad_mm` | Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]. | `0` | |
-| `csf_expansion` | Dilation of the CSF brain mask into surrounding head regions [grid voxels]. | `40` | |
+| `csf_expansion` | Dilation of the CSF brain mask into surrounding head regions [mm]. | `40` | Converted to voxels at the grid resolution (`preproc_crop_eCSF`). |
 | `smooth_method` | Mask smoothing filter type. | `'gaussian'` | `gaussian` / `box` / `off` |
 | `smooth_threshold_skull` | Binarisation threshold for skull mask; higher = thinner mask. | `0.5` | |
 | `smooth_threshold_other` | Binarisation threshold for other masks; higher = thinner mask. | `0.5` | |

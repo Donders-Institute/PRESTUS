@@ -1,5 +1,10 @@
 # PRESTUS Nexus
 
+!!! note "At a glance"
+    - **What:** A desktop app (experimental) to build a study config with live checks, a placement viewer, and buttons to run locally or submit to a cluster.
+    - **When you need it:** As an alternative to the MATLAB GUI, especially for planning placements and submitting cluster jobs from a laptop.
+    - **Before you start:** A Python environment (one `conda` command below). MATLAB is still needed to run simulations.
+
 The PRESTUS Nexus is a standalone desktop app (Python/Qt) for putting a study config together before you run it. It writes an ordinary override YAML for `load_parameters`, containing only the values that differ from `config_default.yaml`. MATLAB still does all loading, validation and simulation. The Nexus is *experimental*; the MATLAB GUI ([doc_gui.md](doc_gui.md)) remains available.
 
 ## Installation

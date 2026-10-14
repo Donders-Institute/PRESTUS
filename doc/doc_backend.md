@@ -1,5 +1,10 @@
 # Simulation backends
 
+!!! note "At a glance"
+    - **What:** The simulation engines PRESTUS can use: k-Wave (default), an elastic k-Wave skull model, BabelBrain and jwave.
+    - **When you need it:** You do not need anything but k-Wave to start. Read the k-Wave section to choose between CPU, GPU, MATLAB and C++.
+    - **Before you start:** k-Wave (installed with PRESTUS).
+
 PRESTUS runs the acoustic and the thermal simulation through interchangeable backends. Pre-processing (segmentation, medium mapping, grid, transducer placement) and post-processing (focal metrics, CEM43, NIfTI export, HTML report) are shared, so switching backend is a config change:
 
 ```yaml

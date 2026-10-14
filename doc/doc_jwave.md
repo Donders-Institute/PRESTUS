@@ -1,5 +1,10 @@
 # jwave acoustic backend
 
+!!! note "At a glance"
+    - **What:** jwave as an alternative acoustic solver.
+    - **When you need it:** Optional: to compare solvers.
+    - **Before you start:** A Python environment with jwave and JAX.
+
 PRESTUS can use [jwave](https://github.com/ucl-bug/jwave) as an alternative backend for acoustic simulation. By default PRESTUS uses k-Wave; the jwave backend can be enabled independently. All pre-processing stages (segmentation, grid setup, medium masks, transducer placement) and all downstream post-processing (focal metrics, NIfTI export, HTML report) run unchanged regardless of which backend is active.
 
 **What is jwave?** jwave is an open-source Python library for differentiable acoustic wave simulation developed at University College London. It implements the same pseudo-spectral k-Wave equations but in [JAX](https://github.com/google/jax), giving access to JIT compilation, automatic differentiation, and NVIDIA GPU acceleration without requiring compiled MATLAB/C++ binaries. jwave provides two solvers: a time-domain pseudo-spectral integrator equivalent to `kspaceFirstOrder*`, and a frequency-domain Helmholtz solver that computes the CW steady-state directly without running a full transient simulation.

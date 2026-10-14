@@ -1,12 +1,17 @@
 # Acoustic simulations
 
-PRESTUS supports 3D acoustic wave simulations using k-Wave’s pseudo-spectral method for time-domain 3D acoustic simulations. These simulations model compressional waves (P-waves), which involve pressure changes propagating through isotropic media *without* shear deformations. To describe wave propagation, they calculate pressure and velocity fields. They are faster, less memory-intensive, and require less assumptions than elastic wave simulations (e.g., using `kWaveElastic`; not implemented) because they ignore shear waves and complex material interactions. However, this also means that scattering via shear waves is not explicitly modeled (albeit contributing to the bulk attenuation coefficient resulting from absorption and scattering).
+!!! note "At a glance"
+    - **What:** How the acoustic simulation is set up: grid sampling, intensity targeting, memory use and 2D axisymmetric runs.
+    - **When you need it:** The section on [ISPPA targeting](#isppa-targeting) is worth reading for every study; the rest matters when you change grid settings or run out of memory.
+    - **Before you start:** Nothing; the defaults are a sound starting point.
+
+PRESTUS supports 3D acoustic wave simulations using k-Wave’s pseudo-spectral method for time-domain 3D acoustic simulations. These simulations model compressional waves (P-waves), which involve pressure changes propagating through isotropic media *without* shear deformations. To describe wave propagation, they calculate pressure and velocity fields. They are faster, less memory-intensive, and require fewer assumptions than elastic wave simulations because they ignore shear waves and complex material interactions. An elastic skull model is available as a separate backend ([`kwave_elastic`](doc_backend.md#k-wave-elastic-backend-shear-waves), draft). However, this also means that scattering via shear waves is not explicitly modeled (albeit contributing to the bulk attenuation coefficient resulting from absorption and scattering).
 
 PRESTUS by default supports 3D simulations using `kspaceFirstOrder3D`.
 
 See the available [simulation backends](doc_backend.md).
 
-> **Turning off acoustic simulations.** PRESTUS uses the `run_acoustic_sims` flag to indicate whether to run simulations. If set to `false`, PRESTUS will first check for existing files and check whether `overwrite_files` is set to off to load the existing matrices. This is intended to make this more intuitive for workflows in which acoustic simulations are "turned off" to run follow-up thermal simulations. This behaviour is unique for this module (turning off other modules may not run the step at all incl. loading existing data).
+> **Turning off acoustic simulations.** PRESTUS uses the `run_acoustic_sims` flag to indicate whether to run simulations. If set to `0`, PRESTUS loads the existing acoustic results from the cache (subject to `io.overwrite_files`; see [Overwrite behaviour](doc_outputs.md#overwrite-behaviour)). This is intended to make this more intuitive for workflows in which acoustic simulations are "turned off" to run follow-up thermal simulations. This behaviour is unique for this module (turning off other modules may not run the step at all incl. loading existing data).
 
 ## Spatial and temporal sampling
 
@@ -52,13 +57,13 @@ Acoustic simulation accuracy depends on resolving the shortest wavelength in the
 
 ### Simulation duration (`t_end`)
 
-The total simulation duration is set long enough for the wave to reach every point in the domain and for the steady-state pressure field to establish everywhere:
+By default (`grid.steady_state_transits: 1`), the total simulation duration is set long enough for the wave to cross the domain diagonal once, so that the steady-state pressure field is established everywhere. More transits can be requested for compact, reflective domains, or a fixed duration with `grid.sim_time_us`:
 
 ```
 t_end = grid_diagonal / c_min
 ```
 
-where `grid_diagonal = sqrt(x_size² + y_size² + z_size²)` and `c_min` is the **minimum** sound speed across all media (typically water or brain, ~1500 m/s).
+(times `steady_state_transits`), where `grid_diagonal = sqrt(x_size² + y_size² + z_size²)` and `c_min` is the **minimum** sound speed across all media (typically water or brain, ~1500 m/s).
 
 The number of time steps follows from `t_end` and `dt`:
 
@@ -66,7 +71,7 @@ The number of time steps follows from `t_end` and `dt`:
 N_steps = round(t_end / dt)
 ```
 
-The sensor then records `p_max_all` and `p_final` over the last three wave periods of this interval to capture the steady-state field.
+The sensor then records `p_max_all` and `p_final` over the last `grid.steady_state_num_periods` (default 3) wave periods of this interval to capture the steady-state field.
 
 ---
 
@@ -132,6 +137,10 @@ The baseline comes from (`isppa_baseline`):
 | `0` | only when the target differs from a calibration ISPPA |
 
 A target is never reported unscaled: when it needs a rescale but no simulated baseline exists (e.g. `run_water_baseline: 0` with an uncalibrated transducer, or a cached result from a run without baseline and `run_source_setup: 0`), the run stops with `prestus:isppa:noBaseline` or `prestus:isppa:unsimulatedBaseline` (`isppa_scale_factor`). Scale factors above 4 or below 0.25 warn (`prestus:isppa:largeScale`): check that the target is in the linear regime of the simulated drive.
+
+The baseline run also stores the free-water intensity along each transducer's beam axis (bowl apex → grid edge) as `acoustic_provenance.freefield_axial`. The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3-D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical O'Neil profile for a single annular transducer (always), both at the drive level of the plotted field after scaling. They are omitted for combined async / FOV fields (which are scaled per source) and for the BabelBrain backend.
+
+`target_isppa_wcm2` is set per transducer and refers to that transducer alone. With several transducers the scaling above does not apply to the combined field: coherent runs set each transducer's drive to its own target before the simulation, async runs scale each field before combining (see [Multi-transducer — ISPPA targets](doc_multitransducer.md#isppa-targets)). The older `calibration.target_isppa_wcm2` is still read and moved to `transducer(1).target_isppa_wcm2` with a deprecation warning.
 
 > **Changed in 2026-10.** Before, a target on a transducer without calibration ISPPA was silently ignored — even with `run_water_baseline: 1` — and the field was reported at `elem_p_amp`. Such runs now run the baseline (`auto`) and are scaled to the target, which with the default target means 30 W/cm². Set `target_isppa_wcm2: []` to keep reporting the drive level.
 
@@ -208,5 +217,4 @@ Multiple adjustments are made if axisymmetry is requested:
 ### PML behaviour in axisymmetric mode
 
 The PML is applied asymmetrically when `PMLInside=false` (the PRESTUS default): the **axial** dimension receives `pml_size` voxels on both sides, while the **radial** outer edge receives `pml_size` voxels on one side only. The inner radial boundary at `r = 0` is a symmetry axis and does not require a PML. k-Wave handles this automatically; no configuration change is needed.
-
 

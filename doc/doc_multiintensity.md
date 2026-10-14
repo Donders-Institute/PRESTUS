@@ -44,12 +44,7 @@ transducer:
   # ... other transducer fields
 ```
 
-**Important:** `modules.run_water_baseline` defaults to `0` — you must explicitly enable it so that the provenance required for scaling is recorded:
-
-```yaml
-modules:
-  run_water_baseline: 1
-```
+The free-water baseline that the scaling needs runs automatically (`modules.run_water_baseline: auto`, the default); see [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting).
 
 > **Backwards compatibility:** The older form `calibration.target_isppa_wcm2` is still accepted and is automatically migrated to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning.
 

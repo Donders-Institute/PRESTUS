@@ -1,5 +1,10 @@
 # Head preprocessing
 
+!!! note "At a glance"
+    - **What:** How the SimNIBS segmentation becomes the simulation grid: rotation, rescaling, smoothing, skull hole filling and cropping.
+    - **When you need it:** Rarely: the defaults suit most studies. Read it when the skull looks wrong in the report, or to understand why the grid has the size it has.
+    - **Before you start:** A `layered` simulation with a SimNIBS segmentation.
+
 PRESTUS preprocesses `layered` segmentations to set up simulation grids.
 
 ![preprocessing](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/preprocessing.png)
@@ -23,7 +28,7 @@ The 3D planning image is then resliced to the requested grid resolution by isotr
 
 ### Medium Mapping (incl. segmentation smoothing)
 
-Segmentations are mapped onto the requested layer medium masks (to later assign acoustic properties). The standard (10-tissue) SimNIBS 4 segmentation will be converted into the (by default 5) specified layers (controlled by `parameters.layers`). If a segmentation for the requested layer is not available, requested layers will be removed from the specification. All segmentation IDs that are not explicitly assigned in dedicated layers are automatically included in a baseline water layer. Medium maps contain layer indices corresponding to the respective layer label position in the medium properties (`parameters.medium`). This allows for flexibility in requested layers with stable medium ids (unless `parameters.medium` is edited).
+Segmentations are mapped onto the requested layer medium masks (to later assign acoustic properties). The standard (10-tissue) SimNIBS 4 segmentation will be converted into the (by default 5) specified layers (controlled by `layers`). If a segmentation for the requested layer is not available, requested layers will be removed from the specification. All segmentation IDs that are not explicitly assigned in dedicated layers are automatically included in a baseline water layer. Medium maps contain layer indices corresponding to the respective layer label position in the medium properties (`medium_properties`). This allows for flexibility in requested layers with stable medium ids (unless `medium_properties` is edited).
 
 Each layer is smoothed using one of the algorithms below. The size of smoothing kernels refer to the grid size of the medium mask, NOT the original dimensions of the planning image. If a multi-layer skull model is requested, both cortical and trabecular layers are initially combined into a skull segment and smoothed. Subsequently, the trabecular bone layer is smoothed and added.
 

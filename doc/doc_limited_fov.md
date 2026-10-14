@@ -1,5 +1,10 @@
 ## Limited acoustic FOV
 
+!!! note "At a glance"
+    - **What:** Running the acoustic simulation on a smaller box around the beam to save time and memory.
+    - **When you need it:** Optional: for large grids, fine resolutions or many runs.
+    - **Before you start:** A working head simulation to compare against.
+
 Running the full k-Wave acoustic simulation on a whole-head grid can be slow and
 memory-intensive when only the focal zone and near-field matter.  The acoustic FOV
 feature crops the k-Wave domain to a beam-axis-aligned box before simulation and

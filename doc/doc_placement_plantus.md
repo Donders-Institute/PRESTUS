@@ -1,5 +1,10 @@
 # PlanTUS placement pipeline – step-by-step
 
+!!! note "At a glance"
+    - **What:** Placement with the external PlanTUS tool, which scores scalp positions on several criteria (distance, angles, skull thickness, beam–target overlap).
+    - **When you need it:** When you want an optimised, documented choice of entry point, or to compare focal depths.
+    - **Before you start:** The full SimNIBS mesh, a PlanTUS installation and Connectome Workbench ([Installation](doc_installation.md#optional-plantus-dependencies)).
+
 > ⚠️ **Experimental.** PlanTUS placement is under active development. Results should be verified manually before use in a study.
 
 This document describes the sequence of operations performed when

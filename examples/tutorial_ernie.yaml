@@ -1,0 +1,43 @@
+# Study config for the head-simulation tutorial (doc/doc_tutorial_head.md).
+# Only the values that differ from config/config_default.yaml are listed.
+# Replace the four paths before running.
+
+platform: matlab                 # run in this MATLAB session; 'slurm' or 'qsub' on a cluster
+
+path:
+  anat: /path/to/simnibs4_examples/org   # folder with ernie_T1.nii.gz and ernie_T2.nii.gz
+  t1_pattern: ernie_T1.nii.gz
+  t2_pattern: ernie_T2.nii.gz
+  seg: /path/to/tutorial/simnibs         # SimNIBS writes m2m_sub-001/ here
+  sim: /path/to/tutorial/sim             # PRESTUS outputs
+
+startup:
+  simnibs_bin_path: /path/to/conda/envs/simnibs_v4.6.0/bin
+
+simulation:
+  medium: layered
+  code_type: matlab_gpu          # 'matlab_cpu' without a GPU (much slower)
+
+transducer:
+  serial: CTX_500_026            # Sonic Concepts CTX-500, from the shipped library
+  combo:
+    ds_serial: SC_203_035        # driving system
+  focal_distance_ep: 50          # focal depth setting [mm from the exit plane]
+  target_isppa_wcm2: 30          # free-water ISPPA the results are scaled to [W/cm2]
+
+placement:
+  mode: mni
+  mni:
+    trans_pos_mm: [-52, -8, 58]  # transducer on the left scalp [MNI mm]
+    focus_pos_mm: [-29, -6, 7]   # target [MNI mm]
+    skin_gap_mm: 5
+
+timing:                          # 20 s of 20 ms pulses at 5 Hz (10 % duty cycle)
+  pd: 0.02
+  pri: 0.2
+  ptd: 20
+  pt_timestep: 0.02
+  ptri: 20
+  ptrd: 20
+  post_ptri_dur: 20              # 20 s of cooling after the protocol
+  post_pt_timestep: 1

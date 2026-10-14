@@ -501,7 +501,7 @@ segmentation:
 
 headmodel:
   head_pad_mm: 0      # Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]
-  csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [grid voxels]
+  csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [mm]; converted to voxels at grid.resolution_mm
   # Thresholds for smoothing masks (and acoustic properties)
   smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
   smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)

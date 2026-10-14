@@ -23,9 +23,32 @@ These features make PRESTUS an accessible tool for researchers to plan, validate
 
 A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
 
+# Where to start
+
+New to PRESTUS? Follow these in order:
+
+1. [Concepts and glossary](doc_concepts.md): what PRESTUS does, and the terms used throughout.
+2. [Installation](doc_installation.md): MATLAB, PRESTUS and k-Wave are enough to begin.
+3. [Your first simulation](doc_getting-started.md): a free-water run in a few minutes, then what a head simulation needs.
+4. [Reading your results](doc_results.md): what to check in the report, and how to read the safety summary.
+5. [Configuring a study](doc_configuration.md): your own config files for your own data.
+
+Looking for something specific?
+
+| I want to… | Go to |
+|---|---|
+| simulate a transducer I own | [Transducer Library](doc_transducer_library.md) |
+| decide where the transducer goes | [Placement](doc_placement.md) |
+| simulate heating for my protocol | [Thermal](doc_simulations-thermal.md) |
+| simulate a pose recorded with Localite | [Localite placement](doc_placement_neuronav.md) |
+| run many subjects | [Studies & group analysis](doc_group.md) |
+| run on a cluster | [Running on a cluster](doc_hpc.md) |
+| look up a setting | [Parameters](doc_parameters.md) |
+| fix an error | [Troubleshooting](doc_troubleshooting.md) |
+
 # Installation
 
-Follow the [Installation Guide](doc_installation.md) and continue with the [Quick Start Guide](doc_getting-started.md).
+Follow the [Installation Guide](doc_installation.md), run [your first simulation](doc_getting-started.md), and set up your own study with [Configuring a study](doc_configuration.md).
 
 ### Versions
 

@@ -37,56 +37,67 @@ theme:
 
 nav:
   - 🏠 Home: README.md
-  - 🚀 Getting Started:
+  - 🚀 Get Started:
+    - Concepts & Glossary: doc_concepts.md
     - Installation: doc_installation.md
-    - Getting started: doc_getting-started.md
-    - GUI: doc_gui.md
-    - Nexus (standalone config builder): doc_nexus.md
-    - Usage Statistics: doc_usage_statistics.md
-  - 🔧 Equipment Modeling:
-    - Transducer Configuration: doc_transducer.md
+    - Your first simulation: doc_getting-started.md
+    - Reading your results: doc_results.md
+    - Configuring a study: doc_configuration.md
+    - MATLAB GUI: doc_gui.md
+    - PRESTUS Nexus: doc_nexus.md
+  - 🧠 Head Model:
+    - Segmentation & Preprocessing: doc_preproc.md
+    - Medium Setup: doc_medium.md
+    - (pseudo-)CT: doc_pseudoCT.md
+  - 🔧 Transducer:
+    - Transducer Definition: doc_transducer.md
     - Transducer Library: doc_transducer_library.md
     - Calibration: doc_calibration.md
-    - Transducer Placement Overview: doc_placement.md
-    - Transducer Placement (Heuristic): doc_placement_heuristic.md
-    - Transducer Placement (MNI): doc_placement_mni.md
-    - Transducer Placement (Neuronavigation): doc_placement_neuronav.md
-    - Neuronavigation Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
-    - Neuronavigation Multi-Target Toolkit: doc_placement_neuronav_multitarget.md
-    - Transducer Placement (PLANTUS): doc_placement_plantus.md
-    - Coordinate Systems: doc_coordinate_systems.md
-  - 🧠 Tissue Modeling:
-    - Head Preprocessing: doc_preproc.md
-    - Medium Setup: doc_medium.md
-    - (pseudo)CT: doc_pseudoCT.md
-  - 🖥️ Simulations:
+    - Adding & Maintaining Entries: doc_transducer_library_maintenance.md
+  - 🎯 Placement:
+    - Overview & Manual: doc_placement.md
+    - MNI: doc_placement_mni.md
+    - Heuristic: doc_placement_heuristic.md
+    - PlanTUS: doc_placement_plantus.md
+    - TUS_entry: doc_placement_tus_entry.md
+    - Localite Placement: doc_placement_neuronav.md
+    - Localite Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
+    - Localite Multi-Target Toolkit: doc_placement_neuronav_multitarget.md
+  - 🖥️ Simulation:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
     - Limited Acoustic FOV: doc_limited_fov.md
-    - Outputs: doc_outputs.md
-    - Backend: doc_backend.md
-    - BabelBrain: doc_babelbrain.md
-    - jwave: doc_jwave.md
-    - HPC: doc_hpc.md
-  - 📊 Advanced Pipelines:
+    - Time Reversal: doc_time_reversal.md
+  - ▶️ Running & Outputs:
+    - Running on a Cluster: doc_hpc.md
+    - Partial Runs (Modules): doc_modules.md
+    - Outputs & Reports: doc_outputs.md
+    - Studies & Group Analysis: doc_group.md
+  - 📊 Advanced Modes:
     - Overview: doc_advanced.md
-    - Uncertainty Analysis: doc_uncertainty.md
     - Multi-Intensity: doc_multiintensity.md
     - Multi-Transducer: doc_multitransducer.md
     - Sequential: doc_sequential.md
-    - Group Analysis: doc_group.md
+    - Uncertainty Analysis: doc_uncertainty.md
+  - ⚙️ Backends:
+    - Overview & k-Wave: doc_backend.md
+    - BabelBrain: doc_babelbrain.md
+    - jwave: doc_jwave.md
   - 📚 Reference:
-    - How PRESTUS works: doc_architecture.md
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
-    - Modules: doc_modules.md
-    - Testing: doc_testing.md
-    - Telemetry: doc_telemetry.md
+    - Coordinate Systems: doc_coordinate_systems.md
+    - How PRESTUS works: doc_architecture.md
+  - 🛟 Help:
     - Troubleshooting: doc_troubleshooting.md
-  - 📋 Community:
-    - Code of Conduct: CODE_OF_CONDUCT.md
-    - Contributing: CONTRIBUTING.md
     - Changelog: CHANGELOG.md
+  - 🛠️ Developers:
+    - Contributing: CONTRIBUTING.md
+    - Testing: doc_testing.md
+    - BabelBrain Internals: doc_babelbrain_internals.md
+    - Telemetry: doc_telemetry.md
+    - Usage Statistics: doc_usage_statistics.md
+    - Code of Conduct: CODE_OF_CONDUCT.md
 
 plugins:
   - search

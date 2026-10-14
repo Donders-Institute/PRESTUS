@@ -1,5 +1,10 @@
 # Simulation outputs
 
+!!! note "At a glance"
+    - **What:** Reference of every output file, table column and folder.
+    - **When you need it:** To find a specific file or column. To get started, read [Reading your results](doc_results.md) first.
+    - **Before you start:** A finished run.
+
 PRESTUS provides multiple outputs. Some of these outputs are optional (or can be deactivated upon request to save space.)
 
 ---

@@ -4,7 +4,7 @@
 
 The base configuration of PRESTUS allows you to specify a single setup encompassing transducer specification, entry-target points, and temporal sequence characteristics. To explore the effects of different parameter settings on an outcome — for benchmarking or choosing a stimulation sequence — a general strategy is to work from a single study config (see the [Getting Started guide](doc_getting-started.md)) and iteratively overwrite values in a MATLAB script.
 
-For most parameters this means setting different values for `parameters.<field>`. One exception is the intensity and depth setting of the transducer output, as these depend on the internal transducer calibration. Where the built-in profiling does not provide sufficient flexibility, use `transducer_calibration` within an iterative MATLAB loop to find phase and amplitude settings that replicate the desired free-water output profile (see [Transducer Calibration](doc_calibration.md)).
+For most parameters this means setting different values for `parameters.<field>`. One exception is the intensity and depth setting of the transducer output, as these depend on the internal transducer calibration. Where the built-in profiling does not provide sufficient flexibility, use `calibration_transducer` within an iterative MATLAB loop to find phase and amplitude settings that replicate the desired free-water output profile (see [Transducer Calibration](doc_calibration.md)).
 
 ---
 

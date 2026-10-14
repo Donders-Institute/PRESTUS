@@ -28,6 +28,8 @@ All MATLAB code is under `functions/<subsystem>/`; [Functions](doc_functions.md)
 
 ## Configuration
 
+The user-facing description is [Configuring a study](doc_configuration.md); this section adds the internals.
+
 `load_parameters` builds one `parameters` struct from up to four layers, each merged onto the previous one (`mergestruct` + `restore_struct_arrays`, so struct arrays such as `transducer(2)` keep their own fields):
 
 | Layer | Source | Notes |
@@ -45,7 +47,7 @@ After merging, `load_parameters` migrates deprecated keys, derives transducer pa
 
 ## Where a run executes
 
-`prestus_pipeline_start` resolves `platform` (`auto` detects SLURM or qsub, else `matlab`):
+`prestus_pipeline_start` resolves `platform` (`auto` detects SLURM or qsub via `hpc_detect_system`, and errors when neither is on the PATH):
 
 - **`matlab`** — runs in the current session.
 - **`slurm` / `qsub`** — saves `parameters` to a temporary `.mat`, writes a small `.m` launcher that adds the PRESTUS paths and calls `prestus_pipeline`, and submits it (`hpc_submit_job`; SLURM via `sbatch --parsable`). With `hpc.wait_for_job` it blocks until the job ends (`hpc_wait_for_completion`); otherwise it submits a dependent report job (`hpc_job_report`: run time, memory, energy).
