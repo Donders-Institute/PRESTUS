@@ -2,8 +2,9 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 % MEDIUM_PCT_DENSITY  Map pseudo-CT Hounsfield values to skull bone density
 %
 % Applies one of six algorithms to fill density for skull voxels indexed
-% by skull_idx. Algorithm 'k-plan' uses the piece-wise linear HU-density
-% look-up from the k-Plan pipeline; 'k-wave' uses hounsfield2density with
+% by skull_idx. Algorithm 'k-plan' uses a piece-wise linear HU-density
+% table: k-Plan's default, or the scanner/protocol-specific table named by
+% pct.density_calibration (MEDIUM_PCT_DENSITY_CALIBRATION); 'k-wave' uses hounsfield2density with
 % a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
 % 2017; 'aubry' uses the porosity mixture model from Aubry et al. 2003;
 % 'air-tissue' uses the linear air-to-bone model (Pichardo and McDannold
@@ -35,23 +36,48 @@ arguments
     algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','air-tissue','none'})}
 end
 
+% The k-plan / k-wave fits draw a figure; only when it is saved (debug mode)
+show_fit = parameters.simulation.debug == 1;
+
+% A UTE->HU line returns HU on the scale of the CT it was fitted to; density needs
+% that CT's calibration (doc: Pairing a UTE->HU mapping with its CT calibration)
+coupled = struct('treeby', 'ucl_lowdose_80kvp');       % skull_mapping -> its density_calibration
+if isfield(parameters, 'pct') && isfield(parameters.pct, 'skull_mapping') && isfield(coupled, char(parameters.pct.skull_mapping))
+    need = coupled.(char(parameters.pct.skull_mapping));
+    have = '';
+    if isfield(parameters.pct, 'density_calibration'); have = char(parameters.pct.density_calibration); end
+    if ~strcmp(algorithm, 'k-plan') || ~strcmp(have, need)
+        warn('prestus:pct:calibrationMismatch', ['pct.skull_mapping ''%s'' gives HU on the scale of its own CT; use ' ...
+            'pct.mapping_density ''k-plan'' with pct.density_calibration ''%s'' (now: ''%s'', ''%s'').'], ...
+            char(parameters.pct.skull_mapping), need, algorithm, have);
+    end
+end
+
+% pct.density_calibration only acts on the k-plan table
+if ~strcmp(algorithm, 'k-plan') && isfield(parameters, 'pct') && isfield(parameters.pct, 'density_calibration') ...
+        && ~isempty(parameters.pct.density_calibration)
+    warn(sprintf('pct.density_calibration (%s) is ignored: it applies to pct.mapping_density ''k-plan'', not ''%s''.', ...
+        char(parameters.pct.density_calibration), algorithm));
+end
+
 switch algorithm
     case 'k-plan'
 
-        % define piece-wise linear mapping between HU and mass density in kg/m^3 hounsfieldUnits = [-990, 60, 1000, 1950]; 
-        % see https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration
-        hounsfieldUnits = [-990, 60, 1000, 1950]; 
-        massDensity = [1.2, 1060, 1530, 2150]; 
+        % piece-wise linear HU -> mass density [kg/m^3]: k-Plan's default table
+        % (-990, 60, 1000, 1950 HU -> 1.2, 1060, 1530, 2150 kg/m^3; see
+        % https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration)
+        % or the table selected by pct.density_calibration
+        [hounsfieldUnits, massDensity] = medium_pct_density_calibration(parameters);
 
-        density(skull_idx) = fit_pairwiselinear(pseudoCT(skull_idx), hounsfieldUnits, massDensity, 1);
+        density(skull_idx) = fit_pairwiselinear(pseudoCT(skull_idx), hounsfieldUnits, massDensity, show_fit);
 
         % plot the mapping
-        if parameters.simulation.debug == 1
+        if show_fit
             output_plot = fullfile(parameters.io.dir_debug_medium,...
                 sprintf('pCT_hounsfield-density_kplan.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
+            close(gcf);
         end
-        close(gcf);
 
         % regularize minimum to density in water
         density(skull_idx) = max(parameters.medium_properties.water.density, density(skull_idx));
@@ -69,15 +95,15 @@ switch algorithm
         pseudoCT(skull_idx) = max(pseudoCT(skull_idx),0);
 
         % estimate density
-        density(skull_idx) = hounsfield2density(pseudoCT(skull_idx), 1);
+        density(skull_idx) = hounsfield2density(pseudoCT(skull_idx), show_fit);
         
         % plot the mapping
-        if parameters.simulation.debug == 1
+        if show_fit
             output_plot = fullfile(parameters.io.dir_debug_medium,...
                 sprintf('pCT_hounsfield-density_kwave.png'));
             exportgraphics(gcf, output_plot, 'Resolution', 150);
+            close(gcf);
         end
-        close(gcf);
 
         % regularize minimum density to water density
         density(skull_idx) = max(density(skull_idx),parameters.medium_properties.water.density);

@@ -1,0 +1,10 @@
+# k-Plan default CT -> mass density calibration (HU, kg/m^3).
+# "An approximate average of the calibration curves acquired using calibration
+# images from several different CT vendors"; k-Plan recommends a calibration
+# per scanner and protocol, as it depends on tube voltage and kernel.
+# Source: https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration
+# Used by pct.mapping_density 'k-plan' when pct.density_calibration is empty.
+-990, 1.2
+60, 1060
+1000, 1530
+1950, 2150

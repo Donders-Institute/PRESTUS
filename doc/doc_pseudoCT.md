@@ -49,14 +49,16 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
     pct:
       enabled: 1
       skull_mapping: 'kosciessa' # UTE→HU linear mapping algorithm
-      debug: 1                   # keep intermediate images in pseudoCT/ subfolder
+      debug: 1                   # keep intermediate images in the debug_pct/ subfolder
       mapping_density: 'k-plan'
+      density_calibration: ''    # HU->density table for k-plan; '' = k-Plan default (see below)
       mapping_soundspeed: 'k-plan'
       mapping_attenuation: 'k-plan'
     ```
 
-    **Manual fallback.** If `pseudoCT.nii.gz` already exists in the `m2m_sub-XXX/` folder when the pipeline runs, generation is skipped automatically. You can also run `pct_create_pseudoCT.sh` directly in bash before starting PRESTUS. An example wrapper is provided at `examples/createPseudoCT.sh`. Required modules: SimNIBS, FSL, ANTs.
+    **Reuse.** If `pseudoCT.nii.gz` already exists in the pseudo-CT folder when the pipeline runs, generation is skipped. Its `pseudoCT.json` must then record the current `pct.skull_mapping`; a pseudo-CT made with another mapping stops the run (`prestus:cache:signatureMismatch`; see `io.cache_signature_check`). Move the folder aside, or set `path.pct` to another folder, to generate one with the new mapping. A pseudo-CT without a sidecar is used with the warning `prestus:cache:unverified`. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs).
 
+    **Manual fallback.** A pseudo-CT that older versions wrote into `m2m_sub-XXX/` is still used, with a warning (`PRESTUS:pct:legacyLocation`) to move it. Those versions also renamed `T2_reg.nii.gz` to `UTE_reg.nii.gz` inside `m2m_sub-XXX/`; either name is read. You can also run `pct_create_pseudoCT.sh` directly in bash before starting PRESTUS. An example wrapper is provided at `examples/createPseudoCT.sh`. Required modules: SimNIBS, FSL, ANTs.
 
 
 #### pseudoCT generation
@@ -71,7 +73,10 @@ The following steps are used to create the pseudoCT:
     - `miscouridou` | pHU = −2085 UTE + 2329
     - `carpino`     | pHU = -2194 UTE + 2236
     - `wiesinger`   | pHU = -2000 (UTE-1) + 42
-    - `treeby`      | pHU = -2929.6 UTE + 3247.9
+    - `treeby`      | pHU = -2929.6 UTE + 3274.9 (ucl-bug/petra-to-ct; fitted to 80 kVp CT: use with `density_calibration: ucl_lowdose_80kvp`, see [below](#pairing-a-utehu-mapping-with-its-ct-calibration))
+    - `custom`      | pHU = `pct.custom_slope` UTE + `pct.custom_intercept` (any other linear map)
+
+    The `kosciessa` fit is `pct_skullmapping_fit`: three points from the UTE histograms of charm cortical and trabecular bone (lower quarter-max crossing of the cortical histogram → 1900 HU, crossover of the two histograms → 700 HU, upper quarter-max crossing of the trabecular histogram around its x-weighted peak → 300 HU; bins 0.9–1.1 replaced by a spline against soft-tissue partial volume) and a least-squares line. The anchors, width level and interpolation window are options of `pct_skullmapping_fit`.
     - `kosciessa`   | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
 - 3D Gaussian smoothing (σ=0.8 voxels via ANTs’ SmoothImage) prevents abrupt tissue transitions in the simulation grid. To retain information in the skull layer, unsmoothed values are retained within an eroded skull mask that attempts to correct for partial volume effects.
 
@@ -82,6 +87,32 @@ Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A
 Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).    
 Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.   
 </span>
+
+#### Pairing a UTE→HU mapping with its CT calibration
+
+A UTE→HU line returns HU on the scale of the CT it was fitted to. That scale depends on the scanner, the tube voltage (kVp) and the reconstruction kernel: at 80 kVp, for example, bone has about 1.35 times the HU it has at about 120 kVp. HU are only an intermediate step: what the simulation needs is density, and turning HU into density needs the calibration of the same CT. **The skull mapping and the density calibration are therefore one coupled choice**, set together with `pct.skull_mapping`, `pct.mapping_density: k-plan` and `pct.density_calibration`:
+
+| `skull_mapping` | CT the line was fitted to | `mapping_density` | `density_calibration` |
+|---|---|---|---|
+| `kosciessa`, `miscouridou`, `carpino`, `wiesinger` | clinical CT, about 120 kVp (assumed; for `kosciessa` the anchors 1900/700/300 HU are assumed on this scale) | any | `''` (k-Plan default) |
+| `treeby` | low-dose CT, 80 kVp, BONEPLUS kernel (UCL) | `k-plan` | `ucl_lowdose_80kvp` |
+| `custom` with petra2density's line (−2080.02, 2133.23) | the cph2025 phantom calibration | `k-plan` | `cph2025` |
+| `custom` with your own line | your CT (any scanner and kVp) | `k-plan` | path to that CT's phantom table |
+
+```yaml
+pct:
+  skull_mapping: 'treeby'
+  mapping_density: 'k-plan'
+  density_calibration: 'ucl_lowdose_80kvp'   # the 80 kVp CT treeby was fitted to
+  mapping_soundspeed: 'k-plan'               # follows from density
+  mapping_attenuation: 'k-plan'
+```
+
+This also makes lines at other target kVp usable: fit a line (or a study-specific `custom` line) against CT of any protocol, scan a density phantom with the same protocol, and pass both. No conversion of HU between kVp is needed.
+
+Only `k-plan` reads the calibration. The other density mappings have a fixed, clinical HU scale built in (`k-wave`: Schneider et al.; `marsac`: 300–2000 HU; `air-tissue`, which `pichardo` and `mcdannold` need: about −1000 to 1000 HU), as do the HU-based sound speed and attenuation of `webb` (defaults for GE 120 kVp, B kernel; scanner-specific values via `pct.webb_*`). `aubry` and `mueller` rescale by the skull's own minimum and maximum HU, so they are insensitive to the HU scale, but they also remove differences in density level between subjects. Use them with lines on the clinical scale only, or with `k-plan` and the matching calibration otherwise.
+
+PRESTUS warns when `skull_mapping: treeby` is used without `mapping_density: k-plan` and `density_calibration: ucl_lowdose_80kvp`.
 
 ### Using (pseudo-)CTs to inform acoustic properties
 
@@ -107,6 +138,17 @@ Mapping algorithm is governed by `pct_mapping_density`.
     ```
 
     Density estimates are regularized at the minimum to the water density specified in the configuration.
+
+    **CT calibration (`pct.density_calibration`).** HU depend on the CT scanner, tube voltage (kVp) and reconstruction kernel; k-Plan's default table is an average over vendors, and k-Plan recommends a calibration per scanner and protocol. A UTE→HU line returns HU on the scale of the CT it was fitted to, so the density step should use that CT's table. `pct.density_calibration` replaces the default table:
+
+    | Value | Table |
+    |---|---|
+    | `''` (default) | k-Plan default (`config/ct_calibration/kplan_default.csv`) |
+    | `'ucl_lowdose_80kvp'` | UCL low-dose CT (GE Revolution, 80 kVp, BONEPLUS; CIRS 062M phantom): the CT behind `skull_mapping: treeby`. Bone has about 1.35× the default's HU for the same density |
+    | `'cph2025'` | petra2density's phantom calibration, the CT behind its line −2080.02·UTE + 2133.23 (use `skull_mapping: custom`). Bone has about 0.85× the default's HU |
+    | a path | any CSV with two columns, HU and density [kg/m³] (lines starting with `#` are comments), e.g. a phantom scan of your own scanner or a table that goes with a study-specific `custom` line |
+
+    Tables are applied piecewise linearly and extrapolated linearly beyond their end points, as the default. The setting applies to `mapping_density: k-plan` only (a warning is issued otherwise); the resolved table is printed by `medium_setup` and recorded in the medium statistics. Sound speed and attenuation of the k-plan pipeline follow from density and are unaffected otherwise.
 
     > Note: k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularized data ranges. Such density regularization is not currently enforced in PRESTUS...
 

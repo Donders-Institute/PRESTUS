@@ -1,0 +1,18 @@
+# UCL low-dose CT -> mass density calibration (HU, kg/m^3): CIRS 062M electron
+# density phantom, GE Revolution, 80 kVp, BONEPLUS kernel, 0.625 mm slices.
+# The CT behind the treeby (ucl-bug/petra-to-ct) PETRA->HU line; pair it with
+# pct.skull_mapping 'treeby'. At 80 kVp bone has about 1.35x the HU of the
+# k-Plan default for the same density.
+# Source: ucl-bug/petra-to-ct, ct-calibration-low-dose-30-March-2023-v1.csv, as
+# shipped with simnibs/petra2density (maps/, GPL-3.0; pinned 1c24712);
+# Miscouridou et al., arXiv 2508.01050, Table I.
+-987.3963, 1.2000
+-106.5455, 960.0000
+-38.2491, 990.0000
+53.9061, 1060.0000
+336.7982, 1160.0000
+1356.6949, 1530.0000
+1699.3630, 1660.0000
+2136.4053, 1820.0000
+2544.0942, 1990.0000
+2614.7998, 2150.0000

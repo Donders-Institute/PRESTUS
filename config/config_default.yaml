@@ -528,6 +528,10 @@ pct:
   custom_intercept: []          # (skull voxels; soft tissue 42 HU, air -1000 HU as for the other mappings)
   debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
   mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry/air-tissue
+  density_calibration: ''       # HU->density table for mapping_density 'k-plan'. HU depend on scanner, kVp and kernel, so use the
+                                #   table of the CT the UTE->HU line was fitted to: '' = k-Plan default (kplan_default),
+                                #   a table in config/ct_calibration/ by name ('ucl_lowdose_80kvp' for treeby, 'cph2025'),
+                                #   or a CSV path (two columns: HU, density [kg/m^3]; # comments)
   mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold
   mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller/aubry/webb/pichardo/mcdannold
 

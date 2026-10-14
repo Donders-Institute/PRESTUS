@@ -303,6 +303,7 @@ The following documents the functions provided in PRESTUS.
 | `medium_elastic_properties`             | Build the k-Wave elastic medium (compressional + shear) from a fluid medium |
 | `medium_pct_attenuation`                | Skull: pCT-informed attenuation mapping |
 | `medium_pct_density`                    | Skull: pCT-informed density mapping |
+| `medium_pct_density_calibration`        | CT->density calibration table for pct.mapping_density 'k-plan' |
 | `medium_pct_pichardo_load`              | Load and cache Pichardo 2D interpolant from BabelBrain |
 | `medium_pct_soundspeed`                 | Skull: pCT-informed sound speed mapping |
 | `medium_setup`                          | Set up medium |

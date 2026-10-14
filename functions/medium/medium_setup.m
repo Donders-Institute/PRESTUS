@@ -137,6 +137,9 @@ end
             medium_stats.mapping       = struct('density', pct_mapping_density, ...
                                                  'sound_speed', pct_mapping_soundspeed, ...
                                                  'attenuation', pct_mapping_attenuation);
+            if strcmp(pct_mapping_density, 'k-plan')
+                [~, ~, medium_stats.mapping.density_calibration] = medium_pct_density_calibration(parameters);
+            end
             medium_stats.properties.pseudoCT_HU = local_distribution_stats(pseudoCT(skull_idx));
             medium_stats.properties.density     = local_distribution_stats(density(skull_idx));
             medium_stats.properties.sound_speed = local_distribution_stats(sound_speed(skull_idx));
@@ -355,6 +358,10 @@ end
         if isfield(parameters.pct, 'mapping_soundspeed'),  pct_s = char(parameters.pct.mapping_soundspeed);  end
         if isfield(parameters.pct, 'mapping_attenuation'), pct_a = char(parameters.pct.mapping_attenuation); end
         fprintf('[medium_setup] pCT mapping      : yes (density=%s, soundspeed=%s, attenuation=%s)\n', pct_d, pct_s, pct_a);
+        if strcmp(pct_d, 'k-plan')
+            [~, ~, cal_src] = medium_pct_density_calibration(parameters);
+            fprintf('[medium_setup] CT calibration   : %s\n', cal_src);
+        end
     else
         fprintf('[medium_setup] pCT mapping      : no\n');
     end

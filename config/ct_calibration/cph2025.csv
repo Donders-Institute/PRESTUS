@@ -1,0 +1,19 @@
+# cph2025 CT -> mass density calibration (HU, kg/m^3): phantom calibration
+# behind petra2density's cph2025 PETRA->HU line (-2080.02 u + 2133.23); pair it
+# with a custom skull mapping of that line. Bone has about 0.85x the HU of the
+# k-Plan default for the same density.
+# Source: simnibs/petra2density, maps/ct_to_density_calibration_cph2025_v1.csv
+# (GPL-3.0; pinned 1c24712). petra2density additionally adds 3150 HU ->
+# 3147.35 kg/m^3 and clamps above; PRESTUS extrapolates the last segment.
+-950.3370, 1.2000
+-758.8759, 205.0000
+-464.8147, 507.0000
+-63.1852, 960.0000
+-33.4801, 990.0000
+30.8087, 1060.0000
+196.1250, 1160.0000
+808.2466, 1530.0000
+1007.1955, 1660.0000
+1227.7307, 1820.0000
+1392.0580, 1990.0000
+1631.3565, 2150.0000

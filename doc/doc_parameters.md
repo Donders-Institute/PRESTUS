@@ -519,6 +519,7 @@ See [doc_pseudoCT.md](doc_pseudoCT.md).
 | `custom_intercept` | Intercept of the `custom` UTE→HU map [HU]. | `[]` | Scalar; required when `skull_mapping` is `custom`. |
 | `debug` | Keep intermediate NIfTI files in the `pseudoCT/` subfolder. | `1` | `1 = keep`, `0 = delete after generation`. |
 | `mapping_density` | HU-to-density mapping algorithm. | `'k-plan'` | `k-plan` / `k-wave` / `marsac` / `aubry` / `air-tissue` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-density). |
+| `density_calibration` | HU-to-density table for `mapping_density: k-plan`; use the table of the CT the UTE→HU line was fitted to. | `''` | `''` (k-Plan default) / `ucl_lowdose_80kvp` (for `treeby`) / `cph2025` / path to a CSV (HU, density [kg/m³]). See [doc](doc_pseudoCT.md#mapping-skull-density). |
 | `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-sound-speed). |
 | `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-attenuation). |
 
