@@ -1,4 +1,4 @@
-function uncertainty_pipeline(parameters, options)
+function jobs = uncertainty_pipeline(parameters, options)
 % UNCERTAINTY_PIPELINE  Run the full PRESTUS uncertainty quantification workflow
 %
 % Rather than a single simulation with one set of tissue properties, this
@@ -12,6 +12,16 @@ function uncertainty_pipeline(parameters, options)
 %   Stage 4  Conservative simulation ─┘
 %   Stage 5  Uncertainty report generation         (after stages 2–4)
 %
+% Nested chained modes: when the base config is itself a multi-ISPPA sweep
+% (vector transducer.target_isppa_wcm2) or an async multi-transducer run
+% (simulation.transducer_coupling: async), each variant runs that pipeline
+% (MULTI_ISPPA_PIPELINE / ASYNC_TRANSDUCER_PIPELINE) with the variant's medium,
+% and Stage 5 writes one uncertainty report per sweep point. Uncertainty is
+% always the outer mode. A multi-ISPPA variant reuses the Stage-1 head/grid
+% caches; an async variant builds its own (async Stage 0), so Stage 1 is not
+% run. Inner-pipeline options (e.g. .thermal_timelimit) pass through options.
+% Sequential follow-up runs are not supported in nested mode.
+%
 % Variant definitions:
 %   Default      Best-estimate medium properties (reference)
 %   Liberal      Low skull impedance / attenuation → higher intracranial
@@ -23,7 +33,9 @@ function uncertainty_pipeline(parameters, options)
 %   matlab       Stages run sequentially in the current MATLAB session.
 %   slurm/qsub   All five jobs are submitted immediately. Stages 2–4 carry
 %                an afterok dependency on stage 1; stage 5 carries afterok
-%                dependencies on all three simulation jobs.
+%                dependencies on all three simulation jobs. In nested mode
+%                the variants' inner job graphs are submitted from here, and
+%                each Stage-5 report waits for every job they submitted.
 %                prestus_pipeline_start must return the submitted job id as
 %                its first output argument.
 %
@@ -54,6 +66,12 @@ function uncertainty_pipeline(parameters, options)
 %                                       variants (default/liberal/conservative thermal
 %                                       outputs are passed to the corresponding variant
 %                                       of the next run)
+%
+% Output:
+%   jobs       - struct with .all: every scheduler job ID submitted (stage 1,
+%                variants or their inner jobs, reports, sequential runs);
+%                [] when run in MATLAB. Lets a caller make later jobs depend
+%                on this run.
 %
 % See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE, GENERATE_UNCERTAINTY_REPORT
 
@@ -172,6 +190,19 @@ fprintf('║  Medium  : %-26s ║\n',                     parameters.simulation.
 fprintf('║  Platform: %-26s ║\n',                     upper(platform));
 fprintf('╚══════════════════════════════════════╝\n\n');
 
+% Nested chained mode: '' | 'multi_isppa' | 'async' (see header).
+nested = nested_mode(parameters);
+if strcmp(nested, 'multi_isppa') && numel(parameters.transducer) > 1
+    % Fail before any job is submitted (MULTI_ISPPA_PIPELINE would reject it later).
+    error('prestus:isppa:coherentSweep', ...
+        ['ISPPA sweeps are not available for coherent multi-transducer runs, with or ' ...
+         'without uncertainty. Run one config per point, or use ' ...
+         'simulation.transducer_coupling: async.']);
+end
+if ~isempty(nested)
+    fprintf('Nested mode: each variant runs a %s pipeline.\n\n', strrep(nested, '_', '-'));
+end
+
 % =========================================================================
 %% Build one parameter struct per stage
 %
@@ -181,6 +212,7 @@ fprintf('╚══════════════════════�
 % =========================================================================
 
 ow = resolve_chained_overwrite(parameters);
+jobs = struct('all', []);
 
 p_stage1       = make_stage1_params(parameters, ow);
 
@@ -209,9 +241,12 @@ log_files.conservative= fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',            
 log_files.report      = fullfile(logs_dir, sprintf('%s_%s_desc-report_%s.txt',          subj, medium, run_ts));
 
 p_stage1.io.log_file       = log_files.stage1;
-p_default.io.log_file      = log_files.default;
-p_liberal.io.log_file      = log_files.liberal;
-p_conservative.io.log_file = log_files.conservative;
+if isempty(nested)
+    % Nested variants are job graphs: each inner job writes its own log.
+    p_default.io.log_file      = log_files.default;
+    p_liberal.io.log_file      = log_files.liberal;
+    p_conservative.io.log_file = log_files.conservative;
+end
 
 p_report       = make_report_params(parameters, options.affixes, log_files, ow);
 
@@ -222,6 +257,12 @@ p_report       = make_report_params(parameters, options.affixes, log_files, ow);
 has_sequential = isfield(options, 'sequential_configs') && ...
                  isstruct(options.sequential_configs) && ...
                  ~isempty(fieldnames(options.sequential_configs));
+if has_sequential && ~isempty(nested)
+    error('uncertainty_pipeline:nestedSequential', ...
+        ['Sequential follow-up runs are not supported when the uncertainty variants ' ...
+         'run a %s pipeline. Run the sequential chain with a scalar target and ' ...
+         'coherent coupling, or drop options.sequential_configs.'], strrep(nested, '_', '-'));
+end
 
 % run_index_start: the run number assigned to the FIRST sequential follow-up.
 % Run 1 is the base uncertainty run, so sequential runs start at 2.
@@ -237,6 +278,12 @@ switch platform
     case 'matlab'
     % All five stages run sequentially in the current MATLAB session.
     % ---------------------------------------------------------------------
+
+        if ~isempty(nested)
+            run_nested_matlab(parameters, options, nested, platform, ...
+                {p_default, p_liberal, p_conservative}, p_stage1, log_files, ow);
+            return
+        end
 
         run_stage(1, 'Preprocessing & source setup', @() prestus_pipeline(p_stage1));
         run_stage(2, 'Default simulation',           @() prestus_pipeline(p_default));
@@ -296,6 +343,12 @@ switch platform
             run_prefix = '';
         end
 
+        if ~isempty(nested)
+            jobs.all = submit_nested_hpc(parameters, options, nested, platform, ...
+                {p_default, p_liberal, p_conservative}, p_stage1, log_files, ow);
+            return
+        end
+
         % ── Stage 1 ──────────────────────────────────────────────────────
         % Skip if the head preprocessing cache already exists.
         % Sentinel: cache/sub-NNN_<medium>_cropped_smoothed.mat
@@ -340,7 +393,7 @@ switch platform
             p_sim       = sim_stages{si, 3};
             affix       = sim_stages{si, 4};
             csv_file    = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, affix));
+                sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
             fprintf('[%s] Submitting %s simulation    ', stage_label, variant);
             if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
@@ -366,7 +419,7 @@ switch platform
         % Skip if the report already exists.
         % Depends on whichever simulation jobs were actually submitted.
         report_file = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s_uncertainty_report.html', subject_id, medium));
+            sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, options.affixes.default));
         fprintf('[Stage 5] Submitting uncertainty report      ');
         if isfile(report_file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
@@ -398,6 +451,7 @@ switch platform
         % ── Summary ──────────────────────────────────────────────────────
         fprintf('All jobs submitted. Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
         submitted_ids = all_submitted_ids(all_submitted_ids > 0);
+        jobs.all = submitted_ids;
         if ~isempty(submitted_ids)
             fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));
             fprintf('To cancel         : scancel %s\n', num2str(submitted_ids));
@@ -661,6 +715,187 @@ function p = clear_uncertainty_flag(p)
     end
 end
 
+function mode = nested_mode(p)
+% Chained mode each uncertainty variant runs: 'async' | 'multi_isppa' | ''.
+% Async absorbs a vector target as its own sweep, so it takes precedence.
+    if is_async_mode(p)
+        mode = 'async';
+    elseif is_multi_isppa_mode(p)
+        mode = 'multi_isppa';
+    else
+        mode = '';
+    end
+end
+
+function p = clear_nested_modes(p)
+% Stage 1 and the report run once for all variants (and all sweep points):
+% clear sweep targets and async coupling so neither re-enters a chained
+% pipeline. Neither stage uses the drive level (CACHE_SIGNATURE excludes it).
+    if isfield(p, 'transducer')
+        for ti = 1:numel(p.transducer)
+            if isfield(p.transducer(ti), 'target_isppa_wcm2')
+                p.transducer(ti).target_isppa_wcm2 = NaN;
+            end
+        end
+    end
+    if isfield(p, 'simulation') && isfield(p.simulation, 'transducer_coupling')
+        p.simulation.transducer_coupling = 'coherent';
+    end
+end
+
+function run = run_variant(p, nested, platform, inner_options)
+% Run one variant's inner chained pipeline; returns its job IDs and the
+% output affix of each sweep point (run.output_affixes).
+    p.platform = platform;
+    switch nested
+        case 'multi_isppa'
+            run = multi_isppa_pipeline(p, inner_options);
+        case 'async'
+            run = async_transducer_pipeline(p, inner_options);
+    end
+    if ~isfield(run, 'all')
+        run.all = [run.preproc(:)', run.acoustic(:)', run.combine(:)', ...
+                   run.thermal(:)', run.water(:)'];
+    end
+    run.all = run.all(run.all > 0);
+end
+
+function inner = inner_options(options, prefix, depend_ids)
+% Pass the caller's options through to the inner pipeline (it reads the
+% fields it knows, e.g. .thermal_timelimit), plus nesting knobs.
+    inner = options;
+    inner.job_name_prefix = prefix;
+    inner.depend_job_ids  = depend_ids;
+end
+
+function reports = make_point_reports(parameters, options, runs, log_files, ow)
+% One uncertainty report per sweep point j, comparing the three variants'
+% outputs at that point. Returns a struct array with .params, .suffix, .file.
+    n_points = numel(runs{1}.output_affixes);
+    if any(cellfun(@(r) numel(r.output_affixes), runs) ~= n_points)
+        error('uncertainty_pipeline:pointMismatch', ...
+            'The uncertainty variants produced different numbers of sweep points.');
+    end
+    variant_affixes = {options.affixes.default, options.affixes.liberal, options.affixes.conservative};
+    reports = struct('params', {}, 'suffix', {}, 'file', {});
+    for j = 1:n_points
+        % Each point's affix is <variant affix><point suffix>; the suffix is shared.
+        suffix = point_suffix(runs{1}.output_affixes{j}, variant_affixes{1});
+        for v = 2:3
+            if ~strcmp(point_suffix(runs{v}.output_affixes{j}, variant_affixes{v}), suffix)
+                error('uncertainty_pipeline:pointMismatch', ...
+                    'Sweep point %d has different output affixes across variants.', j);
+            end
+        end
+        affixes = struct( ...
+            'default',      runs{1}.output_affixes{j}, ...
+            'liberal',      runs{2}.output_affixes{j}, ...
+            'conservative', runs{3}.output_affixes{j});
+        lf = log_files;
+        [d, n, e] = fileparts(log_files.report);
+        lf.report = fullfile(d, [n suffix e]);
+        p = make_report_params(parameters, affixes, lf, ow);
+        reports(j).params = p;
+        reports(j).suffix = suffix;
+        reports(j).file   = fullfile(get_output_dir(parameters), sprintf( ...
+            'sub-%03d_%s_desc-uncertainty_report%s.html', ...
+            parameters.subject_id, parameters.simulation.medium, p.uncertainty.report_suffix));
+    end
+end
+
+function suffix = point_suffix(full_affix, variant_affix)
+    if ~startsWith(full_affix, variant_affix)
+        error('uncertainty_pipeline:pointMismatch', ...
+            'Output affix ''%s'' does not start with variant affix ''%s''.', full_affix, variant_affix);
+    end
+    suffix = full_affix(numel(variant_affix)+1:end);
+end
+
+function run_nested_matlab(parameters, options, nested, platform, p_variants, p_stage1, log_files, ow)
+% MATLAB platform, nested mode: Stage 1 (multi-ISPPA only), each variant's
+% inner pipeline, then one report per sweep point.
+    if strcmp(nested, 'multi_isppa')
+        run_stage(1, 'Preprocessing & source setup', @() prestus_pipeline(p_stage1));
+    end
+    labels = {'Default', 'Liberal', 'Conservative'};
+    runs = cell(1, 3);
+    for v = 1:3
+        fprintf('────────────────────────────────────────\n');
+        fprintf('[Stage %d] %s simulation (%s)\n', v + 1, labels{v}, strrep(nested, '_', '-'));
+        fprintf('────────────────────────────────────────\n');
+        runs{v} = run_variant(p_variants{v}, nested, platform, inner_options(options, '', []));
+    end
+    reports = make_point_reports(parameters, options, runs, log_files, ow);
+    for j = 1:numel(reports)
+        assert_variant_outputs_exist(parameters, reports(j).params.uncertainty.affixes);
+        run_stage(5, sprintf('Uncertainty report%s', reports(j).suffix), ...
+                  @() prestus_pipeline(reports(j).params));
+    end
+end
+
+function submitted_ids = submit_nested_hpc(parameters, options, nested, platform, p_variants, p_stage1, log_files, ow)
+% HPC, nested mode: submit Stage 1 (multi-ISPPA only) and each variant's inner
+% job graph from here, so every report job can wait for the jobs that write its inputs.
+    subj = sprintf('sub-%03d', parameters.subject_id);
+    job_id_stage1 = [];
+    if strcmp(nested, 'multi_isppa')
+        preproc_sentinel = fullfile(get_output_dir(parameters), 'cache', ...
+            sprintf('sub-%03d_%s_cropped_smoothed.mat', parameters.subject_id, parameters.simulation.medium));
+        if isfile(preproc_sentinel) && ~ow.rerun_intermediates
+            fprintf('[Stage 1] Preprocessing cache exists — skipping submission.\n');
+        else
+            p_stage1.hpc.timelimit = options.stage1_timelimit;
+            p_stage1.hpc.job_name  = sprintf('PRESTUS-u1-preproc_%s', subj);
+            p_stage1               = apply_memorylimit(p_stage1, options.stage1_memorylimit);
+            p_stage1               = strip_gpu_requirements(p_stage1, options.stage1_partition);
+            job_id_stage1          = prestus_pipeline_start(p_stage1);
+            fprintf('[Stage 1] Preprocessing → job %s\n', num2str(job_id_stage1));
+        end
+    else
+        fprintf('[Stage 1] Not needed: each async variant builds its own grid and medium.\n');
+    end
+    fprintf('\n');
+
+    variants = {'default', 'liberal', 'conservative'};
+    runs = cell(1, 3);
+    for v = 1:3
+        fprintf('[Stage %d] %s variant (%s)\n', v + 1, variants{v}, strrep(nested, '_', '-'));
+        prefix  = sprintf('u%d-%s-', v + 1, variants{v});
+        runs{v} = run_variant(p_variants{v}, nested, platform, ...
+                              inner_options(options, prefix, job_id_stage1));
+        fprintf('\n');
+    end
+    variant_ids = [job_id_stage1, cellfun(@(r) r.all, runs, 'UniformOutput', false)];
+    variant_ids = [variant_ids{:}];
+
+    reports = make_point_reports(parameters, options, runs, log_files, ow);
+    report_ids = [];
+    for j = 1:numel(reports)
+        fprintf('[Stage 5] Uncertainty report%s  ', reports(j).suffix);
+        if isfile(reports(j).file) && ~ow.rerun_outputs
+            fprintf('— report exists, skipping.\n');
+            continue
+        end
+        p = reports(j).params;
+        p.hpc.timelimit = options.report_timelimit;
+        p.hpc.job_name  = sprintf('PRESTUS-u5-report%s_%s', reports(j).suffix, subj);
+        p               = apply_memorylimit(p, options.report_memorylimit);
+        p               = strip_gpu_requirements(p, options.report_partition);
+        p               = hpc_add_dependency(p, variant_ids);
+        report_ids(end+1) = prestus_pipeline_start(p); %#ok<AGROW>
+        fprintf('→ job %s\n', num2str(report_ids(end)));
+    end
+    fprintf('\n');
+
+    submitted_ids = [variant_ids, report_ids];
+    submitted_ids = submitted_ids(submitted_ids > 0);
+    fprintf('All jobs submitted. Monitor: squeue --user $USER -o "%%.18i %%.9P %%.50j %%.8u %%.2t %%.10M %%.6D %%R"\n');
+    if ~isempty(submitted_ids)
+        fprintf('Submitted job IDs : %s\n', num2str(submitted_ids));
+        fprintf('To cancel         : scancel %s\n', num2str(submitted_ids));
+    end
+end
+
 function p = make_stage1_params(base, ow)
 % Stage 1: preprocessing and source setup only — no simulation.
 %
@@ -671,6 +906,7 @@ function p = make_stage1_params(base, ow)
 %
 % GPU is not required: no k-Wave simulation runs in this stage.
     p = clear_uncertainty_flag(base);
+    p = clear_nested_modes(p);
     p.modules.run_source_setup         = 1;
     p.modules.run_acoustic_sims        = 0;
     p.modules.run_heating_sims         = 0;
@@ -728,6 +964,8 @@ function p = make_sim_params(base, affix, medium_config, ow)
     % Both the grid cache and kwave source were written by stage 1 with
     % affix ''. Point lookups at those files rather than recomputing.
     p.io.preproc_affix                 = '';
+    % The medium is variant-specific: keep each variant's medium cache apart.
+    p.io.medium_affix                  = affix;
     p.io.overwrite_files               = ow.outputs;
     % Medium is variant-specific, so only the stage-1 head/grid caches are reused.
     p.io.reuse_upstream_caches         = {'head', 'grid'};
@@ -746,6 +984,13 @@ function p = make_report_params(base, affixes, log_files, ow)
 % log_files is a struct with fields stage1, default, liberal, conservative,
 % report — pre-assigned paths that allow the report to parse per-stage timing.
     p = clear_uncertainty_flag(base);
+    if ~isempty(nested_mode(base))
+        % The report reads the variants' outputs only; an async run has no
+        % shared Stage-1 grid to load, so do not rebuild one.
+        p.modules.run_grid_setup     = 0;
+        p.modules.run_medium_setup   = 0;
+    end
+    p = clear_nested_modes(p);
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_heating_sims       = 0;
@@ -761,6 +1006,9 @@ function p = make_report_params(base, affixes, log_files, ow)
     p.simulation.interactive         = 0;
     p.uncertainty.affixes            = affixes;
     p.uncertainty.log_files          = log_files;
+    % The report is named after the default variant's affix (base affix and,
+    % in nested mode, the sweep point), so runs with different affixes coexist.
+    p.uncertainty.report_suffix      = affixes.default;
 end
 
 % =========================================================================

@@ -139,10 +139,12 @@ uncertainty_pipeline(parameters, options);
 | Stage | Modules enabled | `io.output_affix` | Medium override |
 |---|---|---|---|
 | 1 | source setup only | `''` | none |
-| 2 | acoustic + thermal | `''` | none (default) |
-| 3 | acoustic + thermal | `'_liberal'` | `config_medium_liberal.yaml` |
-| 4 | acoustic + thermal | `'_conservative'` | `config_medium_conservative.yaml` |
+| 2 | acoustic + thermal | `<base>` | none (default) |
+| 3 | acoustic + thermal | `<base>_desc-liberal` | `config_medium_liberal.yaml` |
+| 4 | acoustic + thermal | `<base>_desc-conservative` | `config_medium_conservative.yaml` |
 | 5 | uncertainty report | `''` | none |
+
+`<base>` is the base config's `io.output_affix` (usually empty). Variants share the stage-1 head and grid caches; each maps its own medium, cached under its own affix.
 
 The medium override YAMLs are merged on top of the base parameters using `MergeStruct`, so only the properties defined in the override file are changed — all other settings (transducer, grid, paths) are inherited from the base config.
 
@@ -161,7 +163,7 @@ Each simulation variant writes its outputs into the shared `path.sim` output fol
 
 | File pattern | Description | Kept when `save_matrices` is `0` or empty |
 |---|---|---|
-| `sub-NNN_layered_output_table<affix>.csv` | Acoustic and thermal metrics table | yes |
+| `sub-NNN_layered<affix>.csv` | Acoustic and thermal metrics table | yes |
 | `sub-NNN_layered_report<affix>.html` | Per-variant simulation report | yes |
 | `sub-NNN_layered_intensity_<dim><affix>.png` | Intensity overlay image per slice dimension (x, y, z) | yes |
 | `sub-NNN_layered_maxT_<dim><affix>.png` | Max temperature overlay image per slice dimension (x, y, z) | yes |
@@ -177,7 +179,26 @@ The uncertainty report is written as:
 
 | File | Description |
 |---|---|
-| `sub-NNN_layered_uncertainty_report.html` | Unified uncertainty HTML report |
+| `sub-NNN_layered_desc-uncertainty_report<base>.html` | Unified uncertainty HTML report |
+
+The report name ends with the default variant's affix, so runs with different base affixes keep separate reports. With a nested multi-ISPPA sweep or async run there is one report per sweep point, e.g. `sub-NNN_layered_desc-uncertainty_report<base>_desc-isppa030.html` (see [below](#combining-with-a-multi-isppa-sweep-or-async-transducers)).
+
+---
+
+## Combining with a multi-ISPPA sweep or async transducers
+
+Uncertainty composes with the two other chained modes. When the base config is a multi-ISPPA sweep (a vector `transducer.target_isppa_wcm2`) or an async multi-transducer run (`simulation.transducer_coupling: async`), each variant runs that pipeline with its own medium, and stage 5 writes one uncertainty report per sweep point. Uncertainty is always the outer mode, on every platform.
+
+| | Multi-ISPPA sweep | Async transducers |
+|---|---|---|
+| Stage 1 | shared preprocessing, as above | not run: each variant's async stage 0 builds its own grid and medium |
+| Stages 2–4 | per variant: [`multi_isppa_pipeline`](doc_multiintensity.md) (acoustic, one thermal job per target, summary) | per variant: [`async_transducer_pipeline`](doc_multitransducer.md) (stage 0, acoustic per transducer, combine and joint per sweep point) |
+| Variant outputs | `<variant affix>_desc-isppaNNN` | `<variant affix>_desc-asyncJoint` or `_desc-asyncJointSjj` |
+| Stage 5 | one report per target | one report per sweep point |
+
+On HPC, `uncertainty_pipeline` submits each variant's inner jobs itself. Job names carry the variant (`PRESTUS-u3-liberal-mi2-thermal_isppa030_sub-001`), the multi-ISPPA acoustic jobs wait for stage 1, and every report job waits for all the variants' jobs. Options for the inner pipeline (e.g. `options.thermal_timelimit`) pass through the `options` struct given to `prestus_pipeline_start`.
+
+Not supported: sequential follow-up runs (`options.sequential_configs`) in nested mode, and a multi-ISPPA sweep with more than one coherent transducer (as without uncertainty). Both stop with an error before any job is submitted.
 
 ---
 
@@ -201,11 +222,13 @@ The uncertainty pipeline supports automatic resumption on both platforms.
 
 | Stage | Sentinel file | Location |
 |---|---|---|
-| 1 — Preprocessing | `sub-NNN_<medium>_after_cropping_and_smoothing.mat` | `<output_dir>/debug/` |
-| 2 — Default sim | `sub-NNN_<medium>_output_table.csv` | `<output_dir>/` |
-| 3 — Liberal sim | `sub-NNN_<medium>_output_table_liberal.csv` | `<output_dir>/` |
-| 4 — Conservative sim | `sub-NNN_<medium>_output_table_conservative.csv` | `<output_dir>/` |
-| 5 — Report | `sub-NNN_<medium>_uncertainty_report.html` | `<output_dir>/` |
+| 1 — Preprocessing | `sub-NNN_<medium>_cropped_smoothed.mat` | `<output_dir>/cache/` |
+| 2 — Default sim | `sub-NNN_<medium><base>.csv` | `<output_dir>/` |
+| 3 — Liberal sim | `sub-NNN_<medium><base>_desc-liberal.csv` | `<output_dir>/` |
+| 4 — Conservative sim | `sub-NNN_<medium><base>_desc-conservative.csv` | `<output_dir>/` |
+| 5 — Report | `sub-NNN_<medium>_desc-uncertainty_report<base>.html` | `<output_dir>/` |
+
+In nested mode (below) the variants' inner pipelines apply their own per-stage checks, and each per-point report is skipped when its file exists.
 
 To rerun a stage, delete its sentinel file before resubmitting. With `io.overwrite_files: 'always'`, stages 2–5 are always resubmitted (stage 1 still resumes from its cache); with `'force'`, stage 1 is resubmitted too. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 

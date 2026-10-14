@@ -6,7 +6,8 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 % prestus_pipeline directly. On HPC, serialises parameters to a temp .mat
 % file, generates a bootstrap .m script, and submits via hpc_submit_job.
 % When parameters.simulation.uncertainty is true, delegates to
-% uncertainty_pipeline. When parameters.simulation.transducer_coupling is
+% uncertainty_pipeline on every platform (it nests an async or multi-ISPPA
+% run inside each variant). When parameters.simulation.transducer_coupling is
 % 'async' and multiple transducers are present, delegates to
 % async_transducer_pipeline instead of direct submission.
 %
@@ -84,8 +85,18 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
             % ========== HPC EXECUTION ==========
             % Intercept uncertainty mode before single-job submission:
             % uncertainty_pipeline manages its own multi-stage job graph.
-            if isfield(parameters.simulation, 'uncertainty') && parameters.simulation.uncertainty
-                uncertainty_pipeline(parameters, options);
+            if is_uncertainty_mode(parameters)
+                jobs = uncertainty_pipeline(parameters, options);
+                job_id = [];
+                return;
+            end
+
+            % Intercept the pose workflow (search -> verification -> final run);
+            % its follow-up jobs carry state.pose_workflow and are submitted
+            % as ordinary jobs (PRESTUS_PIPELINE runs their stage).
+            if is_pose_workflow_mode(parameters) && ...
+                    ~(isfield(parameters, 'state') && isfield(parameters.state, 'pose_workflow'))
+                jobs = pose_workflow_pipeline(parameters, options);
                 job_id = [];
                 return;
             end
@@ -157,4 +168,9 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
             error('Unknown platform: %s. Use ''matlab'', ''slurm'', ''qsub'', or ''auto''.', ...
                 parameters.platform);
     end
+end
+
+function tf = is_uncertainty_mode(parameters)
+    tf = isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
+         logical(parameters.simulation.uncertainty);
 end

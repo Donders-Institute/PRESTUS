@@ -42,8 +42,8 @@ class Artifact:
 @dataclass
 class Plan:
     mode: str                          # 'single' | 'async' | 'multi_isppa' | 'uncertainty'
-    platform_used: str                 # 'matlab' | 'hpc'
-    ambiguous: bool
+    nested: str                        # uncertainty only: '' | 'async' | 'multi_isppa' run per variant
+    platform_used: str                 # 'matlab' | 'hpc' | 'auto' (only changes the jobs wording)
     tag: str                           # 'sub-003', or 'sub-XXX' when subject_id is unset/invalid
     artifacts: list[Artifact] = field(default_factory=list)
     common_dirs: list[str] = field(default_factory=list)
@@ -99,11 +99,8 @@ def predict(model: ConfigModel) -> Plan:
     multi_isppa_on = is_multi_isppa_mode(model)
     uncertainty_on = bool(model.get("simulation.uncertainty"))
 
-    # platform='auto' (config_default.yaml's own default!) is resolved to a concrete
-    # platform by hpc_detect_system() *inside* prestus_pipeline_start.m — by the time
-    # its dispatch switch runs, parameters.platform is never still 'auto'. Predicting
-    # from a config alone, before that call, we genuinely don't know which way 'auto'
-    # will go: keep it a distinct third state rather than guessing 'hpc'.
+    # platform='auto' is resolved inside prestus_pipeline_start.m; it only changes
+    # how the jobs list describes the run.
     platform = model.get("platform")
     if platform == "matlab":
         platform_used = "matlab"
@@ -112,43 +109,24 @@ def predict(model: ConfigModel) -> Plan:
     else:
         platform_used = "auto"
 
-    active = {"async": async_on, "multi_isppa": multi_isppa_on, "uncertainty": uncertainty_on}
-    precedence_matlab = ["async", "multi_isppa", "uncertainty"]
-    precedence_hpc = ["uncertainty", "async", "multi_isppa"]
-    mode_matlab = next((m for m in precedence_matlab if active[m]), "single")
-    mode_hpc = next((m for m in precedence_hpc if active[m]), "single")
-
-    # A vector target_isppa_wcm2 under async coupling is NOT ambiguous: async mode
-    # absorbs it as its own internal sweep (see async_transducer_pipeline.m's
-    # header), identically on every platform. The one platform-DEPENDENT case is
-    # uncertainty mode competing with async/multi-ISPPA — HPC checks uncertainty
-    # first, MATLAB checks it last (see prestus_pipeline_start.m) — so only that
-    # combination is flagged, and only then does platform_used=='auto' matter.
-    ambiguous = uncertainty_on and (async_on or multi_isppa_on)
-    if platform_used == "matlab":
-        mode = mode_matlab
-    elif platform_used == "hpc":
-        mode = mode_hpc
+    # Same order as prestus_pipeline_start.m on every platform. Uncertainty
+    # combined with async or a multi-ISPPA sweep nests that pipeline inside
+    # each variant (uncertainty_pipeline.m).
+    if uncertainty_on:
+        mode = "uncertainty"
+    elif async_on:
+        mode = "async"
+    elif multi_isppa_on:
+        mode = "multi_isppa"
     else:
-        mode = mode_matlab   # representative pick; see the 'auto' warning below when ambiguous
+        mode = "single"
+    nested = ""
+    if uncertainty_on and async_on:
+        nested = "async"
+    elif uncertainty_on and multi_isppa_on:
+        nested = "multi_isppa"
 
     warnings: list[str] = []
-    if ambiguous:
-        active_names = [n for n in ("async", "multi_isppa", "uncertainty") if active[n]]
-        base = ("More than one pipeline trigger is active at once (" + " + ".join(active_names) +
-                "). prestus_pipeline_start.m resolves this differently by platform: async > "
-                "multi-ISPPA > uncertainty on 'matlab', but uncertainty > async > multi-ISPPA on "
-                "'slurm'/'qsub'.")
-        if platform_used == "auto":
-            warnings.append(
-                f"{base} platform is 'auto': PRESTUS decides at submission time (hpc_detect_system), "
-                f"so this could run as '{mode_matlab}' mode (no scheduler found) or as '{mode_hpc}' "
-                f"mode (SLURM/qsub found). This preview shows '{mode}' mode; set platform explicitly "
-                "to pin down which one.")
-        else:
-            warnings.append(
-                f"{base} For platform_used='{platform_used}' this prediction assumes '{mode}' mode "
-                "runs; the others are ignored here, not combined.")
     if mode != "single":
         warnings.append(
             f"Assumes {_MODE_FUNCTION[mode]} runs with its default options (see its own help text); "
@@ -209,15 +187,44 @@ def predict(model: ConfigModel) -> Plan:
         jobs.append("1 summary report job (final stage)")
 
     elif mode == "uncertainty":
+        # Output affix suffix of each sweep point an inner pipeline writes.
+        if nested == "multi_isppa":
+            targets = _finite_values(model.get("transducer.target_isppa_wcm2", 0))
+            point_suffixes = [f"_desc-isppa{round(t):03d}" for t in targets]
+        elif nested == "async":
+            n_points = _async_sweep_points(model)
+            point_suffixes = [_async_affix_thermal("", j, n_points) for j in range(1, n_points + 1)]
+        else:
+            point_suffixes = [""]
+        n_pts = len(point_suffixes)
         for variant in ("default", "liberal", "conservative"):
-            affix = base_affix if variant == "default" else f"{base_affix}_desc-{variant}"
-            artifacts.append(Artifact(f"{tag}_{medium}{affix}.csv", f"{variant} variant metrics"))
-            artifacts.append(Artifact(f"{tag}_{medium}_report{affix}.html", f"{variant} variant report"))
-        artifacts.append(Artifact(f"{tag}_{medium}_uncertainty_report.html",
-                                   "combined uncertainty report (default/liberal/conservative)"))
-        jobs.append("1 preprocessing job (stage 1)")
-        jobs.append("3 variant simulation jobs: default, liberal, conservative (stages 2–4)")
-        jobs.append("1 uncertainty report job (stage 5)")
+            variant_affix = base_affix if variant == "default" else f"{base_affix}_desc-{variant}"
+            for j, suffix in enumerate(point_suffixes, start=1):
+                affix = variant_affix + suffix
+                label = f"{variant} variant" + (f", sweep point {j}/{n_pts}" if n_pts > 1 else "")
+                artifacts.append(Artifact(f"{tag}_{medium}{affix}.csv", f"{label} metrics"))
+                artifacts.append(Artifact(f"{tag}_{medium}_report{affix}.html", f"{label} report"))
+            if nested == "multi_isppa":
+                artifacts.append(Artifact(f"{tag}_{medium}_desc-multiIsppa_report{variant_affix}.html",
+                                           f"{variant} variant: summary comparing all targets"))
+        for j, suffix in enumerate(point_suffixes, start=1):
+            label = "combined uncertainty report (default/liberal/conservative)"
+            if n_pts > 1:
+                label = f"{label}, sweep point {j}/{n_pts}"
+            artifacts.append(Artifact(f"{tag}_{medium}_desc-uncertainty_report{base_affix}{suffix}.html", label))
+        if nested == "multi_isppa":
+            jobs.append("1 preprocessing job (stage 1)")
+            jobs.append("3 multi-ISPPA runs, one per variant (default, liberal, conservative): "
+                        f"each 1 acoustic job, {n_pts} thermal jobs and 1 summary job")
+            jobs.append(f"{n_pts} uncertainty report job(s) — one per target (stage 5)")
+        elif nested == "async":
+            jobs.append("3 async multi-transducer runs, one per variant (default, liberal, conservative), "
+                        "each with its own preprocessing, acoustic, combine and joint jobs")
+            jobs.append(f"{n_pts} uncertainty report job(s) — one per sweep point (stage 5)")
+        else:
+            jobs.append("1 preprocessing job (stage 1)")
+            jobs.append("3 variant simulation jobs: default, liberal, conservative (stages 2-4)")
+            jobs.append("1 uncertainty report job (stage 5)")
 
     if mode != "single":
         if platform_used == "hpc":
@@ -228,7 +235,7 @@ def predict(model: ConfigModel) -> Plan:
             jobs.append("platform='auto': separate SLURM/qsub jobs with dependencies if a scheduler is "
                         "found at submission time, otherwise sequential stages in one MATLAB session.")
 
-    return Plan(mode=mode, platform_used=platform_used, ambiguous=ambiguous, tag=tag,
+    return Plan(mode=mode, nested=nested, platform_used=platform_used, tag=tag,
                 artifacts=artifacts, common_dirs=common_dirs, warnings=warnings, jobs=jobs)
 
 

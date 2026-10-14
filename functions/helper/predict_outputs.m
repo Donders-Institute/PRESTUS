@@ -9,16 +9,11 @@ function plan = predict_outputs(parameters)
 %
 % Mode is detected with the SAME predicates PRESTUS_PIPELINE_START itself uses
 % (IS_ASYNC_MODE, IS_MULTI_ISPPA_MODE, parameters.simulation.uncertainty), so this
-% function cannot disagree with what actually runs. Dispatch PRECEDENCE differs
-% by platform (see PRESTUS_PIPELINE_START): on 'matlab', async > multi-ISPPA >
-% uncertainty; on 'slurm'/'qsub', uncertainty > async > multi-ISPPA. This only
-% matters when uncertainty is competing with async or multi-ISPPA (an async
-% sweep or a vector multi-ISPPA target on their own are unambiguous on every
-% platform). parameters.platform = 'auto' (config_default.yaml's own default) is
-% resolved to a concrete platform by hpc_detect_system() *inside*
-% PRESTUS_PIPELINE_START, so a prediction made beforehand cannot know which way
-% it will go; in that ambiguous+auto case, plan.mode is only a representative
-% pick and plan.warnings names both possible outcomes explicitly.
+% function cannot disagree with what actually runs. Precedence is the same on
+% every platform: uncertainty > async > multi-ISPPA. Uncertainty combined with
+% async or a multi-ISPPA sweep nests that pipeline inside each variant (see
+% UNCERTAINTY_PIPELINE); plan.nested names it. A vector target under async
+% coupling is async's own sweep.
 %
 % This only predicts the DEFAULT options of each sub-pipeline (e.g. the
 % multi-ISPPA summary report, water validation): a non-default
@@ -41,10 +36,9 @@ function plan = predict_outputs(parameters)
 % Output:
 %   plan - struct with fields:
 %     .mode          'single' | 'async' | 'multi_isppa' | 'uncertainty'
-%     .platform_used precedence this prediction assumed: 'matlab' | 'hpc' | 'auto'
-%     .ambiguous     true only when uncertainty competes with async/multi-ISPPA
-%                    (precedence between those two never actually varies by
-%                    platform, so that combination alone is never ambiguous)
+%     .nested        uncertainty mode only: '' | 'async' | 'multi_isppa', the
+%                    pipeline each variant runs; '' in every other mode
+%     .platform_used 'matlab' | 'hpc' | 'auto' (only changes plan.jobs wording)
 %     .output_dir    get_output_dir(parameters)
 %     .artifacts     struct array (.name, .note) of primary output files,
 %                    relative to output_dir
@@ -74,11 +68,8 @@ multi_isppa_on = is_multi_isppa_mode(parameters);
 uncertainty_on = isfield(parameters, 'simulation') && isfield(parameters.simulation, 'uncertainty') && ...
                  logical(parameters.simulation.uncertainty);
 
-% platform='auto' (config_default.yaml's own default!) is resolved to a concrete
-% platform by hpc_detect_system() *inside* PRESTUS_PIPELINE_START — by the time
-% its dispatch switch runs, parameters.platform is never still 'auto'. Predicting
-% from a config alone, before that call, we genuinely don't know which way 'auto'
-% will go: keep it a distinct third state rather than guessing 'hpc'.
+% parameters.platform = 'auto' (config_default.yaml's own default) is resolved
+% inside PRESTUS_PIPELINE_START; it only changes how plan.jobs describes the run.
 if isfield(parameters, 'platform') && strcmp(parameters.platform, 'matlab')
     platform_used = 'matlab';
 elseif isfield(parameters, 'platform') && ismember(parameters.platform, {'slurm', 'qsub'})
@@ -87,48 +78,24 @@ else
     platform_used = 'auto';
 end
 
-active = struct('async', async_on, 'multi_isppa', multi_isppa_on, 'uncertainty', uncertainty_on);
-precedence_matlab = {'async', 'multi_isppa', 'uncertainty'};
-precedence_hpc    = {'uncertainty', 'async', 'multi_isppa'};
-mode_matlab = first_active(active, precedence_matlab);
-mode_hpc    = first_active(active, precedence_hpc);
-
-% A vector target_isppa_wcm2 under async coupling is NOT ambiguous: async mode
-% absorbs it as its own internal sweep (see ASYNC_TRANSDUCER_PIPELINE's header),
-% identically on every platform. The one platform-DEPENDENT case is uncertainty
-% mode competing with async/multi-ISPPA — HPC checks uncertainty first,
-% MATLAB checks it last (see PRESTUS_PIPELINE_START) — so only that
-% combination is flagged, and only then does platform_used=='auto' matter.
-ambiguous = uncertainty_on && (async_on || multi_isppa_on);
-switch platform_used
-    case 'matlab'
-        mode = mode_matlab;
-    case 'hpc'
-        mode = mode_hpc;
-    otherwise    % 'auto': representative pick; see the 'auto' warning below when ambiguous
-        mode = mode_matlab;
+% Same order as PRESTUS_PIPELINE_START on every platform.
+if uncertainty_on
+    mode = 'uncertainty';
+elseif async_on
+    mode = 'async';
+elseif multi_isppa_on
+    mode = 'multi_isppa';
+else
+    mode = 'single';
+end
+nested = '';
+if uncertainty_on && async_on
+    nested = 'async';
+elseif uncertainty_on && multi_isppa_on
+    nested = 'multi_isppa';
 end
 
 warnings_ = {};
-if ambiguous
-    active_names = {};
-    if async_on;       active_names{end+1} = 'async';       end
-    if multi_isppa_on; active_names{end+1} = 'multi_isppa'; end
-    if uncertainty_on; active_names{end+1} = 'uncertainty'; end
-    base_msg = sprintf(['More than one pipeline trigger is active at once (%s). ' ...
-        'PRESTUS_PIPELINE_START resolves this differently by platform: async > multi-ISPPA > ' ...
-        'uncertainty on ''matlab'', but uncertainty > async > multi-ISPPA on ''slurm''/''qsub''.'], ...
-        strjoin(active_names, ' + '));
-    if strcmp(platform_used, 'auto')
-        warnings_{end+1} = sprintf(['%s platform is ''auto'': PRESTUS decides at submission time ' ...
-            '(hpc_detect_system), so this could run as ''%s'' mode (no scheduler found) or as ' ...
-            '''%s'' mode (SLURM/qsub found). This preview shows ''%s'' mode; set platform ' ...
-            'explicitly to pin down which one.'], base_msg, mode_matlab, mode_hpc, mode);
-    else
-        warnings_{end+1} = sprintf(['%s For platform_used=''%s'' this prediction assumes ''%s'' ' ...
-            'mode runs; the others are ignored here, not combined.'], base_msg, platform_used, mode);
-    end
-end
 if ~strcmp(mode, 'single')
     warnings_{end+1} = sprintf(['Assumes %s runs with its default options (see its own help ' ...
         'text); a non-default call to prestus_pipeline_start(parameters, options) can add to ' ...
@@ -137,8 +104,8 @@ end
 
 plan = struct();
 plan.mode          = mode;
+plan.nested         = nested;
 plan.platform_used  = platform_used;
-plan.ambiguous      = ambiguous;
 plan.output_dir     = get_output_dir(parameters);
 plan.common_dirs    = {'nii/', 'img/', 'log/', 'cache/'};
 if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
@@ -221,23 +188,69 @@ switch mode
 
     case 'uncertainty'
         variants = {'default', 'liberal', 'conservative'};
+        % Output affix suffix of each sweep point an inner pipeline writes ('' when not nested).
+        switch nested
+            case 'multi_isppa'
+                targets = parameters.transducer(1).target_isppa_wcm2(:)';
+                targets = targets(isfinite(targets));
+                point_suffixes = arrayfun(@(t) sprintf('_desc-isppa%03d', round(t)), targets, ...
+                    'UniformOutput', false);
+            case 'async'
+                n_points = async_sweep_points(parameters);
+                point_suffixes = arrayfun(@(j) async_affix_thermal('', j, n_points), 1:n_points, ...
+                    'UniformOutput', false);
+            otherwise
+                point_suffixes = {''};
+        end
         for k = 1:numel(variants)
             v = variants{k};
             if strcmp(v, 'default')
-                affix = base_affix;
+                variant_affix = base_affix;
             else
-                affix = [base_affix, '_desc-', v];
+                variant_affix = [base_affix, '_desc-', v];
             end
-            artifacts(end+1) = art(sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix), ...
-                [v, ' variant metrics']);
-            artifacts(end+1) = art(sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix), ...
-                [v, ' variant report']);
+            for j = 1:numel(point_suffixes)
+                affix = [variant_affix, point_suffixes{j}];
+                label = [v, ' variant'];
+                if numel(point_suffixes) > 1
+                    label = sprintf('%s, sweep point %d/%d', label, j, numel(point_suffixes));
+                end
+                artifacts(end+1) = art(sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix), ...
+                    [label, ' metrics']); %#ok<AGROW>
+                artifacts(end+1) = art(sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix), ...
+                    [label, ' report']); %#ok<AGROW>
+            end
+            if strcmp(nested, 'multi_isppa')
+                artifacts(end+1) = art(sprintf('sub-%03d_%s_desc-multiIsppa_report%s.html', ...
+                    subject_id, medium, variant_affix), [v, ' variant: summary comparing all targets']); %#ok<AGROW>
+            end
         end
-        artifacts(end+1) = art(sprintf('sub-%03d_%s_uncertainty_report.html', subject_id, medium), ...
-            'combined uncertainty report (default/liberal/conservative)');
-        jobs{end+1} = '1 preprocessing job (stage 1)';
-        jobs{end+1} = '3 variant simulation jobs: default, liberal, conservative (stages 2-4)';
-        jobs{end+1} = '1 uncertainty report job (stage 5)';
+        for j = 1:numel(point_suffixes)
+            label = 'combined uncertainty report (default/liberal/conservative)';
+            if numel(point_suffixes) > 1
+                label = sprintf('%s, sweep point %d/%d', label, j, numel(point_suffixes));
+            end
+            artifacts(end+1) = art(sprintf('sub-%03d_%s_desc-uncertainty_report%s%s.html', ...
+                subject_id, medium, base_affix, point_suffixes{j}), label); %#ok<AGROW>
+        end
+        switch nested
+            case 'multi_isppa'
+                jobs{end+1} = '1 preprocessing job (stage 1)';
+                jobs{end+1} = sprintf(['3 multi-ISPPA runs, one per variant (default, liberal, ' ...
+                    'conservative): each 1 acoustic job, %d thermal jobs and 1 summary job'], ...
+                    numel(point_suffixes));
+                jobs{end+1} = sprintf('%d uncertainty report job(s) — one per target (stage 5)', ...
+                    numel(point_suffixes));
+            case 'async'
+                jobs{end+1} = ['3 async multi-transducer runs, one per variant (default, liberal, ' ...
+                    'conservative), each with its own preprocessing, acoustic, combine and joint jobs'];
+                jobs{end+1} = sprintf('%d uncertainty report job(s) — one per sweep point (stage 5)', ...
+                    numel(point_suffixes));
+            otherwise
+                jobs{end+1} = '1 preprocessing job (stage 1)';
+                jobs{end+1} = '3 variant simulation jobs: default, liberal, conservative (stages 2-4)';
+                jobs{end+1} = '1 uncertainty report job (stage 5)';
+        end
 end
 if ~strcmp(mode, 'single')
     switch platform_used
@@ -260,16 +273,6 @@ end
 
 function a = art(name, note)
 a = struct('name', name, 'note', note);
-end
-
-function mode = first_active(active, precedence)
-mode = 'single';
-for k = 1:numel(precedence)
-    if active.(precedence{k})
-        mode = precedence{k};
-        return;
-    end
-end
 end
 
 function tf = get_flag(parameters, section, field, default)

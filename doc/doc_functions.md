@@ -287,12 +287,14 @@ The following documents the functions provided in PRESTUS.
 | `validate_any_required_field`           | Error clearly unless at least one candidate field is set. |
 | `validate_required_fields`              | Error clearly unless every required field is set. |
 | `warn`                                  | Wrapper around warning() that suppresses the stack-trace printout. |
+| `write_sidecar`                         | Write a JSON sidecar describing a stage output later runs can start from |
 | `zip_fields`                            | Convert a structure's fields and values into a cell array. |
 
 #### HPC
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `hpc_add_dependency`                    | Add scheduler job IDs to the jobs a submission waits for |
 | `hpc_detect_system`                     | Detect SLURM or qsub HPC system. |
 | `hpc_job_info`                          | Generate formatted job display information. |
 | `hpc_job_name`                          | Generate standardized HPC job name. |

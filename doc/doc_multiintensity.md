@@ -99,20 +99,18 @@ Each stage checks for its sentinel output file before submitting (HPC) or runnin
 
 ## Relationship to uncertainty mode
 
-Multi-ISPPA mode and uncertainty mode are composable. When both `simulation.uncertainty = true` and `transducer.target_isppa_wcm2` is a vector, the two modes nest automatically:
+Multi-ISPPA mode and uncertainty mode are composable. When both `simulation.uncertainty = true` and `transducer.target_isppa_wcm2` is a vector, uncertainty is the outer mode and each variant runs its own multi-ISPPA pipeline:
 
 ```
-Stage 1   preproc / source setup         (shared)
-Stage 2   acoustic — default variant     ┐
-Stage 3   acoustic — liberal variant     ├ each includes water baseline
-Stage 4   acoustic — conservative variant┘
-Stages 5… thermal — one job per variant × target  (_liberal_isppa030, _conservative_isppa010 …)
-Final     report
+Stage 1    preproc / source setup                      (shared)
+Variants   default, liberal, conservative — each:      (after stage 1)
+             acoustic + free-water baseline
+             thermal — one job per target              (_desc-liberal_desc-isppa030 …)
+             multi-ISPPA summary
+Stage 5    uncertainty report — one per target         (after every variant job)
 ```
 
-This works because `uncertainty_pipeline` passes the full `parameters` struct (including the vector `target_isppa_wcm2`) into each variant's `prestus_pipeline` call, which then dispatches to `multi_isppa_pipeline`. Affixes compose naturally: the uncertainty variant affix (`_liberal`) is already set in `io.output_affix` when `multi_isppa_pipeline` builds its per-target affixes, yielding `_liberal_isppa030` etc.
-
-For each target intensity, an uncertainty report is generated aggregating the three variants at that intensity (e.g. `sub-001_layered_uncertainty_report_isppa030.html`). No report aggregating across intensities is produced.
+Affixes compose: the variant affix (`_desc-liberal`) prefixes the per-target affix, yielding `_desc-liberal_desc-isppa030`. Each target gets an uncertainty report comparing the three variants at that intensity, e.g. `sub-001_layered_desc-uncertainty_report_desc-isppa030.html` (with the base `io.output_affix` before the target suffix when one is set). No report aggregates across intensities. See [doc_uncertainty.md](doc_uncertainty.md#combining-with-a-multi-isppa-sweep-or-async-transducers).
 
 ---
 

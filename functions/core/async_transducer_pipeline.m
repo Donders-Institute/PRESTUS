@@ -75,12 +75,18 @@ function jobs = async_transducer_pipeline(parameters, options)
 %                .thermal_timelimit    wall time per thermal job  ('04:00:00')
 %                .acoustic_memorylimit / combine_memorylimit / thermal_memorylimit
 %                .acoustic_partition  / combine_partition  / thermal_partition
+%                .depend_job_ids       scheduler job IDs every submitted job also
+%                                      waits for (default []); set by a caller
+%                                      that nests this run, e.g. UNCERTAINTY_PIPELINE
+%                .job_name_prefix      inserted after 'PRESTUS-' in job names ('')
 %
 % Output:
 %   jobs       - scheduler job IDs submitted per stage (fields preproc,
 %                acoustic, combine, thermal, water; [] for stages that were
 %                skipped because their output exists, and all [] when run in
 %                MATLAB). Lets a caller make later jobs depend on this run.
+%                .output_affixes (1×M cell) is the io.output_affix of each sweep
+%                point's joint (thermal) outputs.
 %
 % See also: PRESTUS_PIPELINE_START, COMBINE_ASYNC_INTENSITY,
 %           IS_ASYNC_MODE, MULTI_ISPPA_PIPELINE
@@ -124,6 +130,8 @@ if ~isfield(options, 'acoustic_partition');   options.acoustic_partition   = [];
 if ~isfield(options, 'combine_partition');    options.combine_partition    = [];         end
 if ~isfield(options, 'thermal_partition');    options.thermal_partition    = [];         end
 if ~isfield(options, 'water_partition');      options.water_partition      = [];         end
+if ~isfield(options, 'depend_job_ids');       options.depend_job_ids       = [];         end
+if ~isfield(options, 'job_name_prefix');      options.job_name_prefix      = '';         end
 
 % =========================================================================
 %% Resolve multi-ISPPA sweep points
@@ -314,7 +322,8 @@ fprintf('╚══════════════════════�
 %% Execute
 % =========================================================================
 
-jobs = struct('preproc', [], 'acoustic', [], 'combine', [], 'thermal', [], 'water', []);
+jobs = struct('preproc', [], 'acoustic', [], 'combine', [], 'thermal', [], 'water', [], ...
+              'output_affixes', {affix_thermal});
 
 switch platform
 
@@ -378,9 +387,10 @@ switch platform
                 else
                     p_prep = make_preproc_params(parameters, affix_preproc{ti}, ti, ow);
                     p_prep.hpc.timelimit = options.preproc_timelimit;
-                    p_prep.hpc.job_name  = sprintf('PRESTUS-at%02d-pp_%s', ti, subj);
+                    p_prep.hpc.job_name  = sprintf('PRESTUS-%sat%02d-pp_%s', options.job_name_prefix, ti, subj);
                     p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
                     p_prep = apply_partition(p_prep, options.preproc_partition);
+                    p_prep = hpc_add_dependency(p_prep, options.depend_job_ids);
                     job_ids_preproc(ti)   = prestus_pipeline_start(p_prep);
                     preproc_submitted(ti) = true;
                     fprintf('             → job %s\n', num2str(job_ids_preproc(ti)));
@@ -393,9 +403,10 @@ switch platform
             else
                 p_prep = make_preproc_params(parameters, affix_preproc, [], ow);
                 p_prep.hpc.timelimit = options.preproc_timelimit;
-                p_prep.hpc.job_name  = sprintf('PRESTUS-at-pp_%s', subj);
+                p_prep.hpc.job_name  = sprintf('PRESTUS-%sat-pp_%s', options.job_name_prefix, subj);
                 p_prep = apply_memorylimit(p_prep, options.preproc_memorylimit);
                 p_prep = apply_partition(p_prep, options.preproc_partition);
+                p_prep = hpc_add_dependency(p_prep, options.depend_job_ids);
                 job_id_shared        = prestus_pipeline_start(p_prep);
                 job_ids_preproc(:)   = job_id_shared;
                 preproc_submitted(:) = true;
@@ -415,12 +426,13 @@ switch platform
             else
                 pa = p_acoustic{ti};
                 pa.hpc.timelimit = options.acoustic_timelimit;
-                pa.hpc.job_name  = sprintf('PRESTUS-at%02d-ac_%s', ti, subj);
+                pa.hpc.job_name  = sprintf('PRESTUS-%sat%02d-ac_%s', options.job_name_prefix, ti, subj);
                 pa = apply_memorylimit(pa, options.acoustic_memorylimit);
                 pa = apply_partition(pa, options.acoustic_partition);
                 if preproc_submitted(ti)
-                    pa.hpc.depend_job_ids = job_ids_preproc(ti);
+                    pa = hpc_add_dependency(pa, job_ids_preproc(ti));
                 end
+                pa = hpc_add_dependency(pa, options.depend_job_ids);
                 job_ids_acoustic(ti)   = prestus_pipeline_start(pa);
                 acoustic_submitted(ti) = true;
                 fprintf('             → job %s\n', num2str(job_ids_acoustic(ti)));
@@ -449,12 +461,13 @@ switch platform
                 p_comb = make_combine_params(parameters, files_acoustic, ...
                                              files_combined{j}, targets_matrix(:,j)');
                 p_comb.hpc.timelimit = options.combine_timelimit;
-                p_comb.hpc.job_name  = sprintf('PRESTUS-at-cb%02d_%s', j, subj);
+                p_comb.hpc.job_name  = sprintf('PRESTUS-%sat-cb%02d_%s', options.job_name_prefix, j, subj);
                 p_comb = apply_memorylimit(p_comb, options.combine_memorylimit);
                 p_comb = apply_partition(p_comb, options.combine_partition);
                 if ~isempty(pending_acoustic)
-                    p_comb.hpc.depend_job_ids = pending_acoustic;
+                    p_comb = hpc_add_dependency(p_comb, pending_acoustic);
                 end
+                p_comb = hpc_add_dependency(p_comb, options.depend_job_ids);
                 job_ids_combine(j)   = prestus_pipeline_start(p_comb);
                 combine_submitted(j) = true;
                 fprintf('           → job %s\n', num2str(job_ids_combine(j)));
@@ -476,12 +489,13 @@ switch platform
             else
                 pt = p_thermal{j};
                 pt.hpc.timelimit = options.thermal_timelimit;
-                pt.hpc.job_name  = sprintf('PRESTUS-at-th%02d_%s', j, subj);
+                pt.hpc.job_name  = sprintf('PRESTUS-%sat-th%02d_%s', options.job_name_prefix, j, subj);
                 pt = apply_memorylimit(pt, options.thermal_memorylimit);
                 pt = apply_partition(pt, options.thermal_partition);
                 if combine_submitted(j)
-                    pt.hpc.depend_job_ids = job_ids_combine(j);
+                    pt = hpc_add_dependency(pt, job_ids_combine(j));
                 end
+                pt = hpc_add_dependency(pt, options.depend_job_ids);
                 job_id_th = prestus_pipeline_start(pt);
                 jobs.thermal(end+1) = job_id_th;
                 fprintf('           → job %s\n', num2str(job_id_th));
@@ -502,12 +516,13 @@ switch platform
                 else
                     pw = make_water_params(parameters, ti, affix_per_t{ti}, ow);
                     pw.hpc.timelimit = options.water_timelimit;
-                    pw.hpc.job_name  = sprintf('PRESTUS-at%02d-wv_%s', ti, subj);
+                    pw.hpc.job_name  = sprintf('PRESTUS-%sat%02d-wv_%s', options.job_name_prefix, ti, subj);
                     pw = apply_memorylimit(pw, options.water_memorylimit);
                     pw = apply_partition(pw, options.water_partition);
                     if ~isempty(pending_for_water)
-                        pw.hpc.depend_job_ids = pending_for_water;
+                        pw = hpc_add_dependency(pw, pending_for_water);
                     end
+                    pw = hpc_add_dependency(pw, options.depend_job_ids);
                     job_id_wv = prestus_pipeline_start(pw);
                     jobs.water(end+1) = job_id_wv;
                     fprintf('           → job %s\n', num2str(job_id_wv));
@@ -550,6 +565,11 @@ function p = make_preproc_params(base, affix_preproc, transducer_idx, ow)
         p.transducer = base.transducer(transducer_idx);
     end
     % Otherwise (shared mode) keep ALL transducers so grid_tissue_setup sizes the grid to contain all of them.
+    % Preproc ignores drive level; clear the targets so a sweep vector does not
+    % route this job into multi_isppa_pipeline (cache_signature excludes them).
+    for ti = 1:numel(p.transducer)
+        p.transducer(ti).target_isppa_wcm2 = NaN;
+    end
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_water_baseline     = 0;
@@ -558,6 +578,9 @@ function p = make_preproc_params(base, affix_preproc, transducer_idx, ow)
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 0;
     p.io.output_affix                = affix_preproc;
+    p.io.preproc_affix               = affix_preproc;
+    p.io.reuse_upstream_caches       = {};  % this stage builds the caches
+    p                                = own_preproc_caches(p);
     p.io.overwrite_files             = ow.intermediates;
     p.io.overwrite_simnibs           = 0;
     p.io.save_grid_cache             = 1;  % override save_matrices: 0 from config
@@ -584,6 +607,7 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow
     p.modules.generate_report        = 0;
     p.io.output_affix                = affix;
     p.io.preproc_affix               = affix_preproc;  % load shared grid sized for all transducers
+    p                                = own_preproc_caches(p);
     % Tell load_grid_cache_file which transducer this sub-job is, so that on a
     % cache hit it copies this transducer's grid-space trans_pos/focus_pos
     % (set by grid_transducer_location during Stage 0) instead of leaving the
@@ -601,6 +625,11 @@ end
 
 function p = make_combine_params(base, files_in, file_out, targets_wcm2)
     p = base;
+    % Targets travel in async_combine.targets_wcm2; clear the sweep vectors so
+    % this job does not route into multi_isppa_pipeline.
+    for ti = 1:numel(p.transducer)
+        p.transducer(ti).target_isppa_wcm2 = NaN;
+    end
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_water_baseline     = 0;
@@ -638,6 +667,7 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.grid.acoustic_fov_diameter_mm  = [];
     p.grid.acoustic_fov_length_mm    = [];
     p.io.preproc_affix               = affix_preproc;  % reuse trans-01 preproc cache
+    p                                = own_preproc_caches(p);
     p.io.overwrite_files             = ow.outputs;
     p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};  % the combined field was computed on these
     p.io.overwrite_simnibs           = 0;
@@ -667,6 +697,15 @@ function p = make_water_params(base, transducer_idx, affix, ow)
     p.io.save_kwave_medium            = 0;
     p.io.save_thermal_matrices        = 0;
     p.simulation.interactive          = 0;
+end
+
+function p = own_preproc_caches(p)
+% The medium cache follows io.preproc_affix here: Stage 0 builds it per grid.
+% Drop an io.medium_affix inherited from an enclosing pipeline (an uncertainty
+% variant), whose medium Stage 0 already maps under the variant's preproc affix.
+    if isfield(p.io, 'medium_affix')
+        p.io = rmfield(p.io, 'medium_affix');
+    end
 end
 
 function affix = preproc_affix_for(affix_preproc, ti)

@@ -25,9 +25,16 @@ else
     preproc_affix = parameters.io.output_affix;
 end
 
+% Uncertainty variants share the stage-1 head/grid (io.preproc_affix) but each
+% maps its own medium, so io.medium_affix keeps their medium caches apart.
+medium_affix = preproc_affix;
+if isfield(parameters.io, 'medium_affix')
+    medium_affix = parameters.io.medium_affix;
+end
+
 filename_medium_cache = fullfile(parameters.io.dir_cache, ...
     sprintf('sub-%03d_%s_medium_cache%s.mat', ...
-    parameters.subject_id, parameters.simulation.medium, preproc_affix));
+    parameters.subject_id, parameters.simulation.medium, medium_affix));
 
 filename_planimg_sidecar = fullfile(parameters.io.dir_cache, ...
     sprintf('sub-%03d_%s_planimg%s.mat', ...

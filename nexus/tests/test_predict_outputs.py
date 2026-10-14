@@ -1,6 +1,7 @@
 """predict_outputs.py mirrors functions/helper/predict_outputs.m (and the mode
-predicates is_async_mode.m / is_multi_isppa_mode.m it calls). These cases mirror
-tests/test_helper.m's predict_outputs block one for one — if one side changes,
+predicates is_async_mode.m / is_multi_isppa_mode.m it calls). The nested
+uncertainty cases have MATLAB counterparts in
+tests/test_uncertainty_nesting.m (predictOutputsNested) — if one side changes,
 the other should too."""
 
 from prestus_nexus.model import ConfigModel
@@ -22,7 +23,7 @@ def _base(schema) -> ConfigModel:
 def test_single_mode(schema):
     plan = predict(_base(schema))
     assert plan.mode == "single"
-    assert not plan.ambiguous
+    assert plan.nested == ""
     names = [a.name for a in plan.artifacts]
     assert names == ["sub-003_layered.csv", "sub-003_layered_report.html",
                       "sub-003_layered_targeting.csv"]
@@ -88,43 +89,54 @@ def test_uncertainty_mode(schema):
     names = [a.name for a in plan.artifacts]
     assert len(names) == 7   # 3 variants x (csv + html) + combined report
     assert "sub-003_layered_desc-liberal.csv" in names
-    assert "sub-003_layered_uncertainty_report.html" in names
+    assert "sub-003_layered_desc-uncertainty_report.html" in names
 
 
-def test_ambiguous_precedence_by_platform(schema):
+def test_uncertainty_is_outer_mode_on_every_platform(schema):
+    # Uncertainty nests an async run inside each variant (uncertainty_pipeline.m),
+    # with the same precedence on every platform (prestus_pipeline_start.m).
     m = _base(schema)
     m.set("simulation.transducer_coupling", "async")
     m.add_transducer()
     m.set("simulation.uncertainty", True)
-
-    m.set("platform", "matlab")
-    plan_matlab = predict(m)
-    assert plan_matlab.mode == "async"
-    assert plan_matlab.ambiguous
-
-    m.set("platform", "slurm")
-    plan_hpc = predict(m)
-    assert plan_hpc.mode == "uncertainty"
-    assert plan_hpc.ambiguous
+    for platform in ("matlab", "slurm", "auto"):
+        m.set("platform", platform)
+        plan = predict(m)
+        assert plan.mode == "uncertainty"
+        assert plan.nested == "async"
 
 
-def test_ambiguous_with_platform_auto_is_disclosed_not_guessed(schema):
-    # platform='auto' (config_default.yaml's own default) is only resolved to a
-    # concrete platform by hpc_detect_system() inside prestus_pipeline_start.m at
-    # submission time — a prediction made beforehand cannot know which way it goes.
+def test_uncertainty_nests_multi_isppa_sweep(schema):
     m = _base(schema)
-    m.set("simulation.transducer_coupling", "async")
-    m.add_transducer()
     m.set("simulation.uncertainty", True)
-    m.set("platform", "auto")
-
+    m.set("transducer.target_isppa_wcm2", [10, 30])
     plan = predict(m)
-    assert plan.platform_used == "auto"
-    assert plan.ambiguous
-    assert any("platform is 'auto'" in w for w in plan.warnings)
+    assert plan.mode == "uncertainty"
+    assert plan.nested == "multi_isppa"
+    names = [a.name for a in plan.artifacts]
+    # 3 variants x 2 targets x (csv + html) + 3 summaries + 2 uncertainty reports
+    assert len(names) == 17
+    assert "sub-003_layered_desc-liberal_desc-isppa030.csv" in names
+    assert "sub-003_layered_desc-multiIsppa_report_desc-conservative.html" in names
+    assert "sub-003_layered_desc-uncertainty_report_desc-isppa010.html" in names
+    assert any("2 uncertainty report job(s)" in j for j in plan.jobs)
 
 
-def test_async_multi_isppa_sweep_is_not_ambiguous(schema):
+def test_uncertainty_nests_async_sweep(schema):
+    m = _base(schema)
+    m.set("simulation.transducer_coupling", "async")
+    m.add_transducer()
+    m.set("transducer.target_isppa_wcm2", [10, 20], 0)
+    m.set("transducer.target_isppa_wcm2", [10, 20], 1)
+    m.set("simulation.uncertainty", True)
+    plan = predict(m)
+    assert plan.nested == "async"
+    names = [a.name for a in plan.artifacts]
+    assert "sub-003_layered_desc-liberal_desc-asyncJointS02.csv" in names
+    assert "sub-003_layered_desc-uncertainty_report_desc-asyncJointS01.html" in names
+
+
+def test_async_multi_isppa_sweep_is_async(schema):
     # A vector target under async coupling is async's own internal sweep
     # (see async_transducer_pipeline.m), not a conflict with multi_isppa_pipeline.
     m = _base(schema)
@@ -134,7 +146,7 @@ def test_async_multi_isppa_sweep_is_not_ambiguous(schema):
     m.set("transducer.target_isppa_wcm2", [10, 20], 1)
     plan = predict(m)
     assert plan.mode == "async"
-    assert not plan.ambiguous
+    assert plan.nested == ""
 
 
 def test_common_dirs_include_debug_when_enabled(schema):

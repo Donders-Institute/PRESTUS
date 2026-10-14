@@ -364,7 +364,7 @@ prestus_pipeline_start(parameters);   % dispatches to async_transducer_pipeline
 - **Shared head model.** Both transducers must use the same segmented head grid.
 - **Linear regime.** The same validity conditions as single-transducer ISPPA scaling apply (see [doc_calibration.md](doc_calibration.md)).
 - **`modules.run_water_baseline: 1` is required.** Without it, pressure scaling is skipped.
-- **Async mode is mutually exclusive with uncertainty mode.** Use coherent mode with uncertainty if skull-property uncertainty quantification is required.
+- **Async mode composes with uncertainty mode.** With `simulation.uncertainty: true`, each uncertainty variant runs its own async pipeline (stage 0 included) with its medium, and one uncertainty report is written per sweep point. See [doc_uncertainty.md](doc_uncertainty.md#combining-with-a-multi-isppa-sweep-or-async-transducers).
 
 ### HPC options
 

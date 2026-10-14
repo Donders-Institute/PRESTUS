@@ -1,4 +1,4 @@
-function multi_isppa_pipeline(parameters, options)
+function jobs = multi_isppa_pipeline(parameters, options)
 % MULTI_ISPPA_PIPELINE  Run acoustic simulation once, then thermal analysis at
 %                       multiple free-water target intensities in parallel
 %
@@ -55,6 +55,17 @@ function multi_isppa_pipeline(parameters, options)
 %                .summary_memorylimit      - RAM in GB for summary stage
 %                .acoustic_partition       - HPC partition for stage 1
 %                .summary_partition        - HPC partition for summary stage
+%                .depend_job_ids           - scheduler job IDs the first submitted
+%                                            stage waits for (default []); set by a
+%                                            caller that nests this run, e.g.
+%                                            UNCERTAINTY_PIPELINE
+%                .job_name_prefix          - inserted after 'PRESTUS-' in job names
+%                                            (default '')
+%
+% Output:
+%   jobs       - struct: .acoustic, .thermal, .summary (scheduler job IDs; [] for
+%                skipped stages and in MATLAB), .all (every submitted ID), and
+%                .output_affixes (1×M cell, io.output_affix of each target's outputs)
 %
 % See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE,
 %           MEASURE_FREEFIELD_BASELINE, APPLY_ISPPA_SCALING
@@ -102,6 +113,8 @@ if ~isfield(options, 'thermal_memorylimit');     options.thermal_memorylimit    
 if ~isfield(options, 'summary_memorylimit');     options.summary_memorylimit     = []; end
 if ~isfield(options, 'acoustic_partition');      options.acoustic_partition      = []; end
 if ~isfield(options, 'summary_partition');       options.summary_partition       = []; end
+if ~isfield(options, 'depend_job_ids');          options.depend_job_ids          = []; end
+if ~isfield(options, 'job_name_prefix');         options.job_name_prefix         = ''; end
 
 % =========================================================================
 %% Resolve platform
@@ -153,6 +166,9 @@ end
 
 p_summary = make_summary_params(parameters, targets, affixes, base_affix, ow);
 
+jobs = struct('acoustic', [], 'thermal', [], 'summary', [], 'all', [], ...
+              'output_affixes', {affixes});
+
 % =========================================================================
 %% Execute
 % =========================================================================
@@ -192,7 +208,8 @@ switch platform
         acoustic_sentinel = fullfile(output_dir, 'cache', ...
             sprintf('sub-%03d_%s_results%s.mat', subject_id, medium, base_affix));
         p_acoustic.hpc.timelimit = options.acoustic_timelimit;
-        p_acoustic.hpc.job_name  = sprintf('PRESTUS-mi1-acoustic_%s', subj);
+        p_acoustic.hpc.job_name  = sprintf('PRESTUS-%smi1-acoustic_%s', options.job_name_prefix, subj);
+        p_acoustic               = hpc_add_dependency(p_acoustic, options.depend_job_ids);
         p_acoustic               = apply_memorylimit(p_acoustic, options.acoustic_memorylimit);
         p_acoustic               = apply_partition(p_acoustic, options.acoustic_partition);
 
@@ -222,11 +239,13 @@ switch platform
             else
                 pt = p_thermal{ti};
                 pt.hpc.timelimit = options.thermal_timelimit;
-                pt.hpc.job_name  = sprintf('PRESTUS-mi%d-thermal_isppa%03d_%s', ...
-                                           ti + 1, round(targets(ti)), subj);
+                pt.hpc.job_name  = sprintf('PRESTUS-%smi%d-thermal_isppa%03d_%s', ...
+                                           options.job_name_prefix, ti + 1, round(targets(ti)), subj);
                 pt = apply_memorylimit(pt, options.thermal_memorylimit);
                 if ~isempty(job_id_acoustic)
-                    pt.hpc.depend_job_id = job_id_acoustic;
+                    pt = hpc_add_dependency(pt, job_id_acoustic);
+                else
+                    pt = hpc_add_dependency(pt, options.depend_job_ids);
                 end
                 job_ids_thermal(ti)   = prestus_pipeline_start(pt);
                 thermal_submitted(ti) = true;
@@ -244,12 +263,14 @@ switch platform
                 fprintf('— report exists, skipping.\n');
             else
                 p_summary.hpc.timelimit = options.summary_timelimit;
-                p_summary.hpc.job_name  = sprintf('PRESTUS-mi-summary_%s', subj);
+                p_summary.hpc.job_name  = sprintf('PRESTUS-%smi-summary_%s', options.job_name_prefix, subj);
                 p_summary               = apply_memorylimit(p_summary, options.summary_memorylimit);
                 p_summary               = apply_partition(p_summary, options.summary_partition);
                 pending_ids = job_ids_thermal(thermal_submitted);
                 if ~isempty(pending_ids)
-                    p_summary.hpc.depend_job_ids = pending_ids;
+                    p_summary = hpc_add_dependency(p_summary, pending_ids);
+                else
+                    p_summary = hpc_add_dependency(p_summary, options.depend_job_ids);
                 end
                 job_id_summary = prestus_pipeline_start(p_summary);
                 fprintf('→ job %s\n', num2str(job_id_summary));
@@ -264,6 +285,10 @@ switch platform
             all_ids = [all_ids, job_id_summary];
         end
         all_ids = all_ids(all_ids > 0);
+        jobs.acoustic = job_id_acoustic;
+        jobs.thermal  = job_ids_thermal(thermal_submitted);
+        if exist('job_id_summary', 'var'); jobs.summary = job_id_summary; end
+        jobs.all      = all_ids;
         if ~isempty(all_ids)
             fprintf('Submitted job IDs : %s\n', num2str(all_ids));
             fprintf('To cancel         : scancel %s\n', num2str(all_ids));
@@ -339,7 +364,12 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix, ow)
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 1;
     p.io.output_affix                = affix;
-    p.io.preproc_affix               = base_affix;   % point at stage-1 preprocessing cache
+    % Point at the stage-1 preprocessing cache: the acoustic stage's own affix, or
+    % the caches it inherited (an uncertainty variant reuses the shared stage-1 head/grid).
+    p.io.preproc_affix               = base_affix;
+    if isfield(base, 'io') && isfield(base.io, 'preproc_affix')
+        p.io.preproc_affix           = base.io.preproc_affix;
+    end
     p.io.overwrite_files             = ow.outputs;
     p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};
     p.io.overwrite_simnibs           = 0;

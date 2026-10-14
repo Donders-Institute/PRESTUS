@@ -11,7 +11,9 @@ function report_path = generate_uncertainty_report(parameters, affixes)
 %
 % Input:
 %   parameters - (1,1) simulation parameters struct; parameters.io.dir_output
-%                must point to the shared output folder
+%                must point to the shared output folder; the optional
+%                parameters.uncertainty.report_suffix (the default variant's
+%                affix, e.g. '_desc-isppa030') is appended to the report file name
 %   affixes    - struct with fields .default, .liberal, .conservative
 %                (defaults: '', '_liberal', '_conservative')
 %
@@ -180,7 +182,14 @@ try
     html_parts{end+1} = '</html>';
 
     %% Write file
-    report_filename = sprintf('sub-%03d_%s_desc-uncertainty_report.html', subject_id, medium);
+    % Named after the default variant's affix: one report per base affix and,
+    % for nested sweeps, per sweep point (UNCERTAINTY_PIPELINE).
+    report_suffix = '';
+    if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'report_suffix')
+        report_suffix = parameters.uncertainty.report_suffix;
+    end
+    report_filename = sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', ...
+        subject_id, medium, report_suffix);
     report_path = fullfile(output_dir, report_filename);
     fid = fopen(report_path, 'w', 'n', 'UTF-8');
     if fid == -1
