@@ -302,68 +302,8 @@ if isempty(target)
     target = 'target';
 end
 
-%% Multi-transducer coherent combination
-% When more than one transducer is present and async mode is not active,
-% simulate each transducer independently and sum the complex Fourier pressure
-% fields (coherent superposition). Each recursive call reduces to the
-% single-transducer path below.
-n_tx = numel(parameters.transducer);
-is_async = isfield(parameters, 'simulation') && ...
-           isfield(parameters.simulation, 'transducer_coupling') && ...
-           strcmp(parameters.simulation.transducer_coupling, 'async');
-
-if n_tx > 1 && ~is_async
-    fprintf('[babelbrain_wrapper] %d transducers — running coherent combination.\n', n_tx);
-    p_combined  = [];
-    last_sd     = struct();
-    for ti = 1:n_tx
-        fprintf('[babelbrain_wrapper] === Transducer %d / %d ===\n', ti, n_tx);
-        p_ti           = parameters;
-        p_ti.transducer = parameters.transducer(ti);
-        % Prevent re-entry on recursive call.
-        p_ti.simulation.transducer_coupling = 'coherent';
-        % Give each sub-run a unique affix so output files don't collide.
-        base_affix = parameters.io.output_affix;
-        p_ti.io.output_affix = [base_affix, trans_suffix(ti, n_tx)];
-        focus_ti = parameters.transducer(ti).focus_pos;
-        trans_ti = parameters.transducer(ti).trans_pos;
-        sd_ti = babelbrain_wrapper(p_ti, medium_masks, kwave_medium, ...
-            focus_ti, trans_ti, planimg, equip_param, pseudoCT);
-        if ~isfield(sd_ti, 'p_complex') || isempty(sd_ti.p_complex)
-            error(['babelbrain_wrapper: p_complex missing from transducer %d output.\n' ...
-                'Ensure the BabelBrain DataForSim.h5 contains /p_complex.'], ti);
-        end
-        % Shape consistency across transducers
-        if ~isempty(p_combined) && ~isequal(size(sd_ti.p_complex), size(p_combined))
-            error(['babelbrain_wrapper: p_complex size mismatch at transducer %d.\n' ...
-                'Got [%d %d %d], expected [%d %d %d].\n' ...
-                'All transducers must use the same simulation grid.'], ...
-                ti, size(sd_ti.p_complex,1), size(sd_ti.p_complex,2), size(sd_ti.p_complex,3), ...
-                size(p_combined,1), size(p_combined,2), size(p_combined,3));
-        end
-        % Finite-value check
-        n_bad = nnz(~isfinite(sd_ti.p_complex(:)));
-        if n_bad > 0
-            error('babelbrain_wrapper: p_complex from transducer %d contains %d NaN/Inf values.', ti, n_bad);
-        end
-        if isempty(p_combined)
-            p_combined = sd_ti.p_complex;
-        else
-            p_combined = p_combined + sd_ti.p_complex;
-        end
-        last_sd = sd_ti;
-    end
-    % Final combined field check
-    n_bad = nnz(~isfinite(p_combined(:)));
-    if n_bad > 0
-        error('babelbrain_wrapper: combined p_complex contains %d NaN/Inf values after summing %d transducers.', n_bad, n_tx);
-    end
-    sensor_data                    = last_sd;
-    sensor_data.p_complex          = p_combined;
-    sensor_data.p_max_all          = abs(p_combined);
-    sensor_data.coherent_n_tx      = n_tx;
-    return
-end
+%% Geometry BabelBrain can simulate: one transducer, beam along the grid z axis
+babelbrain_check_geometry(parameters, trans_pos, focus_pos);
 
 tr = parameters.transducer(1);
 
@@ -591,7 +531,6 @@ fprintf('[babelbrain_wrapper] ---- BabelBrain simulation summary ----\n');
 
 % --- Transducer & frequency ---
 fprintf('[babelbrain_wrapper]  backend   : %s\n', backend_str);
-fprintf('[babelbrain_wrapper]  transducers: %d\n', n_tx);
 fprintf('[babelbrain_wrapper]  Preset:           %s\n', bb.tx_system);
 fprintf('[babelbrain_wrapper]  Frequency:        %.0f Hz (%.0f kHz)\n', freq_hz, freq_hz/1e3);
 fprintf('[babelbrain_wrapper]  PRESTUS grid:     %.4f mm\n', res_mm);
@@ -1250,11 +1189,6 @@ end
 end
 
 %% Local helpers
-
-function sfx = trans_suffix(ti, n_tx)
-% Return a unique affix for transducer ti of n_tx (e.g. '_tx1of3').
-    sfx = sprintf('_tx%dof%d', ti, n_tx);
-end
 
 function s = apply_default(s, field, val)
     if ~isfield(s, field) || isempty(s.(field))

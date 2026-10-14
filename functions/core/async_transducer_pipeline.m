@@ -98,6 +98,11 @@ if N < 2
     error('async_transducer_pipeline:singleTransducer', ...
         'async mode requires at least 2 transducers; only %d found.', N);
 end
+% BabelBrain backends support one transducer per run (errors here, before any job)
+if (isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain')) || ...
+        (isfield(parameters, 'thermal_backend') && strcmpi(parameters.thermal_backend, 'babelbrain'))
+    babelbrain_check_geometry(parameters);
+end
 
 % =========================================================================
 %% Resolve options

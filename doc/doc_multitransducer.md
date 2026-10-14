@@ -106,10 +106,13 @@ The Nexus placement viewer draws every transducer's FOV box.
 
 BabelBrain models one transducer per simulation. Several foci of one phased array (*multi-point* focusing) are treated as time-multiplexed, like PRESTUS async mode: each focal spot is simulated separately, the displayed and safety field is the per-voxel maximum of the pressure amplitudes (`CalculateFieldProcess.py`), and the thermal simulation switches between the spots' magnitude fields with each spot on for its share of the duty cycle (`BHTEMultiplePressureFields` in `ThermalModeling/CalculateTemperatureEffects.py`). The fields are not added as complex fields. Complex fields are used inside one BabelBrain simulation, for the Rayleigh propagation of the source and for phase-conjugation refocusing.
 
+The PRESTUS **BabelBrain backend** (`acoustic_backend` / `thermal_backend: babelbrain`) is limited to one transducer per run, coherent and async alike; multi-transducer runs need `kwave` or `jwave` with `thermal_backend: kwave`. See [BabelBrain — Geometry limits](doc_babelbrain.md#geometry-limits).
+
 ---
 
 ## Known limitations
 
+- The BabelBrain backend supports one transducer per run (see [Comparison with BabelBrain](#comparison-with-babelbrain)).
 - Simulations without a skull or layered setup (e.g. `medium: water`) only model the first transducer.
 - `kWaveArray` mode supports multiple transducers in non-axisymmetric mode. Axisymmetric mode (`grid.axisymmetric = 1`) remains single-transducer only. Matrix-type transducers in `kWaveArray` mode assume a +Z beam axis; see [Transducer geometry](doc_transducer.md#beam-axis-constraint) for details.
 - **Different carrier frequencies** across transducers are handled as follows:

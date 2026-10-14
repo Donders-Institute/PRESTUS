@@ -12,6 +12,13 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, GUI 
 
 - ⚠️ **Fix:** `pct_skullmapping_fit` took the quarter-max crossings around the global maximum of each histogram, not around the peaks it identified. When charm's trabecular label holds many voxels with air-like UTE (a near-zero mode that is the histogram maximum), the "upper trabecular crossing" landed below the crossover (sub-109 of the pCT database: points 0.03 / 0.63 / 0.20 → −1426·u + 1376 instead of about −1600·u + 1880). The crossings are now taken around the cortical peak and the x-weighted trabecular peak, and a warning is issued when the three points are not in ascending order. Fits whose histogram maxima are the identified peaks are unchanged. **Rerun `kosciessa` pCTs that warn or whose `pCT_skull_mapping.png` shows a near-zero trabecular mode.**
 
+#### BabelBrain backend: one transducer, beam along the grid z axis
+
+- ⚠️ **Fix:** PRESTUS hands BabelBrain its simulation grid unrotated, and BabelBrain places the transducer on that grid's z axis through the focus. A beam off z (any multi-transducer run on a shared grid; `grid.mode: ras_plus`) was therefore simulated along z, silently, aimed at the right focus. New `babelbrain_check_geometry` errors instead: more than one transducer with `acoustic_backend` or `thermal_backend` `babelbrain` (at config load, at the start of `async_transducer_pipeline` and in `babelbrain_wrapper`), and a beam more than 2° off the grid z axis (in `babelbrain_wrapper`). The Nexus flags both before launch.
+- **Removed:** multi-transducer support with BabelBrain (coherent recursion in `babelbrain_wrapper`; async). Use `kwave` or `jwave` with `thermal_backend: kwave` for multi-transducer runs. None of the v05 BabelBrain runs used several transducers or `ras_plus`.
+- **Docs:** *BabelBrain — Geometry limits* (new); the limitations table had listed coherent and async multi-transducer as supported.
+- **Tests:** `test_babelbrain_geometry`; Nexus `test_babelbrain_geometry_rules`.
+
 #### Documentation reorganised
 
 - Navigation regrouped by workflow: Get Started, Head Model, Transducer, Placement, Simulation, Running & Outputs, Advanced Modes, Backends, Reference, Help, Developers. Page URLs are unchanged.
