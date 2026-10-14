@@ -205,6 +205,8 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
 
 **Debug files** are only written when `parameters.simulation.debug = 1`.
 
+**Run statistics**: each run that ran an acoustic or thermal simulation adds one line to `<path.sim>/run_stats.jsonl` (one file per `path.sim`, shared by all subjects). The line records the grid size, time steps, thermal steps, simulation durations, solver, partition and peak RAM. The Nexus estimates resources from this file; see [Resource estimates](doc_hpc.md#resource-estimates-from-earlier-runs).
+
 ### Overwrite behaviour
 
 `io.overwrite_files` controls whether existing files are reused or recomputed.

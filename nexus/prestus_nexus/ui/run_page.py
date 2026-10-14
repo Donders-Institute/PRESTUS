@@ -17,6 +17,7 @@ from .. import jobs as hpc_jobs
 from .. import launcher
 from .. import remote as rmt
 from ..model import ConfigModel
+from ..estimate import estimate
 from ..predict_outputs import predict, save_summary
 from .jobs_view import JobsView, JobsWindow
 
@@ -44,7 +45,7 @@ class RunPage(QWidget):
         intro.setWordWrap(True)
         v.addWidget(intro)
 
-        self.deploy_toggle = QCheckBox("Show deployment & save details")
+        self.deploy_toggle = QCheckBox("Show deployment, save & resource details")
         self.deploy_toggle.setToolTip(
             "What prestus_pipeline_start would submit (single job, or one job per transducer/"
             "target/uncertainty variant) and what io.save_* keeps besides the CSV/report.")
@@ -196,7 +197,8 @@ class RunPage(QWidget):
         self.update_deployment_summary()
 
     def update_deployment_summary(self) -> None:
-        """Cheap, no disk I/O — safe to call on every model edit, unlike refresh()."""
+        """Cheap — safe to call on every model edit, unlike refresh(). The only disk
+        access is a stat of run_stats.jsonl (re-read only when it changed)."""
         if not self.deploy_toggle.isChecked():
             return
         plan = predict(self.model)
@@ -206,6 +208,8 @@ class RunPage(QWidget):
             lines.append(f"  ! {w}")
         lines += ["", "SAVE CHOICES"]
         lines += [f"  {s}" for s in save_summary(self.model)]
+        lines += ["", "RESOURCES  (from earlier runs of this project)"]
+        lines += [f"  {s}" for s in estimate(self.model).lines()]
         self.deploy_text.setPlainText("\n".join(lines))
 
     def _toggle_deployment(self, on: bool) -> None:

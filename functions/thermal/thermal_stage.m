@@ -219,9 +219,16 @@ if run_new_sim
             time_status_seq = struct([]);
         end
     else
+        t_thermal = tic;
         [kwaveDiffusion, time_status_seq, results_heating] = ...
             thermal_simulation(parameters_th, sensor_data, kgrid_th, kwave_medium_th, ...
                                sensor_th, source_th, transf_th, medium_masks_th);
+        % Size and duration for resource estimates (run_stats.jsonl)
+        pth = thermal_parameters(parameters_th, true);
+        run_stats('add', 'thermal_s', toc(t_thermal), ...
+            'thermal_steps', pth.n_ptri_reps * (pth.n_pulses_per_pt * ...
+                (pth.pt_on_steps_n + pth.pt_off_steps_n) + pth.ptri_off_steps_n) + pth.post_ptri_steps_n);
+        run_stats('set', 'thermal_voxels', kgrid_th.total_grid_points);
     end
 
     if should_save_output(parameters.io, 'save_thermal_matrices')

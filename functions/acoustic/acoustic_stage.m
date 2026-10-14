@@ -173,6 +173,7 @@ use_jwave      = strcmpi(acoustic_backend_name(parameters), 'jwave');
 parameters.state.acoustic_dry_run = is_acoustic_dry_run(parameters);
 save_cache = should_save_output(parameters.io, 'save_acoustic_matrices') && ...
     ~parameters.state.acoustic_dry_run;
+t_backend = tic;
 
 if use_babelbrain
     sensor_data = babelbrain_wrapper( ...
@@ -229,6 +230,15 @@ else
         acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, ...
                          medium_masks, filename_sensor_data, segmentation, ...
                          source_labels, acoustic_provenance);
+end
+
+% Size and duration for resource estimates (run_stats.jsonl); BabelBrain
+% simulates on its own grid, so only its duration is recorded.
+if ~parameters.state.acoustic_dry_run
+    run_stats('add', 'acoustic_s', toc(t_backend));
+    if ~use_babelbrain && isa(kgrid, 'kWaveGrid')
+        run_stats('set', 'acoustic_voxels', kgrid.total_grid_points, 'acoustic_nt', kgrid.Nt);
+    end
 end
 
 end

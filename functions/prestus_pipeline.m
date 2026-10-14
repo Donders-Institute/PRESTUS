@@ -65,6 +65,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     telemetry_setup();
     telemetry_t0  = tic;
     telemetry_rid = generate_run_id();
+    run_stats('reset');
     try
 
     % ====================================================================
@@ -464,6 +465,10 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
 
     diary('off')
+
+    % Record this run's size and resources before post-hoc water or
+    % follow-up runs (which may run inline) start records of their own.
+    run_stats('write', parameters, toc(telemetry_t0));
 
     % ====================================================================
     %% STAGE 11 — POST-HOC WATER SIMULATION  (optional)

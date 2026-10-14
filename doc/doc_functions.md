@@ -246,6 +246,7 @@ The following documents the functions provided in PRESTUS.
 | `round_if_integer`                      | Rounds values if they are sufficiently close to integers; otherwise raises an error. |
 | `run_command`                           | Execute an external program via java.lang.ProcessBuilder. |
 | `run_shell_script`                      | Execute a shell script string via ProcessBuilder, with only ONE shell in the loop. |
+| `run_stats`                             | Collect a run's simulation size, duration and peak memory |
 | `safe_addpath`                          | Add a directory tree to the MATLAB path, skipping hidden directories |
 | `sample_beam_axis`                      | Interpolate a 2D/3D field along the beam axis from the bowl apex to the grid edge (distances from the apex). |
 | `sanitize_output_affix`                 | Normalise `io.output_affix` to the BIDS `_desc-<label>` form. |

@@ -8,18 +8,20 @@ function varargout = log_timer(action, label, varargin)
 % Use as:
 %   log_timer('start', 'label')
 %   log_timer('start', 'label', '/path/to/monitor')
-%   result = log_timer('stop', 'label')
+%   log_timer('stop', 'label')
+%   log_timer('set_monitor', '/path/to/monitor')
 %
 % Input:
-%   action   - 'start' | 'stop'
-%   label    - string identifier for the timed block; must match between start/stop
-%   varargin - (start only) optional path to monitor for free disk space
+%   action   - 'start' | 'stop' | 'set_monitor'
+%   label    - string identifier for the timed block; must match between
+%              start/stop. For 'set_monitor': the default path to monitor.
+%   varargin - (start only) optional path to monitor for disk usage
+%              (default: the 'set_monitor' path, else pwd)
 %
-% Output (stop only):
-%   varargout{1} - struct with fields:
-%                    .elapsed_s    — wall-clock time [s]
-%                    .peak_ram_gb  — peak RAM usage during block [GB]
-%                    .free_disk_gb — free disk space at stop (if path provided) [GB]
+% Output:
+%   none. 'stop' prints one line: elapsed wall-clock time [s], RAM increase
+%   from start to peak [GB], peak RAM [GB] and the change in used disk
+%   space on the monitored path [GB and MB].
 %
 % Note:
 %   Uses MATLAB persistent variables and timer() objects. If MATLAB exits

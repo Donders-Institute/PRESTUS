@@ -1,0 +1,159 @@
+function out = run_stats(action, varargin)
+% RUN_STATS  Collect a run's simulation size, duration and peak memory
+%
+% The acoustic and thermal stages report what they simulated; at the end of
+% a successful run the pipeline appends one JSON line to
+% <path.sim>/run_stats.jsonl. The Nexus resource estimate (and its headless
+% form, python -m prestus_nexus.estimate) reads that file. Nothing is sent
+% anywhere; this is independent of telemetry consent.
+%
+% Use as:
+%   run_stats('reset')
+%   run_stats('add', 'acoustic_s', 812.4)        % sums over repeated calls
+%   run_stats('set', 'acoustic_nt', 4200)
+%   rec = run_stats('write', parameters, total_s) % append; returns the record
+%   rec = run_stats('get')
+%
+% Input:
+%   action     - 'reset' | 'set' | 'add' | 'get' | 'write'
+%   varargin   - name/value pairs ('set', 'add'); parameters and total run
+%                time [s] ('write')
+%
+% Output:
+%   out - the record struct ('get', 'write'); empty otherwise
+%
+% Record fields: timestamp, platform, hpc_name, hpc_partition, host,
+% gpu_model, code_type, precision, acoustic_backend, medium, resolution_mm,
+% acoustic_voxels, acoustic_nt, acoustic_s, thermal_voxels, thermal_steps,
+% thermal_s, total_s, peak_ram_gb. A stage that did not simulate (cache
+% reuse, dry run, stage off) leaves its fields out.
+%
+% Peak RAM is the MATLAB process high-water mark, or the job cgroup peak
+% (which includes child solvers) under SLURM; Linux only, NaN elsewhere.
+%
+% See also: LOG_MEMORY_USAGE, PRESTUS_PIPELINE
+
+persistent S
+if isempty(S), S = struct(); end
+out = [];
+
+switch action
+    case 'reset'
+        S = struct();
+    case 'set'
+        for k = 1:2:numel(varargin)
+            S.(varargin{k}) = varargin{k+1};
+        end
+    case 'add'
+        for k = 1:2:numel(varargin)
+            if isfield(S, varargin{k})
+                S.(varargin{k}) = S.(varargin{k}) + varargin{k+1};
+            else
+                S.(varargin{k}) = varargin{k+1};
+            end
+        end
+    case 'get'
+        out = S;
+    case 'write'
+        out = S;
+        S = struct();   % a nested or follow-up run starts clean
+        % Only runs that simulated something are useful for estimates.
+        if ~isfield(out, 'acoustic_s') && ~isfield(out, 'thermal_s')
+            return
+        end
+        try
+            out = build_record(out, varargin{1}, varargin{2});
+            append_record(out, varargin{1});
+        catch me
+            % Bookkeeping must never fail a finished run.
+            fprintf('[run_stats] not recorded: %s\n', me.message);
+        end
+    otherwise
+        error('run_stats:badAction', 'Unknown action ''%s''.', action);
+end
+end
+
+%% ------------------------------------------------------------------------
+function rec = build_record(S, parameters, total_s)
+rec = struct();
+rec.timestamp        = char(datetime('now', 'TimeZone', 'UTC', 'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z'''));
+rec.platform         = char(get_field(parameters, {'platform'}, 'matlab'));
+rec.hpc_name         = char(get_field(parameters, {'hpc', 'name'}, ''));
+rec.hpc_partition    = char(get_field(parameters, {'hpc', 'partition'}, ''));
+rec.host             = host_name();
+rec.code_type        = char(get_field(parameters, {'simulation', 'code_type'}, ''));
+rec.gpu_model        = '';
+if contains(rec.code_type, 'gpu')
+    rec.gpu_model = gpu_name();
+end
+rec.precision        = char(get_field(parameters, {'simulation', 'precision'}, ''));
+rec.acoustic_backend = char(get_field(parameters, {'acoustic_backend'}, 'kwave'));
+rec.medium           = char(get_field(parameters, {'simulation', 'medium'}, ''));
+rec.resolution_mm    = get_field(parameters, {'grid', 'resolution_mm'}, NaN);
+fn = fieldnames(S);
+for k = 1:numel(fn)
+    rec.(fn{k}) = S.(fn{k});
+end
+rec.total_s     = total_s;
+rec.peak_ram_gb = peak_ram_gb();
+end
+
+function append_record(rec, parameters)
+sim_dir = char(get_field(parameters, {'path', 'sim'}, ''));
+if isempty(sim_dir) || ~isfolder(sim_dir)
+    return
+end
+fid = fopen(fullfile(sim_dir, 'run_stats.jsonl'), 'a');
+if fid < 0
+    return
+end
+cleaner = onCleanup(@() fclose(fid));
+fprintf(fid, '%s\n', jsonencode(rec));
+end
+
+function v = get_field(s, keys, default)
+v = s;
+for i = 1:numel(keys)
+    if isstruct(v) && isfield(v, keys{i}) && ~isempty(v.(keys{i}))
+        v = v.(keys{i});
+    else
+        v = default;
+        return
+    end
+end
+end
+
+function name = host_name()
+name = getenv('SLURMD_NODENAME');
+if isempty(name)
+    [~, name] = system('hostname');
+end
+name = strtrim(name);
+end
+
+function name = gpu_name()
+try
+    g = gpuDevice();
+    name = g.Name;
+catch
+    name = '';
+end
+end
+
+function gb = peak_ram_gb()
+gb = NaN;
+if ~isunix || ismac || ~isfile('/proc/self/status')
+    return
+end
+try
+    tok = regexp(fileread('/proc/self/status'), 'VmHWM:\s+(\d+)\s*kB', 'tokens', 'once');
+    gb = str2double(tok{1}) / 1024^2;
+    if ~isempty(getenv('SLURM_JOB_ID'))
+        % The job cgroup also holds child solvers (k-Wave C++ binary, BabelBrain).
+        % (evalc: log_memory_usage prints a line; keep the run log clean.)
+        [~, mem] = evalc('log_memory_usage(''run_stats'')');
+        gb = max(gb, mem.cg_peak_gb);
+    end
+catch
+end
+end
