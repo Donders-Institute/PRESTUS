@@ -54,6 +54,7 @@ sections:
   jwave:              {label: jwave backend}
   babelbrain:         {label: BabelBrain backend}
   elastic:            {label: Elastic skull model}
+  time_reversal:      {label: Time reversal, advanced: true}
   medium_properties:  {label: Medium properties, advanced: true}
 
 fields:
@@ -244,6 +245,14 @@ fields:
 
   # ── Backends ─────────────────────────────────────────────────────────
   jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
+  time_reversal.placement_search.standoff_mm: {kind: yaml, unit: mm}
+  time_reversal.placement_search.jitter_mm: {kind: yaml, unit: mm}
+  time_reversal.pose_workflow.poses: {kind: yaml, help: "Pose ids of the pose table to verify as well, e.g. [12, 40]."}
+  time_reversal.pose_workflow.aim: {kind: str, choices: [corrected, geometric, both]}
+  time_reversal.pose_workflow.verify_fov: {kind: str, choices: [partial, full, config]}
+  time_reversal.pose_workflow.rank_by: {kind: str, choices: [target_intensity, focus_error]}
+  time_reversal.pose_workflow.max_focus_error_mm: {kind: yaml, unit: mm}
+  time_reversal.pose_workflow.search_memorylimit: {kind: yaml, unit: GB}
   jwave.python_env: {kind: path}
   jwave.python_env_gpu: {kind: path}
   jwave.use_gpu: {kind: tristate}
@@ -502,7 +511,7 @@ tabs:
   - key: simulation
     label: Simulation
     intro: Medium and solver, the simulation grid, the sonication protocol and the thermal model.
-    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain, elastic]
+    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain, elastic, time_reversal]
   - key: study
     label: Study
     intro: Many subjects with per-run settings, targeting accuracy and the group report.
@@ -778,6 +787,7 @@ display:
   jwave: {label: jwave solver}
   babelbrain: {label: BabelBrain solver}
   elastic: {label: Elastic (shear-wave) skull model}
+  time_reversal: {label: Time reversal (refocusing, aberration report, pose search)}
 
   # Timing
   timing: {label: Sonication protocol}

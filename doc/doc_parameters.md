@@ -603,6 +603,35 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 ---
 
+### Time reversal (`time_reversal`)
+
+See [Time reversal](doc_time_reversal.md). One extra k-Wave run per target (point source at the target), between the free-water baseline and the acoustic simulation.
+
+| **Parameter** | **Description** | **Default** | **Comments** |
+|---|---|---|---|
+| `enabled` | Run the reverse simulation and write the refocusing / aberration report. | `false` | Cartesian 2D/3D grids with the k-Wave source setup; not with `acoustic_backend: babelbrain` (use `babelbrain.do_refocusing`). |
+| `apply_phases` | Use the time-reversal phases in the acoustic run. | `false` | Matrix: per element; annular: per ring; ignored for a single element. ISPPA targeting keeps the drive amplitudes of the geometric drive. |
+| `save_field` | Save the complex reverse field (sensor region) with the results. | `false` | `<dir_cache>/<prefix>_timereversal.mat`. |
+| `placement_search.enabled` | Score transducer poses around the planned one on the same reverse run. | `false` | Curved annular transducers, 3D. Suggestions only: the acoustic run keeps the planned pose. |
+| `placement_search.max_angle_deg` | Largest tilt of the beam direction from the planned one [deg]. | `20` | Poses lie on an orbit around the target, against the scalp. |
+| `placement_search.angle_step_deg` | Angular step of the candidate directions [deg]. | `2.5` | |
+| `placement_search.standoff_mm` | Scalp to exit-plane distance [mm]. | `[]` | `[]` = that of the planned pose. |
+| `placement_search.aim_iterations` | Re-aim at target − predicted shift this many times. | `2` | `0` = geometric aim only. |
+| `placement_search.jitter_mm` | Also score the planned pose with its apex moved by ± this distance along each grid axis [mm]. | `[]` | E.g. `0.5`, the local search users often run with forward simulations. Rows of kind `jitter`. |
+| `only` | Stop after the time-reversal stage. | `false` | No water baseline, acoustic or thermal simulation: the report and pose table only. |
+| `pose_workflow.enabled` | Run the pose workflow (search → forward verification → final full-grid run) instead of a single simulation. | `false` | One curved annular transducer, `simulation.medium: layered`. See [Pose workflow](doc_time_reversal.md#pose-workflow). |
+| `pose_workflow.n_top` | Number of best poses (by predicted target pressure after aim correction) to verify. | `5` | The planned pose is always verified as the reference. |
+| `pose_workflow.poses` | Pose ids of the pose table to verify as well. | `[]` | |
+| `pose_workflow.aim` | Aim of the verification runs. | `'corrected'` | `'corrected'` (aberration-corrected aim point), `'geometric'` (at the target) or `'both'`. |
+| `pose_workflow.verify_fov` | Grid of the verification runs. | `'partial'` | `'partial'`: acoustic FOV around each beam (`grid.acoustic_fov_*`, `'auto'` unless set); `'full'`; `'config'`: as configured. |
+| `pose_workflow.target_radius_mm` | Radius of the target sphere over which the simulated intensity is averaged [mm]. | `2` | |
+| `pose_workflow.rank_by` | How the best pose is chosen. | `'target_intensity'` | `'target_intensity'` (highest mean intensity in the target sphere) or `'focus_error'` (smallest distance from the −3 dB focal centroid to the target). |
+| `pose_workflow.max_focus_error_mm` | Only poses whose −3 dB focal centroid lies within this distance of the target qualify [mm]. | `[]` | `[]` = no limit. |
+| `pose_workflow.final_run` | Run the best pose on the full grid with the configured modules. | `true` | Affix `<affix>_posebest`. |
+| `pose_workflow.search_memorylimit` | `hpc.memorylimit` of the search run [GB]. | `[]` | `[]` = `hpc.memorylimit`. The search records the field over all candidate poses. |
+
+---
+
 ### Output analysis (`analysis`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |

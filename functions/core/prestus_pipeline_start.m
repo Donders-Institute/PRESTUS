@@ -30,7 +30,9 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 %   jobs       - async multi-transducer mode on HPC: the job IDs submitted per
 %                stage (fields preproc, acoustic, combine, thermal, water; see
 %                ASYNC_TRANSDUCER_PIPELINE), e.g. to make later jobs depend on
-%                the acoustic fields. struct() (no fields) otherwise.
+%                the acoustic fields. Uncertainty mode: field .all, every job
+%                submitted (see UNCERTAINTY_PIPELINE). Pose workflow: the jobs of
+%                its first stage (see POSE_WORKFLOW_PIPELINE). struct() (no fields) otherwise.
 %
 % See also: PRESTUS_PIPELINE, UNCERTAINTY_PIPELINE, LOAD_PARAMETERS, PATH_LOG_SETUP
 
@@ -72,7 +74,13 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
     switch parameters.platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
-            if is_async_mode(parameters)
+            % Same precedence as HPC: uncertainty is the outer mode and nests
+            % an async or multi-ISPPA run inside each variant.
+            if is_uncertainty_mode(parameters)
+                jobs = uncertainty_pipeline(parameters, options);
+            elseif is_pose_workflow_mode(parameters)
+                pose_workflow_pipeline(parameters, options);
+            elseif is_async_mode(parameters)
                 async_transducer_pipeline(parameters, options);
             elseif is_multi_isppa_mode(parameters)
                 multi_isppa_pipeline(parameters, options);

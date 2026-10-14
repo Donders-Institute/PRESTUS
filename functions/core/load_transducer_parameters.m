@@ -60,8 +60,10 @@ end
                 resolved{t_i} = parameters.transducer(t_i);
             end
             for t_i = find(has_serial)
+                before = resolved{t_i};
                 resolved{t_i} = resolve_transducer_from_serial( ...
                     resolved{t_i}, equip_param, library_path, t_i);
+                parameters = record_library_drive(parameters, t_i, before, resolved{t_i});
             end
             % Collect all field names across all elements, then rebuild.
             all_fields = cellfun(@fieldnames, resolved, 'UniformOutput', false);
@@ -163,4 +165,26 @@ end
             'Exiting');
     end
 
+end
+function parameters = record_library_drive(parameters, t_i, before, after)
+% parameters.state.library_drive{t_i}: which annular drive fields the
+% calibration library filled in (phases, amplitudes), so that a run at another
+% focal depth (e.g. TIME_REVERSAL_POSE_PARAMETERS) can clear and re-resolve
+% them. A later call finds them filled and keeps the earlier record.
+    filled = @(f) ~annular_set(before, f) && annular_set(after, f);
+    lib = struct('phases', filled('elem_phase_deg'), 'amp', filled('elem_p_amp'));
+    if ~isfield(parameters, 'state') || ~isfield(parameters.state, 'library_drive')
+        parameters.state.library_drive = {};
+    end
+    if numel(parameters.state.library_drive) >= t_i && isstruct(parameters.state.library_drive{t_i})
+        old = parameters.state.library_drive{t_i};
+        lib.phases = lib.phases || old.phases;
+        lib.amp    = lib.amp || old.amp;
+    end
+    parameters.state.library_drive{t_i} = lib;
+end
+
+function tf = annular_set(tr, f)
+    tf = isfield(tr, 'annular') && isstruct(tr.annular) && isfield(tr.annular, f) && ...
+        ~isempty(tr.annular.(f)) && isnumeric(tr.annular.(f)) && ~all(isnan(tr.annular.(f)(:)));
 end

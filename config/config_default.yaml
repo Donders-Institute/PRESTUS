@@ -578,6 +578,32 @@ thermal:
   record_t_at_every_step: 0 # should we record temperature for every time step _for the whole sensor window_ (memory intensive, turn off if you experience 'out of memory' issues)
   log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
 
+#------------ Time reversal (reciprocity): refocusing phases, aberration metrics, pose search (see doc_time_reversal.md)
+# One extra k-Wave run per target with a point source at the target, before the acoustic simulation.
+time_reversal:
+  enabled: false            # Run the reverse simulation and write the refocusing / aberration report
+  apply_phases: false       # Use the time-reversal phases in the acoustic run (matrix: per element; annular: per ring; ignored for a single element)
+  save_field: false         # Also save the reverse field (sensor region, complex) in <dir_cache>/<prefix>_timereversal.mat
+  placement_search:
+    enabled: false          # Score transducer poses around the planned one on the same reverse run (curved annular, 3D); suggestions only
+    max_angle_deg: 20       # Largest tilt of the beam direction from the planned one (orbit around the target) [deg]
+    angle_step_deg: 2.5     # Angular step of the candidate directions [deg]
+    standoff_mm: []         # Scalp to exit-plane distance [mm]; [] = that of the planned pose
+    aim_iterations: 2       # Aberration-corrected aim: re-aim at target - predicted shift this many times (0 = geometric aim only)
+    jitter_mm: []           # Also score the planned pose with its apex moved by +-jitter_mm along each grid axis (e.g. 0.5); [] = none
+  only: false               # Stop after the time-reversal stage: no water baseline, acoustic or thermal simulation
+  pose_workflow:            # Search -> forward verification -> final full-grid run, in one call (one curved annular transducer, layered medium)
+    enabled: false          # Run the pose workflow instead of a single simulation (doc_time_reversal.md#pose-workflow)
+    n_top: 5                # Verify the n_top best poses by predicted target pressure (plus the planned pose as reference)
+    poses: []               # Also verify these pose ids of the pose table
+    aim: 'corrected'        # Aim of the verification runs: 'corrected' (aberration-corrected aim point) | 'geometric' (at the target) | 'both'
+    verify_fov: 'partial'   # Grid of the verification runs: 'partial' (acoustic FOV, 'auto' sizes unless set) | 'full' | 'config' (as configured)
+    target_radius_mm: 2     # Radius of the target sphere over which the simulated intensity is averaged [mm]
+    rank_by: 'target_intensity'  # Choose the best pose by 'target_intensity' (highest) | 'focus_error' (smallest -3 dB centroid to target distance)
+    max_focus_error_mm: []  # Only poses whose -3 dB centroid lies within this distance of the target qualify [mm]; [] = no limit
+    final_run: true         # Run the best pose on the full grid, with the configured modules (e.g. thermal)
+    search_memorylimit: []  # hpc.memorylimit of the search run [GB] (records the field over all candidate poses); [] = hpc.memorylimit
+
 #------------ jwave solver settings (used when acoustic_backend = 'jwave'; see doc_jwave.md)
 jwave:
   python_env: ''            # Path to Python environment or executable; empty = system python

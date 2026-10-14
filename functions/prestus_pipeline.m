@@ -83,6 +83,11 @@ function [parameters] = prestus_pipeline(parameters, options)
         return;
     end
 
+    if is_pose_workflow_mode(parameters)
+        pose_workflow_pipeline(parameters, options);
+        return;
+    end
+
     if isfield(parameters, 'modules') && isfield(parameters.modules, 'combine_async') && ...
             parameters.modules.combine_async
         targets = [];
@@ -232,16 +237,16 @@ function [parameters] = prestus_pipeline(parameters, options)
                 disp('Adapting time step for simulation stability...')
                 clear source sensor source_labels
                 grid_time_step = dt_stability_limit * parameters.grid.source_limit_fraction;
-                [kgrid, source, sensor, source_labels] = source_sensor_setup( ...
+                [kgrid, source, sensor, source_labels, src_weights] = source_sensor_setup( ...
                     parameters, max_sound_speed, trans_pos, focus_pos, grid_time_step, min_sound_speed);
             end
         end
     elseif use_babelbrain_acoustic
         disp('[pipeline] BabelBrain acoustic backend: skipping source setup.')
-        kgrid = []; source = []; sensor = []; source_labels = [];
+        kgrid = []; source = []; sensor = []; source_labels = []; src_weights = [];
     else
         disp('No source setup requested...no simulations will be performed.')
-        kgrid = []; source = []; sensor = []; source_labels = [];
+        kgrid = []; source = []; sensor = []; source_labels = []; src_weights = [];
     end
     log_timer('stop', 'source');
 
@@ -260,9 +265,44 @@ function [parameters] = prestus_pipeline(parameters, options)
         acoustic_provenance.tx_calibration = tr1.tx_calibration;
     end
     clear tr1
+    if ~isempty(coherent_drive)
+        acoustic_provenance.coherent_drive = coherent_drive;
+    end
 
-    acoustic_provenance = acoustic_water_baseline( ...
-        parameters, acoustic_provenance, kgrid, source, sensor, source_labels);
+    tr_only = isfield(parameters, 'time_reversal') && parameters.time_reversal.enabled && ...
+        isfield(parameters.time_reversal, 'only') && parameters.time_reversal.only;
+    if ~tr_only
+        acoustic_provenance = acoustic_water_baseline( ...
+            parameters, acoustic_provenance, kgrid, source, sensor, source_labels);
+    end
+
+    % ====================================================================
+    %% TIME REVERSAL  (optional: refocusing phases, aberration metrics, pose search)
+    % ====================================================================
+    % After the free-water baseline, so that ISPPA targeting keeps the drive
+    % amplitudes of the geometric drive when time-reversal phases are applied.
+
+    if isfield(parameters, 'time_reversal') && parameters.time_reversal.enabled
+        if isempty(kgrid)
+            warning('prestus_pipeline:timeReversalNoGrid', ...
+                ['time_reversal needs the k-Wave source setup; skipped (BabelBrain has its own ' ...
+                 'refocusing: babelbrain.do_refocusing).']);
+        else
+            log_timer('start', 'time_reversal', parameters.io.dir_output);
+            [parameters, source, source_labels] = time_reversal_stage(parameters, kgrid, kwave_medium, ...
+                medium_masks, sensor, src_weights, trans_pos, focus_pos, source, source_labels, planimg, fov_state);
+            log_timer('stop', 'time_reversal');
+        end
+    end
+    clear src_weights
+
+    if tr_only
+        fprintf('time_reversal.only: no acoustic or thermal simulation. Finishing.\n');
+        log_timer('stop','prestus_pipeline')
+        diary('off')
+        run_stats('write', parameters, toc(telemetry_t0));
+        return;
+    end
 
     % ====================================================================
     %% STAGE 6 — ACOUSTIC SIMULATION

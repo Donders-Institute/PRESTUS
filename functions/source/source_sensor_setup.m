@@ -1,4 +1,4 @@
-function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
+function [kgrid, source, sensor, source_labels, src_weights] = source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
 % SOURCE_SENSOR_SETUP  Create kWaveGrid, CW source, and full-grid sensor for a TUS simulation
 %
 % Builds the k-Wave computational grid (kWaveGrid) in 2-D or 3-D from
@@ -70,6 +70,8 @@ function [kgrid, source, sensor, source_labels] = source_sensor_setup(parameters
 %   source        - struct with source.p_mask and source.p
 %   sensor        - struct with sensor.mask, sensor.record, sensor.record_start_index
 %   source_labels - grid of integer element labels (0 = inactive)
+%   src_weights   - per-element grid weights of the source points (SOURCE_CREATE);
+%                   rebuilt when the source is read from the cache and requested
 %
 % See also: SOURCE_CREATE, GRID_TISSUE_SETUP, GRID_TRANSDUCER_LOCATION
 
@@ -262,46 +264,46 @@ end
     parameters.io.filename_kwave_source  = fullfile(parameters.io.dir_cache, ...
         sprintf('sub-%03d_%s_kwave_source%s.mat', ...
         parameters.subject_id, parameters.simulation.medium, source_affix));
-    if confirm_overwriting(parameters.io.filename_kwave_source, parameters)
 
-        % build per-transducer positions for geometry (both kWaveArray and non-kWaveArray paths)
-        if numel(parameters.transducer) > 1
-            nT = numel(parameters.transducer);
-            trans_pos = zeros(nT, numel(parameters.grid.dims));
-            focus_pos = zeros(nT, numel(parameters.grid.dims));
+    % build per-transducer positions for geometry (both kWaveArray and non-kWaveArray paths)
+    if numel(parameters.transducer) > 1
+        nT = numel(parameters.transducer);
+        trans_pos = zeros(nT, numel(parameters.grid.dims));
+        focus_pos = zeros(nT, numel(parameters.grid.dims));
 
-            for ti = 1:nT
-                tr = parameters.transducer(ti);
+        for ti = 1:nT
+            tr = parameters.transducer(ti);
 
-                % transducer position in grid
-                if isfield(tr, 'trans_pos') && ~isempty(tr.trans_pos)
-                    pos = tr.trans_pos;
-                    if size(pos,1) > size(pos,2)
-                        pos = pos';
-                    end
-                    trans_pos(ti,:) = pos;
-                else
-                    trans_pos(ti,:) = trans_pos_final;
+            % transducer position in grid
+            if isfield(tr, 'trans_pos') && ~isempty(tr.trans_pos)
+                pos = tr.trans_pos;
+                if size(pos,1) > size(pos,2)
+                    pos = pos';
                 end
-
-                % focus position in grid
-                if isfield(tr, 'focus_pos') && ~isempty(tr.focus_pos)
-                    fpos = tr.focus_pos;
-                    if size(fpos,1) > size(fpos,2)
-                        fpos = fpos';
-                    end
-                    focus_pos(ti,:) = fpos;
-                else
-                    focus_pos(ti,:) = focus_pos_final;
-                end
+                trans_pos(ti,:) = pos;
+            else
+                trans_pos(ti,:) = trans_pos_final;
             end
-        else
-            % single-transducer case
-            trans_pos = trans_pos_final;
-            focus_pos = focus_pos_final;
+
+            % focus position in grid
+            if isfield(tr, 'focus_pos') && ~isempty(tr.focus_pos)
+                fpos = tr.focus_pos;
+                if size(fpos,1) > size(fpos,2)
+                    fpos = fpos';
+                end
+                focus_pos(ti,:) = fpos;
+            else
+                focus_pos(ti,:) = focus_pos_final;
+            end
         end
+    else
+        % single-transducer case
+        trans_pos = trans_pos_final;
+        focus_pos = focus_pos_final;
+    end
+    if confirm_overwriting(parameters.io.filename_kwave_source, parameters)
         % Create the source matrix
-        [source, source_labels, ~] = source_create(parameters, kgrid, trans_pos, focus_pos);
+        [source, source_labels, ~, src_weights] = source_create(parameters, kgrid, trans_pos, focus_pos);
         % Save the source matrix (controlled by io.save_source_matrices,
         % falling back to io.save_matrices, defaulting to true)
         if should_save_output(parameters.io, 'save_source_matrices')
@@ -311,6 +313,12 @@ end
         end
     else
         load(parameters.io.filename_kwave_source);
+        if nargout >= 5 && isfield(parameters, 'time_reversal') && parameters.time_reversal.enabled
+            % The cached source holds no element weights: rebuild them (time reversal needs them)
+            [~, ~, ~, src_weights] = source_create(parameters, kgrid, trans_pos, focus_pos);
+        else
+            src_weights = [];
+        end
     end
 
     % Creates a sensor that records the the maximum and final pressure

@@ -1,4 +1,4 @@
-function [source, source_labels, tr_arr] = source_create(parameters, kgrid, trans_pos, focus_pos)
+function [source, source_labels, tr_arr, src_weights] = source_create(parameters, kgrid, trans_pos, focus_pos)
 % SOURCE_CREATE  Build a k-Wave source struct from PRESTUS transducer parameters
 %
 % Dispatches to one of two branches:
@@ -51,6 +51,15 @@ function [source, source_labels, tr_arr] = source_create(parameters, kgrid, tran
 %   source_labels - grid array of integer element labels (0 = inactive)
 %   tr_arr        - transducer struct array updated with grid-point element dimensions
 %                   and phase/amplitude fields
+%   src_weights   - grid weight of every element at every source point, as the
+%                   source uses them (for TIME_REVERSAL_REFOCUS); struct with
+%                     .W           [num_src x n_elements] sparse weights
+%                     .mask_ind    [num_src x 1] linear grid indices of the points
+%                     .elem_counts [1 x transducer_N] elements per transducer
+%                     .drive       [n_elements x 1] complex drive A*exp(1i*phi) used
+%                                  (matrix phases as set by CREATE_MATRIX_KARRAY)
+%                   W is binary for makeBowl/makeArc elements. Empty in
+%                   axisymmetric mode.
 %
 % See also: SOURCE_SENSOR_SETUP, CREATE_MATRIX_KARRAY, CREATE_CLOVER_ARRAY
 
@@ -209,6 +218,13 @@ end
 
         source.p_mask    = transducer_mask;
 
+        mask_ind    = find(transducer_mask);
+        src_weights = struct( ...
+            'W',           sparse(1:numel(mask_ind), source_labels(mask_ind), 1, numel(mask_ind), n_elements_total), ...
+            'mask_ind',    mask_ind, ...
+            'elem_counts', n_elements_per_T, ...
+            'drive',       element_drive(tr_arr));
+
     %% Branch 2: kWaveArray-based setup (multi-transducer supported in non-axisymmetric mode)
 
     else
@@ -366,6 +382,7 @@ end
 
             source_labels = sum(grid_weights_cropped > 0.5, 1) > 0;
             source_labels = squeeze(source_labels);
+            src_weights   = [];   % rings on the mirrored grid: no per-point 3D weights
 
             tr_arr(1) = tr;
 
@@ -577,6 +594,9 @@ end
             source.p_mask = binary_mask;
             source.p      = distributed_source_signal;
 
+            src_weights = struct('W', W_src, 'mask_ind', mask_ind, 'elem_counts', elem_counts, ...
+                                 'drive', element_drive(tr_arr));
+
             if parameters.simulation.debug == 1
                 show_binary_mask_transducer(karray, kgrid, parameters);
             end
@@ -608,4 +628,17 @@ end
         fprintf('[source_create]   mode              : axisymmetric (mirrored-grid approximation)\n');
     end
     fprintf('[source_create] ------------------------------------\n');
+end
+
+function C = element_drive(tr_arr)
+% Complex drive A*exp(1i*phi) of every element, transducers concatenated
+    C = cell(numel(tr_arr), 1);
+    for it = 1:numel(tr_arr)
+        g = tr_arr(it).(tr_arr(it).type);
+        a = g.elem_p_amp(:);
+        ph = g.elem_phase_rad(:);
+        if isscalar(a), a = repmat(a, numel(ph), 1); end
+        C{it} = a .* exp(1i * ph);
+    end
+    C = vertcat(C{:});
 end

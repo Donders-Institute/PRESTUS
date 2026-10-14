@@ -19,22 +19,32 @@ The following documents the functions provided in PRESTUS.
 | `assemble_limited_fov_fields`           | Back-project and combine N limited-FOV acoustic results. |
 | `assemble_pfov_fields`                  | Deprecated alias of ASSEMBLE_LIMITED_FOV_FIELDS. |
 | `cache_acoustic`                        | Save or load the slim acoustic results cache. |
+| `coherent_drive_calibration`            | Set each transducer's drive to its own ISPPA target (coherent runs) |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 | `fov_backproject_volume`                | Zero-pad a FOV sub-grid volume back to the full acoustic grid. |
 | `fov_restore_transducers`               | Put every transducer back at its full-grid position after an FOV crop. |
 | `fov_to_grid_pos`                       | Convert FOV-grid voxel indices to full sim-grid indices. |
 | `is_acoustic_dry_run`                   | True when the configured acoustic backend only writes inputs |
+| `load_acoustic_input`                   | Start a run from a prior pressure map instead of simulating |
 | `needs_water_baseline`                  | Decide whether a free-water baseline simulation must run |
 | `plot_axial_profile`                    | Plot and save pressure and intensity along the beam axis (depth from the exit plane) with tissue shading and the free-water O'Neil / k-Wave baseline intensity of the simulated transducer. |
+| `predict_focal_shift`                   | Focus near the target predicted from the reverse field over an aperture |
 | `prepare_thermal_domain`                | Restore full-grid state or adjust planimg for thermal FOV. |
 | `resolve_acoustic_fov_params`           | Resolve 'auto' FOV settings and check readiness. |
+| `reverse_point_source_field`            | Complex CW field of a point source at the target, at the sensor points |
 | `superpose_complex_fields`              | Coherent sum of complex pressure fields from separate runs. |
 | `targeting_analysis`                    | Targeting accuracy of one run from its focal-mask NIfTIs: simulated focus vs planned focus (axial/lateral), vs MNI target and ROI; writes `sub-XXX_<medium><affix>_targeting.csv`. |
+| `time_reversal_pose_metrics`            | Target intensity and focus position of one pose-verification run |
+| `time_reversal_pose_parameters`         | Run parameters that place the transducer at a pose of a pose search |
+| `time_reversal_refocus`                 | Element transfers, refocusing phases and aberration metrics of one transducer |
+| `time_reversal_stage`                   | Refocusing phases, aberration metrics and pose search from one reverse run per target |
+| `write_acoustic_sidecar`                | Describe the T1w pressure NIfTI so a later run can start from it |
 
 #### BABELBRAIN
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `babelbrain_check_geometry`             | Error for geometries the BabelBrain backend cannot simulate (several transducers, beam off the grid z axis) |
 | `babelbrain_insitu_isppa`               | In-brain peak ISPPA of the scaled acoustic field — the `Isppa` BabelBrain's thermal solver normalises to. |
 | `babelbrain_placement_correction`       | Mechanical Tx offset that puts BabelBrain's apex at trans_pos |
 | `babelbrain_thermal_timing`             | Convert PRESTUS timing to BabelBrain thermal parameters |
@@ -136,6 +146,7 @@ The following documents the functions provided in PRESTUS.
 | `grid_stage`                            | Build or load the head model grid cache (Stage 3). |
 | `is_async_mode`                         | Return true when async multi-transducer mode is active. |
 | `is_multi_isppa_mode`                   | True when any transducer carries more than one ISPPA target. |
+| `is_pose_workflow_mode`                 | True when time_reversal.pose_workflow.enabled is set |
 | `isppa_baseline`                        | Free-water ISPPA an acoustic field was produced at, and its origin |
 | `isppa_scale_factor`                    | Pressure scale factor that brings a field to a target free-water ISPPA |
 | `load_grid_cache_file`                  | Load a PRESTUS grid cache and restore pipeline state. |
@@ -144,6 +155,7 @@ The following documents the functions provided in PRESTUS.
 | `medium_stage`                          | Build or load the acoustic/thermal medium property cache (Stage 4). |
 | `multi_isppa_pipeline`                  | Run acoustic simulation once, then thermal analysis at |
 | `path_log_setup`                        | Set up internal paths and logging, filename for output table |
+| `pose_workflow_pipeline`                | Transducer pose search, forward verification and final run in one call |
 | `prestus_config_init`                   | Bootstrap a project-specific PRESTUS configuration folder |
 | `prestus_config_upgrade`                | Refresh a project's config_default.yaml from the toolbox |
 | `prestus_group_report_start`            | Entry point for the group HTML report and group MNI maps: study mode (runs from `study.manifest`) or subject mode (auto-discovered / listed subjects). |
@@ -481,14 +493,20 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `annular_aperture_points`               | Sample points on the radiating surface of a curved annular array |
 | `annular_bowl_depth_mm`                 | Distance from the transducer position (bowl apex) to the exit plane |
+| `annular_geometric_phases`              | Ring phases that steer a curved annular array to a point, in water |
 | `convert_to_element_pos`                | Generate element positions for matrix transducers |
 | `extract_element_pos`                   | Read matrix transducer element positions from file |
 | `focal_distance_calculation`            | Compute expected focal distances for (multi-)transducer setup. |
 | `get_arc`                               | Generates the coordinates of an arc in 2D space. |
 | `get_trans_pos_from_trigger_markers`    | Determines transducer and target positions using Localite trigger marker files. |
 | `get_transducer_box`                    | Computes transducer box dimensions and positions for simulations. |
+| `is_flat_matrix`                        | True for a flat matrix array (is_curved false or infinite radius) |
 | `matrix_elem_diameter`                  | Aperture diameter of a disc/bowl matrix element (equal-area or `elem_diameter_mm`). |
+| `matrix_element_aim`                    | Point each matrix element faces (its normal), curved or flat |
+| `reciprocity_pose_candidates`           | Transducer poses around the planned one, for scoring on one reverse field |
+| `reciprocity_score_poses`               | Score transducer poses on one reverse field (acoustic reciprocity) |
 | `tp_candidate_mesh`                     | Build coordinate mesh and candidate transducer geometry. |
 | `tp_evaluate_candidate_positions`       | Evaluate candidate transducer positions. |
 | `tp_find_initial_candidate`             | Find candidate transducer positions on skull surface. |
