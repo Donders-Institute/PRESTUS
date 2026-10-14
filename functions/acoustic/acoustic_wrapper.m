@@ -73,10 +73,12 @@ end
     pml_size_val = parameters.grid.pml_size;
     if (ischar(pml_size_val) || isstring(pml_size_val)) && strcmp(pml_size_val, 'auto')
         axisym = isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1;
+        pml_range = [];   % k-Wave default [10, 40]
+        if isfield(parameters.grid, 'pml_size_range'); pml_range = parameters.grid.pml_size_range; end
         if axisym
-            effective_pml = getOptimalPMLSize(kgrid, [], 'WSWA');
+            effective_pml = getOptimalPMLSize(kgrid, pml_range, 'WSWA');
         else
-            effective_pml = getOptimalPMLSize(kgrid);
+            effective_pml = getOptimalPMLSize(kgrid, pml_range);
         end
         parameters.grid.pml_size_effective = effective_pml;
     else
@@ -170,6 +172,9 @@ end
     kwave_input_args = struct('PMLInside', false, ...
         'PMLSize', effective_pml, ...
         'PlotPML', true);
+    if isfield(parameters.grid, 'pml_alpha') && ~isempty(parameters.grid.pml_alpha)
+        kwave_input_args.PMLAlpha = parameters.grid.pml_alpha;   % else k-Wave's 2
+    end
 
     if contains(parameters.simulation.medium, {'layered'}) && ...
             any(ismember(fieldnames(parameters.layers), {'skull'}))

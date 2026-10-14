@@ -367,6 +367,23 @@ extra:
     kind: number
     default: 3
     help: Number of trailing wave periods recorded as the steady-state window.
+  grid.pml_size_range:
+    kind: numbers
+    default: [10, 40]
+    unit: grid points
+    help: Search range [min, max] of pml_size 'auto' (k-Wave getOptimalPMLSize).
+  grid.pml_alpha:
+    kind: number
+    default: []
+    help: PML absorption in Nepers per grid point; empty uses k-Wave's default (2).
+  grid.bli_tolerance:
+    kind: number
+    default: []
+    help: kWaveArray band-limited interpolation tolerance; empty uses 0.1 (3D) or 0.01 (axisymmetric).
+  grid.bli_upsampling_rate:
+    kind: number
+    default: []
+    help: kWaveArray integration-point upsampling rate; empty uses 10 (3D) or 100 (axisymmetric).
   grid.source_ppp:
     kind: number
     default: []
@@ -688,6 +705,10 @@ display:
   grid.steady_state_transits: {label: Transits before steady state}
   grid.steady_state_num_periods: {label: Recorded steady-state periods}
   grid.source_ppp: {label: Time steps per period}
+  grid.pml_size_range: {label: PML size search range}
+  grid.pml_alpha: {label: PML absorption}
+  grid.bli_tolerance: {label: kWaveArray BLI tolerance}
+  grid.bli_upsampling_rate: {label: kWaveArray upsampling rate}
   grid.sim_time_us: {label: Fixed simulation duration}
   grid.origin_ras_mm: {label: "RAS origin of voxel [1,1,1]"}
 

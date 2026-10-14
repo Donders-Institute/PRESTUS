@@ -232,10 +232,20 @@ end
             axisymmetric = false;
         end
 
+        % Band-limited interpolation of the source: grid.bli_tolerance and
+        % grid.bli_upsampling_rate, else 0.1 / 10 (3D) and 0.01 / 100 (axisymmetric)
+        if axisymmetric; bli = [0.01, 100]; else; bli = [0.1, 10]; end
+        if isfield(parameters.grid, 'bli_tolerance') && ~isempty(parameters.grid.bli_tolerance)
+            bli(1) = parameters.grid.bli_tolerance;
+        end
+        if isfield(parameters.grid, 'bli_upsampling_rate') && ~isempty(parameters.grid.bli_upsampling_rate)
+            bli(2) = parameters.grid.bli_upsampling_rate;
+        end
+
         % Create kWaveArray object (always without native axisymmetry)
         karray = kWaveArray('Axisymmetric', false, ...
-                           'BLITolerance', 0.1, ...
-                           'UpsamplingRate', 10, ...
+                           'BLITolerance', bli(1), ...
+                           'UpsamplingRate', bli(2), ...
                            'BLIType', 'sinc', ...
                            'SinglePrecision', strcmp(parameters.simulation.precision, 'single'));
 

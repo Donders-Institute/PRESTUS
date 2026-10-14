@@ -433,6 +433,8 @@ grid:
   #                               # Leave empty to reuse the acoustic grid resolution.
   # thermal_fov_mm: []            # Independent thermal FOV [mm]; defines a sub-grid around the focus
   #                               # for the thermal solver, independent of the acoustic FOV.
+  # pml_size_range: [10, 40]  # Search range [min, max] of 'auto' pml_size [grid points] (k-Wave default)
+  # pml_alpha: []              # PML absorption [Nepers per grid point]; empty: k-Wave default (2)
   pml_size: 'auto'    # Perfectly Matched Layer (PML) thickness [grid points] or 'auto'.
                       # 'auto': calls getOptimalPMLSize(kgrid) which searches the range [10, 40]
                       #   and picks the size that minimises the largest prime factor of
