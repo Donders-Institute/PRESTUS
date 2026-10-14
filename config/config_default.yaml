@@ -188,8 +188,14 @@ analysis:
 #   Scalar  → scale to that intensity before thermal analysis.
 #   Vector  → run one thermal job per value (multi-ISPPA sweep mode).
 #   Empty   → no scaling; use elem_p_amp drive level as-is.
+#   Several transducers: each one's own free-water ISPPA (that transducer
+#   alone). async: each field is scaled to its target before combining.
+#   coherent: each transducer's elem_p_amp is set to its target BEFORE the
+#   simulation (free-water baseline of that transducer alone); vectors and
+#   path.acoustic_input are not available.
 #
-# The acoustic simulation always runs at the elem_p_amp specified below.
+# The acoustic simulation runs at the elem_p_amp specified below (coherent
+# multi-transducer runs: at the per-transducer drive set from the targets).
 # Scaling needs a free-water baseline ISPPA. With modules.run_water_baseline: auto
 # (default) it runs whenever a target is set and the transducer has no matching
 # calibration ISPPA; a target that cannot be met stops the run with an error.

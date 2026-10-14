@@ -171,6 +171,31 @@ def rule_issues(model: ConfigModel) -> list[Issue]:
         issues.append(Issue("error", "thermal_backend",
                             "thermal_backend 'babelbrain' requires acoustic_backend 'babelbrain'"))
 
+    # babelbrain_check_geometry.m: BabelBrain simulates one beam, along the grid z axis
+    if "babelbrain" in (ab, tb):
+        key = "acoustic_backend" if ab == "babelbrain" else "thermal_backend"
+        if len(model.effective_transducers()) > 1:
+            issues.append(Issue("error", key,
+                                "The BabelBrain backend supports one transducer per run; "
+                                "use kwave or jwave for multi-transducer runs"))
+        if g("grid.mode") == "ras_plus":
+            issues.append(Issue("error", "grid.mode",
+                                "grid.mode 'ras_plus' leaves the beam off the grid z axis, which the "
+                                "BabelBrain backend cannot simulate; use 'focal_axis'"))
+
+    # coherent_drive_calibration.m / multi_isppa_pipeline.m: coherent multi-transducer
+    # runs set each drive from one target per transducer; a sweep needs one run per point
+    txs_all = model.effective_transducers()
+    if len(txs_all) > 1 and g("simulation.transducer_coupling") != "async":
+        for ti, t in enumerate(txs_all):
+            v = t.get("target_isppa_wcm2")
+            if isinstance(v, (list, tuple)) and len([x for x in v if _is_num(x)]) > 1:
+                issues.append(Issue("error", "transducer.target_isppa_wcm2",
+                                    "Coherent multi-transducer runs take one target per transducer "
+                                    "(each sweep point needs its own simulation); use async coupling "
+                                    "for a sweep", ti))
+                break
+
     # prestus_pipeline.m: mm positions need the placement stage
     cs = g("placement.manual.coordinate_space")
     if g("placement.mode") == "manual" and cs in ("ras", "mni") and \

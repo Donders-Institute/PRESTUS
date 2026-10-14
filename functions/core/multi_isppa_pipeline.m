@@ -68,6 +68,15 @@ end
 %% Validate
 % =========================================================================
 
+% Coherent multi-transducer runs set each transducer's drive from its own target
+% before the simulation (COHERENT_DRIVE_CALIBRATION): one simulation per sweep point.
+if numel(parameters.transducer) > 1
+    error('prestus:isppa:coherentSweep', ...
+        ['ISPPA sweeps are not available for coherent multi-transducer runs: each transducer''s ' ...
+         'drive is set from its own target before the simulation, so every sweep point needs its ' ...
+         'own simulation. Run one config per point, or use simulation.transducer_coupling: async.']);
+end
+
 % Targets are read from transducer(1).target_isppa_wcm2 (canonical location).
 % calibration.target_isppa_wcm2 is the deprecated fallback handled by load_parameters.
 if ~isfield(parameters, 'transducer') || isempty(parameters.transducer) || ...

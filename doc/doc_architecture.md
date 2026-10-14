@@ -88,7 +88,7 @@ Three **chained pipelines** split one run into several jobs that pass results th
 | 3 | Grid | `grid_stage` → `grid_tissue_setup`, `autopad_grid_for_transducers`, `grid_transducer_location`, `grid_axisymmetry` | T1, segmentation, pseudo-CT | `cache/…_grid_cache…mat` (`io.save_grid_cache`), `…_planimg…mat` sidecar |
 | 4 | Medium | `medium_stage` → `medium_setup`; `nifti_medium` | masks, `medium_properties`, pseudo-CT | `cache/…_medium_cache…mat` (`io.save_medium_cache`); property NIfTIs |
 | – | FOV crop | `acoustic_fov_crop` | `grid.acoustic_fov_*` | cropped medium and positions; `fov_state` |
-| 5 | Source | `source_sensor_setup` → `source_create`; `checkStability` | transducer geometry, drive | `cache/…_kwave_source…mat` |
+| 5 | Source | `coherent_drive_calibration` (coherent, >1 transducer); `source_sensor_setup` → `source_create`; `checkStability` | transducer geometry, drive | `cache/…_kwave_source…mat` |
 | – | Free-water baseline | `acoustic_water_baseline` → `needs_water_baseline`, `water_baseline` | source, water properties | `acoustic_provenance.freefield_isppa_wcm2`, `freefield_source` |
 | 6 | Acoustic | `acoustic_stage` → `run_acoustic_backend` (`acoustic_wrapper` / `jwave_wrapper` / `babelbrain_wrapper`); `apply_isppa_scaling` | medium, source, sensor | `cache/…_results…mat` (`cache_acoustic`) |
 | 7 | Acoustic analysis | `acoustic_analysis`; `nifti_acoustic`; `targeting_analysis` | `sensor_data`, masks | `…<affix>.csv`, intensity/pressure/MI NIfTIs, `…_targeting.csv` |
@@ -115,6 +115,8 @@ Caches are for re-runs of the same run. A separate run starts from an earlier ru
 ## Intensity scaling
 
 Simulations run at the drive `elem_p_amp`; results are reported at the free-water ISPPA `transducer.target_isppa_wcm2`, by scaling pressure with `sqrt(target / baseline)`. The baseline comes from a free-water simulation of the same source (`modules.run_water_baseline: auto` runs it when needed) or from a matching library calibration. A target that cannot be met stops the run rather than being reported unscaled. See [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting).
+
+With several transducers each target is that transducer's own free-water ISPPA. Coherent runs cannot scale the combined field per transducer, so `coherent_drive_calibration` sets each transducer's `elem_p_amp` before the source is built (baseline: the transducer alone in water, or its matching calibration) and `apply_isppa_scaling` leaves the result unscaled (`acoustic_provenance.coherent_drive`). Async runs scale each field in `combine_async_intensity`. See [Multi-transducer — ISPPA targets](doc_multitransducer.md#isppa-targets).
 
 ---
 

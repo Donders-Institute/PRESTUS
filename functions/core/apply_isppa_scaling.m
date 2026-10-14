@@ -17,11 +17,11 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
 % (prestus:isppa:noBaseline / prestus:isppa:unsimulatedBaseline) rather than
 % reporting the field at its raw simulated drive level. See ISPPA_SCALE_FACTOR.
 %
-% The target is read from the first transducer entry (single-transducer and
-% coherent multi-transducer runs share one combined field driven by
-% transducer(1)).  For async multi-transducer runs each transducer is scaled
-% independently inside COMBINE_ASYNC_INTENSITY before the fields are summed —
-% this function is not called in that code path.
+% The target is read from the first transducer entry (single-transducer
+% runs). Multi-transducer runs are not rescaled here: coherent runs set each
+% transducer's drive to its own target before the simulation
+% (COHERENT_DRIVE_CALIBRATION, recorded in acoustic_provenance.coherent_drive),
+% and async runs scale each transducer inside COMBINE_ASYNC_INTENSITY.
 %
 % All pressure fields relevant to downstream analysis are scaled by the same
 % factor: p_max_all (Isppa/Psptp), p_min_all (peak rarefaction → MI/MI_tc), and
@@ -37,9 +37,24 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
     % p_max_all while leaving p_max_async untouched, producing an inconsistency
     % between thermal and acoustic safety fields.  Skip for those caches.
     if isfield(acoustic_provenance, 'combination_mode') && ...
-            any(strcmp(acoustic_provenance.combination_mode, ...
-                       {'async_dual_field', 'limited_fov_incoherent_sum'}))
+            (startsWith(acoustic_provenance.combination_mode, 'async_dual_field') || ...   % incl. _fov_backprojected
+             strcmp(acoustic_provenance.combination_mode, 'limited_fov_incoherent_sum'))
         return;
+    end
+
+    % Coherent multi-transducer: drives were set per transducer before the
+    % simulation; the combined field is final.
+    if isfield(acoustic_provenance, 'coherent_drive') && ~isempty(acoustic_provenance.coherent_drive)
+        return;
+    end
+    n_tx = 0;
+    if isfield(parameters, 'transducer'), n_tx = numel(parameters.transducer); end
+    if n_tx > 1 && ~is_async_mode(parameters) && isfinite_scalar(get_target(parameters))
+        error('prestus:isppa:coherentWithoutDriveCalibration', ...
+            ['This coherent %d-transducer result has no per-transducer drive calibration ' ...
+             '(acoustic_provenance.coherent_drive): it was simulated before ISPPA targets were ' ...
+             'applied per transducer, so it cannot be scaled to them. Re-run the acoustic ' ...
+             'simulation (io.overwrite_files).'], n_tx);
     end
 
     target = get_target(parameters);
@@ -76,4 +91,8 @@ function target = get_target(parameters)
     if numel(target) > 1
         target = [];
     end
+end
+
+function tf = isfinite_scalar(x)
+    tf = isnumeric(x) && isscalar(x) && isfinite(x);
 end

@@ -218,7 +218,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `target_isppa_wcm2` | Target free-water ISPPA [W/cm²]. | Default `30`. Scalar: the field is scaled to it (needs a free-water baseline; see `modules.run_water_baseline`). Vector: one thermal job per value ([multi-intensity](doc_multiintensity.md)). Empty `[]`: no scaling, the field is reported at `elem_p_amp`. |
+| `target_isppa_wcm2` | Target free-water ISPPA [W/cm²] of this transducer alone. | Default `30`. Scalar: the field is scaled to it (needs a free-water baseline; see `modules.run_water_baseline`). Vector: one thermal job per value ([multi-intensity](doc_multiintensity.md)). Empty `[]`: no scaling, the field is reported at `elem_p_amp`. Several transducers: each transducer's own target; coherent runs set each drive before the simulation, async runs scale each field before combining (see [Multi-transducer — ISPPA targets](doc_multitransducer.md#isppa-targets)). |
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
 | `serial` | Equipment serial; geometry, phases and drive come from the equipment config and transducer library. | See [doc_transducer_library.md](doc_transducer_library.md). Values set in the study config take precedence. |

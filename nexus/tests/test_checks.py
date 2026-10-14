@@ -56,6 +56,30 @@ def test_transducer_rules(schema):
     assert ("transducer.serial", "error") in found
 
 
+def test_babelbrain_geometry_rules(schema):
+    m = ConfigModel(schema)
+    m.set("acoustic_backend", "babelbrain")
+    assert ("acoustic_backend", "error") not in _msgs(checks.rule_issues(m))
+    m.add_transducer()
+    assert ("acoustic_backend", "error") in _msgs(checks.rule_issues(m))
+    m = ConfigModel(schema)
+    m.set("acoustic_backend", "babelbrain")
+    m.set("grid.mode", "ras_plus")
+    assert ("grid.mode", "error") in _msgs(checks.rule_issues(m))
+    m.set("acoustic_backend", "kwave")
+    assert ("grid.mode", "error") not in _msgs(checks.rule_issues(m))
+
+
+def test_coherent_sweep_rule(schema):
+    m = ConfigModel(schema)
+    m.set("transducer.target_isppa_wcm2", [10, 20])
+    assert ("transducer.target_isppa_wcm2", "error") not in _msgs(checks.rule_issues(m))   # one transducer
+    m.add_transducer()
+    assert ("transducer.target_isppa_wcm2", "error") in _msgs(checks.rule_issues(m))
+    m.set("simulation.transducer_coupling", "async")
+    assert ("transducer.target_isppa_wcm2", "error") not in _msgs(checks.rule_issues(m))
+
+
 def test_value_checks(schema):
     m = ConfigModel(schema)
     m.load_dict({"transducer": {"trans_pos": [1, 2]}, "simulation": {"medium": "vacuum"},

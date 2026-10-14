@@ -208,12 +208,21 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     use_babelbrain_acoustic = isfield(parameters, 'acoustic_backend') && ...
         strcmpi(parameters.acoustic_backend, 'babelbrain');
+    coherent_drive = [];
 
     if (~isfield(parameters.modules, 'run_source_setup') || parameters.modules.run_source_setup == 1) && ...
             ~use_babelbrain_acoustic
         max_sound_speed = max(kwave_medium.sound_speed(:));
         min_sound_speed = min(kwave_medium.sound_speed(:));
-        [kgrid, source, sensor, source_labels] = source_sensor_setup( ...
+        % Coherent multi-transducer: set each transducer's drive to its own
+        % ISPPA target (free-water baseline of that transducer alone)
+        if numel(parameters.transducer) > 1 && ~is_async_mode(parameters)
+            simulate_baseline = @(p) single_source_water_baseline(p, max_sound_speed, ...
+                min_sound_speed, trans_pos, focus_pos);
+            [parameters, coherent_drive] = coherent_drive_calibration(parameters, simulate_baseline);
+            clear simulate_baseline
+        end
+        [kgrid, source, sensor, source_labels, src_weights] = source_sensor_setup( ...
             parameters, max_sound_speed, trans_pos, focus_pos, [], min_sound_speed);
         if isfield(parameters.grid, 'source_limit_fraction') && parameters.grid.source_limit_fraction ~= 0
             disp('Checking CFL stability condition...')
@@ -558,4 +567,18 @@ function v = posthoc_water_limit(parameters, field, fallback)
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, key) && ~isempty(parameters.hpc.(key))
         v = parameters.hpc.(key);
     end
+end
+
+function isppa = single_source_water_baseline(parameters, max_sound_speed, min_sound_speed, trans_pos, focus_pos)
+% Free-water ISPPA of the source in parameters (COHERENT_DRIVE_CALIBRATION
+% passes all transducers but one at zero amplitude): same grid and geometry as
+% the run, built and simulated in water like the run's own baseline. The
+% source gets its own affix, is always rebuilt and never saved, so it can
+% neither come from nor replace the run's cached source (kwave_source*.mat).
+    parameters.io.output_affix         = [parameters.io.output_affix, '_drivecal'];
+    parameters.io.overwrite_files      = 'always';
+    parameters.io.save_source_matrices = 0;
+    [kgrid, source, sensor, source_labels] = source_sensor_setup( ...
+        parameters, max_sound_speed, trans_pos, focus_pos, [], min_sound_speed);
+    isppa = water_baseline(parameters, kgrid, source, sensor, source_labels);
 end

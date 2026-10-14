@@ -32,6 +32,35 @@ The simulation grid is cropped to the bounding box that encloses the CSF-expande
 
 ---
 
+## ISPPA targets
+
+`transducer(k).target_isppa_wcm2` is the free-water ISPPA of **transducer k alone**, for every coupling mode. Each transducer has its own device settings (serial, focal-depth calibration, drive amplitude `elem_p_amp`), so a target that differs from what its drive gives needs that transducer's drive rescaled, not the combined field.
+
+| Coupling | How the targets are applied | Sweeps (vector targets) |
+|---|---|---|
+| `coherent` | Before the simulation (`coherent_drive_calibration`): each transducer's `elem_p_amp` is multiplied by √(target / baseline), where baseline is the free-water ISPPA of that transducer alone at its configured drive. The combined field is simulated at these drives and not rescaled afterwards. | Not available: every sweep point needs its own simulation. Errors (`prestus:isppa:coherentSweep`); run one config per point, or use `async`. |
+| `async` | After the per-transducer simulations: each field is scaled to its own target in `combine_async_intensity`, then combined. | Yes: one acoustic run per transducer, one combine + thermal pair per sweep point (see [Async multi-transducer mode](#async-multi-transducer-mode)). |
+
+**Coherent baseline per transducer.** As for a single transducer (`modules.run_water_baseline`, [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)): when the target matches the transducer's calibration ISPPA (`tx_calibration.isppa_wcm2`, e.g. from the equipment library) within 1 %, the calibration is the baseline and the drive is kept; otherwise PRESTUS simulates that transducer alone in water (the other transducers at zero amplitude, same grid and source geometry). With N transducers that is up to N extra free-water simulations. A transducer with `target_isppa_wcm2: []` keeps its configured drive.
+
+The result records the per-transducer targets, baselines, their source and the drive scale in `acoustic_provenance.coherent_drive`. The free-water ISPPA of the combined source (both firing, with interference) is not a target; if the run's own free-water baseline runs, it reports that combined value. A coherent multi-transducer result cached before this behaviour existed carries no `coherent_drive` and is refused when targets are set (`prestus:isppa:coherentWithoutDriveCalibration`): re-run its acoustic simulation. `path.acoustic_input` (a prior combined pressure map) cannot be rescaled per transducer and errors when targets are set.
+
+```yaml
+simulation:
+  transducer_coupling: coherent
+transducer:
+  - name: left
+    serial: IS_PCD15473_01001
+    target_isppa_wcm2: 20     # left transducer alone: 20 W/cm² in free water
+  - name: right
+    serial: IS_PCD15473_01003
+    target_isppa_wcm2: 40     # right transducer alone: 40 W/cm²
+```
+
+In the Nexus, the target is the per-transducer field *Target free-water Isppa* on the transducer page (switch transducers with the selector); *Multi-transducer coupling* chooses between the two rows above.
+
+---
+
 ## Temporal relation of multi-transducer firing
 
 In practice, multiple transducers may fire simultaneously, with some temporal offset, or fully independently with different duty cycles or pulse sequences. PRESTUS has native support only for the simultaneous coherent case. The other scenarios require workarounds described below.
@@ -40,7 +69,7 @@ In practice, multiple transducers may fire simultaneously, with some temporal of
 
 When multiple transducers are listed in the configuration, PRESTUS combines them into a single k-Wave source matrix. Their pressure fields superpose implicitly as k-Wave solves the linear acoustic PDE — this is the physically correct treatment for transducers that fire at the same frequency with a known phase relationship. All transducers must share the same fundamental frequency; a warning is issued if they differ.
 
-This is the default mode and requires no additional configuration.
+This is the default mode and requires no additional configuration. Each transducer's `target_isppa_wcm2` sets its own drive before the simulation (see [ISPPA targets](#isppa-targets)).
 
 ### Asynchronous / temporally non-overlapping firing
 
