@@ -418,8 +418,12 @@ neuronav:
 
 grid:
   resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
-  default_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
-  # z_beyond_focus_mm: 40   # Extra axial length beyond the focal depth when acoustic_fov_length_mm='auto' [mm].
+  default_dims: 'auto'          # [points per dimension] [used for setting up free-water grid]; 'auto' = sized to the transducer:
+                                #   aperture + 2 x water_margin_mm laterally, focal distance (bowl) + z_beyond_focus_mm axially.
+                                #   Same free-water ISPPA and focus as [144, 144, 400] (k-Wave drive benchmark, 2026-10).
+                                #   A matrix transducer placed by trans_pos/focus_pos (grid indices) keeps [144, 144, 400].
+  # water_margin_mm: 5      # Lateral margin on each side of the aperture when default_dims='auto' [mm].
+  # z_beyond_focus_mm: 40   # Extra axial length beyond the focal depth when acoustic_fov_length_mm='auto' or default_dims='auto' [mm].
   #                          # Default 40 mm, matching BabelBrain conventions.  Override to extend or
   #                          # shorten the acoustic-only sub-grid along the beam axis.
   # acoustic_fov_diameter_mm: []  # Lateral diameter of the beam-axis-aligned acoustic sub-grid [mm].

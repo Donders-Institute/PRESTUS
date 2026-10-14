@@ -413,6 +413,7 @@ The following documents the functions provided in PRESTUS.
 | `grid_transducer_location`              | Position transducer (and target) in simulation grid |
 | `source_create`                         | Creates ultrasound source signals and masks for k-Wave simulations based on transducer geometry. |
 | `source_sensor_setup`                   | Configure a k-Wave simulation grid, transducer sources, and sensor mask based on input parameters for recording pressure fields in 2D or 3D ultrasonic neuromodulation setups. |
+| `water_grid_dims`                       | Free-water grid size from the transducer aperture and focal depth |
 
 #### TELEMETRY
 

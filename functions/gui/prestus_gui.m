@@ -570,8 +570,8 @@ end
         sp(gl, 13);
 
         sec(gl, 14, 'Grid Dimensions');
-        lbl(gl, 15, 1, 'Default dims (water/phantom)');
-        xyz_panel(gl, 15, 'grid.default_dims', [144 144 400]);
+        lbl(gl, 15, 1, 'Default dims (water/phantom; 0 0 0 = auto)');
+        xyz_panel(gl, 15, 'grid.default_dims', [0 0 0]);   % 'auto' (config_default)
 
         lbl(gl, 16, 1, 'PML size');
         nedt(gl, 16, 2, 'grid.pml_size', 10);
@@ -2112,7 +2112,13 @@ end
         for i = 1:numel(xyz_tags)
             tag     = xyz_tags{i};
             safe    = strrep(tag, '.', '__');
-            if isfield(flat, safe) && isnumeric(flat.(safe))
+            if strcmp(tag, 'grid.default_dims') && isfield(flat, safe) && ...
+                    (ischar(flat.(safe)) || isstring(flat.(safe)))
+                for k = 1:3                                % 'auto' shown as 0 0 0
+                    hw = cached_findobj(sprintf('%s_%d', tag, k));
+                    if ~isempty(hw), hw.Value = 0; end
+                end
+            elseif isfield(flat, safe) && isnumeric(flat.(safe))
                 v = double(flat.(safe));
                 if numel(v) >= 3
                     % 3-D: load all three components directly
@@ -2261,6 +2267,9 @@ end
             % built (at least one widget exists); otherwise keep the seeded
             % value to avoid zeroing out unvisited-tab fields.
             if any_widget
+                if strcmp(tag, 'grid.default_dims') && all(vals == 0)
+                    vals = 'auto';                         % 0 0 0 = sized to the transducer
+                end
                 params = set_nested(params, tag, vals);
             end
         end

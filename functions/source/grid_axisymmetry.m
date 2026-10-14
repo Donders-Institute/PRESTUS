@@ -94,8 +94,13 @@ end
         end
         trans_pos = parameters.transducer(1).trans_pos;
         focus_pos = parameters.transducer(1).focus_pos;
-        % ensure that radial(y) dim is shorter than axial (x) dim
-        if parameters.grid.dims(2) > parameters.grid.dims(1)
+        % axial (x) must be dim 1: the beam axis runs along the dim in which
+        % transducer and focus differ. Fall back to the longer dim only when that
+        % is ambiguous — a short free-water grid ('auto', shallow focus, wide
+        % aperture) can be wider than it is long.
+        axis_dim2 = trans_pos(1) == focus_pos(1) && trans_pos(2) ~= focus_pos(2);
+        axis_dim1 = trans_pos(2) == focus_pos(2) && trans_pos(1) ~= focus_pos(1);
+        if axis_dim2 || (~axis_dim1 && parameters.grid.dims(2) > parameters.grid.dims(1))
             parameters.grid.dims = fliplr(parameters.grid.dims);
             trans_pos    = fliplr(trans_pos);
             focus_pos    = fliplr(focus_pos);

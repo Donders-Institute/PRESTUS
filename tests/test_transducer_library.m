@@ -540,6 +540,58 @@ classdef test_transducer_library < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% load_transducer_parameters integration
     % ------------------------------------------------------------------ %
+    % ------------------------------------------------------------------ %
+    %% Free-water grid 'auto' and k-Wave drive metrics (no simulation)
+    % ------------------------------------------------------------------ %
+    methods (Test, TestTags = {'kwave_drive'})
+
+        function test_water_grid_dims_auto_covers_aperture_and_focus(tc)
+            tr = tc.equip_param.trans.CTX_250_001.transducer;
+            tr.focal_distance_ep = 40;
+            p = struct('grid', struct('resolution_mm', 0.5), 'transducer', tr);
+            [dims, info] = water_grid_dims(p);
+            tc.verifyEqual(numel(dims), 3);
+            tc.verifyEqual(dims(1), dims(2));
+            tc.verifyEqual(mod(dims(1), 2), 1, 'odd lateral size: the beam axis is a grid line');
+            tc.verifyGreaterThanOrEqual(dims(1) * 0.5, max(tr.annular.elem_od_mm) + 10);
+            tc.verifyEqual(info.axial_mm, info.focal_distance_bowl_mm + 40, 'AbsTol', 1e-9);
+            tc.verifyGreaterThanOrEqual((dims(3) - 2) * 0.5, info.axial_mm);
+            p.grid.axisymmetric = 1; p.grid.water_margin_mm = 2; p.grid.z_beyond_focus_mm = 20;
+            dims2 = water_grid_dims(p);
+            tc.verifyEqual(numel(dims2), 2);
+            tc.verifyLessThan(dims2(1), dims(1));
+            tc.verifyLessThan(dims2(2), dims(3));
+        end
+
+        function test_water_grid_dims_needs_aperture(tc)
+            p = struct('grid', struct('resolution_mm', 0.5), ...
+                'transducer', struct('type', 'annular', 'focal_distance_ep', 40));
+            tc.verifyError(@() water_grid_dims(p), 'water_grid_dims:aperture');
+        end
+
+        function test_kwave_drive_metrics_separates_level_and_shape(tc)
+            z  = (0:0.5:100)';
+            It = exp(-((z - 50) / 8).^2);                    % measured shape (any scale)
+            % Simulation: right shape, 20 % too hot -> level error only
+            m = kwave_drive_metrics(z, 7 * It, z, 36 * It, 30);
+            tc.verifyEqual(m.isppa_ratio, 1.2, 'AbsTol', 1e-9);
+            tc.verifyEqual(m.isppa_err_pct, 20, 'AbsTol', 1e-6);
+            tc.verifyEqual(m.i_at_target_ratio, 1.2, 'AbsTol', 1e-3);
+            tc.verifyGreaterThan(m.nrmse_before, 0.02);
+            tc.verifyEqual(m.nrmse_after, 0, 'AbsTol', 1e-12);
+            tc.verifyEqual(m.r2_abs_after, 1, 'AbsTol', 1e-12);
+            tc.verifyLessThan(m.r2_abs_before, 1);
+            % Shifted focus: the drive correction cannot remove a shape error
+            m2 = kwave_drive_metrics(z, It, z, 30 * exp(-((z - 54) / 8).^2), 30, ...
+                struct('I_analytical', 25 * It));
+            tc.verifyEqual(m2.isppa_ratio, 1, 'AbsTol', 1e-6);
+            tc.verifyGreaterThan(m2.nrmse_after, 0.05);
+            tc.verifyLessThan(m2.i_at_target_ratio, 1);
+            tc.verifyEqual(m2.kwave_over_analytical, 30 / 25, 'AbsTol', 1e-6);
+        end
+
+    end
+
     methods (Test, TestTags = {'integration'})
 
         function test_serial_triggers_geometry_in_pipeline(tc)

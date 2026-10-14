@@ -130,6 +130,31 @@ else
         % set up default grid dimensions
         assert(isfield(parameters, 'grid') && isfield(parameters.grid, 'default_dims'), ...
             'parameters.grid.default_dims must be set for water simulations')
+        if ischar(parameters.grid.default_dims) || isstring(parameters.grid.default_dims)
+            assert(strcmpi(parameters.grid.default_dims, 'auto'), 'grid_tissue_setup:defaultDims', ...
+                'grid.default_dims must be numeric or ''auto''.');
+            % Annular transducers are placed on the auto grid (GRID_TRANSDUCER_LOCATION
+            % clears their positions in water); other types keep trans_pos/focus_pos,
+            % which are indices of a grid of known size: keep the grid they were
+            % set for (the default until 2026-10)
+            tr1 = parameters.transducer(1);
+            pos_set = any(cellfun(@(f) isfield(tr1, f) && ~isempty(tr1.(f)), ...
+                {'trans_pos', 'focus_pos', 'trans_pos_mm', 'focus_pos_mm'}));
+            if ~strcmp(tr1.type, 'annular') && pos_set
+                legacy = [144, 144, 400];
+                if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric; legacy = [144, 400]; end
+                warning('grid_tissue_setup:autoDimsPositions', ['grid.default_dims ''auto'' with a %s transducer ' ...
+                    'placed by trans_pos/focus_pos (grid indices): using [%s]. Set grid.default_dims explicitly.'], ...
+                    tr1.type, num2str(legacy));
+                parameters.grid.default_dims = legacy;
+            end
+        end
+        if ischar(parameters.grid.default_dims) || isstring(parameters.grid.default_dims)
+            % Sized to the transducer aperture and focal depth (WATER_GRID_DIMS)
+            [parameters.grid.default_dims, gi] = water_grid_dims(parameters);
+            fprintf('[grid_tissue_setup] default_dims auto: aperture %.1f mm + margins → %.1f mm lateral, focus %.1f mm (bowl) + beyond → %.1f mm axial\n', ...
+                gi.aperture_mm, gi.lateral_mm, gi.focal_distance_bowl_mm, gi.axial_mm);
+        end
         parameters.grid.dims = squeeze(parameters.grid.default_dims);
         fprintf('[grid_tissue_setup] Using default %dD grid dimensions: [%s]\n', numel(parameters.grid.dims), num2str(parameters.grid.dims));
         % set up empty medium masks and segmentations

@@ -199,7 +199,7 @@ fields:
 
   # ── Grid ─────────────────────────────────────────────────────────────
   grid.resolution_mm: {unit: mm}
-  grid.default_dims: {kind: numbers, unit: grid points}
+  grid.default_dims: {kind: yaml, unit: grid points}
   grid.pml_size: {kind: yaml}
   grid.source_ppw: {kind: number}
   grid.use_kWaveArray: {kind: flag}
@@ -334,7 +334,12 @@ extra:
     kind: number
     default: 40
     unit: mm
-    help: Extra axial length beyond the focal depth when acoustic_fov_length_mm is 'auto'.
+    help: Extra axial length beyond the focal depth when acoustic_fov_length_mm or default_dims is 'auto'.
+  grid.water_margin_mm:
+    kind: number
+    default: 5
+    unit: mm
+    help: Lateral margin on each side of the aperture when default_dims is 'auto'.
   grid.acoustic_fov_diameter_mm:
     kind: yaml
     default: []
@@ -685,7 +690,7 @@ display:
   grid: {label: Simulation grid}
   grid.*: {advanced: true}
   grid.resolution_mm: {label: Grid resolution, advanced: false}
-  grid.default_dims: {label: Free-water grid size}
+  grid.default_dims: {label: Free-water grid size, help: "Grid points of free-water simulations. 'auto' (default) sizes the grid to the transducer: aperture + 2 × water_margin_mm laterally, focal distance from the bowl + z_beyond_focus_mm axially; same free-water ISPPA and focus as [144, 144, 400]. Or explicit sizes, e.g. [144, 144, 400] (3D) or [144, 400] (axisymmetric); a matrix transducer placed by grid indices keeps [144, 144, 400] under 'auto'."}
   grid.pml_size: {label: PML thickness}
   grid.source_ppw: {label: Points per wavelength}
   grid.min_ppw: {label: Minimum points per wavelength}

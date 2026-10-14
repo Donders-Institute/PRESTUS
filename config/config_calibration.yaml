@@ -50,7 +50,8 @@
   # and reports the agreement with the measured profile; phases unchanged
   kwave_drive_calibration: true     # Run it? (former name: run_free_water_sim, still read)
   force_kwavearray: 1               # Simulate with kWaveArray?
-  axisymmetric2D: 0                 # 2D axisymmetric grid (faster) instead of the study's 3D grid; currently not reliable (doc_transducer_library.md), keep 0
+  axisymmetric2D: 0                 # 2D axisymmetric grid instead of 3D: ~1 min per depth, drive within ~3 % ISPPA of 3D (doc_transducer_library.md)
+  kwave_grid_dims: []               # Free-water grid: [] = grid.default_dims of the simulation config | 'auto' = sized to the aperture and focus (water_grid_dims) | [Nx Ny Nz]
 
   # oneil_phase_only preset only
   opt_method: 'FEXminimize'         # 'FEXminimize' (open source subtoolbox) | 'GlobalSearch' (MATLAB's Global Optimization Toolbox)

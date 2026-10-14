@@ -245,7 +245,10 @@ function print_if_field(s, field, fmt, alternate_name)
         val = s.(field);
         
         % SPECIAL HANDLING: Vector dimensions
-        if strcmp(field, 'default_dims') || strcmp(field, 'grid_dims')
+        if (strcmp(field, 'default_dims') || strcmp(field, 'grid_dims')) && (ischar(val) || isstring(val))
+            fprintf('  %-30s %s\n', [display_name ':'], char(val));   % e.g. 'auto'
+            return;
+        elseif strcmp(field, 'default_dims') || strcmp(field, 'grid_dims')
             if ~isempty(val) && all(isfinite(val(:))) && ~any(isnan(val(:)))
                 if length(val) <= 10
                     grid_str = sprintf('%g ', val);
