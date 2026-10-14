@@ -1440,6 +1440,23 @@ def main():
         if 'OutDiameters' in preset_cfg:
             geom_kw['OutDiameters'] = np.array([float(x) for x in preset_cfg['OutDiameters']])
 
+    # Only forward geometry the preset's sim class accepts by name. Phased arrays
+    # (H317, H246, ...) hardcode their geometry in CreateSimConditions and pass
+    # **kargs on to BabelFTD_Simulations_BASE, which rejects Aperture et al.
+    sim_cls = getattr(sys.modules.get(RunSimClass.__module__), 'BabelFTD_Simulations', None)
+    if geom_kw and sim_cls is not None:
+        import inspect
+        accepted = set()
+        for cls in sim_cls.__mro__:
+            if '__init__' in cls.__dict__:
+                accepted |= {n for n, p in inspect.signature(cls.__init__).parameters.items()
+                             if p.kind in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY)}
+        dropped = sorted(k for k in geom_kw if k not in accepted)
+        if dropped:
+            print(f'[run_babelbrain_case] {args.tx_system}: preset class takes no '
+                  f'{", ".join(dropped)}; using its built-in geometry for these.')
+            geom_kw = {k: v for k, v in geom_kw.items() if k in accepted}
+
     if geom_kw:
         print(f'[run_babelbrain_case] Preset geometry: '
               f"Aperture={geom_kw.get('Aperture','?')} m  "
