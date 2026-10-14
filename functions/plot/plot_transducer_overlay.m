@@ -57,15 +57,26 @@ end
 
 r = max_od / 2 / grid_step;
 
+% Flat element (plane piston, curv_radius_mm = Inf): its face is the exit plane
+is_flat = ~isfinite(tr.(tr.type).curv_radius_mm);
+
 % Exit plane positions (two methods for consistency)
-dist_to_exit_plane_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
+if strcmp(tr.type, 'annular')
+    dist_to_exit_plane_mm = annular_bowl_depth_mm(tr.annular);
+else
+    dist_to_exit_plane_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
+end
 dist_to_exit_plane_vox = round(dist_to_exit_plane_mm / parameters.grid.resolution_mm);
 ex_plane_x_simple = trans_pos(2) - 1 + dist_to_exit_plane_vox;  % Rectangle method
 
 % Full geometry (for curved visualization)
-geom_focus_pos = trans_pos(:)' - (tr.(tr.type).curv_radius_mm / grid_step) * [cos(focal_angle), sin(focal_angle)];
-dist_to_ep = 0.5 * sqrt(4*tr.(tr.type).curv_radius_mm^2 - max_od^2) / grid_step;
-ex_plane_pos_trig = geom_focus_pos + dist_to_ep * [cos(focal_angle), sin(focal_angle)];
+if is_flat
+    ex_plane_pos_trig = trans_pos(:)';
+else
+    geom_focus_pos = trans_pos(:)' - (tr.(tr.type).curv_radius_mm / grid_step) * [cos(focal_angle), sin(focal_angle)];
+    dist_to_ep = 0.5 * sqrt(4*tr.(tr.type).curv_radius_mm^2 - max_od^2) / grid_step;
+    ex_plane_pos_trig = geom_focus_pos + dist_to_ep * [cos(focal_angle), sin(focal_angle)];
+end
 ort_angle = atan2(-focal_slope(1), focal_slope(2));
 
 %% 2. VISUAL PROPERTIES
@@ -143,11 +154,13 @@ right_edge_y = ex_plane_pos_trig(1) + r * cos(ort_angle);
 line([left_edge_x, right_edge_x], [left_edge_y, right_edge_y], ...
      'LineWidth', lineWidth, 'Color', boxColor, 'LineStyle', ':');
 
-% Curved front surface
-arc_halfangle = atan((max_od/2) / (dist_to_ep * grid_step));
-[arc_x, arc_y] = get_arc(geom_focus_pos, tr.(tr.type).curv_radius_mm/grid_step, ...
-                        focal_angle-arc_halfangle, focal_angle+arc_halfangle);
-plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth);
+% Front surface: the arc of a bowl; a flat face is the exit-plane chord above
+if ~is_flat
+    arc_halfangle = atan((max_od/2) / (dist_to_ep * grid_step));
+    [arc_x, arc_y] = get_arc(geom_focus_pos, tr.(tr.type).curv_radius_mm/grid_step, ...
+                            focal_angle-arc_halfangle, focal_angle+arc_halfangle);
+    plot(arc_y, arc_x, 'Color', boxColor, 'LineWidth', lineWidth);
+end
 
 hold off;
 end

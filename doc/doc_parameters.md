@@ -256,8 +256,10 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `elem_width_mm` | Element width [mm], along x. | `rect` elements: size along x; `disc`/`bowl`: sets the equal-area diameter. |
 | `elem_diameter_mm` | Aperture diameter of `disc`/`bowl` elements [mm]. | Optional. Empty = equal-area diameter from `elem_width_mm` × `elem_height_mm` (flat disc area for `disc`, spherical-cap area for `bowl`). Also sets the element size in the transducer mask. |
 | `elem_phase_override_deg` | Calibrated per-element phases [deg]. | Optional, one value per element (after Clover replication). Replaces the geometric steering phases toward `focus_pos`; element orientation is unchanged. Empty = geometric steering. |
+| `use_steering_correction` | Scale the element drive by the steering correction k(target). | Default `true`. Used when the transducer library (or `steering_correction`) holds one; see [Steering correction of matrix arrays](doc_transducer_library.md#steering-correction-of-matrix-arrays). |
+| `steering_correction` | Steering correction given inline. | Optional struct as written by `build_steering_correction`. Empty = from the transducer library. |
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
-| `is_curved` | Whether the array has a curved surface. | |
+| `is_curved` | Whether the array has a curved surface. | `false` = flat array: every element faces +z, `curv_radius_mm` is not used, `elem_shape` must be `rect` or `disc`. |
 | `curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. Depends on `is_curved`. |
 | `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` and `outer_diameter_mm` if not provided. Depends on `is_curved`. |
 | `is_clover_setup` | Enables Clover (multi-array) configuration. | Replicates array into multiple leaves. |
@@ -307,9 +309,10 @@ Warning: The `define_here` options are experimental and may contain bugs due to 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `file_path` | Path to coordinate file. | Must contain (x, y, z). |
+| `file_path` | Path to coordinate file. | Must contain (x, y, z) [mm]. Curved array: origin at the centre of curvature, z towards the array. Flat array: origin at the array centre, z along the beam. |
 | `start_row` | Row index where data starts. | MATLAB may skip header row. |
 | `start_col` | Column index where data starts. | |
+| `rot_col` | Column with each element's rotation about its own normal [deg]. | Optional. For rectangular elements laid out in different orientations (e.g. `90` = turned on its side). Empty = all elements as `elem_width_mm` × `elem_height_mm` along x × y. |
 | `elem_n` | Number of elements to extract. | Can exceed final active count. |
 | `select_random_subset` | Enable random subset selection. | Useful for sparse arrays. |
 | `subset.random_seed` | Controls reproducibility of subset. | `true` = new subset each run. |

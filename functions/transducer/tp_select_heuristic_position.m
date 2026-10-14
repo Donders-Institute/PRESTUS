@@ -167,7 +167,10 @@ best_trans_pos.ras_targ_z_mm = target_pos_ras(3);
 
 table_formatted = rows2vars(best_trans_pos);
 
-table_path = fullfile(parameters.io.dir_output, sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
+parameters.placement.heuristic.target_name = target_name;
+run_dir = placement_run_dir(parameters, 'heuristic');
+if ~isfolder(run_dir); mkdir(run_dir); end
+table_path = fullfile(run_dir, sprintf('sub-%03.0f_%s.txt', subject_id, target_name));
 writetable(table_formatted, table_path, 'Delimiter', 'tab', 'WriteVariableNames', false);
 fprintf('[TP_HEURISTIC] Saved heuristic position: %s\n', table_path);
 

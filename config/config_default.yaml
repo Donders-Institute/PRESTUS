@@ -240,9 +240,11 @@ transducer:
     elem_width_mm: []     # Element width [mm]
     elem_diameter_mm: []  # Aperture diameter of 'disc'/'bowl' elements [mm]; [] = equal area to width x height
     elem_phase_override_deg: [] # Calibrated per-element phases [deg] replacing geometric steering; [] = steer geometrically to focus_pos
+    use_steering_correction: true # Scale the drive by the library's steering correction k(target) (measured / modelled focal peak), when the library has one
+    steering_correction: []   # Steering correction given inline (struct from build_steering_correction); [] = from the transducer library
     outer_diameter_mm: [] # Outer diameter of the transducer [mm]
     depth_mm: []          # Depth of transducer used for visualization purposes [mm]
-    is_curved: []         # true if transducer has a curved (spherical) surface, false if flat
+    is_curved: []         # true if transducer has a curved (spherical) surface, false if flat (elements face +z; elem_shape rect or disc)
     curv_radius_mm: []    # Radius of curvature of the bowl [mm]
     dist_geom_ep_mm: []   # Distance from exit plane to geometric focus [mm]
 
@@ -284,6 +286,7 @@ transducer:
         file_path: []              # Path to file with element positions (x, y, z) [string]
         start_row: []              # Row in file where element data starts
         start_col: []              # Column in file where element data starts
+        rot_col: []                # Column with each element's rotation about its normal [deg] (e.g. 90 = rectangle turned on its side); [] = none
         elem_n: []                 # Total number of elements to extract
         select_random_subset: []   # true to randomly pick a subset
         subset:

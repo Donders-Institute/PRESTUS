@@ -12,6 +12,18 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 % given in tr.matrix.elem_phase_override_deg (one value per element), which
 % then replace the geometric steering phases.
 %
+% Flat arrays (is_curved false) have every element facing +z. Rectangular
+% elements are turned about their own normal by tr.matrix.elem_rot_deg
+% (one value per element, from EXTRACT_ELEMENT_POS) when it is set.
+%
+% Steering correction: when tr.matrix.steering_correction holds a fitted
+% map (FIT_STEERING_CORRECTION, usually from the transducer library) and
+% tr.matrix.use_steering_correction is not false, every element amplitude
+% is multiplied by k(target) = measured / modelled focal peak at the
+% steering target (STEERING_CORRECTION_FACTOR). elem_p_amp then stays the
+% nominal drive setting, and the simulated field is what the device
+% delivers at that setting. k is stored in tr.matrix.steering_k.
+%
 % Use as:
 %   [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos, focus_pos)
 %
@@ -32,9 +44,10 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 % Output:
 %   karray - kWaveArray with all elements added
 %   tr     - updated with tr.matrix.elem_phase_rad, tr.matrix.elem_phase_deg,
-%            tr.matrix.elem_n, tr.matrix.elem_p_amp
+%            tr.matrix.elem_n, tr.matrix.elem_p_amp, tr.matrix.steering_k
 %
-% See also: CREATE_CLOVER_ARRAY, SOURCE_CREATE
+% See also: CREATE_CLOVER_ARRAY, SOURCE_CREATE, MATRIX_ELEMENT_AIM,
+%           STEERING_CORRECTION_FACTOR
 
 arguments
     kgrid      (1,1)
@@ -59,11 +72,12 @@ end
     % axes (e.g. a second transducer firing in -Z in a bilateral setup) element
     % orientations and phase delays will be wrong. Annular transducers are
     % unaffected (this function is only called for matrix type).
-    natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
+    % Elements face the natural focus (curved) or along +z (flat)
+    aim_pos_m = matrix_element_aim(tr.matrix, elem_pos_m, trans_pos_m);
+    natural_focus_pos_m = mean(aim_pos_m, 2);   % for the debug figure only
 
     % Apply Clover setup if requested
-    aim_pos_m = repmat(natural_focus_pos_m, 1, size(elem_pos_m, 2));
-    if tr.matrix.is_clover_setup    
+    if isequal(tr.matrix.is_clover_setup, true)    
         [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
     end
     
@@ -71,6 +85,33 @@ end
 
     % Initialize source amplitudes (uniform)
     tr.matrix.elem_p_amp = tr.matrix.elem_p_amp(1) * ones(1, tr.matrix.elem_n);
+
+    % Steering correction: measured / modelled focal peak at this target
+    tr.matrix.steering_k = 1;
+    use_sc = ~isfield(tr.matrix, 'use_steering_correction') || isempty(tr.matrix.use_steering_correction) ...
+        || isequal(tr.matrix.use_steering_correction, true);
+    if use_sc && isfield(tr.matrix, 'steering_correction') && isstruct(tr.matrix.steering_correction)
+        target_mm = (focus_pos_m - trans_pos_m)' * 1e3;   % transducer frame, beam along +z
+        tr.matrix.steering_k = steering_correction_factor(tr.matrix.steering_correction, target_mm);
+        tr.matrix.elem_p_amp = tr.matrix.elem_p_amp * tr.matrix.steering_k;
+        fprintf('Matrix transducer: steering correction k = %.3f at target [%.1f %.1f %.1f] mm.\n', ...
+            tr.matrix.steering_k, target_mm);
+    end
+
+    % Per-element rotation about the element normal (rectangular elements)
+    elem_rot_deg = zeros(1, tr.matrix.elem_n);
+    if isfield(tr.matrix, 'elem_rot_deg') && ~isempty(tr.matrix.elem_rot_deg)
+        if numel(tr.matrix.elem_rot_deg) ~= tr.matrix.elem_n
+            error('create_matrix_karray:rotSize', ...
+                'elem_rot_deg has %d values but the matrix array has %d elements.', ...
+                numel(tr.matrix.elem_rot_deg), tr.matrix.elem_n);
+        end
+        elem_rot_deg = tr.matrix.elem_rot_deg(:)';
+    end
+    if is_flat_matrix(tr.matrix) && strcmpi(tr.matrix.elem_shape, 'bowl')
+        error('create_matrix_karray:flatBowl', ...
+            'A flat matrix array (is_curved false) needs elem_shape ''rect'' or ''disc''.');
+    end
 
     % Wavelength and wavenumber for phase calculation
     lambda = parameters.medium_properties.water.sound_speed / tr.freq_hz;
@@ -106,6 +147,13 @@ end
         c = dot(z0, norm_vec);
         vx = [ 0 -v(3) v(2); v(3) 0 -v(1); -v(2) v(1) 0 ];
         R = eye(3) + vx + vx^2*((1-c)/(s^2+eps));
+
+        % Turn the element about its own normal (applied before aiming)
+        if elem_rot_deg(ind) ~= 0
+            R = R * [cosd(elem_rot_deg(ind)) -sind(elem_rot_deg(ind)) 0;
+                     sind(elem_rot_deg(ind))  cosd(elem_rot_deg(ind)) 0;
+                     0 0 1];
+        end
 
 
         % Convert rotation matrix to ZYX Euler angles (extrinsic)

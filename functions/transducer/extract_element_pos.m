@@ -1,4 +1,4 @@
-function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
+function [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
 % EXTRACT_ELEMENT_POS  Read matrix transducer element positions from file
 %
 % Reads element position coordinates from an external file and converts
@@ -6,8 +6,18 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
 % optionally projected onto a new radius of curvature before being
 % shifted to the transducer location in the k-Wave grid.
 %
+% Coordinate frame of the file: for a curved array (is_curved true), the
+% origin is the centre of curvature and z points towards the array (the
+% apex sits at z = curv_radius_mm). For a flat array (is_curved false),
+% the origin is the array centre and z points along the beam; elements
+% normally lie at z = 0.
+%
+% With extract_from_file.rot_col set, that column holds each element's
+% rotation about its own normal [deg] (e.g. 90 for a rectangular element
+% turned on its side); it is returned in tr.matrix.elem_rot_deg.
+%
 % Use as:
-%   elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
+%   [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
 %
 % Input:
 %   parameters  - (1,1) simulation parameters struct
@@ -16,6 +26,8 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
 %
 % Output:
 %   elem_pos_m - [3xN] element positions in simulation coordinates [m]
+%   tr         - transducer struct; tr.matrix.elem_rot_deg [1xN] set when
+%                extract_from_file.rot_col is given
 %
 % See also: CONVERT_TO_ELEMENT_POS, TRANSDUCER_SETUP
 
@@ -36,6 +48,12 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
     phys_positions_mm = table2array( ...
     tran_info(row_start:row_end, col_start:col_start+2) ...
     );
+
+    % Optional per-element rotation about the element normal [deg]
+    elem_rot_deg = [];
+    if isfield(file_ext, 'rot_col') && ~isempty(file_ext.rot_col)
+        elem_rot_deg = table2array(tran_info(row_start:row_end, file_ext.rot_col));
+    end
     
     % ---------------------------------------------------------------------
     % Optional: randomly select subset of elements
@@ -46,26 +64,38 @@ function elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m)
             rng('shuffle'); % seed RNG based on current time
         end
 
-        phys_positions_mm = datasample(phys_positions_mm, ...
+        [phys_positions_mm, keep] = datasample(phys_positions_mm, ...
             file_ext.subset.subset_n_elements, ...
             1, ...
             'Replace', ...
             false);
+        if ~isempty(elem_rot_deg); elem_rot_deg = elem_rot_deg(keep); end
     end
+    if ~isempty(elem_rot_deg); tr.matrix.elem_rot_deg = elem_rot_deg(:)'; end
     
     % ---------------------------------------------------------------------
     % Convert positions from mm to metres and center coordinates
     % ---------------------------------------------------------------------
     ROC = tr.matrix.curv_radius_mm;
 
-    % Translate origin from [0,0,ROC] to [0,0,0], convert mm→m, and flip Z-axis
-    phys_positions_m = (phys_positions_mm - [0, 0, ROC]) .* [1, 1, -1] / 1000;
+    if is_flat_matrix(tr.matrix)
+        % Flat array: the file is already in the transducer frame (origin at
+        % the array centre, beam along +z); only mm -> m
+        phys_positions_m = phys_positions_mm / 1000;
+        if isfield(file_ext, 'project_on_new_ROC') && isequal(file_ext.project_on_new_ROC, true)
+            error('extract_element_pos:flatProjection', ...
+                'project_on_new_ROC needs a curved array (is_curved true).');
+        end
+    else
+        % Translate origin from [0,0,ROC] to [0,0,0], convert mm→m, and flip Z-axis
+        phys_positions_m = (phys_positions_mm - [0, 0, ROC]) .* [1, 1, -1] / 1000;
+    end
     
     % ---------------------------------------------------------------------
     % Optional: project elements onto new radius of curvature
     % ---------------------------------------------------------------------
 
-    if file_ext.project_on_new_ROC
+    if ~is_flat_matrix(tr.matrix) && isequal(file_ext.project_on_new_ROC, true)
 
         new_ROC_mm = file_ext.ROC_projection.new_ROC_mm;
 

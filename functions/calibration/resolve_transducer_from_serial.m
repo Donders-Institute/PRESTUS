@@ -69,7 +69,11 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
     end
 
     %% ── Calibration library lookup ───────────────────────────────────────
-    % Only annular transducers currently support library-based calibration.
+    % Matrix arrays: an optional steering correction (BUILD_STEERING_CORRECTION).
+    if strcmp(tr.type, 'matrix')
+        tr = resolve_matrix_steering(tr, serial, library_path, t_i);
+        return;
+    end
     if ~strcmp(tr.type, 'annular')
         return;
     end
@@ -192,6 +196,33 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i)
 end
 
 % ── Helpers ──────────────────────────────────────────────────────────────
+
+function tr = resolve_matrix_steering(tr, serial, library_path, t_i)
+% Attach the library's steering correction, if there is one and the study
+% config gives none and has not switched it off.
+    if isfield(tr.matrix, 'use_steering_correction') && isequal(tr.matrix.use_steering_correction, false)
+        return;
+    end
+    if isfield(tr.matrix, 'steering_correction') && isstruct(tr.matrix.steering_correction)
+        return;   % given inline
+    end
+    if isfield(tr, 'library_path') && ~isempty(tr.library_path)
+        library_path = char(tr.library_path);
+    end
+    combo_name = resolve_combo_name(serial, tr);
+    files = {fullfile(library_path, [combo_name, '.yaml']), fullfile(library_path, [serial, '.yaml'])};
+    f = files(cellfun(@isfile, files));
+    if isempty(f)
+        return;   % uncorrected: the model drive is used as is
+    end
+    lib = yaml.loadFile(f{1}, 'ConvertToArray', true);
+    if ~isfield(lib, 'steering_correction')
+        return;
+    end
+    tr.matrix.steering_correction = lib.steering_correction;
+    fprintf('[transducer %d] Steering correction from %s (%s, %d targets).\n', ...
+        t_i, f{1}, char(lib.steering_correction.model), lib.steering_correction.n_targets);
+end
 
 function combo_name = resolve_combo_name(serial, tr, ~, ~)
 % Return the library lookup key.

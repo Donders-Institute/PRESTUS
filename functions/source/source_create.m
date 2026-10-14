@@ -441,7 +441,7 @@ end
                             case 'define_here'
                                 [elem_pos_m, tr] = convert_to_element_pos(parameters, tr, trans_pos_m, focus_pos_m);
                             case 'extract_from_file'
-                                elem_pos_m = extract_element_pos(parameters, tr, trans_pos_m);
+                                [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m);
                             otherwise
                                 error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
                         end

@@ -90,15 +90,15 @@ function [transducer_mask, source_label, tr] = ...
                 case 'define_here'
                     [elem_pos_m, tr] = convert_to_element_pos(parameters, tr,  trans_pos_m, focus_pos_m);
                 case 'extract_from_file'
-                    elem_pos_m = extract_element_pos(parameters, tr,  trans_pos_m);
+                    [elem_pos_m, tr] = extract_element_pos(parameters, tr,  trans_pos_m);
                 otherwise
                     error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
             end
 
-            natural_focus_pos_m = trans_pos_m + [0, 0, tr.matrix.curv_radius_mm / 1000]';
+            % Elements face the natural focus (curved) or along +z (flat)
+            aim_pos_m = matrix_element_aim(tr.matrix, elem_pos_m, trans_pos_m);
 
             % Apply Clover setup if requested
-            aim_pos_m = repmat(natural_focus_pos_m, 1, size(elem_pos_m, 2));
             if isfield(tr.matrix, 'is_clover_setup') && isequal(tr.matrix.is_clover_setup, true)
                 [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr.matrix, elem_pos_m, trans_pos_m, focus_pos_m);
             end
@@ -115,6 +115,12 @@ function [transducer_mask, source_label, tr] = ...
             mask_elem = tr.matrix;
             mask_elem.elem_shape = 'bowl';
             r_c = tr.matrix.curv_radius_mm / 1e3;
+            if is_flat_matrix(tr.matrix)
+                % Flat elements: drawn as bowls of 1 m radius (sag < one voxel
+                % for elements of a few mm); the kWaveArray source is exact
+                r_c = 1;
+                mask_elem.curv_radius_mm = 1e3;
+            end
             r_c_grid = r_c * 1e3 / grid_res_mm;
             diameter_grid = matrix_elem_diameter(mask_elem) * 1e3 / grid_res_mm;
 

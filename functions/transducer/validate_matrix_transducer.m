@@ -261,7 +261,13 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
 
             file_path = extract_shape_from_file.file_path;
 
-            resolved_path = which(file_path);
+            % An existing (absolute or relative) path is used as given; otherwise
+            % the file is looked up on the MATLAB path
+            if isfile(file_path)
+                f = dir(file_path); resolved_path = fullfile(f.folder, f.name);
+            else
+                resolved_path = which(file_path);
+            end
 
             assert(~isempty(resolved_path), ...
                 'Transducer %i; File "%s" does not exist or is not on the MATLAB path.', t_i, file_path);

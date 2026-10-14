@@ -55,12 +55,13 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `axial_transfer_matrix`                 | On-axis complex pressure per unit element drive |
+| `build_steering_correction`             | Steering correction of a matrix array from hydrophone measurements |
 | `calibrate_babelbrain_phase_profile`    | Whole-profile Rayleigh fit of annular drive phases for BabelBrain |
 | `calibrate_focal_steering`              | Analytical steer that lands the FWHM/peak at a target |
 | `calibrate_library_entry`               | Calibration core: profiles at requested depths (measured or interpolated), per-depth fits, refinements, optional k-Wave drive calibration, report (no file I/O) |
 | `calibration_desired_profiles`          | Profiles on a desired-depth grid, for prediction and fitting |
 | `calibration_evaluate`                  | Geometric, library, fitted and k-Wave profiles on one set of depths |
-| `calibration_fit`                       | Interactive calibration fit: per-depth refinements or the static model |
+| `calibration_fit`                       | Interactive calibration fit: per-depth refinements |
 | `calibration_fit_depths`                | One `fit_transducer_model` fit per depth of a profile set (shared by library build, refinement, GUI, `calibration_transducer`) |
 | `calibration_fit_entry`                 | Library entry from the current entry and a CALIBRATION_FIT result |
 | `calibration_fit_options`               | Per-depth fit presets: `rayleigh_phase_gain` (default) and `oneil_phase_only` (former global-search settings) |
@@ -74,12 +75,16 @@ The following documents the functions provided in PRESTUS.
 | `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
 | `evaluate_library_entry`                | Model the axial profiles a study gets from a library entry, at any depths |
 | `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
+| `field_transfer_matrix`                 | Complex pressure per unit element drive at points off the axis |
+| `fit_ring_profile`                      | Fit a within-ring velocity profile shared by all focal depths |
+| `fit_steering_correction`               | Fit measured / modelled focal peak over a matrix array's steering range |
 | `fit_transducer_model`                  | Fit a static annular-array model to hydrophone axial profiles |
 | `focal_reference_to_frac`               | Map a `focal_reference` config value (`flhm_3db`/`flhm_6db`) to its FLHM threshold fraction of peak; errors on `peak` (no associated fraction) or an unknown value. |
 | `generate_calibration_report`           | Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup. |
 | `interpolate_axial_profiles`            | Axial intensity profiles at desired focal depths from measured ones |
 | `kwave_calibrate_drive`                 | Calibrate the drive of per-depth refinements in free-water k-Wave (rescale to the simulated ISPPA) and report agreement with the measured profiles |
 | `kwave_check_refinement`                | Deprecated name of KWAVE_CALIBRATE_DRIVE |
+| `kwave_drive_metrics`                   | Absolute agreement of a simulated free-water profile with its target |
 | `library_add_conditions`                | Add dephased drive conditions to a library entry [EXPERIMENTAL] |
 | `library_add_refinements`               | Merge depth-specific phase offsets (and drives) into a library entry |
 | `library_condition`                     | Phases, gains and drive of a dephased library condition [EXPERIMENTAL] |
@@ -87,24 +92,35 @@ The following documents the functions provided in PRESTUS.
 | `library_ingest_conditions`             | Add dephased conditions from a profile CSV + sidecar [EXPERIMENTAL] |
 | `library_model_at_depth`                | Phases, gains and drive of a library entry at any focal depth |
 | `library_refinement_from_fits`          | Write per-depth FIT_TRANSDUCER_MODEL results as library refinements |
+| `library_set_ring_profile`              | Set or remove the within-ring velocity profile of a library entry |
 | `library_settings_table`                | Per-depth transducer settings a library entry resolves to, as a table / CSV |
-| `library_static_model`                  | Static model of a library entry, in FIT_TRANSDUCER_MODEL form |
+| `library_static_model`                  | Global model of a library entry (geometric, or a legacy static offset) in FIT_TRANSDUCER_MODEL form; the prior of per-depth fits |
+| `library_transducer`                    | Transducer geometry a library entry was calibrated with |
 | `load_equipment_config`                 | Load equipment configuration from individual YAML files |
 | `load_transducer_from_library`          | Load calibrated transducer parameters from library |
+| `matrix_element_layout`                 | Matrix-array elements in the transducer frame (no grid) |
+| `matrix_focal_peak`                     | Modelled free-field focal peak of a matrix array per steering target |
+| `matrix_rayleigh_pressure`              | Free-field complex pressure of a matrix array (Rayleigh integral) |
 | `perform_global_search`                 | Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles. |
 | `phase_optimization_annulus_full_curve` | Optimizes the phase profile for an annular transducer by matching intensity curves. |
 | `plot_calibration_report`               | Measured vs library vs calibrated axial profiles per depth (PNG) |
+| `plot_ring_profile`                     | Show a fitted within-ring velocity profile and what it changes |
 | `plot_transducer_library`               | Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas). |
 | `rayleigh_axial_intensity`              | On-axis intensity via the Rayleigh–Sommerfeld integral |
 | `read_axial_profiles`                   | Read a hydrophone axial-profile CSV (one column per focal depth) |
+| `read_steering_measurements`            | Read hydrophone focal peaks of a steered matrix array |
 | `refine_transducer_library`             | Optional refinement of a library entry to your own hydrophone profiles |
 | `resolve_transducer_from_serial`        | Populate transducer struct from equipment and calibration library |
+| `ring_profile_drive`                    | Simulation drive of an annular transducer with a ring profile |
+| `ring_profile_transducer`               | Annular transducer with a within-ring velocity profile |
 | `save_elem_correction`                  | Compute and persist per-element phase correction into the equipment YAML |
 | `save_library_entry`                    | Write a user-calibrated library entry with provenance |
 | `save_optimized_values`                 | Append optimized transducer phases and amplitudes into a CSV table (indexed by intensity/focus) and save parameters as YAML for PRESTUS config integration. |
 | `scan_and_ingest_calibrations`          | Scan a folder and ingest all calibration YAMLs |
 | `set_real_phases`                       | Load or compute manufacturer-specific (Sonic Concepts/Imasonic) transducer element phases for given focal depth (wrt exit plane), interpolate/unwrap for virtual elements, and return phase degrees. |
+| `steering_correction_factor`            | Measured / modelled focal peak at steering targets |
 | `steering_path_lengths`                 | Ring-centre to target distances used for geometric steering |
+| `steering_quad_terms`                   | Design matrix of a full quadratic surface in three coordinates |
 | `update_transducer_library`             | Add depth-specific refinements to a library YAML |
 | `validate_transducer_library`           | Validate calibration library against equipment configs |
 | `water_baseline`                        | Measure free-water ISPPA at the current source amplitude |

@@ -419,6 +419,36 @@ columns:
 
 ---
 
+## Steering correction of matrix arrays
+
+A matrix (2D) array is steered with geometric phases at one element amplitude. The focal peak it delivers can differ from the model by a factor that changes with the steering target: element directivity, crosstalk and manufacturing spread are not in the model. The steering correction measures that factor at a set of targets and scales the drive by it.
+
+**What is fitted.** At each measured target x, `k(x) = measured / modelled focal peak`, both at the same drive. The modelled peak is the largest free-field pressure in the plane through the target, normal to the beam axis, from a Rayleigh integral over the array (`matrix_focal_peak`, `matrix_rayleigh_pressure`); the measured peak is the same quantity from a hydrophone scan of that plane. `fit_steering_correction` fits k as one constant (`scale`) or as a full quadratic surface in x, y, z (`quadratic`, 10 coefficients, linear least squares) and scores both by leave-one-out cross-validation. The default `auto` keeps the quadratic surface only with at least 15 targets and a median cross-validated error at most 0.8 times that of the constant. Arrays differ: on some the steering-dependent part is real, on others one constant is as good, and the cross-validation decides. A quadratic map is not extrapolated: targets outside the measured range use the value at its edge, with a warning.
+
+**How it is applied.** `create_matrix_karray` multiplies every element amplitude by k(target) and records it in `transducer.matrix.steering_k`. `elem_p_amp` therefore stays the nominal drive setting and the simulated field is what the device delivers at that setting. With [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting) the field is reported at the target free-water ISPPA either way, so the correction does not change the results; it changes the drive that achieves them: `elem_p_amp × isppa_scale_p` (the scale recorded with the results), or in volts `drive_ref_v × elem_p_amp × isppa_scale_p / elem_p_amp_ref`. With `target_isppa_wcm2: []` the results are reported at the corrected drive. Switch it off with `transducer.matrix.use_steering_correction: false`.
+
+**Building an entry.** Measure the focal peak at targets spread through the steering range you will use (30–40 targets, including its edges and the geometric focus, plus a few kept back to check the fit), all at one drive voltage and with the geometric phases PRESTUS computes for each target. Write one CSV row per target:
+
+| Column | Unit | Required | Meaning |
+|---|---|---|---|
+| `target_x_mm`, `target_y_mm`, `target_z_mm` | mm | yes | Steering target in the transducer frame: origin at the apex (curved) or array centre (flat), z along the beam |
+| `peak_pressure_mpa` | MPa | yes | Largest pressure amplitude in the plane through the target, normal to the beam axis |
+| `drive_v` | V | no | Drive voltage; rows at other voltages are scaled to the median voltage |
+| `peak_x_mm`, `peak_y_mm` | mm | no | Where the peak was found |
+| `model_pressure_mpa` | MPa | no | A modelled peak at the same drive, used instead of the Rayleigh model |
+
+Then, with the array's geometry in `tr` (from its equipment YAML) and `tr.matrix.elem_p_amp` the element amplitude that stands for the measurement drive:
+
+```matlab
+% run from the PRESTUS folder; writes the library entry next to the shipped ones
+sc = build_steering_correction(parameters, tr, 'steering_peaks.csv', ...
+    struct('out_file', fullfile('config', 'calibration', '<serial>.yaml'), 'serial', '<serial>'));
+```
+
+`resolve_transducer_from_serial` attaches the entry to a matrix transducer given by `serial` (`<serial>_<ds_serial>.yaml` first, then `<serial>.yaml`, or `transducer.library_path`); without an entry the array is simulated uncorrected. The entry stores the fit, its cross-validated errors, `elem_p_amp_ref` and `drive_ref_v`. An inline `transducer.matrix.steering_correction` takes precedence.
+
+**Limits.** Only the focal peak is corrected, not side lobes or the shape of the field. The model assumes the beam along +z of the transducer frame and does not support Clover setups. The Rayleigh model treats each element as a baffled piston in free water; whether k-Wave reproduces it for a given array can be checked with a free-water run at a few targets. Background: Dadgar-Kiani et al. (2026), *Calibrated simulations for dynamic focusing of ultrasound through the temporal window*, Cell Reports Methods 6:101568, fit such a correction with a Gaussian of the difference in MPa; PRESTUS fits the ratio, which applies to the drive at any level.
+
 ## Library limitations
 
 | Limitation | Effect | Mitigation |

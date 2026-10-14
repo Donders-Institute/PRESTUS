@@ -58,7 +58,12 @@ end
 %% heuristic positioning
 
 % specify output file
-tpos_output_file = fullfile(parameters.io.dir_output, ...
+% Candidates and the selected position go to this target's placement run
+% folder (PLACEMENT_RUN_DIR), not to the simulation output
+parameters.placement.heuristic.target_name = target_name;
+run_dir = placement_run_dir(parameters, 'heuristic');
+if ~isfolder(run_dir); mkdir(run_dir); end
+tpos_output_file = fullfile(run_dir, ...
     sprintf('tpars_sub-%03i_%s.csv', subject_id, target_name));
 
 if confirm_overwriting(tpos_output_file, parameters)
