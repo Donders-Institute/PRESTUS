@@ -3,9 +3,7 @@ function fig = calibration_gui(options)
 %
 % Pick a transducer and driving system, load an axial-profile CSV, compare
 % the measured profiles with geometric steering and the current library
-% entry, fit per-depth refinements (default) or — for debugging — the
-% static model (all selected depths jointly), optionally check the per-depth
-% refinements in free-water k-Wave (drive corrected to the simulated ISPPA;
+% entry, fit per-depth refinements, optionally check them in free-water k-Wave (drive corrected to the simulated ISPPA;
 % KWAVE_CALIBRATE_DRIVE), and save the result to a user library folder
 % (transducer.library_path).
 %
@@ -15,7 +13,7 @@ function fig = calibration_gui(options)
 % INTERPOLATE_AXIAL_PROFILES), and geometric steering, the library entry and
 % the unsaved fit are modelled there through the runtime library path
 % (EVALUATE_LIBRARY_ENTRY: refinements interpolated between refined depths,
-% blended back to the static model outside them). The view shows the
+% blended back to the global model outside them). The view shows the
 % profiles, R² against the (derived) profile, focus vs target, and per depth
 % the phase model, drive and phases. With "Calibrate at: desired depths",
 % Fit calibrates at the desired depths on those profiles; the result is
@@ -203,19 +201,9 @@ function fig = calibration_gui(options)
     ui.ax_r2   = uiaxes(R);
     ui.params  = uitable(R, 'ColumnName', {'Element', 'Phase offset (°)', 'Gain'}, 'RowName', {});
 
-    on_mode();
     on_transducer();
 
     %% Callbacks --------------------------------------------------------------
-    function on_mode()
-        % c steer changes the steering law of the whole entry: static model only.
-        % The k-Wave drive calibration applies to per-depth refinements.
-        per_depth = ~startsWith(ui.mode.Value, 'Static');
-        ui.fp_c.Enable = ternary(per_depth, 'off', 'on');
-        ui.kw.Enable   = ternary(per_depth, 'on', 'off');
-        ui.kw_grid.Enable = ui.kw.Enable;
-    end
-
     function on_browse_simcfg()
         [f, p] = uigetfile({'*.yaml;*.yml', 'YAML config'}, 'Simulation config for the k-Wave drive calibration');
         if ~isequal(f, 0); ui.simcfg.Value = fullfile(p, f); end
@@ -911,18 +899,10 @@ function fig = calibration_gui(options)
         end
         if isempty(st.fit); ui.params.Data = {}; return; end
         m = st.fit.model;
-        if iscell(m)
-            ph = cell2mat(cellfun(@(x) x.elem_phase_correction_deg(:), m, 'UniformOutput', false));
-            ui.params.ColumnName = [{'Element'}, arrayfun(@(x) sprintf('%.1f mm', x.fit_depths_ep_mm), ...
-                [m{:}], 'UniformOutput', false)];
-            ui.params.Data = num2cell([(1:size(ph, 1))', round(ph, 1)]);
-        else
-            ui.params.ColumnName = {'Element', 'Phase offset (°)', 'Gain'};
-            ui.params.Data = num2cell([(1:numel(m.elem_amp_weight))', ...
-                round(m.elem_phase_correction_deg(:), 1), round(m.elem_amp_weight(:), 3)]);
-            say(sprintf('c_steer %.0f m/s | cost %.3g (%d starts)', ...
-                m.steering_sound_speed, m.cost, numel(m.start_costs)));
-        end
+        ph = cell2mat(cellfun(@(x) x.elem_phase_correction_deg(:), m, 'UniformOutput', false));
+        ui.params.ColumnName = [{'Element'}, arrayfun(@(x) sprintf('%.1f mm', x.fit_depths_ep_mm), ...
+            [m{:}], 'UniformOutput', false)];
+        ui.params.Data = num2cell([(1:size(ph, 1))', round(ph, 1)]);
     end
 
     function draw_settings()
@@ -1080,7 +1060,6 @@ function fig = calibration_gui(options)
         end
         n = numel(fieldnames(st.adv));
         ui.adv_btn.Text = ternary(n > 0, sprintf('Advanced (%d)', n), 'Advanced…');
-        on_mode();
         say(sprintf('Fit settings taken from the entry (meta.fit: %s, %s, %s).', char(get_field(rec, 'mode', '')), ...
             char(get_field(rec, 'tool', '')), char(string(get_field(lib.meta, 'last_updated', '')))));
     end

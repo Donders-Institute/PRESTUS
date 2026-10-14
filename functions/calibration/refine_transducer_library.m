@@ -8,15 +8,13 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 %
 % Two modes:
 %   'per_depth' — (default) fit phase offsets and gains at each given depth,
-%                 regularised towards the entry's static model (geometric
-%                 steering for a geometric entry), and store them with the
-%                 drive that gives Intensity at that depth under
+%                 regularised towards the entry's global model (geometric
+%                 steering, or a legacy entry's static offset), and store them
+%                 with the drive that gives Intensity at that depth under
 %                 'refinement'. load_transducer_from_library uses them at and
-%                 between those depths and fades back to the static model
+%                 between those depths and fades back to the global model
 %                 outside (refinement.blend_mm).
-%   'static'    — (debugging) refit the depth-independent model jointly over
-%                 the given depths: per-element phase offsets, gains and
-%                 (optionally) the steering sound speed. Replaces global_model.
+%   'geometric' — no fit: geometric steering with the measured drive per depth.
 %
 % Optionally (KWave = true) each refined depth is then checked in a
 % free-water k-Wave simulation of the runtime library path, and its drive
@@ -39,8 +37,7 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 %                      An existing entry there is updated; otherwise the shipped
 %                      entry (config/calibration/) is copied first.
 %   options          - struct, all optional:
-%     .Mode           - 'per_depth' (default) | 'static' | 'geometric' (no fit:
-%                       geometric steering with the measured drive per depth)
+%     .Mode           - 'per_depth' (default) | 'geometric'
 %     .Preset         - per-depth fit settings, CALIBRATION_FIT_OPTIONS:
 %                       'rayleigh_phase_gain' (default) | 'oneil_phase_only'
 %                       (former PERFORM_GLOBAL_SEARCH behaviour)
@@ -64,24 +61,27 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 %     .Intensity      - reference ISPPA for the amplitude [W/cm²] (default 30)
 %     .FitOptions     - FIT_TRANSDUCER_MODEL options (FreeParams, ForwardModel,
 %                       NearFieldSkipMm, HuberDelta, Lambda, NStarts, ...) on top
-%                       of the Preset; Prior defaults to the entry's static
+%                       of the Preset; Prior defaults to the entry's global
 %                       model, with the z shift fixed at 0. Adding 'z_shift' fits an axial
 %                       offset as a diagnostic (refinement.fit_z_shift_mm); it is
 %                       not applied at run time, so the default keeps it at 0.
 %     .BlendMm        - refinement.blend_mm for per_depth (default 5)
 %     .KWaveDriveCalibration - true: calibrate the drive of each refined depth
 %                       in free-water k-Wave (former name KWave, still read)
-%                       (per_depth only; default false)
+%                       (default false)
 %     .KWaveDriveOptions - options for KWAVE_CALIBRATE_DRIVE (SimConfig, WorkDir, ...;
 %                       former name KWaveOptions, still read)
 %     .Plot           - true: save {combo_name}_refinement.png next to the YAML
 %                       (measured vs library vs refined, per depth)
+%     .RingProfile    - within-ring velocity profile (CALIBRATE_LIBRARY_ENTRY):
+%                       'auto' (default: keep the entry's) | 'fit' | 'none' | struct
+%     .RingProfileOptions - FIT_RING_PROFILE options (NSub, Smooth, NearFieldSkipMm, HeldOut)
 %     .EquipParam     - struct from load_equipment_config (default: loaded)
 %     .ShippedLibrary - source of the base entry (default config/calibration/)
 %
 % Output:
 %   out_file - path of the written YAML
-%   fits     - FIT_TRANSDUCER_MODEL result(s): one model ('static') or one per depth
+%   fits     - FIT_TRANSDUCER_MODEL results, one per depth
 %   report   - table per calibrated depth: profile type, R², |focal error| and
 %              near-field excess of the entry before (library) and after refinement
 %              (on derived profiles these compare with the derived profile)
@@ -97,8 +97,8 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
     do_plot   = opt(options, 'Plot', false);
     equip     = opt(options, 'EquipParam', []);
     shipped   = opt(options, 'ShippedLibrary', fullfile(get_prestus_path(), 'config', 'calibration'));
-    assert(ismember(mode, {'per_depth', 'geometric', 'static'}), ...
-        'refine_transducer_library: Mode must be ''per_depth'', ''geometric'' or ''static''.');
+    assert(ismember(mode, {'per_depth', 'geometric'}), 'refine_transducer_library:mode', ...
+        'refine_transducer_library: Mode must be ''per_depth'' or ''geometric'' (''static'' has been removed).');
     if isempty(equip); equip = load_equipment_config(); end
 
     %% Base entry ----------------------------------------------------------
@@ -139,7 +139,7 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
     if ~isempty(prof_csv)
         write_axial_profiles(prof, prof_csv, struct('combo', combo_name));
         fprintf('Calibration profiles: %s\n', prof_csv);
-        if ~strcmp(mode, 'static'); lib.refinement.calibration_profiles_csv = prof_csv; end
+        lib.refinement.calibration_profiles_csv = prof_csv;
     end
 
     %% Provenance and write ------------------------------------------------

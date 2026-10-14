@@ -48,7 +48,7 @@ class FakeBridge(QObject):
         if fn == "nexus_calibration":
             name = {"open": "calibration_open", "load": "calibration_open",
                     "view": "calibration_view_predicted" if args.get("predicted") else "calibration_view_measured",
-                    "fit": "calibration_fit_static" if args.get("mode") == "static" else "calibration_fit_per_depth"
+                    "fit": "calibration_fit_per_depth"
                     }.get(action)
             out = fixture(name) if name else {"file": str(Path(args.get("out_dir", "")) / "entry.yaml"),
                                               "path": args.get("path", ""), "what": "fit"}
@@ -111,11 +111,6 @@ def test_calibration_page_opens_the_config_transducer_and_fits(window):
     assert fit_args["action"] == "fit" and fit_args["measured_depths"] == [31.11]
     assert fit_args["settings"]["isppa_wcm2"] == 30 and fit_args["free_params"] == ["phase", "amp"]
     assert page.has_fit and page.table.horizontalHeaderItem(0).text() == "Element"
-
-    page.mode.setCurrentIndex(1)                                # static: one row per element
-    page.fit()
-    assert page.table.horizontalHeaderItem(2).text() == "Gain"
-    assert "c_steer" in page.log.toPlainText()
 
 
 def test_calibration_depths_follow_the_setting_and_the_placement(window, monkeypatch):

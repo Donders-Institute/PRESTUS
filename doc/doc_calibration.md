@@ -14,7 +14,6 @@ The transducer library stores, for each measured depth, per-ring phase offsets, 
 |---|---|---|---|---|---|
 | **Per-depth refinement** (default) | `build_transducer_library`, `refine_transducer_library`, `calibration_gui`, `calibration_transducer` | Analytical fit per depth (`fit_transducer_model` via `calibrate_library_entry`) | Analytical, per depth | No | Library entries from hydrophone profiles; calibration at chosen depths and intensities |
 | **k-Wave drive calibration** (optional) | `kwave_calibrate_drive` (`KWave` option / GUI checkbox / `kwave_drive_calibration`) | Unchanged | Calibrated to free-water k-Wave ISPPA | Yes | Simulation-consistent drive at the refined depths |
-| **Static joint model** (debugging) | `LIBRARY_MODE = 'static'`, `Mode = 'static'` | One depth-independent offset over all depths | Analytical fit per depth | No | Comparison with per-depth refinement |
 | **O'Neil phase-only fit** | `fit_preset: oneil_phase_only` / `Preset = 'oneil_phase_only'` | Per-depth fit with the former global-search settings (O'Neil, FEX-minimize, phases only) | Analytical, per depth | No | Comparison with results of the former `perform_global_search` pipeline |
 
 Because the k-Wave drive calibration is optional, most entries stay at the "Analytical" amplitude level unless someone deliberately runs it. `load_transducer_from_library` does not assume that step happened: it resolves `tx_calibration.amp_kwave_calibrated` per requested depth and warns (`load_transducer_from_library:uncalibratedAmplitude`) whenever the driven amplitude has not been k-Wave-calibrated — see [doc_transducer_library.md](doc_transducer_library.md#optional-free-water-k-wave-drive-calibration).
@@ -51,7 +50,7 @@ Defaults to `flhm_3db` when unset, preserving prior behaviour.
 
 ### Library build (per-depth refinement)
 
-The library is built by `build_transducer_library.m` from the profiles in `local/profiles/`. By default (`LIBRARY_MODE = 'per_depth'`), every measured depth becomes a refinement fitted by `fit_transducer_model`: phase offsets and gains on top of geometric steering (`set_real_phases`, path-length geometry from the ring dimensions), plus the drive that reproduces the measured peak. The global model is geometric steering with the measured drive per depth. `meta.quality` records in-sample, held-out interpolation and geometric R². The result is written to `config/calibration/{combo_name}.yaml` (`LIBRARY_PATH`).
+The library is built by `build_transducer_library.m` from the profiles in `local/profiles/`. Every measured depth becomes a refinement fitted by `fit_transducer_model`: phase offsets and gains on top of geometric steering (`set_real_phases`, path-length geometry from the ring dimensions), plus the drive that reproduces the measured peak. The global model is geometric steering with the measured drive per depth. `meta.quality` records in-sample, held-out interpolation and geometric R². The result is written to `config/calibration/{combo_name}.yaml` (`LIBRARY_PATH`).
 
 At runtime, load calibrated parameters with:
 ```matlab
@@ -135,7 +134,7 @@ All values in the output folder are resolved from the library entry (`library_mo
 
 | Key | Meaning |
 |---|---|
-| `phase_mode` | `single_depth` (default): fit each depth · `geometric`: no fit, geometric steering with the measured drive · `multi_depth`: one depth-independent model over all depths (debugging) |
+| `phase_mode` | `single_depth` (default): fit each depth · `geometric`: no fit, geometric steering with the measured drive (the former `multi_depth` joint model has been removed) |
 | `fit_preset` | `rayleigh_phase_gain` (default) · `oneil_phase_only` (see above) |
 | `forward_model`, `fit_options` | Optional overrides of the preset |
 | `opt_phase_precession` | `false` · `linear` · `monotonic` phase constraint (`PhaseConstraint`) |

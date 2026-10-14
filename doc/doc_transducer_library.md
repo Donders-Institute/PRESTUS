@@ -23,7 +23,7 @@ drive_i  = elem_p_amp(d) · gain_i · exp(i · phase_i(d))
 
 - **Geometric steering** (`set_real_phases`) is computed from the ring geometry in `config/equipment/`, at the steering sound speed `global_model.steering_sound_speed` (default 1500 m/s).
 - **Refinement** (default): one fit per measured depth (`refinement.depths_ep_mm`), holding a per-ring phase offset (`elem_phase_correction_deg`), per-ring gains (`elem_amp_weight`) and the drive that gives the reference ISPPA at that depth (`elem_p_amp`). Between refined depths, offsets are interpolated per element on the unit circle, and gains and drive linearly. Outside that span, the nearest refinement fades back to the global model over `refinement.blend_mm` (default 5 mm), so phases and drive stay continuous in depth.
-- **Global model**: geometric steering with the measured drive per depth (`global_model.amplitude_by_depth`) for per-depth entries. With `LIBRARY_MODE = 'static'` (debugging) it is instead one depth-independent static model, a per-ring phase offset and gain fitted jointly to all measured depths.
+- **Global model**: geometric steering with the measured drive per depth (`global_model.amplitude_by_depth`). Older entries may instead hold one depth-independent static offset and gains (`global_model.elem_phase_correction_deg`, `elem_amp_weight`); these are still read, but can no longer be fitted (see below).
 
 `transducer.tx_calibration.phase_model` records what was used: `geometric`, `static`, `refined` or `blend`; `amplitude_source` records `refinement`, `blend` or `global`.
 
@@ -33,13 +33,13 @@ drive_i  = elem_p_amp(d) · gain_i · exp(i · phase_i(d))
 
 `fit_transducer_model` uses the fact that the on-axis field is linear in the complex element drives: p(z) = H(z)·w. The transfer matrix H is computed once per transducer (`axial_transfer_matrix`, Rayleigh by default), so each evaluation is a matrix product. Details:
 
-- **Free parameters** (`FreeParams`): `phase`, `amp` (per-ring gain), `z_shift` (axial registration of the hydrophone profiles; a fit nuisance, not applied at run time) and `c_steer`. Rings driven by one channel share phase and gain; for example, the 30 sub-rings of IS_PCD15287 fit as 10 channels.
+- **Free parameters** (`FreeParams`): `phase`, `amp` (per-ring gain), and for `fit_transducer_model` called directly `z_shift` (axial registration of the hydrophone profiles; a fit nuisance, not applied at run time) and `c_steer`; the calibration entry points fit `phase` and `amp` only. Rings driven by one channel share phase and gain; for example, the 30 sub-rings of IS_PCD15287 fit as 10 channels.
 - **Loss**: pseudo-Huber on peak-normalised *pressure* amplitude beyond `NearFieldSkipMm`, with every depth weighted equally. Secondary lobes and split foci therefore count, and isolated artefacts don't dominate.
 - **Optimiser**: `lsqnonlin` from `NStarts` starts (geometry first, then random), because profiles with two foci have several local optima. `lsqnonlin` needs the Optimization Toolbox; loading library entries does not.
 - **Near field**: the first `NearFieldSkipMm` (10 mm) are not fitted. A soft penalty (`NearFieldPenalty`) discourages a model near field hotter than the measured one, and every fit reports `nearfield_excess`, because a hot spot near the exit plane matters in skull simulations.
 - **Plausibility**: gains may range over 0.1–10× (`AmpBounds`). A gain outside 0.5–2× the mean (`PlausibleGain`), or at a bound, is flagged (`model.flags`) instead of being shipped silently: it more likely indicates a faulty element, cable or driver channel than something to calibrate away.
 
-**Static library model (`LIBRARY_MODE = 'static'`, debugging).** Per-ring phase offset + per-ring gain (`FreeParams = {'phase','amp'}`). The axial shift and steering sound speed are fitted only as diagnostics. In the first benchmarked combo they did not improve held-out depths; confirm across all combos before changing this. A persistent axial shift points to an error in the equipment geometry or exit-plane distance and should be corrected there. Held-out results are recorded per entry in `meta.quality`.
+**Static joint model (removed 2026-10).** One depth-independent per-ring offset and gain fitted jointly over all depths (`LIBRARY_MODE = 'static'`, `Mode = 'static'`, `phase_mode: multi_depth`, GUI *Static model (joint, debug)*) was kept for debugging only. No benchmark showed it ahead of per-depth refinement, and all shipped entries are per-depth, so it was removed; those options now raise an error. Entries that already hold a static offset are still loaded.
 
 **Library model version.** Entries with `meta.library_model_version: 2` apply per-ring gains to `elem_p_amp`, so simulated pressure and heating differ from runs with version-1 entries (phase offset only). Version-3 entries (`library_mode: per_depth`) take phases, gains and drive from the refinement at each measured depth. Results are not comparable across versions; record the version with your results (`transducer.tx_calibration.library_meta`).
 
@@ -53,7 +53,7 @@ meta:
   created_at: '2026-06-12'
   prestus_version: <commit>
 
-global_model:                         # static model
+global_model:                         # legacy static model (read only)
   elem_phase_correction_deg: [22.3, 56.3, 72.0, 349.9]   # one value per ring
   elem_amp_weight: [0.92, 1.03, 1.06, 0.99]              # per-ring gain, mean 1
   steering_sound_speed: 1500          # [m/s] steering law
@@ -227,7 +227,7 @@ Then set `transducer.library_path` in the study config. At the measured depths P
 
 To inspect an entry, `plot_transducer_library(combo, library_path)` plots the ring phases, drive and ring gains it resolves to across depths, and `generate_calibration_report(combo, library_path)` writes an HTML summary with the fit quality and the settings at the fitted depths.
 
-Per-depth fits free the phase offsets and per-ring gains (`FreeParams = {'phase','amp'}`), with an intensity-domain loss (`Domain = 'intensity'`, `HuberDelta = 0.8`). They are regularised towards the entry's static model, which is geometric steering for per-depth entries. The same defaults apply in the GUI and in `build_transducer_library`. The axial registration `z_shift` stays at 0: a study does not apply it, so phases fitted with it would match the hydrophone only after a shift the entry never gets. The GUI therefore does not offer it. `build_transducer_library` still fits it once, separately, as a diagnostic (`z_shift_mm` in its quality report); a shift at its bound (±3 mm) at many depths points to an error in the equipment geometry or exit-plane distance, which should be corrected in the profiles or the equipment config rather than fitted.
+Per-depth fits free the phase offsets and per-ring gains (`FreeParams = {'phase','amp'}`), with an intensity-domain loss (`Domain = 'intensity'`, `HuberDelta = 0.8`). They are regularised towards the entry's global model, which is geometric steering for per-depth entries. The same defaults apply in the GUI and in `build_transducer_library`. The axial registration `z_shift` stays at 0: a study does not apply it, so phases fitted with it would match the hydrophone only after a shift the entry never gets. The GUI therefore does not offer it. A persistent axial misregistration points to an error in the equipment geometry or exit-plane distance, which should be corrected in the profiles or the equipment config rather than fitted.
 
 You can also use the GUI:
 
@@ -351,7 +351,7 @@ The profile CSV path is stored relative to `ProfileRoot` when it lies under it, 
 - **Library**: the library entry, including any refinements (the entry in **Save to folder**, if there is one, otherwise the shipped entry).
 - **Fit**: the current fit, before it is saved, with k-Wave-calibrated drives if the k-Wave drive calibration ran.
 
-Between refined depths the refinement offsets are interpolated. Outside the refined span they fade back to the static model over `blend_mm`. Drives and per-ring gains are interpolated in depth and held constant outside the span. The diagnostic `fit_z_shift_mm` is not applied, because a study does not apply it either.
+Between refined depths the refinement offsets are interpolated. Outside the refined span they fade back to the global model over `blend_mm`. Drives and per-ring gains are interpolated in depth and held constant outside the span. The diagnostic `fit_z_shift_mm` is not applied, because a study does not apply it either.
 
 **Profiles at desired depths.** With a profile CSV loaded, each desired depth also gets a profile from the measurements (`interpolate_axial_profiles`):
 

@@ -470,20 +470,18 @@ class CalibrationPage(QWidget):
 
     # ── settings ────────────────────────────────────────────────────────
     def settings(self) -> cal.FitSettings:
-        free = [p for p, w in (("phase", self.fp_phase), ("amp", self.fp_amp), ("c_steer", self.fp_c))
-                if w.isChecked()]
+        free = [p for p, w in (("phase", self.fp_phase), ("amp", self.fp_amp)) if w.isChecked()]
         return cal.FitSettings(
-            mode=self.mode.currentData(), free_params=free, forward_model=self.fwd.currentText(),
+            free_params=free, ring_profile=self.ring.currentData(), forward_model=self.fwd.currentText(),
             near_field_skip_mm=self.skip.value(), domain=self.domain.currentText(),
             huber_delta=self.huber.value(), n_starts=self.nstarts.value(), isppa_wcm2=self.isppa.value(),
             align=self.align.currentText(), max_extrapolation_mm=self.extrap.value(),
             calibrate_at=self.calat.currentData(), advanced=dict(self.advanced))
 
     def apply_settings(self, s: cal.FitSettings) -> None:
-        self.mode.setCurrentIndex(self.mode.findData(s.mode))
+        self.ring.setCurrentIndex(max(0, self.ring.findData(s.ring_profile)))
         self.fp_phase.setChecked("phase" in s.free_params)
         self.fp_amp.setChecked("amp" in s.free_params)
-        self.fp_c.setChecked("c_steer" in s.free_params)
         self.fwd.setCurrentText(s.forward_model)
         self.skip.setValue(s.near_field_skip_mm)
         self.domain.setCurrentText(s.domain)
@@ -495,11 +493,6 @@ class CalibrationPage(QWidget):
         self.calat.setCurrentIndex(self.calat.findData(s.calibrate_at))
         self.advanced = dict(s.advanced)
         self._update_advanced_button()
-
-    def _mode_changed(self) -> None:
-        per_depth = self.mode.currentData() == "per_depth"
-        self.fp_c.setEnabled(not per_depth)          # c steer changes the whole entry: static only
-        self.kw_btn.setEnabled(per_depth and not self._busy)
 
     def _advanced(self) -> None:
         dlg = AdvancedDialog(self.advanced, self)
@@ -688,7 +681,7 @@ class CalibrationPage(QWidget):
         the corrected entry; run it on the Run tab (or in MATLAB / on the cluster yourself)."""
         from .. import launcher
         from .main_window import RUN
-        if not self.has_fit or self.mode.currentData() != "per_depth":
+        if not self.has_fit:
             self._say("The k-Wave drive check needs a per-depth fit: run Fit first.")
             return
         if self.model.path is None and not self.window.save():
@@ -868,18 +861,11 @@ class CalibrationPage(QWidget):
                 t.setRowCount(0)
                 t.setColumnCount(0)
                 return
-            if p.get("kind") == "per_depth":
-                cols = [as_floats(c) for c in as_list(p.get("phase_deg"))]
-                if cols and not isinstance(as_list(p.get("phase_deg"))[0], list):
-                    cols = [as_floats(p.get("phase_deg"))]
-                heads = ["Element"] + [f"{d:.1f} mm (°)" for d in as_floats(p.get("depths"))]
-                rows = [[str(i + 1)] + [f"{c[i]:.1f}" for c in cols] for i in range(max(map(len, cols)))]
-            else:
-                ph, g = as_floats(p.get("phase_deg")), as_floats(p.get("gain"))
-                heads = ["Element", "Phase offset (°)", "Gain"]
-                rows = [[str(i + 1), f"{ph[i]:.1f}", f"{g[i]:.3f}"] for i in range(len(ph))]
-                self._say(f"c_steer {p.get('c_steer', 0):.0f} m/s | cost {p.get('cost', 0):.3g} "
-                          f"({p.get('n_starts', 0)} starts)")
+            cols = [as_floats(c) for c in as_list(p.get("phase_deg"))]
+            if cols and not isinstance(as_list(p.get("phase_deg"))[0], list):
+                cols = [as_floats(p.get("phase_deg"))]
+            heads = ["Element"] + [f"{d:.1f} mm (°)" for d in as_floats(p.get("depths"))]
+            rows = [[str(i + 1)] + [f"{c[i]:.1f}" for c in cols] for i in range(max(map(len, cols)))]
         t.setColumnCount(len(heads))
         t.setHorizontalHeaderLabels(heads)
         t.setRowCount(len(rows))

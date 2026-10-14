@@ -68,11 +68,9 @@ function [res, msg] = calibration_evaluate(tran, prof, options)
             % As a study resolves it (on the measured depths too, when the
             % fit was calibrated on desired depths)
             res.fit = pack(evaluate_library_entry(tran, opt(options, 'FitEntry', fit.entry), prof, rt));
-        elseif iscell(fit.model)
+        else
             res.fit = pack_many(fit.model);
             if ~isempty(kw); res.kwave = pack_kwave(kw.sims, kw.report, fit.model{1}.z_ep_mm, skip); end
-        else
-            res.fit = pack(fit.model);
         end
     end
     if predicted

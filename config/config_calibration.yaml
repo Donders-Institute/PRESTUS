@@ -32,7 +32,7 @@
   filename_calibrated_CSV: ''       # Filename of the phase/amplitude CSV table ('' = PRESTUS_virtual_{combo}.csv)
 
   # Calibration (the same core as build_transducer_library / refine_transducer_library)
-  phase_mode: 'single_depth'        # 'single_depth' (default): fit each requested depth | 'geometric': no fit, geometric steering with the measured drive | 'multi_depth': one depth-independent model over all depths (debugging)
+  phase_mode: 'single_depth'        # 'single_depth' (default): fit each requested depth | 'geometric': no fit, geometric steering with the measured drive
   fit_preset: 'rayleigh_phase_gain' # 'rayleigh_phase_gain': per-ring phase + gain, Rayleigh model, robust intensity loss | 'oneil_phase_only': former global-search behaviour (O'Neil model, opt_method optimiser, phases only)
   # forward_model: 'rayleigh'       # Optional override of the preset's forward model: 'rayleigh' | 'oneil'
   # fit_options: {}                 # Optional fit_transducer_model options on top of the preset (e.g. {NStarts: 32})

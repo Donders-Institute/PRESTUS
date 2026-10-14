@@ -19,9 +19,10 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
 %        'geometric' - no fit: geometric steering (plus any static offset)
 %                      scored per depth and stored as refinements with the
 %                      measured drive.
-%        'static'    - one depth-independent model over all depths
-%                      (FIT_TRANSDUCER_MODEL defaults + FitOptions); replaces
-%                      global_model (LIBRARY_ENTRY_FROM_MODEL). Debugging.
+%   Optional within-ring velocity profile (RingProfile, FIT_RING_PROFILE):
+%      every ring is split into sub-rings with fixed weights shared by all
+%      depths, fitted on all measured depths before the per-depth fits; the
+%      per-depth fits then calibrate the channels of that geometry.
 %   3. Optional free-water k-Wave drive calibration of each refined depth: the
 %      stored drive is rescaled to the simulated ISPPA (KWAVE_CALIBRATE_DRIVE).
 %   4. Report: the entry before and after, scored on the same profiles.
@@ -36,13 +37,10 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
 %   meas    - measured profiles (READ_AXIAL_PROFILES): .depths_ep_mm, .z_ep_mm, .I
 %   options - struct, all optional:
 %     .Depths             - depths to calibrate [mm from EP] (default: all measured)
-%     .Mode               - 'per_depth' (default) | 'geometric' | 'static'
+%     .Mode               - 'per_depth' (default) | 'geometric'
 %     .Preset             - CALIBRATION_FIT_OPTIONS preset, 'rayleigh_phase_gain' |
-%                           'oneil_phase_only' (per_depth / geometric;
-%                           default 'rayleigh_phase_gain')
+%                           'oneil_phase_only' (default 'rayleigh_phase_gain')
 %     .FitOptions         - FIT_TRANSDUCER_MODEL options on top of the preset
-%                           (static: on top of FIT_TRANSDUCER_MODEL's defaults,
-%                           FreeParams defaulting to {'phase','amp'})
 %     .Intensity          - reference ISPPA for the stored drives [W/cm²] (default 30)
 %     .BlendMm            - refinement.blend_mm (default: keep existing / 5)
 %     .Source             - provenance string stored with the refinements
@@ -78,8 +76,12 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
     blend_mm  = opt(options, 'BlendMm', []);
     source    = opt(options, 'Source', '');
     max_gap   = opt(options, 'MaxGapMm', 10);
-    assert(ismember(mode, {'per_depth', 'geometric', 'static'}), 'calibrate_library_entry:mode', ...
-        'calibrate_library_entry: Mode must be ''per_depth'', ''geometric'' or ''static''.');
+    if strcmp(mode, 'static')
+        error('calibrate_library_entry:staticRemoved', ...
+            'Mode ''static'' (joint depth-independent model) has been removed; use ''per_depth''.');
+    end
+    assert(ismember(mode, {'per_depth', 'geometric'}), 'calibrate_library_entry:mode', ...
+        'calibrate_library_entry: Mode must be ''per_depth'' or ''geometric''.');
 
     %% Profiles at the requested depths ------------------------------------
     use  = reshape(opt(options, 'Depths', meas.depths_ep_mm), 1, []);

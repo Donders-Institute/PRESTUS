@@ -54,7 +54,7 @@ def test_target_depths_join_the_settings(schema, prestus_root):
 
 
 def test_settings_from_record_restores_the_fit():
-    rec = {"tool": "calibration_gui", "mode": "static", "calibrate_at": "desired",
+    rec = {"tool": "calibration_gui", "mode": "per_depth", "calibrate_at": "desired",
            "depths_ep_mm": [35, 45], "isppa_wcm2": 20,
            "fit_options": {"FreeParams": ["phase", "c_steer"], "ForwardModel": "oneil",
                            "NearFieldSkipMm": 12, "HuberDelta": 0.5, "NStarts": 8, "Domain": "amplitude",
@@ -62,7 +62,7 @@ def test_settings_from_record_restores_the_fit():
                            "FocalWeight": 2},
            "profile_options": {"Align": "peak", "MaxExtrapolationMm": 4}}
     s, depths = cal.settings_from_record(rec, cal.FitSettings())
-    assert (s.mode, s.free_params, s.forward_model, s.domain) == ("static", ["phase", "c_steer"], "oneil", "amplitude")
+    assert (s.free_params, s.forward_model, s.domain) == (["phase"], "oneil", "amplitude")   # c_steer (removed static model) dropped
     assert (s.near_field_skip_mm, s.huber_delta, s.n_starts, s.isppa_wcm2) == (12, 0.5, 8, 20)
     assert (s.align, s.max_extrapolation_mm, s.calibrate_at) == ("peak", 4, "desired")
     assert s.advanced == {"PhaseConstraint": "linear", "FocalWeight": 2}       # defaults dropped

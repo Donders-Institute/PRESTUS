@@ -11,7 +11,7 @@ function lib = save_library_entry(lib, out_file, mode, report, extra_meta)
 % Input:
 %   lib        - library struct
 %   out_file   - output YAML path ({library_path}/{combo_name}.yaml)
-%   mode       - calibration mode ('per_depth' | 'geometric' | 'static')
+%   mode       - calibration mode ('per_depth' | 'geometric')
 %   report     - report table from CALIBRATE_LIBRARY_ENTRY
 %   extra_meta - optional struct of further meta fields (e.g. preset, source)
 %

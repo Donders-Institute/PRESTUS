@@ -270,14 +270,8 @@ function out = payload(S, res, msg, st)
     end
     if ~S.predicted && ~isempty(S.fit)
         m = S.fit.model;
-        if iscell(m)
-            out.params = struct('kind', 'per_depth', 'depths', cellfun(@(x) x.fit_depths_ep_mm, m), ...
-                'phase_deg', {cellfun(@(x) x.elem_phase_correction_deg(:)', m, 'UniformOutput', false)});
-        else
-            out.params = struct('kind', 'static', 'phase_deg', m.elem_phase_correction_deg(:)', ...
-                'gain', m.elem_amp_weight(:)', 'c_steer', m.steering_sound_speed, 'cost', m.cost, ...
-                'n_starts', numel(m.start_costs));
-        end
+        out.params = struct('kind', 'per_depth', 'depths', cellfun(@(x) x.fit_depths_ep_mm, m), ...
+            'phase_deg', {cellfun(@(x) x.elem_phase_correction_deg(:)', m, 'UniformOutput', false)});
     end
 end
 

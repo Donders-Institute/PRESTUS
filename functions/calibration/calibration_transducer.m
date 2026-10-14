@@ -30,8 +30,7 @@ function [lib, report, out] = calibration_transducer(...
 % Configuration (parameters.calibration, see config_calibration.yaml):
 %   phase_mode        - 'single_depth' (default): fit each depth |
 %                       'geometric': no fit, geometric steering with the
-%                       measured drive | 'multi_depth': one depth-independent
-%                       model over all depths (debugging)
+%                       measured drive
 %   fit_preset        - 'rayleigh_phase_gain' (default) | 'oneil_phase_only'
 %                       (CALIBRATION_FIT_OPTIONS)
 %   fit_options       - struct of FIT_TRANSDUCER_MODEL options on top of the preset
@@ -221,10 +220,12 @@ function mode = phase_mode_to_mode(phase_mode)
     switch char(phase_mode)
         case 'single_depth'; mode = 'per_depth';
         case 'geometric';    mode = 'geometric';
-        case 'multi_depth';  mode = 'static';
+        case 'multi_depth'
+            error('calibration_transducer:phaseMode', ...
+                'calibration.phase_mode ''multi_depth'' (joint depth-independent model) has been removed; use ''single_depth''.');
         otherwise
             error('calibration_transducer:phaseMode', ...
-                'Unknown calibration.phase_mode ''%s'' (single_depth | geometric | multi_depth).', char(phase_mode));
+                'Unknown calibration.phase_mode ''%s'' (single_depth | geometric).', char(phase_mode));
     end
 end
 

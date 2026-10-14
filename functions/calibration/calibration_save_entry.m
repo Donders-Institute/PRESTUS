@@ -60,7 +60,7 @@ function [file, prof_csv] = calibration_save_entry(lib, fit, out_dir, options)
         % The profiles the entry was fitted to, next to it (as REFINE_TRANSDUCER_LIBRARY)
         prof_csv = fullfile(out_dir, [combo '_calibration_profiles.csv']);
         write_axial_profiles(fit.prof, prof_csv, struct('combo', combo));
-        if strcmp(fit.mode, 'per_depth'); lib.refinement.calibration_profiles_csv = prof_csv; end
+        lib.refinement.calibration_profiles_csv = prof_csv;
     end
     file = fullfile(out_dir, [combo '.yaml']);
     yaml.dumpFile(file, lib);

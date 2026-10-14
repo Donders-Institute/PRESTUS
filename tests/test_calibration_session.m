@@ -74,8 +74,7 @@ classdef test_calibration_session < matlab.unittest.TestCase
         function test_fit_errors(tc)
             p = tc.Meas; p.profile_type = repmat({'unavailable'}, 1, 3);
             tc.verifyError(@() calibration_fit(tc.Tran, p), 'calibration_fit:noProfiles');
-            tc.verifyError(@() calibration_fit(tc.Tran, tc.Meas, struct('Mode', 'static', ...
-                'FitOptions', struct('PhaseConstraint', 'linear'))), 'calibration_fit:constraint');
+            tc.verifyError(@() calibration_fit(tc.Tran, tc.Meas, struct('Mode', 'static')), 'calibration_fit:mode');   % removed
             tc.verifyError(@() calibration_fit(tc.Tran, tc.Meas, struct('Mode', 'joint')), 'calibration_fit:mode');
         end
 

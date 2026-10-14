@@ -1,14 +1,13 @@
 function [fit, msg] = calibration_fit(tran, prof, options)
-% CALIBRATION_FIT  Interactive calibration fit: per-depth refinements or the static model
+% CALIBRATION_FIT  Interactive calibration fit: per-depth refinements
 %
 % The "Fit" step of CALIBRATION_GUI and the Calibration page of the PRESTUS
 % Nexus. Depths without a profile ('unavailable', e.g. desired depths
 % outside the measured range) are skipped. Per-depth mode fits each depth on
 % its own (CALIBRATION_FIT_DEPTHS) with phase and gain free; the axial shift
 % stays 0 because it is not applied at run time, and the prior (the current
-% entry's static model, if any) only pins the unobservable common phase.
-% Static mode fits one depth-independent model to all depths jointly
-% (debugging). The result carries the library entry Save would write
+% entry's global model, if any) only pins the unobservable common phase.
+% The result carries the library entry Save would write
 % (CALIBRATION_FIT_ENTRY) and a record of how it was fitted, which
 % CALIBRATION_SAVE_ENTRY stores as meta.fit.
 %
@@ -22,9 +21,8 @@ function [fit, msg] = calibration_fit(tran, prof, options)
 %             (CALIBRATION_DESIRED_PROFILES / INTERPOLATE_AXIAL_PROFILES);
 %             with .n_z_scan only the first n_z_scan z samples are fitted
 %   options - struct, all optional:
-%     .Mode          - 'per_depth' (default) | 'static'
-%     .FreeParams    - subset of {'phase', 'amp', 'c_steer'} (default phase, amp);
-%                      per-depth mode ignores c_steer
+%     .Mode          - 'per_depth' (default; the former 'static' has been removed)
+%     .FreeParams    - subset of {'phase', 'amp'} (default both)
 %     .FitOptions    - further FIT_TRANSDUCER_MODEL options (ForwardModel,
 %                      NearFieldSkipMm, HuberDelta, NStarts, Domain, advanced ones)
 %     .Library       - current library entry (prior and base of the new entry) or []
@@ -50,8 +48,8 @@ function [fit, msg] = calibration_fit(tran, prof, options)
 
     if nargin < 3; options = struct(); end
     mode = char(opt(options, 'Mode', 'per_depth'));
-    assert(any(strcmp(mode, {'per_depth', 'static'})), 'calibration_fit:mode', ...
-        'Mode must be ''per_depth'' or ''static'', not ''%s''.', mode);
+    assert(strcmp(mode, 'per_depth'), 'calibration_fit:mode', ...
+        'Mode must be ''per_depth'', not ''%s'' (the static joint model has been removed).', mode);
     free = cellstr(opt(options, 'FreeParams', {'phase', 'amp'}));
     fo   = opt(options, 'FitOptions', struct());
     lib  = opt(options, 'Library', []);
