@@ -153,7 +153,7 @@ Filename patterns:
 |---|---|
 | `intensity` | Pulse-average intensity (IPA) [W/cm²] |
 | `MI` | Mechanical index |
-| `pressure` | Peak pressure [Pa] |
+| `pressure` | Peak pressure [Pa]; with a JSON sidecar so a later run can start from it ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)) |
 | `focal_mask_3dB` | −3 dB focal zone binary mask (IPA ≥ 50 % of peak; restricted to brain for layered, to beyond-exit-plane for free-field) |
 | `focal_mask_6dB` | −6 dB / FWHM focal zone binary mask (IPA ≥ 25 % of peak = P ≥ Pmax/2; same region restriction) |
 
@@ -171,6 +171,59 @@ Filename patterns:
 | `CEM43_iso_end` | CEM43 (ISO) at end of last pulse [min] |
 
 ---
+
+## Where outputs live
+
+Every location belongs to one level, set by what its contents depend on. A level only reads the levels above it, and each folder has one writer.
+
+| Level | Depends on | Locations | Written by |
+|---|---|---|---|
+| **Inputs** | — | `path.anat` (T1/T2), `path.localite_raw` (raw Localite exports), `path.localite_t1` (planning T1s) | you / the scanner / Localite; PRESTUS only reads them |
+| **Subject derivatives** | the subject's images | `path.seg` (SimNIBS `m2m_sub-XXX`), `path.pct` (pseudo-CT), `path.localite_post` (ingested Localite markers) | segmentation (layered media; `io.overwrite_simnibs`), pseudo-CT generation, `neuronav_ingest_markers` |
+| **Placement** | subject derivatives, target, transducer geometry, placement settings | `path.placement` (default `<path.sim>/placement`): `sub-XXX/<mode>/<target_name>/` | the placement stage (heuristic, PlanTUS, TUS_entry) |
+| **Simulation** | everything above, plus the acoustic/thermal setup | `path.sim/sub-XXX/` (this page) | the simulation pipeline |
+
+Because a placement does not depend on the acoustic setup (medium, grid, drive level), it has its own root: point several setups at one `path.placement` to reuse a heuristic, PlanTUS or TUS_entry result across them. Each run folder holds everything the run produced (tool inputs such as masks and configs, raw tool output, metrics, neuronavigation exports) and a run record, `placement_run.json`, with the resolved positions and the settings they depend on. `placement.reuse` decides when a later run uses the recorded placement instead of running the tool again ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)). The simulation keeps its own record of the positions it used, `sub-XXX_placement<affix>.json`.
+
+`manual`, `mni` and `localite` placements are resolved from the config or the recorded markers alone and have no run folder.
+
+`path.localite_export` is not a level but a hand-off folder: copies of placement results meant for import into Localite (heuristic position table, Localite-ready T1), kept apart so the neuronavigation computer can read them from a share.
+
+The SimNIBS `m2m_sub-XXX` folders are only read after segmentation. The pseudo-CT goes to `path.pct/sub-NNN`, or `<parent of path.seg>/pct/sub-NNN` when `path.pct` is empty; a pseudo-CT that older versions wrote into `m2m_sub-XXX` is still used, with a warning to move it.
+
+## Starting from earlier stage outputs
+
+PRESTUS keeps two kinds of intermediate results apart:
+
+- **Within-run caches** (`cache/` of a simulation folder): only the run that wrote them, or a re-run of it, reloads them. `io.overwrite_files` decides whether they are reused ([Overwrite behaviour](#overwrite-behaviour)).
+- **Stage outputs**: complete results of a stage that a later, separate run starts from. Each has a JSON sidecar next to it, as in BIDS, that records how it was made. A run that starts from the output compares the sidecar's `signature` (the settings the output depends on) with its own settings.
+
+| Stage output | Sidecar | Picked up by | Compared settings |
+|---|---|---|---|
+| SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | — (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | — |
+| Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) |
+| Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
+| Pressure map, `nii/T1w/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
+
+A mismatch is handled by `io.cache_signature_check` (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pseudo-CT made by an earlier version, or a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
+
+Every sidecar starts with the same header, followed by fields of its kind:
+
+```json
+{
+  "sidecar_version": 1,
+  "kind": "acoustic_pressure",
+  "created": "2026-10-07T16:00:00",
+  "generated_by": {"name": "PRESTUS", "version": "v0.6.1-42-gabc1234"},
+  "subject_id": 1,
+  "...": "kind-specific fields",
+  "signature": {"...": "settings the output depends on"}
+}
+```
+
+**Placement (`placement.reuse`).** `auto` (default) reuses a recorded run whose settings match and otherwise runs the placement again, replacing the record; under `io.overwrite_files: never` a mismatch is handled like `always`. `always` requires a recorded run, `never` always runs the tool. This is independent of `io.overwrite_files`, so a PlanTUS or TUS_entry result is reused while the simulation stages are recomputed. Records written as `placement_run.mat` by earlier versions are still read.
+
+**Pressure map (`path.acoustic_input`).** Every run that writes the T1w pressure NIfTI also writes its sidecar, with the free-water ISPPA the map corresponds to (`isppa.level_wcm2`: the target it was scaled to, or the free-water ISPPA of the simulated drive), the baseline, the transducer and the backend. A later run with `path.acoustic_input` pointing at the NIfTI skips the acoustic simulation and the free-water baseline. It puts the map onto its own grid (including an acoustic FOV), rescales it to its `transducer.target_isppa_wcm2`, and runs acoustic analysis and the thermal stage as after a simulation. The run needs the T1 → grid transform (`simulation.medium` layered or phantom, a 3D grid) and the k-Wave grid of the source stage (`modules.run_source_setup: 1`). Two limits follow from the map: it is stored at the T1's resolution, so a map from a finer simulation grid has lost some peak sharpness, and it has no peak negative pressure, so the mechanical index uses the peak pressure (with a warning). A map without a sidecar is used as it is and cannot be rescaled.
 
 ## Output directory structure
 
@@ -241,7 +294,9 @@ Grid and medium caches are named by subject, medium and affix only. So that a ca
 | Grid (`*_grid_cache*.mat`) | `simulation.medium`, `grid`, `layers`, `headmodel`, `pct`, and the transducer (geometry and positions after placement) |
 | Medium (`*_medium_cache*.mat`) | the grid settings above, plus `medium_properties` |
 
-Paths, I/O, HPC and module flags are not compared (moving data or changing downstream stages does not change these caches), nor is the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field.
+The JSON sidecars of stage outputs (placement runs, pseudo-CTs, pressure maps) are checked the same way; see [Starting from earlier stage outputs](#starting-from-earlier-stage-outputs).
+
+Paths, I/O, HPC and module flags are not compared (moving data or changing downstream stages does not change these caches), nor is the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field, nor the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps these settings of its own.
 
 When a cache is reused because of `io.overwrite_files: never` (or a declined overwrite prompt, or the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
 

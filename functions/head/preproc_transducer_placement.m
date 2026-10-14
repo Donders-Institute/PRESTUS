@@ -112,7 +112,7 @@ end
 
         % ── HEURISTIC ─────────────────────────────────────────────────────
         case 'heuristic'
-            parameters = run_heuristic_placement(parameters);
+            parameters = run_with_record(parameters, mode, @run_heuristic_placement);
 
         % ── MNI ───────────────────────────────────────────────────────────
         case 'mni'
@@ -120,11 +120,11 @@ end
 
         % ── PLANTUS ───────────────────────────────────────────────────────
         case 'plantus'
-            parameters = run_plantus_placement(parameters);
+            parameters = run_with_record(parameters, mode, @run_plantus_placement);
 
         % ── TUS_ENTRY ─────────────────────────────────────────────────────
         case 'tus_entry'
-            parameters = run_tus_entry_placement(parameters);
+            parameters = run_with_record(parameters, mode, @run_tus_entry_placement);
 
         otherwise
             error(['Unknown placement.mode ''%s''. ' ...
@@ -141,6 +141,107 @@ end
         generate_placement_report(parameters, mode);
     end
 
+end
+
+% ── Placement run record ─────────────────────────────────────────────────
+function parameters = run_with_record(parameters, mode, run_fn)
+% Run a placement mode that has a run folder and record its result there
+% (placement_run.json). placement.reuse decides when a recorded run is used
+% instead of running the mode again; see PLACEMENT_REUSE_MODE.
+
+    if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, mode)
+        parameters = run_fn(parameters);    % reports the missing config itself
+        return
+    end
+    run_dir   = placement_run_dir(parameters, mode);
+    signature = placement_signature(parameters, mode);
+    reuse     = placement_reuse_mode(parameters);
+    remedy    = sprintf(['Set placement.reuse: never to run the %s placement again, or point ' ...
+        'path.placement (or placement.%s.target_name) at another run folder'], mode, mode);
+
+    rec = [];
+    if ~strcmp(reuse, 'never')
+        [rec, record_file] = read_placement_record(run_dir);
+    end
+    if isempty(rec) && strcmp(reuse, 'always')
+        error('PRESTUS:placement:noRecord', ...
+            ['placement.reuse: always, but there is no recorded %s placement in\n  %s\n' ...
+             'Run the placement first (placement.reuse: auto or never).'], mode, run_dir);
+    end
+
+    if ~isempty(rec)
+        strict = strcmp(reuse, 'always') || overwrite_never(parameters);
+        if strict
+            use_rec = check_sidecar_signature(record_file, rec.signature, signature, parameters, remedy) ...
+                || strcmp(cache_check_mode(parameters), 'warn');
+        else
+            % auto: a record made with other settings is replaced, not an error
+            quiet = parameters;
+            quiet.io.cache_signature_check = 'warn';
+            w = warning('off', 'prestus:cache:signatureMismatch');
+            restore = onCleanup(@() warning(w));
+            [use_rec, diffs] = check_sidecar_signature(record_file, rec.signature, signature, quiet, remedy);
+            clear restore
+            if ~use_rec
+                fprintf(['The %s placement recorded in\n  %s\nwas made with different settings ' ...
+                    '(%s); running it again (placement.reuse: auto).\n'], ...
+                    mode, record_file, strjoin(diffs, ', '));
+            end
+        end
+        if use_rec
+            fprintf('Reusing the %s placement recorded in:\n  %s\n', mode, record_file);
+            for ti = 1:numel(parameters.transducer)
+                k = min(ti, size(rec.trans_pos, 1));
+                parameters.transducer(ti).trans_pos = rec.trans_pos(k, :);
+                parameters.transducer(ti).focus_pos = rec.focus_pos(k, :);
+                if ~isempty(rec.trans_pos_ras)
+                    parameters.transducer(ti).trans_pos_ras = rec.trans_pos_ras(k, :);
+                    parameters.transducer(ti).focus_pos_ras = rec.focus_pos_ras(k, :);
+                end
+            end
+            if ~isempty(rec.target_ras)
+                parameters.placement.(mode).target_ras = rec.target_ras;
+            end
+            plot_placement_t1_overlay(parameters, ...
+                parameters.transducer(1).trans_pos, parameters.transducer(1).focus_pos, mode);
+            return
+        end
+    end
+
+    parameters = run_fn(parameters);
+    write_placement_record(parameters, mode, run_dir, signature);
+end
+
+function reuse = placement_reuse_mode(parameters)
+% placement.reuse: 'auto' (default) reuses a recorded run whose settings
+% match and runs the mode again otherwise; 'always' requires a recorded run
+% (settings checked per io.cache_signature_check); 'never' always runs it.
+    reuse = 'auto';
+    if isfield(parameters.placement, 'reuse') && ~isempty(parameters.placement.reuse)
+        reuse = parameters.placement.reuse;
+        if islogical(reuse) || isnumeric(reuse)
+            % unquoted YAML: true/1 -> always, false/0 -> never
+            if logical(reuse); reuse = 'always'; else; reuse = 'never'; end
+        end
+        reuse = lower(char(reuse));
+    end
+    if ~any(strcmp(reuse, {'auto', 'always', 'never'}))
+        error('PRESTUS:placement:badReuse', ...
+            'placement.reuse must be ''auto'', ''always'' or ''never'' (got ''%s'').', reuse);
+    end
+end
+
+function tf = overwrite_never(parameters)
+    tf = isfield(parameters, 'io') && isfield(parameters.io, 'overwrite_files') && ...
+        strcmp(char(parameters.io.overwrite_files), 'never');
+end
+
+function mode = cache_check_mode(parameters)
+    mode = 'error';
+    if isfield(parameters, 'io') && isfield(parameters.io, 'cache_signature_check') && ...
+            (ischar(parameters.io.cache_signature_check) || isstring(parameters.io.cache_signature_check))
+        mode = lower(char(parameters.io.cache_signature_check));
+    end
 end
 
 % ── Manual placement dispatcher ──────────────────────────────────────────

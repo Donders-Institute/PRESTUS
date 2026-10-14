@@ -266,10 +266,10 @@ end
         sp(gl, 33);
 
         sec(gl, 34, 'Advanced I/O');
-        lbl(gl, 35, 1, 'External acoustic NIfTI');
-        edt(gl, 35, 2, 'io.external_acoustic_nifti', '', 0);
-        brw(gl, 35, 4, 'io.external_acoustic_nifti', 'file');
-        note_lbl(gl, 36, 'When set, skips acoustic simulation. NIfTI must contain p-max [Pa] in T1 space (e.g. from BabelBrain or a prior run).');
+        lbl(gl, 35, 1, 'Start from pressure map');
+        edt(gl, 35, 2, 'path.acoustic_input', '', 0);
+        brw(gl, 35, 4, 'path.acoustic_input', 'file');
+        note_lbl(gl, 36, 'When set, skips acoustic simulation. Peak-pressure NIfTI [Pa] in T1 space, e.g. a prior run''s *_pressure.nii.gz (its .json sidecar rescales it to the target ISPPA).');
 
         lbl(gl, 37, 1, 'Save complex pressure');
         chk(gl, 37, 2, 'io.save_p_complex', false, 'Save magnitude + phase of steady-state pressure field');

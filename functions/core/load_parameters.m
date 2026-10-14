@@ -199,6 +199,20 @@ function parameters = load_parameters(varargin)
         parameters.calibration = rmfield(parameters.calibration, 'target_isppa_wcm2');
     end
 
+    %% Backwards compatibility: io.external_acoustic_nifti → path.acoustic_input
+    if isfield(parameters, 'io') && isfield(parameters.io, 'external_acoustic_nifti')
+        if ~isempty(parameters.io.external_acoustic_nifti)
+            warning('prestus:deprecatedField', ...
+                ['io.external_acoustic_nifti is deprecated. Set path.acoustic_input instead ' ...
+                 '(acoustic analysis now also runs on it). The value has been migrated ' ...
+                 'automatically this run.']);
+            if ~isfield(parameters.path, 'acoustic_input') || isempty(parameters.path.acoustic_input)
+                parameters.path.acoustic_input = parameters.io.external_acoustic_nifti;
+            end
+        end
+        parameters.io = rmfield(parameters.io, 'external_acoustic_nifti');
+    end
+
     %% Check interactive mode requirements
 
     assert(parameters.simulation.interactive == 0 || usejava('desktop'), ...
@@ -301,17 +315,32 @@ function parameters = load_parameters(varargin)
         if strcmpi(parameters.thermal_backend, 'babelbrain')
             ac_is_bb = isfield(parameters, 'acoustic_backend') && ...
                 strcmpi(parameters.acoustic_backend, 'babelbrain');
-            has_ext_ac = isfield(parameters, 'io') && ...
-                isfield(parameters.io, 'external_acoustic_nifti') && ...
-                ~isempty(parameters.io.external_acoustic_nifti);
+            has_ext_ac = ~isempty(acoustic_input_file(parameters));
             if ~ac_is_bb || has_ext_ac
                 error('prestus:thermalBackendRequiresBabelBrainAcoustics', ...
                     ['thermal_backend "babelbrain" requires acoustic_backend "babelbrain" ' ...
                      '(it runs on the *DataForSim.h5 BabelBrain writes) and cannot be combined ' ...
-                     'with io.external_acoustic_nifti. Use thermal_backend "kwave" with ' ...
+                     'with path.acoustic_input. Use thermal_backend "kwave" with ' ...
                      'k-Wave/jwave/external acoustics.']);
             end
+            % BabelBrain computes only its own (Sapareto & Dewey) dose; the ISO
+            % maps are NaN, so the report falls back to the k-Wave-form columns.
+            if isfield(parameters, 'thermal') && isfield(parameters.thermal, 'cem43_iso') && ...
+                    parameters.thermal.cem43_iso == 1
+                warning('prestus:cem43IsoBabelBrain', ...
+                    ['thermal.cem43_iso = 1 is not available with thermal_backend "babelbrain" ' ...
+                     '(BabelBrain does not compute the ISO 14708-3 / ITRUSST form). ' ...
+                     'Setting thermal.cem43_iso = 0; the report uses BabelBrain''s CEM43.']);
+                parameters.thermal.cem43_iso = 0;
+            end
         end
+    end
+
+    %% BabelBrain: one transducer per run (see babelbrain_check_geometry)
+    uses_bb = (isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain')) || ...
+              (isfield(parameters, 'thermal_backend')  && strcmpi(parameters.thermal_backend,  'babelbrain'));
+    if uses_bb
+        babelbrain_check_geometry(parameters);
     end
 
     %% Normalise babelbrain.computing_backend names to BabelBrain's integer codes

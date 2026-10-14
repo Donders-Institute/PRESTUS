@@ -45,26 +45,15 @@ end
     subj_id_string = sprintf('%03d', parameters.subject_id);
     path_seg       = parameters.path.seg;
 
-    % Resolve the subject-specific pCT output directory.
-    % Use io.dir_pct when path_log_setup has already resolved it; otherwise apply the
-    % same resolution logic: empty path.pct → m2m_sub-NNN, non-empty → sub-NNN.
-    if isfield(parameters, 'io') && isfield(parameters.io, 'pct_dir') && ~isempty(parameters.io.dir_pct)
-        path_pct_out = parameters.io.dir_pct;
-    elseif isfield(parameters.path, 'pct') && ~isempty(parameters.path.pct)
-        path_pct_out = fullfile(parameters.path.pct, sprintf('sub-%s', subj_id_string));
-    else
-        path_pct_out = fullfile(path_seg, sprintf('m2m_sub-%s', subj_id_string));
-    end
+    % Subject-specific pCT output directory (GET_PCT_DIR); the SimNIBS m2m
+    % folder is only read.
+    path_pct_out = get_pct_dir(parameters);
     if ~isfolder(path_pct_out)
         mkdir(path_pct_out);
     end
 
-    % Resolve optional pCT parameters with safe defaults
-    skull_mapping = 'kosciessa';
-    if isfield(parameters, 'pct') && isfield(parameters.pct, 'skull_mapping') ...
-            && ~isempty(parameters.pct.skull_mapping)
-        skull_mapping = parameters.pct.skull_mapping;
-    end
+    % Resolve the skull mapping (also recorded in the sidecar, PCT_SIGNATURE)
+    [pct_sig, skull_mapping] = pct_signature(parameters);
 
     debug_flag = '1';
     if isfield(parameters, 'pct') && isfield(parameters.pct, 'debug')
@@ -294,15 +283,14 @@ end
     else
         fprintf(['To generate a pseudoCT, run the following command in bash:\n' ...
                  'bash -c %s\n' ...
-                 'Rerun the pipeline once pseudoCT.nii.gz exists in the m2m folder.\n'], ...
+                 'Rerun the pipeline once pseudoCT.nii.gz exists in the pCT folder.\n'], ...
                  shell_quote_arg(pct_call));
         error('Platform ''%s'' is not supported for automatic pseudoCT generation.', platform);
     end
 
-    % Write a JSON sidecar alongside pseudoCT.nii.gz recording the generation parameters.
-    % A JSON sidecar (BIDS convention) is used because NIfTI-1 headers have only 80 bytes
-    % for free-text metadata — insufficient for structured provenance.
-    write_pct_sidecar(path_pct_out, parameters, skull_mapping);
+    % Sidecar next to pseudoCT.nii.gz recording how it was made; a later run
+    % that reuses this pseudo-CT checks its signature (PREPROC_SEGMENTATION).
+    write_pct_sidecar(path_pct_out, parameters, pct_sig);
 
 end
 
@@ -321,19 +309,17 @@ function pct_poll_for_file(filepath, max_checks)
 end
 
 % ── Helper: write pseudoCT.json sidecar with generation provenance ────────
-function write_pct_sidecar(pct_dir, parameters, skull_mapping)
-    sidecar_path = fullfile(pct_dir, 'pseudoCT.json');
-    fid = fopen(sidecar_path, 'w');
-    if fid == -1
-        warn('Could not write pseudoCT.json to %s', pct_dir);
-        return;
+function write_pct_sidecar(pct_dir, parameters, pct_sig)
+    m2m = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+    content = struct( ...
+        'files', struct('pseudoCT', 'pseudoCT.nii.gz', 'tissues_mask', 'tissues_mask.nii.gz'), ...
+        'units', 'HU', ...
+        'space', 'T1w (SimNIBS m2m T1.nii.gz grid)', ...
+        'inputs', struct('segmentation', m2m), ...
+        'skull_mapping', pct_sig.skull_mapping, ...
+        'signature', pct_sig);
+    sidecar_path = write_sidecar(fullfile(pct_dir, 'pseudoCT.json'), 'pseudoCT', content, parameters);
+    if ~isempty(sidecar_path)
+        fprintf('pseudoCT.json written to %s\n', sidecar_path);
     end
-
-    fprintf(fid, '{\n');
-    fprintf(fid, '  "SkullMapping": "%s",\n',          skull_mapping);
-    fprintf(fid, '  "GenerationDate": "%s",\n',         char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
-    fprintf(fid, '  "SubjectID": %d\n',                 parameters.subject_id);
-    fprintf(fid, '}\n');
-    fclose(fid);
-    fprintf('pseudoCT.json written to %s\n', sidecar_path);
 end

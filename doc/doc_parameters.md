@@ -107,11 +107,14 @@ Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull
 | `anat` | Absolute path to structural input data. | — | Mandatory |
 | `sim` | Absolute path to simulation outputs. | — | Mandatory |
 | `seg` | Absolute path to SimNIBS segmentations (m2m folders). | — | Mandatory |
+| `placement` | Placement outputs: one folder per run, `<placement>/sub-XXX/<mode>/<target_name>/` (heuristic, PlanTUS, TUS_entry). | `''` | Empty = `<sim>/placement`. Share one folder across setups to reuse placements. See [Where outputs live](doc_outputs.md#where-outputs-live). |
 | `localite_raw` | Raw Localite exports, `<localite_raw>/sub-XXX/ses-XX/[<loc_folder>/]…`. | `''` | See [Localite I/O](doc_placement_neuronav.md#localite-io). |
 | `localite_post` | Ingested Localite markers, `<localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json`. | `''` | Written by `neuronav_ingest_markers` / `neuronav_gui`; read by `placement.mode: 'localite'` (automatic mode). |
 | `localite_t1` | Folder with the planning T1s loaded into Localite (`[sub-XXX/]<localite_t1_pattern>`). | `''` | Empty = `localite_raw`. |
 | `localite_t1_pattern` | File-name template of the planning T1; `%s` = `sub-XXX`. | `'%s_*T1*.nii*'` | Replaces `neuronav_t1_pattern` (still read). |
 | `localite_export` | Output folder for files to import into Localite (heuristic placement), per subject `sub-XXX/`. | `''` | Resolved into `io.dir_localite_export`. |
+| `pct` | Pseudo-CT outputs, per subject `<pct>/sub-NNN/`. | `''` | Empty = `<parent of path.seg>/pct/sub-NNN/`, next to the SimNIBS folder (never inside it). Resolved into `io.dir_pct`. |
+| `acoustic_input` | Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this subject's T1w space, e.g. an earlier run's `nii/T1w/*_pressure.nii.gz`. | `''` | Its JSON sidecar is checked against the current settings and used to rescale the map to `transducer.target_isppa_wcm2`; acoustic analysis and thermal simulation then run as usual. Replaces `io.external_acoustic_nifti` (still read). See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
 | `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `''` | Optional; empty skips the T2 (e.g. `'sub-%1$03d_T2w.nii*'`). |
@@ -139,7 +142,7 @@ Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull
 |---|---|---|---|
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour). |
-| `cache_signature_check` | Response when a reused grid/medium cache was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Applies when a cache is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs.md#cache-reuse-checks). |
+| `cache_signature_check` | Response when a reused grid/medium cache, or a stage output a run starts from (placement run, pseudo-CT, pressure map), was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Caches: applies when one is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs.md#cache-reuse-checks) and [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save all intermediate matrices (`.mat` / cache files)? | `[]` | `1` = save all, `0` = save none, `[]` = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to `0`/`1` always wins. `0` also triggers cleanup of uncertainty intermediates. |
 | `save_source_matrices` | Save `kwave_source.mat` (transducer source array)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. Needed by multi-stage pipelines (e.g. uncertainty). |
@@ -322,6 +325,7 @@ See [doc_placement.md](doc_placement.md).
 |---|---|---|---|
 | `mode` | Placement mode. | `'manual'` | `'manual'`, `'localite'`, `'heuristic'`, `'mni'`, `'plantus'` or `'tus_entry'`. |
 | `report` | Write the stand-alone placement report `sub-XXX_placement_<mode>.html` to `io.dir_reports`. | `true` | See [placement report](doc_placement.md#placement-report). |
+| `reuse` | When to reuse a recorded heuristic, PlanTUS or TUS_entry run (`placement_run.json` in its run folder). | `'auto'` | `'auto'`: reuse it when its settings match, else run again; `'always'`: require it (mismatch per `io.cache_signature_check`); `'never'`: always run. Independent of `io.overwrite_files`. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
 
 #### `placement.manual`
 

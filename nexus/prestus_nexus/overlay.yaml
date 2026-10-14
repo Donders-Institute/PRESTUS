@@ -73,9 +73,11 @@ fields:
   path.anat: {kind: dir}
   path.sim: {kind: dir}
   path.seg: {kind: dir}
+  path.placement: {kind: dir}
   path.localite*: {kind: dir}
   path.localite_t1_pattern: {kind: str}
   path.pct: {kind: dir}
+  path.acoustic_input: {kind: file}
   startup.*_path: {kind: path}
   startup.modules_to_load: {kind: strlist}
   startup.paths_to_add: {kind: strlist}
@@ -163,6 +165,7 @@ fields:
 
   # ── Placement ────────────────────────────────────────────────────────
   placement.mode: {choices: [manual, localite, heuristic, mni, plantus, tus_entry]}
+  placement.reuse: {choices: [auto, always, never]}
   placement.manual: {visible_if: {key: placement.mode, in: [manual]}}
   placement.manual.coordinate_space: {choices: [voxel, ras, mni]}
   placement.localite: {visible_if: {key: placement.mode, in: [localite]}}
@@ -268,6 +271,7 @@ deprecated:
   expected_focal_distance_mm: {use: transducer.focal_distance_ep, source: load_transducer_parameters.m}
   transducer.set_intensity_w_per_cm2: {use: transducer.target_isppa_wcm2, source: babelbrain_thermal_wrapper.m}
   jwave.pml_size: {use: grid.pml_size, ignored: true, source: jwave_wrapper.m}
+  io.external_acoustic_nifti: {use: path.acoustic_input, source: load_parameters.m}
 
 extra:
   simulation.async_grid_mode:
@@ -311,13 +315,6 @@ extra:
     default: kwave
     choices: [kwave, babelbrain]
     help: "Thermal solver: 'kwave' (default) | 'babelbrain' (requires acoustic_backend: 'babelbrain')"
-  io.external_acoustic_nifti:
-    kind: file
-    default: ''
-    help: >-
-      Full path to a pre-computed acoustic pressure NIfTI [Pa, T1 space]. When set,
-      acoustic simulation stages are skipped and this file is passed directly to the
-      thermal simulation. Requires modules.run_heating_sims: 1.
   transducer.serial:
     kind: str
     default: ''
@@ -550,6 +547,8 @@ display:
   path.localite_export: {label: Localite export folder, group: placement, advanced: true}
   path.localite: {label: Localite folder (deprecated), group: placement, advanced: true}
   path.pct: {label: Pseudo-CT output folder, advanced: true}
+  path.acoustic_input: {label: Start from pressure map (NIfTI), advanced: true}
+  path.placement: {label: Placement output folder, group: placement, advanced: true}
 
   # Environment
   startup.simnibs_bin_path: {label: SimNIBS bin folder}
@@ -577,7 +576,6 @@ display:
   io.save_Ipa: {label: Save pulse-average intensity map}
   io.save_Ita: {label: Save time-average intensity map}
   io.save_p_complex: {label: Save complex pressure field}
-  io.external_acoustic_nifti: {label: External acoustic pressure NIfTI, advanced: true}
 
   calibration: {label: Calibration conventions}
   calibration.focal_reference: {label: Focal-depth reference, advanced: true}
@@ -661,6 +659,7 @@ display:
   # Placement
   placement.mode: {label: Placement method, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}
   placement.report: {label: Write placement report}
+  placement.reuse: {label: Reuse recorded placement run}
   placement.manual: {label: Manual coordinates}
   placement.manual.coordinate_space: {label: Coordinate space of the positions}
   placement.localite: {label: Localite neuronavigation}

@@ -10,6 +10,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_convert_axisymmetry`          | Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
 | `acoustic_fov_crop`                     | Resolve FOV settings and crop the acoustic grid if active. |
 | `acoustic_grid_fov`                     | Crop the acoustic simulation domain to a beam-axis FOV box. |
+| `acoustic_input_file`                   | Pressure map a run starts from instead of simulating ('' if none) |
 | `acoustic_simulation`                   | Set up acoustic simulation |
 | `acoustic_simulation_elastic`           | Run a k-Wave elastic (shear-wave) simulation via pstdElastic2D/3D |
 | `acoustic_stage`                        | Run or load the acoustic pressure simulation (Stage 6). |
@@ -186,12 +187,14 @@ The following documents the functions provided in PRESTUS.
 | `preproc_rescale_only`                  | Rescale a 3D image to grid resolution without rotation |
 | `preproc_segmentation`                  | Setup SimNIBS segmentation |
 | `preproc_transducer_placement`          | Resolve transducer and focus positions |
+| `read_placement_record`                 | Read the run record of a placement run folder |
 | `segmentation_run`                      | Submit SimNIBS segmentation |
 | `skull_fill_holes`                      | Fill holes in skull segmentation and between skull and skin |
 | `skull_rubber_wrap`                     | Inflate the skull layer to locally fill potential holes |
 | `skull_rubber_wrap_visualize`           | Visualize results of skull rubber expansion |
 | `smooth_img`                            | Apply 3D smoothing |
 | `write_placement_positions`             | Write the resolved transducer positions as a JSON sidecar |
+| `write_placement_record`                | Write the run record (placement_run.json) of a placement run |
 
 #### HELPER
 
@@ -206,6 +209,7 @@ The following documents the functions provided in PRESTUS.
 | `check_availability`                    | Check file availability. |
 | `check_cache_signature`                 | Refuse to reuse a cache built from different settings |
 | `check_layers`                          | Match requested layers to those available in the segmentation. For (p)CT, homogenize multi-skull layer into a single `skull `layer. |
+| `check_sidecar_signature`               | Compare a sidecar's recorded settings with the current run's |
 | `compute_ramp_factor`                   | Pulse-average / temporal-peak intensity ratio for a ramped pulse |
 | `config_known_extra_keys`               | Config keys PRESTUS reads that config_default.yaml omits |
 | `config_unknown_keys`                   | Dotted keys of a user config that PRESTUS does not know |
@@ -214,9 +218,13 @@ The following documents the functions provided in PRESTUS.
 | `default_log_file`                      | Timestamped pipeline log (diary) path for a run |
 | `ensure_hdf5_plugin_path`               | Set HDF5_PLUGIN_PATH so MATLAB's h5read/h5write don't fail |
 | `find_min_factor`                       | Find the number with the smallest maximum factor in a range. |
+| `find_pseudoct_dir`                     | Folder holding this subject's existing pseudoCT.nii.gz |
+| `find_sidecar`                          | JSON sidecar of a data file: same name with .json (BIDS convention) |
 | `get_crop_dims`                         | Computes cropping dimensions for a 3D image with a margin. |
 | `get_flhm_center_position`              | Calculates the center position of the full-length half-maximum (FLHM). |
 | `get_output_dir`                        | Derive the simulation output directory from parameters |
+| `get_pct_dir`                           | Per-subject pseudo-CT folder |
+| `get_placement_dir`                     | Per-subject root of the placement outputs |
 | `get_prestus_path`                      | GET_PRESTUSPATH  Return the absolute path to the PRESTUS toolbox root |
 | `get_slice_by_label`                    | Extracts a specific slice from a 3D image based on axis label and slice number. |
 | `get_xyz_mesh`                          | Generates a mesh of 3D coordinates for a given image. |
@@ -237,6 +245,7 @@ The following documents the functions provided in PRESTUS.
 | `print_predicted_outputs`               | Print `predict_outputs`' plan to the console. |
 | `r_quote_string`                        | Escape a string for safe embedding in a generated R string literal. |
 | `read_ini_file`                         | Read an INI file into MATLAB |
+| `read_sidecar`                          | Read a stage-output JSON sidecar |
 | `resolve_chained_overwrite`             | Map io.overwrite_files onto the stages of a |
 | `resolve_io_dirs`                       | Fill missing io path fields from path.sim + subject_id |
 | `resolve_jwave_pml_size`                | Resolve grid.pml_size 'auto' to a wavelength-based scalar PML thickness for jwave |
@@ -357,10 +366,13 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `check_pct_sidecar`                     | Refuse an existing pseudo-CT made with other settings |
 | `fit_pairwiselinear`                    | Perform a pairwise linear fit between HU and density values with optional plot. |
 | `pct_create_pCT_run`                    | Submit a pseudoCT generation job |
+| `pct_signature`                         | Settings a pseudo-CT depends on, and the resolved skull mapping |
 | `pct_skullexpand`                       | Load SimNIBS NIfTIs + headers, run skull rubber wrap, save output. |
 | `pct_skullmapping`                      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug] |
+| `pct_skullmapping_fit`                  | Subject-specific UTE->HU line from cortical / trabecular UTE histograms |
 | `pct_soft_tissue_peak`                  | Identifies the soft tissue peak from UTE intensity distribution histograms. |
 
 #### PLOT

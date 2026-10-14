@@ -340,6 +340,10 @@ function [parameters] = prestus_pipeline(parameters, options)
         end
         log_timer('stop', 'nifti_acoustic');
 
+        % Sidecar of the pressure map, so a later run can start from it
+        % (path.acoustic_input) instead of simulating
+        write_acoustic_sidecar(parameters, acoustic_provenance, sensor_data);
+
         % Targeting accuracy from the focal-mask NIfTIs just written
         if (~isfield(parameters.modules, 'run_targeting_analysis') || parameters.modules.run_targeting_analysis) && ...
                 (~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation) && ...

@@ -41,7 +41,7 @@ prestus_pipeline
       │                 free-water ISPPA of the current drive, for target_isppa_wcm2 scaling
       ▼
 [6 acoustic]            modules.run_acoustic_sims           (acoustic cache)
-      │                 k-Wave / jwave / BabelBrain, or io.external_acoustic_nifti;
+      │                 k-Wave / jwave / BabelBrain, or a prior pressure map (path.acoustic_input);
       │                 field scaled to target_isppa_wcm2; dry-run backends stop here
       ▼
 [7 acoustic analysis]   modules.run_acoustic_analysis
@@ -68,9 +68,9 @@ prestus_pipeline
 | Goal | Settings |
 |---|---|
 | Run SimNIBS segmentation only | `modules.segmentation_only = 1` |
-| Re-run from acoustic simulation onwards | `modules.run_grid_setup = 0`, `run_medium_setup = 0`, `run_source_setup = 0` |
-| Add thermal simulation to completed acoustic run | `modules.run_heating_sims = 1`; all others can remain `1` |
-| Regenerate analysis outputs only | `run_acoustic_sims = 0`, `run_heating_sims = 0` |
+| Reuse a heuristic / PlanTUS / TUS_entry placement | Nothing to set: `placement.reuse: auto` reuses a recorded run whose settings match; `always` requires one. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs) |
+| Thermal simulation (or analysis) on a completed acoustic run | `path.acoustic_input: <earlier run>/nii/T1w/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz`; keep the other modules on (grid and medium take seconds to a minute). The map is rescaled to `transducer.target_isppa_wcm2` from its sidecar |
+| Regenerate analysis outputs from the acoustic cache | `run_acoustic_sims = 0`, `run_heating_sims = 0` (the acoustic stage then loads `cache/…_results….mat`, which the earlier run only wrote with `io.save_acoustic_matrices: 1`). Without that cache, use `path.acoustic_input` as above |
 | Skip free-water reference | `modules.run_posthoc_water_sims = 0` |
 | Run thermal at a specific free-water ISPPA | `transducer.target_isppa_wcm2: 30` (with `modules.run_water_baseline: auto`, the free-water baseline runs when the target needs it); see [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting) |
 | Report the field at the simulated drive (`elem_p_amp`) | `transducer.target_isppa_wcm2: []` |
@@ -80,6 +80,6 @@ prestus_pipeline
 | Generate a cross-subject group report | `modules.generate_group_report = 1` (or run `prestus_group_report_start` manually); see [doc_group.md](doc_group.md#group-html-report) |
 | Run many subjects with per-subject settings | `study.manifest` + `prestus_study_start(config)`; see [doc_group.md](doc_group.md#study-setup) |
 
-> **Note:** Downstream modules depend on outputs from upstream ones. If intermediate files already exist on disk (e.g. from a prior run), PRESTUS reuses them subject to `io.overwrite_files`; a reused grid or medium cache must match the current settings ([Cache reuse checks](doc_outputs.md#cache-reuse-checks)). If they do not exist, disabling an upstream module while enabling a downstream one will error.
+> **Note:** Downstream modules depend on outputs from upstream ones. Within-run caches in `cache/` are reused subject to `io.overwrite_files`, and a reused grid or medium cache must match the current settings ([Cache reuse checks](doc_outputs.md#cache-reuse-checks)). The grid, medium and acoustic caches are only written when `io.save_grid_cache`, `io.save_medium_cache` and `io.save_acoustic_matrices` (or `io.save_matrices`) are on; by default they are not. If a stage is switched off and its cache does not exist, the stage does not stop the run: the grid and medium stages continue with empty results, and the acoustic and thermal stages report that no results are available and skip their analysis. To start a run from the results of an earlier one, use its stage outputs instead ([Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs)).
 
 ---

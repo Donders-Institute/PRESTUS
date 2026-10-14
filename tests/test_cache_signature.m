@@ -121,7 +121,7 @@ classdef test_cache_signature < matlab.unittest.TestCase
         end
 
         function test_unknown_kind_errors(tc)
-            tc.verifyError(@() cache_signature(tc.params(), 'acoustic'), 'cache_signature:badKind');
+            tc.verifyError(@() cache_signature(tc.params(), 'thermal'), 'cache_signature:badKind');
         end
 
     end

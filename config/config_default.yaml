@@ -93,11 +93,6 @@ io:
   save_Ita: 1              # Save temporal-average intensity (Ita) NIfTI map; suppressed automatically when timing.pd/.pri absent
   save_p_complex: 0         # Save complex pressure field (p_complex) alongside p_max_all in the acoustic cache? (large)
 
-  # --- Advanced / optional fields (not set by default; uncomment to enable) ---
-  # external_acoustic_nifti: ''  # Full path to a pre-computed acoustic pressure NIfTI [Pa, T1 space].
-  #                              # When set, acoustic simulation stages are skipped and this file is
-  #                              # passed directly to the thermal simulation. Acoustic analysis is
-  #                              # not available in this path.  Requires run_heating_sims: 1.
 
 #------------ Calibration (equipment-level metadata, not ISPPA targeting)
 
@@ -299,10 +294,15 @@ placement:
                     #   'localite' (derive from a recorded Localite pose; set placement.localite.file or path.localite_post/_raw) |
                     #   'heuristic' (sphere-expansion search; set placement.heuristic.mni_target_mm and target_name) |
                     #   'mni'       (define trans/focus directly in MNI mm; snapped to scalp + gap; set placement.mni.*) |
-                    #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*)
+                    #   'plantus'   (multi-objective optimisation via external PlanTUS; set placement.plantus.*) |
+                    #   'tus_entry' (flattest scalp contact via external TUS_entry (R); set placement.tus_entry.*)
   report: true      # Write a stand-alone placement report (sub-XXX_placement_<mode>.html in
                     #   io.dir_reports) after placement: target, positions, T1 overlay and, for
                     #   'plantus', the criteria evaluation (placement.plantus.evaluate).
+  reuse: 'auto'     # Reuse a recorded heuristic/plantus/tus_entry run (placement_run.json in its run folder):
+                    #   'auto'   reuse it when its settings match, else run the placement again |
+                    #   'always' require it (mismatch handled per io.cache_signature_check) |
+                    #   'never'  always run the placement. Independent of io.overwrite_files.
   manual:
     coordinate_space: 'voxel' # Space of transducer.trans_pos / focus_pos in mode='manual':
                               #   'voxel' (1-based T1 voxel indices) |

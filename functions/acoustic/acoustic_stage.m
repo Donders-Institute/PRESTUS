@@ -5,7 +5,7 @@ function [sensor_data, parameters, kgrid, kwave_medium, medium_masks, ...
                    acoustic_provenance, planimg, trans_pos, focus_pos, pseudoCT)
 % ACOUSTIC_STAGE  Run or load the acoustic pressure simulation (Stage 6).
 %
-% Handles the external acoustic NIfTI shortcut, cache load/save, and backend
+% Handles a prior pressure map (path.acoustic_input), cache load/save, and backend
 % dispatch (k-Wave default / jwave / BabelBrain).  Must be called after
 % source setup and acoustic_water_baseline.
 %
@@ -36,8 +36,8 @@ function [sensor_data, parameters, kgrid, kwave_medium, medium_masks, ...
 %   pseudoCT          - pseudo-CT volume ([] if not available)
 %
 % Outputs:
-%   sensor_data       - struct with p_max_all field (Pa), or char NIfTI path
-%                       for external acoustic input, or [] when unavailable
+%   sensor_data       - struct with p_max_all field (Pa) (also for a prior pressure
+%                       map, resampled onto the grid), or [] when unavailable
 %   parameters        - updated with state.acoustics_available and
 %                       state.acoustic_dry_run flags
 %   kgrid, kwave_medium, medium_masks, segmentation, source, source_labels -
@@ -71,22 +71,19 @@ filename_sensor_data = fullfile(parameters.io.dir_cache, ...
 parameters.state.acoustics_available = 0;
 parameters.state.acoustic_dry_run    = false;
 
-% --- External acoustic NIfTI (e.g. from BabelBrain or a prior PRESTUS run) ---
-% When io.external_acoustic_nifti is set, all acoustic sim stages are skipped
-% and the NIfTI path is passed directly to thermal_simulation.
-has_external_acoustic = isfield(parameters.io, 'external_acoustic_nifti') && ...
-    ~isempty(parameters.io.external_acoustic_nifti);
+% Settings the acoustic field depends on: written to the pressure map's
+% sidecar (WRITE_ACOUSTIC_SIDECAR) and compared when a later run starts from it.
+input_signature = cache_signature(parameters, 'acoustic');
+acoustic_provenance.input_signature = input_signature;
 
-if has_external_acoustic
-    ext_nii = parameters.io.external_acoustic_nifti;
-    if ~isfile(ext_nii)
-        error('prestus_pipeline:externalAcousticNotFound', ...
-            'io.external_acoustic_nifti not found: %s', ext_nii);
-    end
-    fprintf('[pipeline] Using external acoustic NIfTI: %s\n', ext_nii);
-    sensor_data = ext_nii;
+% --- Prior pressure map (path.acoustic_input): no simulation -----------------
+% The map is resampled onto this grid, so acoustic analysis and the thermal
+% stage run as after a simulation (LOAD_ACOUSTIC_INPUT).
+acoustic_input = acoustic_input_file(parameters);
+if ~isempty(acoustic_input)
+    [sensor_data, acoustic_provenance] = load_acoustic_input( ...
+        acoustic_input, parameters, planimg, acoustic_provenance);
     parameters.state.acoustics_available = 1;
-    parameters.modules.run_acoustic_analysis = 0;
     return;
 end
 

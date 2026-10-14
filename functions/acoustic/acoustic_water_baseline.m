@@ -30,6 +30,12 @@ if is_acoustic_dry_run(parameters)
     return;
 end
 
+if ~isempty(acoustic_input_file(parameters))
+    % The input map's sidecar carries its free-water ISPPA (LOAD_ACOUSTIC_INPUT)
+    fprintf('Skipping free-water baseline: starting from path.acoustic_input.\n');
+    return;
+end
+
 [run_baseline, reason] = needs_water_baseline(parameters, acoustic_provenance);
 
 cal_isppa = NaN;
