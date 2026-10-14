@@ -84,6 +84,17 @@ if numel(cached.grid_cache_info.parameters.transducer) > numel(transducer_before
              'is not set. Grid positions may be in the wrong coordinate space. ' ...
              'Ensure make_acoustic_params sets io.async_transducer_idx.']);
     end
+elseif numel(cached.grid_cache_info.parameters.transducer) == numel(transducer_before_load)
+    % Same transducers: keep the caller's settings (drive, phases, ISPPA
+    % targets, ...) and take only what the grid stage computed, the grid-space
+    % positions (GRID_TRANSDUCER_LOCATION). Restoring the whole cached array
+    % would replace e.g. the targets of a run that reuses another run's grid.
+    cached_transducers = cached.grid_cache_info.parameters.transducer;
+    parameters.transducer = transducer_before_load;
+    for ti = 1:numel(cached_transducers)
+        parameters.transducer(ti).trans_pos = cached_transducers(ti).trans_pos;
+        parameters.transducer(ti).focus_pos = cached_transducers(ti).focus_pos;
+    end
 else
     parameters.transducer = cached.grid_cache_info.parameters.transducer;
 end
