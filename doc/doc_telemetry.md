@@ -91,6 +91,7 @@ All system resource fields are collected inside `try/catch` blocks and fall back
 | `run_type` | `technical` (test/CI run) or `deployment` (default). See [Technical vs. deployment runs](#technical-vs-deployment-runs). |
 | `timestamp_utc` | POSIX timestamp (seconds since epoch, UTC) |
 | `uuid` | Random UUID generated locally on first run; stored in `~/.prestus/uuid.txt`. Not linked to your identity or machine. |
+| `run_id` | Random UUID generated per pipeline run, so the events of one run can be told apart. Not linked to your identity or machine. |
 | `prestus_ver` | Version string of the running PRESTUS checkout (from `git describe` or the `VERSION` file, e.g. `v0.5.1`) |
 | `prestus_hash` | Short git commit hash of the running PRESTUS checkout (e.g. `628edd0`) |
 | `matlab_ver` | MATLAB release string (e.g. `R2024a`) |
@@ -117,7 +118,8 @@ All system resource fields are collected inside `try/catch` blocks and fall back
 | `pct_density` | Name of the density mapping used for pCT (string, not values) |
 | `pct_speed` | Name of the sound-speed mapping used for pCT |
 | `pct_atten` | Name of the attenuation mapping used for pCT |
-| `modules_enabled` | List of module names that are switched on (e.g. `["acoustic_sim","thermal_sim"]`) |
+| `modules_enabled` | Names of the `modules.*` flags set to 1 (e.g. `["run_acoustic_sims","run_heating_sims"]`) |
+| `pipeline_mode` | Pipeline mode of the run: `single`, `async` (asynchronous multi-transducer), `multi_isppa` or `sequential` |
 
 ### Transducer
 
