@@ -512,7 +512,9 @@ headmodel:
 
 pct:
   enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
-  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/carpino/wiesinger/treeby/kosciessa
+  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/carpino/wiesinger/treeby/kosciessa/custom
+  custom_slope: []              # skull_mapping 'custom': HU = custom_slope * normalised UTE + custom_intercept
+  custom_intercept: []          # (skull voxels; soft tissue 42 HU, air -1000 HU as for the other mappings)
   debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
   mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry/air-tissue
   mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold

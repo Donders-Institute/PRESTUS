@@ -333,13 +333,18 @@ function pct_create_pseudoCT()
     wiesinger)
         fslmaths "$ute_norm" -add -1 -mul -2000 -add 42 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     treeby)
-        fslmaths "$ute_norm" -mul -2929.6 -add 3247.9 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+        fslmaths "$ute_norm" -mul -2929.6 -add 3274.9 -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     kosciessa)
         m1=$(awk 'NR==1{print $1}' "${path_pct}/pCT_skull_mapping.txt")
         m2=$(awk 'NR==2{print $1}' "${path_pct}/pCT_skull_mapping.txt")
         fslmaths "$ute_norm" -mul "$m1" -add "$m2" -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
+    custom:*)
+        # user-defined linear map: custom:<slope>:<intercept> (pct.custom_slope / pct.custom_intercept)
+        IFS=':' read -r _ m1 m2 <<< "$skullmapping"
+        [[ "$m1" =~ ^-?[0-9]+(\.[0-9]+)?$ && "$m2" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] || { echo "ERROR: custom mapping needs numeric slope and intercept: '$skullmapping'"; exit 1; }
+        fslmaths "$ute_norm" -mul "$m1" -add "$m2" -mul "$skull_mask_PVC_dil" "$pCT_skull" ;;
     *)
-        echo "ERROR: Unknown skullmapping value '$skullmapping'. Valid options: miscouridou, carpino, wiesinger, treeby, kosciessa"
+        echo "ERROR: Unknown skullmapping value '$skullmapping'. Valid options: miscouridou, carpino, wiesinger, treeby, kosciessa, custom:<slope>:<intercept>"
         exit 1 ;;
     esac
 

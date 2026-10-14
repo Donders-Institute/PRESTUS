@@ -1,10 +1,9 @@
 function pct_skullmapping(simnibs_path, path_pct)
 % PCT_SKULLMAPPING  Compute pseudo-CT mapping for cortical and trabecular bone from UTE histograms
 %
-% Analyses UTE image histograms for cortical and trabecular bone,
-% identifies peak positions, FWHM widths, and crossover points, fits a
-% piecewise linear pCT mapping, and saves visualisations and coefficients
-% to the subject folder.
+% Fits the subject-specific UTE->HU line from the cortical and trabecular
+% UTE histograms (PCT_SKULLMAPPING_FIT, default settings) and saves the
+% coefficients (pCT_skull_mapping.txt, rounded) and a figure to path_pct.
 %
 % Use as:
 %   pct_skullmapping(simnibs_path, path_pct)
@@ -13,7 +12,7 @@ function pct_skullmapping(simnibs_path, path_pct)
 %   simnibs_path - path to the subject's m2m folder (e.g. .../m2m_sub-009)
 %   path_pct     - path to the pseudoCT working directory
 %
-% See also: PCT_SOFT_TISSUE_PEAK, FIT_PAIRWISELINEAR, PCT_SKULLEXPAND
+% See also: PCT_SKULLMAPPING_FIT, PCT_SOFT_TISSUE_PEAK, PCT_SKULLEXPAND
 
 arguments
     simnibs_path (1,:) char
@@ -21,153 +20,17 @@ arguments
 end
 
     %% Load UTE image and tissue mask
-    ute_file = fullfile(path_pct, 'UTE_STnorm.nii.gz');
-    ute_corr = niftiread(ute_file);
+    ute_corr  = niftiread(fullfile(path_pct, 'UTE_STnorm.nii.gz'));
+    mask_corr = niftiread(fullfile(simnibs_path, 'final_tissues.nii.gz'));
 
-    % Hard-coded SimNIBS labels for tissue types
-    idx_cortical = 7; % Cortical bone
-    idx_trabecular = 8; % Trabecular bone
-    idx_air = 0; % Air
-
-    % Load tissue mask
-    mask_file = fullfile(simnibs_path, 'final_tissues.nii.gz');
-    mask_corr = niftiread(mask_file);
-
-    %% Extract UTE values for each tissue type
-    mask_cortical = logical(mask_corr == idx_cortical);
-    ute_cortical = ute_corr(mask_cortical);
-
-    mask_trabecular = logical(mask_corr == idx_trabecular);
-    ute_trabecular = ute_corr(mask_trabecular);
-
-    mask_air = logical(mask_corr == idx_air);
-    ute_air = ute_corr(mask_air);
-
-    %% Compute histograms for UTE values
-    x = [0:0.01:1.5]; % Bin edges for histograms
-    y1 = hist(ute_cortical, x); % Cortical bone histogram
-    y2 = hist(ute_trabecular, x); % Trabecular bone histogram
-    y3 = hist(ute_air, x); % Air histogram
-
-    %% Interpolate values between 0.90 and 1.10 to exclude partial volumes
-    interpPoints = [0.90:0.01:1.1];
-    idx_interp = find(x >= interpPoints(1) & x <= interpPoints(end));
-    y1(idx_interp) = NaN;
-    y2(idx_interp) = NaN;
-    y1(idx_interp) = interp1(x, y1, interpPoints, 'spline');
-    y2(idx_interp) = interp1(x, y2, interpPoints, 'spline');
-
-    %% Normalize histograms to their maximum values
-    y1 = y1 ./ max(y1);
-    y2 = y2 ./ max(y2);
-    y3 = y3 ./ max(y3);
-
-    %% Step 1: Find maxima of cortical and trabecular histograms
-    [pks1, locs1] = findpeaks(y1, x); % Peaks for cortical histogram
-    [pks2, locs2] = findpeaks(x .* y2, x); % Peaks for trabecular histogram (scaled by x)
-    
-    [~, idxMax1] = max(pks1);
-    [~, idxMax2] = max(pks2);
-    
-    xMax1 = locs1(idxMax1); % Cortical peak position
-    xMax2 = locs2(idxMax2); % Trabecular peak position
-    
-    disp(['Maxima of cortical histogram at x = ', num2str(xMax1)]);
-    disp(['Maxima of trabecular histogram at x = ', num2str(xMax2)]);
-
-    %% Step 2: Calculate FWQM for y1 (x1, cortical bone)
-
-    % Find peak value and quarter-maximum value for y1
-    [~, peakIdxY1] = max(y1);
-    peakValueY1 = y1(peakIdxY1);
-    halfMaxY1 = peakValueY1 / 4;
-    
-    % Find indices where y1 crosses half-maximum on both sides of the peak
-    leftIdxY1 = find(y1(1:peakIdxY1) < halfMaxY1, 1, 'last');
-    rightIdxY1 = find(y1(peakIdxY1:end) < halfMaxY1, 1, 'first') + peakIdxY1 - 1;
-    
-    % Interpolate to find exact crossing points
-    xLeftY1 = interp1(y1(leftIdxY1:leftIdxY1+1), x(leftIdxY1:leftIdxY1+1), halfMaxY1);
-    xRightY1 = interp1(y1(rightIdxY1-1:rightIdxY1), x(rightIdxY1-1:rightIdxY1), halfMaxY1);
-    
-    fwhmWidthY1 = xRightY1 - xLeftY1; % Calculate FWHM width
-    
-    disp(['FWHM width for y1: ', num2str(fwhmWidthY1)]);
-    disp(['Left crossing point (xLeft): ', num2str(xLeftY1)]);
-    disp(['Right crossing point (xRight): ', num2str(xRightY1)]);
-
-    %% Step 3: Find crossover point (x1) within restricted range
-
-    % Restrict range to [xMax1, xMax2]
-    rangeIdx = (x >= xMax1 & x <= xMax2); % Logical index for restricted range
-    xRestricted = x(rangeIdx);
-    y1Restricted = y1(rangeIdx);
-    y2Restricted = y2(rangeIdx);
-
-    diffHistRestricted = y1Restricted - y2Restricted; % Difference between histograms
-    % Define the window size for consecutive samples
-    smooth_window = 2;
-    % Preallocate array for moving averages
-    movingAvgDiff = zeros(length(diffHistRestricted) - smooth_window + 1, 1);
-    % Compute moving average of differences over the specified window size
-    for i = 1:length(movingAvgDiff)
-        movingAvgDiff(i) = mean(diffHistRestricted(i:i+smooth_window-1));
-    end
-    % Find the index of the minimum absolute moving average difference
-    [minDiff, minIdx] = min(abs(movingAvgDiff));
-    % Adjust index to account for window size
-    crossIdx = minIdx + floor(smooth_window / 2);
-
-    % Display results
-    fprintf('Min. difference: %.2f\n', minDiff);
-    fprintf('Crossover index: %d\n', crossIdx);
-
-    % Check if crossIdx is empty
-    if isempty(crossIdx)
-        warn('No crossover point found within the restricted range. Choosing the midway point between tissue peaks. Visual inspection recommended.');
-        xCross = round(mean([xMax1, xMax2]));
-    else
-        xCross = x(crossIdx + find(rangeIdx, 1, 'first')-1);
-    end
-    
-    disp(['Crossover point (x1): ', num2str(xCross)]);
-    
-    %% Step 3: Calculate FWHM for y2 (x2, trabecular bone)
-    % Find peak value and half-maximum value for y2
-    [~, peakIdxY2] = max(y2);
-    peakValueY2 = y2(peakIdxY2);
-    halfMaxY2 = peakValueY2 / 4;
-    
-    % Find indices where y2 crosses half-maximum on both sides of the peak
-    leftIdxY2 = find(y2(1:peakIdxY2) < halfMaxY2, 1, 'last');
-    rightIdxY2 = find(y2(peakIdxY2:end) < halfMaxY2, 1, 'first') + peakIdxY2 - 1;
-    
-    % Interpolate to find exact crossing points
-    xLeftY2 = interp1(y2(leftIdxY2:leftIdxY2+1), x(leftIdxY2:leftIdxY2+1), halfMaxY2);
-    xRightY2 = interp1(y2(rightIdxY2-1:rightIdxY2), x(rightIdxY2-1:rightIdxY2), halfMaxY2);
-    
-    fwhmWidthY2 = xRightY2 - xLeftY2; % Calculate FWHM width
-    
-    disp(['FWHM width for y2: ', num2str(fwhmWidthY2)]);
-    disp(['Left crossing point (xLeft): ', num2str(xLeftY2)]);
-    disp(['Right crossing point (xRight): ', num2str(xRightY2)]);
-    
-    %% Assemble points for fitting
-
-    % Define the three points
-    X = [xLeftY1, xCross, xRightY2]; % X-coordinates (cortical lower FWHM; crossover; trabecular higher FWQM)
-    Y = [1900, 700, 300];            % Y-coordinates
-    
-    % Solve for least squares fit using polyfit (degree 1 for linear fit)
-    coefficients = polyfit(X, Y, 1);
-    
-    % Extract slope (m) and intercept (b)
-    m = coefficients(1); % Slope
-    b = coefficients(2); % Intercept
-    
-    % Display the linear equation
+    %% Fit (pct_skullmapping_fit, default settings)
+    [m, b, fi] = pct_skullmapping_fit(ute_corr, mask_corr);
+    x = fi.x; y1 = fi.y_cortical; y2 = fi.y_trabecular;
+    xLeftY1 = fi.x_points(1); xCross = fi.x_points(2); xRightY2 = fi.x_points(3);
+    y3 = hist(ute_corr(mask_corr == 0), x); y3 = y3 ./ max(y3);    % air, for the plot only
+    fprintf('Points: cortical lower width %.3f, crossover %.3f, trabecular upper width %.3f\n', fi.x_points);
     disp(['Least Squares Linear Fit: y = ', num2str(m), ' * x + ', num2str(b)]);
-    
+
     %% Visualize the histograms with key points
 
     h = figure('Position', [100, 100, 600, 500]);
