@@ -7,17 +7,19 @@ Multiple transducers can be specified in layered simulations:
 ```yaml
 transducer:
   - name: right
-    elem_n: 10
-    # ...
+    serial: IS_PCD15473_01001
+    combo: {ds_serial: IGT_32_ch_comb_10_ch}
+    # ... trans_pos, focus_pos, focal_distance_ep
 
   - name: left
-    elem_n: 10
+    serial: IS_PCD15473_01001
+    combo: {ds_serial: IGT_32_ch_comb_10_ch}
     # ...
 ```
 
 ### Grid alignment
 
-The default `focal_axis` mode rotates the grid so that the mean focal unit vector of all transducers aligns with z. For bilateral setups this equals the inter-transducer axis, making the grid symmetric with respect to both bowls. For angled setups (e.g. two transducers at 45° or 90°) z correctly points toward the beam convergence zone rather than the inter-transducer axis. No configuration is needed — this is the default:
+The default `focal_axis` mode rotates the grid so that the mean beam axis of all transducers aligns with z. The beams are averaged as axes, not directions, so opposed (bilateral) beams do not cancel: z bisects their two axes, and each beam is tilted from z by about half the angle between them. For angled setups converging from one side (e.g. two transducers at 45° or 90°) z is their bisector. Every beam that is not on z is drawn obliquely on the grid; at coarse resolution that costs accuracy (see `async_grid_mode: per_transducer` below for async runs). No configuration is needed — this is the default:
 
 ```yaml
 grid:
@@ -195,21 +197,24 @@ $$p_\mathrm{thermal} = \sqrt{2 \cdot I_\mathrm{total} \cdot \rho c}$$
 
 By default (`simulation.async_grid_mode: 'shared'`), all transducers share one grid — see
 [Grid alignment](#grid-alignment) and [Grid cropping](#grid-cropping) above. This means each
-transducer's own acoustic sub-run (`_trans-01`, `_trans-02`, …) is simulated on a grid aligned to
-the *mean* focal axis and cropped to enclose every transducer's bowl, not just its own — so a
-per-transducer result (e.g. focal distance, ISPPA) can differ noticeably from what the same
-transducer would show run alone (solo/sequential mode), even though only that transducer drives
-sound in its own acoustic stage. This is a genuine geometric effect (different beam incidence
-through the skull), not a bug.
+transducer's own acoustic sub-run (`_trans-01`, `_trans-02`, …) is simulated on a grid oriented
+along the *mean* beam axis and cropped to enclose every transducer's bowl, not just its own. A beam
+that is not on the grid axis is drawn obliquely: its bowl and the skull it crosses are voxelised at
+an angle. The physics is the same, but the discretisation is not, so a per-transducer result
+(e.g. focal distance, ISPPA, even the free-water ISPPA) can differ from what the same transducer
+shows run alone (solo/sequential mode). The difference shrinks with grid resolution; at 2 mm
+(2.5 points per wavelength at 300 kHz) a beam 41° off axis lost 16% of its free-water ISPPA.
 
 Setting `simulation.async_grid_mode: 'per_transducer'` instead gives each transducer its own
 optimally aligned, minimally cropped grid — identical to what solo/sequential mode would produce
 for that transducer. `combine_async_intensity` then resamples every transducer's field onto
 transducer(1)'s grid (the reference frame) via each run's `planimg` sidecar (sim-voxel → world RAS
 mm affine), so per-voxel max/sum combination remains correct even though each field was simulated
-on a different grid. Use this mode when per-transducer characterization (focal distance, ISPPA,
-focal volume) needs to match the solo/sequential result, or when transducers are widely separated
-or steeply angled (where the shared union-bbox grid would otherwise grow large or badly aligned).
+on a different grid. That resampling costs accuracy in turn (linear interpolation of a rotated
+field; parts of a field outside transducer(1)'s grid are dropped). Use this mode when per-transducer
+characterization (focal distance, ISPPA, focal volume) needs to match the solo/sequential result,
+or when transducers are widely separated or steeply angled (where the shared union-bbox grid would
+otherwise grow large or badly aligned).
 
 ```yaml
 simulation:

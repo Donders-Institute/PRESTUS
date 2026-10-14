@@ -176,9 +176,11 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `autopad_grid_for_transducers`          | Expand grid if any transducer/focus position falls outside |
 | `head_smooth_and_crop`                  | Convert and smooth segmentations into medium map & crop grid for effiency |
+| `mean_beam_axis`                        | Mean axis of several transducer beams, averaged as axes (opposed beams do not cancel) |
+| `placement_run_dir`                     | Folder of one placement run (one mode, one target) |
+| `placement_signature`                   | Settings a placement run's result depends on |
 | `preproc_align_to_focal_axis`           | Rotate input image and its grid coordinates to the transducer-focal axis (+Z) |
 | `preproc_align_to_mean_focal_axis`      | Rotate a 3D image so the mean focal axis aligns with z |
-| `preproc_align_to_principal_axis`       | Rotate a 3D image so the principal axis of transducer positions aligns with z |
 | `preproc_crop_eCSF`                     | Expand CSF to define outer edges of layered medium. |
 | `preproc_crop_grid`                     | Crop grid to head + transducer + PML. |
 | `preproc_deface_m2m`                    | Create a defaced copy of a SimNIBS m2m folder |

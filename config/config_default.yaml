@@ -475,27 +475,27 @@ grid:
   # sim_time_us: []                # Fixed simulation duration [us]; when set, replaces steady_state_transits.
   max_expand: 40      # Prime number grid expansion size to (potentially) speed up computations
   use_kWaveArray: 1   # Use the kwaveArray class for transducer modeling?
+  # bli_tolerance: []        # kWaveArray band-limited interpolation tolerance; empty: 0.1 (3D), 0.01 (axisymmetric)
+  # bli_upsampling_rate: []  # kWaveArray integration-point upsampling; empty: 10 (3D), 100 (axisymmetric)
   axisymmetric: 0     # Use 2D axisymmetric simulation mode?
   axisymmetric_output: 'auto' # Axisymmetric results: 'auto' (3D for phantoms or with heating, else the 2D plane),
                               # '2d' (mirrored plane; no heating), '3d' (always expand)
   mode: 'focal_axis'       # Grid orientation mode:
-                           #   'focal_axis' (default) — rotate volume so the mean focal unit
-                           #     vector of all transducers aligns with z. For N=1 this equals
-                           #     transducer_axis; for bilateral setups it equals the
-                           #     inter-transducer axis (identical to the old principal_axis
-                           #     result); for angled multi-transducer setups z correctly points
-                           #     toward the beam convergence zone. Falls back to transducer(1)
-                           #     focal axis if beams are too spread (norm < grid.focal_axis_min_norm).
+                           #   'focal_axis' (default) — rotate volume so the mean beam axis of
+                           #     all transducers aligns with z, averaging the beams as axes (a beam
+                           #     pointing against transducer(1)'s is reversed first). For N=1 this
+                           #     equals transducer_axis; same-side beams give their bisector;
+                           #     opposed (bilateral) beams give the bisector of their axes, each
+                           #     beam tilted by about half the angle between them. Falls back to
+                           #     transducer(1)'s axis if the axes are too spread (norm <
+                           #     grid.focal_axis_min_norm; only possible with 3+ transducers).
                            #   'transducer_axis' — rotate volume so the focal axis of
                            #     transducer(1) aligns with z. Compact grid, z-aligned beam.
                            #     Useful when transducer(1) is the primary beam and other
                            #     transducers are secondary/passive.
                            #   'ras_plus' — keep volume in RAS+ orientation; no rotation applied,
-                           #     only isotropic rescaling. Preserves world-space geometry and
-                           #     aligns with k-Plan / BabelBrain conventions. Requires that
-                           #     transducer_setup can place a bowl at an arbitrary angle, which
-                           #     k-Wave supports via makeBowl(grid, trans_pos, r, d, focus_pos).
-                           #   'principal_axis' — deprecated alias for focal_axis; emits a warning.
+                           #     only isotropic rescaling, so every beam is oblique to the grid.
+                           #     Not compatible with grid.axisymmetric.
 
 #------------ Segmentation
 

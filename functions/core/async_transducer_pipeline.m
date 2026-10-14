@@ -64,7 +64,8 @@ function jobs = async_transducer_pipeline(parameters, options)
 %                target_isppa_wcm2.  io.output_affix, if set, prefixes every
 %                stage's affix (e.g. _desc-run1_trans-01, _desc-run1_desc-asyncJoint).
 %                simulation.async_grid_mode (optional): 'shared' (default) —
-%                one grid sized/aligned to fit every transducer; or
+%                one grid sized to fit every transducer and oriented by
+%                grid.mode (default 'focal_axis': mean beam axis); or
 %                'per_transducer' — each transducer gets its own optimally
 %                aligned, minimally cropped grid, resampled onto
 %                transducer(1)'s grid at combine time. See doc_multitransducer.md.
@@ -182,8 +183,8 @@ for ti = 1:N
     affix_per_t{ti} = [base_affix, trans_suffix(ti, N)];
 end
 
-% Grid geometry mode: 'shared' (default) sizes/aligns one grid to fit every
-% transducer (mean focal axis, union bounding box); 'per_transducer' gives
+% Grid geometry mode: 'shared' (default) builds one grid that fits every
+% transducer (oriented by grid.mode, union bounding box); 'per_transducer' gives
 % each transducer its own optimally-aligned, minimally-cropped grid (matching
 % solo/sequential mode) and resamples onto transducer(1)'s grid at combine
 % time. See doc_multitransducer.md.

@@ -46,8 +46,9 @@ function [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
 %    All downstream code (thermal, reporting, NIfTI export) sees the
 %    original grid as if axisymmetric mode was never used.
 %
-% Requirement: grid.mode must be 'transducer_axis' (default); the beam axis
-% must be aligned with the grid z-axis.  'ras_plus' mode is incompatible.
+% Requirement: the beam axis must be aligned with the grid z-axis, as in
+% grid.mode 'focal_axis' (default) or 'transducer_axis' with one transducer.
+% 'ras_plus' mode is incompatible.
 %
 % Use as:
 %   [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
@@ -84,7 +85,7 @@ end
         error('PRESTUS:gridMode:incompatible', ...
             ['grid.mode=''ras_plus'' is incompatible with grid.axisymmetric=1. ' ...
              'Axisymmetric mode requires the beam axis to be aligned with the grid z-axis, ' ...
-             'which is only guaranteed in the default ''transducer_axis'' mode.']);
+             'as in the default ''focal_axis'' mode.']);
     end
 
     if numel(parameters.transducer(1).focus_pos) == 2 && ...

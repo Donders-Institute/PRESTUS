@@ -8,15 +8,20 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 % to the beam convergence direction for any transducer geometry:
 %
 %   N=1  : z = focal axis of transducer(1)  (honours align_to_focus flag)
-%   N=2+ : z = normalize( sum of all focal unit vectors )
+%   N=2+ : z = normalize( mean of the focal unit vectors, each taken as an
+%          axis: a vector pointing against transducer(1)'s is flipped first )
 %
-% For bilateral (180-degree opposed) setups the result is numerically
-% identical to principal_axis mode. For non-bilateral angled setups the
-% mean focal axis correctly orients z toward the convergence zone,
-% whereas the principal axis (inter-transducer PCA vector) does not.
+% Taking the beams as axes (lines, not directions) handles both geometries
+% with one rule: beams converging from the same side average to their
+% bisector, and opposed (bilateral) beams average to the bisector of
+% transducer(1)'s axis and the reversed axis of the opposite transducer,
+% so each beam is tilted from z by about half the angle between the axes.
+% Plain direction averaging would cancel opposed beams. z points along
+% transducer(1)'s beam.
 %
-% Guard: if norm(mean focal vector) < parameters.grid.focal_axis_min_norm
-% (default 0.5, corresponding to beams spread > ~150 degrees total), a
+% Guard: if norm(mean axis vector) < parameters.grid.focal_axis_min_norm
+% (default 0.5; for two transducers the norm is always >= cos(45 deg) =
+% 0.71, so this only triggers for three or more widely spread beams), a
 % warning is issued and the function falls back to the focal axis of
 % transducer(1) alone.
 %
@@ -59,9 +64,9 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     trans_pos_grid = gather(trans_pos_grid);
     focus_pos_grid = gather(focus_pos_grid);
 
-    %% Step 1: Compute mean focal axis across all transducers
+    %% Step 1: Compute the mean focal axis across all transducers (beams as axes)
 
-    min_norm = 0.5; % guard threshold: norm < 0.5 -> beams spread > ~150 deg total
+    min_norm = 0.5; % guard threshold (see MEAN_BEAM_AXIS)
     if isfield(parameters, 'grid') && isfield(parameters.grid, 'focal_axis_min_norm')
         min_norm = parameters.grid.focal_axis_min_norm;
     end
@@ -78,31 +83,13 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     end
     u1 = raw1 / norm(raw1);
 
-    if n_trans == 1
-        align_vec = u1;
-    else
-        focal_units = u1;
-        for ti = 2:n_trans
-            tp_i = parameters.transducer(ti).trans_pos(:)';
-            fp_i = parameters.transducer(ti).focus_pos(:)';
-            u_i  = fp_i - tp_i;
-            focal_units(end+1,:) = u_i / norm(u_i); %#ok<AGROW>
-        end
-
-        u_mean      = mean(focal_units, 1);
-        u_mean_norm = norm(u_mean);
-
-        if u_mean_norm < min_norm
-            warning('PRESTUS:gridAlignment:ambiguousFocalAxis', ...
-                ['Mean focal axis norm %.3f is below threshold %.3f ' ...
-                 '(beams may be near-opposing or heavily spread). ' ...
-                 'Falling back to focal axis of transducer(1).'], ...
-                u_mean_norm, min_norm);
-            align_vec = u1;
-        else
-            align_vec = u_mean / u_mean_norm;
-        end
+    % Beam unit vectors of transducers 2..N (planned positions, T1 voxels)
+    focal_units = u1;
+    for ti = 2:n_trans
+        u_i = parameters.transducer(ti).focus_pos(:)' - parameters.transducer(ti).trans_pos(:)';
+        focal_units(end+1,:) = u_i / norm(u_i); %#ok<AGROW>
     end
+    align_vec = mean_beam_axis(focal_units, min_norm);
 
     focal_axis = [align_vec, 1]';
 

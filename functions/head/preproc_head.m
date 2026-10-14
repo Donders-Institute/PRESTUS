@@ -146,7 +146,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     end
 
     %% Rotate/rescale images to match the stimulation trajectory
-    % grid.mode='transducer_axis' (default): rotate so focal axis aligns with z.
+    % grid.mode='focal_axis' (default): rotate so the mean beam axis of all
+    %   transducers aligns with z (= transducer(1)'s axis for one transducer).
+    % grid.mode='transducer_axis': rotate so transducer(1)'s focal axis aligns with z.
     % grid.mode='ras_plus': rescale only; volume stays in RAS+ orientation.
 
     grid_mode = 'focal_axis';
@@ -162,14 +164,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             fprintf('[preproc_head] %s\n', 'Rotating images to mean focal axis and rescaling to grid resolution ...')
             preproc_fn = @preproc_align_to_mean_focal_axis;
         case 'principal_axis'
-            % Deprecated: principal_axis used PCA on transducer positions, which only equals
-            % the beam axis for bilateral (180-degree) setups. Use focal_axis instead.
-            warning('PRESTUS:gridMode:deprecatedPrincipalAxis', ...
-                ['grid.mode=''principal_axis'' is deprecated. ' ...
-                 'Use grid.mode=''focal_axis'' for correct beam-axis alignment. ' ...
-                 'Results are identical for bilateral setups.']);
-            fprintf('[preproc_head] %s\n', 'Rotating images to mean focal axis (via deprecated principal_axis mode) ...')
-            preproc_fn = @preproc_align_to_mean_focal_axis;
+            error('PRESTUS:gridMode:removedPrincipalAxis', ...
+                ['grid.mode=''principal_axis'' has been removed. Use grid.mode=''focal_axis'' ' ...
+                 '(the default), which aligns z with the mean beam axis of all transducers.']);
         case 'transducer_axis'
             fprintf('[preproc_head] %s\n', 'Rotating images to focal axis of transducer(1) and rescaling to grid resolution ...')
             preproc_fn = @preproc_align_to_focal_axis;

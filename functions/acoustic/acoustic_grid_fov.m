@@ -4,8 +4,9 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
 % ACOUSTIC_GRID_FOV  Crop the acoustic simulation domain to a beam-axis FOV box.
 %
 % Reduces the k-Wave grid to a rectangular box centred on the focus before
-% acoustic simulation.  When grid.mode = 'transducer_axis' (default), the
-% grid z-axis is the acoustic beam axis; x and y are lateral.  The FOV box
+% acoustic simulation.  When grid.mode = 'focal_axis' (default) or
+% 'transducer_axis', the grid z-axis is the acoustic beam axis of a single
+% transducer; x and y are lateral.  The FOV box
 % dimensions are therefore:
 %
 %   lateral (dims 1 & 2):  grid.acoustic_fov_diameter_mm  [mm]
@@ -28,7 +29,7 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
 %   acoustic_fov_length_mm    — axial FOV depth [mm]      (numeric; resolve 'auto' in caller)
 %
 % Optional parameters.grid fields:
-%   mode  — 'transducer_axis' (default) or 'ras_plus'.
+%   mode  — 'focal_axis' (default), 'transducer_axis' or 'ras_plus'.
 %           In 'ras_plus' mode the beam axis is derived from trans_pos→focus_pos
 %           and a warning is issued; FOV orientation may be approximate.
 %

@@ -15,10 +15,10 @@ PRESTUS aligns the simulation grid before cropping. The alignment strategy is co
 
 | Mode | Description |
 |---|---|
-| `focal_axis` (default) | Rotates the volume so the mean focal unit vector of all transducers aligns with z. For N=1 this equals `transducer_axis`; for bilateral setups it equals the inter-transducer axis (same result as the old `principal_axis`); for angled multi-transducer setups z correctly points toward the beam convergence zone. Falls back to transducer(1) focal axis if `norm(mean focal vector) < grid.focal_axis_min_norm` (default 0.5). Implemented in `preproc_align_to_mean_focal_axis`. |
+| `focal_axis` (default) | Rotates the volume so the mean beam axis of all transducers aligns with z. The beams are averaged as axes, not directions (`mean_beam_axis`): a beam pointing against transducer(1)'s is reversed first. For N=1 this equals `transducer_axis`; beams converging from the same side give their bisector; opposed (bilateral) beams give the bisector of the two axes, so each beam is tilted from z by about half the angle between their axes (two beams 41° off exactly opposed: 21° each). z points along transducer(1)'s beam. Falls back to transducer(1)'s axis if the mean axis vector is shorter than `grid.focal_axis_min_norm` (default 0.5), which for two transducers cannot happen (minimum 0.71). Implemented in `preproc_align_to_mean_focal_axis`. |
 | `transducer_axis` | Rotates the volume so the focal axis of transducer(1) aligns with z. Useful when transducer(1) is the primary beam and other transducers are secondary. Implemented in `preproc_align_to_focal_axis`. |
 | `ras_plus` | No rotation; only isotropic rescaling to the requested grid resolution. Preserves world-space (RAS+) orientation. |
-| `principal_axis` | Deprecated alias for `focal_axis`; emits a warning. Previously used PCA on transducer positions, which only equals the beam axis for bilateral setups. |
+| `principal_axis` | Removed; errors. Use `focal_axis`. |
 
 In all modes the returned `scale_rotate_recenter_matrix` encodes the full T1-space → rotated/rescaled-grid transform, which is used downstream to map all transducer positions into the simulation space. 
 
