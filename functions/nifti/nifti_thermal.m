@@ -27,6 +27,9 @@ arguments
     kwave_medium    (1,1) struct
 end
 
+    % a recomputed stage replaces its existing outputs, also under 'never'
+    parameters = outputs_follow_recompute(parameters, 'thermal');
+
     if isfield(parameters.modules, 'run_nifti_creation') && ...
             parameters.modules.run_nifti_creation == 0
         disp('No nifti creation requested...')

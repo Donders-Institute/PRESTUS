@@ -286,6 +286,8 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
 | `force` | Same as `always` | Always re-run | Always re-run, overwrite outputs |
 | `ask` | Prompt per file (interactive only) | Resume from cache | Skip if the output exists |
 
+Under `never` or `ask`, an acoustic or thermal stage that recomputes its results (no cache to reuse, e.g. with `io.save_matrices: 0`) still replaces its existing NIfTI outputs, so the NIfTI and CSV outputs of a folder always come from the same run.
+
 `io.overwrite_simnibs` governs SimNIBS segmentations separately.
 
 **Chained pipelines** split one run into separate jobs. Each job reuses what the previous stage wrote:

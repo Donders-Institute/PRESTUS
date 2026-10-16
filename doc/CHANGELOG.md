@@ -178,6 +178,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: every Snellius SLURM submission failed (wall-time check)
 - Fixed: qsub scripts wrote `walltime` as character codes and requested GPU nodes for CPU-only jobs; SLURM job IDs are read with `sbatch --parsable`
 - Fixed: `io.overwrite_simnibs` never passed `--forcerun` to charm; `simnibs_t1_to_mni` respects `overwrite_files`
+- ⚠️ **Fixed:** under `io.overwrite_files: never` or `ask`, a recomputed acoustic or thermal stage kept existing NIfTIs but rewrote the CSV, mixing outputs of two runs. Re-run output folders that were simulated more than once under `never`
 
 #### Nexus & GUIs
 - **PRESTUS Nexus** (`nexus/`, *experimental*): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)

@@ -271,6 +271,7 @@ The following documents the functions provided in PRESTUS.
 | `matlab_escape_quotes`                  | Escapes text for a single-quoted MATLAB literal in generated job scripts (doubles `'`). |
 | `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
 | `nearest_fill_nan`                      | Replace NaN voxels with the value of the nearest non-NaN voxel |
+| `outputs_follow_recompute`              | Let a recomputed stage replace its existing output files |
 | `parse_memory_tags`                     | Extract peak memory figures from [memory]/[memory_bb] log lines. |
 | `predict_outputs`                       | Predict the pipeline mode and the CSV/HTML files a run will write, before submission (read-only). |
 | `prestus_version`                       | Print PRESTUS version info and optionally return the git hash. |

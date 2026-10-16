@@ -71,6 +71,7 @@ filename_sensor_data = fullfile(parameters.io.dir_cache, ...
 
 parameters.state.acoustics_available = 0;
 parameters.state.acoustic_dry_run    = false;
+parameters.state.recomputed.acoustic = false;   % set by RUN_ACOUSTIC_BACKEND (OUTPUTS_FOLLOW_RECOMPUTE)
 
 % Settings the acoustic field depends on: written to the pressure map's
 % sidecar (WRITE_ACOUSTIC_SIDECAR) and compared when a later run starts from it.
@@ -191,6 +192,7 @@ use_jwave      = strcmpi(acoustic_backend_name(parameters), 'jwave');
 % A dry run (jwave/BabelBrain) writes the solver inputs and returns no field;
 % it is never cached, so a later real run cannot load the empty result.
 parameters.state.acoustic_dry_run = is_acoustic_dry_run(parameters);
+parameters.state.recomputed.acoustic = true;
 save_cache = should_save_output(parameters.io, 'save_acoustic_matrices') && ...
     ~parameters.state.acoustic_dry_run;
 t_backend = tic;
