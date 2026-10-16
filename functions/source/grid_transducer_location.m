@@ -68,13 +68,13 @@ end
 
         % Convert mm positions to voxel indices if specified via *_mm fields.
         % This allows configs to store resolution-independent coordinates in mm
-        % (e.g. trans_pos_mm: [35, 1]) rather than voxel counts that change
-        % with grid resolution.
+        % from the centre of voxel 1 (e.g. trans_pos_mm: [35, 0]) rather than
+        % voxel counts that change with grid resolution (GRID_MM_TO_VOXEL).
         if isfield(parameters.transducer, 'trans_pos_mm') && ~isempty(parameters.transducer.trans_pos_mm)
-            parameters.transducer.trans_pos = round(parameters.transducer.trans_pos_mm(:)' / parameters.grid.resolution_mm);
+            parameters.transducer.trans_pos = grid_mm_to_voxel(parameters.transducer.trans_pos_mm, parameters.grid.resolution_mm);
         end
         if isfield(parameters.transducer, 'focus_pos_mm') && ~isempty(parameters.transducer.focus_pos_mm)
-            parameters.transducer.focus_pos = round(parameters.transducer.focus_pos_mm(:)' / parameters.grid.resolution_mm);
+            parameters.transducer.focus_pos = grid_mm_to_voxel(parameters.transducer.focus_pos_mm, parameters.grid.resolution_mm);
         end
 
         if (~isfield(parameters.transducer, 'trans_pos') || isempty(parameters.transducer.trans_pos)) ...

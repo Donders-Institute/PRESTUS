@@ -540,6 +540,7 @@ The following documents the functions provided in PRESTUS.
 | `convert_final_to_MNI_matlab`           | Converts an image from subject space to MNI space using MATLAB. |
 | `convert_final_to_MNI_simnibs`          | Converts an image to MNI space using SimNIBS. |
 | `ensure_ras_plus`                       | Reorient a NIfTI volume to RAS+ if needed |
+| `grid_mm_to_voxel`                      | Grid position in mm to a 1-based voxel index |
 | `grid_to_ras`                           | Converts 1-based voxel indices to RAS coordinates (inverse of `ras_to_grid`). |
 | `grid_to_ras_affine`                    | Build the acoustic-grid-voxel -> RAS-mm affine |
 | `mni2subject_coords_LDfix`              | Transforms a set of coordinates in MNI space to subject space. |
