@@ -21,10 +21,12 @@ function sig = cache_signature(parameters, kind)
 %   sig = cache_signature(parameters, 'grid')
 %   sig = cache_signature(parameters, 'medium')
 %   sig = cache_signature(parameters, 'acoustic')
+%   sig = cache_signature(parameters, 'headmodel')
 %
 % Input:
 %   parameters - PRESTUS parameter struct
-%   kind       - 'grid', 'medium' or 'acoustic' (sidecar of a reusable pressure map)
+%   kind       - 'grid', 'medium', 'acoustic' (sidecar of a reusable pressure map)
+%                or 'headmodel' (HEAD_MODEL_LOAD_OR_BUILD)
 %
 % Output:
 %   sig - struct of the relevant settings
@@ -55,8 +57,34 @@ function sig = cache_signature(parameters, kind)
                 g = fieldnames(sig.grid);
                 sig.grid = rmfield(sig.grid, g(startsWith(g, 'thermal_')));
             end
+        case 'headmodel'
+            % The pose-independent head model (HEAD_MODEL_LOAD_OR_BUILD): its
+            % resolution, smoothing / hole filling, labels and pseudo-CT, and
+            % the segmentation it was made from; not the transducer or the crop
+            sig = rmfield(sig, {'transducer', 'grid', 'headmodel'});
+            sig.subject_id    = get_field(parameters, {'subject_id'});
+            sig.resolution_mm = get_field(parameters, {'grid', 'resolution_mm'});
+            hmod = get_field(parameters, {'headmodel'});
+            sig.headmodel = struct();
+            for f = {'smooth_method', 'smooth_threshold_skull', 'smooth_threshold_other', 'smooth_fwhm_mm', ...
+                     'skull_fill_method', 'skull_wrap_radius'}
+                if isstruct(hmod) && isfield(hmod, f{1}), sig.headmodel.(f{1}) = hmod.(f{1}); end
+            end
+            mp = get_field(parameters, {'medium_properties'});
+            if isstruct(mp), sig.tissue_labels = fieldnames(mp); end
+            sig.segmentation_date = segmentation_date(parameters);
         otherwise
-            error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic).', kind);
+            error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic | headmodel).', kind);
+    end
+end
+
+function d = segmentation_date(parameters)
+% Modification date of the segmentation (final_tissues), so a re-run of charm invalidates the model
+    d = [];
+    try
+        f = dir(fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz'));
+        if ~isempty(f), d = f(1).datenum; end
+    catch
     end
 end
 

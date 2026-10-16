@@ -5,33 +5,31 @@
     - **When you need it:** To find a specific file or column. To get started, read [Reading your results](doc_results.md) first.
     - **Before you start:** A finished run.
 
-PRESTUS provides multiple outputs. Some of these outputs are optional (or can be deactivated upon request to save space.)
-
 ---
 
 ## Summary table
 
 Filename: `sub-XXX_<simulation_medium><affix>.csv`
 
-Targeting accuracy (`modules.run_targeting_analysis`, layered or phantom media) goes to a sidecar, `sub-XXX_<simulation_medium><affix>_targeting.csv`; see [Targeting accuracy](doc_group.md#targeting-accuracy).
+One CSV holds all quantitative metrics: acoustic metrics first, then thermal metrics if heating was simulated. Tissue-specific columns exist for layered simulations only.
 
-All quantitative metrics are written to a single CSV file. Acoustic metrics are written first; thermal metrics are appended if heating simulations were run. Tissue-specific columns are only present for layered simulations.
+Targeting accuracy (`modules.run_targeting_analysis`, layered or phantom media) goes to `sub-XXX_<simulation_medium><affix>_targeting.csv`; see [Targeting accuracy](doc_group.md#targeting-accuracy).
 
 ### Intensity nomenclature
 
-All intensity values are **pulse-average intensity (IPA)**, computed from the steady-state peak pressure amplitude as:
+All intensity values are **pulse-average intensity (IPA)**, computed from the steady-state peak pressure amplitude:
 
 ```
 I = p² / (2ρc)   [W/cm²]
 ```
 
-where `p` is the peak pressure amplitude, `ρ` is density, and `c` is sound speed. The cycle-averaging factor of 2 reflects that `p` is the amplitude of a sinusoid — this yields the time-average intensity *during* the pulse, i.e. IPA, not the temporal peak (ITP, which would lack the factor of 2) and not the temporal average over the full repetition interval (ISPTA, which would additionally apply the duty cycle PD/PRI).
+`p` is the peak pressure amplitude, `ρ` density and `c` sound speed. The factor 2 averages over the sinusoid's cycle. The result is the time-average intensity *during* the pulse (IPA). It is not the temporal peak (ITP, without the factor 2), nor the average over the repetition interval (ISPTA, which also applies the duty cycle PD/PRI).
 
-The **spatial peak** of IPA is ISPPA. When IPA is reported at a specific location (target point, radius average) rather than at the spatial maximum, it is labelled IPA.
+The **spatial peak** of IPA is ISPPA. IPA at a specific location (target point, radius average) is labelled IPA.
 
-The **mechanical index** at each voxel is defined as MI = p⁻ / √f, where p⁻ is the peak rarefaction (negative) pressure in MPa and f is the centre frequency in MHz (IEC 62359 / FDA). PRESTUS records `p_min_all` from k-Wave and uses its absolute value for MI; for multi-transducer async combinations the per-voxel most-negative pressure across transducers (`p_min_async`) is used instead.
+The **mechanical index** per voxel is MI = p⁻ / √f, with p⁻ the peak rarefaction (negative) pressure in MPa and f the centre frequency in MHz (IEC 62359 / FDA). PRESTUS uses the absolute value of `p_min_all` from k-Wave. For multi-transducer async combinations it uses the per-voxel most-negative pressure across transducers (`p_min_async`).
 
-An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical Neurophysiology)](https://doi.org/10.1016/j.clinph.2021.12.010).
+[Darmani et al. (2022, Clinical Neurophysiology)](https://doi.org/10.1016/j.clinph.2021.12.010) give an overview of the nomenclature.
 
 ![intensity_nomenclature](https://ars.els-cdn.com/content/image/1-s2.0-S1388245721008920-gr2.jpg)
 
@@ -50,7 +48,7 @@ An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical N
 |---|---|---|
 | `subject_id` | — | Subject identifier |
 | `freq_Hz` | Hz | Transducer centre frequency |
-| `Isppa` | W/cm² | ISPPA — maximum pulse-average intensity across the entire simulation grid |
+| `Isppa` | W/cm² | ISPPA: maximum pulse-average intensity across the entire simulation grid |
 | `Isppa_after_exitplane` | W/cm² | Maximum IPA beyond the transducer exit plane (or within brain if modelled) |
 | `real_focal_distance_mm` | mm | Distance from the transducer face to the location of maximum IPA |
 | `Ipa_target` | W/cm² | IPA at the specified target coordinate |
@@ -58,7 +56,7 @@ An overview of the nomenclature is provided in [Darmani et al. (2022, Clinical N
 | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
 | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
 
-Water/free-field simulations additionally include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target), `MI` (global mechanical index from peak rarefaction pressure, unitless; ITRUSST limit 1.9, labelled "MI (free water)" in the report), and the full set of ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_dist_mm`) computed over the region beyond the transducer exit plane.
+Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; ITRUSST limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_dist_mm`), computed beyond the transducer exit plane.
 
 #### Tissue-specific *(layered simulations only)*
 
@@ -70,14 +68,14 @@ Water/free-field simulations additionally include `Psptp` (spatial peak temporal
 | `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
 | `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
 | `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
-| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (same column also written for water/free-field runs). Max pressure safety limit: 2 MPa |
+| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (also written for water/free-field runs). Max pressure safety limit: 2 MPa |
 | `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
 | `MI_brain` | — | Maximum mechanical index within brain tissue (GM + WM) |
 | `MI_skull` | — | Maximum mechanical index within skull bone |
 | `MI_skin` | — | Maximum mechanical index within skin |
-| `MI_tc` | — | **Transcranial MI** — maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
+| `MI_tc` | — | **Transcranial MI**: maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
 | `Ix_brain_vox`, `Iy_brain_vox`, `Iz_brain_vox` | voxels | Grid coordinates of peak IPA within brain |
-| `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −3 dB intensity region within brain (IPA ≥ 50 % of `Isppa_brain`; preserved for backward compatibility — equals `focal_vol_3dB_mm3`) |
+| `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −3 dB intensity region within brain (IPA ≥ 50 % of `Isppa_brain`); equals `focal_vol_3dB_mm3` |
 | `focal_vol_3dB_mm3` | mm³ | Volume of the −3 dB focal zone within brain (IPA ≥ 50 % of peak; 10·log₁₀(0.5) = −3 dB) |
 | `focal_vol_6dB_mm3` | mm³ | Volume of the −6 dB focal zone within brain (IPA ≥ 25 % of peak = pressure ≥ 50 % of peak; FWHM) |
 | `focal_centroid_3dB_dist_mm` | mm | Distance from the transducer to the geometric centroid of the −3 dB focal region |
@@ -86,7 +84,7 @@ Water/free-field simulations additionally include `Psptp` (spatial peak temporal
 
 ### Thermal metrics *(only written when heating simulations are run)*
 
-Temperature is simulated over the full sonication protocol (on/off cycles) using the Pennes bioheat equation. All values are spatial maxima within the respective tissue.
+Temperature is simulated over the full sonication protocol (on/off cycles) with the Pennes bioheat equation. All values are spatial maxima within the respective tissue.
 
 #### Global
 
@@ -112,7 +110,7 @@ Temperature is simulated over the full sonication protocol (on/off cycles) using
 | `CEM43iso_brain/skull/skin` | min | Maximum CEM43 (ISO form) in each tissue |
 | `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at end of last pulse |
 
-Both CEM43 formulations are always computed. See [doc_simulations-thermal.md](doc_simulations-thermal.md) for formula details. The HTML report displays the formulation selected by `parameters.thermal.cem43_iso`.
+Both CEM43 formulations are always computed; see [doc_simulations-thermal.md](doc_simulations-thermal.md) for the formulas. The HTML report shows the one selected by `parameters.thermal.cem43_iso`.
 
 ---
 
@@ -131,15 +129,14 @@ The HTML report flags each metric against the ITRUSST consensus non-significant 
 | CEM43 (skull) (c) | 16 min |
 | CEM43 (skin) (c) | 21 min |
 
-For thermal estimates, non-significant risk can be characterized by a, b, or c. NSR limits above and in the HTML are provided for quick reference. Always check the original reference for details and check for possible consensus updates. PRESTUS does not make independent recommendations.
+For thermal estimates, non-significant risk can be characterized by a, b, or c. These limits are for quick reference. Always check the original reference and possible consensus updates. PRESTUS does not make independent recommendations.
 
 ---
 
 ## NIfTI images
 
-PRESTUS exports 3D volumes (or 2D for axisymmetric simulations) in NIfTI format, provided in subject-native T1 space and MNI-152 space. NIfTI export is staged: medium property maps are written after medium setup, acoustic maps after acoustic analysis, and thermal maps after thermal analysis.
+PRESTUS exports 3D volumes (2D for axisymmetric simulations) in subject-native T1 space and MNI-152 space. Each group of maps is written as soon as its stage finishes.
 
-Filename patterns:
 - Subject T1 space: `sub-XXX_<medium>_T1w<affix>_<type>.nii.gz`
 - MNI space: `sub-XXX_<medium>_MNI<affix>_<type>.nii.gz`
 
@@ -170,16 +167,16 @@ Filename patterns:
 | `heating_end` | Temperature at end of last pulse [°C] |
 | `heatrise` | Temperature rise above baseline [°C] |
 | `heatrise_end` | Temperature rise above baseline at end of last pulse [°C] |
-| `CEM43` | CEM43 thermal dose — kWave form [min] |
+| `CEM43` | CEM43 thermal dose, kWave form [min] |
 | `CEM43_end` | CEM43 (kWave) at end of last pulse [min] |
-| `CEM43_iso` | CEM43 thermal dose — ISO form [min] |
+| `CEM43_iso` | CEM43 thermal dose, ISO form [min] |
 | `CEM43_iso_end` | CEM43 (ISO) at end of last pulse [min] |
 
 ---
 
 ## Where outputs live
 
-Every location belongs to one level, set by what its contents depend on. A level only reads the levels above it, and each folder has one writer.
+Each location belongs to one level. A level only reads the levels above it, and each folder has one writer.
 
 | Level | Depends on | Locations | Written by |
 |---|---|---|---|
@@ -188,20 +185,16 @@ Every location belongs to one level, set by what its contents depend on. A level
 | **Placement** | subject derivatives, target, transducer geometry, placement settings | `path.placement` (default `<path.sim>/placement`): `sub-XXX/<mode>/<target_name>/` | the placement stage (heuristic, PlanTUS, TUS_entry) |
 | **Simulation** | everything above, plus the acoustic/thermal setup | `path.sim/sub-XXX/` (this page) | the simulation pipeline |
 
-Because a placement does not depend on the acoustic setup (medium, grid, drive level), it has its own root: point several setups at one `path.placement` to reuse a heuristic, PlanTUS or TUS_entry result across them. Each run folder holds everything the run produced (tool inputs such as masks and configs, raw tool output, metrics, neuronavigation exports) and a run record, `placement_run.json`, with the resolved positions and the settings they depend on. `placement.reuse` decides when a later run uses the recorded placement instead of running the tool again ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)). The simulation keeps its own record of the positions it used, `sub-XXX_placement<affix>.json`.
-
-`manual`, `mni` and `localite` placements are resolved from the config or the recorded markers alone and have no run folder.
-
-`path.localite_export` is not a level but a hand-off folder: copies of placement results meant for import into Localite (heuristic position table, Localite-ready T1), kept apart so the neuronavigation computer can read them from a share.
-
-The SimNIBS `m2m_sub-XXX` folders are only read after segmentation. The pseudo-CT goes to `path.pct/sub-NNN`, or `<parent of path.seg>/pct/sub-NNN` when `path.pct` is empty; a pseudo-CT that older versions wrote into `m2m_sub-XXX` is still used, with a warning to move it.
+- **Placement** does not depend on the medium, grid or drive level. Point several setups at one `path.placement` to reuse a heuristic, PlanTUS or TUS_entry result. Each run folder holds everything the run produced (masks, configs, raw tool output, metrics, neuronavigation exports) and a run record, `placement_run.json`. `manual`, `mni` and `localite` placements have no run folder. The simulation records the positions it used in `sub-XXX_placement<affix>.json`.
+- **`path.localite_export`** is a hand-off folder, not a level. It holds copies of placement results for import into Localite (heuristic position table, Localite-ready T1), readable from a share by the neuronavigation computer.
+- **SimNIBS `m2m_sub-XXX`** folders are only read after segmentation. For the pseudo-CT location, see [(pseudo-)CT](doc_pseudoCT.md).
 
 ## Starting from earlier stage outputs
 
 PRESTUS keeps two kinds of intermediate results apart:
 
-- **Within-run caches** (`cache/` of a simulation folder): only the run that wrote them, or a re-run of it, reloads them. `io.overwrite_files` decides whether they are reused ([Overwrite behaviour](#overwrite-behaviour)).
-- **Stage outputs**: complete results of a stage that a later, separate run starts from. Each has a JSON sidecar next to it, as in BIDS, that records how it was made. A run that starts from the output compares the sidecar's `signature` (the settings the output depends on) with its own settings.
+- **Within-run caches** (`cache/` of a simulation folder) are reloaded only by the run that wrote them, or a re-run of it. `io.overwrite_files` decides reuse ([Overwrite behaviour](#overwrite-behaviour)).
+- **Stage outputs** are complete results that a later, separate run starts from. Each has a BIDS-style JSON sidecar. The later run compares the sidecar's `signature` (the settings the output depends on) with its own settings.
 
 | Stage output | Sidecar | Picked up by | Compared settings |
 |---|---|---|---|
@@ -210,9 +203,9 @@ PRESTUS keeps two kinds of intermediate results apart:
 | Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
 | Pressure map, `nii/T1w/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
 
-A mismatch is handled by `io.cache_signature_check` (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pseudo-CT made by an earlier version, or a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
+`io.cache_signature_check` handles a mismatch (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
 
-Every sidecar starts with the same header, followed by fields of its kind:
+Every sidecar starts with the same header:
 
 ```json
 {
@@ -226,9 +219,28 @@ Every sidecar starts with the same header, followed by fields of its kind:
 }
 ```
 
-**Placement (`placement.reuse`).** `auto` (default) reuses a recorded run whose settings match and otherwise runs the placement again, replacing the record; under `io.overwrite_files: never` a mismatch is handled like `always`. `always` requires a recorded run, `never` always runs the tool. This is independent of `io.overwrite_files`, so a PlanTUS or TUS_entry result is reused while the simulation stages are recomputed. Records written as `placement_run.mat` by earlier versions are still read.
+**Placement (`placement.reuse`).**
 
-**Pressure map (`path.acoustic_input`).** Every run that writes the T1w pressure NIfTI also writes its sidecar, with the free-water ISPPA the map corresponds to (`isppa.level_wcm2`: the target it was scaled to, or the free-water ISPPA of the simulated drive), the baseline, the transducer and the backend. A later run with `path.acoustic_input` pointing at the NIfTI skips the acoustic simulation and the free-water baseline. It puts the map onto its own grid (including an acoustic FOV), rescales it to its `transducer.target_isppa_wcm2`, and runs acoustic analysis and the thermal stage as after a simulation. The run needs the T1 → grid transform (`simulation.medium` layered or phantom, a 3D grid) and the k-Wave grid of the source stage (`modules.run_source_setup: 1`). Two limits follow from the map: it is stored at the T1's resolution, so a map from a finer simulation grid has lost some peak sharpness, and it has no peak negative pressure, so the mechanical index uses the peak pressure (with a warning). A map without a sidecar is used as it is and cannot be rescaled.
+| Value | Effect |
+|---|---|
+| `auto` (default) | Reuse a recorded run whose settings match; otherwise run the placement again and replace the record. Under `io.overwrite_files: never`, a mismatch is handled like `always` |
+| `always` | Require a recorded run |
+| `never` | Always run the tool |
+
+`placement.reuse` is independent of `io.overwrite_files`: a PlanTUS or TUS_entry result is reused while the simulation stages are recomputed. `placement_run.mat` records are also read.
+
+**Pressure map (`path.acoustic_input`).** Point `path.acoustic_input` at a T1w pressure NIfTI from an earlier run. The new run then:
+
+- skips the acoustic simulation and the free-water baseline;
+- puts the map onto its own grid (including an acoustic FOV);
+- rescales it to its `transducer.target_isppa_wcm2`, using the sidecar's `isppa.level_wcm2` (the free-water ISPPA the map corresponds to);
+- runs acoustic analysis and the thermal stage as after a simulation.
+
+It needs the T1 → grid transform (`simulation.medium` layered or phantom, a 3D grid) and the k-Wave grid of the source stage (`modules.run_source_setup: 1`). Limits:
+
+- The map is stored at T1 resolution, so a map from a finer simulation grid has lost some peak sharpness.
+- The map has no peak negative pressure, so the mechanical index uses the peak pressure (with a warning).
+- A map without a sidecar is used as it is and cannot be rescaled.
 
 ## Output directory structure
 
@@ -259,11 +271,9 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
     source/         source/transducer setup (element distribution plots)
 ```
 
-**Cache files** are regenerable: if `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed. Set `io.save_matrices = 0` to skip saving intermediate matrices (cache files will not be written), or `1` to save all of them; per-step flags such as `io.save_acoustic_matrices` override it when set. See [Overwrite behaviour](#overwrite-behaviour) below.
-
-**Debug files** are only written when `parameters.simulation.debug = 1`.
-
-**Run statistics**: each run that ran an acoustic or thermal simulation adds one line to `<path.sim>/run_stats.jsonl` (one file per `path.sim`, shared by all subjects). The line records the grid size, time steps, thermal steps, simulation durations, solver, partition and peak RAM. The Nexus estimates resources from this file; see [Resource estimates](doc_hpc.md#resource-estimates-from-earlier-runs).
+- **Cache files** are regenerable. With `io.overwrite_files = 'never'`, existing files are reloaded instead of recomputed ([Overwrite behaviour](#overwrite-behaviour)). `io.save_matrices = 0` writes no cache files; `1` saves all of them. Per-step flags such as `io.save_acoustic_matrices` override it when set.
+- **Debug files** are written only with `parameters.simulation.debug = 1`.
+- **Run statistics**: each run with an acoustic or thermal simulation adds one line to `<path.sim>/run_stats.jsonl` (one file per `path.sim`, shared by all subjects): grid size, time steps, thermal steps, simulation durations, solver, partition and peak RAM. The Nexus estimates resources from it; see [Resource estimates](doc_hpc.md#resource-estimates-from-earlier-runs).
 
 ### Overwrite behaviour
 
@@ -276,9 +286,9 @@ debug/                                     ← diagnostic artefacts (debug=1 onl
 | `force` | Same as `always` | Always re-run | Always re-run, overwrite outputs |
 | `ask` | Prompt per file (interactive only) | Resume from cache | Skip if the output exists |
 
-SimNIBS segmentations are governed separately by `io.overwrite_simnibs`.
+`io.overwrite_simnibs` governs SimNIBS segmentations separately.
 
-**Chained pipelines** split one run into separate jobs, each of which reuses what the previous stage wrote:
+**Chained pipelines** split one run into separate jobs. Each job reuses what the previous stage wrote:
 
 | Pipeline | Intermediate stages | Output stages |
 |---|---|---|
@@ -286,24 +296,22 @@ SimNIBS segmentations are governed separately by `io.overwrite_simnibs`.
 | Multi-ISPPA ([doc](doc_multiintensity.md)) | Stage-1 acoustic | Per-ISPPA thermal + report, summary report |
 | Uncertainty ([doc](doc_uncertainty.md)) | Stage-1 preprocessing | Variant simulations + reports, uncertainty report |
 
-So with the default `always`, resubmitting a finished chained run reuses the expensive acoustic simulations and regenerates the CSV, NIfTI and HTML outputs. Use `force` when an input that feeds the intermediate caches has changed — transducer placement, transducer or source parameters, grid, segmentation, or medium properties. Grid and medium caches detect such changes (see below); the acoustic cache only detects a changed grid size, so after changing source or medium parameters use `force` or delete the relevant `cache/` files before resubmitting.
+With the default `always`, resubmitting a finished chained run reuses the acoustic simulations and regenerates the CSV, NIfTI and HTML outputs. Use `force` when an input of the intermediate caches has changed: transducer placement, transducer or source parameters, grid, segmentation, or medium properties. Grid and medium caches detect such changes ([below](#cache-reuse-checks)). The acoustic cache only detects a changed grid size. After changing source or medium parameters, use `force` or delete the relevant `cache/` files before resubmitting.
 
-Within a chained run, sub-jobs that consume a shared cache (e.g. per-transducer acoustic jobs loading the Stage-0 grid) always load it rather than rebuilding it, even under `force`; the stage that owns the cache is the one that rebuilds it. Internally this is signalled by `io.reuse_upstream_caches` (set by the pipelines; not a user setting).
+Within a chained run, sub-jobs that consume a shared cache (e.g. per-transducer acoustic jobs loading the Stage-0 grid) always load it, even under `force`. Only the stage that owns the cache rebuilds it.
 
 ### Cache reuse checks
 
-Grid and medium caches are named by subject, medium and affix only. So that a cache built from different settings is not reused silently, each cache stores the settings it depends on (`cache_signature`):
+Grid and medium caches are named by subject, medium and affix only. Each cache therefore stores the settings it depends on (`cache_signature`):
 
 | Cache | Compared settings |
 |---|---|
 | Grid (`*_grid_cache*.mat`) | `simulation.medium`, `grid`, `layers`, `headmodel`, `pct`, and the transducer (geometry and positions after placement) |
 | Medium (`*_medium_cache*.mat`) | the grid settings above, plus `medium_properties` |
 
-The JSON sidecars of stage outputs (placement runs, pseudo-CTs, pressure maps) are checked the same way; see [Starting from earlier stage outputs](#starting-from-earlier-stage-outputs).
+Not compared, because they do not change these caches: paths, I/O, HPC and module flags; the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field; and the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps its own values of these settings.
 
-Paths, I/O, HPC and module flags are not compared (moving data or changing downstream stages does not change these caches), nor is the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field, nor the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps these settings of its own.
-
-When a cache is reused because of `io.overwrite_files: never` (or a declined overwrite prompt, or the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
+When a cache is reused (under `io.overwrite_files: never`, after a declined overwrite prompt, or in the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
 
 | Value | Effect |
 |---|---|
@@ -311,13 +319,13 @@ When a cache is reused because of `io.overwrite_files: never` (or a declined ove
 | `warn` | Warn and reuse the cache anyway. |
 | `off` | No check. |
 
-Caches written before signatures existed cannot be checked; they are reused with the warning `prestus:cache:unverified`. Sub-jobs that load a cache owned by another stage of the same chained run (`io.reuse_upstream_caches`) are not checked.
+A cache without a signature is reused with the warning `prestus:cache:unverified`. Sub-jobs that load a cache owned by another stage of the same chained run are not checked. Stage-output sidecars are checked the same way ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)).
 
 ---
 
 ## Figures
 
-PRESTUS saves PNG overlays of intensity and temperature on the segmentation for quick visual inspection.
+PRESTUS saves PNG overlays of intensity and temperature on the segmentation.
 
 ![PRESTUS_fig_example_thermal](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/thermal_fig_examples.png)
 
@@ -325,21 +333,23 @@ PRESTUS saves PNG overlays of intensity and temperature on the segmentation for 
 
 ## HTML report
 
-A self-contained HTML report is written to the output directory (`sub-XXX_<medium>_report<affix>.html`). It includes:
+`sub-XXX_<medium>_report<affix>.html` is a self-contained report in the output directory. Sections:
 
-- **Safety dashboard** — color-coded cards for all ITRUSST-limited metrics (green / amber / red)
-- **Simulation summary** — key acoustic and thermal values at a glance
-- **Methods** — auto-generated, ITRUSST-aligned methods text (CC0) covering software, transducer, simulation grid, tissue properties, pulse timing, thermal model and the simulated exposure values, with a matching reference list. *Copy methods text* / *Copy text + references* put it on the clipboard as formatted text (sub-/superscripts kept) with a plain-text fallback, ready to paste into a manuscript. Check it against your study before use.
-- **Configuration summary** — parameters used for the run
-- **Medium properties** — per-tissue acoustic and thermal properties (layered only)
-- **Acoustic results** — intensity overlay images and the full acoustic metrics table
-- **Thermal results** — temperature, CEM43 (kWave), and CEM43 (ISO) plots (if heating simulations were run); the safety dashboard uses the formulation selected by `parameters.thermal.cem43_iso`
-- **Post-hoc water simulation** — free-field reference results (if run)
-- **Log** — full pipeline execution log
+| Section | Content |
+|---|---|
+| **Safety dashboard** | colour-coded cards for all ITRUSST-limited metrics (green / amber / red); thermal cards use the formulation selected by `parameters.thermal.cem43_iso` |
+| **Simulation summary** | key acoustic and thermal values |
+| **Methods** | ITRUSST-aligned methods text (CC0) with reference list: software, transducer, grid, tissue properties, pulse timing, thermal model, exposure values. *Copy methods text* / *Copy text + references* copy it as formatted text with a plain-text fallback. Check it against your study before use |
+| **Configuration summary** | parameters used for the run |
+| **Medium properties** | per-tissue acoustic and thermal properties (layered only) |
+| **Acoustic results** | intensity overlays and the full acoustic metrics table |
+| **Thermal results** | temperature, CEM43 (kWave) and CEM43 (ISO) plots (if heating was simulated) |
+| **Post-hoc water simulation** | free-field reference results (if run) |
+| **Log** | full pipeline execution log |
 
 ![PRESTUS_html](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/html_report.png)
 
-A full example report on a phantom can be found here: [🔗 Download Example HTML](https://raw.githubusercontent.com/jkosciessa/PRESTUS_bin/main/examples/example_report.html)
+Example report on a phantom: [🔗 Download Example HTML](https://raw.githubusercontent.com/jkosciessa/PRESTUS_bin/main/examples/example_report.html)
 
 ---
 
@@ -347,7 +357,7 @@ A full example report on a phantom can be found here: [🔗 Download Example HTM
 
 The group tools read existing per-run outputs and never simulate; see [Group analysis](doc_group.md).
 
-**Study** (`prestus_group_report_start` on a config with `study.manifest`, or the end of `prestus_study_start`): everything goes to `<path.sim>/group/<study.name>/`:
+**Study** (`prestus_group_report_start` on a config with `study.manifest`, or the end of `prestus_study_start`), written to `<path.sim>/group/<study.name>/`:
 
 ```
 group_<name>_report.html                  ← self-contained group HTML report
@@ -364,7 +374,7 @@ log/
 log_hpc/                                  ← dependent study-report job (HPC)
 ```
 
-**Subjects** (no manifest: all subjects under the same `simulation.medium` and `io.output_affix`; `prestus_group_report_start`, or `modules.generate_group_report = 1` after each subject), written to `path.sim`:
+**Subjects** (no manifest: all subjects with the same `simulation.medium` and `io.output_affix`; `prestus_group_report_start`, or `modules.generate_group_report = 1` after each subject), written to `path.sim`:
 
 ```
 group_<medium>_report<affix>.html         ← self-contained group HTML report
@@ -379,4 +389,4 @@ group_plots/                              ← group-level box-plot images
 group/<medium><affix>/maps/, plots/       ← group MNI maps (manual prestus_group_report_start only)
 ```
 
-Thermal plots need a layered medium with heating results. Box plots auto-scale to the number of plotted columns. The Safety dashboard's Mechanical grid always shows both `MI` (free water) and `MItc` tiles plus Max pressure; whichever MI variant has no data for the medium renders greyed out ("N/A"). See [Group HTML report](doc_group.md#group-html-report) for details.
+Thermal plots need a layered medium with heating results. See [Group HTML report](doc_group.md#group-html-report) for the report contents.

@@ -20,6 +20,9 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   (from the grid/medium/source stages) are always preferred.
 %   Applies the axisymmetric coordinate fix-up when needed, and calls
 %   apply_isppa_scaling so the caller receives a correctly scaled field.
+%   When the cached free-field baseline is missing or unreadable, the
+%   baseline of the current run (acoustic_provenance passed on load) is
+%   used for that scaling.
 %
 % Use as:
 %   % save
@@ -29,6 +32,8 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   % load
 %   [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
 %       cache_acoustic('load', filename, parameters)
+%   % load, falling back to this run's free-water baseline
+%   [...] = cache_acoustic('load', filename, parameters, struct(), [], live_provenance)
 %
 % Input:
 %   mode              - 'save' or 'load'
@@ -36,7 +41,9 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   parameters        - PRESTUS config struct (updated on load for axisym)
 %   sensor_data       - (save only) struct with p_max_all [Pa]
 %   kgrid             - (save only) kWaveGrid object
-%   acoustic_provenance - (save only) struct with freefield_isppa_wcm2
+%   acoustic_provenance - save: struct with freefield_isppa_wcm2;
+%                       load: (optional) provenance of the current run, used
+%                       when the cached baseline is missing or unreadable
 %   acoustic_info     - (save only) struct with parameters snapshot
 %   kwave_medium      - (save only) medium properties; included in async mode
 %
@@ -65,7 +72,7 @@ if strcmp(mode, 'save')
 end
 
 [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
-    acoustic_cache_load(filename, parameters);
+    acoustic_cache_load(filename, parameters, acoustic_provenance);
 
 end
 
@@ -103,7 +110,7 @@ end
 % =========================================================================
 
 function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = ...
-        acoustic_cache_load(filename, parameters)
+        acoustic_cache_load(filename, parameters, live_provenance)
 
 % Load only the slim variables the cache is guaranteed to contain.
 % Legacy full caches may contain additional fields; they are ignored here
@@ -190,6 +197,9 @@ if numel(parameters.grid.dims) == 2 && ...
     end
 end
 
+% Fill a missing cached baseline from the current run before scaling, so the
+% target can still be met (apply_isppa_scaling errors without a baseline).
+acoustic_provenance = fill_baseline_from_live(acoustic_provenance, live_provenance);
 sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters);
 
 end
@@ -203,5 +213,30 @@ catch ME
         'Cached acoustic_provenance.%s is unreadable (%s); treating it as missing.', ...
         name, ME.message);
     v = NaN;
+end
+end
+
+%% ------------------------------------------------------------------------
+function provenance = fill_baseline_from_live(provenance, live)
+% The cached free-field ISPPA describes the drive level of the cached field and
+% takes precedence. When it is missing or unreadable, fall back to the baseline
+% computed in the current run (acoustic_water_baseline, same source and grid).
+cached_ok = isfield(provenance, 'freefield_isppa_wcm2') && ...
+    isscalar(provenance.freefield_isppa_wcm2) && isfinite(provenance.freefield_isppa_wcm2);
+live_ok = isfield(live, 'freefield_isppa_wcm2') && ...
+    isscalar(live.freefield_isppa_wcm2) && isfinite(live.freefield_isppa_wcm2);
+if ~cached_ok && live_ok
+    fprintf('[acoustic_stage] Using free-water baseline from this run (%.2f W/cm²); cached value unavailable.\n', ...
+        live.freefield_isppa_wcm2);
+    provenance.freefield_isppa_wcm2 = live.freefield_isppa_wcm2;
+    if isfield(live, 'freefield_source')
+        provenance.freefield_source = live.freefield_source;
+    end
+    if isfield(live, 'tx_calibration')
+        provenance.tx_calibration = live.tx_calibration;
+    end
+    if isfield(live, 'freefield_axial')
+        provenance.freefield_axial = live.freefield_axial;
+    end
 end
 end
