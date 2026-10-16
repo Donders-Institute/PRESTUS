@@ -303,6 +303,10 @@ extra:
     default: []
     derived: true
     help: Set by the transducer validators (annular and 1D-steered matrix → true); a configured value is overwritten.
+  transducer.tx_calibration:
+    kind: yaml
+    default: {}
+    help: "Calibration record of the drive, written by the calibration pipeline and the transducer library; isppa_wcm2 is the free-water ISPPA that elem_p_amp produces. A target_isppa_wcm2 that differs from it rescales the results."
   timing.pulse_ramp_dur:
     kind: number
     default: 0

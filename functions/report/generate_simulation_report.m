@@ -1790,6 +1790,15 @@ function html = build_config_summary(parameters, csv_table)
             html = config_row(html, 'Expected focal distance', sprintf('%.1f mm', focal));
         end
         html = [html build_calibration_provenance_rows(td, csv_table)]; %#ok<AGROW>
+        [isppa_msg, isppa_mismatch] = isppa_intent(parameters, 1);
+        if ~isempty(isppa_msg)
+            if isppa_mismatch
+                isppa_msg = ['<span class="badge badge-amber">check</span> ' html_utils.escape(isppa_msg)];
+            else
+                isppa_msg = html_utils.escape(isppa_msg);
+            end
+            html = [html sprintf('<tr><th>Modelled intensity</th><td>%s</td></tr>', isppa_msg)]; %#ok<AGROW>
+        end
     end
 
     % Modules

@@ -98,6 +98,9 @@ end
     yaml_path = fullfile(parameters.calibration.path_output_profiles, yaml_file);
 
     parameters.transducer.focal_distance_ep = parameters.calibration.desired_focal_distance_ep;
+    % The drive reproduces desired_intensity; target it too, so a config built
+    % from this file models the calibrated intensity rather than the default.
+    parameters.transducer.target_isppa_wcm2           = parameters.calibration.desired_intensity;
     parameters.transducer.tx_calibration.isppa_wcm2   = parameters.calibration.desired_intensity;
     parameters.transducer.tx_calibration.phase_source = 'library';
     parameters.transducer.tx_calibration.isppa_source = 'library';

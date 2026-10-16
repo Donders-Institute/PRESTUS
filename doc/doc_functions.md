@@ -149,6 +149,7 @@ The following documents the functions provided in PRESTUS.
 | `is_multi_isppa_mode`                   | True when any transducer carries more than one ISPPA target. |
 | `is_pose_workflow_mode`                 | True when time_reversal.pose_workflow.enabled is set |
 | `isppa_baseline`                        | Free-water ISPPA an acoustic field was produced at, and its origin |
+| `isppa_intent`                          | One-line statement of the free-water ISPPA a run will model |
 | `isppa_scale_factor`                    | Pressure scale factor that brings a field to a target free-water ISPPA |
 | `load_grid_cache_file`                  | Load a PRESTUS grid cache and restore pipeline state. |
 | `load_parameters`                       | Loads and merges configuration files for simulation parameters; a trailing `{key, value}` cell applies overrides before validation. |

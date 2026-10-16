@@ -42,6 +42,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: `io.save_matrices: 1` had no effect with the default config
 - Fixed: `get_alpha_coeff` read a non-existent medium field
 - Fixed: acoustic caches whose free-water ISPPA was stored as a gpuArray could not be read back
+- The parameter summary and HTML report state the free-water ISPPA a run models; a target that differs from the drive's calibration ISPPA, or the default target on an uncalibrated drive, warns (`prestus:isppa:targetVsCalibration`)
 
 #### Transducer library & calibration
 - Transducer library (`config/calibration/`): per-depth refinements of geometric steering, interpolated between measured depths; transducers resolved from their serial number via the equipment library. Fitting needs the Optimization Toolbox; loading does not
@@ -57,6 +58,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** interpolating a measured axial profile to an unmeasured focal depth put the focus at the same position for every desired depth; re-run calibrations at depths that were not measured
 - ⚠️ **Fixed:** the O'Neil forward model was evaluated 0.5 mm short of the requested depth; affects library entries fitted with the `oneil_phase_only` preset and `babelbrain.profile_calibration` (the default `rayleigh_phase_gain` preset is unchanged)
 - Fixed: `export_babelbrain_weights` wrote a file BabelBrain itself could not read
+- ⚠️ **Fixed:** calibration files (`*-F*mm-I*wpercm2.yaml`) recorded the default `target_isppa_wcm2` instead of their calibrated intensity, so a config built from one was rescaled to 30 W/cm². Set `target_isppa_wcm2` in configs built from older calibration files
 
 #### Transducers & sources
 - Flat annular elements (`transducer.annular.curv_radius_mm: .inf`), kWaveArray source only

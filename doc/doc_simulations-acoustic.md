@@ -126,7 +126,7 @@ where `baseline_isppa` is the free-water peak ISPPA of the same drive. All press
 The baseline comes from (`isppa_baseline`):
 
 1. a **free-water simulation** with the same grid, source and backend (`acoustic_water_baseline` → `water_baseline`; BabelBrain runs its own), recorded as `acoustic_provenance.freefield_isppa_wcm2` with its origin in `freefield_source`; or
-2. the transducer's **calibration ISPPA** (`tx_calibration.isppa_wcm2`, from the library), used only when it matches the target to within 1 % — then no scaling is needed.
+2. the transducer's **calibration ISPPA** (`tx_calibration.isppa_wcm2`, from the library or a calibration file), used only when it matches the target to within 1 % — then no scaling is needed.
 
 `modules.run_water_baseline` decides when the free-water simulation runs (`needs_water_baseline`):
 
@@ -137,6 +137,8 @@ The baseline comes from (`isppa_baseline`):
 | `0` | only when the target differs from a calibration ISPPA |
 
 A target is never reported unscaled: when it needs a rescale but no simulated baseline exists (e.g. `run_water_baseline: 0` with an uncalibrated transducer, or a cached result from a run without baseline and `run_source_setup: 0`), the run stops with `prestus:isppa:noBaseline` or `prestus:isppa:unsimulatedBaseline` (`isppa_scale_factor`). Scale factors above 4 or below 0.25 warn (`prestus:isppa:largeScale`): check that the target is in the linear regime of the simulated drive.
+
+**Check what a run models.** The parameter summary at the start of the log and the HTML report (row *Modelled intensity*) state the free-water ISPPA the results report and how it relates to the calibration ISPPA of the drive. A target that differs from the calibration ISPPA, or the default target on a drive without calibration ISPPA, is marked ⚠️ and warns `prestus:isppa:targetVsCalibration`. A calibration file (`<equipment>-F<focus>mm-I<isppa>wpercm2.yaml`, [calibration](doc_calibration.md)) sets both `target_isppa_wcm2` and `tx_calibration.isppa_wcm2` to its calibrated intensity. If you copy only its `annular` drive into a config, also set `target_isppa_wcm2` to that intensity, or the results are rescaled to the default 30 W/cm².
 
 The baseline run also stores the free-water intensity along each transducer's beam axis (bowl apex → grid edge) as `acoustic_provenance.freefield_axial`. The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3-D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical O'Neil profile for a single annular transducer (always), both at the drive level of the plotted field after scaling. They are omitted for combined async / FOV fields (which are scaled per source) and for the BabelBrain backend.
 

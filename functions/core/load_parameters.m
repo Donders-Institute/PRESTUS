@@ -122,6 +122,12 @@ function parameters = load_parameters(varargin)
         parameters = restore_struct_arrays(parameters, project_defaults);
     end
     known_keys  = parameters;          % for the unknown-key check below
+    % default ISPPA target, recorded below when no config layer sets one (ISPPA_INTENT)
+    default_target = [];
+    if isfield(parameters, 'transducer') && isfield(parameters.transducer, 'target_isppa_wcm2')
+        default_target = parameters.transducer(1).target_isppa_wcm2;
+    end
+    target_set = false;
     extra_keys  = config_known_extra_keys(prestus_root);
     calibration_cfg = fullfile(prestus_root, 'config', 'config_calibration.yaml');
     if isfile(calibration_cfg)
@@ -143,6 +149,7 @@ function parameters = load_parameters(varargin)
             extra_parameters = yaml_load_validated(fullfile(extra_config_file));
             report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
         end
+        target_set = target_set || sets_target(extra_parameters);
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargs == 2
@@ -150,6 +157,7 @@ function parameters = load_parameters(varargin)
         extra_config_location = varargin{2};
         extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
         report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
+        target_set = target_set || sets_target(extra_parameters);
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
     elseif nargs > 2
@@ -163,6 +171,7 @@ function parameters = load_parameters(varargin)
             extra_config_location = varargin{i+1};
             extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
             report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
+            target_set = target_set || sets_target(extra_parameters);
             parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
         end
@@ -171,6 +180,11 @@ function parameters = load_parameters(varargin)
     %% Key/value overrides (e.g. one row of a study manifest)
     if ~isempty(overrides)
         parameters = apply_config_overrides(parameters, overrides);
+        target_set = target_set || any(~cellfun(@isempty, regexp(cellstr(string(overrides(:, 1))), ...
+            '^(transducer(\(\d+\))?|calibration)\.target_isppa_wcm2$', 'once')));
+    end
+    if ~target_set && ~(isfield(parameters, 'calibration') && isfield(parameters.calibration, 'target_isppa_wcm2'))
+        parameters.state.target_isppa_default_wcm2 = default_target;
     end
 
     %% Backwards compatibility: migrate calibration.target_isppa_wcm2 → transducer(i).target_isppa_wcm2
@@ -387,6 +401,12 @@ function parameters = load_parameters(varargin)
         print_parameter_summary(parameters)
     end
 
+end
+
+function tf = sets_target(s)
+% true when a config layer sets an ISPPA target (per transducer or the deprecated global one)
+    tf = (isfield(s, 'transducer') && isstruct(s.transducer) && isfield(s.transducer, 'target_isppa_wcm2')) || ...
+         (isfield(s, 'calibration') && isstruct(s.calibration) && isfield(s.calibration, 'target_isppa_wcm2'));
 end
 
 function merged = restore_struct_arrays(merged, extra)

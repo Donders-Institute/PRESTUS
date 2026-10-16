@@ -174,6 +174,13 @@ for t_i = 1:numel(parameters.transducer)
 
     print_if_field(tr, 'freq_hz', '%.1f Hz');
     print_if_field(tr.(tr.type), 'elem_p_amp', '%.1f Pa');
+    [isppa_msg, isppa_mismatch] = isppa_intent(parameters, t_i);
+    if ~isempty(isppa_msg)
+        fprintf('  %s%-30s %s\n', iif(isppa_mismatch, '⚠️  ', ''), 'modelled intensity:', isppa_msg);
+        if isppa_mismatch
+            warning('prestus:isppa:targetVsCalibration', 'Transducer %d: %s.', t_i, isppa_msg);
+        end
+    end
     print_if_field(tr, 'trans_pos', '[%.1f %.1f %.1f]');
     print_if_field(tr, 'focus_pos', '[%.1f %.1f %.1f]');
 	print_if_field(tr, 'focal_distance_ep', '%.1f mm');

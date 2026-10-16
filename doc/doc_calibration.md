@@ -128,7 +128,7 @@ desired_intensities:           # free-water ISPPA [W/cm²]; the first is the sto
 1. **Library entry** `{library_path}/{combo}.yaml` (default `{path_output}/library`): the calibrated depths as refinements on top of the existing user entry, or else the shipped one. Studies use it by setting `transducer.library_path` to that folder.
 2. **Calibration output folder** `path_output_profiles` (default `{path_output}/profiles`):
     - `PRESTUS_virtual_{combo}.csv`: phases and amplitude per intensity (rows) × depth (columns)
-    - `{combo}-F{depth}mm-I{intensity}wpercm2.yaml`: one PRESTUS transducer block per depth × intensity (can be ingested with `update_transducer_library`)
+    - `{combo}-F{depth}mm-I{intensity}wpercm2.yaml`: one PRESTUS transducer block per depth × intensity, with `target_isppa_wcm2` and `tx_calibration.isppa_wcm2` set to that intensity (can be ingested with `update_transducer_library`)
     - `{combo}_settings_I{intensity}.csv`: per-depth phases, per-ring amplitudes, gains, model focus (`library_settings_table`)
     - `{combo}_calibration_profiles.csv`: the measured or interpolated profiles that were fitted
     - `{combo}_calibration_report.csv`, `{combo}_calibration.png`, and `{combo}_kwave_drive_calibration.csv` if the k-Wave drive calibration ran
