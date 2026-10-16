@@ -114,16 +114,16 @@ end
                 parameters.transducer(1).focal_distance_bowl/parameters.grid.resolution_mm);
         else
             focus_pos = parameters.transducer.focus_pos;
-            % Adjust if the positions are transposed (2D only)
-            % In 2D, we expect the second index as the axial dimension
-            if numel(parameters.grid.dims) == 2 && focus_pos(1)>focus_pos(2)
-                warn('Specified focus position appears transposed...adjusting');
-                focus_pos = focus_pos';
+            % A column vector is read as a row; the beam axis of a 2D
+            % axisymmetric grid is inferred from the positions (GRID_AXISYMMETRY)
+            if numel(focus_pos) ~= numel(parameters.grid.dims)
+                error('focus_pos has %d elements but grid has %d dimensions. Check your focus position configuration.', ...
+                    numel(focus_pos), numel(parameters.grid.dims));
             end
         end
-        % Retain transducer and focus positions
-        parameters.transducer(1).trans_pos = trans_pos;
-        parameters.transducer(1).focus_pos = focus_pos;
+        % Retain transducer and focus positions (row vectors)
+        parameters.transducer(1).trans_pos = trans_pos(:)';
+        parameters.transducer(1).focus_pos = focus_pos(:)';
     end
     
     % Verify that transducer and focus positions lie within the interior grid.

@@ -71,12 +71,10 @@ if opts.IsLayered
 else
     res = parameters.grid.resolution_mm;
 
-    % For axisymmetric phantom runs the acoustic/thermal outputs are radially
-    % expanded to 3D [2*Nr x 2*Nr x Nz]. Extract the central xz-slice so the
-    % saved NIfTI matches the 2D phantom input dimensions [Nr_full x Nz].
-    if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1 && ndims(data) == 3
-        data = squeeze(data(round(size(data,1)/2), :, :));
-    end
+    % For axisymmetric runs the acoustic/thermal outputs are radially
+    % expanded to 3D [Nlateral x Nlateral x Naxial]. Extract the plane through
+    % the beam axis so the saved NIfTI matches the 2D input [Nlateral x Naxial].
+    [data, phantom_tf] = phantom_voxel_order(data, parameters, planimg);
 
     % Write without header first so niftiinfo can parse the file dimensions,
     % then rewrite with the full spatial header.
@@ -91,8 +89,11 @@ else
     % Reuse the phantom input NIfTI transform when available so output NIfTIs
     % share the same world-space orientation (including any z-flip) and can be
     % overlaid directly on the phantom in a viewer.
-    if isfield(planimg, 'phantom_header') && ~isempty(planimg.phantom_header)
-        hdr.Transform = planimg.phantom_header.Transform;
+    % The header of the file written above has no transform (TransformName
+    % 'None'), under which niftiwrite ignores hdr.Transform.
+    hdr.TransformName = 'Sform';
+    if ~isempty(phantom_tf)
+        hdr.Transform = phantom_tf;
     else
         if isfield(planimg, 'origin_ras_mm') && ~isempty(planimg.origin_ras_mm)
             origin = planimg.origin_ras_mm(:);

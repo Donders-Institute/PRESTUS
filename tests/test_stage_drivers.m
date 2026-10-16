@@ -319,6 +319,56 @@ classdef test_stage_drivers < matlab.unittest.TestCase
                 'acoustic_stage:staleCacheNoSource');
         end
 
+        function test_acoustic_stage_axisym_cache_expands_inputs(tc)
+            % Reloading an axisymmetric phantom field (cached in 3D) expands the
+            % half-plane grid, positions and medium like a fresh simulation
+            p = stage_params(tc.Dir);
+            p.io.overwrite_files = 'never';
+            p.simulation.medium = 'phantom';
+            p.grid.axisymmetric = 1;
+            p.grid.dims = [12 4];
+            p.grid.axisym_bilateral_dims = [12 8];
+            p.grid.axisym_transposed = true;
+            p.transducer.trans_pos = [1 1];
+            p.transducer.focus_pos = [9 1];
+            p.transducer.trans_pos_bilateral = [1 5];
+            p.transducer.focus_pos_bilateral = [9 5];
+            prov = struct('freefield_isppa_wcm2', 30, 'input_signature', cache_signature(p, 'acoustic'));
+            q = p; q.grid.dims = [8 8 12];
+            f = fullfile(p.io.dir_cache, sprintf('sub-%03d_%s_results%s.mat', ...
+                p.subject_id, p.simulation.medium, p.io.output_affix));
+            cache_acoustic('save', f, q, struct('p_max_all', ones(8, 8, 12)), [], prov, struct());
+
+            masks = 2 * ones(12, 4);
+            med = struct('sound_speed', 1500 * ones(12, 4), 'density', 1000);
+            [~, sd, p2, kgrid, med2, masks2, seg2, src2] = evalc_out(@() acoustic_stage(p, [], med, [], [], ...
+                masks, masks, [], struct(), struct('transf', eye(4)), ...
+                p.transducer.trans_pos, p.transducer.focus_pos, []));
+            tc.verifyEqual(size(sd.p_max_all), [8 8 12]);
+            tc.verifyEqual(p2.grid.dims, [8 8 12]);
+            tc.verifyEqual(p2.transducer.trans_pos, [5 5 1]);
+            tc.verifyEqual(p2.transducer.focus_pos, [5 5 9]);
+            tc.verifyEqual(size(masks2), [8 8 12]);
+            tc.verifyEqual(size(seg2), [8 8 12]);
+            tc.verifyEqual(size(med2.sound_speed), [8 8 12]);
+            tc.verifyEqual(med2.density, 1000);
+            tc.verifyEqual([kgrid.Nx kgrid.Ny kgrid.Nz], [8 8 12]);
+            tc.verifyEmpty(src2);                           % no source set up: left as is
+        end
+
+        function test_acoustic_stage_cache_signature_checked(tc)
+            % A field cached with other settings is not reused silently
+            p = stage_params(tc.Dir);
+            p.io.overwrite_files = 'never';
+            q = p; q.grid.resolution_mm = 2;
+            write_results_cache(p, ones(p.grid.dims), ...
+                struct('freefield_isppa_wcm2', 30, 'input_signature', cache_signature(q, 'acoustic')));
+            tc.verifyError(@() call_acoustic_stage(p, [], struct()), 'prestus:cache:signatureMismatch');
+            p.io.cache_signature_check = 'off';
+            sd = call_acoustic_stage(p, [], struct());
+            tc.verifyEqual(sd.p_max_all, ones(p.grid.dims));
+        end
+
         function test_acoustic_stage_clears_mismatched_source_labels(tc)
             p = stage_params(tc.Dir);
             p.io.overwrite_files = 'never';

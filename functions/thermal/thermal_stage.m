@@ -127,6 +127,15 @@ if run_new_sim
             num2str(fov_state.offset), num2str(parameters.grid.dims));
     end
 
+    % Axisymmetric runs: the acoustic stage expanded the positions in
+    % parameters; the pipeline's trans_pos/focus_pos are the half-plane ones.
+    if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1 && ...
+            isfield(parameters.transducer(1), 'trans_pos_bilateral') && ...
+            numel(parameters.transducer(1).trans_pos) == numel(parameters.grid.dims)
+        trans_pos = parameters.transducer(1).trans_pos;
+        focus_pos = parameters.transducer(1).focus_pos;
+    end
+
     kwave_medium.temp_0              = medium_plus.temp_0;
     if isfield(medium_plus, 'absorption_np')
         kwave_medium.absorption_np = medium_plus.absorption_np;

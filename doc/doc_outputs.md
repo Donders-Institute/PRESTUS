@@ -302,14 +302,17 @@ Within a chained run, sub-jobs that consume a shared cache (e.g. per-transducer 
 
 ### Cache reuse checks
 
-Grid and medium caches are named by subject, medium and affix only. Each cache therefore stores the settings it depends on (`cache_signature`):
+Grid, medium and acoustic caches are named by subject, medium and affix only. Each cache therefore stores the settings it depends on (`cache_signature`):
 
 | Cache | Compared settings |
 |---|---|
 | Grid (`*_grid_cache*.mat`) | `simulation.medium`, `grid`, `layers`, `headmodel`, `pct`, and the transducer (geometry and positions after placement) |
 | Medium (`*_medium_cache*.mat`) | the grid settings above, plus `medium_properties` |
+| Acoustic (`*_results*.mat`) | the medium settings above, plus `subject_id` and `grid.acoustic_fov_*`; not `grid.thermal_*` |
 
-Not compared, because they do not change these caches: paths, I/O, HPC and module flags; the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field; and the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps its own values of these settings.
+For `simulation.medium: phantom`, each also compares the phantom file (size and modification date of `final_tissues.nii.gz`).
+
+Not compared, because they do not change these caches: paths, I/O, HPC and module flags; the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field; and, for grid and medium caches, the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps its own values of these settings.
 
 When a cache is reused (under `io.overwrite_files: never`, after a declined overwrite prompt, or in the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
 

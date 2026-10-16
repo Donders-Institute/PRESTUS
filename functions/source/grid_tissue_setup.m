@@ -25,7 +25,10 @@ function [parameters, medium_masks, segmentation, bone_mask, pseudoCT, planimg] 
 %   pseudoCT     - [Nx x Ny (x Nz)] numeric, Hounsfield-unit skull image
 %                  ([] when parameters.pct.enabled ~= 1 or medium is not layered)
 %   planimg      - (struct) planning image data (t1_image_orig, t1_header,
-%                    transf, inv_transf); fields are empty for non-layered media
+%                    transf, inv_transf); fields are empty for non-layered media.
+%                    Phantoms add phantom_header, phantom_transposed (2D phantom
+%                    transposed to default_dims) and phantom_slice (struct dim,
+%                    index of the plane cut from a 3D phantom; [] otherwise)
 %
 % See also: GRID_AXISYMMETRY, PREPROC_HEAD, PREPROC_MEDIUM_MASK
 
@@ -84,9 +87,21 @@ else
         nii_info      = niftiinfo(filename_segmented);
         segmented_img = squeeze(niftiread(filename_segmented));
         planimg.phantom_header = nii_info;
+        % What is done to the phantom array below, so output NIfTIs can be
+        % returned to the file's voxel order (PHANTOM_VOXEL_ORDER)
+        planimg.phantom_transposed = false;
+        planimg.phantom_slice      = [];
 
-        % Read voxel size from NIfTI header (first spatial dim; phantoms are isotropic)
-        nii_res_mm = nii_info.PixelDimensions(1);
+        % Read voxel size from NIfTI header; the grid has one resolution, so
+        % the phantom voxels must be isotropic in its spatial dims
+        spatial = find(nii_info.ImageSize(1:min(3, end)) > 1);
+        pix_mm  = nii_info.PixelDimensions(spatial);
+        if any(abs(pix_mm - pix_mm(1)) > 1e-6 * max(1, pix_mm(1)))
+            error('grid_tissue_setup:anisotropicPhantom', ...
+                ['Phantom NIfTI voxels are not isotropic (%s mm): %s\n' ...
+                 'Resample the phantom to isotropic voxels.'], num2str(pix_mm), filename_segmented);
+        end
+        nii_res_mm = pix_mm(1);
         if abs(nii_res_mm - parameters.grid.resolution_mm) > 1e-6
             warning(['Phantom NIfTI voxel size (%.4f mm) differs from parameters.grid.resolution_mm (%.4f mm). ' ...
                      'Overriding parameters.grid.resolution_mm with NIfTI value.'], ...
@@ -100,18 +115,21 @@ else
         elseif length(size(segmented_img))==2 && isequal(size(segmented_img'), parameters.grid.default_dims)
             parameters.grid.dims = parameters.grid.default_dims;
             segmented_img = segmented_img';
+            planimg.phantom_transposed = true;
             fprintf('[grid_tissue_setup] %s\n', 'Check passed: phantom dimensions fit requested grid after rotating phantom...');
         elseif isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric && ...
                 ndims(segmented_img) == 3 && numel(parameters.grid.default_dims) == 2
-            % 2D axisymmetric sim with a 3D phantom: extract centre lateral slice
-            centre_y = round(size(segmented_img, 2) / 2);
-            segmented_img = squeeze(segmented_img(:, centre_y, :));
+            % 2D axisymmetric sim with a 3D phantom: extract the dim-2 plane
+            % through the transducer
+            [slice_y, parameters] = phantom_axis_slice(parameters, size(segmented_img));
+            segmented_img = squeeze(segmented_img(:, slice_y, :));
+            planimg.phantom_slice = struct('dim', 2, 'index', slice_y);
             if isequal(size(segmented_img), parameters.grid.default_dims)
                 parameters.grid.dims = parameters.grid.default_dims;
             else
                 parameters.grid.dims = size(segmented_img);
             end
-            fprintf('[grid_tissue_setup] Axisymmetric 2D: extracted centre slice (y=%d) from 3D phantom.\n', centre_y);
+            fprintf('[grid_tissue_setup] Axisymmetric 2D: extracted slice (y=%d) from 3D phantom.\n', slice_y);
             fprintf('[grid_tissue_setup] %dD grid dimensions: [%s]\n', numel(parameters.grid.dims), num2str(parameters.grid.dims));
         else
             parameters.grid.dims = size(segmented_img);
@@ -181,4 +199,49 @@ else
         planimg.origin_ras_mm = [];
     end
 
+end
+end
+
+function [k, parameters] = phantom_axis_slice(parameters, sz)
+% Dim-2 index of the plane cut from a 3D phantom for an axisymmetric run: the
+% transducer's when transducer(1) gives a 3D trans_pos (or trans_pos_mm,
+% converted as in GRID_TRANSDUCER_LOCATION), which is then reduced to the
+% plane; else the centre slice.
+    tr  = parameters.transducer(1);
+    res = parameters.grid.resolution_mm;
+    pos = struct();
+    for f = {'trans_pos', 'focus_pos'}
+        mm = [f{1} '_mm'];
+        if isfield(tr, mm) && numel(tr.(mm)) == 3
+            pos.(f{1}) = grid_mm_to_voxel(tr.(mm), res);
+        elseif isfield(tr, f{1}) && numel(tr.(f{1})) == 3
+            pos.(f{1}) = tr.(f{1})(:)';
+        end
+    end
+    if ~isfield(pos, 'trans_pos')
+        k = round(sz(2) / 2);
+        if mod(sz(2), 2) == 0
+            warning('grid_tissue_setup:ambiguousPhantomCentre', ...
+                ['The 3D phantom has an even number of slices (%d) in dim 2, so its centre lies ' ...
+                 'between two slices; using slice %d. Give transducer.trans_pos in 3D to choose it.'], ...
+                sz(2), k);
+        end
+        return
+    end
+    k = pos.trans_pos(2);
+    if k < 1 || k > sz(2)
+        error('grid_tissue_setup:phantomSliceOutside', ...
+            'transducer.trans_pos dim-2 index %d lies outside the 3D phantom (1..%d).', k, sz(2));
+    end
+    if isfield(pos, 'focus_pos') && pos.focus_pos(2) ~= k
+        error('grid_tissue_setup:phantomSliceAxis', ...
+            ['Axisymmetric run on a 3D phantom: transducer and focus must lie in the same dim-2 ' ...
+             'slice (trans_pos %d, focus_pos %d).'], k, pos.focus_pos(2));
+    end
+    % positions in the extracted [dim1 x dim3] plane
+    for f = {'trans_pos', 'focus_pos', 'trans_pos_mm', 'focus_pos_mm'}
+        if isfield(tr, f{1}) && numel(tr.(f{1})) == 3
+            parameters.transducer(1).(f{1}) = tr.(f{1})([1 3]);
+        end
+    end
 end

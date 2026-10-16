@@ -16,6 +16,7 @@ function [parameters, segmentation, bone_mask, pseudoCT, medium_masks] = ...
 %    Action: if dims(2) > dims(1), transpose so the layout is [Naxial x Nlateral]
 %            (axial along rows, lateral along columns).
 %            Save the bilateral snapshot:
+%              parameters.grid.axisym_transposed         = whether the input was transposed
 %              parameters.grid.axisym_bilateral_dims     = [Naxial, Nlateral]
 %              parameters.transducer(1).trans_pos_bilateral = [axial, lateral]
 %              parameters.transducer(1).focus_pos_bilateral = [axial, lateral]
@@ -101,7 +102,11 @@ end
         % aperture) can be wider than it is long.
         axis_dim2 = trans_pos(1) == focus_pos(1) && trans_pos(2) ~= focus_pos(2);
         axis_dim1 = trans_pos(2) == focus_pos(2) && trans_pos(1) ~= focus_pos(1);
-        if axis_dim2 || (~axis_dim1 && parameters.grid.dims(2) > parameters.grid.dims(1))
+        % Recorded so outputs can be returned to the input's voxel order
+        % (PHANTOM_VOXEL_ORDER): the expanded plane is always [Nlateral x Naxial].
+        parameters.grid.axisym_transposed = axis_dim2 || ...
+            (~axis_dim1 && parameters.grid.dims(2) > parameters.grid.dims(1));
+        if parameters.grid.axisym_transposed
             parameters.grid.dims = fliplr(parameters.grid.dims);
             trans_pos    = fliplr(trans_pos);
             focus_pos    = fliplr(focus_pos);

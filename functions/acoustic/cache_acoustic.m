@@ -18,8 +18,9 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   Reads the slim variables from the cache file.  For legacy full caches
 %   the extra fields are silently ignored; the caller's in-scope variables
 %   (from the grid/medium/source stages) are always preferred.
-%   Applies the axisymmetric coordinate fix-up when needed, and calls
-%   apply_isppa_scaling so the caller receives a correctly scaled field.
+%   Calls apply_isppa_scaling so the caller receives a correctly scaled
+%   field. Axisymmetric runs: the cached field is already expanded; the
+%   caller (ACOUSTIC_STAGE) expands parameters and the grid/medium variables.
 %   When the cached free-field baseline is missing or unreadable, the
 %   baseline of the current run (acoustic_provenance passed on load) is
 %   used for that scaling.
@@ -38,7 +39,7 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 % Input:
 %   mode              - 'save' or 'load'
 %   filename          - full path to the cache .mat file
-%   parameters        - PRESTUS config struct (updated on load for axisym)
+%   parameters        - PRESTUS config struct
 %   sensor_data       - (save only) struct with p_max_all [Pa]
 %   kgrid             - (save only) kWaveGrid object
 %   acoustic_provenance - save: struct with freefield_isppa_wcm2;
@@ -52,7 +53,7 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   kgrid             - kWaveGrid object
 %   acoustic_provenance - provenance struct
 %   acoustic_info     - info struct
-%   parameters        - updated parameters (axisym coord fix applied)
+%   parameters        - parameters (unchanged on load)
 
 arguments
     mode                (1,:) char   {mustBeMember(mode, {'save','load'})}
@@ -170,32 +171,9 @@ if isfield(cached, 'acoustic_grid_dims') && numel(parameters.grid.dims) == 3
     end
 end
 
-% Axisymmetric coordinate fix-up.
-% acoustic_wrapper saves sensor_data after expanding the axisymmetric
-% result to 2-D / 3-D, but parameters still holds the pre-expansion dims
-% and transducer positions when we bypass acoustic_wrapper via cache.
-if numel(parameters.grid.dims) == 2 && ...
-        isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric
-    expand_to_3d = strcmp(parameters.simulation.medium, 'phantom') || ...
-                   (isfield(parameters.modules, 'run_heating_sims') && ...
-                    parameters.modules.run_heating_sims == 1);
-    if ~expand_to_3d
-        % The cached sensor_data was already expanded to 2D bilateral by
-        % convert_axisymmetric_to_2d, which restores the original dims and
-        % positions.  Read those from the bilateral snapshot stored by
-        % grid_axisymmetry so the loaded parameters match.
-        if isfield(parameters.grid, 'axisym_bilateral_dims')
-            bilateral_dims = parameters.grid.axisym_bilateral_dims;
-            for ti = 1:numel(parameters.transducer)
-                parameters.transducer(ti).trans_pos = ...
-                    fliplr(parameters.transducer(ti).trans_pos_bilateral);
-                parameters.transducer(ti).focus_pos = ...
-                    fliplr(parameters.transducer(ti).focus_pos_bilateral);
-            end
-            parameters.grid.dims = fliplr(bilateral_dims);
-        end
-    end
-end
+% Axisymmetric runs: the cached sensor_data is already expanded to 2-D / 3-D,
+% while parameters and the grid/medium variables still describe the
+% half-plane. ACOUSTIC_STAGE expands those (ACOUSTIC_CONVERT_AXISYMMETRY).
 
 % Fill a missing cached baseline from the current run before scaling, so the
 % target can still be met (apply_isppa_scaling errors without a baseline).

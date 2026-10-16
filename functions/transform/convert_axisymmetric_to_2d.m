@@ -66,10 +66,15 @@ ax_center = bilateral_tp(2);     % axis column in the bilateral grid (e.g. 140)
 % half-grid (cols 2..(Nlateral-ax_center+1)), so the half-grid must have
 % at least Nlateral-ax_center+1 columns.  grid_axisymmetry guarantees this
 % because Nr = dims(2) - ax_center + 1 and dims(2) = Nlateral.
+% With the axis right of centre (ax_center > Nr) the left side reaches
+% beyond the simulated radius; those columns repeat the outermost column,
+% like the edge fill of radialExpand2DTo3D for the 3D expansion.
 right_len = Nlateral - ax_center;               % columns right of axis
+left_len  = ax_center - 1;                      % columns left of axis
 
 mirror = @(A) cat(2, ...
-    fliplr(A(:, 2:ax_center)), ...              % reflected left:  ax_center-1 cols
+    fliplr(A(:, [2:min(ax_center, size(A, 2)), ...   % reflected left:  left_len cols
+                 repmat(size(A, 2), 1, max(0, left_len - (size(A, 2) - 1)))])), ...
     A(:, 1), ...                                % axis:            1 col
     A(:, 2:right_len+1));                       % right half:      right_len cols
 

@@ -272,37 +272,14 @@ end
         end
     end
 
-    % convert media and results to 2D/3D (if axisymmetry was used)
-    if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
-        % grid.axisymmetric_output 'auto' (default): phantom simulations always
-        % expand to 3D so that output NIfTIs have consistent dimensions regardless
-        % of whether heating is requested; all other mediums expand to 3D only when
-        % heating is requested (3D thermal diffusion requires it). '2d' keeps the
-        % mirrored plane (no heating), '3d' always expands.
-        heating = isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims == 1;
-        out_mode = 'auto';
-        if isfield(parameters.grid, 'axisymmetric_output') && ~isempty(parameters.grid.axisymmetric_output)
-            out_mode = lower(char(parameters.grid.axisymmetric_output));
-        end
-        switch out_mode
-            case 'auto'; expand_to_3d = strcmp(parameters.simulation.medium, 'phantom') || heating;
-            case '3d';   expand_to_3d = true;
-            case '2d'
-                if heating
-                    error('acoustic_wrapper:axisymOutput2dHeating', ...
-                        'grid.axisymmetric_output = ''2d'' cannot be combined with heating simulations (3D required).');
-                end
-                expand_to_3d = false;
-            otherwise
-                error('acoustic_wrapper:axisymOutput', ...
-                    'grid.axisymmetric_output must be ''auto'', ''2d'' or ''3d'' (got ''%s'').', out_mode);
-        end
-        if expand_to_3d
-            [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                convert_axisymmetric_to_3d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels);
-        else
-            [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
-                convert_axisymmetric_to_2d(sensor_data, parameters, segmentation, medium_masks, kwave_medium, source, source_labels);
+    % convert media and results to 2D/3D (if axisymmetry was used); the form
+    % (AXISYMMETRIC_OUTPUT_MODE) is shared with the acoustic cache reload
+    axisym_mode = axisymmetric_output_mode(parameters);
+    if ~isempty(axisym_mode)
+        [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, source, source_labels] = ...
+            acoustic_convert_axisymmetry(parameters, sensor_data, segmentation, medium_masks, ...
+                                         kwave_medium, kgrid, source, source_labels, axisym_mode);
+        if strcmp(axisym_mode, '2d')
             warn('Axisymmetry setup was requested for acoustic simulation without follow-up heating simulation. Follow-up thermal simulations loading these 2D results may not work as expected (e.g., 3D thermal diffusion).')
         end
     end

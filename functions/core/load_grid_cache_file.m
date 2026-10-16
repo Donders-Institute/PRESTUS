@@ -76,13 +76,7 @@ if numel(cached.grid_cache_info.parameters.transducer) > numel(transducer_before
         ti = parameters.io.async_transducer_idx;
         cached_transducers = cached.grid_cache_info.parameters.transducer;
         if ti >= 1 && ti <= numel(cached_transducers)
-            cached_tr = cached_transducers(ti);
-            if isfield(cached_tr, 'trans_pos') && ~isempty(cached_tr.trans_pos)
-                parameters.transducer(1).trans_pos = cached_tr.trans_pos;
-            end
-            if isfield(cached_tr, 'focus_pos') && ~isempty(cached_tr.focus_pos)
-                parameters.transducer(1).focus_pos = cached_tr.focus_pos;
-            end
+            parameters.transducer = copy_grid_positions(parameters.transducer, 1, cached_transducers(ti));
         else
             warning('load_grid_cache_file:badTransducerIdx', ...
                 ['async_transducer_idx (%d) is out of range for cached transducer ' ...
@@ -98,13 +92,13 @@ if numel(cached.grid_cache_info.parameters.transducer) > numel(transducer_before
 elseif numel(cached.grid_cache_info.parameters.transducer) == numel(transducer_before_load)
     % Same transducers: keep the caller's settings (drive, phases, ISPPA
     % targets, ...) and take only what the grid stage computed, the grid-space
-    % positions (GRID_TRANSDUCER_LOCATION). Restoring the whole cached array
-    % would replace e.g. the targets of a run that reuses another run's grid.
+    % positions (GRID_TRANSDUCER_LOCATION, and the bilateral snapshot of
+    % GRID_AXISYMMETRY). Restoring the whole cached array would replace e.g.
+    % the targets of a run that reuses another run's grid.
     cached_transducers = cached.grid_cache_info.parameters.transducer;
     parameters.transducer = transducer_before_load;
     for ti = 1:numel(cached_transducers)
-        parameters.transducer(ti).trans_pos = cached_transducers(ti).trans_pos;
-        parameters.transducer(ti).focus_pos = cached_transducers(ti).focus_pos;
+        parameters.transducer = copy_grid_positions(parameters.transducer, ti, cached_transducers(ti));
     end
 else
     parameters.transducer = cached.grid_cache_info.parameters.transducer;
@@ -144,6 +138,19 @@ end
 
 function names = grid_stage_outputs()
 % Grid keys the grid stage sets (GRID_TISSUE_SETUP, PREPROC_HEAD,
-% AUTOPAD_GRID_FOR_TRANSDUCERS): restored from the cache, not from the caller.
-names = {'dims', 'default_dims', 'resolution_mm', 'display_orientation'};
+% AUTOPAD_GRID_FOR_TRANSDUCERS, GRID_AXISYMMETRY): restored from the cache,
+% not from the caller.
+names = {'dims', 'default_dims', 'resolution_mm', 'display_orientation', ...
+         'axisym_bilateral_dims', 'axisym_transposed'};
+end
+
+function transducers = copy_grid_positions(transducers, ti, cached_tr)
+% Grid-space positions of transducer TI from its cached entry: trans_pos /
+% focus_pos and, for axisymmetric grids, the bilateral snapshot that the
+% axisymmetric expansion and the thermal stage read.
+for f = {'trans_pos', 'focus_pos', 'trans_pos_bilateral', 'focus_pos_bilateral'}
+    if isfield(cached_tr, f{1}) && ~isempty(cached_tr.(f{1}))
+        transducers(ti).(f{1}) = cached_tr.(f{1});
+    end
+end
 end

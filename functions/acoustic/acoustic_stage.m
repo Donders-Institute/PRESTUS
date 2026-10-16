@@ -41,7 +41,8 @@ function [sensor_data, parameters, kgrid, kwave_medium, medium_masks, ...
 %   parameters        - updated with state.acoustics_available and
 %                       state.acoustic_dry_run flags
 %   kgrid, kwave_medium, medium_masks, segmentation, source, source_labels -
-%                       updated by k-Wave path; unchanged for other backends
+%                       updated by k-Wave path (expanded for axisymmetric runs,
+%                       also on cache reload); unchanged for other backends
 
 arguments
     parameters        (1,1) struct
@@ -112,9 +113,23 @@ elseif exist(filename_sensor_data, 'file')
     disp('Skipping acoustic simulation, loading existing output file.')
     live_provenance = acoustic_provenance;
     try
-        [sensor_data, kgrid, acoustic_provenance, ~, parameters] = ...
+        [sensor_data, kgrid_cached, acoustic_provenance, ~, parameters] = ...
             cache_acoustic('load', filename_sensor_data, parameters, struct(), [], live_provenance);
+        if user_driven_reuse(parameters)
+            % Like a reused grid/medium cache: the cached field must come from
+            % this run's settings (io.cache_signature_check).
+            stored_sig = [];
+            if isfield(acoustic_provenance, 'input_signature')
+                stored_sig = acoustic_provenance.input_signature;
+            end
+            check_cache_signature(filename_sensor_data, stored_sig, input_signature, parameters);
+        end
         acoustic_provenance.input_signature = input_signature;
+        % The cached field of an axisymmetric run is already expanded: expand
+        % the grid, positions and in-scope medium the same way.
+        [parameters, kgrid, kwave_medium, medium_masks, segmentation, source, source_labels] = ...
+            expand_axisymmetric_inputs(parameters, sensor_data, kgrid, kgrid_cached, kwave_medium, ...
+                                       medium_masks, segmentation, source, source_labels, filename_sensor_data);
     catch ME
         if strcmp(ME.identifier, 'cache_acoustic:staleGrid') && isempty(source)
             % No source to re-simulate with (e.g. a job that only reads a
@@ -128,6 +143,7 @@ elseif exist(filename_sensor_data, 'file')
             % scaled exactly like a fresh run.
             fprintf('[pipeline] Acoustic cache grid mismatch — re-running acoustic simulation (%s backend).\n', ...
                 acoustic_backend_name(parameters));
+            acoustic_provenance = live_provenance;   % not the stale cache's
             [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgrid, ...
              source, source_labels, acoustic_provenance] = run_acoustic_backend( ...
                 parameters, kgrid, kwave_medium, source, sensor, medium_masks, ...
@@ -245,6 +261,94 @@ if ~parameters.state.acoustic_dry_run
     end
 end
 
+end
+
+%% ------------------------------------------------------------------------
+function [parameters, kgrid, kwave_medium, medium_masks, segmentation, source, source_labels] = ...
+        expand_axisymmetric_inputs(parameters, sensor_data, kgrid, kgrid_cached, kwave_medium, ...
+                                   medium_masks, segmentation, source, source_labels, filename)
+% EXPAND_AXISYMMETRIC_INPUTS  Bring the half-plane state of an axisymmetric
+% run to the expanded state of the reloaded field, as ACOUSTIC_WRAPPER does
+% after a simulation (ACOUSTIC_CONVERT_AXISYMMETRY). Variables that are not
+% half-plane arrays (e.g. no source in a job that only reads the field) are
+% returned unchanged. Non-axisymmetric runs only take the cached kgrid.
+
+mode = axisymmetric_output_mode(parameters);
+if isempty(mode) || ~isfield(parameters.grid, 'axisym_bilateral_dims') || ...
+        ~isstruct(sensor_data) || ~isfield(sensor_data, 'p_max_all')
+    kgrid = kgrid_cached;
+    return
+end
+
+% The cached field decides the form; a 2-D plane cannot feed 3-D heating.
+cached_mode = '2d';
+if ndims(sensor_data.p_max_all) == 3; cached_mode = '3d'; end
+if ~strcmp(cached_mode, mode)
+    heating = isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims == 1;
+    if heating && strcmp(cached_mode, '2d')
+        error('acoustic_stage:axisymCacheForm', ...
+            ['%s holds the 2-D axisymmetric plane, but heating needs the 3-D expansion. ' ...
+             'Re-run the acoustic simulation with heating enabled or grid.axisymmetric_output: 3d.'], filename);
+    end
+    warning('acoustic_stage:axisymCacheForm', ...
+        'Cached axisymmetric field is %s, this run would expand to %s; using the cached form.', ...
+        upper(cached_mode), upper(mode));
+    mode = cached_mode;
+end
+
+% Placeholders for variables that are not half-plane arrays, so the
+% conversion updates parameters and kgrid in any case
+half = parameters.grid.dims;
+is_half = @(A) (isnumeric(A) || islogical(A)) && isequal(size(A), half);
+real_seg   = is_half(segmentation);
+real_masks = is_half(medium_masks);
+real_src   = isstruct(source) && isfield(source, 'p_mask') && is_half(source.p_mask);
+real_lbl   = is_half(source_labels);
+seg_in = segmentation;   if ~real_seg,   seg_in = zeros(half, 'uint8'); end
+msk_in = medium_masks;   if ~real_masks, msk_in = zeros(half, 'uint8'); end
+src_in = source;         if ~real_src,   src_in = struct('p_mask', zeros(half)); end
+lbl_in = source_labels;  if ~real_lbl,   lbl_in = zeros(half); end
+med_in = kwave_medium;
+for f = fieldnames(med_in)'
+    if ~isscalar(med_in.(f{1})) && ~is_half(med_in.(f{1}))
+        med_in = rmfield(med_in, f{1});   % not on the half-plane: leave as is
+    end
+end
+sd_placeholder = struct('p_final', zeros(half, 'single'), 'p_max_all', zeros(half, 'single'));
+kgrid_in = kgrid;
+if isempty(kgrid_in); kgrid_in = struct(); end   % replaced by the conversion
+
+[~, parameters, seg_out, msk_out, med_out, kgrid_out, src_out, lbl_out] = ...
+    acoustic_convert_axisymmetry(parameters, sd_placeholder, seg_in, msk_in, med_in, ...
+                                 kgrid_in, src_in, lbl_in, mode);
+
+if real_seg,   segmentation  = seg_out; end
+if real_masks, medium_masks  = msk_out; end
+if real_src,   source        = src_out; end
+if real_lbl,   source_labels = lbl_out; end
+for f = fieldnames(med_out)'
+    kwave_medium.(f{1}) = med_out.(f{1});
+end
+kgrid = kgrid_cached;
+if ~isa(kgrid, 'kWaveGrid'); kgrid = kgrid_out; end
+
+% Same response as a stale 3-D cache (CACHE_ACOUSTIC): the caller re-runs
+% the simulation on its unchanged half-plane variables.
+if ~isequal(size(sensor_data.p_max_all), parameters.grid.dims)
+    error('cache_acoustic:staleGrid', ...
+        ['Acoustic cache was built on a different grid [%s] than the expanded axisymmetric ' ...
+         'grid [%s] of this run:\n  %s'], ...
+        num2str(size(sensor_data.p_max_all)), num2str(parameters.grid.dims), filename);
+end
+end
+
+%% ------------------------------------------------------------------------
+function tf = user_driven_reuse(parameters)
+% True when a run reloads its own acoustic cache (io.overwrite_files), not a
+% field another job wrote for it: io.acoustic_cache_affix (multi-ISPPA,
+% async combine) or the caches of a chained pipeline (io.reuse_upstream_caches).
+tf = ~(isfield(parameters.io, 'acoustic_cache_affix') && ~isempty(parameters.io.acoustic_cache_affix)) && ...
+     ~(isfield(parameters.io, 'reuse_upstream_caches') && ~isempty(parameters.io.reuse_upstream_caches));
 end
 
 function name = acoustic_backend_name(parameters)

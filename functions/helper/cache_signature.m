@@ -8,7 +8,8 @@ function sig = cache_signature(parameters, kind)
 % (CHECK_CACHE_SIGNATURE).
 %
 % Paths, I/O, HPC and module flags are excluded (moving data or changing what
-% is run downstream does not change the cached result), as are the drive level
+% is run downstream does not change the cached result); a phantom's file is
+% identified by subject, size and modification date. Excluded are the drive level
 % (target_isppa_wcm2, tx_calibration: they scale the acoustic field, not the
 % grid or medium) and, for grid and medium caches, the partial acoustic FOV
 % (grid.acoustic_fov_*: cropped after these stages).
@@ -40,6 +41,11 @@ function sig = cache_signature(parameters, kind)
         sig.(f{1}) = get_field(parameters, f);
     end
     sig.transducer = strip_drive(get_field(parameters, {'transducer'}));
+    % A phantom is read from path.seg/m2m_sub-*/final_tissues.nii.gz: a
+    % regenerated phantom changes the grid, medium and field built from it
+    if strcmp(sig.medium, 'phantom') && ~strcmp(kind, 'headmodel')
+        sig.phantom_file = segmentation_identity(parameters);
+    end
 
     switch kind
         case 'grid'
@@ -80,6 +86,16 @@ function sig = cache_signature(parameters, kind)
             sig.segmentation_date = segmentation_date(parameters);
         otherwise
             error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic | headmodel).', kind);
+    end
+end
+
+function id = segmentation_identity(parameters)
+% Subject, size and modification date of the segmentation (final_tissues)
+    id = struct('subject_id', get_field(parameters, {'subject_id'}), 'bytes', [], 'date', []);
+    try
+        f = dir(fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz'));
+        if ~isempty(f), id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400); end   % [s]
+    catch
     end
 end
 

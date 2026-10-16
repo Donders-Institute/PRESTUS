@@ -195,10 +195,11 @@ Multiple adjustments are made if axisymmetry is requested:
 
 - The grid should be specified as `[radial x 2, axial]`.
 - It is assumed that the (2x) radial axis is shorter than the axial axis.
-- Internally, `[radial x 2, axial]` is remapped onto `[axial radial]` and only values from `[half+1:end]` are retained.
+- Internally, `[radial x 2, axial]` is remapped onto `[axial radial]` and only the columns from the beam axis (the transducer's lateral position) onward are retained. With the axis off centre, the expanded output repeats the outermost simulated value beyond the simulated radius.
 - Medium, source, and sensor are set up according to [axial, radial] dimensions.
 - Following acoustic simulation, values are either mirrored into a cartesian 2D grid, or radially expanded into a cartesion 3D grid (see the note below). In cartesian 2D, the output will have [radial x 2, axial] dimensions again, in line with the default specification for kspaceFirstOrder2D.
 - Only a **single transducer** is supported; specifying multiple transducers with `axisymmetric == 1` raises an error.
+- A 3D `phantom` is cut along its second dimension at the transducer's `trans_pos` when that is given in 3D, else at the centre slice. Output NIfTIs of `phantom` runs are written in the phantom file's voxel order and world space.
 - Only **annular transducers** explicitly support axisymmetric `kWaveArray` mode. Other transducer types are not tested in this configuration.
 - The source keeps every grid point with a non-zero band-limited-interpolation weight (as the 3D path and k-Wave do). Until 2026-10 points with weights ≤ 0.25 were dropped, which raised the free-water focal pressure by 6–11 % (ITRUSST BM1 at 0.5–0.25 mm); results of earlier axisymmetric runs at the drive level are affected, runs scaled to a simulated free-water baseline much less so. `test_physics_water` and `test_itrusst_benchmark` check this against the O'Neil solution and the ITRUSST reference ([Testing](doc_testing.md)).
 

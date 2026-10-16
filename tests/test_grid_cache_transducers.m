@@ -46,6 +46,34 @@ classdef test_grid_cache_transducers < matlab.unittest.TestCase
             tc.verifyEqual(tp, [11 21 31]); tc.verifyEqual(fp, [41 51 61]);
         end
 
+        function test_cached_bilateral_positions(tc)
+            % An axisymmetric grid cache also restores the bilateral snapshot
+            % that the axisymmetric expansion and the thermal stage read.
+            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
+            tmp = tempname; mkdir(tmp);
+            tc.addTeardown(@() rmdir(tmp, 's'));
+            p = make_minimal_parameters(tmp);
+            p.transducer = p.transducer(1);
+            c = p;
+            c.grid.dims = [240 71];
+            c.grid.axisym_bilateral_dims = [240 140];
+            c.grid.axisym_transposed = true;
+            c.transducer.trans_pos = [1 1];
+            c.transducer.focus_pos = [50 1];
+            c.transducer.trans_pos_bilateral = [1 70];
+            c.transducer.focus_pos_bilateral = [50 70];
+            grid_cache_info = struct('parameters', c); %#ok<NASGU>
+            planimg = struct(); medium_masks = []; segmentation = []; bone_mask = []; pseudoCT = []; %#ok<NASGU>
+            f = fullfile(tmp, 'grid_cache.mat');
+            save(f, 'grid_cache_info', 'planimg', 'medium_masks', 'segmentation', 'bone_mask', 'pseudoCT');
+
+            q = load_grid_cache_file(f, p);
+            tc.verifyEqual(q.transducer.trans_pos_bilateral, [1 70]);
+            tc.verifyEqual(q.transducer.focus_pos_bilateral, [50 70]);
+            tc.verifyEqual(q.grid.axisym_bilateral_dims, [240 140]);
+            tc.verifyTrue(q.grid.axisym_transposed);
+        end
+
         function test_caller_grid_settings_cached_dims(tc)
             % The grid stage's outputs come from the cache; the run's other
             % grid settings stay (a partial FOV on a full-grid run's cache, or

@@ -127,6 +127,14 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** initial temperature (`temp_0`) was not loaded from cached heating files; rerun thermal analyses that reused cached heating files
 - Fixed: `fit_alpha_power: 0` failed in k-Wave; `convert_axisymmetric_to_3d` failed on label maps; three runtime crashes in `thermal_analysis`
 - Fixed: report and GUI texts for CEM43 now cite ISO 14708-3:2017 and Aubry et al. (2025) for the ISO form and state the k-Wave rule correctly; `thermal.cem43_iso` selects the form shown in the report (both are always computed)
+- ⚠️ **Fixed:** axisymmetric phantom runs that reloaded the acoustic cache crashed on a half-grid medium; the reload now expands grid, positions and medium like a fresh simulation and honours `grid.axisymmetric_output`
+- ⚠️ **Fixed:** axisymmetric NIfTI outputs were cut at the grid centre instead of the beam axis when the transducer sat off centre. Re-export NIfTIs of off-centre runs
+- ⚠️ **Fixed:** phantom NIfTI outputs carried no affine and kept the simulation's voxel order; they now carry the phantom's affine in its voxel order (transposed or axial-first 2D phantoms, plane of a 3D phantom). Re-export phantom NIfTIs
+- ⚠️ **Fixed:** axisymmetric 2D output with the beam axis right of centre failed; beyond the simulated radius the plane repeats the edge value, as the 3D expansion does
+- Axisymmetric runs keep the bilateral transducer positions when reusing a grid cache, and the thermal stage uses the expanded positions on a separate thermal grid
+- Phantom voxels must be isotropic; an axisymmetric run on a 3D phantom cuts the plane at a 3D `transducer.trans_pos` (warns when the centre is ambiguous)
+- Focus positions with `focus_pos(1) > focus_pos(2)` are no longer turned into column vectors
+- Grid, medium and acoustic caches of phantom runs record the phantom file; a reused acoustic cache is checked against the run's settings (`io.cache_signature_check`)
 
 #### Multi-transducer
 - Incoherent summation of independent-element arrays; exit-plane mask covers all transducers

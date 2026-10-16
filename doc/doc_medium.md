@@ -33,7 +33,7 @@ PRESTUS supports homo- and heterogeneous medium configurations. These can be spe
 
     A 3D imaging-based simulation is not always necessary. For debugging and benchmarking, one may for instance externally design a 2D phantom, and run simulations in a well-defined space. As the 2D phantom is explicitly designed, no preprocessing (e.g., rotation, cropping, etc.) is necessary. Using the ```phantom``` flag allows the same tissue flexibility as the ```layered``` version, but maps segmentation files onto medium masks without any further image processing. The 2D segmentation phantom must be provided as a ```final_tissues.nii.gz``` file in a (dummy) SimNIBS output folder.
     <n>
-    A `phantom` Nifti is expected to contain artificial layers of a SimNIBS segmentation, including the PML padding.
+    A `phantom` Nifti is expected to contain artificial layers of a SimNIBS segmentation. It covers the simulation domain only: the PML is added outside the grid. Its voxels must be isotropic.
     <br>
 
 ### Medium acoustic properties

@@ -7,7 +7,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `acoustic_analysis`                     | Compute acoustic safety metrics (Isppa, MI, max pressure) from sensor data, extract tissue-specific maxima, focal distances, and generate overlaid ISPPA plots on segmentation. |
-| `acoustic_convert_axisymmetry`          | Expand k-Wave axisymmetric (2D rotational) simulation outputs to full 3D (via  convert_axisymmetric_to_3d ) for heating sims or 2D Cartesian (via  convert_axisymmetric_to_2d ) otherwise, updating sensor data, parameters, masks, medium, grid, source, and labels. |
+| `acoustic_convert_axisymmetry`          | Expand axisymmetric simulation fields to 3D or the mirrored 2D plane in the form chosen by `axisymmetric_output_mode`, after a simulation and on acoustic cache reload |
 | `acoustic_fov_crop`                     | Resolve FOV settings and crop the acoustic grid if active. |
 | `acoustic_grid_fov`                     | Crop the acoustic simulation domain to a beam-axis FOV box. |
 | `acoustic_input_file`                   | Pressure map a run starts from instead of simulating ('' if none) |
@@ -18,6 +18,7 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_wrapper`                      | Set up acoustic simulation |
 | `assemble_limited_fov_fields`           | Back-project and combine N limited-FOV acoustic results. |
 | `assemble_pfov_fields`                  | Deprecated alias of ASSEMBLE_LIMITED_FOV_FIELDS. |
+| `axisymmetric_output_mode`              | Form into which axisymmetric results are expanded |
 | `cache_acoustic`                        | Save or load the slim acoustic results cache. |
 | `coherent_drive_calibration`            | Set each transducer's drive to its own ISPPA target (coherent runs) |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
@@ -393,6 +394,7 @@ The following documents the functions provided in PRESTUS.
 | `nifti_thermal`                         | Export thermal-stage data to NIfTI in T1 and MNI space |
 | `nifti_to_mni`                          | Convert a T1-space NIfTI to MNI space via SimNIBS |
 | `nifti_to_t1w`                          | Back-transform one volume to T1 space and write NIfTI |
+| `phantom_voxel_order`                   | Return a non-layered output volume to the voxel order of its input |
 | `simnibs_t1_to_mni`                     | Register subject T1 to MNI space if not already done |
 
 #### PSEUDO-CT

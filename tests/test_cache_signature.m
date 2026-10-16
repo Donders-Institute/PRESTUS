@@ -138,6 +138,31 @@ classdef test_cache_signature < matlab.unittest.TestCase
                 cache_signature(p, 'grid'), p), 'prestus:cache:badCheckMode');
         end
 
+        function test_regenerated_phantom_is_detected(tc)
+            % A phantom is read from final_tissues.nii.gz: a new file
+            % invalidates grid and medium caches built from the old one
+            root = tempname; mkdir(root);
+            tc.addTeardown(@() rmdir(root, 's'));
+            m2m = fullfile(root, 'm2m_sub-001'); mkdir(m2m);
+            f = fullfile(m2m, 'final_tissues.nii.gz');
+            fid = fopen(f, 'w'); fwrite(fid, uint8(1:10)); fclose(fid);
+            p = tc.params();
+            p.simulation.medium = 'phantom';
+            p.path.seg = root;
+            old = struct('grid', cache_signature(p, 'grid'), 'medium', cache_signature(p, 'medium'));
+            fid = fopen(f, 'w'); fwrite(fid, uint8(1:20)); fclose(fid);
+            for kind = {'grid', 'medium'}
+                tc.verifyError(@() check_cache_signature('x.mat', old.(kind{1}), ...
+                    cache_signature(p, kind{1}), p), 'prestus:cache:signatureMismatch');
+            end
+            % a cache written before the phantom file was recorded is not compared on it
+            legacy = rmfield(cache_signature(p, 'grid'), 'phantom_file');
+            tc.verifyTrue(check_cache_signature('x.mat', legacy, cache_signature(p, 'grid'), p));
+            % layered runs do not record it
+            p.simulation.medium = 'layered';
+            tc.verifyFalse(isfield(cache_signature(p, 'grid'), 'phantom_file'));
+        end
+
         function test_unknown_kind_errors(tc)
             tc.verifyError(@() cache_signature(tc.params(), 'thermal'), 'cache_signature:badKind');
         end
