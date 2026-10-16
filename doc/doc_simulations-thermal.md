@@ -56,6 +56,15 @@ These parameters influence the underlying mechanisms of how the thermal simulati
 - `sensor_xy_halfsize` defines the half-size (in grid units) of the rectangular XY sensor window centred on the transducer position. Only voxels within this window are included in the temperature sensor mask passed to `kWaveDiffusion`; voxels outside it are not recorded. The full Z extent of the grid is always included. Reducing this value lowers memory use during thermal simulation.
 - `record_t_at_every_step` controls whether the full sensor window temperature is stored at every simulation time step. When disabled (default, `0`), the sensor is discarded before the simulation and only the final temperature field is retained, which is substantially more memory-efficient. Enable (`1`) only if you need the complete temperature time series, but note that this can cause `out of memory` errors for large grids or many time steps.
 
+### Heat deposition
+
+The acoustic field deposits heat at the rate Q = 2&alpha;<sub>abs</sub>I = &alpha;<sub>abs</sub>p<sup>2</sup>/(&rho;c), with the absorption coefficient &alpha;<sub>abs</sub> [Np/m] at the source frequency. `thermal.absorption_model` selects how &alpha;<sub>abs</sub> is specified per tissue (see [Medium properties](doc_medium.md)):
+
+- `fraction` (default): `absorption_fraction` × the attenuation coefficient.
+- `coefficient`: `absorption_coeff` [dB/(cm·MHz<sup>y</sup>)], with the tissue's attenuation power law y (`alpha_power`). Every tissue in `layers` needs a value; `config_default.yaml` provides them.
+
+A run uses one model. A pseudo-CT skull with mapped attenuation has no matching absorption map, so `coefficient` falls back to `fraction` there, with a warning.
+
 ### Thermal dose (CEM43) calculation
 
 PRESTUS always computes **both** CEM43 formulations in every k-Wave thermal simulation run. Both are written to the CSV output, exported as NIfTI volumes, and shown as separate figures. The HTML report (dashboard, safety verdict, methods text) uses the formulation selected by `parameters.thermal.cem43_iso`. With the BabelBrain thermal backend only BabelBrain's own dose is available (R = 0.25 below 43 °C, 0.5 at or above 43 °C): the ISO maps are NaN, and `load_parameters` sets `cem43_iso` to 0 with a warning, so the report uses BabelBrain's dose.

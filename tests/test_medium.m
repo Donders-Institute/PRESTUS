@@ -103,6 +103,81 @@ classdef test_medium < matlab.unittest.TestCase
 
     end
 
+    methods (Test, TestTags = {'absorption'})
+
+        function test_absorption_coeff_converted_to_np_per_m(tc)
+            % absorption_coeff [dB/(cm MHz^y)] with y = alpha_power, in Np/m at f
+            p = medium_params();
+            p.thermal.absorption_model = 'coefficient';
+            [masks, tissues] = slab_masks(p);
+            [~, plus] = quiet_medium_setup(p, masks);
+            tc.verifyEqual(sort(fieldnames(plus)), sort({'temp_0'; 'absorption_np'}));
+            f_mhz = p.transducer.freq_hz / 1e6;
+            for t = 1:numel(tissues)
+                ref = tc.Cfg.medium_properties.(tissues{t});
+                tc.verifyEqual(unique(plus.absorption_np(masks == t)), ...
+                    ref.absorption_coeff * f_mhz^ref.alpha_power * 100 / (20*log10(exp(1))), ...
+                    'RelTol', 1e-12, tissues{t});
+            end
+        end
+
+        function test_absorption_coeff_matches_fraction_where_equivalent(tc)
+            % fraction 1 and absorption_coeff = alpha_coeff give the same heat source
+            p = medium_params();
+            [masks, tissues] = slab_masks(p);
+            [km_f, plus_f] = quiet_medium_setup(p, masks);
+            p.thermal.absorption_model = 'coefficient';
+            [~, plus_c] = quiet_medium_setup(p, masks);
+            w = 2*pi*p.transducer.freq_hz;
+            alpha_np_f = db2neper(km_f.alpha_coeff .* plus_f.absorption_fraction, km_f.alpha_power) .* w.^km_f.alpha_power;
+            for t = 1:numel(tissues)
+                ref = tc.Cfg.medium_properties.(tissues{t});
+                if ref.absorption_fraction == 1 && ref.absorption_coeff == ref.alpha_coeff
+                    v = masks == t;
+                    tc.verifyEqual(plus_c.absorption_np(v), alpha_np_f(v), 'RelTol', 1e-9, tissues{t});
+                end
+            end
+        end
+
+        function test_absorption_coeff_required_in_coefficient_mode(tc)
+            p = medium_params();
+            p.thermal.absorption_model = 'coefficient';
+            p.medium_properties.brain = rmfield(p.medium_properties.brain, 'absorption_coeff');
+            masks = slab_masks(p);
+            tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:missingAbsorptionCoeff');
+        end
+
+        function test_absorption_model_resolution(tc)
+            p = medium_params();
+            tc.verifyEqual(thermal_absorption_model(p), 'fraction');      % shipped default
+            p.thermal.absorption_model = 'coefficient';
+            [m, forced] = thermal_absorption_model(p);
+            tc.verifyEqual(m, 'coefficient'); tc.verifyFalse(forced);
+            p.pct.enabled = 1; p.pct.mapping_attenuation = 'none';       % fixed skull values
+            tc.verifyEqual(thermal_absorption_model(p), 'coefficient');
+            p.pct.mapping_attenuation = 'k-plan';                         % mapped skull attenuation
+            [m, forced] = thermal_absorption_model(p);
+            tc.verifyEqual(m, 'fraction'); tc.verifyTrue(forced);
+            p.thermal.absorption_model = 'other';
+            tc.verifyError(@() thermal_absorption_model(p), 'thermal_absorption_model:unknownModel');
+        end
+
+        function test_fraction_mode_cache_signature_ignores_absorption_coeff(tc)
+            % caches written before absorption_coeff existed stay valid in fraction mode
+            p = medium_params();
+            sig = cache_signature(p, 'medium');
+            tc.verifyFalse(isfield(sig, 'absorption_model'));
+            tc.verifyFalse(isfield(sig.medium_properties.brain, 'absorption_coeff'));
+            p.thermal.absorption_model = 'coefficient';
+            sig = cache_signature(p, 'medium');
+            tc.verifyEqual(sig.absorption_model, 'coefficient');
+            tc.verifyTrue(isfield(sig.medium_properties.brain, 'absorption_coeff'));
+            sig = cache_signature(p, 'acoustic');
+            tc.verifyFalse(isfield(sig.medium_properties.brain, 'absorption_coeff'));
+        end
+
+    end
+
     methods (Test, TestTags = {'attenuation'})
 
         function test_power_law_fit_identity_for_y2(tc)

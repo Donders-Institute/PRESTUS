@@ -237,6 +237,7 @@ fields:
   # ── Timing & thermal ─────────────────────────────────────────────────
   timing.*: {unit: s}
   timing.equal_step_duration: {kind: flag, unit: ''}
+  thermal.absorption_model: {kind: str, choices: [fraction, coefficient]}
   thermal.cem43_iso: {kind: flag}
   thermal.temp_0.*: {unit: °C}
   thermal.sensor_xy_halfsize: {unit: grid points}
@@ -276,6 +277,7 @@ fields:
   medium_properties.*.density: {unit: kg/m³}
   medium_properties.*.thermal_conductivity: {unit: W/m/°C}
   medium_properties.*.specific_heat_capacity: {unit: J/kg/°C}
+  medium_properties.*.absorption_coeff: {unit: dB/(cm·MHz^y)}
 
 deprecated:
   transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}

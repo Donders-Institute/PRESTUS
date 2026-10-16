@@ -98,6 +98,19 @@ classdef test_stage_drivers < matlab.unittest.TestCase
             tc.verifyEqual(d2(f(1), f(2), f(3)) / d1(f(1), f(2), f(3)), 4, 'RelTol', 1e-3);
         end
 
+        function test_thermal_absorption_coeff_matches_fraction(tc)
+            % absorption_coeff = a * alpha_coeff (same power law) heats like absorption_fraction = a
+            p = stage_params(tc.Dir);
+            [kgrid, med, masks] = brain_medium(p);
+            p.medium_properties.brain.absorption_fraction = 0.5;
+            p.medium_properties.brain.absorption_coeff = 0.5 * p.medium_properties.brain.alpha_coeff;
+            [~, ~, r_frac] = run_thermal(p, gaussian_p(p, 1e6), kgrid, med, masks);
+            p.thermal.absorption_model = 'coefficient';
+            [~, ~, r_coeff] = run_thermal(p, gaussian_p(p, 1e6), kgrid, med, masks);
+            tc.verifyGreaterThan(max(r_frac.maxT(:)) - 37, 1e-3);
+            tc.verifyEqual(r_coeff.maxT, r_frac.maxT, 'AbsTol', 1e-9);
+        end
+
     end
 
     % ------------------------------------------------------------------ %
@@ -369,7 +382,9 @@ end
 function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks)
     [~, plus] = medium_setup(p, masks, struct());
     kwave_medium.temp_0 = plus.temp_0;
-    kwave_medium.absorption_fraction = plus.absorption_fraction;
+    for f = intersect(fieldnames(plus), {'absorption_fraction', 'absorption_np'})'
+        kwave_medium.(f{1}) = plus.(f{1});
+    end
     sensor = struct('mask', ones(p.grid.dims));
     source = struct('Q', zeros(p.grid.dims));
     [~, obj, tss, res] = evalc_out(@() thermal_simulation(p, struct('p_max_all', pr), kgrid, ...

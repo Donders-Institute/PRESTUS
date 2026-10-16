@@ -480,6 +480,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `cem43_iso_increment`                   | ISO thermal-dose (CEM43) increment for one time step |
+| `thermal_absorption_model`              | Resolve how acoustic heat deposition is specified |
 | `thermal_analysis`                      | Analyze output of thermal simulations |
 | `thermal_grid_setup`                    | Build an independent k-Wave grid for thermal simulation |
 | `thermal_parameters`                    | Checks and converts protocol timing setup for thermal estimation |

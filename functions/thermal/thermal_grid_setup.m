@@ -23,7 +23,7 @@ function [kgrid_th, kwave_medium_th, medium_masks_th, parameters_th, transf_th] 
 %   kwave_medium - struct with 3-D field arrays on the acoustic grid
 %                  (sound_speed, density, alpha_coeff, alpha_power,
 %                   thermal_conductivity, specific_heat, perfusion_coeff,
-%                   absorption_fraction, temp_0)
+%                   absorption_fraction or absorption_np, temp_0)
 %   medium_masks - 3-D integer label map on the acoustic grid
 %   trans_pos    - [1x3] transducer position in acoustic grid voxels
 %   focus_pos    - [1x3] focus position in acoustic grid voxels

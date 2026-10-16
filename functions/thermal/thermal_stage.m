@@ -128,7 +128,11 @@ if run_new_sim
     end
 
     kwave_medium.temp_0              = medium_plus.temp_0;
-    kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
+    if isfield(medium_plus, 'absorption_np')
+        kwave_medium.absorption_np = medium_plus.absorption_np;
+    else
+        kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
+    end
 
     use_babelbrain_acoustic = isfield(parameters, 'acoustic_backend') && ...
         strcmpi(parameters.acoustic_backend, 'babelbrain');

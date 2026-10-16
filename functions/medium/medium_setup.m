@@ -34,8 +34,11 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 %                  alpha_coeff [dB/(MHz cm)], alpha_power,
 %                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
 %                  perfusion_coeff [1/s]
-%                  (absorption_fraction and temp_0 are returned in medium_plus)
-%   medium_plus  - struct with fields: absorption_fraction, temp_0 [°C]
+%                  (the absorption map and temp_0 are returned in medium_plus)
+%   medium_plus  - struct with fields: temp_0 [°C] and, depending on
+%                  THERMAL_ABSORPTION_MODEL, either absorption_fraction [0-1]
+%                  ('fraction') or absorption_np [Np/m] at the source
+%                  frequency ('coefficient')
 %                  (kept separate because k-Wave rejects these fields in
 %                  kwave_medium during acoustic simulation)
 %
@@ -65,7 +68,18 @@ end
     specific_heat = empty_grid;
     perfusion = empty_grid;
     absorption_fraction = ones(parameters.grid.dims); % default: convert 100% of attenuation into absorption
+    absorption_coeff = empty_grid; % [dB/(cm MHz^y)], used when thermal.absorption_model = 'coefficient'
     temp_0 = empty_grid;
+
+    % heat deposition: absorption fraction or absorption coefficient (one per run)
+    [absorption_model, absorption_forced] = thermal_absorption_model(parameters);
+    if absorption_forced
+        warn('medium_setup:absorptionModelForced', ...
+            ['thermal.absorption_model = ''coefficient'' is not supported with pseudo-CT attenuation ' ...
+             'mapping (pct.mapping_attenuation = ''%s''); using absorption_fraction instead.'], ...
+            char(parameters.pct.mapping_attenuation));
+    end
+    use_absorption_coeff = strcmp(absorption_model, 'coefficient');
 
     % Get layer and medium labels
     layer_labels = fieldnames(parameters.layers);
@@ -89,8 +103,10 @@ end
                 perfusion(skull_idx) = medium.(label_name).perfusion;
             end
 
-            % set skull absorption fraction
-            if isfield(medium.(label_name), 'absorption_fraction')
+            % set skull absorption fraction / coefficient
+            if use_absorption_coeff
+                absorption_coeff(skull_idx) = get_absorption_coeff(medium, label_name);
+            elseif isfield(medium.(label_name), 'absorption_fraction')
                 absorption_fraction(skull_idx) = medium.(label_name).absorption_fraction;
             end
 
@@ -210,7 +226,9 @@ end
             if isfield(medium.(label_name), 'perfusion')
                 perfusion(medium_masks==medium_i) = medium.(label_name).perfusion;
             end
-            if isfield(medium.(label_name), 'absorption_fraction')
+            if use_absorption_coeff
+                absorption_coeff(medium_masks==medium_i) = get_absorption_coeff(medium, label_name);
+            elseif isfield(medium.(label_name), 'absorption_fraction')
                 absorption_fraction(medium_masks==medium_i) = medium.(label_name).absorption_fraction;
             end
             if isfield(parameters.thermal.temp_0, label_name)
@@ -221,6 +239,20 @@ end
 
     % convert perfusion rate [mL/min/kg] into perfusion coefficient [1/s]
     perfusion_coeff = (perfusion ./ 60) .* density * 1e-6;
+
+    % convert the absorption coefficient into [Np/m] at the source frequency,
+    % using each tissue's attenuation power law (absorption_power = alpha_power)
+    if use_absorption_coeff
+        f_mhz = parameters.transducer(1).freq_hz / 1e6;
+        absorption_np = absorption_coeff .* f_mhz.^alpha_power * 100 / (20*log10(exp(1)));
+        attenuation_np = alpha_coeff .* f_mhz.^alpha_power * 100 / (20*log10(exp(1)));
+        if any(absorption_np(:) > attenuation_np(:) * (1 + 1e-9))
+            warn('medium_setup:absorptionExceedsAttenuation', ...
+                'absorption_coeff exceeds alpha_coeff in %d voxels; heating then exceeds the attenuated power.', ...
+                nnz(absorption_np > attenuation_np * (1 + 1e-9)));
+        end
+        clear absorption_coeff attenuation_np f_mhz
+    end
 
     %% account for k-Wave's actual attenuation behaviour
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
@@ -308,7 +340,11 @@ end
         thermal_conductivity = smooth_img(thermal_conductivity, fwhm_mm, grid_mm, 0, smooth_method);
         specific_heat = smooth_img(specific_heat, fwhm_mm, grid_mm, 0, smooth_method);
         perfusion_coeff = smooth_img(perfusion_coeff, fwhm_mm, grid_mm, 0, smooth_method);
-        absorption_fraction = smooth_img(absorption_fraction, fwhm_mm, grid_mm, 0, smooth_method);
+        if use_absorption_coeff
+            absorption_np = smooth_img(absorption_np, fwhm_mm, grid_mm, 0, smooth_method);
+        else
+            absorption_fraction = smooth_img(absorption_fraction, fwhm_mm, grid_mm, 0, smooth_method);
+        end
         temp_0 = smooth_img(temp_0, fwhm_mm, grid_mm, 0, smooth_method);
     
         % [DEBUG] Plot unsmoothed and smoothed density
@@ -343,7 +379,6 @@ end
                           'thermal_conductivity', thermal_conductivity,...
                           'specific_heat', specific_heat,...
                           'perfusion_coeff', perfusion_coeff,...
-                          'absorption_fraction', absorption_fraction,...
                           'temp_0', temp_0);
     
     fprintf('[medium_setup] ---- medium summary ----\n');
@@ -352,6 +387,11 @@ end
     fprintf('[medium_setup] sound_speed      : %.1f – %.1f m/s\n', min(sound_speed(:), [], 'omitnan'), max(sound_speed(:), [], 'omitnan'));
     fprintf('[medium_setup] density          : %.1f – %.1f kg/m3\n', min(density(:), [], 'omitnan'), max(density(:), [], 'omitnan'));
     fprintf('[medium_setup] alpha_coeff      : %.4f – %.4f\n', min(alpha_coeff_fixed(:), [], 'omitnan'), max(alpha_coeff_fixed(:), [], 'omitnan'));
+    if use_absorption_coeff
+        fprintf('[medium_setup] Absorption       : coefficient (%.4g – %.4g Np/m)\n', min(absorption_np(:), [], 'omitnan'), max(absorption_np(:), [], 'omitnan'));
+    else
+        fprintf('[medium_setup] Absorption       : fraction (%.3g – %.3g)\n', min(absorption_fraction(:), [], 'omitnan'), max(absorption_fraction(:), [], 'omitnan'));
+    end
     if parameters.pct.enabled == 1
         pct_d = 'none'; pct_s = 'none'; pct_a = 'none';
         if isfield(parameters.pct, 'mapping_density'),     pct_d = char(parameters.pct.mapping_density);     end
@@ -399,7 +439,11 @@ end
             filename_perfusion = fullfile(parameters.io.dir_debug_medium,'matrix_perfusion');
             niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
             filename_absorption = fullfile(parameters.io.dir_debug_medium,'matrix_absorption');
-            niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
+            if use_absorption_coeff
+                niftiwrite(absorption_np, [filename_absorption '_np'], 'Compressed',true); pause(0.1);
+            else
+                niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
+            end
         catch
             warn('medium_setup:debugNifti', ...
                 'Error saving debug grid matrices — may result from concurrent write attempts.');
@@ -413,10 +457,24 @@ end
     end
 
     %% Split fields incompatible with k-Wave acoustic validation
-    medium_plus.temp_0              = kwave_medium.temp_0;
-    medium_plus.absorption_fraction = kwave_medium.absorption_fraction;
-    kwave_medium = rmfield(kwave_medium, {'temp_0', 'absorption_fraction'});
+    medium_plus.temp_0 = kwave_medium.temp_0;
+    if use_absorption_coeff
+        medium_plus.absorption_np = absorption_np;
+    else
+        medium_plus.absorption_fraction = absorption_fraction;
+    end
+    kwave_medium = rmfield(kwave_medium, 'temp_0');
 
+end
+
+function a = get_absorption_coeff(medium, label_name)
+% absorption_coeff of one tissue; required when thermal.absorption_model = 'coefficient'
+    if ~isfield(medium.(label_name), 'absorption_coeff') || isempty(medium.(label_name).absorption_coeff)
+        error('medium_setup:missingAbsorptionCoeff', ...
+            ['thermal.absorption_model = ''coefficient'' needs medium_properties.%s.absorption_coeff ' ...
+             '[dB/(cm MHz^y)].'], label_name);
+    end
+    a = medium.(label_name).absorption_coeff;
 end
 
 function s = local_distribution_stats(x)

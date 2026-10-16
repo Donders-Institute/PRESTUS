@@ -46,13 +46,18 @@ function sig = cache_signature(parameters, kind)
             sig.grid = drop_acoustic_fov(sig.grid);
         case 'medium'
             sig.grid = drop_acoustic_fov(sig.grid);
-            sig.medium_properties = get_field(parameters, {'medium_properties'});
+            % absorption_coeff only enters the medium with thermal.absorption_model = 'coefficient'
+            use_coeff = strcmp(thermal_absorption_model(parameters), 'coefficient');
+            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), use_coeff);
+            if use_coeff
+                sig.absorption_model = 'coefficient';
+            end
         case 'acoustic'
             % A pressure map reused by a later run (path.acoustic_input): its
             % grid and medium, but not the thermal-only grid settings, so the
             % thermal stage can be re-run on another grid.
             sig.subject_id = get_field(parameters, {'subject_id'});
-            sig.medium_properties = get_field(parameters, {'medium_properties'});
+            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), false);
             if isstruct(sig.grid)
                 g = fieldnames(sig.grid);
                 sig.grid = rmfield(sig.grid, g(startsWith(g, 'thermal_')));
@@ -98,6 +103,18 @@ function v = get_field(s, path)
         s = s(1).(path{i});
     end
     v = s;
+end
+
+function mp = drop_absorption_coeff(mp, keep)
+% absorption_coeff is thermal-only and unused with thermal.absorption_model = 'fraction'
+    if keep || ~isstruct(mp)
+        return
+    end
+    for t = fieldnames(mp)'
+        if isstruct(mp.(t{1})) && isfield(mp.(t{1}), 'absorption_coeff')
+            mp.(t{1}) = rmfield(mp.(t{1}), 'absorption_coeff');
+        end
+    end
 end
 
 function g = drop_acoustic_fov(g)

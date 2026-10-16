@@ -22,6 +22,7 @@ medium_properties:
     specific_heat_capacity: 3696  # J/(kg·K) — upper bound
     perfusion: 809                # mL/min/kg — upper bound (more cooling)
     absorption_fraction: 1.0      # fraction of attenuation converted to heat
+    absorption_coeff: 0.36        # dB/(cm·MHz) — absorption_fraction x alpha_coeff (thermal.absorption_model: coefficient)
 
   skull:
     sound_speed: 2257             # m/s   — lower bound (less impedance mismatch → more transmission)
@@ -32,6 +33,7 @@ medium_properties:
     specific_heat_capacity: 2626  # J/(kg·K) — upper bound
     perfusion: 30                 # mL/min/kg — upper bound
     absorption_fraction: 0.16     # fraction of attenuation converted to heat (BabelBrain default)
+    absorption_coeff: 1.104       # dB/(cm·MHz) — absorption_fraction x alpha_coeff (thermal.absorption_model: coefficient)
 
   skull_trabecular:
     sound_speed: 2257             # m/s   — lower bound (less impedance mismatch → more transmission)
@@ -42,6 +44,7 @@ medium_properties:
     specific_heat_capacity: 2626  # J/(kg·K) — upper bound
     perfusion: 30                 # mL/min/kg — upper bound
     absorption_fraction: 0.16     # fraction of attenuation converted to heat (BabelBrain default)
+    absorption_coeff: 1.104       # dB/(cm·MHz) — absorption_fraction x alpha_coeff (thermal.absorption_model: coefficient)
 
   skull_cortical:
     sound_speed: 2257             # m/s   — lower bound (less impedance mismatch → more transmission)
@@ -52,3 +55,4 @@ medium_properties:
     specific_heat_capacity: 2626  # J/(kg·K) — upper bound
     perfusion: 30                 # mL/min/kg — upper bound
     absorption_fraction: 0.16     # fraction of attenuation converted to heat (BabelBrain default)
+    absorption_coeff: 1.104       # dB/(cm·MHz) — absorption_fraction x alpha_coeff (thermal.absorption_model: coefficient)

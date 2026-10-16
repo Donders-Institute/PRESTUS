@@ -47,8 +47,9 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 %   kwave_medium - struct with fields: alpha_coeff, alpha_power,
 %                  density [kg/m^3], sound_speed [m/s],
 %                  thermal_conductivity [W/(m K)], specific_heat [J/(kg K)],
-%                  perfusion_coeff [1/s], absorption_fraction, temp_0 [°C];
-%                  temp_0 and absorption_fraction are the medium_plus fields
+%                  perfusion_coeff [1/s], absorption_fraction or absorption_np
+%                  [Np/m], temp_0 [°C]; temp_0 and the absorption map are the
+%                  medium_plus fields
 %                  reintegrated by the caller before this function is invoked.
 %                  When using an independent thermal grid, pass the
 %                  kwave_medium_th returned by thermal_grid_setup.
@@ -143,13 +144,18 @@ end
 
 % Expand thermal-only fields from 2D axisymmetric to 3D when needed.
 % acoustic_wrapper already expanded the acoustic fields (sound_speed, density,
-% etc.); temp_0 and absorption_fraction were stored separately in medium_plus
+% etc.); temp_0 and the absorption map were stored separately in medium_plus
 % and were not expanded at that point.
+if isfield(kwave_medium, 'absorption_np')
+    absorption_field = 'absorption_np';         % thermal.absorption_model = 'coefficient'
+else
+    absorption_field = 'absorption_fraction';   % thermal.absorption_model = 'fraction'
+end
 if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
     Nlateral  = parameters.grid.axisym_bilateral_dims(2);
     ax_center = parameters.transducer(1).trans_pos_bilateral(2);
-    kwave_medium.temp_0              = radialExpand2DTo3D(kwave_medium.temp_0,              'linear',  Nlateral, ax_center);
-    kwave_medium.absorption_fraction = radialExpand2DTo3D(kwave_medium.absorption_fraction, 'linear',  Nlateral, ax_center);
+    kwave_medium.temp_0 = radialExpand2DTo3D(kwave_medium.temp_0, 'linear', Nlateral, ax_center);
+    kwave_medium.(absorption_field) = radialExpand2DTo3D(kwave_medium.(absorption_field), 'linear', Nlateral, ax_center);
 end
 
 % Override initial temperature from a previous simulation's heatmap.
@@ -161,16 +167,21 @@ if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_h
         size(medium_masks), 'linear', parameters.thermal.temp_0.water));
 end
 
-% convert attenuation into absorption coefficients
-kwave_medium.alpha_coeff = ...
-    kwave_medium.alpha_coeff .* kwave_medium.absorption_fraction;
+if strcmp(absorption_field, 'absorption_np')
+    % absorption coefficient, already in nepers/m at the source frequency (medium_setup)
+    alpha_np = kwave_medium.absorption_np;
+else
+    % convert attenuation into absorption coefficients
+    kwave_medium.alpha_coeff = ...
+        kwave_medium.alpha_coeff .* kwave_medium.absorption_fraction;
 
-% convert the absorption coefficients to nepers/m (!)
-% see also fitPowerLawParamsMulti.m
-w = 2*pi*tr.freq_hz; % Frequency [rad/s]
-a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power); % [Nepers/((rad/s)^y m)]
-alpha_np = a0_np.*w.^kwave_medium.alpha_power;
-clear w a0_np;
+    % convert the absorption coefficients to nepers/m (!)
+    % see also fitPowerLawParamsMulti.m
+    w = 2*pi*tr.freq_hz; % Frequency [rad/s]
+    a0_np = db2neper(kwave_medium.alpha_coeff, kwave_medium.alpha_power); % [Nepers/((rad/s)^y m)]
+    alpha_np = a0_np.*w.^kwave_medium.alpha_power;
+    clear w a0_np;
+end
 
 % alternative simplified conversion dB to Nepers
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (tr.freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
@@ -207,7 +218,7 @@ clear alpha_np p;
 
 % remove unexpected fields from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');
-kwave_medium = rmfield(kwave_medium, 'absorption_fraction');
+kwave_medium = rmfield(kwave_medium, absorption_field);
 
 % if perfusion was specified, implement it by specifying blood temperature
 if ~all(isnan(kwave_medium.perfusion_coeff))

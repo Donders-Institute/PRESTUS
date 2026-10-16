@@ -304,7 +304,7 @@ PRESTUS reads the result with `read_babelbrain_thermal` and resamples it onto th
 ### Thermal tissue properties
 
 !!! warning "Known limitation: BabelBrain thermal uses its own tissue thermal properties"
-    `thermal_backend: babelbrain` ignores the thermal fields of PRESTUS `medium_properties` (`thermal_conductivity`, `specific_heat_capacity`, `perfusion`, `absorption_fraction`), including uncertainty-mode variants. BabelBrain has no input for them, so PRESTUS uses BabelBrain's values unchanged. The acoustic field amplitude is matched between the thermal backends; the tissue thermal properties are not. Use `thermal_backend: kwave` when PRESTUS thermal properties must apply.
+    `thermal_backend: babelbrain` ignores the thermal fields of PRESTUS `medium_properties` (`thermal_conductivity`, `specific_heat_capacity`, `perfusion`, `absorption_fraction`, `absorption_coeff`), including uncertainty-mode variants. BabelBrain has no input for them, so PRESTUS uses BabelBrain's values unchanged. The acoustic field amplitude is matched between the thermal backends; the tissue thermal properties are not. Use `thermal_backend: kwave` when PRESTUS thermal properties must apply.
 
 On the label-mask path BabelBrain uses this table (`CalculateTemperatureEffects.py`):
 

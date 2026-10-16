@@ -33,6 +33,7 @@ PROPERTIES = [
     ("specific_heat_capacity", "Specific heat", "J/kg/°C"),
     ("perfusion", "Perfusion", "mL/min/kg"),
     ("absorption_fraction", "Absorption fraction", ""),
+    ("absorption_coeff", "Absorption coefficient", "dB/(cm·MHz^y)"),
 ]
 PLOTTED = ("sound_speed", "density", "attenuation", "thermal_conductivity",
            "specific_heat_capacity", "perfusion", "absorption_fraction")

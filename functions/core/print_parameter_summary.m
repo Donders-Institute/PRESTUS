@@ -199,6 +199,10 @@ props = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
 labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz·cm)]', ...
           'Attn: Freq^Power [-]', 'Thermal Cond. [W/(m·K)]', 'Heat Cap. [J/(kg·K)]', ...
           'Perfusion [1/s]', 'Absorption Fraction [-]'};
+if strcmp(thermal_absorption_model(parameters), 'coefficient')
+    props{end} = 'absorption_coeff';
+    labels{end} = 'Absorption (1 MHz) [dB/(MHz·cm)]';
+end
 
 for t_idx = 1:length(tissues)
     tissue = tissues{t_idx};
@@ -412,6 +416,8 @@ elseif contains(prop, 'perfusion')
     unit = 'mL/min/kg';
 elseif contains(prop, 'absorption_fraction')
     unit = '[0-1]';
+elseif contains(prop, 'absorption_coeff')
+    unit = 'dB/cm/MHz';
 else
     unit = 'N/A';
 end

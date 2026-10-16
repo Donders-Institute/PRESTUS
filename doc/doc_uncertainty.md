@@ -43,6 +43,7 @@ The following table summarises the default, liberal, and conservative medium aco
 | Specific heat | 3583 | 3630 | 3696 | J/(kg·K) |
 | Perfusion | 196 | 559 | 809 | mL/min/kg |
 | Absorption fraction | 0.80 | 1.00 | 1.00 | — |
+| Absorption coeff. | 0.752 | 0.59 | 0.36 | dB/(cm·MHz<sup>y</sup>) |
 
 ### Skull
 
@@ -56,6 +57,7 @@ The following table summarises the default, liberal, and conservative medium aco
 | Specific heat | 1313 | 1793 | 2626 | J/(kg·K) |
 | Perfusion | 10 | 20 | 30 | mL/min/kg |
 | Absorption fraction | 1.00 | 0.28 | 0.16 | — |
+| Absorption coeff. | 24.4 | 3.78 | 1.104 | dB/(cm·MHz) |
 
 > **Rationale for skull properties.** The conservative variant uses high attenuation and high acoustic impedance (high density × sound speed), which reflects a denser, more calcified skull: more acoustic energy is lost before reaching the brain, so intracranial intensity is lower. Conversely, the liberal variant uses a skull with low impedance and low attenuation, which allows more energy through to the brain. The absorption fraction modulates how much of the attenuated energy is converted to heat: a lower fraction means less skull heating per unit attenuation. In practice, the liberal variant thus produces higher intracranial intensity *and* allows more limited skull heating estimates relative to the default.
 
