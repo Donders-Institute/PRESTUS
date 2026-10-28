@@ -111,6 +111,8 @@ fields:
   hpc.name: {choices: [default, snellius]}
   hpc.memorylimit: {unit: GB}
   hpc.ld_library_path: {kind: path}
+  # Scheduler settings mean nothing when the pipeline runs in this MATLAB session
+  hpc.*: {visible_if: {key: platform, not_in: [matlab]}}
   snellius: {visible_if: {key: hpc.name, in: [snellius]}}
 
   analysis.focus_area_radius: {unit: mm}

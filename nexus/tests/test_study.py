@@ -8,7 +8,8 @@ import pytest
 
 from prestus_nexus import launcher
 from prestus_nexus.model import ConfigModel
-from prestus_nexus.study import Manifest, from_neuronav_summary, resolve_manifest, sanitize_affix
+from prestus_nexus.study import (Manifest, from_neuronav_summary, parse_subject_ids, resolve_manifest,
+                                 sanitize_affix)
 
 
 def test_manifest_roundtrip_tsv_and_csv(tmp_path):
@@ -22,6 +23,15 @@ def test_manifest_roundtrip_tsv_and_csv(tmp_path):
         assert back.rows[0]["analysis.target_mni_mm"] == "[-38, -20, 60]"
         assert back.rows[1]["analysis.target_mni_mm"] == ""
     assert "# " not in (tmp_path / "s.tsv").read_text()
+
+
+def test_parse_subject_ids():
+    assert parse_subject_ids("1-3, 7 sub-020") == ["1", "2", "3", "7", "sub-020"]
+    assert parse_subject_ids("008-010;3 3") == ["008", "009", "010", "3"]
+    assert parse_subject_ids("  ") == []
+    for bad in ("5-2", "abc", "1-x"):
+        with pytest.raises(ValueError):
+            parse_subject_ids(bad)
 
 
 def test_manifest_comments_and_key_columns(tmp_path):
@@ -141,6 +151,34 @@ def test_study_page_edit_save_and_dry_run(schema, prestus_root, tmp_path):
     loop.exec()
     assert results == [("Study dry run", True)]
     assert "prestus_study_start" in (tmp_path / "args.txt").read_text()
+
+
+def test_study_page_empty_state_add_subjects_default_save(schema, prestus_root, tmp_path):
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication
+
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import STUDY, MainWindow
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    m = ConfigModel(schema)
+    m.save(tmp_path / "config_e.yaml")
+    window = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    page = window.show_special(STUDY)
+    page.refresh()
+    assert page.stack.is_empty() and page.summary.text() == ""
+    page.add_subjects("1-3")
+    assert not page.stack.is_empty()
+    assert [r["subject_id"] for r in page.manifest.rows] == ["1", "2", "3"]
+    assert "subject_id" in page.table.horizontalHeaderItem(0).toolTip()
+    # no table file yet: saved as <config>_runs.tsv next to the config, rows kept
+    saved = page.save_manifest()
+    assert saved == tmp_path / "config_e_runs.tsv"
+    assert window.model.get("study.manifest") == "config_e_runs.tsv"
+    assert len(Manifest.load(saved).rows) == 3
+    # pointing at a new file keeps the rows instead of clearing the table
+    page.path.setText("other.tsv")
+    page._path_edited()
+    assert len(page.manifest.rows) == 3
 
 
 MATLAB = launcher.find_matlab()

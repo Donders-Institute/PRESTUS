@@ -149,6 +149,28 @@ class Manifest:
         return sorted(ids)
 
 
+def parse_subject_ids(text: str) -> list[str]:
+    """Subject IDs from '1-12, 15 sub-020' (ranges, commas or spaces); zero padding kept.
+
+    Raises ValueError naming the first token that is not an ID or a range."""
+    ids: list[str] = []
+    for token in re.split(r"[,;\s]+", text.strip()):
+        if not token:
+            continue
+        rng = re.fullmatch(r"(?:sub-)?(\d+)-(?:sub-)?(\d+)", token)
+        if rng:
+            a, b = rng.groups()
+            if int(b) < int(a):
+                raise ValueError(f"'{token}': the range runs backwards")
+            width = len(a) if a.startswith("0") else 0
+            ids += [str(i).zfill(width) for i in range(int(a), int(b) + 1)]
+        elif _SUBJ_RE.match(token):
+            ids.append(token)
+        else:
+            raise ValueError(f"'{token}' is not a subject ID (use 3, 003, sub-003 or 1-12)")
+    return list(dict.fromkeys(ids))
+
+
 def sanitize_affix(label: str) -> str:
     """Python twin of sanitize_output_affix.m: '_desc-<label>', a leading 'desc-' not repeated."""
     if not label or not isinstance(label, str):

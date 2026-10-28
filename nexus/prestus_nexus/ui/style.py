@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPalette, QPixmap
+from PyQt6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter, QPainterPath, QPalette, QPixmap
 from PyQt6.QtWidgets import QApplication
 
 from ..paths import package_dir
@@ -23,7 +23,7 @@ C = {
     "ink": "#10161d", "ink2": "#3d4956", "ink3": "#6b7886", "ink4": "#9aa7b4",
     "line": "#dde3ea", "line2": "#cdd6df",
     "accent": "#1f6fb2", "accent_soft": "#e7f1f9", "thermal": "#d9482a", "thermal_soft": "#fceee9",
-    "brand": "#097b9a", "brand_soft": "#e2f0f3",
+    "brand": "#097b9a", "brand_soft": "#e2f0f3", "on_brand": "#ffffff",
     "green": "#1f9d57", "amber": "#d98a1f", "red": "#d63b3b", "info": "#2f7fd1",
 }
 
@@ -34,7 +34,7 @@ C_DARK = {
     "ink": "#e8edf2", "ink2": "#c2cbd4", "ink3": "#8fa0ac", "ink4": "#647680",
     "line": "#39424a", "line2": "#49535c",
     "accent": "#5aa8e6", "accent_soft": "#1d3040", "thermal": "#e8815e", "thermal_soft": "#3a2820",
-    "brand": "#2bb6d6", "brand_soft": "#173239",
+    "brand": "#2bb6d6", "brand_soft": "#173239", "on_brand": "#06222a",   # dark text: white on this teal is ~2.3:1
     "green": "#3fcb7c", "amber": "#e3a63e", "red": "#e2685f", "info": "#5b9fe6",
 }
 
@@ -44,6 +44,12 @@ _dark = False
 def active() -> dict:
     """The palette currently applied to everything except the header bar."""
     return C_DARK if _dark else C
+
+
+def mono_font() -> QFont:
+    """The platform's fixed-width font (Menlo, Consolas, DejaVu Sans Mono, …), so code and
+    logs look native on macOS, Windows and Linux alike."""
+    return QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
 
 
 def is_dark() -> bool:
@@ -140,8 +146,10 @@ QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {{ border: 1px solid {c['
 QLineEdit:disabled {{ background: {c['surface3']}; color: {c['ink3']}; }}
 QPushButton {{ background: {c['surface']}; border: 1px solid {c['line2']}; border-radius: 5px; padding: 5px 12px; }}
 QPushButton:hover {{ border-color: {c['brand']}; }}
-QPushButton[primary="true"] {{ background: {c['brand']}; color: white; border-color: {c['brand']}; font-weight: 600; }}
+QPushButton[primary="true"] {{ background: {c['brand']}; color: {c['on_brand']}; border-color: {c['brand']}; font-weight: 600; }}
+QPushButton[primary="true"]:disabled {{ background: {c['surface3']}; color: {c['ink4']}; border-color: {c['line2']}; }}
 QPushButton:disabled {{ color: {c['ink4']}; }}
+QPushButton[compact="true"] {{ padding: 2px 0; min-width: 28px; }}
 QToolButton {{ border: none; padding: 2px 4px; border-radius: 5px; }}
 QToolButton:hover {{ background: {c['surface3']}; }}
 QCheckBox {{ spacing: 6px; }}

@@ -197,6 +197,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - `neuronav_gui`: stand-alone Localite ingest GUI with series QC, batch window and MNI view of batch targets
 - `calibration_gui` and the Nexus Calibration page expose every calibration fit option and save how an entry was fitted (`meta.fit`)
 - Nexus: tissue-property card is read-only until unlocked; with uncertainty on, a card lists and plots the three variants' properties
+- Nexus: a Start tab sets up a first simulation in four steps (T1, transducer, MNI target, run); pages without their inputs say what is missing; the Issues list opens from the header (View ▸ Issues…, Ctrl+Shift+I)
 - Nexus: with `placement.mode: plantus`, the Placement card runs only the PlanTUS placement, choosing the position in Workbench or automatically, and opens the result in the Viewer
 - Fixed (`prestus_gui`): NaN placeholders wrote `0` into `grid.source_ppw`; 2D phantom coordinates; thermal timing state on config load
 

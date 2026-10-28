@@ -7,14 +7,14 @@ import shutil
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QColor, QFont, QKeySequence
-from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDockWidget, QFileDialog, QFrame, QHBoxLayout,
+from PyQt6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
                              QLabel, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
-                             QSplitter, QTabWidget, QToolButton, QTreeWidget, QTreeWidgetItem,
+                             QSplitter, QTabWidget, QTreeWidget, QTreeWidgetItem,
                              QVBoxLayout, QWidget)
 
 from .. import checks
-from ..model import TX, ConfigModel, iter_leaves
+from ..model import TX, ConfigModel, is_empty, iter_leaves
 from ..paths import DEFAULT_NAME, base_default_for, toolbox_default
 from ..project_defaults import carry_pinned_values, replace_project_default
 from ..schema import GENERAL, Schema
@@ -31,12 +31,25 @@ RESULTS = "__results__"
 PCT = "__pct__"
 CALIBRATION = "__calibration__"
 LOCALITE = "__localite__"
-SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE)
+START = "__start__"
+SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE, START)
 SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE)
 LEVEL_ICON = {"error": "✗", "warning": "⚠", "info": "ℹ"}
 LEVEL_COLOR_KEY = {"error": "red", "warning": "amber", "info": "info"}
-ISSUE_DOCK_COLLAPSED_HEIGHT = 32
 _OPEN_WINDOWS: list = []          # keeps windows opened from File > New / Open alive
+
+
+def _dot_icon(colour: str, size: int = 10) -> QIcon:
+    """A filled dot, for status on tabs (the tab style sheet would override a text colour)."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setBrush(QColor(colour))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.drawEllipse(0, 0, size, size)
+    p.end()
+    return QIcon(pix)
 
 
 def study_header(path: Path) -> str:
@@ -58,8 +71,7 @@ class ReviewPage(QWidget):
         self.info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         v.addWidget(self.info)
         self.text = QPlainTextEdit(readOnly=True)
-        mono = QFont("Menlo")
-        mono.setStyleHint(QFont.StyleHint.Monospace)
+        mono = style.mono_font()
         self.text.setFont(mono)
         v.addWidget(self.text, 1)
         row = QHBoxLayout()
@@ -89,7 +101,7 @@ class ReviewPage(QWidget):
                f"{m.schema.project_path}<br>" if m.schema.project_path is not None
                else f"<b>Merged onto:</b> {m.schema.default_path}<br>") +
             f"<b>{m.modified_count()}</b> value(s) differ from the defaults · "
-            f"{n_err} error(s), {n_warn} warning(s) — see the Issues panel.")
+            f"{n_err} error(s), {n_warn} warning(s) — see Issues in the header.")
 
 
 class TabPage(QWidget):
@@ -269,25 +281,13 @@ class MainWindow(QMainWindow):
         cv.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
-        self.issue_tree = QTreeWidget()
-        self.issue_tree.setHeaderLabels(["", "Setting", "Problem"])
-        self.issue_tree.setRootIsDecorated(False)
-        self.issue_tree.setColumnWidth(0, 28)
-        self.issue_tree.setColumnWidth(1, 300)
-        self.issue_tree.itemActivated.connect(self._goto_issue)
-        self.issue_tree.itemClicked.connect(self._goto_issue)
-        self.issue_dock = QDockWidget(self)
-        self.issue_dock.setWidget(self.issue_tree)
-        self.issue_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
-        self.issue_dock.setTitleBarWidget(self._issue_title_bar())
-        self._issue_collapsed = False
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.issue_dock)
-        self.resizeDocks([self.issue_dock], [130], Qt.Orientation.Vertical)
+        self.issue_popup = self._issue_popup()
 
         self._build_menu()
         self._build_view_menu()
         self._build_tools_menu()
         self._build_tabs()
+        self._refresh_cal_cov()
         if hasattr(self, "io_preview"):
             self.io_preview.refresh()
         self.tabs.currentChanged.connect(self._tab_changed)
@@ -320,8 +320,9 @@ class MainWindow(QMainWindow):
         texts.addWidget(self.header_file)
         h.addLayout(texts)
         h.addStretch(1)
-        self.header_issues = QLabel()
-        self.header_issues.setObjectName("HeaderSub")
+        self.header_issues = QPushButton()
+        self.header_issues.setToolTip("Show the issues (Ctrl+Shift+I)")
+        self.header_issues.clicked.connect(self.show_issues)
         h.addWidget(self.header_issues)
         open_btn = QPushButton("Open…")
         open_btn.setToolTip("Open a study config (File ▸ Open…)")
@@ -333,36 +334,47 @@ class MainWindow(QMainWindow):
         h.addWidget(save)
         return bar
 
-    def _issue_title_bar(self) -> QWidget:
-        """Custom dock title bar: a collapse arrow, 'Issues', and the live counts, so the
-        panel can be tucked away without losing sight of whether there is anything to fix."""
-        bar = QWidget()
-        h = QHBoxLayout(bar)
-        h.setContentsMargins(8, 2, 8, 2)
-        self.issue_toggle = QToolButton()
-        self.issue_toggle.setArrowType(Qt.ArrowType.DownArrow)
-        self.issue_toggle.setAutoRaise(True)
-        self.issue_toggle.setToolTip("Collapse / expand")
-        self.issue_toggle.clicked.connect(self._toggle_issues)
-        h.addWidget(self.issue_toggle)
-        title = QLabel("Issues")
-        title.setStyleSheet("font-weight: 600;")
-        h.addWidget(title)
+    def _issue_popup(self) -> QFrame:
+        """The issues list, opened from the header counts. A popup rather than a dock: it
+        takes no room until asked for and opens at a size set by the window, not by
+        whatever space the tabs leave over. Clicking outside or Esc closes it."""
+        popup = QFrame(self, Qt.WindowType.Popup)
+        popup.setFrameShape(QFrame.Shape.StyledPanel)
+        v = QVBoxLayout(popup)
+        v.setContentsMargins(8, 8, 8, 8)
         self.issue_counts_lbl = QLabel()
-        h.addWidget(self.issue_counts_lbl)
-        h.addStretch(1)
-        return bar
+        v.addWidget(self.issue_counts_lbl)
+        self.issue_tree = QTreeWidget()
+        self.issue_tree.setHeaderLabels(["", "Setting", "Problem"])
+        self.issue_tree.setRootIsDecorated(False)
+        self.issue_tree.setWordWrap(True)
+        self.issue_tree.setColumnWidth(0, 28)
+        self.issue_tree.setColumnWidth(1, 300)
+        self.issue_tree.itemActivated.connect(self._goto_issue)
+        self.issue_tree.itemClicked.connect(self._goto_issue)
+        v.addWidget(self.issue_tree, 1)
+        hint = QLabel("Click an issue to open its field.")
+        hint.setObjectName("HeaderSub")
+        v.addWidget(hint)
+        return popup
 
-    def _toggle_issues(self) -> None:
-        self._issue_collapsed = not self._issue_collapsed
-        self.issue_tree.setVisible(not self._issue_collapsed)
-        self.issue_toggle.setArrowType(
-            Qt.ArrowType.RightArrow if self._issue_collapsed else Qt.ArrowType.DownArrow)
-        if self._issue_collapsed:
-            self.issue_dock.setMaximumHeight(ISSUE_DOCK_COLLAPSED_HEIGHT)
-        else:
-            self.issue_dock.setMaximumHeight(16777215)
-            self.resizeDocks([self.issue_dock], [180], Qt.Orientation.Vertical)
+    def show_issues(self) -> None:
+        """Open the issues popup under the header counts, right-aligned with them, at up
+        to 70 % of the window width and 60 % of its height (less if the list is short)."""
+        self._refresh_issues()
+        rows = max(self.issue_tree.topLevelItemCount(), 1)
+        row_h = max(self.issue_tree.sizeHintForRow(0), self.fontMetrics().height() + 6)
+        want_h = 90 + rows * row_h
+        w = max(min(int(self.width() * 0.7), 1100), 560)
+        h = max(min(want_h, int(self.height() * 0.6)), 200)
+        self.issue_popup.resize(w, h)
+        anchor = self.header_issues.mapToGlobal(self.header_issues.rect().bottomRight())
+        screen = self.screen().availableGeometry()
+        x = max(min(anchor.x() - w, screen.right() - w), screen.left())
+        y = min(anchor.y() + 4, screen.bottom() - h)
+        self.issue_popup.move(x, y)
+        self.issue_popup.show()
+        self.issue_tree.setFocus()
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
@@ -407,6 +419,10 @@ class MainWindow(QMainWindow):
         self.dark_mode_action.setChecked(style.is_dark())
         self.dark_mode_action.toggled.connect(self._set_dark_mode)
         view.addAction(self.dark_mode_action)
+        issues = QAction("Issues…", self)
+        issues.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        issues.triggered.connect(self.show_issues)
+        view.addAction(issues)
 
     def _set_dark_mode(self, dark: bool) -> None:
         style.apply(QApplication.instance(), self.prestus_root, dark=dark)
@@ -423,6 +439,12 @@ class MainWindow(QMainWindow):
 
     def _build_tabs(self) -> None:
         schema = self.model.schema
+        from .start_page import StartPage
+        start = StartPage(self)
+        start.goto_tab.connect(self._start_goto)
+        self.pages[START] = start
+        self.tabs.addTab(start, "Start")
+        self.tabs.setTabToolTip(0, "A first simulation in four steps; everything else keeps its default")
         for spec in self._tab_specs():
             tab = TabPage(self, spec)
             key = spec["key"]
@@ -478,6 +500,7 @@ class MainWindow(QMainWindow):
                 from .placement_viewer import PlacementPage
                 viewer = PlacementPage(self.model)
                 viewer.changed.connect(self._changed)
+                viewer.navigate.connect(self.goto)          # empty state: 'Set T1 image…' etc.
                 self.pages[VIEWER] = viewer
                 self._section_tab[VIEWER] = key
                 tab.set_full_tab(viewer, "Viewer")
@@ -598,7 +621,23 @@ class MainWindow(QMainWindow):
     def _page(self, key: str) -> QWidget:
         return self.pages[key]
 
+    def _start_goto(self, key: str) -> None:
+        if key == "run":
+            self.show_special(RUN)
+        else:
+            self._select_tab(key)
+
+    def on_model_edited(self) -> None:
+        """A page outside the form tabs (Start) changed the model: mark it modified and
+        check it now rather than after the debounce, so the page's status follows at once."""
+        self._changed()
+        self._issue_timer.stop()
+        self._refresh_issues()
+
     def _tab_changed(self, _index: int) -> None:
+        if self.tabs.currentWidget() is self.pages.get(START):
+            self.pages[START].refresh()
+            return
         tab = self.tabs.currentWidget()
         if isinstance(tab, TabPage):
             tab.refresh()
@@ -676,8 +715,12 @@ class MainWindow(QMainWindow):
 
     def _goto_issue(self, item: QTreeWidgetItem, _col: int = 0) -> None:
         issue = item.data(0, Qt.ItemDataRole.UserRole)
-        if issue is None:
-            return
+        if issue is not None:
+            self.goto_issue(issue)
+
+    def goto_issue(self, issue) -> None:
+        """Open the field (or the placement viewer) an issue points to."""
+        self.issue_popup.hide()
         if issue.path == QC_PATH:
             self.show_special(VIEWER).show_transducer(issue.transducer or 0)
         else:
@@ -702,7 +745,24 @@ class MainWindow(QMainWindow):
                 continue
             n = sum(self._section_count(p.section) for p in tab.sections)
             label = next((t.get("label", t["key"]) for t in self._tab_specs() if t["key"] == tab.key), tab.key)
-            self.tabs.setTabText(i, f"{label}  ● {n}" if n else label)
+            # The tab shows what needs attention (errors, else warnings) as a coloured dot and
+            # count; the number of changed values, which needs none, moves to the tooltip.
+            mine = [iss for iss in self.issues if self._issue_tab(iss) == tab.key]
+            n_err = sum(1 for iss in mine if iss.level == "error")
+            n_warn = sum(1 for iss in mine if iss.level == "warning")
+            level, count = ("red", n_err) if n_err else ("amber", n_warn) if n_warn else (None, 0)
+            self.tabs.setTabText(i, f"{label}  {count}" if count else label)
+            self.tabs.setTabIcon(i, _dot_icon(style.active()[level]) if level else QIcon())
+            tip = [f"{n_err} error(s), {n_warn} warning(s)" if n_err or n_warn else "No problems found"]
+            if n:
+                tip.append(f"{n} value(s) changed from the defaults")
+            self.tabs.setTabToolTip(i, " · ".join(tip))
+
+    def _issue_tab(self, issue) -> str | None:
+        """Key of the tab that holds the field an issue points to."""
+        if issue.path == QC_PATH:
+            return self._section_tab.get(VIEWER)
+        return self._section_tab.get(self.display_section(issue.path))
 
     def _changed(self) -> None:
         self.dirty = True
@@ -739,15 +799,19 @@ class MainWindow(QMainWindow):
             self.issue_tree.addTopLevelItem(item)
         n_err = sum(1 for i in self.issues if i.level == "error")
         n_warn = sum(1 for i in self.issues if i.level == "warning")
-        colour = style.C["red"] if n_err else style.C["amber"] if n_warn else style.C["green"]
-        self.header_issues.setText(f"<span style='color:{colour}'>●</span> {n_err} error(s) · {n_warn} warning(s)")
-        dock_colour = palette["red"] if n_err else palette["amber"] if n_warn else palette["green"]
+        counts = f"{n_err} error(s) · {n_warn} warning(s)"
+        level = "red" if n_err else "amber" if n_warn else "green"
+        self.header_issues.setText(f"●  {counts}  ▾")       # QPushButton text is plain, not rich text
+        self.header_issues.setStyleSheet(f"QPushButton {{ color: {style.C[level]}; font-weight: 600; }}")
         self.issue_counts_lbl.setText(
-            f"<span style='color:{dock_colour}'>●</span> {n_err} error(s) · {n_warn} warning(s)")
+            f"<b>Issues</b>  <span style='color:{palette[level]}'>●</span> {counts}")
         self._update_tab_counts()
         review = self.pages.get(REVIEW)
         if review is not None and review.isVisible():
             review.refresh()
+        start = self.pages.get(START)
+        if start is not None and self.tabs.currentWidget() is start:
+            start.refresh()
 
     def _update_title(self) -> None:
         name = self.model.path.name if self.model.path else "untitled"

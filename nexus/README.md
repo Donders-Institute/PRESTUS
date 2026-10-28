@@ -31,7 +31,8 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 
 1. **Study config.** Opens the given config, or an untitled one. *File ▸ New study…* creates a config and can copy `config_default.yaml` into the study folder, as `prestus_config_init` does (this fixes the defaults the study is merged onto). *Open…* / *Open recent* switch configs. The subject inputs are on the Setup tab; the Issues panel checks them as you type (the T1 pattern must resolve with MATLAB's `sprintf` and glob semantics, and `m2m_sub-XXX` must exist or SimNIBS must be available to run charm).
 2. **Tabs and sections.**
-   - Six tabs (Setup, Transducer, Placement, Simulation, Study, Run) hold one card per config section; `overlay.yaml` (`tabs`, `display`) assigns sections to tabs and gives fields readable labels, advanced flags and a home section. Advanced settings stay hidden until a card's *+ n advanced* button or the tab's *Show advanced options* is used.
+   - *Start* sets up a first run in four steps (T1 image, transducer, MNI target, run); everything else keeps its default. It derives `path.anat`, `t1_pattern`, `subject_id`, the T2, `path.seg` and a results folder from the chosen T1 (`quickstart.py`).
+   - Seven tabs (Setup, Transducer, Placement, Simulation, Study, Run, Results) hold one card per config section; `overlay.yaml` (`tabs`, `display`) assigns sections to tabs and gives fields readable labels, advanced flags and a home section. Advanced settings stay hidden until a card's *+ n advanced* button or the tab's *Show advanced options* is used.
    - *Tune for* (shared by all tabs) shows and marks the keys tagged with a goal (speed, accuracy, memory, disk space) in `overlay.yaml` (`tune_goals`, `tuning`), advanced ones included.
    - Changed values are marked ●, each field has a reset button, and hovering a field (or **?**) shows its help text, taken from the comments in `config_default.yaml`, with its key and default.
    - Mode-specific fields appear only when they apply, e.g. `placement.localite.*` only for `placement.mode: localite`.
@@ -39,6 +40,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 3. **Transducers.** The transducer section can hold several transducers. As in PRESTUS, transducer 2 and later inherit every value set on transducer 1 unless they override it.
 4. **Issues panel.**
    - Lists problems PRESTUS would otherwise report only at load or run time: wrong types, unknown values, unknown or misspelt keys (with suggestions), deprecated keys, backend combinations, frequency mismatches between transducers, and missing inputs.
+   - Closed by default: the header shows the error and warning counts; clicking them (or *View ▸ Issues…*, Ctrl+Shift+I) opens the list as a popup.
    - Clicking an issue jumps to the field.
 5. **Review & save.** Shows the exact YAML that will be written and which `config_default.yaml` it is merged onto.
 
@@ -61,12 +63,13 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `merge.py` | `mergestruct` semantics, shared by the schema (toolbox + project defaults) and the model. |
 | `project_defaults.py` | Refreshing a project's `config_default.yaml` copy (*Tools ▸ Update project defaults…*). |
 | `outputs.py` | Where the pipeline writes per-subject outputs; the placement record (`sub-XXX_placement<affix>.json`). |
-| `ui/` | PyQt6 main window (tabs), section forms, transducer panel and cross-section, placement viewer, timing diagram, study manifest and Localite import, run page, Calibration page (`calibration_page.py`), Localite page with batch and MNI dialogs (`localite_page.py`), MATLAB session status (`matlab_status.py`), style. |
+| `ui/` | PyQt6 main window (tabs), section forms, transducer panel and cross-section, placement viewer, timing diagram, study manifest and Localite import, run page, Start tab (`start_page.py`), Calibration page (`calibration_page.py`) and its library plots (`calibration_plots.py`), empty-state panels (`empty_state.py`), Localite page with batch and MNI dialogs (`localite_page.py`), MATLAB session status (`matlab_status.py`), style. |
 | `timing.py` | Protocol maths and the TUS calculator settings exchange. |
 | `study.py`, `neuronav_import.py` | Study manifest model; manifest rows from the Localite ingestion outputs. |
 | `bridge.py` | The MATLAB session for interactive steps: file protocol (`BridgeClient`), the Qt client (`MatlabBridge`, one per app), JSON helpers. MATLAB side: `functions/gui/nexus_bridge.m`. |
 | `calibration.py`, `localite.py` | Calibration and Localite page logic without Qt: depth lists, the study's focal depths, `meta.fit` ↔ fit settings; raw-root resolution, settings snapshot, target map. |
 | `labels.py` | Readable field labels. |
+| `quickstart.py` | Start tab logic without Qt: config keys from one T1 file (pattern, subject, T2, segmentation folder), default results folder, SimNIBS discovery on macOS/Windows/Linux. |
 
 ### YAML compatibility with MATLAB
 

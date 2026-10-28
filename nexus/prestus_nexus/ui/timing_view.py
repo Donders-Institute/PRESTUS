@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFileDialog, 
                              QMessageBox, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from .. import timing as tm
-from .style import C
+from . import style
 
 
 def _fmt_s(v: float) -> str:
@@ -58,17 +58,17 @@ class TimingDiagram(QWidget):
         return 0.5 * (1 - math.cos(math.pi * x)) if p.ramp_shape == "tukey" else x
 
     def _arrow(self, qp: QPainter, x0: float, x1: float, y: float, text: str) -> None:
-        qp.setPen(QPen(QColor(C["ink3"]), 1))
+        qp.setPen(QPen(QColor(style.active()["ink3"]), 1))
         qp.drawLine(QPointF(x0, y), QPointF(x1, y))
         for x, d in ((x0, 1), (x1, -1)):
             qp.drawLine(QPointF(x, y), QPointF(x + 5 * d, y - 3))
             qp.drawLine(QPointF(x, y), QPointF(x + 5 * d, y + 3))
-        qp.setPen(QColor(C["ink2"]))
+        qp.setPen(QColor(style.active()["ink2"]))
         w = max(60.0, x1 - x0)
         qp.drawText(QRectF((x0 + x1) / 2 - w / 2, y + 2, w, 16), Qt.AlignmentFlag.AlignHCenter, text)
 
     def _lane_frame(self, qp: QPainter, top: float, title: str) -> tuple[float, float, float, float]:
-        qp.setPen(QColor(C["ink2"]))
+        qp.setPen(QColor(style.active()["ink2"]))
         f = qp.font()
         f.setBold(True)
         qp.setFont(f)
@@ -77,26 +77,26 @@ class TimingDiagram(QWidget):
         qp.setFont(f)
         x0, x1 = 128.0, self.width() - 16.0
         y_base, y_top = top + 40, top + 12
-        qp.setPen(QPen(QColor(C["line2"]), 1))
+        qp.setPen(QPen(QColor(style.active()["line2"]), 1))
         qp.drawLine(QPointF(x0, y_base), QPointF(x1, y_base))
         return x0, x1, y_base, y_top
 
     def paintEvent(self, _event) -> None:  # noqa: N802 (Qt API)
         qp = QPainter(self)
         qp.setRenderHint(QPainter.RenderHint.Antialiasing)
-        qp.fillRect(self.rect(), QColor(C["surface"]))
+        qp.fillRect(self.rect(), QColor(style.active()["surface"]))
         f = QFont(qp.font())
         f.setPointSizeF(max(8.0, f.pointSizeF() - 1))
         qp.setFont(f)
         p = self.p
         if not p.has_pulse:
-            qp.setPen(QColor(C["ink3"]))
+            qp.setPen(QColor(style.active()["ink3"]))
             qp.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
                         "Set the pulse duration (and train settings) to see the protocol.")
             return
         top = 6.0
-        acc = QColor(C["accent"])
-        soft = QColor(C["accent_soft"])
+        acc = QColor(style.active()["accent"])
+        soft = QColor(style.active()["accent_soft"])
 
         # Lane 1: one pulse inside one PRI
         x0, x1, yb, yt = self._lane_frame(qp, top, "Pulse")
@@ -113,7 +113,7 @@ class TimingDiagram(QWidget):
         qp.drawPath(path)
         self._arrow(qp, x0, x0 + p.pd * sx, yb + 8, f"PD {_fmt_s(p.pd)}")
         if p.ramp > 0:
-            qp.setPen(QColor(C["ink3"]))
+            qp.setPen(QColor(style.active()["ink3"]))
             qp.drawText(QRectF(x0 + p.pd * sx + 8, yt + 2, 320, 14), Qt.AlignmentFlag.AlignLeft,
                         f"{p.ramp_shape} ramp {_fmt_s(p.ramp)} (Ipa = {p.ramp_factor:.3f} × Itp)")
         if p.has_train:
@@ -137,7 +137,7 @@ class TimingDiagram(QWidget):
                 qp.fillRect(QRectF(x0, yt, p.ptd * sx, yb - yt), soft)
                 qp.setPen(QPen(acc, 1))
                 qp.drawRect(QRectF(x0, yt, p.ptd * sx, yb - yt))
-                qp.setPen(QColor(C["ink2"]))
+                qp.setPen(QColor(style.active()["ink2"]))
                 qp.drawText(QRectF(x0, yt, p.ptd * sx, yb - yt), Qt.AlignmentFlag.AlignCenter,
                             f"{npulse} pulses")
             self._arrow(qp, x0, x0 + p.ptd * sx, yb + 8, f"PTD {_fmt_s(p.ptd)}  ·  {npulse} pulses")
@@ -150,10 +150,13 @@ class TimingDiagram(QWidget):
         if p.has_repetition:
             x0, x1, yb, yt = self._lane_frame(qp, top, "Repetitions")
             sx = (x1 - x0) / p.ptrd
-            qp.setPen(Qt.PenStyle.NoPen)
-            qp.setBrush(QColor(C["thermal"]))
+            # Each train as the pulse-train block above (soft fill, accent edge): the same
+            # quantity at a coarser scale, not a warning.
             for k in range(p.trains):
-                qp.drawRect(QRectF(x0 + k * p.ptri * sx, yt, max(1.0, p.ptd * sx), yb - yt))
+                r = QRectF(x0 + k * p.ptri * sx, yt, max(1.0, p.ptd * sx), yb - yt)
+                qp.fillRect(r, QColor(style.active()["accent_soft"]))
+                qp.setPen(QPen(QColor(style.active()["accent"]), 1))
+                qp.drawRect(r)
             self._arrow(qp, x0, x1, yb + 8, f"PTRD {_fmt_s(p.ptrd)}  ·  {p.trains} trains")
         qp.end()
 
@@ -202,7 +205,7 @@ class TimingPanel(QWidget):
         if p.has_pulse:
             parts.append(f"On-time {_fmt_s(p.sonication_time_s)} of {_fmt_s(p.total_duration_s)} "
                          f"(overall duty cycle {100 * p.overall_duty_cycle:.3g} %)")
-        parts += [f"<span style='color:{C['red']}'>{m}</span>" for m in p.problems()]
+        parts += [f"<span style='color:{style.active()['red']}'>{m}</span>" for m in p.problems()]
         self.summary.setText(" · ".join(parts[:1]) + ("<br>" + "<br>".join(parts[1:]) if len(parts) > 1 else ""))
 
     # ── TUS calculator ──────────────────────────────────────────────────

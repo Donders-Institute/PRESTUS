@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLineEdit,
-                             QToolButton, QWidget)
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
+                             QToolButton, QVBoxLayout, QWidget)
 
 from .. import yamlio
 from ..checks import check_value
 from ..model import is_empty
 from ..schema import Node
+from . import style
 
 TRISTATE = [("auto (~)", None), ("true", True), ("false", False)]
 
@@ -86,7 +87,7 @@ class TextEditor(FieldEditor):
         self.set_error(None)
 
     def set_error(self, message: str | None) -> None:
-        self.edit.setStyleSheet("QLineEdit { border: 1px solid #d9534f; }" if message else "")
+        self.edit.setStyleSheet(f"QLineEdit {{ border: 1px solid {style.active()['red']}; }}" if message else "")
         self.edit.setToolTip(message or "")
 
     def parse(self, text: str) -> Any:
@@ -147,7 +148,15 @@ class ChoiceEditor(FieldEditor):
     def __init__(self, node: Node, parent: QWidget | None = None):
         super().__init__(node, parent)
         self.combo = QComboBox()
-        self._layout.addWidget(self.combo, 1)
+        box = QVBoxLayout()
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(2)
+        box.addWidget(self.combo)
+        self.note = QLabel()            # why the selected choice cannot run yet (set_item_status)
+        self.note.setWordWrap(True)
+        self.note.setVisible(False)
+        box.addWidget(self.note)
+        self._layout.addLayout(box, 1)
         self._items: list[Any] = []
         self._setting = False
         self.combo.currentIndexChanged.connect(self._changed)
@@ -199,6 +208,14 @@ class ChoiceEditor(FieldEditor):
                 label += "  (needs setup)"
             item.setText(label)
             item.setToolTip(st.reason or "All inputs found")
+        st = status.get(current) if isinstance(current, str) else None
+        if st is not None and st.state != "ready" and st.reason:
+            colour = style.active()["red" if st.state == "unavailable" else "amber"]
+            what = "Cannot run yet" if st.state == "unavailable" else "Still to set up"
+            self.note.setText(f"<span style='color:{colour}'>{what}:</span> {st.reason}")
+            self.note.setVisible(True)
+        else:
+            self.note.setVisible(False)
 
 
 class CheckEditor(FieldEditor):

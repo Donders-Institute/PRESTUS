@@ -7,14 +7,17 @@ from pathlib import Path
 
 import numpy as np
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout,
-                             QLabel, QMessageBox, QPushButton, QRadioButton, QSlider, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
+                             QHBoxLayout, QLabel, QMenu, QMessageBox, QPushButton, QSlider,
+                             QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
 from .. import checks, neuronav_import as ni, paths, placement as pl
 from ..heuristic_import import candidates as heuristic_candidates, selected as heuristic_selected
 from ..model import TX, ConfigModel, Issue, is_empty
 from ..outputs import dir_placement_run, placement_record
+from . import style
+from .empty_state import EmptyStack
 
 try:        # matplotlib is optional: the page explains what is missing
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -23,6 +26,11 @@ try:        # matplotlib is optional: the page explains what is missing
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
     HAVE_MPL = False
+
+
+def _ok_colour(ok: bool) -> str:
+    """Palette green / red for a check in the info panel (follows dark mode)."""
+    return style.active()["green" if ok else "red"]
 
 
 QC_PATH = "placement viewer"     # Issue.path of the viewer's checks (MainWindow opens the viewer)
@@ -41,6 +49,7 @@ _OVERHEAD_FRAC = 0.12          # approx. fraction of row height spent on title/a
 
 class PlacementPage(QWidget):
     changed = pyqtSignal()
+    navigate = pyqtSignal(str)        # config key to show (MainWindow.goto), from the empty state
 
     def __init__(self, model: ConfigModel, parent: QWidget | None = None):
         super().__init__(parent)
@@ -54,88 +63,153 @@ class PlacementPage(QWidget):
         self.direction: np.ndarray | None = None     # focus -> transducer, when no transducer yet
         self._slice_ratio: float | None = None       # ideal slice-row height per pixel of width
 
+        self._t1_error = ""                          # why the T1 could not be read, if so
+
         v = QVBoxLayout(self)
         title = QLabel("Placement viewer")
         title.setObjectName("CardTitle")
         v.addWidget(title)
+        content = QWidget()
+        cv = QVBoxLayout(content)
+        cv.setContentsMargins(0, 0, 0, 0)
+        self._content = content
+        self.stack = EmptyStack(content)
+        v.addWidget(self.stack, 1)
+
+        # One status banner (info / warning / error) instead of lines of mixed colours;
+        # 'Switch to manual placement' sits in it because it only applies to what it says.
+        self.banner_box = QFrame()
+        self.banner_box.setObjectName("ViewerBanner")
+        bb = QHBoxLayout(self.banner_box)
+        bb.setContentsMargins(10, 6, 6, 6)
         self.banner = QLabel()
         self.banner.setWordWrap(True)
-        v.addWidget(self.banner)
+        self.banner.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        bb.addWidget(self.banner, 1)
+        self.use_manual = QPushButton("Switch to m&anual placement")
+        self.use_manual.setToolTip("Set placement.mode to manual, so clicks and the Place actions "
+                                   "write the positions to the study config.")
+        self.use_manual.clicked.connect(self._use_manual)
+        bb.addWidget(self.use_manual, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.banner_box.hide()
+        cv.addWidget(self.banner_box)
 
         bar = QHBoxLayout()
+        bar.setSpacing(6)
         self.tx_combo = QComboBox()
+        self.tx_combo.setToolTip("The transducer that clicks and the Place actions edit")
         self.tx_combo.currentIndexChanged.connect(self._select_transducer)
-        bar.addWidget(QLabel("Transducer"))
         bar.addWidget(self.tx_combo)
         self.tx_add = QPushButton("+")
-        self.tx_add.setToolTip("Add a transducer")
-        self.tx_add.setMaximumWidth(28)
+        self.tx_add.setToolTip("Add a transducer to this study")
         self.tx_add.clicked.connect(self._add_transducer)
-        bar.addWidget(self.tx_add)
         self.tx_remove = QPushButton("−")
-        self.tx_remove.setToolTip("Remove this transducer")
-        self.tx_remove.setMaximumWidth(28)
+        self.tx_remove.setToolTip("Remove the selected transducer from this study")
         self.tx_remove.clicked.connect(self._remove_transducer)
-        bar.addWidget(self.tx_remove)
-        self.rb_focus = QRadioButton("Click sets focus")
-        self.rb_trans = QRadioButton("Click sets transducer")
-        self.rb_browse = QRadioButton("Click to browse")
-        self.rb_browse.setToolTip("Left-click just moves the crosshair, like scrolling; "
-                                  "nothing is written to the study config")
-        self.rb_focus.setChecked(True)
-        grp = QButtonGroup(self)
-        for rb in (self.rb_focus, self.rb_trans, self.rb_browse):
-            grp.addButton(rb)
-            bar.addWidget(rb)
-        bar.addStretch(1)
-        self.use_manual = QPushButton("Switch to manual placement")
-        self.use_manual.clicked.connect(self._use_manual)
-        bar.addWidget(self.use_manual)
-        v.addLayout(bar)
+        for b in (self.tx_add, self.tx_remove):
+            b.setProperty("compact", True)          # the app's 5px 12px padding clips a glyph
+            b.setStyleSheet("padding: 2px 0;")
+            b.setFixedWidth(30)
+            bar.addWidget(b)
+        bar.addSpacing(10)
 
-        tools = QHBoxLayout()
-        b_axis = QPushButton("Transducer at focal depth")
-        b_axis.setToolTip("Keep the beam direction; put the transducer where the focal depth setting "
-                          "lands on the target (bowl apex focal_distance_bowl from it)")
-        b_axis.clicked.connect(self._place_on_axis)
-        self.gap = QDoubleSpinBox(minimum=-20, maximum=50, value=5, singleStep=0.5, suffix=" mm")
-        self.gap.setToolTip("Distance between scalp and exit plane")
-        b_snap = QPushButton("Snap to scalp")
-        b_snap.setToolTip("Keep the beam direction; put the exit plane this far outside the scalp")
+        click = QLabel("Click sets")
+        click.setObjectName("CardSub")
+        bar.addWidget(click)
+        self.click_mode = QFrame()
+        self.click_mode.setObjectName("Segmented")
+        seg = QHBoxLayout(self.click_mode)
+        seg.setContentsMargins(2, 2, 2, 2)
+        seg.setSpacing(2)
+        self.rb_focus = QToolButton(text="F&ocus")
+        self.rb_focus.setToolTip("Left-click on a slice places the focus (the target) there")
+        self.rb_trans = QToolButton(text="T&ransducer")
+        self.rb_trans.setToolTip("Left-click on a slice places the transducer (bowl apex) there")
+        self.rb_browse = QToolButton(text="&Browse")
+        self.rb_browse.setToolTip("Left-click only moves the crosshair; nothing is written to the "
+                                  "study config")
+        self.click_group = QButtonGroup(self)
+        self.click_group.setExclusive(True)
+        for b in (self.rb_focus, self.rb_trans, self.rb_browse):
+            b.setCheckable(True)
+            b.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            self.click_group.addButton(b)
+            seg.addWidget(b)
+        self.rb_focus.setChecked(True)
+        bar.addWidget(self.click_mode)
+        bar.addSpacing(10)
+
+        b_snap = QPushButton("&Snap to scalp")
+        b_snap.setToolTip("Keep the beam direction and move the transducer so its exit plane sits "
+                          "the 'gap' distance (More menu) outside the scalp.")
         b_snap.clicked.connect(self._snap)
-        b_match = QPushButton("Set focal depth to target")
-        b_match.setToolTip("Set the focal depth setting (focal_distance_ep) to this placement's target "
-                           "depth (exit plane → target)")
+        b_match = QPushButton("Set focal &depth to target")
+        b_match.setToolTip("Set the focal depth setting (focal_distance_ep) to this placement's "
+                           "target depth, exit plane to target.")
         b_match.clicked.connect(self._match_focal_distance)
-        b_traj = QPushButton("Import trajectory…")
-        b_traj.setToolTip("Brainsight target export (NIfTI coordinates) or 3D Slicer transform")
-        b_traj.clicked.connect(self._import_trajectory)
-        b_centre = QPushButton("Centre on focus")
-        b_centre.clicked.connect(self._centre)
+        self.more_btn = QPushButton("&More ▾")
+        self.more_btn.setToolTip("Less common placement actions: import a trajectory, put the "
+                                 "transducer at the focal depth, scalp gap")
+        more = QMenu(self.more_btn)
+        a_traj = more.addAction("Import trajectory…")
+        a_traj.setToolTip("Read a Brainsight target export (NIfTI coordinates) or a 3D Slicer "
+                          "transform and place focus and transducer from it.")
+        a_traj.triggered.connect(self._import_trajectory)
+        a_axis = more.addAction("Transducer at focal depth")
+        a_axis.setToolTip("Keep the beam direction and put the transducer where the focal depth "
+                          "setting lands on the target.")
+        a_axis.triggered.connect(self._place_on_axis)
+        more.addSeparator()
+        self.gap = QDoubleSpinBox(minimum=-20, maximum=50, value=5, singleStep=0.5, suffix=" mm")
+        self.gap.setToolTip("Distance between scalp and exit plane that 'Snap to scalp' leaves")
+        more.addAction(self._menu_row("Scalp gap", self.gap, more))
+        more.setToolTipsVisible(True)
+        self.more_btn.clicked.connect(lambda: self._popup(more, self.more_btn))
+        self._more_menu = more
+        for w in (b_snap, b_match, self.more_btn):
+            bar.addWidget(w)
+        bar.addStretch(1)
+
+        self.view_btn = QPushButton("Vie&w ▾")
+        self.view_btn.setToolTip("Overlay opacity, acoustic field-of-view size and centring")
+        view = QMenu(self.view_btn)
+        b_centre = view.addAction("Centre on focus")
+        b_centre.setToolTip("Move the crosshair (and so the three slices) to the focus")
+        b_centre.triggered.connect(self._centre)
+        view.addSeparator()
         self.alpha = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=100, value=35)
-        self.alpha.setMaximumWidth(120)
+        self.alpha.setMinimumWidth(140)
+        self.alpha.setToolTip("Opacity of the tissue segmentation drawn over the T1")
         self.alpha.valueChanged.connect(self._draw)
+        view.addAction(self._menu_row("Tissue overlay", self.alpha, view))
         self.fov_diam = QDoubleSpinBox(minimum=0, maximum=300, value=0, singleStep=1, suffix=" mm")
         self.fov_diam.setSpecialValueText("auto")
         self.fov_diam.setToolTip("grid.acoustic_fov_diameter_mm — lateral width of the acoustic "
                                  "simulation crop, centred on the focus. 'auto' = outermost "
                                  "element diameter.")
         self.fov_diam.editingFinished.connect(self._fov_edited)
+        view.addAction(self._menu_row("Acoustic FOV ⌀", self.fov_diam, view))
         self.fov_len = QDoubleSpinBox(minimum=0, maximum=400, value=0, singleStep=1, suffix=" mm")
         self.fov_len.setSpecialValueText("auto")
         self.fov_len.setToolTip("grid.acoustic_fov_length_mm — axial length of the acoustic "
                                 "simulation crop, starting at the transducer. 'auto' = focal "
                                 "depth + grid.z_beyond_focus_mm.")
         self.fov_len.editingFinished.connect(self._fov_edited)
-        for w in (b_axis, QLabel("gap"), self.gap, b_snap, b_match, b_traj, b_centre,
-                  QLabel("overlay"), self.alpha, QLabel("FOV ⌀"), self.fov_diam,
-                  QLabel("len"), self.fov_len):
-            tools.addWidget(w)
-        tools.addStretch(1)
-        v.addLayout(tools)
+        view.addAction(self._menu_row("Acoustic FOV length", self.fov_len, view))
+        view.setToolTipsVisible(True)
+        self.view_btn.clicked.connect(lambda: self._popup(view, self.view_btn))
+        self._view_menu = view
+        bar.addWidget(self.view_btn)
+        self.coords_btn = QPushButton("&Coordinates…")
+        self.coords_btn.setCheckable(True)
+        self.coords_btn.setToolTip("Type RAS, voxel or MNI coordinates to go to or to set the "
+                                   "focus or transducer")
+        bar.addWidget(self.coords_btn)
+        cv.addLayout(bar)
 
-        coords = QHBoxLayout()
-        coords.addWidget(QLabel("Enter coordinates:"))
+        self.coords_row = QWidget()
+        coords = QHBoxLayout(self.coords_row)
+        coords.setContentsMargins(0, 0, 0, 0)
         self.coord_space = QComboBox()
         self.coord_space.addItem("RAS mm", "ras")
         self.coord_space.addItem("Voxel", "voxel")
@@ -157,17 +231,21 @@ class PlacementPage(QWidget):
         for label, spin in (("X", self.cx), ("Y", self.cy), ("Z", self.cz)):
             coords.addWidget(QLabel(label))
             coords.addWidget(spin)
-        b_goto = QPushButton("Go to")
-        b_goto.setToolTip("Move the crosshair here; writes nothing")
+        b_goto = QPushButton("&Go to")
+        b_goto.setToolTip("Move the crosshair to these coordinates; writes nothing")
         b_goto.clicked.connect(self._goto_coords)
         b_set_focus = QPushButton("Set focus")
+        b_set_focus.setToolTip("Write these coordinates as the focus of the selected transducer")
         b_set_focus.clicked.connect(lambda: self._set_coords("focus_pos"))
         b_set_trans = QPushButton("Set transducer")
+        b_set_trans.setToolTip("Write these coordinates as the transducer (bowl apex) position")
         b_set_trans.clicked.connect(lambda: self._set_coords("trans_pos"))
         for w in (b_goto, b_set_focus, b_set_trans):
             coords.addWidget(w)
         coords.addStretch(1)
-        v.addLayout(coords)
+        self.coords_row.setVisible(False)
+        self.coords_btn.toggled.connect(self.coords_row.setVisible)
+        cv.addWidget(self.coords_row)
 
         body = QHBoxLayout()
         if HAVE_MPL:
@@ -177,22 +255,92 @@ class PlacementPage(QWidget):
             self.canvas.mpl_connect("button_press_event", self._clicked)
             self.canvas.mpl_connect("scroll_event", self._scrolled)
             body.addWidget(self.canvas, 3)
-        else:
-            body.addWidget(QLabel("Install matplotlib and nibabel to use the viewer."), 3)
         self.info = QLabel()
         self.info.setWordWrap(True)
         self.info.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.info.setMinimumWidth(280)
         self.info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         body.addWidget(self.info, 1)
-        v.addLayout(body, 1)
+        cv.addLayout(body, 1)
         self._body = body
-        hint = QLabel("Click a slice to place the focus or transducer, or switch to 'Click to "
-                      "browse' to just move around; scroll to move through slices either way. "
-                      "Or type RAS, voxel or MNI coordinates above and use Go to / Set focus / "
-                      "Set transducer. Positions are written to the study config immediately.")
-        hint.setStyleSheet("color: gray;")
-        v.addWidget(hint)
+        hint = QLabel("Click a slice to set the chosen point (or just browse); scroll to step "
+                      "through slices. Positions are saved to the study config at once.")
+        hint.setObjectName("CardSub")
+        hint.setWordWrap(True)
+        cv.addWidget(hint)
+        self._restyle()
+
+    @staticmethod
+    def _menu_row(label: str, widget: QWidget, menu: QMenu) -> QWidgetAction:
+        """A labelled control inside a drop-down menu."""
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(12, 4, 12, 4)
+        text = QLabel(label)
+        text.setMinimumWidth(130)
+        h.addWidget(text)
+        h.addWidget(widget, 1)
+        act = QWidgetAction(menu)
+        act.setDefaultWidget(row)
+        return act
+
+    @staticmethod
+    def _popup(menu: QMenu, button: QWidget) -> None:
+        menu.popup(button.mapToGlobal(button.rect().bottomLeft()))
+
+    def _restyle(self) -> None:
+        """Palette-dependent looks (segmented click mode), re-applied on refresh so a theme
+        switch is followed."""
+        c = style.active()
+        self.click_mode.setStyleSheet(
+            f"QFrame#Segmented {{ background: {c['surface']}; border: 1px solid {c['line2']}; "
+            f"border-radius: 6px; }}"
+            f"QFrame#Segmented QToolButton {{ border: none; border-radius: 4px; padding: 3px 10px; "
+            f"color: {c['ink2']}; }}"
+            f"QFrame#Segmented QToolButton:hover {{ background: {c['surface3']}; }}"
+            f"QFrame#Segmented QToolButton:checked {{ background: {c['brand']}; color: white; "
+            f"font-weight: 600; }}")
+
+    def _set_banner(self, level: str, lines: list[str]) -> None:
+        """One compact banner: level 'info' | 'warning' | 'error' picks the palette colour."""
+        if not lines:
+            self.banner_box.hide()
+            return
+        c = style.active()
+        col = QColor(c[{"error": "red", "warning": "amber"}.get(level, "info")])
+        rgba = lambda a: f"rgba({col.red()}, {col.green()}, {col.blue()}, {a})"   # noqa: E731
+        self.banner_box.setStyleSheet(
+            f"QFrame#ViewerBanner {{ background: {rgba(0.10)}; border: 1px solid {rgba(0.45)}; "
+            f"border-left: 4px solid {col.name()}; border-radius: 6px; }}"
+            f"QFrame#ViewerBanner QLabel {{ color: {c['ink']}; background: transparent; }}")
+        self.banner.setText("<br>".join(lines))
+        self.banner_box.show()
+
+    def _show_empty(self) -> None:
+        """No T1 to draw on: one panel that says what is missing and opens that field."""
+        m = self.model
+        sid, anat = m.get("subject_id"), m.get("path.anat")
+        if not HAVE_MPL:
+            self.stack.show_empty("The viewer needs matplotlib and nibabel",
+                                  "Install them in the Nexus's Python environment and restart.")
+        elif not isinstance(sid, (int, float)) or isinstance(sid, bool):
+            self.stack.show_empty("No subject selected",
+                                  "The viewer shows one subject's T1 image; set subject_id first.",
+                                  "Set subject…", lambda: self.navigate.emit("subject_id"))
+        elif is_empty(anat):
+            self.stack.show_empty("No T1 image yet",
+                                  "The viewer draws the transducer and focus on the subject's T1 "
+                                  "image. Set the anatomy folder (path.anat) on Setup ▸ Paths.",
+                                  "Set T1 image…", lambda: self.navigate.emit("path.anat"))
+        elif self._t1_error:
+            self.stack.show_empty("Cannot read the T1 image", self._t1_error,
+                                  "Check T1 image…", lambda: self.navigate.emit("path.anat"))
+        else:
+            pattern = m.get("path.t1_pattern") or ""
+            self.stack.show_empty(f"No T1 image found for sub-{int(sid):03d}",
+                                  f"Nothing matches path.t1_pattern '{pattern}' in {anat}. "
+                                  "Check the anatomy folder and the file pattern.",
+                                  "Check T1 image…", lambda: self.navigate.emit("path.anat"))
 
     def resizeEvent(self, event) -> None:      # noqa: N802
         super().resizeEvent(event)
@@ -215,6 +363,7 @@ class PlacementPage(QWidget):
             return
         self._loaded_for = key
         self.t1 = self.seg = None
+        self._t1_error = ""
         if not isinstance(sid, (int, float)) or is_empty(anat):
             return
         t1 = pl.find_t1(anat, pattern or "", int(sid))
@@ -223,7 +372,7 @@ class PlacementPage(QWidget):
                 self.t1 = pl.Volume(t1)
                 self.cursor = self.t1.to_ras(np.array(self.t1.shape) / 2)[0]
             except Exception as exc:
-                self.banner.setText(f"<span style='color:#c9302c'>Cannot read {t1}: {exc}</span>")
+                self._t1_error = f"{t1}: {exc}"
         seg = pl.find_segmentation(seg_root, int(sid)) if not is_empty(seg_root) else None
         if seg is not None:
             try:
@@ -403,9 +552,16 @@ class PlacementPage(QWidget):
         self.tx_remove.setEnabled(self.model.n_transducers > 1)
         self._load_images()
 
+        self._restyle()
+        if self.t1 is None:
+            self._show_empty()
+            self._slice_ratio = None
+            return
+        self.stack.show_content()
         mode = self.model.get("placement.mode")
         msgs = []
-        self.use_manual.setVisible(mode != "manual")
+        level = "info"
+        self.use_manual.setVisible(mode not in ("manual", None, ""))
         if mode not in ("manual", None, ""):
             r_trans, r_focus = self.positions()
             if r_trans is not None or r_focus is not None:
@@ -413,6 +569,7 @@ class PlacementPage(QWidget):
                 msgs.append(f"placement.mode is <b>{mode}</b>: showing the position written by {source} "
                             "(read-only here — PRESTUS resolves it again at run time).")
             else:
+                level = "warning"
                 where = {"localite": "path.localite_post, placement.localite.session/.target",
                          "heuristic": "the heuristic placement run folder (tpars_*.csv)"
                          }.get(mode, "")
@@ -421,14 +578,13 @@ class PlacementPage(QWidget):
                             f"(checked {where}). Run the placement stage once "
                             "(e.g. with only modules.run_transducer_placement), or switch to manual placement.")
         if self._space() == "mni":
+            level = "warning"
             msgs.append("coordinate_space is <b>mni</b>: positions need SimNIBS to map to this "
                         "subject and are not shown. Use 'ras' or 'voxel' to place here.")
-        if self.t1 is None:
-            msgs.append("<span style='color:#c9302c'>No T1 image found. Set subject_id, "
-                        "path.anat and path.t1_pattern.</span>")
-        elif self.seg is None:
-            msgs.append("No segmentation (m2m_sub-XXX/final_tissues.nii.gz): no overlay, no scalp snapping.")
-        self.banner.setText("<br>".join(msgs))
+        if self.seg is None:
+            msgs.append("No segmentation (m2m_sub-XXX/final_tissues.nii.gz): no tissue overlay "
+                        "and no scalp snapping.")
+        self._set_banner(level, msgs)
         self.fov_diam.blockSignals(True)
         self.fov_len.blockSignals(True)
         self.fov_diam.setValue(self._mm_or(self.model.get("grid.acoustic_fov_diameter_mm")))
@@ -556,6 +712,7 @@ class PlacementPage(QWidget):
             self.canvas.setMaximumHeight(16_777_215)           # Qt's QWIDGETSIZE_MAX: no cap
             return
         self.layout().activate()                # make self._body.geometry() reflect this resize
+        self._content.layout().activate()
         avail = self._body.geometry().height() or self.canvas.height()
         ideal = self.canvas.width() * self._slice_ratio
         self.canvas.setMaximumHeight(max(50, round(min(ideal, avail))))
@@ -595,7 +752,7 @@ class PlacementPage(QWidget):
             line = f"<b>Target depth:</b> {ep:.2f} mm from the exit plane (bowl apex → target {dist:.2f} mm)"
             if exp is not None:
                 diff = dist - exp
-                colour = "#3c763d" if abs(diff) <= DEPTH_TOL_MM else "#c9302c"
+                colour = _ok_colour(abs(diff) <= DEPTH_TOL_MM)
                 where = (f"target {abs(diff):.2f} mm {'beyond' if diff > 0 else 'short of'} the focus"
                          if abs(diff) >= 0.005 else "on target")
                 line += (f"<br>Focal depth setting: {exp - bowl.offset:.2f} mm from the exit plane — "
@@ -604,15 +761,15 @@ class PlacementPage(QWidget):
             if dev is not None and dev.min_foc is not None and dev.max_foc is not None:
                 ok = dev.min_foc <= ep <= dev.max_foc
                 line += (f"<br>Device focal range {dev.min_foc:g}–{dev.max_foc:g} mm: "
-                         + ("<span style='color:#3c763d'>OK</span>" if ok
-                            else "<span style='color:#c9302c'>outside</span>"))
+                         + (f"<span style='color:{_ok_colour(True)}'>OK</span>" if ok
+                            else f"<span style='color:{_ok_colour(False)}'>outside</span>"))
             lines.append(line)
             if self.seg is not None and dist > 0:
                 exit_pt = trans + axis / dist * bowl.offset
                 scalp = pl.scalp_exit(self.seg, focus, trans - focus)
                 if scalp is not None:
                     gap = float(np.dot(exit_pt - scalp, (trans - focus) / dist))
-                    colour = "#3c763d" if gap >= 0 else "#c9302c"
+                    colour = _ok_colour(gap >= 0)
                     lines.append(f"<b>Exit plane vs scalp:</b> <span style='color:{colour}'>"
                                  f"{gap:+.1f} mm</span> ({'outside' if gap >= 0 else 'inside the head'})")
                 lines.append(self._beam_qc_text(trans, focus, bowl))
@@ -628,7 +785,7 @@ class PlacementPage(QWidget):
             freq_issue = any(i.where() == "transducer.freq_hz" for i in checks.rule_issues(self.model))
             line = f"<b>{self.model.n_transducers} transducers</b> · grid.mode: {mode}"
             if freq_issue:
-                line += " · <span style='color:#c9302c'>frequencies differ</span>"
+                line += f" · <span style='color:{_ok_colour(False)}'>frequencies differ</span>"
             lines.append(line)
         self.info.setText("<br><br>".join(lines))
 
@@ -712,7 +869,7 @@ class PlacementPage(QWidget):
         q = self._beam_qc(trans, focus, bowl)
 
         def c(text, bad=False, warn=False):
-            colour = "#c9302c" if bad else ("#b8860b" if warn else "#3c763d")
+            colour = style.active()["red" if bad else ("amber" if warn else "green")]
             return f"<span style='color:{colour}'>{text}</span>"
 
         inc = q["beam_skull_incidence_mean_deg"]

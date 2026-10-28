@@ -8,9 +8,9 @@ import html
 from pathlib import Path
 
 from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QTextCursor
+from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
+                             QMenu, QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
                              QVBoxLayout, QWidget)
 
 from .. import jobs as hpc_jobs
@@ -19,6 +19,7 @@ from .. import remote as rmt
 from ..model import ConfigModel
 from ..estimate import estimate
 from ..predict_outputs import predict, save_summary
+from . import style
 from .jobs_view import JobsView, JobsWindow
 
 
@@ -45,7 +46,7 @@ class RunPage(QWidget):
         intro.setWordWrap(True)
         v.addWidget(intro)
 
-        self.deploy_toggle = QCheckBox("Show deployment, save & resource details")
+        self.deploy_toggle = QCheckBox("Show deployment, save && resource details")
         self.deploy_toggle.setToolTip(
             "What prestus_pipeline_start would submit (single job, or one job per transducer/"
             "target/uncertainty variant) and what io.save_* keeps besides the CSV/report.")
@@ -54,8 +55,7 @@ class RunPage(QWidget):
         v.addWidget(self.deploy_toggle)
         self.deploy_text = QPlainTextEdit(readOnly=True)
         self.deploy_text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        deploy_mono = QFont("Menlo")
-        deploy_mono.setStyleHint(QFont.StyleHint.Monospace)
+        deploy_mono = style.mono_font()
         self.deploy_text.setFont(deploy_mono)
         self.deploy_text.setFixedHeight(180)
         self.deploy_text.setVisible(self.deploy_toggle.isChecked())
@@ -144,18 +144,32 @@ class RunPage(QWidget):
         self.b_stop.clicked.connect(self.stop)
         self.b_save_log = QPushButton("Save log…")
         self.b_save_log.clicked.connect(self._save_log)
-        for b in (self.b_write, self.b_validate, self.b_run, self.b_submit, self.b_stop):
+        # One primary action, chosen by 'Run on' (refresh); the other way to run, the launcher
+        # and the log export sit in 'More' so the row reads as: run · check · stop.
+        self.b_more = QToolButton(text="More ▾")
+        self.b_more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.b_more.setStyleSheet("QToolButton::menu-indicator { image: none; width: 0; }")
+        more = QMenu(self.b_more)
+        self.act_alt = more.addAction("Submit to cluster")
+        self.act_alt.triggered.connect(lambda: (self.submit if self.b_run.property("primary") else self.run)())
+        more.addSeparator()
+        more.addAction("Write launcher (run_<study>.m)", self.write_launcher)
+        more.addAction("Save log…", self._save_log)
+        self.b_more.setMenu(more)
+        for b in (self.b_run, self.b_submit, self.b_validate, self.b_stop):
             buttons.addWidget(b)
         buttons.addStretch(1)
-        buttons.addWidget(self.b_save_log)
+        buttons.addWidget(self.b_more)
+        for b in (self.b_write, self.b_save_log):    # reachable from 'More'; kept for scripting
+            b.setVisible(False)
+            buttons.addWidget(b)
         v.addLayout(buttons)
 
         self.status = QLabel()
         self.status.setWordWrap(True)
         v.addWidget(self.status)
         self.log = QTextEdit(readOnly=True)
-        mono = QFont("Menlo")
-        mono.setStyleHint(QFont.StyleHint.Monospace)
+        mono = style.mono_font()
         self.log.setFont(mono)
         v.addWidget(self.log, 1)
 
@@ -189,12 +203,34 @@ class RunPage(QWidget):
             b.setEnabled(not running)
         self.b_connect.setEnabled(not running and rmt.sharing_supported())
         self.b_stop.setEnabled(running)
+        self._arrange_run_buttons(running)
         if self._remote_on():
             self.b_submit.setToolTip("Runs PRESTUS on the SSH host, which submits with the config's "
                                      "hpc.* settings; the jobs are listed below.")
         if self.model.path is not None and not self.r_local.text():
             self._guess_mapping(self.model.path)
         self.update_deployment_summary()
+
+    def _cluster_first(self) -> bool:
+        """Whether 'Run on' sends this config to a scheduler (else it runs in MATLAB here)."""
+        platform = self.model.get("platform")
+        if platform in ("slurm", "qsub"):
+            return True
+        return platform == "auto" and (self.scheduler is not None or self._remote_on())
+
+    def _arrange_run_buttons(self, running: bool) -> None:
+        cluster = self._cluster_first()
+        primary, other = (self.b_submit, self.b_run) if cluster else (self.b_run, self.b_submit)
+        primary.setVisible(True)
+        other.setVisible(False)
+        for b, on in ((primary, True), (other, False)):
+            if b.property("primary") != on:
+                b.setProperty("primary", on)
+                b.style().unpolish(b)
+                b.style().polish(b)
+        self.act_alt.setText(other.text())
+        self.act_alt.setEnabled(other.isEnabled())
+        self.act_alt.setToolTip(other.toolTip())
 
     def update_deployment_summary(self) -> None:
         """Cheap — safe to call on every model edit, unlike refresh(). The only disk
@@ -298,9 +334,9 @@ class RunPage(QWidget):
         self._ok = not missing
         if missing:
             self._append(f"Not found on {found['host']}: {', '.join(missing)} "
-                         "(check the setup commands and the remote PRESTUS folder).", "#c9302c")
+                         "(check the setup commands and the remote PRESTUS folder).", style.active()["red"])
         else:
-            self._append(f"Ready to submit from {found['host']}.", "#3c763d")
+            self._append(f"Ready to submit from {found['host']}.", style.active()["green"])
 
     def _submit_remote(self) -> None:
         r = self._remote()
@@ -348,11 +384,11 @@ class RunPage(QWidget):
             c = colour
             if c is None:
                 if line.startswith(launcher.FAIL_SENTINEL) or "Error" in line[:12] or line.startswith("{Error"):
-                    c = "#c9302c"
+                    c = style.active()["red"]
                 elif "Warning" in line[:10] or line.startswith("[Warning"):
-                    c = "#b8860b"
+                    c = style.active()["amber"]
                 elif line.startswith(launcher.OK_SENTINEL):
-                    c = "#3c763d"
+                    c = style.active()["green"]
             if launcher.OK_SENTINEL in line:
                 self._ok = True
             safe = html.escape(line) or "&nbsp;"
@@ -387,7 +423,7 @@ class RunPage(QWidget):
 
     def _error(self, err) -> None:
         if err == QProcess.ProcessError.FailedToStart:
-            self._append(f"Could not start {self._program}", "#c9302c")
+            self._append(f"Could not start {self._program}", style.active()["red"])
             self._done(-1, None)
 
     def _done(self, code: int, _status) -> None:
@@ -402,14 +438,14 @@ class RunPage(QWidget):
         # "Permission denied" comes from the remote side (e.g. MATLAB's mkdir)
         if self._program == "ssh" and code != 0 and "Permission denied (" in self.log.toPlainText():
             self._append("Not logged in: click Connect… to log in with your password, "
-                         "or set up an SSH key.", "#b8860b")
+                         "or set up an SSH key.", style.active()["amber"])
         if self._program == "ssh" and "DISPLAY" in self.log.toPlainText():
             # site 'matlab' wrappers (e.g. Donders' module) refuse to start without X
             self._append("The host's 'matlab' is a wrapper that needs a display. Set Remote MATLAB "
                          "to the MATLAB binary itself (e.g. <matlabroot>/bin/matlab; on the host: "
-                         "module load matlab/<version>; type -a matlab).", "#b8860b")
+                         "module load matlab/<version>; type -a matlab).", style.active()["amber"])
         ok = code == 0 and self._ok
-        colour = "#3c763d" if ok else "#c9302c"
+        colour = style.active()["green"] if ok else style.active()["red"]
         self.status.setText(f"<b>{self.task}</b>: <span style='color:{colour}'>"
                             f"{'finished' if ok else f'failed (exit code {code})'}</span>")
         self.proc.deleteLater()
@@ -487,7 +523,7 @@ class RunPage(QWidget):
         known = {j.job_id for j in self.jobs}
         new = [j for j in hpc_jobs.parse_submissions(self.log.toPlainText()) if j.job_id not in known]
         if not new:
-            self._append("No submitted job was reported (see the log above).", "#b8860b")
+            self._append("No submitted job was reported (see the log above).", style.active()["amber"])
         elif self.job_remote is not None:
             self.job_kind = rmt.scheduler_from_log(self.log.toPlainText()) or "slurm"
         else:

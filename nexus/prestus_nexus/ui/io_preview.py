@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import os
 
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
 
 from ..model import ConfigModel, is_empty
 from ..paths import m2m_dir, matlab_sprintf
 from ..predict_outputs import predict
+from . import style
 
 _COMMON_NOTES = {
     "nii/": "property/acoustic/thermal maps (T1w + MNI)",
@@ -46,8 +46,7 @@ class IOPreviewPanel(QWidget):
         v.addWidget(sub)
         self.text = QPlainTextEdit(readOnly=True)
         self.text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        mono = QFont("Menlo")
-        mono.setStyleHint(QFont.StyleHint.Monospace)
+        mono = style.mono_font()
         self.text.setFont(mono)
         v.addWidget(self.text, 1)
 

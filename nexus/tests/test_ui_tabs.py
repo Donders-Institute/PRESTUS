@@ -37,7 +37,7 @@ def _row(page, path):
 
 def test_tabs_and_sections(window):
     keys = [window.tabs.widget(i).key for i in range(window.tabs.count())]
-    assert keys == ["setup", "transducer", "placement", "simulation", "study", "run", "results"]
+    assert keys == ["start", "setup", "transducer", "placement", "simulation", "study", "run", "results"]
     assert window._section_tab["timing"] == "simulation" and window._section_tab["study"] == "study"
     # platform is shown on the Run tab (HPC card), the backends on the Simulation tab
     assert any(r.node.path == "platform" for r in window.pages["hpc"].rows)

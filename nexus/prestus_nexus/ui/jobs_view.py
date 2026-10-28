@@ -11,12 +11,13 @@ from __future__ import annotations
 import html
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtGui import QBrush, QColor
 from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QLabel, QPlainTextEdit,
                              QPushButton, QSplitter, QTabWidget, QToolButton, QTreeWidget,
                              QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from .. import jobs as hpc_jobs
+from . import style
 
 JOB_COLUMNS = ["Job ID", "Name", "State", "Elapsed / limit", "Left", "Where", "Peak memory", "Exit"]
 LOG_TABS = (("output", "Output"), ("error", "Errors"), ("report", "Report"))
@@ -125,11 +126,11 @@ class JobsView(QWidget):
             item.setToolTip(5, j.work_dir and f"Logs in {j.work_dir}")
             if j.time_warning():
                 for col in (3, 4):
-                    item.setForeground(col, QBrush(QColor("#c9302c")))
+                    item.setForeground(col, QBrush(QColor(style.active()["red"])))
                 item.setToolTip(4, "Little time left: the job may be stopped (TIMEOUT). "
                                    "Raise hpc.timelimit for the next run.")
             if j.finished and not j.state.startswith("COMPLETED"):
-                item.setForeground(2, QBrush(QColor("#c9302c")))
+                item.setForeground(2, QBrush(QColor(style.active()["red"])))
             self.tree.addTopLevelItem(item)
             item.setSelected(j.job_id in selected)
         for col in range(len(JOB_COLUMNS)):
@@ -212,8 +213,7 @@ class JobsView(QWidget):
         self._apply_font()
 
     def _apply_font(self) -> None:
-        font = QFont("Menlo")
-        font.setStyleHint(QFont.StyleHint.Monospace)
+        font = style.mono_font()
         font.setPointSize(int(self.page.window.session.get("job_log_font_pt", FONT_PT)))
         for view in self.views.values():
             view.setFont(font)

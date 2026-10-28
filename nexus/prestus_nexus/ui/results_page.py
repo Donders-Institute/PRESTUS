@@ -13,13 +13,11 @@ they are opened, so the T1, the maps and the HTML report are read on request."""
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import numpy as np
 from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton, QTableWidget,
                              QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 
@@ -27,6 +25,7 @@ from .. import placement as pl
 from .. import results as rs
 from ..model import is_empty
 from ..outputs import dir_output
+from .empty_state import EmptyStack
 from .heat_view import HeatPanel
 from .ortho_view import OrthoViewer, cached_volume
 
@@ -37,15 +36,19 @@ TX_COLOURS = ("#ffffff", "#5ad1ff", "#9dff8a", "#ffd35a")
 class _OverlayPanel(QWidget):
     """A viewer with a dropdown of the maps the selected run has."""
 
-    def __init__(self, labels: tuple[str, ...], parent: QWidget | None = None):
+    def __init__(self, labels: tuple[str, ...], kind: str = "", set_t1=None,
+                 parent: QWidget | None = None):
         super().__init__(parent)
         self._labels = labels
+        self._kind = kind                   # 'acoustic' / 'thermal', for the empty state
+        self._set_t1 = set_t1               # opens the T1 setting (MainWindow.goto)
         self._run: rs.Run | None = None
 
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0, 0, 0)
         tb = QHBoxLayout()
-        tb.addWidget(QLabel("Map"))
+        self.map_label = QLabel("Map")
+        tb.addWidget(self.map_label)
         self.combo = QComboBox()
         self.combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.combo.currentTextChanged.connect(self._load_overlay)
@@ -56,7 +59,7 @@ class _OverlayPanel(QWidget):
         tb.addWidget(self.peak)
         tb.addStretch(1)
         self.note = QLabel()
-        self.note.setStyleSheet("color: gray;")
+        self.note.setObjectName("CardSub")
         tb.addWidget(self.note)
         v.addLayout(tb)
         self.viewer = OrthoViewer()
@@ -74,7 +77,18 @@ class _OverlayPanel(QWidget):
         if current in available:
             self.combo.setCurrentText(current)
         self.combo.blockSignals(False)
-        self.note.setText("" if available else "This run wrote none of these maps.")
+        for w in (self.map_label, self.combo, self.peak):      # nothing to pick without maps
+            w.setVisible(bool(available))
+        self.note.setText("" if available or run is None else
+                          f"This run wrote no {self._kind or 'such'} maps.")
+        if run is None:
+            self.viewer.set_empty_message("No run selected")
+        elif anat is None:
+            self.viewer.set_empty_message(
+                "No T1 image to show the maps on",
+                "The maps are drawn over the subject's T1 image; set path.anat and "
+                "path.t1_pattern on Setup ▸ Paths.",
+                "Set T1 image…" if self._set_t1 is not None else None, self._set_t1)
         self._load_overlay(self.combo.currentText(), centre=True)
 
     def _load_overlay(self, label: str, centre: bool = False) -> None:
@@ -109,7 +123,8 @@ class ResultsPage(QWidget):
         refresh.setToolTip("Rescan the output folder and reload the shown files")
         refresh.clicked.connect(lambda: self.refresh(force=True))
         tb.addWidget(refresh)
-        tb.addWidget(QLabel("Run"))
+        self.run_label = QLabel("Run")
+        tb.addWidget(self.run_label)
         self.run_combo = QComboBox()
         self.run_combo.setMinimumWidth(320)
         self.run_combo.setToolTip("Runs found in this subject's output folder, by output affix")
@@ -120,23 +135,29 @@ class ResultsPage(QWidget):
         self.parts.currentIndexChanged.connect(self._show_part)
         tb.addWidget(self.parts)
         open_html = QPushButton("Open HTML report")
+        open_html.setToolTip("Open the selected report in the system's web browser")
         open_html.clicked.connect(self._open_html)
         tb.addWidget(open_html)
         open_folder = QPushButton("Open output folder")
+        open_folder.setToolTip("Show this subject's output folder in the file manager")
         open_folder.clicked.connect(self._open_folder)
         tb.addWidget(open_folder)
+        # run selector and open buttons do nothing until there are runs: hidden till then
+        self._run_controls = (self.run_label, self.run_combo, open_html, open_folder)
         tb.addStretch(1)
         self.status = QLabel("No output loaded.")
-        self.status.setStyleSheet("color: gray;")
+        self.status.setObjectName("CardSub")
         tb.addWidget(self.status)
         v.addLayout(tb)
 
         self.subtabs = QTabWidget()
-        v.addWidget(self.subtabs, 1)
+        self.stack = EmptyStack(self.subtabs)
+        v.addWidget(self.stack, 1)
         acoustic = tuple(k for k in rs.MAPS if k not in rs.THERMAL_MAPS)
-        self.acoustic = _OverlayPanel(acoustic)
+        set_t1 = (lambda: window.goto("path.anat")) if hasattr(window, "goto") else None
+        self.acoustic = _OverlayPanel(acoustic, "acoustic", set_t1)
         self.subtabs.addTab(self.acoustic, "Acoustic")
-        self.thermal = _OverlayPanel(rs.THERMAL_MAPS)
+        self.thermal = _OverlayPanel(rs.THERMAL_MAPS, "thermal", set_t1)
         self.subtabs.addTab(self.thermal, "Thermal")
         self.heat = HeatPanel()
         self.subtabs.addTab(self.heat, "Heating")
@@ -191,8 +212,9 @@ class ResultsPage(QWidget):
         changed since the last scan (or when forced)."""
         base = self._base()
         if base is None:
-            self.status.setText("Output folder not found — check path.sim and subject_id, "
-                                "and run the pipeline first.")
+            self._fingerprint = None
+            self.runs, self._all_runs = [], []
+            self._show_empty(dir_output(self.window.model))
             return
         all_runs = rs.runs_for(self.window.model)
         target = rs.default_run(all_runs, self.window.model)
@@ -218,9 +240,12 @@ class ResultsPage(QWidget):
         self.run_combo.blockSignals(False)
         self._fill_compare()
         if not self.runs:
-            self.status.setText(f"No results in {base}.")
             self._show_run(-1)
+            self._show_empty(base)
             return
+        self.stack.show_content()
+        for w in self._run_controls:
+            w.show()
         # Keep the run on show when only its files changed; else the config's own run.
         keep = shown.affix if same_target and shown is not None else target_affix
         idx = next((i for i, r in enumerate(self.runs) if r.affix == keep),
@@ -230,6 +255,24 @@ class ResultsPage(QWidget):
         self.run_combo.blockSignals(False)
         self._show_run(idx)
         self.status.setText(f"{len(self.runs)} run(s) in {base}")
+
+    def _show_empty(self, base: Path | None) -> None:
+        """No runs to show: one panel that says so and leads to the Run tab."""
+        sid = self.window.model.get("subject_id")
+        sub = f"sub-{int(sid):03d}" if isinstance(sid, (int, float)) and not isinstance(sid, bool) else "this subject"
+        where = f" PRESTUS writes them to {base}." if base is not None else \
+            " Set path.sim (where PRESTUS writes its outputs) on Setup ▸ Paths."
+        self.stack.show_empty(f"No results for {sub} yet",
+                              "Run the pipeline on the Run tab; its maps, report and tables "
+                              "appear here." + where, "Go to Run", self._goto_run)
+        for w in self._run_controls:
+            w.hide()
+        self.parts.hide()
+        self.status.setText("")
+
+    def _goto_run(self) -> None:
+        from .main_window import RUN
+        self.window.show_special(RUN)
 
     # ── one run ─────────────────────────────────────────────────────────
     def _current(self) -> rs.Run | None:
@@ -385,9 +428,5 @@ def _fmt(value: str) -> str:
 
 
 def _open_in_os(path: Path) -> None:
-    if sys.platform == "darwin":
-        subprocess.run(["open", str(path)])
-    elif sys.platform.startswith("win"):
-        os.startfile(str(path))       # noqa: S606 (Windows-only API)
-    else:
-        subprocess.run(["xdg-open", str(path)])
+    """Open a file or folder with the system's default app (macOS, Windows and Linux)."""
+    QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))

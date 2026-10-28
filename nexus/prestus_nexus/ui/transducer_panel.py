@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QFormLayout, QGroupBox, QH
 
 from .. import placement as pl
 from ..model import TX, ConfigModel, is_empty, iter_leaves
+from . import style
 
 GEOMETRY_GROUPS = ("annular", "matrix")
 
@@ -44,7 +45,7 @@ class DevicePanel(QGroupBox):
         form.addRow("", self.info)
         self.inline = QLabel()
         self.inline.setWordWrap(True)
-        self.inline.setStyleSheet("color: #b8860b;")
+        self.inline.setStyleSheet(f"color: {style.active()['amber']};")
         self.clear_btn = QPushButton("Clear inline geometry")
         self.clear_btn.setToolTip("Remove geometry values set in this study so the library values apply")
         irow = QHBoxLayout()
@@ -105,7 +106,7 @@ class DevicePanel(QGroupBox):
         dev = m.device(ti)
         if dev is None:
             self.info.setText("Geometry is taken from the fields below." if self.rb_custom.isChecked()
-                              else "<span style='color:#c9302c'>Serial not found in config/equipment.</span>")
+                              else f"<span style='color:{style.active()['red']}'>Serial not found in config/equipment.</span>")
             self.inline.setText("")
             self.clear_btn.setVisible(False)
             return
@@ -118,7 +119,7 @@ class DevicePanel(QGroupBox):
         ep = m.get(f"{TX}.focal_distance_ep", ti)
         if isinstance(ep, (int, float)) and dev.min_foc is not None and dev.max_foc is not None:
             ok = dev.min_foc <= ep <= dev.max_foc
-            colour = "#3c763d" if ok else "#c9302c"
+            colour = style.active()["green"] if ok else style.active()["red"]
             lines[-1] += f" — requested <span style='color:{colour}'>{ep:g} mm</span>"
         if dev.type == "annular":
             ann_set = all(not is_empty(m.get(f"{TX}.annular.{k}", ti))
@@ -156,9 +157,9 @@ class DevicePanel(QGroupBox):
         if status.in_range:
             lo, hi = status.bracket
             r2 = f", R² ≈ {status.nearest_r2:.2f} nearby" if status.nearest_r2 is not None else ""
-            return (f"&nbsp;&nbsp;at {ep:g} mm: <span style='color:#3c763d'>within range</span> "
+            return (f"&nbsp;&nbsp;at {ep:g} mm: <span style='color:{style.active()['green']}'>within range</span> "
                     f"(between {lo:g}–{hi:g} mm, {status.phase_model}{r2})")
-        colour = "#b8860b" if status.phase_model == "blend" else "#c9302c"
+        colour = style.active()["amber"] if status.phase_model == "blend" else style.active()["red"]
         return (f"&nbsp;&nbsp;at {ep:g} mm: <span style='color:{colour}'>"
                 f"{status.extrapolation_mm:.1f} mm past the calibrated range</span> "
                 f"(nearest {status.nearest_mm:g} mm, {status.phase_model})")

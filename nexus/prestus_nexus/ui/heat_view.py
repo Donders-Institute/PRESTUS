@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel, QListWid
                              QListWidgetItem, QPushButton, QVBoxLayout, QWidget)
 
 from .. import results as rs
+from .empty_state import EmptyStack
 
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
@@ -33,7 +34,12 @@ class HeatPanel(QWidget):
         self._hidden: set[str] = set()            # tissues unticked by the user (lower case)
         self._colours: dict[str, str] = {}        # tissue (lower case) -> colour, stable
 
-        v = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        content = QWidget()
+        self.stack = EmptyStack(content)
+        outer.addWidget(self.stack)
+        v = QVBoxLayout(content)
         v.setContentsMargins(0, 0, 0, 0)
         tb = QHBoxLayout()
         tb.addWidget(QLabel("Metric"))
@@ -52,7 +58,7 @@ class HeatPanel(QWidget):
         tb.addWidget(self.shade)
         tb.addStretch(1)
         self.note = QLabel()
-        self.note.setStyleSheet("color: gray;")
+        self.note.setObjectName("CardSub")
         self.note.setWordWrap(True)
         tb.addWidget(self.note, 2)
         v.addLayout(tb)
@@ -83,6 +89,7 @@ class HeatPanel(QWidget):
             plot.addWidget(QLabel("Install matplotlib to plot the time courses."), 1)
         body.addLayout(plot, 1)
         v.addLayout(body, 1)
+        self.stack.show_empty("No run selected")
 
     # ── loading ─────────────────────────────────────────────────────────
     def load(self, run: rs.Run | None) -> None:
@@ -96,13 +103,22 @@ class HeatPanel(QWidget):
         self._key = key
         self.data = None
         if path is None:
-            self.note.setText("No run selected.")
+            self.note.setText("")
+            self.stack.show_empty("No run selected")
         else:
             try:
                 self.data = rs.read_heat(Path(path))
                 self.note.setText(path.name)
+                self.stack.show_content()
             except rs.HeatReadError as exc:
                 self.note.setText(str(exc))
+                if not Path(path).is_file():
+                    self.stack.show_empty("No heating time courses for this run",
+                                          "They come from the thermal stage "
+                                          "(modules.run_heating_sims), which writes "
+                                          f"{Path(path).name} to the cache folder.")
+                else:
+                    self.stack.show_empty("Cannot read this run's heating time courses", str(exc))
         current = self.metric.currentText()
         labels = list(self.data.metrics) if self.data is not None else []
         self.metric.blockSignals(True)

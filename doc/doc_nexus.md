@@ -41,25 +41,43 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
 
 ## Workflow
 
+**Start tab.** The Nexus opens on *Start*, which sets up a first simulation in four steps. Every other setting keeps its PRESTUS default.
+
+1. **Head image:** choose the T1-weighted NIfTI, or drop it onto the window.
+   - From the file name it sets `path.anat`, `path.t1_pattern` (as `sub-%1$03d_…` when the name holds `sub-<n>`) and `subject_id`.
+   - It also finds a T2 next to the T1 (`T1w`→`T2w`), and a folder with `m2m_sub-XXX` in the anatomy folder, one of its subfolders or one of its siblings (`path.seg`).
+   - If the segmentation is missing, it looks for SimNIBS (`charm` on the `PATH`, then the installers' default folders on macOS, Windows and Linux) to set `startup.simnibs_bin_path`.
+   - The results folder defaults to `prestus_sim` next to the study config, or next to the anatomy folder if the config is unsaved, never inside the anatomy folder.
+2. **Transducer:** the device and driving system from the equipment library, the focal depth setting (with the device's range) and the free-water I_SPPA. The calibration entry PRESTUS will use is shown below.
+3. **Target:** an MNI target, either alone (`placement.mode: heuristic`, which needs a target name) or with a transducer position (`mni`). A study using another mode is pointed to the Placement tab.
+4. **Check and run:** *Run on* (`platform`) and the errors still to fix, each a link to its field. *Continue to Run* saves the study and opens the Run tab.
+
+Each step shows *To do* until it is filled in, then *Done* or the number of problems (hover for the messages). The Start page writes the same config keys as the other tabs, so the two never disagree.
+
 1. **Study config.** The Nexus opens a given config, or an untitled one. **File ▸ New study…** creates a config and can copy `config_default.yaml` into its folder, which pins the defaults as `prestus_config_init` does. **Open…** and **Open recent** switch to another config. The subject, paths, T1/T2 patterns and SimNIBS folder are set on the Setup tab, and the Issues panel checks them as you type: the T1 must resolve, and the `m2m_sub-XXX` folder must exist or SimNIBS must be set.
 2. **Tabs.** The window has one tab per area; each shows its config sections as cards:
 
    | Tab | Sections | Also on the tab |
    |---|---|---|
+   | Start | (the four steps above) | |
    | Setup | subject, paths, environment, input/output | |
-   | Transducer | transducer, calibration conventions | device panel, cross-section drawing; 'Calibration' sub-tab |
+   | Transducer | transducer, calibration conventions | device panel, cross-section drawing, calibration coverage; 'Calibration' sub-tab |
    | Placement | placement (incl. the Localite folders), Localite ingestion | placement viewer ('Viewer' sub-tab, next to 'Settings'); 'Localite' sub-tab; Localite shortcuts |
    | Simulation | medium & solvers, grid, sonication protocol, thermal, head model, pseudo-CT, tissue layers and properties, jwave, BabelBrain | timing diagram, TUS calculator exchange |
    | Study | study name, targeting & analysis | study manifest editor |
    | Run | pipeline stages, where to run, HPC | run log, YAML review |
 
    - Each field has a readable name. Hovering over it or clicking **?** shows the full help from `config_default.yaml`, the config key and the default.
-   - Changed values are marked ● (the tab label counts them), fields filled from the equipment library are marked *from library*, and ↺ resets a field.
+   - Changed values are marked ●, fields filled from the equipment library are marked *from library*, and ↺ resets a field.
+   - A tab's label shows a red (errors) or amber (warnings only) dot with the number of problems in its fields. Its tooltip also counts the changed values.
+   - Inputs are as wide as their content needs: short for numbers and choices, wider for paths.
    - Fields appear only when they apply to the current modes (e.g. the Localite settings only with `placement.mode: localite`).
-   - *Placement mode* marks each mode for the configured subject: **unavailable** (greyed out; the tooltip names the missing input) when PRESTUS cannot produce an input it needs — no T1, no SimNIBS segmentation (PlanTUS: also the mesh `sub-XXX.msh`) and no `startup.simnibs_bin_path` to run charm, or no recorded Localite poses; **needs setup** when charm will run first or the mode's tool paths are still empty. Tool paths never grey a mode out, since they are only shown once it is selected; the mode in use always stays selectable.
+   - *Placement mode* marks each mode for the configured subject: **unavailable** (greyed out; the tooltip names the missing input) when PRESTUS cannot produce an input it needs — no T1, no SimNIBS segmentation (PlanTUS: also the mesh `sub-XXX.msh`) and no `startup.simnibs_bin_path` to run charm, or no recorded Localite poses; **needs setup** when charm will run first or the mode's tool paths are still empty. Tool paths never grey a mode out, since they are only shown once it is selected; the mode in use always stays selectable, and why it cannot run yet is written under the field.
 3. **Advanced options.** Each tab hides the settings most studies leave at their defaults, and says how many are hidden. You can ignore them until you need them:
    - **+ n advanced** in a card's header shows that card's advanced settings (*Hide advanced* folds them again). **Show advanced options** shows them on every card of the tab, including the fully advanced sections.
    - An advanced setting that holds a value is always shown. Jumping to an issue opens the card it is on.
+   - **Locked cards.** The tissue properties card (`medium_properties`) is read-only. **🔒 Unlock** asks for confirmation and makes it editable for the session; **Lock** reverts. Values from a loaded config still apply. Set by `locked: true` under `sections:` in `overlay.yaml`.
+   - **Uncertainty variants.** With *Uncertainty analysis* on, the Simulation tab shows the conservative and liberal medium files and a card listing the default, conservative and liberal properties, with their brain and skull ranges plotted one property per column. Greyed values are not in the variant file and use the default.
    - **Tune for** (Speed, Accuracy, Memory, Disk space) is for optimising a run. It shows the settings that affect that goal, advanced ones included, on every tab, and marks them after their label (e.g. *Grid resolution · speed, accuracy, memory*). The goal is highlighted. The tag says only what a setting affects; check its help (**?**) before changing it. Set it back to **—** to return to the normal view. Which keys count for which goal is listed under `tuning:` in `nexus/prestus_nexus/overlay.yaml`, mainly the grid, time-step, FOV, precision and solver settings and the large `io.save_*` outputs.
 
    What counts as advanced:
@@ -80,7 +98,8 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
    sharing it with the settings — the same nested-tab pattern the Run tab uses for Run log / Review
    YAML / Results.
    - Axial, coronal and sagittal T1 slices with the segmentation overlay.
-   - Click to set the focus or the transducer (bowl apex), or switch to **Click to browse** to just
+   - Without a T1, the viewer shows what is missing and a button to the field instead of empty slices.
+   - **Click sets** (*Focus* · *Transducer* · *Browse*) chooses what a click on a slice does: set the focus or the transducer (bowl apex), or with *Browse* just
      move the crosshair without writing anything (scrolling always just browses). The bowl is drawn
      from the device geometry.
    - With several transducers, every bowl, beam axis and acoustic FOV box is drawn; the ones not
@@ -90,7 +109,7 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
    - **+**/**−** by the transducer selector add or remove a transducer without switching to the
      Transducer tab; with several transducers, transducer 2 and later inherit transducer 1's values
      unless set (see *Transducer* below).
-   - **Enter coordinates** types X/Y/Z directly instead of clicking: **RAS mm** or **Voxel** need
+   - **Coordinates…** opens a row to type X/Y/Z directly instead of clicking: **RAS mm** or **Voxel** need
      no conversion; **MNI mm** is converted to this subject's space with SimNIBS's
      `mni2subject_coords` CLI tool, the same one-shot external call `mni2subject_coords_LDfix.m`
      uses — it is not run on every redraw, only when you click. This needs SimNIBS (charm) to have
@@ -110,7 +129,7 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
      directly (PRESTUS converts them at placement-stage runtime) and is not shown in the viewer;
      type an MNI point and use **Go to** here just to look at the matching subject-space location.
    - With manual placement, the readout's red flags are also listed in the Issues panel, for every transducer: a target more than 2 mm from the focal depth setting, an exit plane (centre or rim) inside the scalp, and beam rays through an eye. They are checked once the viewer (or the Run tab) has loaded the T1 and segmentation; clicking one opens the viewer on that transducer.
-   - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Transducer at focal depth* instead puts the transducer where the focal depth setting lands on the target.
+   - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Transducer at focal depth* (under **More**, with the gap) instead puts the transducer where the focal depth setting lands on the target. **View** holds the overlay opacity, the FOV size and *Centre on focus*.
    - **Beam:** with a segmentation, the readout adds skull on the beam (mean ± SD over 37 rays from the aperture to the focus; the central ray), the mean skull incidence (amber above 20°), the gap between the exit-plane rim and the scalp along the beam (mean ± SD; red when the minimum is negative, i.e. the transducer cuts into the head; a large SD means uneven contact) and the share of rays that pass an eye. These are the measures of the placement comparison (`placement.beam_qc`).
    - The readout keeps two depths apart: the **target depth** (exit plane → `focus_pos`, from the placement) and the **focal depth setting** (`focal_distance_ep`, the depth set on the equipment). For annular arrays the setting selects the calibrated phases, so the simulated focus lands at the setting even when the target is deeper or shallower; the readout gives the difference (red above 2 mm). *Set focal depth to target* copies the target depth into the setting.
    - Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
@@ -118,9 +137,11 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
    - Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`, written by `write_placement_positions`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.
    - The *Localite* sub-tab detects, names and writes the recorded series of a session (see [Localite page](#localite-page)).
    - With `placement.mode: localite`, the Placement card offers *Localite page* and *Import into study…*.
+   - With `placement.mode: plantus`, the Placement card runs only the [PlanTUS placement](doc_placement_plantus.md#running-plantus): *Choose in Workbench…* opens PlanTUS's maps to pick the position, *Automatic* takes the composite-score optimum. The run shows on the Run tab, and the Viewer opens on the result.
 6. **Timing diagram and TUS calculator** (Simulation tab, *Sonication protocol*). See the next section.
-7. **Issues panel.** Lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied, and (manual placement) the placement viewer's checks. Clicking an issue opens its tab and field, showing advanced options if needed. The header shows the error and warning counts.
+7. **Issues panel.** Lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied, and (manual placement) the placement viewer's checks. Clicking an issue opens its tab and field, showing advanced options if needed. The panel is closed by default: the header shows the error and warning counts, and clicking them (or **View ▸ Issues…**, Ctrl+Shift+I) opens the list. It closes on Esc, a click outside, or a click on an issue.
 8. **Run tab.**
+   - The highlighted button follows *Run on*: *Run locally* for `platform: matlab`, *Submit to cluster* for `slurm` or `qsub` (and for `auto` when a scheduler or the SSH host is available). The other one, *Write launcher* and *Save log…* are under **More**. The HPC card hides the scheduler fields while *Run on* is `matlab`.
    - *Validate in MATLAB* only runs `load_parameters`.
    - *Show deployment, save & resource details* lists the jobs the run submits, which outputs it saves, and a resource estimate from earlier runs of the project (`<path.sim>/run_stats.jsonl`): acoustic and thermal simulation time and peak RAM, as median and maximum. See [Resource estimates](doc_hpc.md#resource-estimates-from-earlier-runs).
    - *Run locally* writes `run_<study>.m` next to the config and runs it with `matlab -batch`, streaming the log. It sets `platform: matlab` for that run only. You can also run the launcher yourself with `run('run_<study>.m')`.
@@ -140,10 +161,12 @@ The Nexus runs from a local copy of its own code. On start it copies the files o
      - *Data Table*: the run's metrics (last CSV row).
      - *Compare runs*: one row per run with the key metrics (ISPPA, MI, focal distance and volume, temperature rise, CEM43); double-click a row to show that run.
 9. **Study tab.** Runs many subjects with per-run settings. See [Group analysis](doc_group.md#study-setup).
-   - Set the manifest file (`study.manifest`, relative to the config) and edit the table: one row per run, with `subject_id`, `condition`, `include`, `config` and any config key as a column (*Add column…* offers the known keys).
-   - *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. *Localite page* opens the ingestion page. See [Group analysis](doc_group.md#from-localite-ingestion).
+   - The table (the study manifest, `study.manifest`) has one row per simulation run; settings not in the table come from the study config. A single subject does not need it. *How to fill the table* shows the steps and an example.
+   - *Add subjects…* adds one run per subject ID (`1-12, 15, sub-020`). *Add setting column…* adds a config key to vary per run (empty cell = the study value) or the run columns `include`, `config` and `notes`; hovering over a column header shows its help. *More* holds adding an empty row, removing rows or a column, and *Save table as…*.
+   - The table is saved to the *Table file* (relative to the config). Without one, the first save writes `<config name>_runs.tsv` next to the config and sets `study.manifest`.
+   - *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. See [Group analysis](doc_group.md#from-localite-ingestion).
    - The summary under the table checks the manifest as you type: subject IDs, `include` values, unknown keys (with suggestions), and rows that would write to the same outputs.
-   - *Check all rows in MATLAB* runs `prestus_study_start(config, 'DryRun', true)`. *Run study locally* writes `run_study_<study>.m` and runs it. *Build group report* runs `prestus_group_report_start(config)` (group maps + report). All three stream to the Run tab.
+   - *Check all runs* saves the table and runs `prestus_study_start(config, 'DryRun', true)`. *Run all runs locally* writes `run_study_<study>.m` and runs it; *Write launcher script* only writes it. These stay disabled while the table is empty. *Build group report* runs `prestus_group_report_start(config)` (group maps + report). Checks, runs and the report stream to the Run tab.
 
 ## Timing diagram and TUS calculator
 
@@ -159,7 +182,7 @@ Both use the same ramp convention: the ramp duration is the rise (= fall) time a
 
 ## MATLAB session
 
-The Calibration and Localite pages compute in MATLAB, with the same functions as `calibration_gui` and `neuronav_gui`. To avoid a MATLAB start-up per click, the Nexus keeps one MATLAB session open (`nexus_bridge`, started with `matlab -batch` on the first use; the MATLAB binary is the one set on the Run tab). The first call takes as long as MATLAB needs to start (15–60 s); later ones take only the computation. The pages show the session's state (*starting*, *ready*, *working*), and **Stop** ends it.
+The Calibration and Localite pages compute in MATLAB, with the same functions as `calibration_gui` and `neuronav_gui`. To avoid a MATLAB start-up per click, the Nexus keeps one MATLAB session open (`nexus_bridge`, started with `matlab -batch` the first time an action needs it, e.g. *Load*, *Predict* or *Fit* on the Calibration page or *Detect series* on the Localite page; showing a page does not start it. The MATLAB binary is the one set on the Run tab). The first call takes as long as MATLAB needs to start (15–60 s); later ones take only the computation. The pages show the session's state (*starting*, *ready*, *working*), and **Stop** ends it.
 
 - The session ends by itself after 30 min without use, since it holds a MATLAB licence, and when the Nexus quits or stops answering. The next call starts a new one, and the pages open their transducer or session again.
 - The Nexus and MATLAB exchange JSON files in a temporary folder. MATLAB runs only `nexus_calibration`, `nexus_neuronav` and `nexus_ping` from it.

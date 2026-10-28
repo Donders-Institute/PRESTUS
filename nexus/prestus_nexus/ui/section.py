@@ -4,17 +4,22 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+from PyQt6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton,
                              QScrollArea, QToolButton, QToolTip, QVBoxLayout, QWidget)
 
 from .. import labels
 from ..checks import check_value, placement_mode_status
 from ..model import TX, ConfigModel
 from ..schema import Node
+from . import style
 from .fields import FieldEditor, display_text, make_editor
 from .transducer_panel import DevicePanel
 
 LABEL_WIDTH = 290
+# Inputs stay near their label instead of stretching across a wide window: values and
+# choices get a short field, paths and lists a longer one (both still shrink when narrow).
+FIELD_MAX_WIDTH = {"dir": 760, "file": 760, "path": 760, "str": 560, "strlist": 560, "yaml": 760, "numbers": 420}
+FIELD_MAX_DEFAULT = 380
 
 
 def _tooltip(node: Node) -> str:
@@ -23,13 +28,13 @@ def _tooltip(node: Node) -> str:
     parts = [f"<b>{title}</b>"]
     if node.help:
         parts.append(node.help.replace("\n", "<br>"))
-    parts.append(f"<span style='color:#9aa7b4'>Key: {node.path}</span>")
+    parts.append(f"<span style='color:{style.active()['ink4']}'>Key: {node.path}</span>")
     if not node.is_group:
-        parts.append(f"<span style='color:#9aa7b4'>Default: {display_text(node.default) or '(empty)'}</span>")
+        parts.append(f"<span style='color:{style.active()['ink4']}'>Default: {display_text(node.default) or '(empty)'}</span>")
     if node.tune:
-        parts.append(f"<span style='color:#9aa7b4'>Tuning: affects {', '.join(node.tune)}</span>")
+        parts.append(f"<span style='color:{style.active()['ink4']}'>Tuning: affects {', '.join(node.tune)}</span>")
     if node.extra:
-        parts.append("<span style='color:#9aa7b4'>Not in config_default.yaml; read by PRESTUS code.</span>")
+        parts.append(f"<span style='color:{style.active()['ink4']}'>Not in config_default.yaml; read by PRESTUS code.</span>")
     return "<br>".join(parts)
 
 
@@ -175,6 +180,7 @@ class SectionPage(QFrame):
         reset = QToolButton(text="↺")
         reset.setToolTip("Reset to default")
         h.addWidget(reset)
+        container.setMaximumWidth(FIELD_MAX_WIDTH.get(node.kind, FIELD_MAX_DEFAULT))
         r = grid.rowCount()
         grid.addWidget(block, r, 0, Qt.AlignmentFlag.AlignTop)
         grid.addWidget(container, r, 1, Qt.AlignmentFlag.AlignTop)
@@ -198,11 +204,11 @@ class SectionPage(QFrame):
         self.tx_combo.currentIndexChanged.connect(self._select_transducer)
         add = QPushButton("+")
         add.setToolTip("Add a transducer")
-        add.setMaximumWidth(28)
+        add.setProperty("compact", True)
         add.clicked.connect(self._add_transducer)
         self.tx_remove = QPushButton("−")
         self.tx_remove.setToolTip("Remove this transducer")
-        self.tx_remove.setMaximumWidth(28)
+        self.tx_remove.setProperty("compact", True)
         self.tx_remove.clicked.connect(self._remove_transducer)
         self.tx_note = QLabel()
         self.tx_note.setObjectName("CardSub")
@@ -326,9 +332,9 @@ class SectionPage(QFrame):
         if not node.tune or not (self.show_advanced or self.goal):
             return ""
         schema = self.model.schema
-        tags = [f"<b style='color:#1f6fb2'>{schema.tune_label(g).lower()}</b>" if g == self.goal
+        tags = [f"<b style='color:{style.active()['accent']}'>{schema.tune_label(g).lower()}</b>" if g == self.goal
                 else schema.tune_label(g).lower() for g in node.tune]
-        return f" <span style='color:#9aa7b4'>· {', '.join(tags)}</span>"
+        return f" <span style='color:{style.active()['ink4']}'>· {', '.join(tags)}</span>"
 
     def refresh(self) -> None:
         for i in range(self.extras.count()):

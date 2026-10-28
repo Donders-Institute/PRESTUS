@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QSlider, QVBoxLayout, QWidget)
 
 from .. import placement as pl
+from .empty_state import EmptyStack
 
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -134,35 +135,50 @@ class OrthoViewer(QWidget):
         self._relay = _Relay(self)
         self._relay.done.connect(self._loaded, Qt.ConnectionType.QueuedConnection)
 
-        v = QVBoxLayout(self)
+        # What the empty state says when there is no anatomy: (title, body, action, callback);
+        # the host page sets it (set_empty_message), so the panel names the missing input.
+        self._empty_msg: tuple = ("No image to show", "", None, None)
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        content = QWidget()
+        self.stack = EmptyStack(content)
+        outer.addWidget(self.stack)
+        v = QVBoxLayout(content)
         v.setContentsMargins(4, 4, 4, 4)
         v.setSpacing(4)
 
         tb = QHBoxLayout()
-        tb.addWidget(QLabel("Overlay colormap"))
+        # overlay controls: shown only while there is an overlay to adjust
+        self.overlay_controls = QWidget()
+        oc = QHBoxLayout(self.overlay_controls)
+        oc.setContentsMargins(0, 0, 0, 0)
+        tb.addWidget(self.overlay_controls)
+        oc.addWidget(QLabel("Overlay colormap"))
         self.cmap = QComboBox()
         self.cmap.addItems(COLORMAPS)
         self.cmap.setFixedWidth(110)
         self.cmap.currentTextChanged.connect(self._request_draw)
-        tb.addWidget(self.cmap)
-        tb.addWidget(QLabel("Opacity"))
+        oc.addWidget(self.cmap)
+        oc.addWidget(QLabel("Opacity"))
         self.alpha = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=100, value=50)
         self.alpha.setMaximumWidth(140)
         self.alpha.valueChanged.connect(self._request_draw)
-        tb.addWidget(self.alpha)
-        tb.addWidget(QLabel("Hide below"))
+        oc.addWidget(self.alpha)
+        oc.addWidget(QLabel("Hide below"))
         self.threshold = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=90, value=0,
                                  singleStep=5, pageStep=10)
         self.threshold.setMaximumWidth(120)
         self.threshold.setToolTip("Hide overlay values below this share of the colour scale's top")
         self.threshold.valueChanged.connect(self._request_draw)
-        tb.addWidget(self.threshold)
+        oc.addWidget(self.threshold)
         self.threshold_label = QLabel()
         self.threshold_label.setMinimumWidth(110)
-        tb.addWidget(self.threshold_label)
+        oc.addWidget(self.threshold_label)
+        self.overlay_controls.hide()
         tb.addStretch(1)
         self.status = QLabel()
-        self.status.setStyleSheet("color: gray;")
+        self.status.setObjectName("CardSub")
         tb.addWidget(self.status)
         v.addLayout(tb)
 
@@ -182,8 +198,19 @@ class OrthoViewer(QWidget):
             self.readout = QLabel()
             self.readout.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             v.addWidget(self.readout)
+            self.stack.show_empty(*self._empty_msg)       # never blank axes with 0–1 ticks
         else:
-            v.addWidget(QLabel("Install matplotlib and nibabel to use this viewer."), 1)
+            self._empty_msg = ("This viewer needs matplotlib and nibabel",
+                               "Install them in the Nexus's Python environment and restart.", None, None)
+            self.stack.show_empty(*self._empty_msg)
+
+    def set_empty_message(self, title: str, body: str = "", action: str | None = None,
+                          callback=None) -> None:
+        """What to say (and offer) while there is no anatomy to show."""
+        if HAVE_MPL:
+            self._empty_msg = (title, body, action, callback)
+            if self.anat is None and not self._pending:
+                self.stack.show_empty(*self._empty_msg)
 
     # ── loading ─────────────────────────────────────────────────────────
     def set_anatomy(self, path: str | Path | None) -> None:
@@ -364,14 +391,20 @@ class OrthoViewer(QWidget):
         self._draw_timer.stop()
         if not HAVE_MPL:
             return
+        self.overlay_controls.setVisible(self.overlay is not None)
         if self.anat is None:
             self._artists = None
             for ax in self.axes:
                 ax.clear()
                 ax.set_xticks([])
                 ax.set_yticks([])
-            self.canvas.draw_idle()
+            if self._pending:
+                self.stack.show_empty("Loading the image …", "Large NIfTI files on a network "
+                                      "drive can take a few seconds.")
+            else:
+                self.stack.show_empty(*self._empty_msg)
             return
+        self.stack.show_content()
         data = self.anat.canon
         vs = np.sqrt((self.anat.canon_affine[:3, :3] ** 2).sum(axis=0))
         c = self.anat.ras_to_canon(self.cursor)[0]

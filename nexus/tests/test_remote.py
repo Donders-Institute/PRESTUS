@@ -274,7 +274,8 @@ def test_run_page_shows_selected_job_log(schema, prestus_root, tmp_path, monkeyp
     item = jv.tree.topLevelItem(0)
     assert [item.text(c) for c in range(3, 7)] == ["3:50:00 / 4:00:00", "10:00",
                                                     "gpu40g: dccn-c078", "12.0 GB"]
-    assert item.foreground(4).color().name() == "#c9302c"      # time running out
+    from prestus_nexus.ui import style
+    assert item.foreground(4).color().name() == style.active()["red"]      # time running out
     item.setSelected(True)
     assert jv.views["output"].toPlainText() == "Running k-Wave simulation...\n"
     assert "sub-001_slurm_output_4242.log" in jv.path_label.text()

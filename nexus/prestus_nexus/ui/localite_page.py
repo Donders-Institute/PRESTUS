@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLa
 
 from .. import localite as lc
 from ..bridge import BridgeError, as_floats, as_list
+from . import style
+from .empty_state import EmptyStack
 from .matlab_status import MatlabStatus
 
 try:
@@ -65,7 +67,13 @@ class LocalitePage(QWidget):
         intro.setObjectName("CardSub")
         intro.setWordWrap(True)
         head.addWidget(intro, 1)
-        head.addWidget(MatlabStatus(window.bridge()))
+        # MATLAB starts only on an action that needs it (detect, write, batch, MNI view):
+        # showing this page reads folders only.
+        bridge = window.bridge()
+        self.matlab_status = MatlabStatus(bridge)
+        head.addWidget(self.matlab_status)
+        bridge.state_changed.connect(self._idle_status)     # after MatlabStatus._update
+        self._idle_status(getattr(bridge, "state", ""))
         outer.addLayout(head)
 
         self.summary = QLabel()
@@ -136,13 +144,16 @@ class LocalitePage(QWidget):
             self.fig_pos = Figure(figsize=(6, 4), layout="constrained")
             self.ax_pos = self.fig_pos.add_subplot(projection="3d")
             self.canvas_pos = FigureCanvasQTAgg(self.fig_pos)
-            tabs.addTab(self.canvas_pos, "Positions (3-D)")
+            self.pos_stack = EmptyStack(self.canvas_pos)
+            tabs.addTab(self.pos_stack, "Positions (3-D)")
             self.fig_dev = Figure(figsize=(6, 4), layout="constrained")
             self.ax_dev = self.fig_dev.add_subplot()
             self.canvas_dev = FigureCanvasQTAgg(self.fig_dev)
-            tabs.addTab(self.canvas_dev, "Deviation per pulse")
+            self.dev_stack = EmptyStack(self.canvas_dev)
+            tabs.addTab(self.dev_stack, "Deviation per pulse")
         else:
             self.canvas_pos = self.canvas_dev = None
+            self.pos_stack = self.dev_stack = None
         self.raw = QTableWidget(0, 5)
         self.raw.setHorizontalHeaderLabels(["Type", "File", "Folder (relative)", "Size (kB)", "Status"])
         self.raw.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -155,10 +166,38 @@ class LocalitePage(QWidget):
         split.addWidget(tabs)
         split.setSizes([220, 420])
         outer.addWidget(split, 1)
+        self._show_plot_empty()
 
     @property
     def model(self):
         return self.window.model
+
+    def _idle_status(self, state: str) -> None:
+        """While MATLAB is off, say which action starts it (nothing starts it on show)."""
+        if state == "off":
+            c = style.active()
+            self.matlab_status.label.setText(f"<span style='color:{c['ink3']}'>●</span> MATLAB starts "
+                                             "when you detect series")
+
+    def _show_plot_empty(self) -> None:
+        """Before a detection the plots have nothing to show: say what to do instead."""
+        if self.pos_stack is None:
+            return
+        if not lc.raw_root(self.model):
+            args = ("No Localite exports folder set",
+                    "Set path.localite_raw to the folder with the sub-*/ses-* raw exports.",
+                    "Set Localite folder…", lambda: self.window.goto("path.localite_raw"))
+        elif not getattr(self, "sessions", None):
+            args = ("No sessions found",
+                    "No sub-*/ses-* folders under path.localite_raw. Check the folder.",
+                    "Check Localite folder…", lambda: self.window.goto("path.localite_raw"))
+        else:
+            args = ("No series detected yet",
+                    "Pick a subject and session, then detect their recorded series to plot the "
+                    "pulse positions and their spread. This starts MATLAB (15–60 s the first time).",
+                    "Detect series", self.detect)
+        self.pos_stack.show_empty(*args)
+        self.dev_stack.show_empty(*args)
 
     # ── inputs ──────────────────────────────────────────────────────────
     def refresh(self) -> None:
@@ -179,6 +218,8 @@ class LocalitePage(QWidget):
         self._sub_changed(self.sub.currentText())
         if not self.sessions:
             self._status("No sub-*/ses-* folders under the raw root (path.localite_raw).", "amber")
+        if self.result is None:
+            self._show_plot_empty()
 
     def _sub_changed(self, sub: str) -> None:
         cur = self.ses.currentText()
@@ -361,6 +402,16 @@ class LocalitePage(QWidget):
         ax.clear()
         axd.clear()
         series = (self.result or {}).get("series") or []
+        if not any(not s.get("empty") for s in series):
+            self._show_plot_empty()
+            if self.result is not None:
+                args = ("No usable series in this session",
+                        "The detected series have no pulses; see the Log and Raw marker files tabs.")
+                self.pos_stack.show_empty(*args)
+                self.dev_stack.show_empty(*args)
+            return
+        self.pos_stack.show_content()
+        self.dev_stack.show_content()
         ticked, names, colours = self._table_values() if self.table.rowCount() == len(series) else ([], [], [])
         gum = (self.result or {}).get("markertype") == "GUMMarkers"
         for r, s in enumerate(series):
@@ -621,7 +672,12 @@ class MniDialog(QDialog):
             self.fig = Figure(figsize=(7, 6), layout="constrained")
             self.ax = self.fig.add_subplot(projection="3d")
             self.canvas = FigureCanvasQTAgg(self.fig)
-            g.addWidget(self.canvas, 1)
+            self.plot_stack = EmptyStack(self.canvas)
+            self.plot_stack.show_empty("No targets mapped yet",
+                                       "Map the batch summary to MNI space to see every written "
+                                       "target. This starts MATLAB and loads each subject's warp.",
+                                       "Load and map to MNI", self.load)
+            g.addWidget(self.plot_stack, 1)
         else:
             self.canvas = None
             g.addWidget(QLabel("Install matplotlib to see the MNI view."), 1)
@@ -657,6 +713,12 @@ class MniDialog(QDialog):
         bad = sorted({f"{r.get('sub')} ({r.get('mni_status')})" for r in self.rows if r.get("mni_status")})
         self.status.setText(f"✓ {len(ok)} target(s) of {len({r.get('sub') for r in ok})} subject(s) mapped."
                             + (f" Not mapped: {'; '.join(bad)}" if bad else ""))
+        if self.canvas is not None:
+            if ok:
+                self.plot_stack.show_content()
+            else:
+                self.plot_stack.show_empty("No target could be mapped",
+                                           "See the status on the left for each subject's reason.")
         self.plot()
 
     def _shown(self, key: str) -> set[str]:
