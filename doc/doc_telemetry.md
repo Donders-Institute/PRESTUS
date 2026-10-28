@@ -10,15 +10,13 @@ On each pipeline run PRESTUS prints a short notice and asks whether to enable
 telemetry. How that prompt is shown depends on the session:
 
 - **Interactive console session**: a `y`/`n` prompt that blocks until you answer.
-- **GUI session** (`prestus_gui`): a modal **Allow / Decline / Ask me later**
+- **GUI session** (`prestus_gui`, deprecated): a modal **Allow / Decline / Ask me later**
   dialog shown once at startup, before the "Run Simulation" button (which may
   dispatch to a background worker with no console) can be pressed.
-- **`matlab -batch` run locally with a display attached**: the same
-  Allow / Decline / Ask me later dialog as the GUI, since there is no console
-  to answer `y`/`n` on.
-- **Headless session** (deployed app, or a SLURM/PBS job — see
-  [below](#non-interactive-environments-hpc-batch-jobs)): no prompt of any
-  kind can be shown.
+- **Non-interactive session** (`matlab -batch` with or without a display,
+  deployed app, SLURM/PBS job, or a session with neither desktop nor
+  display; see [below](#non-interactive-environments-batch-runs-hpc-jobs)):
+  no prompt of any kind is shown and the run never waits for an answer.
 
 The prompt repeats every run until you give an explicit answer. Your decision
 is stored in:
@@ -33,22 +31,55 @@ You can change your decision at any time:
   `telemetry_setup_reset()` in MATLAB to be asked again on the next run.
 - **Opt in**: set `"opt_in": true` in the same file.
 
-### Non-interactive environments (HPC batch jobs)
+`telemetry_set_consent(true)` or `telemetry_set_consent(false)` records the
+decision without any prompt.
 
-Deployed applications and jobs that run under SLURM (`SLURM_JOB_ID`) or
-PBS/Torque (`PBS_JOBID`) are always headless: no prompt of any kind is
-possible, even if a figure could technically be drawn. `matlab -batch` run
-locally (not under SLURM/PBS) falls back to the same silent notice only when
-no display is attached; if a display is attached it gets the dialog described
-above. The full notice is printed to stdout (visible in job logs) on every
-run, but **no decision is recorded and no data is sent**. The message will
-reappear on every run until you make an explicit decision.
+### Per-process override: `PRESTUS_TELEMETRY`
+
+The `PRESTUS_TELEMETRY` environment variable sets the decision for one MATLAB
+process, without a prompt and without writing `~/.prestus/telemetry.json`:
+
+| Value (case-insensitive) | Effect for this process |
+|---|---|
+| `off`, `0`, `false` | Opted out: no prompt, nothing sent. |
+| `on`, `1`, `true` | Opted in if no decision is recorded: no prompt, `run_end`/`run_error` events are sent. A recorded opt-out still applies. The random ID in `~/.prestus/uuid.txt` is created on the first send, as for a recorded opt-in. |
+| unset or empty | No override: the recorded decision applies, or the prompt/notice described above. |
+| anything else | Warning `prestus:telemetry:invalidEnv` (once per value per MATLAB session), then treated as unset. |
+
+`PRESTUS_TELEMETRY=off` takes precedence over a recorded decision: it sends
+nothing even after an opt-in. `PRESTUS_TELEMETRY=on` never overrides a recorded
+opt-out (a site-wide setting must not undo a user's explicit choice); it only
+applies when no decision is recorded. The recorded decision is never changed by
+the variable. Use `telemetry_set_consent` for a lasting choice.
+Set the variable before MATLAB starts, e.g.
+`PRESTUS_TELEMETRY=off matlab -batch "..."` or `export PRESTUS_TELEMETRY=off`
+in a job script, or with `setenv('PRESTUS_TELEMETRY', 'off')` in the session.
+
+### Non-interactive environments (batch runs, HPC jobs)
+
+PRESTUS never prompts, and never waits for an answer, in these sessions:
+
+- `matlab -batch` runs (detected with `batchStartupOptionUsed`, R2019a and
+  later), whether or not a display is attached: cron jobs, CI runners and
+  scripts started from a terminal;
+- deployed applications and jobs under SLURM (`SLURM_JOB_ID`) or PBS/Torque
+  (`PBS_JOBID`);
+- sessions with neither the MATLAB desktop nor a display (e.g.
+  `matlab -nodisplay -r ...` from cron). An interactive `matlab -nodisplay`
+  terminal session is also treated this way; record a decision there with
+  `telemetry_set_consent`.
+
+The full notice is printed to stdout (visible in job logs) on every run, but
+**no decision is recorded and no data is sent** unless consent was already
+recorded or `PRESTUS_TELEMETRY=on` is set. The notice reappears on every run
+until you record a decision or set `PRESTUS_TELEMETRY`.
 
 To opt in from an HPC environment, either:
 
 1. Run PRESTUS once interactively (e.g. on a login node) and answer `y`,
-2. Run `telemetry_set_consent(true)` (or `false` to opt out) in MATLAB, or
-3. Create `~/.prestus/telemetry.json` manually:
+2. Run `telemetry_set_consent(true)` (or `false` to opt out) in MATLAB,
+3. Set `PRESTUS_TELEMETRY=on` (or `off`) in the job script, for that job only, or
+4. Create `~/.prestus/telemetry.json` manually:
    ```json
    {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
    ```

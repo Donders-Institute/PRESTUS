@@ -1,7 +1,10 @@
 function track_usage(event, parameters, options, pipe_options)
 % TRACK_USAGE  Send anonymous usage statistics to the PRESTUS telemetry endpoint.
 %
-% Does nothing unless the user has explicitly opted in via telemetry_setup.
+% Does nothing unless the user has explicitly opted in via telemetry_setup
+% or telemetry_set_consent, or PRESTUS_TELEMETRY=on/1/true is set for this
+% process. PRESTUS_TELEMETRY=off/0/false disables sending even after a
+% recorded opt-in (see TELEMETRY_ENV_OVERRIDE).
 % All network errors are silently swallowed – this function never interrupts
 % the pipeline. No personal data is transmitted; see doc/doc_telemetry.md.
 %
@@ -19,7 +22,7 @@ function track_usage(event, parameters, options, pipe_options)
 % pipe_options is the pipeline options struct (e.g. with sequential_configs)
 % used for pipeline mode detection; it is optional and never transmitted.
 %
-% See also: TELEMETRY_SETUP, TELEMETRY_SETUP_RESET, PRESTUS_VERSION
+% See also: TELEMETRY_SETUP, TELEMETRY_SETUP_RESET, TELEMETRY_ENV_OVERRIDE, PRESTUS_VERSION
 
     arguments
         event        (1,:) char
@@ -45,14 +48,22 @@ end
 % =========================================================================
 
 function opted = telemetry_opted_in()
-    cfg_file = fullfile(prefdir_prestus(), 'telemetry.json');
+% PRESTUS_TELEMETRY=off always wins; a recorded decision comes next, so a
+% recorded opt-out is never overridden; PRESTUS_TELEMETRY=on applies only
+% when no decision is recorded.
+    env   = telemetry_env_override();
     opted = false;
-    if ~isfile(cfg_file), return, end
-    try
-        cfg   = jsondecode(fileread(cfg_file));
-        opted = isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true);
-    catch
+    if strcmp(env, 'off'), return, end
+    cfg_file = fullfile(prefdir_prestus(), 'telemetry.json');
+    if isfile(cfg_file)
+        try
+            cfg   = jsondecode(fileread(cfg_file));
+            opted = isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true);
+        catch
+        end
+        return
     end
+    opted = strcmp(env, 'on');
 end
 
 % -------------------------------------------------------------------------

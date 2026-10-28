@@ -478,8 +478,10 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `generate_run_id`                       | Generate a random UUID v4 string for telemetry. |
 | `prefdir_prestus`                       | Return (and create) the PRESTUS per-user preferences directory. |
+| `telemetry_env_override`                | Read the PRESTUS_TELEMETRY environment variable. |
 | `telemetry_has_display`                 | True when MATLAB can render a figure/dialog window. |
 | `telemetry_is_headless_cluster`         | True for compiled apps and SLURM/PBS jobs. |
+| `telemetry_is_noninteractive`           | True when no telemetry prompt may be shown. |
 | `telemetry_run_type`                    | Resolve whether this run is 'technical' or 'deployment'. |
 | `telemetry_set_consent`                 | Record a telemetry opt-in or opt-out decision. |
 | `telemetry_setup`                       | Show the opt-in prompt for anonymous usage statistics. |

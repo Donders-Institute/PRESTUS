@@ -3,21 +3,26 @@ function telemetry_setup(parent_fig)
 %
 % Called at the start of prestus_pipeline, and (with a figure handle) at
 % GUI startup. Skipped if the user has already made an explicit decision
-% (i.e. ~/.prestus/telemetry.json exists).
+% (i.e. ~/.prestus/telemetry.json exists) or PRESTUS_TELEMETRY is set.
+% Never waits for input in a non-interactive session.
 %
 % Decision order:
-%   1. Consent file (~/.prestus/telemetry.json) exists -> the recorded
-%      decision is used, no prompt.
-%   2. parent_fig given (called from the GUI) -> a modal dialog is shown,
+%   1. PRESTUS_TELEMETRY set to off/0/false (see TELEMETRY_ENV_OVERRIDE)
+%      -> nothing is sent from this process, whatever was recorded; one
+%      line is printed, nothing is prompted or recorded.
+%   2. Consent file (~/.prestus/telemetry.json) exists -> the recorded
+%      decision is used, no prompt. A recorded opt-out is never overridden:
+%      PRESTUS_TELEMETRY=on cannot turn sending back on.
+%   3. PRESTUS_TELEMETRY set to on/1/true and no decision recorded -> sent
+%      from this process; one line is printed, nothing is recorded.
+%   4. parent_fig given (called from the GUI) -> a modal dialog is shown,
 %      parented to that figure.
-%   3. Interactive console session -> the y/n prompt below is shown until
+%   5. Interactive console session -> the y/n prompt below is shown until
 %      the user answers (blocks until a decision is made).
-%   4. matlab -batch run locally with a display attached, i.e. not a
-%      deployed app or a SLURM/PBS job (see TELEMETRY_HAS_DISPLAY,
-%      TELEMETRY_IS_HEADLESS_CLUSTER) -> a modal dialog is shown, since
-%      there is no console to answer input() on.
-%   5. Otherwise (deployed app, SLURM/PBS job, or batch with no display at
-%      all) -> only the notice is printed; nothing is recorded or sent.
+%   6. Otherwise (non-interactive: deployed app, SLURM/PBS job,
+%      `matlab -batch` with or without a display, or no desktop and no
+%      display; see TELEMETRY_IS_NONINTERACTIVE) -> only the notice is
+%      printed; nothing is recorded or sent, and nothing waits for input.
 %
 % To record a decision without any prompt (e.g. before an HPC job), call
 % telemetry_set_consent().
@@ -43,15 +48,33 @@ function telemetry_setup(parent_fig)
 %                simulation itself may run on a background worker with no
 %                console at all.
 %
-% See also: TRACK_USAGE, TELEMETRY_SETUP_RESET, TELEMETRY_HAS_DISPLAY
+% See also: TRACK_USAGE, TELEMETRY_SETUP_RESET, TELEMETRY_ENV_OVERRIDE,
+%           TELEMETRY_IS_NONINTERACTIVE
 
     arguments
         parent_fig = []
     end
 
+    env = telemetry_env_override();
+    if strcmp(env, 'off')
+        fprintf('Telemetry off for this process (PRESTUS_TELEMETRY): no data sent.\n');
+        return
+    end
+
     cfg_file = fullfile(prefdir_prestus(), 'telemetry.json');
     if isfile(cfg_file)
-        return   % explicit decision already recorded
+        % Explicit decision already recorded; an opt-out is never overridden.
+        if strcmp(env, 'on')
+            fprintf(['PRESTUS_TELEMETRY=on ignored: the decision recorded in %s applies ' ...
+                     '(change it with telemetry_set_consent).\n'], cfg_file);
+        end
+        return
+    end
+
+    if strcmp(env, 'on')
+        fprintf(['Telemetry on for this process (PRESTUS_TELEMETRY): usage statistics ' ...
+                 'are sent; no decision recorded.\n']);
+        return
     end
 
     if ~isempty(parent_fig)
@@ -64,7 +87,7 @@ function telemetry_setup(parent_fig)
     fprintf('========================================\n');
     fprintf('%s\n', notice_body(cfg_file));
 
-    if is_interactive_session()
+    if ~telemetry_is_noninteractive()
         reply = '';
         while ~ismember(reply, {'y', 'n'})
             reply = lower(strtrim(input('Allow anonymous usage statistics? [y/n]: ', 's')));
@@ -76,33 +99,16 @@ function telemetry_setup(parent_fig)
         return
     end
 
-    if ~telemetry_is_headless_cluster() && telemetry_has_display()
-        % matlab -batch run locally with a display: no console to answer
-        % input() on, but a dialog can still be shown.
-        prompt_via_dialog(cfg_file, []);
-        return
-    end
-
     fprintf(['Non-interactive session: no decision recorded, no data sent.\n' ...
-             'Run telemetry_set_consent(true|false) once to stop this notice.\n\n']);
-end
-
-% -------------------------------------------------------------------------
-function tf = is_interactive_session()
-    tf = ~telemetry_is_headless_cluster() && ~batchStartupOptionUsed;
+             'Run telemetry_set_consent(true|false) once, or set PRESTUS_TELEMETRY=off|on,\n' ...
+             'to stop this notice.\n\n']);
 end
 
 % -------------------------------------------------------------------------
 function prompt_via_dialog(cfg_file, parent_fig)
-% Show a modal Allow/Decline/Ask-me-later dialog in place of console
-% input(). Used for GUI sessions (parent_fig given) and for local -batch
-% sessions with a display but no interactive stdin (parent_fig empty, a
-% throwaway invisible uifigure is created to host the dialog).
-    owns_fig = isempty(parent_fig);
-    if owns_fig
-        parent_fig = uifigure('Visible', 'off', 'Name', 'PRESTUS');
-    end
-    cleanup_fig = onCleanup(@() delete_if_owned(owns_fig, parent_fig)); %#ok<NASGU>
+% Show a modal Allow/Decline/Ask-me-later dialog parented to the GUI figure
+% in place of console input(). Used for GUI sessions only; a session with
+% no figure never gets a dialog (see TELEMETRY_IS_NONINTERACTIVE).
 
     % uiconfirm renders a cell array as one line per element; a plain char
     % array with embedded \n is not guaranteed to wrap the same way.
@@ -121,13 +127,6 @@ function prompt_via_dialog(cfg_file, parent_fig)
         otherwise
             % "Ask me later" (or dialog dismissed): no decision recorded,
             % the prompt reappears on the next call.
-    end
-end
-
-% -------------------------------------------------------------------------
-function delete_if_owned(owns_fig, fig)
-    if owns_fig && isvalid(fig)
-        delete(fig);
     end
 end
 

@@ -5,10 +5,8 @@ function tf = telemetry_is_headless_cluster()
 % a compiled/deployed application has no attached terminal, and a SLURM or
 % PBS/Torque allocation typically runs on a compute node with no display.
 %
-% Distinct from the interactivity check in TELEMETRY_SETUP, which also
-% excludes `matlab -batch`: a batch session run locally (not under
-% SLURM/PBS) may still have a display available for a dialog prompt; see
-% TELEMETRY_HAS_DISPLAY.
+% One of the conditions of TELEMETRY_IS_NONINTERACTIVE, which also covers
+% `matlab -batch` sessions and sessions with neither desktop nor display.
 %
 % Use as:
 %   tf = telemetry_is_headless_cluster()
@@ -16,7 +14,7 @@ function tf = telemetry_is_headless_cluster()
 % Output:
 %   tf - logical
 %
-% See also: TELEMETRY_HAS_DISPLAY, TELEMETRY_SETUP
+% See also: TELEMETRY_IS_NONINTERACTIVE, TELEMETRY_SETUP
 
     tf = true;
     try
