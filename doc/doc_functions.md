@@ -207,6 +207,8 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `autopad_grid_for_transducers`          | Expand grid if any transducer/focus position falls outside |
+| `head_model_load_or_build`              | Pose-independent head model of one subject, built once and cached |
+| `head_model_place`                      | Simulation grid of one transducer placement from the shared head model |
 | `head_smooth_and_crop`                  | Convert and smooth segmentations into medium map & crop grid for effiency |
 | `mean_beam_axis`                        | Mean axis of several transducer beams, averaged as axes (opposed beams do not cancel) |
 | `placement_run_dir`                     | Folder of one placement run (one mode, one target) |

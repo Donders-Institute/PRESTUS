@@ -509,6 +509,7 @@ See [doc_preproc.md](doc_preproc.md).
 | `skull_fill_method` | Method for filling holes in the skull. | `'rubberwrap'` | `rubberwrap` / `imclose` |
 | `skull_wrap_radius` | Rubber-wrap radius [grid voxels]. | `10` | Larger = tighter wrap ignoring bigger dents. Recommended: 2–10. |
 | `skull_wrap_visualize` | Visualize rubber-wrap result? | `0` | `1 = yes`, `0 = no`. Avoid on HPC. |
+| `reuse_across_placements` | Build the smoothed head model once per subject and only rotate and crop it for each transducer placement. | `false` | Saves the smoothing and hole filling (most of head preprocessing at fine resolution) in every run after the first of a subject: other poses, aims or affixes in the same output folder. Cached as `<dir_cache>/sub-XXX_<medium>_headmodel_<res>mm.mat` with the settings it depends on; rebuilt when they change. With `grid.mode: ras_plus` the result equals per-placement preprocessing exactly (checked on one head, two poses). With a rotated mode the smoothing precedes the rotation and the labels are resampled once more (nearest neighbour), which changes thin skull layers (skull-layer Dice 0.80–0.90 against per-placement preprocessing at 1 mm; a warning says so). Needs the planning T1 and the segmentation on one voxel grid. |
 
 ---
 

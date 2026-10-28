@@ -104,6 +104,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 #### Head model & pseudo-CT
 - Automated defacing via pydeface, optionally in the segmentation pipeline
 - Grid cropping includes the bowl of every transducer
+- `headmodel.reuse_across_placements` (default `false`) builds the smoothed head model once per subject and only rotates and crops it for each placement; in rotated grid modes the smoothing then precedes the rotation, so results differ slightly
 - New skull property mappings: `air-tissue` density, `webb` sound speed and attenuation, `pichardo` and `mcdannold` sound speed and attenuation
 - `pct.skull_mapping: custom` with `pct.custom_slope` / `pct.custom_intercept`
 - `pct.density_calibration` selects the HU→density table of `mapping_density: k-plan` (`kplan_default`, `ucl_lowdose_80kvp`, `cph2025`, or a CSV); default `''` keeps results unchanged. PRESTUS warns when `treeby` is not paired with `ucl_lowdose_80kvp`
