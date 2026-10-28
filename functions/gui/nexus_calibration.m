@@ -27,8 +27,10 @@ function out = nexus_calibration(args)
 %     'write_fit' .path (MAT file for a k-Wave drive check script)
 %     'close'
 %   settings - .forward_model, .near_field_skip_mm, .huber_delta, .n_starts,
-%              .domain, .isppa_wcm2, .align, .max_extrapolation_mm and
-%              .advanced (FIT_TRANSDUCER_MODEL option names → values)
+%              .domain, .isppa_wcm2, .align, .max_extrapolation_mm, .tolerance,
+%              .advanced (FIT_TRANSDUCER_MODEL option names → values) and
+%              .ring_profile_options (FIT_RING_PROFILE options, incl. OffAxis: a
+%              plane-scan file, and OffAxisOptions)
 %
 % Output:
 %   out - struct; 'open' and 'load' return the combo (entry, its meta.fit,
@@ -179,7 +181,8 @@ function [S, out] = do_fit(S, args)
         'FreeParams', {cellstr(get_field(args, 'free_params', {'phase'; 'amp'}))'}, ...
         'FitOptions', st.fit, 'Library', S.lib, 'IsppaWcm2', st.isppa, 'TranSerial', S.serial, ...
         'DrivingSystem', S.ds, 'Source', S.csv, 'CalibrateAt', ternary(at_desired, 'desired', 'measured'), ...
-        'Tool', 'nexus', 'RingProfile', char(get_field(args, 'ring_profile', 'auto')), 'Measured', S.meas, ...
+        'Tool', 'nexus', 'RingProfile', char(get_field(args, 'ring_profile', 'auto')), ...
+        'RingProfileOptions', st.ring, 'Measured', S.meas, ...
         'Progress', @(k, n, d, pt) nexus_progress( ...
             sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
     if at_desired
@@ -312,7 +315,21 @@ function st = settings(args)
     st.isppa = double(get_field(s, 'isppa_wcm2', 30));
     st.profile = struct('Align', char(get_field(s, 'align', 'label')), ...
         'MaxExtrapolationMm', double(get_field(s, 'max_extrapolation_mm', 0)), ...
-        'NearFieldSkipMm', st.fit.NearFieldSkipMm);
+        'NearFieldSkipMm', st.fit.NearFieldSkipMm, 'Tolerance', double(get_field(s, 'tolerance', 0.01)));
+    st.ring = plain(get_field(s, 'ring_profile_options', struct()));    % FIT_RING_PROFILE options
+end
+
+function v = plain(v)
+% JSON values as MATLAB options: numeric rows, char, nested structs
+    if isstruct(v)
+        for f = fieldnames(v)'; v.(f{1}) = plain(v.(f{1})); end
+    elseif iscell(v) && all(cellfun(@isnumeric, v))
+        v = cell2mat(v(:)');
+    elseif isnumeric(v)
+        v = double(v(:)');
+    elseif isstring(v)
+        v = char(v);
+    end
 end
 
 function v = row(v)

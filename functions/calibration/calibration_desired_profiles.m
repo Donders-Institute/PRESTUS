@@ -21,6 +21,8 @@ function p = calibration_desired_profiles(tran, meas, depths, options)
 %     .Align              - 'label' (default) | 'peak'
 %     .MaxExtrapolationMm - default 0 (no extrapolation)
 %     .NearFieldSkipMm    - default 10
+%     .Tolerance          - a desired depth within this of a measured one uses
+%                           the measurement [mm] (default 0.01)
 %
 % Output:
 %   p - .depths_ep_mm [1 x N], .z_ep_mm, .I [N_z x N] (NaN where there is no
@@ -41,7 +43,8 @@ function p = calibration_desired_profiles(tran, meas, depths, options)
     end
     io = struct('Align', opt(options, 'Align', 'label'), ...
         'MaxExtrapolationMm', opt(options, 'MaxExtrapolationMm', 0), ...
-        'NearFieldSkipMm', opt(options, 'NearFieldSkipMm', 10));
+        'NearFieldSkipMm', opt(options, 'NearFieldSkipMm', 10), ...
+        'Tolerance', opt(options, 'Tolerance', 0.01));
     p  = interpolate_axial_profiles(meas, dep, io);
     z  = p.z_ep_mm; dz = median(diff(z));
     p.n_z_scan = numel(z);

@@ -119,6 +119,7 @@ The following documents the functions provided in PRESTUS.
 | `plot_transducer_library`               | Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas). |
 | `rayleigh_axial_intensity`              | On-axis intensity via the Rayleigh–Sommerfeld integral |
 | `read_axial_profiles`                   | Read a hydrophone axial-profile CSV (one column per focal depth) |
+| `read_offaxis_scans`                    | Hydrophone plane and volume scans as off-axis data for FIT_RING_PROFILE |
 | `read_steering_measurements`            | Read hydrophone focal peaks of a steered matrix array |
 | `refine_transducer_library`             | Optional refinement of a library entry to your own hydrophone profiles |
 | `resolve_transducer_from_serial`        | Populate transducer struct from equipment and calibration library |

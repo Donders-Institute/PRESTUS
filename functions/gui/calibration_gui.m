@@ -78,6 +78,9 @@ function fig = calibration_gui(options)
     st.kw = [];   % k-Wave drive calibration of the current per-depth fit: .lib, .report, .sims, .settings
     st.predicted = false;   % true: st.prof is the desired-depth grid
     st.adv = struct();      % advanced FIT_TRANSDUCER_MODEL options ("Advanced…"); empty = defaults
+    st.pext = struct();     % desired-profile options ("Advanced…": Tolerance)
+    st.kwo = struct();      % k-Wave drive calibration options ("Advanced…": GridDims, ApplyCorrection)
+    st.rpo = struct();      % FIT_RING_PROFILE / plane-scan options ("Ring profile" Options…)
 
     serials = transducer_serials(st.equip);
 
@@ -131,13 +134,16 @@ function fig = calibration_gui(options)
          'on their measured or interpolated/extrapolated profiles']), 12, 2);
 
     lab('Ring profile', 13);
-    ui.ring = at(uidropdown(L, 'Items', {'keep the entry''s', 'fit (shared by all depths)', 'uniform rings'}, ...
+    rpb = at(uigridlayout(L, [1 2], 'Padding', 0, 'ColumnWidth', {'1x', 80}, 'ColumnSpacing', 4), 13, 2);
+    ui.rpo_btn = uibutton(rpb, 'Text', 'Options…', 'Tooltip', ['Sub-rings, smoothness, optimiser and ' ...
+        'plane scans (off-axis data) for the ring-profile fit'], 'ButtonPushedFcn', @(~,~) on_ring_options());
+    ui.ring = at(uidropdown(rpb, 'Items', {'keep the entry''s', 'fit (shared by all depths)', 'uniform rings'}, ...
         'ItemsData', {'auto', 'fit', 'none'}, 'Tooltip', ...
         ['How each ring vibrates across its width (FIT_RING_PROFILE). Fit: every ring split into ' ...
          'sub-rings with weights shared by all measured depths, then phases, gains and drive per depth; ' ...
          'the near field from 4 mm is then fitted too. Improves transducers whose near-field / focal ' ...
-         'peak ratio uniform rings cannot reproduce (e.g. CTX). Fitted on axial profiles only: ' ...
-         'the off-axis field it implies is not validated.']), 13, 2);
+         'peak ratio uniform rings cannot reproduce (e.g. CTX). Axial profiles alone do not determine ' ...
+         'the off-axis field: add plane scans under Options… where available.']), 1, 1);
     lab('Free parameters', 14);
     fp = at(uigridlayout(L, [2 2], 'Padding', 0, 'RowHeight', {20, 20}, 'RowSpacing', 4), [14 15], 2);
     ui.fp_phase = uicheckbox(fp, 'Text', 'phase', 'Value', true);
@@ -149,7 +155,8 @@ function fig = calibration_gui(options)
     lab('Loss on', 18);
     ui.domain  = at(uidropdown(L, 'Items', {'intensity', 'amplitude'}), 18, 2);
     lab('Huber δ', 19);
-    ui.huber   = at(uieditfield(L, 'numeric', 'Value', 0.8, 'Limits', [1e-3 1]), 19, 2);
+    ui.huber   = at(uieditfield(L, 'numeric', 'Value', 0.8, 'Limits', [1e-3 100], 'Tooltip', ...
+        'Pseudo-Huber scale on the peak-normalised profile; large (e.g. 10) = least squares'), 19, 2);
     lab('Starts', 20);
     nsb = at(uigridlayout(L, [1 2], 'Padding', 0, 'ColumnWidth', {'1x', 96}, 'ColumnSpacing', 4), 20, 2);
     ui.nstarts = uieditfield(nsb, 'numeric', 'Value', 16, 'Limits', [1 200], 'RoundFractionalValues', 'on');
@@ -300,6 +307,7 @@ function fig = calibration_gui(options)
         % INTERPOLATE_AXIAL_PROFILES options for profiles at desired depths
         o = struct('Align', ui.align.Value, 'MaxExtrapolationMm', ui.extrap.Value, ...
                    'NearFieldSkipMm', ui.skip.Value);
+        if isfield(st.pext, 'Tolerance'); o.Tolerance = st.pext.Tolerance; end
     end
 
     function on_predict()
@@ -367,7 +375,8 @@ function fig = calibration_gui(options)
             'Library', st.lib, 'IsppaWcm2', ui.isppa.Value, 'TranSerial', ui.tran.Value, ...
             'DrivingSystem', ternary(strcmp(ui.ds.Value, '(none)'), '', ui.ds.Value), ...
             'Source', ui.csv.Value, 'CalibrateAt', ternary(at_desired, 'desired', 'measured'), ...
-            'Tool', 'calibration_gui', 'RingProfile', ui.ring.Value, 'Measured', st.meas, ...
+            'Tool', 'calibration_gui', 'RingProfile', ui.ring.Value, 'RingProfileOptions', ring_options(), ...
+            'Measured', st.meas, ...
             'Progress', @(k, n, d, pt) set_msg(dlg, sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
         if at_desired
             po = profile_options(); fo.ProfileOptions = rmfield(po, 'NearFieldSkipMm');
@@ -400,6 +409,7 @@ function fig = calibration_gui(options)
             'ProgressFcn', @(k, n, d) set(dlg, 'Value', (k - 1) / n, ...
                 'Message', sprintf('Free-water simulation at %.1f mm (%d/%d)', d, k, n)));
         if ~isempty(strtrim(ui.simcfg.Value)); ko.SimConfig = strtrim(ui.simcfg.Value); end
+        for f = fieldnames(st.kwo)'; ko.(f{1}) = st.kwo.(f{1}); end      % GridDims, ApplyCorrection
         t1 = tic;
         try
             [lib, rep, sims] = kwave_calibrate_drive(st.fit.entry, sel, ko);
@@ -960,71 +970,244 @@ function fig = calibration_gui(options)
     end
 
     function on_advanced()
-        % Advanced FIT_TRANSDUCER_MODEL options. Only values that differ from the
-        % fitter defaults are stored (st.adv), so "Reset" restores the default fit.
-        D = advanced_defaults();
-        cur = D; for f = fieldnames(st.adv)'; cur.(f{1}) = st.adv.(f{1}); end
-        d = uifigure('Name', 'Advanced fit options', 'Position', [200 200 430 470], 'WindowStyle', 'modal');
-        G = uigridlayout(d, [15 2], 'RowHeight', repmat({24}, 1, 15), 'ColumnWidth', {190, '1x'});
-        al = @(txt, r) at(uilabel(G, 'Text', txt), r, 1);
-        num = @(v, r) at(uieditfield(G, 'numeric', 'Value', v), r, 2);
-        at(uilabel(G, 'Text', 'Phase model', 'FontWeight', 'bold'), 1, [1 2]);
-        al('Phase constraint', 2);
-        w.pc = at(uidropdown(G, 'Items', {'none', 'linear', 'monotonic'}, 'Value', cur.PhaseConstraint), 2, 2);
-        sb = cur.PhaseStepBounds; if isempty(sb); sb = [NaN NaN]; end
-        al('Step bounds (rad; blank = default)', 3);
-        g2 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 3, 2);
-        w.sb1 = uieditfield(g2, 'text', 'Value', num2str_blank(sb(1)));
-        w.sb2 = uieditfield(g2, 'text', 'Value', num2str_blank(sb(2)));
-        al('Phase prior λ', 4);                 w.lam  = num(cur.Lambda, 4);
-        al('Gain prior λ', 5);                  w.lama = num(cur.LambdaAmp, 5);
-        at(uilabel(G, 'Text', 'Amplitude and loss', 'FontWeight', 'bold'), 6, [1 2]);
-        al('Amplitude fit', 7);
-        w.af = at(uidropdown(G, 'Items', {'shape', 'absolute'}, 'Value', cur.AmplitudeFit), 7, 2);
-        w.sv = at(uicheckbox(G, 'Text', 'one drive for all depths (absolute)', 'Value', cur.SharedVelocity), 8, [1 2]);
-        al('Focal weight (0 = uniform, ≥1)', 9); w.fw = num(cur.FocalWeight, 9);
-        fw = cur.FitWindowMm; if isempty(fw); fw = [NaN NaN]; end
-        al('Fit window (mm EP; blank = all)', 10);
-        g3 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 10, 2);
-        w.fw1 = uieditfield(g3, 'text', 'Value', num2str_blank(fw(1)));
-        w.fw2 = uieditfield(g3, 'text', 'Value', num2str_blank(fw(2)));
-        al('z shift bounds (mm)', 11);
-        g4 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 11, 2);
-        w.zb1 = uieditfield(g4, 'numeric', 'Value', cur.ZShiftBounds(1));
-        w.zb2 = uieditfield(g4, 'numeric', 'Value', cur.ZShiftBounds(2));
-        at(uilabel(G, 'Text', 'Optimiser', 'FontWeight', 'bold'), 12, [1 2]);
-        g5 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4, 'ColumnWidth', {'1x', 80}), 13, [1 2]);
-        w.opt = uidropdown(g5, 'Items', {'lsqnonlin', 'fexminimize', 'globalsearch'}, 'Value', cur.Optimizer);
-        w.pol = uicheckbox(g5, 'Text', 'polish', 'Value', cur.Polish);
-        al('FEX population / max evals', 14);
-        g6 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 14, 2);
-        w.pop = uieditfield(g6, 'numeric', 'Value', cur.PopSize, 'Limits', [10 1e5], 'RoundFractionalValues', 'on');
-        w.mfe = uieditfield(g6, 'numeric', 'Value', cur.MaxFunEvals, 'Limits', [100 1e8], 'RoundFractionalValues', 'on');
-        bb = at(uigridlayout(G, [1 3], 'Padding', 0), 15, [1 2]);
-        uibutton(bb, 'Text', 'Reset', 'ButtonPushedFcn', @(~,~) apply(struct()));
+        % Advanced options: FIT_TRANSDUCER_MODEL (st.adv), the desired-profile
+        % tolerance (st.pext) and the k-Wave drive calibration (st.kwo). Only
+        % values that differ from the defaults are stored, so "Reset" restores
+        % the default fit. "Start from preset" loads a CALIBRATION_FIT_OPTIONS
+        % preset into this dialog and the main panel.
+        D = advanced_defaults(); E = extra_defaults();
+        cur = D; for fa = fieldnames(st.adv)'; cur.(fa{1}) = st.adv.(fa{1}); end
+        ext = E; for fa = fieldnames(st.pext)'; ext.(fa{1}) = st.pext.(fa{1}); end
+        for fa = fieldnames(st.kwo)'; ext.(fa{1}) = st.kwo.(fa{1}); end
+        n_rows = 30;
+        d = uifigure('Name', 'Advanced fit options', 'Position', [200 120 460 760], 'WindowStyle', 'modal');
+        G = uigridlayout(d, [n_rows 2], 'RowHeight', repmat({22}, 1, n_rows), 'ColumnWidth', {210, '1x'}, ...
+            'RowSpacing', 3, 'Scrollable', 'on');
+        al  = @(txt, r, tip) at(uilabel(G, 'Text', txt, 'Tooltip', tip), r, 1);
+        num = @(r) at(uieditfield(G, 'numeric'), r, 2);
+        hdr = @(txt, r) at(uilabel(G, 'Text', txt, 'FontWeight', 'bold'), r, [1 2]);
+        function [a, b] = pair_row(r, kind)
+            g = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), r, 2);
+            a = uieditfield(g, kind); b = uieditfield(g, kind);
+        end
+        al('Start from preset', 1, ['CALIBRATION_FIT_OPTIONS preset: sets the main panel (free parameters, ' ...
+            'forward model, loss, near-field skip) and these options to the preset''s values']);
+        w.pre = at(uidropdown(G, 'Items', {'(current settings)', 'rayleigh_phase_gain', 'oneil_phase_only'}, ...
+            'ValueChangedFcn', @(src, ~) load_preset(src.Value)), 1, 2);
+        hdr('Phase model', 2);
+        al('Phase constraint', 3, 'none: free offsets per ring; linear / monotonic: PERFORM_GLOBAL_SEARCH constraints');
+        w.pc = at(uidropdown(G, 'Items', {'none', 'linear', 'monotonic'}), 3, 2);
+        al('Step bounds (rad; blank = default)', 4, 'PhaseStepBounds');
+        [w.sb1, w.sb2] = pair_row(4, 'text');
+        al('Phase prior λ', 5, 'Lambda: pull of the phase offsets towards geometric steering');
+        w.lam = num(5);
+        al('Gain prior λ', 6, 'LambdaAmp: pull of the log ring gains towards equal gains');
+        w.lama = num(6);
+        hdr('Gains', 7);
+        al('Gain bounds (× prior)', 8, 'AmpBounds: bounds on each ring gain relative to the prior');
+        [w.ab1, w.ab2] = pair_row(8, 'numeric');
+        al('Plausible gain (× mean; flag only)', 9, 'PlausibleGain: gains outside are flagged as a possible hardware fault');
+        [w.pg1, w.pg2] = pair_row(9, 'numeric');
+        hdr('Amplitude and loss', 10);
+        al('Amplitude fit', 11, 'shape: closed-form scale per depth; absolute: drive velocity fitted to the measured W/cm²');
+        w.af = at(uidropdown(G, 'Items', {'shape', 'absolute'}), 11, 2);
+        w.sv = at(uicheckbox(G, 'Text', 'one drive for all depths (absolute)'), 12, [1 2]);
+        al('Focal weight (0 = uniform, ≥1)', 13, 'FocalWeight: Gaussian weights around the measured focus');
+        w.fw = num(13);
+        al('Fit window (mm EP; blank = all)', 14, 'FitWindowMm');
+        [w.fw1, w.fw2] = pair_row(14, 'text');
+        hdr('Near field', 15);
+        al('Near-field penalty (0 = off)', 16, ['NearFieldPenalty: penalises model near-field intensity above the ' ...
+            'measured near field (between the minimum and the near-field skip)']);
+        w.nfp = num(16);
+        al('Margin (× focal peak)', 17, 'NearFieldMargin: excess tolerated before the penalty applies');
+        w.nfm = num(17);
+        al('From (mm EP)', 18, 'NearFieldMinMm: start of the penalised near field');
+        w.nfz = num(18);
+        hdr('Medium and optimiser', 19);
+        al('Sound speed (m/s) / density (kg/m³)', 20, 'CWater, Rho: free-water medium of the forward model');
+        [w.cw, w.rho] = pair_row(20, 'numeric');
+        al('Optimiser', 21, 'lsqnonlin (NStarts starts) | fexminimize | globalsearch');
+        g5 = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4, 'ColumnWidth', {'1x', 70}), 21, 2);
+        w.opt = uidropdown(g5, 'Items', {'lsqnonlin', 'fexminimize', 'globalsearch'});
+        w.pol = uicheckbox(g5, 'Text', 'polish');
+        al('FEX population / max evals', 22, 'PopSize, MaxFunEvals (fexminimize)');
+        [w.pop, w.mfe] = pair_row(22, 'numeric');
+        w.pop.Limits = [10 1e5]; w.pop.RoundFractionalValues = 'on';
+        w.mfe.Limits = [100 1e8]; w.mfe.RoundFractionalValues = 'on';
+        al('Random seed', 23, 'Seed of the extra starts');
+        w.seed = num(23); w.seed.RoundFractionalValues = 'on';
+        hdr('Desired profiles', 24);
+        al('Same-depth tolerance (mm)', 25, ['Tolerance: a desired depth this close to a measured one uses the ' ...
+            'measurement instead of an interpolated profile']);
+        w.tol = num(25);
+        hdr('k-Wave drive calibration', 26);
+        al('Grid (blank = sim config)', 27, ['GridDims: ''auto'' (sized to the aperture and focus) or ' ...
+            '[nx ny nz]; blank = the sim config''s grid']);
+        w.grid = at(uieditfield(G, 'text'), 27, 2);
+        w.apply = at(uicheckbox(G, 'Text', 'rescale the stored drives to the simulated ISPPA', ...
+            'Tooltip', 'ApplyCorrection; off: report only'), 28, [1 2]);
+        bb = at(uigridlayout(G, [1 3], 'Padding', 0), 30, [1 2]);
+        uibutton(bb, 'Text', 'Reset', 'ButtonPushedFcn', @(~,~) apply(struct(), struct(), struct()));
         uibutton(bb, 'Text', 'Cancel', 'ButtonPushedFcn', @(~,~) close(d));
-        uibutton(bb, 'Text', 'OK', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) apply(read()));
+        uibutton(bb, 'Text', 'OK', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) ok());
+        fill(cur, ext);
 
-        function v = read()
+        function fill(c, e)
+            w.pc.Value = char(c.PhaseConstraint);
+            sb = c.PhaseStepBounds; if isempty(sb); sb = [NaN NaN]; end
+            w.sb1.Value = num2str_blank(sb(1)); w.sb2.Value = num2str_blank(sb(2));
+            w.lam.Value = c.Lambda; w.lama.Value = c.LambdaAmp;
+            w.ab1.Value = c.AmpBounds(1); w.ab2.Value = c.AmpBounds(2);
+            w.pg1.Value = c.PlausibleGain(1); w.pg2.Value = c.PlausibleGain(2);
+            w.af.Value = char(c.AmplitudeFit); w.sv.Value = logical(c.SharedVelocity);
+            w.fw.Value = c.FocalWeight;
+            fw = c.FitWindowMm; if isempty(fw); fw = [NaN NaN]; end
+            w.fw1.Value = num2str_blank(fw(1)); w.fw2.Value = num2str_blank(fw(2));
+            w.nfp.Value = c.NearFieldPenalty; w.nfm.Value = c.NearFieldMargin; w.nfz.Value = c.NearFieldMinMm;
+            w.cw.Value = c.CWater; w.rho.Value = c.Rho;
+            w.opt.Value = char(c.Optimizer); w.pol.Value = logical(c.Polish);
+            w.pop.Value = c.PopSize; w.mfe.Value = c.MaxFunEvals; w.seed.Value = c.Seed;
+            w.tol.Value = e.Tolerance;
+            g = e.GridDims; if isnumeric(g); g = strjoin(compose('%g', g), ' '); end
+            w.grid.Value = char(g); w.apply.Value = logical(e.ApplyCorrection);
+        end
+        function load_preset(name)
+            if strcmp(name, '(current settings)'); return; end
+            p = calibration_fit_options(name);
+            c = D;
+            for fp_ = fieldnames(p)'; if isfield(c, fp_{1}); c.(fp_{1}) = p.(fp_{1}); end; end
+            fill(c, ext);
+            free = cellstr(p.FreeParams);
+            ui.fp_phase.Value = ismember('phase', free); ui.fp_amp.Value = ismember('amp', free);
+            ui.fwd.Value = p.ForwardModel; ui.domain.Value = p.Domain;
+            ui.huber.Value = p.HuberDelta; ui.skip.Value = p.NearFieldSkipMm;
+            say(sprintf('Preset %s loaded into the main panel and the advanced options (press OK to keep).', name));
+        end
+        function ok()
             v = struct('PhaseConstraint', w.pc.Value, 'PhaseStepBounds', pair_or_empty(w.sb1, w.sb2), ...
                 'AmplitudeFit', w.af.Value, 'SharedVelocity', w.sv.Value, 'Optimizer', w.opt.Value, ...
                 'PopSize', w.pop.Value, 'MaxFunEvals', w.mfe.Value, 'Polish', w.pol.Value, ...
                 'FocalWeight', w.fw.Value, 'FitWindowMm', pair_or_empty(w.fw1, w.fw2), ...
-                'Lambda', w.lam.Value, 'LambdaAmp', w.lama.Value, 'ZShiftBounds', [w.zb1.Value w.zb2.Value]);
-            for f = fieldnames(v)'   % keep only non-defaults
-                if isequal(v.(f{1}), D.(f{1})); v = rmfield(v, f{1}); end
+                'Lambda', w.lam.Value, 'LambdaAmp', w.lama.Value, ...
+                'AmpBounds', sort([w.ab1.Value w.ab2.Value]), 'PlausibleGain', sort([w.pg1.Value w.pg2.Value]), ...
+                'NearFieldPenalty', w.nfp.Value, 'NearFieldMargin', w.nfm.Value, 'NearFieldMinMm', w.nfz.Value, ...
+                'CWater', w.cw.Value, 'Rho', w.rho.Value, 'Seed', w.seed.Value);
+            g = strtrim(w.grid.Value);
+            gd = str2num(g); %#ok<ST2NM> numeric dims, else 'auto' or ''
+            if ~isempty(gd); g = gd; end
+            if ~(isempty(g) || isequal(g, 'auto') || (isnumeric(g) && any(numel(g) == [2 3])))
+                uialert(d, 'Grid: enter auto, [nx nz] or [nx ny nz], or leave it blank.', 'Advanced'); return;
             end
+            apply(non_default(v, D), non_default(struct('Tolerance', w.tol.Value), E), ...
+                  non_default(struct('GridDims', g, 'ApplyCorrection', w.apply.Value), E));
         end
-        function apply(v)
-            st.adv = v;
-            n = numel(fieldnames(v));
-            ui.adv_btn.Text = ternary(n > 0, sprintf('Advanced (%d)', n), 'Advanced…');
-            if n > 0
-                say(sprintf('Advanced fit options: %s', strjoin(fieldnames(v), ', ')));
+        function apply(v, pe, kw)
+            st.adv = v; st.pext = pe; st.kwo = kw;
+            update_advanced_button();
+            names = [fieldnames(v); fieldnames(pe); fieldnames(kw)];
+            if ~isempty(names)
+                say(sprintf('Advanced options: %s', strjoin(names, ', ')));
             else
-                say('Advanced fit options reset to defaults.');
+                say('Advanced options reset to defaults.');
             end
             close(d);
+        end
+    end
+
+    function update_advanced_button()
+        n = numel(fieldnames(st.adv)) + numel(fieldnames(st.pext)) + numel(fieldnames(st.kwo));
+        ui.adv_btn.Text = ternary(n > 0, sprintf('Advanced (%d)', n), 'Advanced…');
+        n = numel(fieldnames(st.rpo));
+        ui.rpo_btn.Text = ternary(n > 0, sprintf('Options (%d)', n), 'Options…');
+    end
+
+    function on_ring_options()
+        % FIT_RING_PROFILE options (st.rpo, non-defaults only), incl. a
+        % plane-scan file (READ_OFFAXIS_SCANS) fitted with the axial profiles
+        R0 = ring_defaults();
+        cur = R0; for fr = fieldnames(st.rpo)'; cur.(fr{1}) = st.rpo.(fr{1}); end
+        n_rows = 19;
+        d = uifigure('Name', 'Ring profile options', 'Position', [220 160 470 560], 'WindowStyle', 'modal');
+        G = uigridlayout(d, [n_rows 2], 'RowHeight', repmat({22}, 1, n_rows), 'ColumnWidth', {200, '1x'}, ...
+            'RowSpacing', 3, 'Scrollable', 'on');
+        al  = @(txt, r, tip) at(uilabel(G, 'Text', txt, 'Tooltip', tip), r, 1);
+        num = @(v, r) at(uieditfield(G, 'numeric', 'Value', v), r, 2);
+        hdr = @(txt, r) at(uilabel(G, 'Text', txt, 'FontWeight', 'bold'), r, [1 2]);
+        hdr('Profile model (used when Ring profile = fit)', 1);
+        al('Sub-rings per ring', 2, 'NSub');                       w.nsub = num(cur.NSub, 2);
+        w.nsub.Limits = [1 32]; w.nsub.RoundFractionalValues = 'on';
+        al('Smoothness (0 = none)', 3, 'Smooth: penalty between neighbouring sub-rings'); w.sm = num(cur.Smooth, 3);
+        al('Near-field skip (mm EP)', 4, 'NearFieldSkipMm: axial samples fitted from here'); w.skip = num(cur.NearFieldSkipMm, 4);
+        al('Weight bounds', 5, 'AmpBounds: bounds on sub-ring weights and channel gains');
+        g = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 5, 2);
+        w.ab1 = uieditfield(g, 'numeric', 'Value', cur.AmpBounds(1));
+        w.ab2 = uieditfield(g, 'numeric', 'Value', cur.AmpBounds(2));
+        hdr('Optimiser', 6);
+        al('Alternations', 7, 'Iterations: drives ↔ sub-ring weights');  w.it = num(cur.Iterations, 7);
+        al('Starts per depth', 8, 'NStarts');                            w.ns = num(cur.NStarts, 8);
+        al('Random seed', 9, 'Seed');                                    w.seed = num(cur.Seed, 9);
+        w.ho = at(uicheckbox(G, 'Text', 'leave-one-depth-out check (slower)', 'Value', logical(cur.HeldOut), ...
+            'Tooltip', 'HeldOut: also score each depth with the profile fitted on the other depths'), 10, [1 2]);
+        hdr('Plane / volume scans (off-axis data)', 11);
+        al('File (blank = axial only)', 12, ['OffAxis: Sonic Concepts FUS Metrology export (.mat, folder or ' ...
+            '.zip) or CSV focus_ep_mm, x_mm, y_mm, z_ep_mm, intensity_wcm2 (READ_OFFAXIS_SCANS)']);
+        fb = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4, 'ColumnWidth', {'1x', 60}), 12, 2);
+        w.file = uieditfield(fb, 'text', 'Value', char(cur.OffAxis));
+        uibutton(fb, 'Text', 'Browse…', 'ButtonPushedFcn', @(~,~) browse());
+        al('Scans used', 13, 'Kind: all | transverse (XY planes) | axial (XZ / YZ planes) | volume (3D scans)');
+        w.kind = at(uidropdown(G, 'Items', {'all', 'transverse', 'axial', 'volume'}, 'Value', char(cur.Kind)), 13, 2);
+        al('Weight per plane (× axial profile)', 14, 'Weight'); w.wt = num(cur.Weight, 14);
+        al('Radial range / bin (mm)', 15, 'RMaxMm, BinMm');
+        g = at(uigridlayout(G, [1 2], 'Padding', 0, 'ColumnSpacing', 4), 15, 2);
+        w.rmax = uieditfield(g, 'numeric', 'Value', cur.RMaxMm);
+        w.bin  = uieditfield(g, 'numeric', 'Value', cur.BinMm);
+        al('Axial-plane / volume z bin (mm)', 16, 'ZBinMm: coarser = faster'); w.zbin = num(cur.ZBinMm, 16);
+        al('Transverse / volume centre', 17, 'Centre: origin (scan axis at x = y = 0) | centroid of the top 50 %');
+        w.cen = at(uidropdown(G, 'Items', {'origin', 'centroid'}, 'Value', char(cur.Centre)), 17, 2);
+        bb = at(uigridlayout(G, [1 3], 'Padding', 0), 19, [1 2]);
+        uibutton(bb, 'Text', 'Reset', 'ButtonPushedFcn', @(~,~) apply(struct()));
+        uibutton(bb, 'Text', 'Cancel', 'ButtonPushedFcn', @(~,~) close(d));
+        uibutton(bb, 'Text', 'OK', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) ok());
+
+        function browse()
+            [f, p] = uigetfile({'*.mat;*.zip;*.csv', 'Plane scans (*.mat, *.zip, *.csv)'}, 'Plane scans');
+            figure(d);
+            if ~isequal(f, 0); w.file.Value = fullfile(p, f); end
+        end
+        function ok()
+            file = strtrim(w.file.Value);
+            if ~isempty(file) && ~(isfile(file) || isfolder(file))
+                uialert(d, sprintf('Not found: %s', file), 'Ring profile options'); return;
+            end
+            v = struct('NSub', w.nsub.Value, 'Smooth', w.sm.Value, 'NearFieldSkipMm', w.skip.Value, ...
+                'AmpBounds', sort([w.ab1.Value w.ab2.Value]), 'Iterations', w.it.Value, 'NStarts', w.ns.Value, ...
+                'Seed', w.seed.Value, 'HeldOut', w.ho.Value, 'OffAxis', file, 'Kind', w.kind.Value, ...
+                'Weight', w.wt.Value, 'RMaxMm', w.rmax.Value, 'BinMm', w.bin.Value, 'ZBinMm', w.zbin.Value, ...
+                'Centre', w.cen.Value);
+            apply(non_default(v, R0));
+        end
+        function apply(v)
+            st.rpo = v;
+            update_advanced_button();
+            if isfield(v, 'OffAxis') && ~strcmp(ui.ring.Value, 'fit')
+                say('Plane scans are used when Ring profile is set to "fit".');
+            end
+            close(d);
+        end
+    end
+
+    function ro = ring_options()
+        % RingProfileOptions for CALIBRATION_FIT from st.rpo
+        R0 = ring_defaults(); v = R0;
+        for f = fieldnames(st.rpo)'; v.(f{1}) = st.rpo.(f{1}); end
+        ro = struct('NSub', v.NSub, 'Smooth', v.Smooth, 'NearFieldSkipMm', v.NearFieldSkipMm, ...
+            'AmpBounds', v.AmpBounds, 'Iterations', v.Iterations, 'NStarts', v.NStarts, 'Seed', v.Seed, ...
+            'HeldOut', logical(v.HeldOut));
+        if ~isempty(v.OffAxis)
+            ro.OffAxis = char(v.OffAxis);
+            ro.OffAxisOptions = struct('Kind', v.Kind, 'Weight', v.Weight, 'RMaxMm', v.RMaxMm, ...
+                'BinMm', v.BinMm, 'ZBinMm', v.ZBinMm, 'Centre', v.Centre);
         end
     end
 
@@ -1060,8 +1243,19 @@ function fig = calibration_gui(options)
                 st.adv.(f{1}) = fo.(f{1});
             end
         end
-        n = numel(fieldnames(st.adv));
-        ui.adv_btn.Text = ternary(n > 0, sprintf('Advanced (%d)', n), 'Advanced…');
+        st.pext = non_default(struct('Tolerance', double(get_field(po, 'Tolerance', 0.01))), extra_defaults());
+        st.rpo = struct();
+        rr = get_field(get_field(rec, 'ring_profile', struct()), 'options', struct());
+        if isstruct(rr)
+            oo = get_field(rr, 'OffAxisOptions', struct());
+            for f = fieldnames(oo)'; rr.(f{1}) = oo.(f{1}); end
+            R0 = ring_defaults(); v = struct();
+            for f = fieldnames(R0)'
+                if isfield(rr, f{1}) && ~strcmp(char(string(rr.(f{1}))), '(struct)'); v.(f{1}) = double_if_numeric(rr.(f{1})); end
+            end
+            st.rpo = non_default(v, R0);
+        end
+        update_advanced_button();
         say(sprintf('Fit settings taken from the entry (meta.fit: %s, %s, %s).', char(get_field(rec, 'mode', '')), ...
             char(get_field(rec, 'tool', '')), char(string(get_field(lib.meta, 'last_updated', '')))));
     end
@@ -1108,11 +1302,37 @@ function txt = phase_label(s)
 end
 
 function D = advanced_defaults()
-% Advanced FIT_TRANSDUCER_MODEL options and their fitter defaults ("Advanced…")
+% Advanced FIT_TRANSDUCER_MODEL options and their fitter defaults ("Advanced…").
+% Not offered: the z shift and steering sound speed (not applied at run time),
+% ChannelGroups (equipment), Prior (the entry) and EvaluateOnly ("Evaluate").
     D = struct('PhaseConstraint', 'none', 'PhaseStepBounds', [], 'AmplitudeFit', 'shape', ...
                'SharedVelocity', false, 'Optimizer', 'lsqnonlin', 'PopSize', 5000, ...
                'MaxFunEvals', 2e5, 'Polish', true, 'FocalWeight', 0, 'FitWindowMm', [], ...
-               'Lambda', 1e-3, 'LambdaAmp', 1e-2, 'ZShiftBounds', [-3 3]);
+               'Lambda', 1e-3, 'LambdaAmp', 1e-2, 'AmpBounds', [0.1 10], 'PlausibleGain', [0.5 2], ...
+               'NearFieldPenalty', 1, 'NearFieldMargin', 0.1, 'NearFieldMinMm', 2, ...
+               'CWater', 1500, 'Rho', 994, 'Seed', 1);
+end
+
+function E = extra_defaults()
+% Desired-profile (INTERPOLATE_AXIAL_PROFILES) and k-Wave drive calibration
+% (KWAVE_CALIBRATE_DRIVE) options of "Advanced…" and their defaults
+    E = struct('Tolerance', 0.01, 'GridDims', '', 'ApplyCorrection', true);
+end
+
+function R = ring_defaults()
+% FIT_RING_PROFILE and READ_OFFAXIS_SCANS options ("Ring profile options…")
+    R = struct('NSub', 4, 'Smooth', 0.3, 'NearFieldSkipMm', 4, 'AmpBounds', [0.1 10], ...
+               'Iterations', 6, 'NStarts', 12, 'Seed', 1, 'HeldOut', false, 'OffAxis', '', ...
+               'Kind', 'all', 'Weight', 1, 'RMaxMm', 30, 'BinMm', 0.5, 'ZBinMm', 1, 'Centre', 'origin');
+end
+
+function v = non_default(v, D)
+% Keep only the fields of v that differ from D
+    for f = fieldnames(v)'
+        if isfield(D, f{1}) && isequal(double_if_numeric(v.(f{1})), double_if_numeric(D.(f{1})))
+            v = rmfield(v, f{1});
+        end
+    end
 end
 
 function v = double_if_numeric(v)

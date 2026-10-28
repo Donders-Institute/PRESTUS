@@ -116,6 +116,75 @@ classdef test_ring_profile < matlab.unittest.TestCase
             tc.verifyGreaterThan(info.offaxis(1).r2_profile, 0.99);
         end
 
+        function test_plane_scans_read_and_rescale(tc)
+            % READ_OFFAXIS_SCANS: CSV and FUS Metrology export, radial reduction, rescaling
+            Ir = @(r) 20 * exp(-(r / 3).^2);                     % radially symmetric plane [W/cm²]
+            [x, y] = meshgrid(-10:0.5:10); x = x(:); y = y(:);
+            [xs, zs] = meshgrid(-5:0.5:10, 20:0.5:50); xs = xs(:); zs = zs(:);
+            T = table([40 * ones(numel(x), 1); 40 * ones(numel(xs), 1)], [x; xs], [y; 0 * xs], ...
+                [35 * ones(numel(x), 1); zs], [Ir(hypot(x, y)); Ir(abs(xs)) .* exp(-((zs - 40) / 8).^2)], ...
+                'VariableNames', {'focus_ep_mm', 'x_mm', 'y_mm', 'z_ep_mm', 'intensity_wcm2'});
+            T.label = [repmat("XY 35", numel(x), 1); repmat("XZ", numel(xs), 1)];
+            csv = fullfile(tc.Tmp, 'planes.csv'); writetable(T, csv);
+            oa = read_offaxis_scans(csv, struct('RMaxMm', 8));
+            tc.verifyEqual(sort({oa.kind}), {'axial', 'transverse'});
+            t = oa(strcmp({oa.kind}, 'transverse'));
+            tc.verifyEqual(t.z_ep_mm(1), 35); tc.verifyEqual(t.depth_ep_mm, 40);
+            tc.verifyEqual(t.I(1), Ir(0), 'RelTol', 1e-9, 'axis bin = the centre sample');
+            tc.verifyEqual(t.I, Ir(t.r_mm), 'AbsTol', 0.5, 'azimuthal average of a symmetric plane (0.5 mm bins)');
+            a = oa(strcmp({oa.kind}, 'axial'));
+            tc.verifyLessThanOrEqual(max(a.r_mm), 8); tc.verifyEqual(min(a.z_ep_mm), 20);
+            tc.verifyEqual(read_offaxis_scans(csv, struct('Kind', 'transverse')).label, 'XY 35');
+            % 3D scan, axis off the origin: (r, z) map around the centroid
+            [xv, yv, zv] = ndgrid(-8:0.5:8, -8:0.5:8, 30:1:50); xv = xv(:) + 1; yv = yv(:) - 0.5; zv = zv(:);
+            Iv = Ir(hypot(xv - 1, yv + 0.5)) .* exp(-((zv - 40) / 8).^2);
+            V = table(40 * ones(size(xv)), xv, yv, zv, Iv, ...
+                'VariableNames', {'focus_ep_mm', 'x_mm', 'y_mm', 'z_ep_mm', 'intensity_wcm2'});
+            vcsv = fullfile(tc.Tmp, 'volume.csv'); writetable(V, vcsv);
+            ov = read_offaxis_scans(vcsv, struct('Centre', 'centroid', 'RMaxMm', 6));
+            tc.verifyEqual(ov.kind, 'volume');
+            tc.verifyEqual(numel(unique(ov.z_ep_mm)), 21);
+            at40 = ov.z_ep_mm == 40;
+            tc.verifyEqual(ov.I(at40), Ir(ov.r_mm(at40)), 'AbsTol', 0.6, 'radial profile at each z');
+            tc.verifyError(@() read_offaxis_scans(vcsv, struct('Kind', 'transverse')), 'read_offaxis_scans:none');
+            % FUS Metrology export with its own axial profiles: planes rescaled to the fitted axial peak
+            z = (0:0.5:80)'; ax = 30 * exp(-((z - 40) / 6).^2);
+            pl = struct('type', 'Transverse XY - Holography', 'focus', 40, 'x', x, 'y', y, 'z', 35 + 0 * x, ...
+                        'ISPPA', struct('data', single(Ir(hypot(x, y))'), 'unit', 'W/cm2'));
+            axs = struct('type', 'Axial', 'focus', 40, 'x', 0 * z, 'y', 0 * z, 'z', z, ...
+                         'ISPPA', struct('data', single(ax'), 'unit', 'W/cm2'));
+            data = {axs, pl}; mat = fullfile(tc.Tmp, 'FUS_Metrology_Export_BableBrain.mat'); save(mat, 'data');
+            meas = struct('depths_ep_mm', 39.6, 'z_ep_mm', z, 'I', 0.5 * ax);   % half the export's level
+            o1 = read_offaxis_scans(mat);
+            o2 = read_offaxis_scans(tc.Tmp, struct('Axial', meas, 'Kind', 'transverse'));
+            tc.verifyEqual(o1.scale, 1);
+            tc.verifyEqual(o2(1).scale, 0.5, 'RelTol', 1e-6);
+            tc.verifyEqual(o2(1).I, 0.5 * o1.I, 'RelTol', 1e-6);
+        end
+
+        function test_plane_file_path_equals_struct(tc)
+            % fit_ring_profile reads a plane-scan path itself; same result as the struct
+            tr = tc.Tran; a = tr.transducer.annular; off = a.curv_radius_mm - a.dist_geom_ep_mm;
+            z = (0:0.5:100)'; d = [40 55];
+            H = axial_transfer_matrix(tr, z + off, 1500, 994, 'rayleigh');
+            I = [abs(H * ones(a.elem_n, 1)).^2, abs(H * exp(1i * (0:a.elem_n - 1)' * 0.4)).^2];
+            prof = struct('depths_ep_mm', d, 'z_ep_mm', z, 'I', I);
+            [x, y] = meshgrid(-6:0.5:6); x = x(:); y = y(:);
+            Hr = field_transfer_matrix(tr, hypot(x, y), 35 * ones(size(x)) + off, 1500, 994);
+            T = table(40 * ones(size(x)), x, y, 35 * ones(size(x)), abs(Hr * ones(a.elem_n, 1)).^2, ...
+                'VariableNames', {'focus_ep_mm', 'x_mm', 'y_mm', 'z_ep_mm', 'intensity_wcm2'});
+            csv = fullfile(tc.Tmp, 'plane_fit.csv'); writetable(T, csv);
+            o = struct('NSub', 2, 'NStarts', 2, 'Iterations', 2, 'OffAxisOptions', struct('RMaxMm', 6));
+            [rp1, i1] = fit_ring_profile(tr, prof, setfield(o, 'OffAxis', csv)); %#ok<SFLD>
+            oa = read_offaxis_scans(csv, struct('RMaxMm', 6, 'Axial', prof, 'NearFieldSkipMm', 4));
+            [rp2, i2] = fit_ring_profile(tr, prof, setfield(rmfield(o, 'OffAxisOptions'), 'OffAxis', oa)); %#ok<SFLD>
+            tc.verifyEqual(rp1.weight_abs, rp2.weight_abs, 'AbsTol', 1e-9);
+            tc.verifyEqual(i1.offaxis.r2_profile, i2.offaxis.r2_profile, 'AbsTol', 1e-9);
+            tc.verifyEqual(rp1.offaxis_source, csv);
+            tc.verifyEqual(rp2.offaxis_source, '');
+            tc.verifyGreaterThan(rp1.offaxis_r2, 0.9);
+        end
+
         function test_drive_applies_weights_once(tc)
             trp = ring_profile_transducer(tc.Tran, struct('n_sub', 2, 'weight_abs', 0.5 * ones(1, 8), ...
                 'weight_phase_deg', 30 * ones(1, 8)));

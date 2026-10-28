@@ -221,36 +221,53 @@ This writes an entry with an empty offset (pure geometric steering). Accuracy eq
 
 ### Level 2: Refine to your own hydrophone profiles (optional)
 
-Measure axial profiles in your own water tank at the depths you will stimulate (CSV format below). One call fits them and writes an entry to **your** folder, leaving the shipped library unchanged. It also prints a before/after report and, with `Plot`, saves a figure next to the entry:
+Measure axial profiles in your water tank at the depths you will stimulate ([CSV format](#axial-profile-csv)). One call fits them and writes an entry to **your** folder, with a before/after report and, with `Plot`, a figure:
 
 ```matlab
 refine_transducer_library('CTX_250_001_SC_105_010', 'my_profiles.csv', ...
     '/project/my_study/transducer_library', struct('Plot', true));
 ```
 
-Then set `transducer.library_path` in the study config. At the measured depths PRESTUS uses your refinement. Between them it interpolates, and more than `blend_mm` outside them it returns to the global model. `examples/demo_transducer_refinement.m` runs the whole path on demonstration profiles in a few seconds.
+Then set `transducer.library_path` in the study config. `examples/demo_transducer_refinement.m` runs the whole path on demonstration profiles.
 
-To inspect an entry, `plot_transducer_library(combo, library_path)` plots the ring phases, drive and ring gains it resolves to across depths, and `generate_calibration_report(combo, library_path)` writes an HTML summary with the fit quality and the settings at the fitted depths.
+To inspect an entry:
 
-Per-depth fits free the phase offsets and per-ring gains (`FreeParams = {'phase','amp'}`), with an intensity-domain loss (`Domain = 'intensity'`, `HuberDelta = 0.8`). They are regularised towards the entry's global model, which is geometric steering for per-depth entries. The same defaults apply in the GUI and in `build_transducer_library`. The axial registration `z_shift` stays at 0: a study does not apply it, so phases fitted with it would match the hydrophone only after a shift the entry never gets. The GUI therefore does not offer it. A persistent axial misregistration points to an error in the equipment geometry or exit-plane distance, which should be corrected in the profiles or the equipment config rather than fitted.
+- `plot_transducer_library(combo, library_path)` plots the ring phases, drive and ring gains across depths.
+- `generate_calibration_report(combo, library_path)` writes an HTML summary with the fit quality and the settings at the fitted depths.
 
-You can also use the GUI:
+**Fit defaults.** Per-depth fits free the phase offsets and per-ring gains (`FreeParams = {'phase','amp'}`), with an intensity-domain loss (`Domain = 'intensity'`, `HuberDelta = 0.8`). They are regularised towards geometric steering. The GUI and `build_transducer_library` use the same defaults. `z_shift` stays at 0, because a study does not apply it; correct a persistent axial misregistration in the equipment geometry or the profiles.
+
+**GUI.** The same steps are available interactively:
 
 ```matlab
 calibration_gui(struct('OutputPath', '/project/my_study/transducer_library'))
 ```
 
-Before saving, **Predict** shows what the fit gives at the depths you will stimulate, including depths between and beyond the measured ones (see [Predictions at desired depths](#predictions-at-desired-depths)).
+**Predict** shows the fit at the depths you will stimulate before you save ([Predictions at desired depths](#predictions-at-desired-depths)). The Nexus's *Transducer ▸ Calibration* page gives the same results for the transducers of a study config and saves to the study's `transducer.library_path` ([Calibration page](doc_nexus.md#calibration-page)).
 
-The same steps are on the PRESTUS Nexus's *Transducer ▸ Calibration* page, for the transducers of a study config: it saves to the study's `transducer.library_path` and can predict at the study's own focal depths ([Calibration page](doc_nexus.md#calibration-page)). Both use `calibration_desired_profiles`, `calibration_evaluate`, `calibration_fit` and `calibration_save_entry`, so they give the same results. A saved entry records how it was fitted in `meta.fit`: the fit mode, free parameters and `FitOptions`, whether it was calibrated at measured or desired depths (and those depths), the profile CSV, the reference ISPPA, the profile interpolation options and, if run, the k-Wave drive check settings. When `calibration_gui` or the Nexus opens an entry with `meta.fit`, they restore these settings, so a refit starts from the last one.
+A saved entry records its fit settings (mode, `FitOptions`, depths, profile CSV, reference ISPPA, interpolation and k-Wave options) in `meta.fit`; opening the entry restores them.
 
-Fit settings are passed through `FitOptions` (see `help fit_transducer_model`).
+**Fit options** (`FitOptions`, see `help fit_transducer_model`) in both GUIs:
+
+| Panel | Options |
+|---|---|
+| Main | Free parameters, forward model, near-field skip, loss domain, Huber δ, starts |
+| *Advanced…* | Phase constraint and priors (`Lambda`, `LambdaAmp`), gain bounds (`AmpBounds`, `PlausibleGain`), amplitude fit, focal weighting and fit window, near-field penalty (`NearFieldPenalty`, `NearFieldMargin`, `NearFieldMinMm`), medium (`CWater`, `Rho`), optimiser and seed, desired-profile `Tolerance`, k-Wave drive calibration `GridDims` and `ApplyCorrection` |
+| *Start from preset* | Loads a `calibration_fit_options` preset into both |
+
+Not offered: z shift and steering sound speed (not applied at run time), `ChannelGroups` (from the equipment), `Prior` (the entry) and `EvaluateOnly` (*Evaluate measured*).
+
+**Config-driven.** `calibration_transducer` (`examples/calibration_standalone.m`) runs the same calibration (`calibrate_library_entry`) and writes the library entry plus a calibration output folder; see [doc_calibration.md](doc_calibration.md#calibration-at-chosen-depths-and-intensities-calibration_transducer). To ingest per-run YAMLs (`{combo}-F*mm-I*wpercm2.yaml`) as refinements:
+
+```matlab
+update_transducer_library(combo_name, path_output_profiles, my_library_path)
+```
 
 #### Optional: within-ring velocity profile
 
-The library models each ring as a uniformly vibrating piston. For several Sonic Concepts CTX transducers that model cannot reproduce the measured axial profiles, whatever phases and gains are chosen: in particular the ratio of the near-field peak to the focal peak. On CTX-500-026, the measured near-field peak (8–12 mm from the exit plane, 0.4–0.6 of the focal intensity at deep settings, reproduced by in-house and manufacturer measurements) comes out about 7× too weak. Imasonic transducers are matched well by uniform rings.
+The library models each ring as a uniformly vibrating piston. For several Sonic Concepts CTX transducers no choice of phases and gains then reproduces the measured near-field to focal peak ratio. On CTX-500-026, the measured near-field peak (8–12 mm from the exit plane, 0.4–0.6 of the focal intensity at deep settings) comes out about 7× too weak. Uniform rings match Imasonic transducers well.
 
-The ring profile describes how each ring vibrates across its width. Every ring is split into `n_sub` sub-rings with a complex weight that is the **same at every focal depth** (a property of the hardware), while each depth keeps only what the driver controls: one phase and gain per channel. `fit_ring_profile` fits the weights jointly over all measured depths, with a smoothness penalty between neighbouring sub-rings, and the near field included from 4 mm. Each ring's area-weighted mean weight is 1, so its level and phase stay with the channel drive.
+The ring profile splits every ring into `n_sub` sub-rings with a complex weight that is the **same at every focal depth**. Each depth keeps one phase and gain per channel. `fit_ring_profile` fits the weights jointly over all measured depths, with a smoothness penalty and the near field included from 4 mm. Each ring's area-weighted mean weight is 1.
 
 | | Uniform rings | Ring profile, depth held out |
 |---|---|---|
@@ -259,20 +276,28 @@ The ring profile describes how each ring vibrates across its width. Every ring i
 | CTX-250-001 (4 rings) | 0.978 (0.96) | 0.980 (0.96) |
 | CTX-500-026 near-field / focal ratio error | 7× | 33 % |
 
-(Exploratory analysis, 2026-10-08; peak-normalised intensity from 4 mm, held-out depth with its channel drive refitted. "Uniform rings" here is an unregularised per-depth fit, not the shipped library fit, which regularises the ring gains and penalises a near field hotter than measured; see the off-axis comparison below. The benchmark `code/diagnostics/calib_ring_profile` repeats this for all combos, including prediction between measured depths.)
+Exploratory analysis: peak-normalised intensity from 4 mm, held-out depth with its channel drive refitted. "Uniform rings" here is an unregularised per-depth fit, not the shipped library fit.
 
-Use it from:
-
-- **`calibration_gui`** and the Nexus *Calibration* page: **Ring profile** → *fit (shared by all depths)*; the GUI also shows the fitted profile (`plot_ring_profile`).
-- **`refine_transducer_library`** / **`calibrate_library_entry`**: `RingProfile = 'fit'` (`RingProfileOptions`: `NSub`, `Smooth`, `NearFieldSkipMm`, `HeldOut`); with `Plot`, the profile figure is saved next to the entry.
-- **`config_calibration.yaml`** (`calibration_transducer`): `ring_profile: fit`, `ring_profile_n_sub`, `ring_profile_smooth`, `ring_profile_near_field_skip_mm`.
-- **`build_transducer_library`**: `RING_PROFILE = 'fit'` or a list of combos (default `'none'`).
+| Where | How to enable |
+|---|---|
+| `calibration_gui`, Nexus *Calibration* page | **Ring profile** → *fit (shared by all depths)*; **Options…** sets the `fit_ring_profile` options and a plane-scan file. The GUI shows the profile (`plot_ring_profile`) and R² per plane. |
+| `refine_transducer_library`, `calibrate_library_entry` | `RingProfile = 'fit'`; `RingProfileOptions`: `NSub`, `Smooth`, `NearFieldSkipMm`, `AmpBounds`, `Iterations`, `NStarts`, `Seed`, `HeldOut`, `OffAxis`, `OffAxisOptions`. With `Plot`, the profile figure is saved next to the entry. |
+| `config_calibration.yaml` (`calibration_transducer`) | `ring_profile: fit`, `ring_profile_n_sub`, `ring_profile_smooth`, `ring_profile_near_field_skip_mm`, `ring_profile_offaxis` (plane-scan file), `ring_profile_offaxis_kind` |
+| `build_transducer_library` | `RING_PROFILE = 'fit'` or a list of combos (default `'none'`) |
 
 `'auto'` (the default everywhere) keeps an entry's profile if it has one; `'none'` removes it.
 
-**What changes.** The profile is stored in `global_model.ring_profile` (`n_sub`, `weight_abs`, `weight_phase_deg` per sub-ring, `smooth`, `near_field_skip_mm`, fit quality). All per-element arrays of the entry then refer to the sub-rings, so adding, removing or refitting a profile drops the entry's refinements (with a warning) and only the depths calibrated then are stored. Every function that combines an entry with the equipment geometry resolves it through `library_transducer`, so the profile is used consistently: the analytical models apply the weights in `axial_transfer_matrix`, and `load_transducer_from_library` hands the simulation an annular source of sub-rings, each driven with its channel's phase and drive times its weight (`ring_profile_drive`; `transducer.tx_calibration.ring_profile` records it). Sub-rings are steered with their ring (`annular.steer_r_mid_mm`). Inline `elem_phase_deg` / `elem_p_amp` in a study config refer to the equipment rings and bypass the profile; dephased conditions are not supported with a profile.
+**What changes.**
 
-**Limitation and off-axis data.** On-axis profiles do not determine the surface vibration uniquely: refitting a known smooth profile from synthetic axial profiles reproduces the profiles almost perfectly (R² > 0.998) but not the weights. Off-axis measurements constrain it. `fit_ring_profile` accepts them through `OffAxis` (points r, z with intensity at a focal setting, e.g. the azimuthally averaged radial profile of a transverse hydrophone plane), modelled with `field_transfer_matrix` (the Rayleigh integral at points off the axis) and fitted together with the axial profiles. Validation on CTX-500-026 hydrophone planes at the 40 mm setting (`code/report/01_calibration/ring_profile_validation_*`, project repository; R² of intensity normalised by the axial peak, planes held out of the fit):
+- The profile is stored in `global_model.ring_profile` (`n_sub`, `weight_abs`, `weight_phase_deg` per sub-ring, `smooth`, `near_field_skip_mm`, fit quality).
+- All per-element arrays of the entry then refer to sub-rings. Adding, removing or refitting a profile drops the entry's refinements (with a warning); only the depths calibrated then are stored.
+- The simulation gets an annular source of sub-rings, each driven with its channel's phase and drive times its weight (`ring_profile_drive`). `transducer.tx_calibration.ring_profile` records it. Sub-rings are steered with their ring (`annular.steer_r_mid_mm`).
+- Inline `elem_phase_deg` / `elem_p_amp` in a study config refer to the equipment rings and bypass the profile.
+- Dephased conditions are not supported with a profile.
+
+**Off-axis data.** On-axis profiles do not determine the weights uniquely: a refit from synthetic axial profiles reproduces the profiles (R² > 0.998) but not the weights. Off-axis scans passed through `OffAxis` ([format](#plane-and-volume-scans-optional)) constrain them and are fitted together with the axial profiles.
+
+Validation on CTX-500-026 hydrophone planes at the 40 mm setting (R² of intensity normalised by the axial peak, planes held out of the fit):
 
 | Model (fitted to 12 axial profiles) | Axis (40 mm) | Sagittal XZ (z < 25 mm) | XY 35 mm | XY 40 mm (focus) | −3 dB width |
 |---|---|---|---|---|---|
@@ -283,30 +308,45 @@ Use it from:
 | Ring profile, axial + XY 35 mm plane | 0.97 | 0.94 (0.65) | 0.95 (fitted) | 0.98 | 2.9 mm |
 | Hydrophone | | | | | 2.8 mm |
 
-The shipped library fit predicts the transverse planes and the focal width well: its gain regularisation keeps the ring gains near equal, which costs on-axis fit but keeps the off-axis field right (unregularised fits match the axis better and the planes worse). Its shortfall is the axis and the near field. A ring profile fitted to axial profiles only improves those but loses the transverse planes; with one transverse plane added, it improves the axis and the near field and keeps the focal plane. Without off-axis data, keep the library fit and treat the off-axis field of a ring profile as unvalidated.
+The shipped fit predicts the transverse planes and focal width well but misses the axis and near field. A ring profile fitted to axial profiles alone fixes the axis and loses the planes. Adding one transverse plane gives both. **Without off-axis data, keep the library fit and treat the off-axis field of a ring profile as unvalidated.**
+
+```matlab
+ro = struct('OffAxis', 'SC CTX-500-026 (4 ch.).zip', 'OffAxisOptions', struct('Kind', 'transverse'));
+[lib, fits, report] = calibrate_library_entry(lib, tran, meas, struct('RingProfile', 'fit', 'RingProfileOptions', ro));
+```
 
 #### Optional: free-water k-Wave drive calibration
 
-The analytical fit (Rayleigh) sets the phases and the drive for each refined depth. `kwave_calibrate_drive` simulates every refined depth in free-water k-Wave exactly as a study would resolve it from the entry (serial, driving system, depth, target ISPPA; in-pipeline ISPPA targeting off), and rescales the stored drive so that the simulation hits the reference ISPPA (`elem_p_amp × √(I_ref / I_kWave)`, `amp_source: kwave`). It also reports the simulated ISPPA, R² and FLHM-centre error against the hydrophone profile. Phases are not changed: k-Wave calibrates the amplitude of the analytical fit and validates its phases; it is not a phase optimiser. (Former name: `kwave_check_refinement`, kept as a deprecated wrapper.)
+`kwave_calibrate_drive` simulates every refined depth in free-water k-Wave as a study would resolve it, with ISPPA targeting off. It rescales the stored drive so the simulation hits the reference ISPPA (`elem_p_amp × √(I_ref / I_kWave)`, `amp_source: kwave`). Phases are validated, not changed.
 
-The report also scores the **absolute** profile (`kwave_drive_metrics`), because the peak-normalised R² cannot show a wrong level: `isppa_err_pct` is how far the analytical drive misses the reference ISPPA in k-Wave, `i_at_target_ratio` the simulated intensity at the measured FLHM centre relative to the reference, `kwave_over_analytical` the k-Wave ISPPA over the Rayleigh ISPPA at the same drive (the Rayleigh ISPPA of a shipped drive equals the reference to within 2 %), and `nrmse_before` / `nrmse_after` the RMS difference from the hydrophone profile scaled to the reference ISPPA, before and after the drive correction (what remains after is shape). `sim_seconds` and `grid_points` record the cost. `GridDims` (`kwave_grid_dims` in `config_calibration.yaml`) selects the free-water grid: `'auto'` sizes it to the aperture and focus (`grid.default_dims: 'auto'`).
+**Why run it.** In free-water k-Wave the analytical drive overshoots the reference ISPPA, consistently per transducer and almost independently of depth: by about 3 % (IGT 32-channel, 10 rings), 6–9 % (CTX-250) and 14–16 % (CTX-500), over three depths each. A study inherits that error in every ISPPA-dependent output (intensity, MI, heating) when it skips the free-water baseline. That happens with no `transducer.target_isppa_wcm2`, or with a target equal to the entry's calibration ISPPA (within 1 %; the default 30 W/cm² is the shipped reference), because PRESTUS then trusts the entry's drive ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). A different target, or `modules.run_water_baseline: 1`, removes the error at the cost of one water simulation per run. The drive calibration removes it once per entry.
+
+**Run it.**
 
 ```matlab
 refine_transducer_library('CTX_250_001_SC_105_010', 'my_profiles.csv', lib, struct( ...
     'KWaveDriveCalibration', true, 'KWaveDriveOptions', struct('SimConfig', 'my_study_config.yaml')));
 ```
 
-**Consumption-time warning.** Until the drive calibration is run, an entry's `amp_source` stays `analytical` at every depth — the drive was never validated against a real k-Wave simulation, only against the O'Neil/Rayleigh model. `load_transducer_from_library` surfaces this at the point of use: it resolves `tx_calibration.amp_kwave_calibrated` (true only when the drive at the requested depth comes wholly from a k-Wave-calibrated refinement (`amp_source: kwave`), not the always-analytical global model or a blend with it) and, if false, issues `load_transducer_from_library:uncalibratedAmplitude` naming the nearest checked depth (if any) and its R²/focal error for context. (The former names `amp_kwave_verified`, `amp_kwave_ref_depth_mm` are still written as deprecated aliases of `amp_kwave_calibrated`, `amp_kwave_nearest_depth_mm`; the warning was formerly `:unverifiedAmplitude`.) This is independent of BabelBrain's own `water_amp_calibration` (see `doc_babelbrain.md`), which corrects a *different* bias (BabelBrain's FDTD vs. its own Rayleigh reference) and runs automatically on every BabelBrain simulation regardless of whether the library entry itself was k-Wave-checked.
+- In `calibration_gui`, tick **k-Wave drive: calibrate in free water, after fit** (per-depth mode). The simulated profiles are overlaid in green, and **Save entry** stores the corrected drives.
+- The Nexus Calibration page writes the unsaved fit and a `kwave_drive_<combo>.m` script, to run on its Run tab or on the cluster.
+- `SimConfig` supplies grid, `code_type` and `platform`/HPC settings. Without it, PRESTUS runs locally with `config_default` (CPU on macOS).
+- `GridDims` (`kwave_grid_dims` in `config_calibration.yaml`) selects the free-water grid; `'auto'` sizes it to the aperture and focus (`grid.default_dims: 'auto'`).
+- Each depth is one free-water simulation: about 3–20 min per depth in 3D on 16 CPU cores, about 1 min on the **axisymmetric** grid. 3D removes the error; the axisymmetric grid leaves at most about 3 % (2D and 3D agree within 0.98–1.03 in ISPPA, with the same focus). Use 3D for final entries.
 
-In the GUI, tick **k-Wave drive: calibrate in free water, after fit** (per-depth mode); the Nexus's Calibration page instead writes the unsaved fit and a `kwave_drive_<combo>.m` script, to run on its Run tab or on the cluster. The simulated profiles are overlaid in green, and **Save entry** stores the corrected drives. `SimConfig` supplies grid, `code_type` and `platform`/HPC settings. Without it, PRESTUS runs locally with `config_default` (CPU on macOS). Each depth is one full free-water simulation. On the default free-water grid (`grid.default_dims: 'auto'`, sized to the transducer) that takes about 3–20 min per depth in 3D on 16 CPU cores, and about 1 min with the **axisymmetric** grid option.
+**Report** (`kwave_drive_metrics`), which also scores the absolute level that peak-normalised R² cannot show:
 
-**Why run it.** The shipped drive is fitted with an analytical (Rayleigh) model. In a free-water k-Wave simulation it overshoots the reference ISPPA, consistently per transducer and almost independently of depth: by about 3 % (IGT 32-channel, 10 rings), 6–9 % (CTX-250) and 14–16 % (CTX-500) (k-Wave drive benchmark, 2026-10; three depths each). A study inherits that error in every ISPPA-dependent output (intensity, MI, heating) whenever the free-water baseline is skipped: with no `transducer.target_isppa_wcm2`, or with a target equal to the entry's calibration ISPPA (within 1 %; the default target of 30 W/cm² is the shipped reference), because PRESTUS then trusts the entry's drive ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). A target that differs, or `modules.run_water_baseline: 1`, rescales to a k-Wave water simulation and removes the error, at the cost of one extra simulation on the study grid in every run; the drive calibration removes it once per entry. Calibrating in 3D removes it; calibrating on the axisymmetric grid leaves at most about 3 % (2D and 3D agree within 0.98–1.03 in ISPPA, with the same focus). Use 3D for final entries and the axisymmetric grid for quick checks or when ±3 % is acceptable. (Until 2026-10 the axisymmetric grid placed the rings of an annular array at the apex plane instead of on the bowl, which put the focus tens of mm off; fixed, see the changelog.)
+| Field | Meaning |
+|---|---|
+| `isppa_err_pct` | How far the analytical drive misses the reference ISPPA in k-Wave |
+| `i_at_target_ratio` | Simulated intensity at the measured FLHM centre relative to the reference |
+| `kwave_over_analytical` | k-Wave ISPPA over Rayleigh ISPPA at the same drive (the Rayleigh ISPPA of a shipped drive equals the reference to within 2 %) |
+| `nrmse_before`, `nrmse_after` | RMS difference from the hydrophone profile scaled to the reference ISPPA, before and after correction |
+| `sim_seconds`, `grid_points` | Cost |
 
-`calibration_transducer` (`examples/calibration_standalone.m`, config-driven) runs the same calibration (`calibrate_library_entry`) and writes the library entry directly, plus a calibration output folder; see [doc_calibration.md](doc_calibration.md#calibration-at-chosen-depths-and-intensities-calibration_transducer). Per-run YAMLs from older versions (`{combo}-F*mm-I*wpercm2.yaml`) can still be ingested as refinements with:
+It also reports simulated ISPPA, R² and FLHM-centre error against the hydrophone profile.
 
-```matlab
-update_transducer_library(combo_name, path_output_profiles, my_library_path)
-```
+**Uncalibrated-drive warning.** `load_transducer_from_library` sets `tx_calibration.amp_kwave_calibrated`, true only when the drive at the requested depth comes wholly from a refinement with `amp_source: kwave`. If false, it issues `load_transducer_from_library:uncalibratedAmplitude`, naming the nearest checked depth and its R² and focal error. BabelBrain's `water_amp_calibration` ([doc_babelbrain.md](doc_babelbrain.md)) is independent: it corrects BabelBrain's FDTD against its own Rayleigh reference on every BabelBrain run.
 
 ### Adding transducers and rebuilding entries
 
@@ -549,13 +589,51 @@ File names follow `tran-{TRAN_SERIAL}_ds-{DS_SERIAL}[_acq-{LABEL}]_axial.csv`, u
 | Sonic Concepts CTX (4-element) | 4 | 6–8, including natural focal depth |
 | Any | — | Cover full intended depth range; include the natural focal depth |
 
----
+### Plane and volume scans (optional)
 
-### Phase tables
+Off-axis hydrophone scans for the ring-profile fit, read by `read_offaxis_scans` (`OffAxis` in `RingProfileOptions`; *Ring profile ▸ Options…* in the GUIs; `ring_profile_offaxis` in `config_calibration.yaml`).
 
-Not used. Earlier versions read manufacturer steering tables (Imasonic `.ini`, Sonic Concepts `.csv`). PRESTUS now derives steering phases from ring geometry (`set_real_phases`), and any systematic difference from the hardware is absorbed by the fitted offset.
+**Accepted files.**
 
----
+- **Sonic Concepts FUS Metrology export**: `FUS_Metrology_Export_BableBrain.mat`, its folder, or a `.zip` of the export folder with `Planes/` and `Axial/`. Each entry of the cell array `data` needs `type`, `focus` (focal setting, mm from the exit plane), `x`, `y`, `z` (mm) and `ISPPA.data` with `ISPPA.unit = 'W/cm2'`. Entries of type `Axial` are used only to rescale the scans (below).
+- **CSV**, one row per point:
+
+| Column | Meaning |
+|---|---|
+| `focus_ep_mm` | Focal setting the scan was recorded at [mm from the exit plane] |
+| `x_mm`, `y_mm` | Lateral position [mm]; the beam axis at x = y = 0 (or use `Centre = 'centroid'`) |
+| `z_ep_mm` | Distance from the exit plane [mm] |
+| `intensity_wcm2` | Intensity [W/cm²] |
+| `label` (optional) | Name of the scan; separates scans at the same setting |
+
+```
+focus_ep_mm,x_mm,y_mm,z_ep_mm,intensity_wcm2,label
+40,-15.0,-15.0,35,0.012,XY 35
+40,-14.5,-15.0,35,0.014,XY 35
+...
+```
+
+**Rules.**
+
+- **Kind from the coordinates.** Points need not lie on a grid.
+
+    | Varying coordinates | Kind | Reduced to |
+    |---|---|---|
+    | x, y (constant z) | Transverse plane | Azimuthally averaged radial profile |
+    | x or y with z | Axial plane | (\|x\|, z) map, both sides folded together |
+    | x, y and z | 3D volume | (r, z) map, averaged around one axis parallel to z in each z bin |
+
+- **One scan per setting and label.** Several planes at the same setting need distinct `label` values in a CSV; without them, their points read as one volume.
+- **Absolute level.** A scan is compared with the axial profile at its focal setting (within 1 mm) relative to that profile's peak, so it must be in W/cm² at the same drive. When a Sonic Concepts export includes its own axial profiles, each scan is rescaled by the ratio of the fitted axial peak to the export's at that setting.
+- **Axis.** The scan axis is x = y = 0, or with `Centre = 'centroid'` the intensity centroid of the top 50 % of a transverse plane or volume. A volume's axis is assumed parallel to z; tilt is not corrected.
+- **Reduction options** (`OffAxisOptions`): `Kind` (`all`, `transverse`, `axial`, `volume`, or a list), `Weight` (per scan, relative to one axial profile; default 1), `RMaxMm` (30), `BinMm` (radial bin, 0.5), `ZBinMm` (z bin of axial planes and volumes, 1; the fit's field matrix grows with the number of reduced points), `Centre`.
+
+**What to measure.** One transverse plane a few millimetres before the focus, at a setting that also has an axial profile, made the ring profile identifiable on CTX-500-026 (see [Within-ring velocity profile](#optional-within-ring-velocity-profile)). Further planes or a volume add checks (e.g. of an off-centre or tilted axis) more than constraint.
+
+```matlab
+[oa, scans] = read_offaxis_scans('SC CTX-500-026 (4 ch.).zip', struct('Axial', meas));
+% oa: OffAxis input of fit_ring_profile; scans: maps for plotting
+```
 
 ### Checklist before refining or rebuilding
 

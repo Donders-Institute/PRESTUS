@@ -38,7 +38,9 @@ function [fit, msg] = calibration_fit(tran, prof, options)
 %     .RingProfile   - within-ring velocity profile: 'auto' (default: keep the
 %                      Library entry's) | 'fit' (FIT_RING_PROFILE on the measured
 %                      profiles) | 'none' | a profile struct
-%     .RingProfileOptions - FIT_RING_PROFILE options (NSub, Smooth, NearFieldSkipMm)
+%     .RingProfileOptions - FIT_RING_PROFILE options (NSub, Smooth, NearFieldSkipMm,
+%                      Iterations, NStarts, AmpBounds, HeldOut, Seed, OffAxis: plane
+%                      data or a plane-scan file, OffAxisOptions)
 %     .Measured      - measured profiles for the ring-profile fit (default: the
 %                      measured columns of prof)
 %
@@ -124,12 +126,23 @@ function [fit, msg] = calibration_fit(tran, prof, options)
     if ~isempty(rp)
         fit.record.ring_profile = struct('n_sub', rp.n_sub, 'smooth', rp.smooth, ...
             'near_field_skip_mm', rp.near_field_skip_mm, 'refitted', ~isempty(rp_info));
+        if ~isempty(rp_info)                    % the options it was fitted with, for a refit
+            ro_rec = opt(options, 'RingProfileOptions', struct());
+            if isfield(ro_rec, 'OffAxis') && ~(ischar(ro_rec.OffAxis) || isstring(ro_rec.OffAxis))
+                ro_rec.OffAxis = '(struct)';
+            end
+            fit.record.ring_profile.options = ro_rec;
+        end
     end
 
     pt = prof.profile_type;
     if ~isempty(rp_info)
         msg = [msg sprintf('Ring profile (%d sub-rings): median R² %.3f → %.3f. ', rp.n_sub, ...
             rp.r2_uniform_median, rp.r2_profile_median)];
+        for b = 1:numel(rp_info.offaxis)        % uniform rings → profile, per plane
+            x = rp_info.offaxis(b);
+            msg = [msg sprintf('%s: R² %.3f → %.3f. ', x.label, x.r2_uniform, x.r2_profile)]; %#ok<AGROW>
+        end
     end
     msg = [msg sprintf(['Fit (%s, %s) on %d profiles (%d measured, %d interpolated, %d extrapolated) ' ...
         'in %.1f s: median R² %.3f, min %.3f'], mode, strjoin(fo.FreeParams, '+'), numel(pt), ...

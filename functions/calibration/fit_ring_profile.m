@@ -52,7 +52,11 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
 %                        normalised by that setting's axial peak, so the
 %                        level relative to the axial scan counts), .weight
 %                        (default 1). E.g. azimuthally averaged radial
-%                        profiles of transverse hydrophone planes.
+%                        profiles of transverse hydrophone planes. Or the
+%                        path of a plane-scan file, read with
+%                        READ_OFFAXIS_SCANS (rescaled to prof's axial peaks)
+%     .OffAxisOptions  - READ_OFFAXIS_SCANS options for a path (Kind, Weight,
+%                        RMaxMm, BinMm, ZBinMm, Centre)
 %     .Seed            - RNG seed (default 1)
 %
 % Output:
@@ -60,7 +64,9 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
 %          .weight_phase_deg ([1 x rings*n_sub], inner to outer within each
 %          ring), .smooth, .near_field_skip_mm, .fit_depths_ep_mm,
 %          .r2_uniform_median, .r2_profile_median, .r2_heldout_median (NaN
-%          unless HeldOut), .forward_model
+%          unless HeldOut), .forward_model; with off-axis data also
+%          .offaxis_source (file, '' for a struct), .offaxis_planes (labels)
+%          and .offaxis_r2 (R² per plane)
 %   info - .r2_uniform, .r2_profile, .r2_heldout [1 x N_d], .z_ep_mm,
 %          .I_meas, .I_uniform, .I_profile [N_z x N_d] (peak-normalised, z >=
 %          NearFieldSkipMm), .depths_ep_mm, .drives / .drives_uniform
@@ -111,6 +117,14 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
     % Off-axis measurements, attached to the depth of their focal setting
     S.X = cell(1, nd);
     OA  = opt(options, 'OffAxis', []);
+    oa_src = '';
+    if ischar(OA) || isstring(OA)                        % plane-scan file: READ_OFFAXIS_SCANS
+        oa_src = char(OA);
+        ro = opt(options, 'OffAxisOptions', struct());
+        if ~isfield(ro, 'Axial'); ro.Axial = prof; end
+        if ~isfield(ro, 'NearFieldSkipMm'); ro.NearFieldSkipMm = skip; end
+        OA = read_offaxis_scans(oa_src, ro);
+    end
     tr_h = rmfield_ann(tr_u, 'elem_weight');
     for j = 1:numel(OA)
         [dmin, k] = min(abs(depths - OA(j).depth_ep_mm));
@@ -118,7 +132,8 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
             'OffAxis(%d) is at the %.1f mm setting; no axial profile within 1 mm.', j, OA(j).depth_ep_mm);
         Hx = field_transfer_matrix(tr_h, OA(j).r_mm(:), OA(j).z_ep_mm(:) + off, 1500, 994);
         x  = struct('H', Hx, 'y', double(OA(j).I(:)) / ymax(k), 'weight', field_or(OA(j), 'weight', 1), ...
-                    'r_mm', OA(j).r_mm(:), 'z_ep_mm', OA(j).z_ep_mm(:), 'entry', j);
+                    'r_mm', OA(j).r_mm(:), 'z_ep_mm', OA(j).z_ep_mm(:), 'entry', j, ...
+                    'label', char(field_or(OA(j), 'label', sprintf('off-axis %d', j))));
         S.X{k} = [S.X{k}, x];
     end
 
@@ -149,6 +164,11 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
     info = struct('r2_uniform', r2u, 'r2_profile', r2p, 'r2_heldout', r2h, 'z_ep_mm', z(sel), ...
         'I_meas', Y, 'I_uniform', Iu, 'I_profile', Ip, 'depths_ep_mm', depths(:)', ...
         'drives', C, 'drives_uniform', C0, 'offaxis', offaxis_report(S, u, u1, C, C0));
+    if ~isempty(info.offaxis)                            % provenance of the off-axis data
+        rp.offaxis_source = oa_src;
+        rp.offaxis_planes = strjoin({info.offaxis.label}, '; ');
+        rp.offaxis_r2 = round([info.offaxis.r2_profile], 4);
+    end
 end
 
 function S = sub(S, cols)
@@ -158,7 +178,7 @@ end
 
 function out = offaxis_report(S, u, u1, C, C0)
     out = struct('r_mm', {}, 'z_ep_mm', {}, 'I_meas', {}, 'I_uniform', {}, 'I_profile', {}, ...
-        'r2_uniform', {}, 'r2_profile', {}, 'depth_index', {});
+        'r2_uniform', {}, 'r2_profile', {}, 'depth_index', {}, 'label', {});
     for k = 1:numel(S.X)
         if isempty(S.X{k}); continue; end
         [~, ~, Iu] = depth_res(S, k, u1, C0(:, k), []);
@@ -168,7 +188,7 @@ function out = offaxis_report(S, u, u1, C, C0)
             ss = sum((x.y - mean(x.y)).^2);
             out(end + 1) = struct('r_mm', x.r_mm, 'z_ep_mm', x.z_ep_mm, 'I_meas', x.y, 'I_uniform', Iu{b}, ...
                 'I_profile', Ip{b}, 'r2_uniform', 1 - sum((x.y - Iu{b}).^2) / ss, ...
-                'r2_profile', 1 - sum((x.y - Ip{b}).^2) / ss, 'depth_index', k); %#ok<AGROW>
+                'r2_profile', 1 - sum((x.y - Ip{b}).^2) / ss, 'depth_index', k, 'label', x.label); %#ok<AGROW>
         end
     end
 end

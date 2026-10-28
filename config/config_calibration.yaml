@@ -43,11 +43,13 @@
 
   # Within-ring velocity profile (fit_ring_profile): each ring split into sub-rings with weights shared by all
   # depths, for transducers whose near-field / focal peak ratio uniform rings cannot reproduce (e.g. CTX).
-  # Fitted on the axial profiles only: the off-axis field it implies is not validated by the fit.
+  # On axial profiles only, the off-axis field it implies is not validated: add plane scans (ring_profile_offaxis).
   ring_profile: 'auto'              # 'auto' (keep the library entry's, if any) | 'fit' (all measured depths) | 'none' (uniform rings)
   ring_profile_n_sub: 4             # Sub-rings per ring
   ring_profile_smooth: 0.3          # Smoothness penalty between neighbouring sub-rings (0 = none; larger = closer to uniform)
   ring_profile_near_field_skip_mm: 4  # Near field ignored [mm from the exit plane]; the per-depth fits then use the same range
+  ring_profile_offaxis: ''          # Plane scans fitted with the axial profiles (read_offaxis_scans): FUS Metrology export (.mat/folder/.zip) or CSV; '' = axial only
+  ring_profile_offaxis_kind: 'all'  # Planes used: 'all' | 'transverse' (XY) | 'axial' (XZ / YZ)
 
   # Unmeasured depths: interpolate the neighbouring measured profiles, then fit
   profile_align: 'label'            # Focus alignment when interpolating profiles to an unmeasured depth: 'label' (column focal-depth headers, default) | 'peak' (intensity peak beyond skip_front_peak_mm)

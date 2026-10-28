@@ -49,7 +49,10 @@ function [lib, report, out] = calibration_transducer(...
 %   ring_profile      - within-ring velocity profile (FIT_RING_PROFILE): 'auto'
 %                       (default: keep the entry's) | 'fit' | 'none';
 %                       ring_profile_n_sub (4), ring_profile_smooth (0.3),
-%                       ring_profile_near_field_skip_mm (4) set the fit
+%                       ring_profile_near_field_skip_mm (4) set the fit;
+%                       ring_profile_offaxis (plane-scan file, READ_OFFAXIS_SCANS;
+%                       '' = axial only) and ring_profile_offaxis_kind ('all')
+%                       add off-axis data
 %   library_path      - library endpoint (default {path_output}/library)
 %   path_output_profiles - calibration output folder (default {path_output}/profiles)
 %
@@ -130,6 +133,10 @@ function [lib, report, out] = calibration_transducer(...
     co.RingProfileOptions = struct('NSub', get_or(cal, 'ring_profile_n_sub', 4), ...
         'Smooth', get_or(cal, 'ring_profile_smooth', 0.3), ...
         'NearFieldSkipMm', get_or(cal, 'ring_profile_near_field_skip_mm', 4));
+    if ~isempty(get_or(cal, 'ring_profile_offaxis', ''))
+        co.RingProfileOptions.OffAxis = char(cal.ring_profile_offaxis);
+        co.RingProfileOptions.OffAxisOptions = struct('Kind', char(get_or(cal, 'ring_profile_offaxis_kind', 'all')));
+    end
     warn_obsolete(cal);
 
     %% Base entry: user library, else shipped, else new ----------------------
