@@ -109,6 +109,18 @@ On a local MATLAB session (`platform = 'matlab'`) the five stages run sequential
 
 ### Customising options
 
+The variants' medium files can also be set in the config:
+
+```yaml
+simulation:
+  uncertainty: true
+  uncertainty_conservative: /path/to/my_medium_conservative.yaml   # absolute path, or a file name in config/uncertainty/
+  uncertainty_liberal: my_medium_liberal.yaml
+```
+
+Empty (the default) uses the shipped `config/uncertainty/config_medium_<variant>.yaml`. Each file is merged onto the run's config, so tissues and properties it does not list keep their `medium_properties` values; the shipped files list brain and the three skull layers only. The `options.*_config` arguments below take precedence.
+
+
 Uncertainty-specific options can be passed as the second argument to `prestus_pipeline`:
 
 ```matlab

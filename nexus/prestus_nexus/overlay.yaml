@@ -77,6 +77,8 @@ fields:
   simulation.interactive: {kind: flag}
   simulation.debug: {kind: flag}
   simulation.transducer_coupling: {choices: [coherent, async]}
+  simulation.uncertainty_conservative: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  simulation.uncertainty_liberal: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
 
   # ── Paths & environment ──────────────────────────────────────────────
   path.anat: {kind: dir}
@@ -661,6 +663,8 @@ display:
   simulation.transducer_coupling: {label: Multi-transducer coupling}
   simulation.async_grid_mode: {label: Async grid mode, advanced: true}
   simulation.uncertainty: {label: Uncertainty analysis, advanced: true}
+  simulation.uncertainty_conservative: {label: Conservative medium file (lower bound), help: "Medium properties of the conservative variant: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_conservative.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_liberal: {label: Liberal medium file (upper bound), help: "Medium properties of the liberal variant: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_liberal.yaml. Tissues and properties the file does not list keep the default medium properties."}
 
   # Paths
   path.anat: {label: Anatomical images folder}

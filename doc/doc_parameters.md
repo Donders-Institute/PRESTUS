@@ -23,6 +23,8 @@ Parameters are organised in nested structs that map directly to YAML keys. `conf
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
 | `debug` | Verbose debug mode with additional intermediate outputs. | `0` | `1 = yes`, `0 = no` |
 | `transducer_coupling` | How several transducers interact acoustically. | `'coherent'` | `coherent`: pressure fields superpose in one k-Wave run (interference). `async`: each transducer is simulated separately and intensities are summed incoherently before the thermal simulation. See [doc_multitransducer.md](doc_multitransducer.md). |
+| `uncertainty_conservative` | Medium properties of the conservative (lower-bound) variant when `simulation.uncertainty` is on. | `''` | A YAML file with a `medium_properties` block, merged onto the run's config: an absolute path, or a file name in `config/uncertainty/`. `''` = `config/uncertainty/config_medium_conservative.yaml`. The `options.conservative_config` argument of `uncertainty_pipeline` takes precedence. See [doc_uncertainty.md](doc_uncertainty.md#customising-options). |
+| `uncertainty_liberal` | Medium properties of the liberal (upper-bound) variant. | `''` | As `uncertainty_conservative`; `''` = `config/uncertainty/config_medium_liberal.yaml`; `options.liberal_config` takes precedence. |
 
 ---
 

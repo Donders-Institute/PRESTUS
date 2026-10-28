@@ -169,6 +169,7 @@ The following documents the functions provided in PRESTUS.
 | `prestus_study_start`                   | Run the pipeline for every row of a study manifest (subjects × conditions with per-run settings), locally or on HPC, then build the study report; `DryRun` checks all rows without running. |
 | `print_parameter_summary`               | Print a structured PRESTUS configuration summary to the console |
 | `sequential_pipeline`                   | Dispatch follow-up simulations that chain thermal state |
+| `uncertainty_medium_config`             | Medium-property YAML of one uncertainty variant. |
 | `uncertainty_pipeline`                  | Run the full PRESTUS uncertainty quantification workflow |
 
 #### GROUP

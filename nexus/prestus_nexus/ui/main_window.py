@@ -492,6 +492,9 @@ class MainWindow(QMainWindow):
                 self.pages[PCT] = pct_page
                 self._section_tab[PCT] = key
                 tab.set_full_tab(pct_page, "Pseudo-CT")
+                from .uncertainty_view import UncertaintyCard
+                self.uncertainty_card = UncertaintyCard(self.model, self.prestus_root)
+                tab.add_card(self.uncertainty_card)
             elif key == "run":
                 from .run_page import RunPage
                 side = QTabWidget()

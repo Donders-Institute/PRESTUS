@@ -52,6 +52,9 @@ function jobs = uncertainty_pipeline(parameters, options)
 %                                       filename suffixes per variant
 %                .liberal_config      — path to liberal medium YAML override
 %                .conservative_config — path to conservative medium YAML override
+%                                       (default: simulation.uncertainty_liberal /
+%                                       _conservative, else the shipped files;
+%                                       see UNCERTAINTY_MEDIUM_CONFIG)
 %                .stage1_timelimit    — HPC wall time for stage 1 (default '12:00:00')
 %                .sim_timelimit       — HPC wall time for stages 2-4 (default '06:00:00')
 %                .report_timelimit    — HPC wall time for stage 5 (default '00:30:00')
@@ -84,8 +87,6 @@ end
 %% Resolve options — fill in defaults for any unset fields
 % =========================================================================
 
-uncertainty_configs = fullfile(get_prestus_path(), 'config', 'uncertainty');
-
 if ~isfield(options, 'affixes')
     % If the caller has already set io.output_affix on the base parameters,
     % use it as the default variant's affix so existing naming is preserved.
@@ -100,11 +101,12 @@ if ~isfield(options, 'affixes')
         'liberal',      [base_affix '_desc-liberal'], ...
         'conservative', [base_affix '_desc-conservative']);
 end
+% Variant medium files: options.* > simulation.uncertainty_<variant> > shipped file.
 if ~isfield(options, 'liberal_config')
-    options.liberal_config      = fullfile(uncertainty_configs, 'config_medium_liberal.yaml');
+    options.liberal_config      = uncertainty_medium_config(parameters, 'liberal');
 end
 if ~isfield(options, 'conservative_config')
-    options.conservative_config = fullfile(uncertainty_configs, 'config_medium_conservative.yaml');
+    options.conservative_config = uncertainty_medium_config(parameters, 'conservative');
 end
 if ~isfield(options, 'stage1_timelimit');    options.stage1_timelimit    = '12:00:00'; end
 if ~isfield(options, 'sim_timelimit');       options.sim_timelimit       = '06:00:00'; end

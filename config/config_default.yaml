@@ -33,12 +33,17 @@ simulation:
                                 #   'async'     — each transducer is simulated independently and
                                 #                 intensities are summed incoherently before thermal
                                 #                 simulation (models asynchronous / non-overlapping firing)
+  uncertainty_conservative: ''  # Medium properties of the conservative (lower-bound) variant of simulation.uncertainty: a YAML file
+                                #   with a medium_properties block, merged onto this config (absolute path, or a file name
+                                #   in config/uncertainty/). '' = config/uncertainty/config_medium_conservative.yaml
+  uncertainty_liberal: ''       # Medium properties of the liberal (upper-bound) variant, as above.
+                                #   '' = config/uncertainty/config_medium_liberal.yaml
 
 #------------ Paths
 
 path:
   anat: ''              # Location of the structural input data [full path]
-  sim: ''               # Location of the simulation outputs [full path or folder name in path.anat]
+  sim: ''               # Location of the simulation outputs [full path; a relative path is relative to the MATLAB working directory]
   seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
   placement: ''         # Placement outputs (heuristic, PlanTUS, TUS_entry runs): <placement>/sub-XXX/<mode>/<target_name>/.
                         # Empty = <sim>/placement. Point several setups at one folder to share placements across them.

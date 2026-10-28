@@ -562,9 +562,20 @@ def defaults_issues(model: ConfigModel) -> list[Issue]:
                   "Tools ▸ Update project defaults… refreshes the copy")]
 
 
+def uncertainty_issues(model: ConfigModel) -> list[Issue]:
+    """uncertainty_pipeline.m errors when a variant's medium file is missing (configNotFound)."""
+    if model.get("simulation.uncertainty") is not True:
+        return []
+    from .uncertainty import property_sets
+    sets = property_sets(model, model.schema.toolbox_path.parent.parent)
+    return [Issue("error", f"simulation.uncertainty_{variant}", f"{variant.capitalize()} variant: {why}")
+            for variant, why in sets.errors.items()]
+
+
 def all_issues(model: ConfigModel) -> list[Issue]:
     order = {"error": 0, "warning": 1, "info": 2}
     issues = (value_issues(model) + model.unknown_keys()
               + subject_issues(model) + rule_issues(model) + placement_issues(model)
-              + library_issues(model) + isppa_issues(model) + defaults_issues(model))
+              + library_issues(model) + isppa_issues(model) + defaults_issues(model)
+              + uncertainty_issues(model))
     return sorted(issues, key=lambda i: order.get(i.level, 3))
