@@ -1,5 +1,9 @@
 function prestus_gui(init_params)
-%PRESTUS_GUI  Interactive parameter setup and simulation launcher.
+%PRESTUS_GUI  DEPRECATED interactive parameter setup and simulation launcher.
+%
+%   Deprecated: use PRESTUS_NEXUS to build, check and run study configs.
+%   prestus_gui still works but is no longer developed and will be removed
+%   in a future release.
 %
 %   Opens a single-window tabbed GUI that:
 %     - Loads config_default.yaml and highlights mandatory/optional fields
@@ -12,10 +16,16 @@ function prestus_gui(init_params)
 %     prestus_gui(parameters)   % pre-load a parameter struct
 %
 %   Requirements: MATLAB R2023b, PRESTUS on the MATLAB path.
+%
+% See also: PRESTUS_NEXUS
 
     if nargin < 1
         init_params = [];
     end
+
+    warning('prestus_gui:deprecated', ...
+        ['prestus_gui is deprecated and will be removed in a future release; ' ...
+         'use prestus_nexus to build and run study configs (see doc_nexus.md).']);
 
 %% ── Figure ────────────────────────────────────────────────────────────────
 
@@ -769,7 +779,7 @@ end
         nedt(gl, 6, 2, 'headmodel.head_pad_mm', 0); lbl(gl, 6, 3, 'mm');
 
         lbl(gl, 7, 1, 'CSF expansion');
-        nedt(gl, 7, 2, 'headmodel.csf_expansion', 40); lbl(gl, 7, 3, 'voxels');
+        nedt(gl, 7, 2, 'headmodel.csf_expansion', 40); lbl(gl, 7, 3, 'mm');
 
         lbl(gl, 8, 1, 'Smoothing method');
         drp(gl, 8, 2, 'headmodel.smooth_method', {'gaussian','box','off'}, 'gaussian');

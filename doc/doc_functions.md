@@ -201,7 +201,7 @@ The following documents the functions provided in PRESTUS.
 | `nexus_neuronav`                        | Localite marker ingestion for the PRESTUS Nexus (through NEXUS_BRIDGE) |
 | `nexus_ping`                            | Answer a NEXUS_BRIDGE health check |
 | `nexus_progress`                        | Report progress of the current NEXUS_BRIDGE request to the Nexus |
-| `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs. |
+| `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs [DEPRECATED: use `prestus_nexus`]. |
 | `prestus_nexus`                         | Open the PRESTUS Nexus (standalone PyQt6 config builder, *experimental*; see [doc_nexus.md](doc_nexus.md)). |
 
 #### HEAD

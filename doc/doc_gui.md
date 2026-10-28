@@ -2,12 +2,13 @@
 
 !!! note "At a glance"
     - **What:** A point-and-click editor for PRESTUS configs that can also start a run and show its results.
-    - **When you need it:** If you prefer forms to editing YAML files.
+    - **When you need it:** If you prefer forms to editing YAML files. Use the [PRESTUS Nexus](doc_nexus.md) instead; `prestus_gui` is deprecated.
     - **Before you start:** A MATLAB desktop session. A config made here is an ordinary YAML file ([Configuring a study](doc_configuration.md)).
 
-The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click front-end to the pipeline. Every field maps directly to a YAML parameter — see [doc_parameters.md](doc_parameters.md) for the full reference.
+!!! warning "Deprecated"
+    `prestus_gui` is deprecated and will be removed in a future release. It still works but is no longer developed. Use the [PRESTUS Nexus](doc_nexus.md) to build, check and run study configs. The [Localite ingest GUI](#localite-ingest-gui) (`neuronav_gui`) is not affected.
 
-> A standalone config builder with a placement viewer, the **PRESTUS Nexus**, is available as an experimental alternative: see [doc_nexus.md](doc_nexus.md).
+The PRESTUS graphical user interface (`prestus_gui`) provides a point-and-click front-end to the pipeline. Every field maps directly to a YAML parameter — see [doc_parameters.md](doc_parameters.md) for the full reference.
 
 ![PRESTUS GUI](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_gui.png)
 

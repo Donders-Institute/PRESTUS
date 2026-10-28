@@ -96,7 +96,7 @@ On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); late
 ## 4. Next steps
 
 - Keep your settings in a project folder and a study config: [Configuring a study](doc_configuration.md).
-- Prefer forms to YAML: [MATLAB GUI](doc_gui.md) or [PRESTUS Nexus](doc_nexus.md).
+- Prefer forms to YAML: [PRESTUS Nexus](doc_nexus.md).
 - Use subject-specific skull properties from a UTE scan: [pseudo-CT](doc_pseudoCT.md).
 - Re-run only part of the pipeline: [Modules](doc_modules.md).
 - Many subjects or conditions: [Group analysis](doc_group.md#study-setup).

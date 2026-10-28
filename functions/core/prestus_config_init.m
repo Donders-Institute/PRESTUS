@@ -3,7 +3,7 @@ function prestus_config_init(target_dir, options)
 %
 % Copies config_default.yaml from the toolbox into a project config directory
 % and optionally creates an empty project-specific override file.
-% Optionally opens the PRESTUS GUI for interactive refinement.
+% Optionally opens the deprecated PRESTUS GUI for interactive refinement.
 %
 % Use as:
 %   prestus_config_init(target_dir)
@@ -18,6 +18,7 @@ function prestus_config_init(target_dir, options)
 %                  if empty, only config_default.yaml is copied
 %   open_gui     - (name-value, default false) open the PRESTUS GUI after
 %                  writing the files so parameters can be reviewed visually
+%                  (deprecated with prestus_gui; use prestus_nexus instead)
 %
 % Output files written to target_dir:
 %   config_default.yaml        - full copy of the toolbox default (base config)
