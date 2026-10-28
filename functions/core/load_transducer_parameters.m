@@ -5,8 +5,8 @@ function parameters = load_transducer_parameters(parameters)
 % validate_matrix_transducer or validate_annular_transducer depending on
 % tr.type. Derived scalar fields (elem_n, elem_phase_rad, focal distances)
 % are computed and stored back into each transducer struct. Warns when
-% multiple transducers have mismatched frequencies. Absorbs any legacy top-level
-% expected_focal_distance_mm into per-transducer focal_distance_ep.
+% multiple transducers have mismatched frequencies. A legacy top-level
+% expected_focal_distance_mm is an error (its reference point was ambiguous).
 %
 % Use as:
 %   parameters = load_transducer_parameters(parameters)
@@ -146,14 +146,12 @@ end
                 num2str(unique(all_freqs)));
         end
 
-        % Legacy: top-level expected_focal_distance_mm was ep distance
+        % Legacy expected_focal_distance_mm: v0.5.0 read it from the bowl apex in
+        % most code paths and from the exit plane in others, so it cannot be converted
         if isfield(parameters, 'expected_focal_distance_mm') && ~isempty(parameters.expected_focal_distance_mm)
-            for ti = 1:numel(parameters.transducer)
-                if ~isfield(parameters.transducer(ti), 'focal_distance_ep') || ...
-                        isempty(parameters.transducer(ti).focal_distance_ep)
-                    parameters.transducer(ti).focal_distance_ep = parameters.expected_focal_distance_mm;
-                end
-            end
+            error('prestus:legacyConfigKey', ...
+                ['expected_focal_distance_mm is no longer read: set transducer.focal_distance_ep ' ...
+                 '(from the exit plane) or transducer.focal_distance_bowl (from the bowl apex).']);
         end
 
         % Calculate focal distances (ep ↔ bowl) for all transducers

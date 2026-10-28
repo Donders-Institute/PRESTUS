@@ -33,6 +33,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 #### Core / Config
 - `load_parameters` accepts trailing `{key, value}` overrides, applied after all config layers
 - Unknown study-config keys warn with a suggestion (`prestus:unknownConfigKey`)
+- Configs from v0.5.0 on load as they are: renamed keys are converted to their current names with one warning (`prestus:renamedConfigKey`), and keys without an exact counterpart stop the run with the key to set instead (`prestus:legacyConfigKey`)
+- ⚠️ **Fixed:** a top-level `expected_focal_distance_mm` was read as a distance from the exit plane, while most earlier code read it from the bowl apex; it now stops the run. Set `transducer.focal_distance_ep` or `focal_distance_bowl` and rerun runs whose config set it
 - Grid and medium caches record the settings they depend on and refuse reuse when these differ (`io.cache_signature_check`: `error` | `warn` | `off`)
 - Stage outputs that a later run starts from (pseudo-CT, placement run, T1w pressure map) get a JSON sidecar that is checked on reuse
 - `path.acoustic_input` starts a run from an earlier run's T1w pressure map, rescaled to `transducer.target_isppa_wcm2`
@@ -45,6 +47,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - The parameter summary and HTML report state the free-water ISPPA a run models; a target that differs from the drive's calibration ISPPA, or the default target on an uncalibrated drive, warns (`prestus:isppa:targetVsCalibration`)
 
 #### Transducer library & calibration
+- `calibration_transducer` converts calibration settings from earlier versions and, for a name missing from the equipment library, says how to add it
 - Transducer library (`config/calibration/`): per-depth refinements of geometric steering, interpolated between measured depths; transducers resolved from their serial number via the equipment library. Fitting needs the Optimization Toolbox; loading does not
 - User calibration library: `refine_transducer_library` fits your own hydrophone profiles; set `transducer.library_path` to use it. An optional free-water k-Wave check corrects the drive per depth
 - Calibration at unmeasured depths from interpolated profiles (`interpolate_axial_profiles`); extrapolation is opt-in (`calibration.max_extrapolation_mm`)
@@ -181,11 +184,13 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** under `io.overwrite_files: never` or `ask`, a recomputed acoustic or thermal stage kept existing NIfTIs but rewrote the CSV, mixing outputs of two runs. Re-run output folders that were simulated more than once under `never`
 
 #### Nexus & GUIs
+- Fixed: the Nexus suggested `transducer.target_isppa_wcm2` for the old `set_intensity_w_per_cm2`, which is the drive's calibration ISPPA (`transducer.tx_calibration.isppa_wcm2`)
 - **PRESTUS Nexus** (`nexus/`, *experimental*): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)
 - `prestus_gui` is deprecated in favour of the PRESTUS Nexus; it still works and warns on start. `neuronav_gui` and `calibration_gui` remain supported.
 - `neuronav_gui`: stand-alone Localite ingest GUI with series QC, batch window and MNI view of batch targets
 - `calibration_gui` and the Nexus Calibration page expose every calibration fit option and save how an entry was fitted (`meta.fit`)
 - Nexus: tissue-property card is read-only until unlocked; with uncertainty on, a card lists and plots the three variants' properties
+- Nexus: with `placement.mode: plantus`, the Placement card runs only the PlanTUS placement, choosing the position in Workbench or automatically, and opens the result in the Viewer
 - Fixed (`prestus_gui`): NaN placeholders wrote `0` into `grid.source_ppw`; 2D phantom coordinates; thermal timing state on config load
 
 #### Telemetry

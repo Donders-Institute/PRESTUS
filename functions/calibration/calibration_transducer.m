@@ -80,6 +80,9 @@ function [lib, report, out] = calibration_transducer(...
 %           REFINE_TRANSDUCER_LIBRARY, CALIBRATION_FIT_OPTIONS
 
     if nargin < 6 || isempty(sim_id); sim_id = 1; end
+    % calibration settings may come from an older calibration_config.yaml loaded directly
+    tmp   = upgrade_config_keys(struct('calibration', parameters.calibration), 'parameters.calibration');
+    parameters.calibration = tmp.calibration;
     cal   = parameters.calibration;
     equip = load_equipment_config();
 
@@ -92,7 +95,10 @@ function [lib, report, out] = calibration_transducer(...
         tran_serial = combo; ds_serial = '';
     else
         error('calibration_transducer:unknownEquipment', ...
-            'calibration_transducer: ''%s'' is neither an equipment combo nor a transducer serial.', combo);
+            ['calibration_transducer: ''%s'' is neither an equipment combo nor a transducer serial ' ...
+             'in config/equipment/. Since v0.7 the transducer geometry comes from the equipment ' ...
+             'library, not from parameters.transducer: add an equipment entry for it, or, for a ' ...
+             'virtual transducer, scale its drive from a free-water simulation instead.'], combo);
     end
     tran = equip.trans.(tran_serial);
     bowl_offset = tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm;
@@ -268,10 +274,6 @@ function warn_obsolete(cal)
     if isfield(cal, 'save_elem_correction') && cal.save_elem_correction
         warning('calibration_transducer:obsolete', ['calibration.save_elem_correction is obsolete: ' ...
             'the calibrated offsets are written to the library entry (library_path).']);
-    end
-    if isfield(cal, 'opt_amp_validation') && ~strcmp(char(cal.opt_amp_validation), 'always')
-        warning('calibration_transducer:obsolete', ['calibration.opt_amp_validation is obsolete: ' ...
-            'the drive scales exactly with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once.']);
     end
 end
 

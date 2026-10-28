@@ -327,6 +327,13 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `jwave_wrapper`                         | Run acoustic simulation via jwave (JAX-based Python backend) |
 
+#### LEGACY
+
+| **Function Name**                       | **Description**                                                                                 |
+|-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `config_deprecations`                   | Config keys renamed or removed since PRESTUS v0.5.0 |
+| `upgrade_config_keys`                   | Convert config keys from PRESTUS v0.5.0 onwards to their current names |
+
 #### MEDIUM
 
 | **Function Name**                       | **Description**                                                                                 |

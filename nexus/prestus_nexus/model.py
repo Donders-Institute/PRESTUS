@@ -401,8 +401,20 @@ class ConfigModel:
                 node = self.schema.get(path)
                 if path in self.schema.deprecated:
                     dep = self.schema.deprecated[path]
-                    note = "no longer read by PRESTUS" if dep.get("ignored") else "PRESTUS still converts it"
-                    issues.append(Issue("warning", path, f"Deprecated; use {dep['use']} ({note})", ti))
+                    use = dep.get("use") or []
+                    use = ", ".join(use) if isinstance(use, list) else str(use)
+                    kind = dep.get("kind")
+                    if kind == "error":
+                        msg = f"From an earlier PRESTUS version; PRESTUS stops: {dep.get('note', '')}"
+                        level = "error"
+                    elif kind == "removed":
+                        msg = f"Removed; PRESTUS drops it ({dep.get('note', '')})"
+                        level = "warning"
+                    else:
+                        note = "no longer read by PRESTUS" if dep.get("ignored") else "PRESTUS converts it"
+                        msg = f"Deprecated; use {use} ({note})"
+                        level = "warning"
+                    issues.append(Issue(level, path, msg, ti))
                 elif node is None and path in self.schema.workflow_keys:
                     issues.append(Issue("info", path,
                                         "Calibration-workflow setting (config_calibration.yaml); "

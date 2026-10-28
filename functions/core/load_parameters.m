@@ -7,7 +7,9 @@ function parameters = load_parameters(varargin)
 % default, so keys added to the toolbox since the project copy was made still
 % get their defaults (a warning lists them). Caller-supplied YAML files or
 % parameter structs are then deep-merged on top; keys in those YAML files that
-% PRESTUS does not know are reported (CONFIG_UNKNOWN_KEYS). After merging, runs
+% PRESTUS does not know are reported (CONFIG_UNKNOWN_KEYS). Keys renamed since
+% v0.5.0 are converted to their current names first, in every layer and in the
+% overrides (UPGRADE_CONFIG_KEYS). After merging, runs
 % validation:
 % interactive-mode check, transducer parameter derivation, thermal timing check,
 % output-affix sanitization, path existence checks, and MATLAB version guard.
@@ -33,7 +35,8 @@ function parameters = load_parameters(varargin)
 % Output:
 %   parameters - merged and validated PRESTUS simulation parameters
 %
-% See also: LOAD_TRANSDUCER_PARAMETERS, PRINT_PARAMETER_SUMMARY, PATH_LOG_SETUP
+% See also: LOAD_TRANSDUCER_PARAMETERS, PRINT_PARAMETER_SUMMARY, PATH_LOG_SETUP,
+%           UPGRADE_CONFIG_KEYS
 
     % Trailing cell = key/value overrides (applied after all merges)
     overrides = {};
@@ -117,6 +120,7 @@ function parameters = load_parameters(varargin)
     if ~using_toolbox_default
         fprintf('Project defaults: %s\n', default_config_path);
         project_defaults = yaml_load_validated(default_config_path);
+        project_defaults = upgrade_config_keys(project_defaults, default_config_path);
         report_stale_project_default(default_config_path, parameters, project_defaults);
         parameters = mergestruct(parameters, project_defaults);
         parameters = restore_struct_arrays(parameters, project_defaults);
@@ -144,9 +148,10 @@ function parameters = load_parameters(varargin)
     if nargs == 1
         extra_config_file = varargin{1};
         if isstruct(extra_config_file)
-            extra_parameters = extra_config_file; % Use provided struct directly
+            extra_parameters = upgrade_config_keys(extra_config_file, 'struct input'); % Use provided struct directly
         else
             extra_parameters = yaml_load_validated(fullfile(extra_config_file));
+            extra_parameters = upgrade_config_keys(extra_parameters, extra_config_file);
             report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
         end
         target_set = target_set || sets_target(extra_parameters);
@@ -156,6 +161,7 @@ function parameters = load_parameters(varargin)
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
         extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
+        extra_parameters = upgrade_config_keys(extra_parameters, extra_config_file);
         report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
         target_set = target_set || sets_target(extra_parameters);
         parameters = mergestruct(parameters, extra_parameters);
@@ -170,6 +176,7 @@ function parameters = load_parameters(varargin)
             extra_config_file = varargin{i};
             extra_config_location = varargin{i+1};
             extra_parameters = yaml_load_validated(fullfile(extra_config_location, extra_config_file));
+            extra_parameters = upgrade_config_keys(extra_parameters, extra_config_file);
             report_unknown_keys(extra_parameters, known_keys, extra_keys, extra_config_file);
             target_set = target_set || sets_target(extra_parameters);
             parameters = mergestruct(parameters, extra_parameters);
@@ -179,6 +186,7 @@ function parameters = load_parameters(varargin)
 
     %% Key/value overrides (e.g. one row of a study manifest)
     if ~isempty(overrides)
+        overrides = upgrade_config_keys(overrides, 'overrides');
         parameters = apply_config_overrides(parameters, overrides);
         target_set = target_set || any(~cellfun(@isempty, regexp(cellstr(string(overrides(:, 1))), ...
             '^(transducer(\(\d+\))?|calibration)\.target_isppa_wcm2$', 'once')));

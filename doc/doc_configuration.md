@@ -25,7 +25,7 @@ parameters = load_parameters('config_projectX.yaml', cfg_dir, ...
 
 The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default. Lists of transducers (`transducer(2)`, …) keep their own fields.
 
-After merging, `load_parameters` validates the result: it migrates deprecated keys (with a warning), resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
+Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
 
 You can also change the struct in MATLAB after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception are the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
 
@@ -101,12 +101,28 @@ On a workstation without a job scheduler, also set `platform: matlab`: the defau
 | Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backend](doc_backend.md) |
 | Output files | `io.*` | [Outputs](doc_outputs.md) |
 
+## Configs from earlier PRESTUS versions
+
+Configs written for PRESTUS v0.5.0 or later load as they are. `load_parameters` converts each renamed key to its current name, in every config layer and in the overrides, and lists the conversions in one warning (`prestus:renamedConfigKey`). Update the config with the names from that list; the [Nexus](doc_nexus.md) marks the same keys when you open the file.
+
+A few old keys have no exact counterpart. These stop the run (`prestus:legacyConfigKey`) with a message naming the key to set instead:
+
+| Old key | Set instead |
+|---|---|
+| `smooth_window` [voxels] | `headmodel.smooth_fwhm_mm` [mm] |
+| `expected_focal_distance_mm` | `transducer.focal_distance_ep` (from the exit plane) or `transducer.focal_distance_bowl` (from the bowl apex) |
+| `pseudoCT_variant: marquet` | `pct.mapping_density`, `pct.mapping_soundspeed`, `pct.mapping_attenuation` |
+| `calibration.weights: 0` | `calibration.opt_weights` (now 0 = uniform weighting) |
+| `subject_subfolder: 0`, custom `seg_labels` | not supported: outputs always go to `sub-XXX` folders, and the SimNIBS charm labels are fixed |
+
+A config that sets an old key and its current name to different values also stops the run. Conversion covers names only: defaults that changed since your config was written (for example `transducer.target_isppa_wcm2`) apply unless the config sets them, as listed in the [changelog](CHANGELOG.md). `calibration.skip_front_peak_mm` kept its name but is now measured from the exit plane rather than the bowl apex.
+
 ## Editing configs with a GUI
 
 Two front ends write the same YAML files:
 
-- the [MATLAB GUI](doc_gui.md) (`prestus_gui`), and
-- the [PRESTUS Nexus](doc_nexus.md) (experimental), a desktop app that also checks the config as you type and shows a placement viewer.
+- the [PRESTUS Nexus](doc_nexus.md) (experimental), a desktop app that also checks the config as you type and shows a placement viewer, and
+- the [MATLAB GUI](doc_gui.md) (`prestus_gui`, deprecated).
 
 Both write only the values that differ from the defaults, so their files load with `load_parameters` like hand-written ones.
 

@@ -58,8 +58,34 @@ def _in(d, parts):
 def test_overlay_keys_are_read_by_prestus(schema, prestus_root, section):
     source = _functions_source(prestus_root)
     keys = schema.extra_rules if section == "extra" else schema.deprecated
+    if section == "deprecated":   # entries with a kind are applied by upgrade_config_keys.m
+        keys = [p for p, d in keys.items() if "kind" not in d]
     unused = [p for p in keys if not re.search(r"\b" + re.escape(p.rsplit(".", 1)[-1]) + r"\b", source)]
     assert not unused, f"overlay '{section}' keys no longer referenced in functions/: {unused}"
+
+
+def test_deprecated_conversions_are_consistent(schema, prestus_root):
+    upgrade = (prestus_root / "functions" / "legacy" / "upgrade_config_keys.m").read_text()
+    kinds = {"rename", "convert", "removed", "error"}
+    for old, dep in schema.deprecated.items():
+        if "kind" not in dep:
+            continue
+        assert dep["kind"] in kinds, (old, dep["kind"])
+        assert old not in schema, f"{old} is a current key; it cannot also be converted"
+        assert dep.get("since"), f"{old}: 'since' missing"
+        use = dep.get("use") or []
+        for target in (use if isinstance(use, list) else [use]):
+            parts = target.split(".")
+            # a key inside a free-YAML field (e.g. transducer.tx_calibration) is not a schema node
+            inside_yaml = any((n := schema.get(".".join(parts[:i]))) is not None and n.kind == "yaml"
+                              for i in range(1, len(parts)))
+            assert target in schema or inside_yaml, f"{old}: target {target} is not a config key"
+        if dep["kind"] == "rename":
+            assert isinstance(dep["use"], str), f"{old}: a rename has one target"
+        if dep["kind"] == "convert":
+            assert f"case '{dep['convert']}'" in upgrade, f"{old}: no converter '{dep['convert']}'"
+        if dep["kind"] in ("removed", "error"):
+            assert dep.get("note"), f"{old}: a {dep['kind']} entry needs a note"
 
 
 def test_kinds_and_choices_are_consistent(schema):

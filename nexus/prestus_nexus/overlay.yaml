@@ -10,9 +10,17 @@
 #   extra:    keys PRESTUS code reads that are absent (or commented out) in
 #             config_default.yaml. The drift test checks each is referenced
 #             in functions/.
-#   deprecated: old keys with their replacement; 'ignored: true' when PRESTUS
-#             no longer reads them at all (otherwise it still converts them).
+#   deprecated: old keys with their replacement ('use'). Entries with a 'kind'
+#             (configs from v0.5.0 on) are applied by upgrade_config_keys.m when
+#             a config is loaded: rename (moved), convert (exact value
+#             conversion, 'convert' names the converter), removed (dropped;
+#             with 'keep', any other value is an error), error (no exact
+#             conversion: the run stops). 'since' is the first release
+#             without the key. Entries without a kind are converted by their
+#             'source'; 'ignored: true' when PRESTUS no longer reads them.
 #   sections: display labels and advanced flags for top-level groups.
+#             locked: true shows the section read-only until its card is unlocked
+#             (validated constants most studies must not change).
 #   tune_goals / tuning: what a key can be tuned for (speed, accuracy, …);
 #             see the end of this file.
 #
@@ -280,10 +288,110 @@ fields:
   medium_properties.*.absorption_coeff: {unit: dB/(cm·MHz^y)}
 
 deprecated:
+  # Converted or reported by functions/legacy/upgrade_config_keys.m (configs from v0.5.0 on):
+  data_path: {use: path.anat, kind: rename, since: v0.6.0}
+  output_location: {use: path.sim, kind: convert, convert: output_location, since: v0.6.0}
+  seg_path: {use: path.seg, kind: rename, since: v0.6.0}
+  t1_path_template: {use: path.t1_pattern, kind: rename, since: v0.6.0}
+  t2_path_template: {use: path.t2_pattern, kind: rename, since: v0.6.0}
+  subject_subfolder: {use: [], kind: removed, keep: 1, since: v0.6.0, note: "outputs always go to <path.sim>/sub-XXX"}
+  results_filename_affix: {use: io.output_affix, kind: rename, since: v0.6.0}
+  paths_to_add: {use: startup.paths_to_add, kind: rename, since: v0.6.0}
+  subpaths_to_add: {use: startup.subpaths_to_add, kind: rename, since: v0.6.0}
+  simnibs_bin_path: {use: startup.simnibs_bin_path, kind: rename, since: v0.6.0}
+  interactive: {use: simulation.interactive, kind: rename, since: v0.6.0}
+  simulation_medium: {use: simulation.medium, kind: rename, since: v0.6.0}
+  code_type: {use: simulation.code_type, kind: rename, since: v0.6.0}
+  precision: {use: simulation.precision, kind: rename, since: v0.6.0}
+  debug: {use: simulation.debug, kind: rename, since: v0.6.0}
+  overwrite_files: {use: io.overwrite_files, kind: rename, since: v0.6.0}
+  overwrite_simnibs: {use: io.overwrite_simnibs, kind: rename, since: v0.6.0}
+  savemat: {use: io.save_matrices, kind: rename, since: v0.6.0}
+  heatingvideo: {use: io.save_heatingvideo, kind: rename, since: v0.6.0}
+  run_source_setup: {use: modules.run_source_setup, kind: rename, since: v0.6.0}
+  run_acoustic_sims: {use: modules.run_acoustic_sims, kind: rename, since: v0.6.0}
+  run_heating_sims: {use: modules.run_heating_sims, kind: rename, since: v0.6.0}
+  run_posthoc_water_sims: {use: modules.run_posthoc_water_sims, kind: rename, since: v0.6.0}
+  generate_report: {use: modules.generate_report, kind: rename, since: v0.6.0}
+  hpc_submit_medium: {use: platform, kind: rename, since: v0.6.0}
+  submit_medium: {use: platform, kind: rename, since: v0.6.0}
+  hpc_gpu: {use: hpc.gpu, kind: rename, since: v0.6.0}
+  hcp_gpu: {use: hpc.gpu, kind: rename, yield: true, since: v0.6.0}
+  hpc_partition: {use: hpc.partition, kind: rename, since: v0.6.0}
+  hcp_partition: {use: hpc.partition, kind: rename, yield: true, since: v0.6.0}
+  hpc_reservation: {use: hpc.reservation, kind: rename, since: v0.6.0}
+  ld_library_path: {use: hpc.ld_library_path, kind: rename, since: v0.6.0}
+  slurm_job_prefix: {use: hpc.job_prefix, kind: rename, since: v0.6.0}
+  qsub_job_prefix: {use: hpc.job_prefix, kind: rename, since: v0.6.0}
+  focus_area_radius: {use: analysis.focus_area_radius, kind: rename, since: v0.6.0}
+  usepseudoCT: {use: pct.enabled, kind: rename, since: v0.6.0}
+  pseudoCT_variant: {use: [pct.mapping_density, pct.mapping_soundspeed, pct.mapping_attenuation], kind: convert, convert: pct_mapping, since: v0.6.0, note: "set pct.mapping_density, pct.mapping_soundspeed and pct.mapping_attenuation"}
+  pct_skullmapping: {use: [pct.mapping_density, pct.mapping_soundspeed, pct.mapping_attenuation], kind: convert, convert: pct_mapping, since: v0.6.0, note: "set pct.mapping_density, pct.mapping_soundspeed and pct.mapping_attenuation"}
+  segmentation_software: {use: [], kind: removed, keep: charm, since: v0.6.0, note: "segmentation uses SimNIBS charm only"}
+  seg_labels: {use: [], kind: convert, convert: seg_labels, since: v0.6.0, note: "segmentation labels are the fixed SimNIBS charm labels (charm_seg_labels.m)"}
+  charm_debug: {use: segmentation.debug, kind: rename, since: v0.6.0}
+  use_forceqform: {use: segmentation.use_qform, kind: rename, since: v0.6.0}
+  medium: {use: medium_properties, kind: rename, since: v0.6.0}
+  grid_step_mm: {use: grid.resolution_mm, kind: rename, since: v0.6.0}
+  default_grid_dims: {use: grid.default_dims, kind: rename, since: v0.6.0}
+  n_sim_dims: {use: [], kind: removed, since: v0.6.0, note: "the dimensionality follows grid.default_dims"}
+  pml_size: {use: grid.pml_size, kind: rename, since: v0.6.0}
+  grid_max_expand: {use: grid.max_expand, kind: rename, since: v0.6.0}
+  source_ppw: {use: grid.source_ppw, kind: rename, since: v0.6.0}
+  source_cfl: {use: grid.source_cfl, kind: rename, since: v0.6.0}
+  source_limit_fraction: {use: grid.source_limit_fraction, kind: rename, since: v0.6.0}
+  use_kWaveArray: {use: grid.use_kWaveArray, kind: rename, since: v0.6.0}
+  axisymmetric: {use: grid.axisymmetric, kind: rename, since: v0.6.0}
+  csf_mask_expansion_factor: {use: headmodel.csf_expansion, kind: rename, since: v0.6.0}
+  smooth_method: {use: headmodel.smooth_method, kind: rename, since: v0.6.0}
+  smooth_threshold_skull: {use: headmodel.smooth_threshold_skull, kind: rename, since: v0.6.0}
+  smooth_threshold_other: {use: headmodel.smooth_threshold_other, kind: rename, since: v0.6.0}
+  smooth_window: {use: headmodel.smooth_fwhm_mm, kind: error, since: v0.6.0, note: "set headmodel.smooth_fwhm_mm [mm]; the v0.5.0 3D Gaussian kernel had a FWHM of about 1.53 voxels for any window"}
+  skullfillmethod: {use: headmodel.skull_fill_method, kind: rename, since: v0.6.0}
+  wrapradius: {use: headmodel.skull_wrap_radius, kind: rename, since: v0.6.0}
+  skullwrap_visualize: {use: headmodel.skull_wrap_visualize, kind: rename, since: v0.6.0}
+  transducer_from_localite: {use: placement.localite.enabled, kind: rename, since: v0.6.0}
+  reference_transducer_distance_mm: {use: placement.localite.tracker_to_bowl_mm, kind: rename, since: v0.6.0}
+  dist_close: {use: placement.heuristic.dist_close, kind: rename, since: v0.6.0}
+  thermal.pd: {use: timing.pd, kind: rename, since: v0.6.0}
+  thermal.pri: {use: timing.pri, kind: rename, since: v0.6.0}
+  thermal.ptd: {use: timing.ptd, kind: rename, since: v0.6.0}
+  thermal.pt_timestep: {use: timing.pt_timestep, kind: rename, since: v0.6.0}
+  thermal.ptri: {use: timing.ptri, kind: rename, since: v0.6.0}
+  thermal.ptrd: {use: timing.ptrd, kind: rename, since: v0.6.0}
+  thermal.post_ptri_dur: {use: timing.post_ptri_dur, kind: rename, since: v0.6.0}
+  thermal.post_pt_timestep: {use: timing.post_pt_timestep, kind: rename, since: v0.6.0}
+  thermal.equal_step_duration: {use: timing.equal_step_duration, kind: rename, since: v0.6.0}
+  transducer.n_elements: {use: transducer.annular.elem_n, kind: rename, since: v0.6.0}
+  transducer.Elements_ID_mm: {use: transducer.annular.elem_id_mm, kind: rename, since: v0.6.0}
+  transducer.Elements_OD_mm: {use: transducer.annular.elem_od_mm, kind: rename, since: v0.6.0}
+  transducer.curv_radius_mm: {use: transducer.annular.curv_radius_mm, kind: rename, since: v0.6.0}
+  transducer.dist_to_plane_mm: {use: transducer.annular.dist_geom_ep_mm, kind: rename, since: v0.6.0}
+  transducer.source_amp: {use: transducer.annular.elem_p_amp, kind: rename, since: v0.6.0}
+  transducer.source_phase_deg: {use: transducer.annular.elem_phase_deg, kind: rename, since: v0.6.0}
+  transducer.source_phase_rad: {use: transducer.annular.elem_phase_rad, kind: rename, since: v0.6.0}
+  transducer.source_freq_hz: {use: transducer.freq_hz, kind: rename, since: v0.6.0}
+  transducer.set_intensity_w_per_cm2: {use: transducer.tx_calibration.isppa_wcm2, kind: rename, since: v0.6.0}
+  transducer.set_focus_wrt_exit_plane_mm: {use: [], kind: removed, since: v0.6.0, note: "informational field of v0.5.0 calibration files; set transducer.focal_distance_ep"}
+  transducer.expected_focal_distance_mm: {use: [transducer.focal_distance_ep, transducer.focal_distance_bowl], kind: error, since: v0.6.0, note: "v0.5.0 read this distance from the bowl apex in most code paths and from the exit plane in others; set transducer.focal_distance_ep or transducer.focal_distance_bowl"}
+  expected_focal_distance_mm: {use: [transducer.focal_distance_ep, transducer.focal_distance_bowl], kind: error, since: v0.6.0, note: "v0.5.0 read this distance from the bowl apex in most code paths and from the exit plane in others; set transducer.focal_distance_ep or transducer.focal_distance_bowl"}
+  expected_focal_distance_EP_mm: {use: [], kind: removed, since: v0.6.0, note: "internal field; set transducer.focal_distance_ep"}
+  expected_focal_distance_bowl_mm: {use: [], kind: removed, since: v0.6.0, note: "internal field; set transducer.focal_distance_bowl"}
+  calibration.optmethod: {use: calibration.opt_method, kind: rename, since: v0.6.0}
+  calibration.seed: {use: calibration.opt_seed, kind: rename, since: v0.6.0}
+  calibration.addEPdistance: {use: calibration.add_FDO, kind: rename, since: v0.6.0}
+  calibration.weights: {use: calibration.opt_weights, kind: convert, convert: calibration_weights, since: v0.6.0, note: "the meaning is inverted (now 0 = uniform, w >= 1 = Gaussian with SD = centre/w); set calibration.opt_weights"}
+  calibration.path_input_phase: {use: [], kind: removed, since: v0.7-pre, note: "no longer read"}
+  calibration.submit_medium: {use: [], kind: removed, since: v0.6.0, note: "calibration runs use platform"}
+  calibration.save_in_calibration_folder: {use: [], kind: removed, since: v0.7-pre, note: "outputs go to calibration.path_output, path_output_profiles and library_path"}
+  calibration.interpolateToEP: {use: [], kind: removed, since: v0.6.0, note: "v0.5.0 overwrote it before use, so it had no effect"}
+  calibration.fit_velocity_to_intensity: {use: [], kind: removed, since: v0.6.1, note: "the drive scales with sqrt(ISPPA)"}
+  calibration.opt_upper_velocity: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA)"}
+  calibration.opt_amp_validation: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once"}
+  # Converted where they are read (source):
   transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}
+  transducer.matrix.elem_amp: {use: transducer.matrix.elem_p_amp, source: validate_matrix_transducer.m}
   calibration.target_isppa_wcm2: {use: transducer.target_isppa_wcm2, source: load_parameters.m}
-  expected_focal_distance_mm: {use: transducer.focal_distance_ep, source: load_transducer_parameters.m}
-  transducer.set_intensity_w_per_cm2: {use: transducer.target_isppa_wcm2, source: babelbrain_thermal_wrapper.m}
   jwave.pml_size: {use: grid.pml_size, ignored: true, source: jwave_wrapper.m}
   io.external_acoustic_nifti: {use: path.acoustic_input, source: load_parameters.m}
 
