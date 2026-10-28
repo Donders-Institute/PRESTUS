@@ -99,10 +99,30 @@ end
     fprintf('[time_reversal] reverse run: point source at voxel [%s], %d sensor points, %s\n', ...
         num2str(target_vox), nnz(rev_sensor.mask), rev_parameters.simulation.code_type);
     sensor_data = acoustic_simulation(kgrid, kwave_medium, source, rev_sensor, input_args, rev_parameters);
+    p_t = sensor_data.p;                                  % [n_points x n_t], kept in its class (single)
+    clear sensor_data
 
-    [amp, phase] = extractAmpPhase(double(sensor_data.p), 1/kgrid.dt, freq_hz, 'Dim', 2);
-    t0_s = (double(sensor.record_start_index) - 1) * kgrid.dt;
-    p_complex = amp(:) .* exp(1i * (phase(:) - 2 * pi * freq_hz * t0_s));
+    % Complex amplitude at freq_hz by a single-frequency DFT over the last
+    % whole number of periods of the recorded window (exact for a steady
+    % state), in blocks of points, so the recording is never copied to double
+    % as a whole. Same convention as extractAmpPhase: signal = a*cos(w*t + phi)
+    % -> a*exp(1i*phi), referred to t = 0 of the simulation.
+    n_t   = size(p_t, 2);
+    ppp   = 1 / (freq_hz * kgrid.dt);                     % points per period
+    n_use = max(1, round(floor(n_t / ppp) * ppp));
+    if n_use > n_t, n_use = n_t; end
+    k0    = n_t - n_use;                                  % first sample used (0-based in the window)
+    w     = 2 * pi * freq_hz * kgrid.dt;
+    E     = exp(-1i * w * (0:n_use-1)).' * (2 / n_use);   % [n_use x 1]
+    t0_s  = (double(sensor.record_start_index) - 1 + k0) * kgrid.dt;
+    p_complex = complex(zeros(size(p_t, 1), 1));
+    blk = max(1, floor(2e8 / (8 * n_use)));               % ~200 MB of doubles per block
+    for i0 = 1:blk:size(p_t, 1)
+        r = i0:min(i0 + blk - 1, size(p_t, 1));
+        p_complex(r) = double(p_t(r, k0+1:end)) * E;
+    end
+    clear p_t
+    p_complex = p_complex .* exp(-1i * 2 * pi * freq_hz * t0_s);
 
     info = struct('target_vox', target_vox, 'n_points', numel(p_complex), ...
         'record_start_index', sensor.record_start_index, ...

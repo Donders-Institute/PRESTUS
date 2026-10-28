@@ -71,7 +71,8 @@ end
         r = struct('pose', i, 'kind', ps.kind, 'polar_deg', ps.polar_deg, 'azimuth_deg', ps.azimuth_deg, ...
             'apex_vox_x', ps.apex_m(1) / dx + 1, 'apex_vox_y', ps.apex_m(2) / dx + 1, ...
             'apex_vox_z', ps.apex_m(3) / dx + 1, 'skin_mm', ps.skin_mm, ...
-            'exit_to_target_mm', ps.exit_to_target_mm);
+            'exit_to_target_mm', ps.exit_to_target_mm, 'push_mm', field_or_nan(ps, 'push_mm'), ...
+            'inside_fraction', field_or_nan(ps, 'inside_fraction'), 'jitter_mm', field_or_nan(ps, 'jitter_mm'));
 
         % 1-2. geometric aim at the target
         aim = t_m;
@@ -142,4 +143,8 @@ end
 function sh = nan_shift()
     sh = struct('shift_m', [NaN NaN NaN], 'shift_axial_mm', NaN, 'shift_lateral_mm', NaN, ...
         'shift_mm', NaN, 'peak_rel', NaN, 'at_edge', true, 'f_target', NaN);
+end
+
+function v = field_or_nan(s, f)
+    if isfield(s, f) && ~isempty(s.(f)), v = s.(f); else, v = NaN; end
 end

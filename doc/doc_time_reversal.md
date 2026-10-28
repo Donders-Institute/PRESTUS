@@ -79,13 +79,20 @@ one:
 1. **Candidates** (`reciprocity_pose_candidates`): beam directions tilted from the
    planned one up to `max_angle_deg`, in steps of `angle_step_deg`, all aimed at the
    target. For each direction the bowl sits against the scalp with the planned stand-off,
-   so the required focal depth changes with the direction. A single element cannot steer:
+   so the required focal depth changes with the direction; where the scalp curves, the
+   bowl is moved outward until its surface overlaps the scalp no more than the planned
+   bowl does (`push_mm` in the pose table), so all poses are seated alike. A single element cannot steer:
    its apex is placed at the curvature radius from the target instead, and its aim
-   correction is lateral only. With `jitter_mm` (e.g. `0.5`), the planned pose with its
-   apex moved by ± that distance along each grid axis is scored too (rows of kind
-   `jitter`), the local search often run with forward simulations. Poses whose surface would cut
-   into the head or leave the grid are dropped. The reverse run records the field over
-   the region these poses cover.
+   correction is lateral only. With `jitter_mm` (one or more distances, e.g. `0.5` or
+   `[0.5 1 2 5]`), the planned pose with its apex moved by each distance is scored too
+   (rows of kind `jitter`), the local search often run with forward simulations.
+   `jitter_mode: grid` moves the apex ± along each grid axis, as when editing voxel
+   coordinates; `jitter_mode: scalp` slides the transducer over the scalp perpendicular to
+   the beam in 8 directions and seats it against the scalp, which suits shifts beyond about
+   1 mm. Poses whose surface still
+   overlaps the head by more than the planned surface does plus 2 % of its points are
+   dropped (`inside_fraction`); the planned pose is always kept.
+   The reverse run records the field over the region these poses cover.
 2. **Scoring** (`reciprocity_score_poses`): for each pose, the surface is sampled
    (`annular_aperture_points`) and the target pressure is a sum over the reverse field
    there, so each pose costs an interpolation, not a simulation. Per pose:
@@ -105,9 +112,11 @@ The acoustic run keeps the planned pose. To verify the best poses with forward
 simulations and run the chosen one, use the [pose workflow](#pose-workflow), or set up a
 pose by hand with `time_reversal_pose_parameters(parameters, pose_row)`.
 
-With a [limited acoustic FOV](doc_limited_fov.md), the reverse run of a pose search uses
-the full grid (the crop around the planned beam would exclude most poses); the forward
-run keeps the crop. Poses outside the full grid are dropped.
+The simulation grid ends close to the planned transducer, so tilted poses can lie outside
+it. The reverse run of a pose search therefore uses its own grid: the full grid (also with
+a [limited acoustic FOV](doc_limited_fov.md), whose crop the forward run keeps), padded
+with water on the sides the candidate poses need (the log reports the padding). The
+padding makes the reverse run larger, and so longer, than the forward run.
 
 `time_reversal.only: true` stops the run after this stage (no water baseline, acoustic
 or thermal simulation), for a report or pose table on its own.
@@ -167,10 +176,16 @@ runs, and one full run.
 
 ## Cost
 
-One k-Wave run per distinct target, as long as the acoustic simulation, recording the
-pressure time series (`grid.steady_state_num_periods` periods) at the sensor points: the
-transducer surface (refocusing), plus the candidate region (pose search; this can reach
-GB of RAM on fine grids). Scoring takes seconds per pose.
+One k-Wave run per distinct target, about as long as the acoustic simulation (longer by the
+padding of a pose search), recording the pressure time series
+(`grid.steady_state_num_periods` periods) at the sensor points: the transducer surface
+(refocusing), plus the candidate region (pose search). Scoring takes seconds per pose.
+
+Memory stays below that of the acoustic simulation: the forward source is released during
+the stage and rebuilt afterwards, the padded grid reuses the forward source's element
+weights (no second source is built), and the recording is reduced to one complex amplitude
+per point in blocks, without a double-precision copy (0.5 mm head runs of the forward
+simulation peak at 25–31 GB).
 
 ## Assumptions and limits
 

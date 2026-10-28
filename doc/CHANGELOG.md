@@ -123,6 +123,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Time axis and steady state configurable: `grid.steady_state_transits`, `grid.steady_state_num_periods`, `grid.source_ppp`, `grid.sim_time_us`; PML and band-limiting options `grid.pml_size_range`, `grid.pml_alpha`, `grid.bli_tolerance`, `grid.bli_upsampling_rate`
 - Lower memory use for CW sources on `matlab_cpu` / `matlab_gpu`, also on axisymmetric grids
 - Axial-profile plot with tissue bands and the free-water O'Neil and k-Wave profiles; CSV gains `freewater_oneil_Wcm2` / `freewater_kwave_Wcm2`
+- Time reversal (`time_reversal.enabled`, *draft*): one reverse simulation per target gives refocusing phases, aberration metrics and a ranking of candidate poses; `placement_search.jitter_mm` takes several distances, and `jitter_mode: scalp` slides the pose over the scalp and re-seats it
 - Pulse amplitude ramps in thermal simulations (`timing.pulse_ramp_dur`, `timing.pulse_ramp_shape`: `linear` | `tukey`)
 - New thermal metrics `riseT37_brain` / `riseT37_skull` / `riseT37_skin` (rise from 37 °C); new output columns `MI` (free water) and `Psptp`
 - ⚠️ **Fixed:** MI was computed from peak positive pressure instead of peak rarefaction pressure (IEC 62359); rerun acoustic analysis to update MI

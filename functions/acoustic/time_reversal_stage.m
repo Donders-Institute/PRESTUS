@@ -49,7 +49,9 @@ function [parameters, source, source_labels, tr_results] = time_reversal_stage(p
 %   medium_masks  - grid label volume (0 = water)
 %   src_weights   - element weights from SOURCE_SENSOR_SETUP / SOURCE_CREATE
 %   trans_pos, focus_pos - transducer and focus positions [grid voxels]
-%   source, source_labels - forward source (replaced when phases are applied)
+%   source, source_labels - forward source (replaced when phases are applied);
+%                   struct() to free its memory during the reverse run: it is
+%                   then rebuilt at the end (unless time_reversal.only)
 %   planimg       - grid <-> T1 mapping (inv_transf, t1_header, fov_offset_ac);
 %                   optional: without it, poses are given in grid voxels only
 %   fov_state     - from ACOUSTIC_FOV_CROP (optional): full-grid medium and
@@ -93,14 +95,37 @@ end
     end
 
     % Forward-grid positions (for rebuilding the source) and the context of
-    % the reverse run: the forward grid, or the full grid when a pose search
-    % meets an acoustic FOV crop
+    % the reverse run: the forward grid, or, for a pose search, the full grid
+    % (when an acoustic FOV crop is active) padded with water so that every
+    % candidate pose fits (PRESTUS crops the grid at the planned transducer)
     [trans_rows, focus_rows] = resolve_rows(parameters, trans_pos, focus_pos);
     ctx = struct('parameters', parameters, 'kgrid', kgrid, 'medium', kwave_medium, ...
         'masks', medium_masks, 'sensor', sensor, 'w', src_weights, ...
         'trans', trans_rows, 'focus', focus_rows, 'planimg', planimg);
-    if search && isfield(fov_state, 'active') && fov_state.active
-        ctx = full_grid_context(parameters, kgrid, fov_state, planimg);
+    cand = cell(1, nT);
+    if search
+        ps = cfg.placement_search;
+        find_poses = @(c, it, allow) reciprocity_pose_candidates(c.parameters, c.masks, ...
+            parameters.transducer(it), c.trans(it, :), c.focus(it, :), 'MaxAngle', ps.max_angle_deg, ...
+            'AngleStep', ps.angle_step_deg, 'StandoffMm', ps.standoff_mm, 'JitterMm', ps.jitter_mm, ...
+            'JitterMode', jitter_mode(ps), 'AllowOutside', allow);
+        searchable = arrayfun(@(t) strcmp(t.type, 'annular') && isfinite(t.annular.curv_radius_mm), ...
+            parameters.transducer);
+        for it = find(~searchable)
+            fprintf('[time_reversal] pose search skipped for transducer %d (curved annular only)\n', it);
+        end
+        base = base_context(parameters, kwave_medium, medium_masks, trans_rows, focus_rows, planimg, fov_state);
+        pad_lo = zeros(1, 3); pad_hi = zeros(1, 3);
+        for it = find(searchable)
+            c1 = find_poses(base, it, true);
+            pad_lo = max(pad_lo, c1.pad_lo); pad_hi = max(pad_hi, c1.pad_hi);
+        end
+        if base.rebuild || any(pad_lo + pad_hi > 0)
+            ctx = padded_context(base, kgrid, sensor, src_weights, parameters.grid.dims, pad_lo, pad_hi);
+        end
+        for it = find(searchable)
+            cand{it} = find_poses(ctx, it, false);
+        end
     end
     dims    = ctx.parameters.grid.dims;
     w       = ctx.w;
@@ -110,23 +135,6 @@ end
     sub = cell(1, nd);
     [sub{:}] = ind2sub(dims, w.mask_ind);
     pts_m = (cell2mat(sub) - 1) * dx;
-
-    % Pose candidates per transducer (before the reverse runs: they set the sensor region)
-    cand = cell(1, nT);
-    if search
-        ps = cfg.placement_search;
-        for it = 1:nT
-            tr = parameters.transducer(it);
-            if strcmp(tr.type, 'annular') && isfinite(tr.annular.curv_radius_mm)
-                cand{it} = reciprocity_pose_candidates(ctx.parameters, ctx.masks, tr, ...
-                    ctx.trans(it, :), ctx.focus(it, :), 'MaxAngle', ps.max_angle_deg, ...
-                    'AngleStep', ps.angle_step_deg, 'StandoffMm', ps.standoff_mm, ...
-                    'JitterMm', ps.jitter_mm);
-            else
-                fprintf('[time_reversal] pose search skipped for transducer %d (curved annular only)\n', it);
-            end
-        end
-    end
 
     % One reverse run per distinct target
     [targets, ~, grp] = unique(round(ctx.focus), 'rows', 'stable');
@@ -195,31 +203,105 @@ end
     write_outputs(parameters, tr_results, rev_fields, targets);
     parameters.state.time_reversal = struct('applied', any(arrayfun(@(r) r.refocus.applied, tr_results)));
 
-    if parameters.state.time_reversal.applied
-        disp('[time_reversal] Rebuilding the source with the time-reversal phases...')
+    only = isfield(cfg, 'only') && cfg.only;
+    if ~only && (parameters.state.time_reversal.applied || isempty(fieldnames(source)))
+        if parameters.state.time_reversal.applied
+            disp('[time_reversal] Rebuilding the source with the time-reversal phases...')
+        else
+            disp('[time_reversal] Rebuilding the source for the acoustic simulation...')
+        end
         [source, source_labels] = source_create(parameters, kgrid, trans_rows, focus_rows);
     end
 end
 
-function ctx = full_grid_context(parameters, kgrid, fov_state, planimg)
-% Grid, medium, sensor and element weights of the full (uncropped) grid, with
-% the forward run's time axis, for a reverse run that covers poses outside the
-% acoustic FOV. The source is built under its own affix and never cached.
-    disp('[time_reversal] acoustic FOV active: the pose search runs its reverse simulation on the full grid');
-    p = parameters;
-    p.grid.dims = fov_state.full_dims;
-    p = fov_restore_transducers(p, fov_state);
-    p.io.output_affix         = [char(parameters.io.output_affix) '_trfull'];
-    p.io.overwrite_files      = 'always';
-    p.io.save_source_matrices = 0;
-    c = fov_state.kwave_medium_full.sound_speed;
-    [kg, ~, sens, ~, w] = source_sensor_setup(p, max(c(:)), fov_state.trans_pos_full, ...
-        fov_state.focus_pos_full, kgrid.dt, min(c(:)));
-    [trans_rows, focus_rows] = resolve_rows(p, fov_state.trans_pos_full, fov_state.focus_pos_full);
-    planimg.fov_offset_ac = [1 1 1];
-    ctx = struct('parameters', p, 'kgrid', kg, 'medium', fov_state.kwave_medium_full, ...
-        'masks', fov_state.medium_masks_full, 'sensor', sens, 'w', w, ...
-        'trans', trans_rows, 'focus', focus_rows, 'planimg', planimg);
+function m = jitter_mode(ps)
+    m = 'grid';
+    if isfield(ps, 'jitter_mode') && ~isempty(ps.jitter_mode), m = char(ps.jitter_mode); end
+end
+
+function base = base_context(parameters, kwave_medium, medium_masks, trans_rows, focus_rows, planimg, fov_state)
+% Medium, labels and positions of the grid a pose search starts from: the
+% full grid when an acoustic FOV crop is active (rebuild = true), else the
+% forward grid
+    base = struct('parameters', parameters, 'medium', kwave_medium, 'masks', medium_masks, ...
+        'trans', trans_rows, 'focus', focus_rows, 'planimg', planimg, 'rebuild', false, ...
+        'fwd_to_base', [0 0 0]);
+    if isfield(fov_state, 'active') && fov_state.active
+        p = parameters;
+        p.grid.dims = fov_state.full_dims;
+        p = fov_restore_transducers(p, fov_state);
+        [t, f] = resolve_rows(p, fov_state.trans_pos_full, fov_state.focus_pos_full);
+        planimg.fov_offset_ac = [1 1 1];
+        base = struct('parameters', p, 'medium', fov_state.kwave_medium_full, ...
+            'masks', fov_state.medium_masks_full, 'trans', t, 'focus', f, 'planimg', planimg, 'rebuild', true, ...
+            'fwd_to_base', fov_state.offset(:)' - 1);
+        disp('[time_reversal] acoustic FOV active: the pose search runs its reverse simulation on the full grid');
+    end
+end
+
+function ctx = padded_context(base, kgrid, sensor, w_fwd, fwd_dims, pad_lo, pad_hi)
+% Grid, medium and element weights of the base grid padded with water
+% (pad_lo / pad_hi voxels; padded axes are rounded up to a multiple of 16 for
+% the FFTs). Nothing is rebuilt: the forward run's element weights are moved
+% to the new grid (same resolution, shifted by the forward -> base offset and
+% pad_lo), and its time axis is extended by the extra diagonal transit time,
+% so the steady-state window stays at the end of the run.
+    p = base.parameters;
+    dims0  = p.grid.dims;
+    padded = pad_lo + pad_hi > 0;
+    pad_hi = pad_hi + mod(-(dims0 + pad_lo + pad_hi), 16) .* padded;   % only the padded axes
+    dims   = dims0 + pad_lo + pad_hi;
+    w_label = find(strcmp(fieldnames(p.medium_properties), 'water'), 1);
+    if isempty(w_label), w_label = 0; end
+    masks  = base.masks;
+    medium = base.medium;
+    if any(padded)
+        water_idx = find(masks == w_label | masks == 0, 1);
+        masks = pad_volume(masks, pad_lo, pad_hi, w_label);
+        for f = fieldnames(medium)'
+            v = medium.(f{1});
+            if isnumeric(v) && ~isscalar(v) && isequal(size(v), dims0)
+                medium.(f{1}) = pad_volume(v, pad_lo, pad_hi, v(water_idx));
+            end
+        end
+        fprintf('[time_reversal] pose search: reverse-run grid padded with water by [%s] / [%s] voxels -> [%s]\n', ...
+            num2str(pad_lo), num2str(pad_hi), num2str(dims));
+    end
+
+    % Element weights of the forward source, moved to this grid
+    shift = base.fwd_to_base + pad_lo;
+    [i, j, k] = ind2sub(fwd_dims, w_fwd.mask_ind);
+    w = w_fwd;
+    w.mask_ind = sub2ind(dims, i + shift(1), j + shift(2), k + shift(3));
+
+    % Time axis: the forward one, longer by the extra diagonal transit
+    dx = p.grid.resolution_mm * 1e-3;
+    c  = medium.sound_speed;
+    extra_m = max(0, norm((dims - 1) * dx) - norm((fwd_dims - 1) * dx));
+    n_extra = ceil(extra_m / min(c(:)) / kgrid.dt);
+    kg = kWaveGrid(dims(1), dx, dims(2), dx, dims(3), dx);
+    kg.setTime(kgrid.Nt + n_extra, kgrid.dt);
+    sens = struct('record_start_index', sensor.record_start_index + n_extra);
+
+    for ti = 1:numel(p.transducer)
+        for fld = {'trans_pos', 'focus_pos'}
+            if isfield(p.transducer(ti), fld{1}) && isnumeric(p.transducer(ti).(fld{1})) && ...
+                    numel(p.transducer(ti).(fld{1})) == 3
+                p.transducer(ti).(fld{1}) = p.transducer(ti).(fld{1})(:)' + pad_lo;
+            end
+        end
+    end
+    p.grid.dims = dims;
+    planimg = base.planimg;
+    off = [1 1 1];
+    if isfield(planimg, 'fov_offset_ac') && ~isempty(planimg.fov_offset_ac), off = planimg.fov_offset_ac; end
+    planimg.fov_offset_ac = off - pad_lo;      % padded voxel -> full-grid voxel
+    ctx = struct('parameters', p, 'kgrid', kg, 'medium', medium, 'masks', masks, 'sensor', sens, 'w', w, ...
+        'trans', base.trans + pad_lo, 'focus', base.focus + pad_lo, 'planimg', planimg);
+end
+
+function v = pad_volume(v, pad_lo, pad_hi, value)
+    v = padarray(padarray(v, pad_lo, value, 'pre'), pad_hi, value, 'post');
 end
 
 function [trans_rows, focus_rows] = resolve_rows(parameters, trans_pos, focus_pos)

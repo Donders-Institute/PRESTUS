@@ -289,6 +289,9 @@ function [parameters] = prestus_pipeline(parameters, options)
                  'refocusing: babelbrain.do_refocusing).']);
         else
             log_timer('start', 'time_reversal', parameters.io.dir_output);
+            % The forward source (its signals: GBs at fine resolution) is not
+            % needed by the reverse run; the stage rebuilds it afterwards
+            source = struct();
             [parameters, source, source_labels] = time_reversal_stage(parameters, kgrid, kwave_medium, ...
                 medium_masks, sensor, src_weights, trans_pos, focus_pos, source, source_labels, planimg, fov_state);
             log_timer('stop', 'time_reversal');

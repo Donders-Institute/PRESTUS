@@ -621,7 +621,8 @@ See [Time reversal](doc_time_reversal.md). One extra k-Wave run per target (poin
 | `placement_search.angle_step_deg` | Angular step of the candidate directions [deg]. | `2.5` | |
 | `placement_search.standoff_mm` | Scalp to exit-plane distance [mm]. | `[]` | `[]` = that of the planned pose. |
 | `placement_search.aim_iterations` | Re-aim at target − predicted shift this many times. | `2` | `0` = geometric aim only. |
-| `placement_search.jitter_mm` | Also score the planned pose with its apex moved by ± this distance along each grid axis [mm]. | `[]` | E.g. `0.5`, the local search users often run with forward simulations. Rows of kind `jitter`. |
+| `placement_search.jitter_mm` | Also score the planned pose with its apex moved by these distances [mm], aimed at the target. | `[]` | One or more, e.g. `0.5` (the local search users often run with forward simulations) or `[0.5 1 2 5]`. Rows of kind `jitter`, distance in column `jitter_mm`. |
+| `placement_search.jitter_mode` | How `jitter_mm` moves the apex. | `'grid'` | `'grid'`: ± along each grid axis, as when editing voxel coordinates (6 poses per distance; the bowl is not re-seated, so beyond ~1 mm it can cut into or lift off the scalp). `'scalp'`: slid over the scalp perpendicular to the planned beam in 8 directions and re-seated against the scalp (8 poses per distance). |
 | `only` | Stop after the time-reversal stage. | `false` | No water baseline, acoustic or thermal simulation: the report and pose table only. |
 | `pose_workflow.enabled` | Run the pose workflow (search → forward verification → final full-grid run) instead of a single simulation. | `false` | One curved annular transducer, `simulation.medium: layered`. See [Pose workflow](doc_time_reversal.md#pose-workflow). |
 | `pose_workflow.n_top` | Number of best poses (by predicted target pressure after aim correction) to verify. | `5` | The planned pose is always verified as the reference. |
