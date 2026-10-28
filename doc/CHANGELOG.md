@@ -148,6 +148,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 
 #### Backends
 - **BabelBrain** as acoustic and thermal backend (`acoustic_backend: babelbrain`, `thermal_backend: babelbrain`), with a CT path (`babelbrain.ct_mapping`), internal air regions (`babelbrain.air_regions`) and free-water FDTD by default (`babelbrain.use_rayleigh_for_water: false`). One transducer per run, beam along the grid z axis; BabelBrain thermal uses its own tissue thermal properties. Defaults: `babelbrain.ppw: 12`, `babelbrain.q_correction` 1.0 on the non-CT path (3.0 with CT), `babelbrain.tight_narrow_beam` off, `babelbrain.profile_calibration` off
+- BabelBrain `Single` and `BSonix` presets take their aperture and focal length from the PRESTUS transducer; with `thermal_backend: babelbrain`, multi-ISPPA thermal jobs run one after another, as they share one BabelBrain thermal file
 - **jwave** as acoustic backend (`acoustic_backend: jwave`), Helmholtz and time-domain solvers; `jwave.helmholtz_operator: conservative` (default) corrects transmission through skull, `jwave` restores the built-in operator. kWaveArray sources supported; no axisymmetric grids
 - **k-Wave elastic** (`acoustic_backend: kwave_elastic`, *draft*, not validated): shear waves in the skull with properties from the new `elastic:` section; MATLAB CPU/GPU, no axisymmetric grids
 - Backend settings are validated at config load; the HTML report has backend sections and backend-specific methods text

@@ -197,6 +197,13 @@ def parse_args():
                         'For CUDA/OpenCL, omit to auto-detect via nvidia-smi / pyopencl.')
     p.add_argument('--tx_mech_adjust_z',    default=0.0, type=float,
                    help='Transducer z offset into skin [m] (default 0: geometry already in NIfTI)')
+    p.add_argument('--aperture',            default=0.0, type=float,
+                   help='Transducer aperture (outer diameter) [m]. Required by the single-element '
+                        'presets (Single, BSonix), whose default.yaml has no geometry; overrides '
+                        'the preset TxDiam when > 0.')
+    p.add_argument('--focal_length',        default=0.0, type=float,
+                   help='Transducer focal length (radius of curvature) [m]. Required by the '
+                        'single-element presets; overrides the preset FocalLength when > 0.')
     p.add_argument('--z_steering',          default=0.0, type=float,
                    help='ZSteering: axial offset of electronic focus from preset FocalLength [m]. '
                         'Derived automatically from focal_distance_mm vs FocalLength when no '
@@ -378,12 +385,13 @@ def load_run_sim(babelbrain_root, tx_system):
 
 
 def convert_weights_if_needed(weights_path):
-    """Convert PRESTUS split-format weights HDF5 to BabelBrain native complex format.
+    """Convert legacy PRESTUS split-format weights HDF5 to BabelBrain native complex format.
 
-    PRESTUS export_babelbrain_weights.m writes:
+    export_babelbrain_weights.m now writes the native layout (compound r/i
+    /CALIBRATION with 'type' attributes), which passes through unchanged.
+    Files from earlier PRESTUS versions have:
         /CALIBRATION/real  [N x 1] float32
         /CALIBRATION/imag  [N x 1] float32
-    (MATLAB cannot write native complex HDF5 datasets.)
 
     BabelBrain ReadFromH5py expects:
         /CALIBRATION       [N] complex64  (single dataset at root level)
@@ -1408,7 +1416,9 @@ def main():
     # Replace BabelBrain's built-in material DB with PRESTUS's configured values so
     # all solver backends assume identical tissue acoustics. Requires the skull
     # fix above to be active (otherwise the injected bone attenuation is not
-    # realised). No-op for CT / water-only runs.
+    # realised). Water-only runs do not read it (BabelBrain's own water). On the
+    # CT path bone comes from the HU mapping, but Skin and Brain still come from
+    # MatFreq (BabelIntegrationBASE.py), so their injected values apply there.
     if args.medium_properties_json:
         if args.no_skull_atten_fix:
             print('[run_babelbrain_case] Warning: --medium_properties_json given together with '
@@ -1439,6 +1449,21 @@ def main():
             geom_kw['InDiameters']  = np.array([float(x) for x in preset_cfg['InDiameters']])
         if 'OutDiameters' in preset_cfg:
             geom_kw['OutDiameters'] = np.array([float(x) for x in preset_cfg['OutDiameters']])
+
+    # Geometry passed by PRESTUS (single-element presets have none in default.yaml).
+    for key, val in (('Aperture', args.aperture), ('FocalLength', args.focal_length)):
+        if val > 0:
+            if key in geom_kw and abs(geom_kw[key] - val) > 1e-6:
+                print(f'[run_babelbrain_case] {key}: command line {val} m overrides preset {geom_kw[key]} m')
+            geom_kw[key] = val
+
+    # BabelIntegrationSingle.RUN_SIM.RunCases reads kargs['Aperture'] and
+    # kargs['FocalLength'] with no default; fail here with the fix, not a KeyError.
+    if PRESET_MODULE_MAP[args.tx_system][0].endswith('BabelIntegrationSingle'):
+        missing = [k for k in ('Aperture', 'FocalLength') if k not in geom_kw]
+        if missing:
+            raise ValueError(f'{args.tx_system} preset needs {" and ".join(missing)}: '
+                             f'pass --aperture and --focal_length [m].')
 
     # Only forward geometry the preset's sim class accepts by name. Phased arrays
     # (H317, H246, ...) hardcode their geometry in CreateSimConditions and pass

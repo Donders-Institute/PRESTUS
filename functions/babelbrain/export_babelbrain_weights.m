@@ -44,14 +44,24 @@ function export_babelbrain_weights(phases_rad, velocity, parameters, out_path, g
 %                        weights.
 %
 % Output:
-%   HDF5 file at out_path with:
-%     /CALIBRATION/real, /CALIBRATION/imag - [N_elem x 1] float32 phasors
-%                        encoding hardware-correction delta from geometric phases
-%                        (and relative amplitude shading, if elem_amp given)
-%     /DRIVE/phases_rad, /DRIVE/amp_ratio - [N_elem x 1] intended absolute drive,
-%                        used by run_babelbrain_case.py to rebuild the weights
-%                        against BabelBrain's own AllPhi
+%   HDF5 file at out_path in the layout BabelViscoFDTD's SaveToH5py writes
+%   and ReadFromH5py (BabelIntegrationBASE.py) reads: every root item carries
+%   a string attribute 'type', and complex arrays are an h5py-style compound
+%   {r, i}.
+%     /CALIBRATION       - [N_elem] complex64 (compound r/i float32) phasors
+%                          encoding hardware-correction delta from geometric
+%                          phases (and relative amplitude shading, if elem_amp
+%                          given); type='ndarray'
+%     /DRIVE_phases_rad, /DRIVE_amp_ratio - [N_elem x 1] intended absolute
+%                          drive, used by run_babelbrain_case.py to rebuild
+%                          the weights against BabelBrain's own AllPhi
 %     /metadata/...      - provenance fields (freq, velocity, n_elem, timestamp)
+%
+%   N_elem is one weight per RING. Unpatched BabelBrain expects one weight per
+%   sub-element (AdjustWeightAmplitudes); run_babelbrain_case.py expands the
+%   per-ring weights. Files written before this layout (/CALIBRATION/real +
+%   /imag groups) are still read by IMPORT_BABELBRAIN_WEIGHTS and converted by
+%   run_babelbrain_case.py.
 %
 % See also: IMPORT_BABELBRAIN_WEIGHTS, PERFORM_GLOBAL_SEARCH,
 %           BabelBrain/TranscranialModeling/BabelIntegrationBASE.py
@@ -132,14 +142,6 @@ end
 write_path = [tempname, '.h5'];
 tmp_guard  = onCleanup(@() h5_tmp_cleanup(write_path));
 
-% CALIBRATION dataset: real and imaginary parts stored as separate float32
-% arrays to match NumPy complex64 on read.
-% Reconstruct in Python: weights = data['real'] + 1j*data['imag']
-h5create(write_path, '/CALIBRATION/real', [n_elem 1], 'Datatype', 'single');
-h5create(write_path, '/CALIBRATION/imag', [n_elem 1], 'Datatype', 'single');
-h5write(write_path,  '/CALIBRATION/real', single(real(weights)));
-h5write(write_path,  '/CALIBRATION/imag', single(imag(weights)));
-
 % RAW DRIVE (for the AllPhi-referenced correction path in run_babelbrain_case.py):
 % the intended per-ring absolute drive phases (phases_rad) and relative
 % amplitude shading (amp_ratio). When present, run_babelbrain_case.py rebuilds
@@ -147,12 +149,13 @@ h5write(write_path,  '/CALIBRATION/imag', single(imag(weights)));
 % OWN internally-computed AllPhi, so the realised per-ring phase equals
 % phases_rad EXACTLY (effective = AllPhi + [phases_rad - AllPhi] = phases_rad),
 % independent of any analytic reconstruction of BabelBrain's geometric steer.
-% The /CALIBRATION dataset above stays as a fallback (analytic delta) for
-% consumers that do not apply this correction.
-h5create(write_path, '/DRIVE/phases_rad', [n_elem 1], 'Datatype', 'double');
-h5write(write_path,  '/DRIVE/phases_rad', double(phases_rad(:)));
-h5create(write_path, '/DRIVE/amp_ratio',  [n_elem 1], 'Datatype', 'double');
-h5write(write_path,  '/DRIVE/amp_ratio',  double(amp_ratio(:)));
+% The /CALIBRATION dataset below stays as a fallback (analytic delta) for
+% consumers that do not apply this correction. Flat root names (not a /DRIVE
+% group): ReadFromH5py requires a 'type' attribute on every root item.
+h5create(write_path, '/DRIVE_phases_rad', [n_elem 1], 'Datatype', 'double');
+h5write(write_path,  '/DRIVE_phases_rad', double(phases_rad(:)));
+h5create(write_path, '/DRIVE_amp_ratio',  [n_elem 1], 'Datatype', 'double');
+h5write(write_path,  '/DRIVE_amp_ratio',  double(amp_ratio(:)));
 
 % Metadata for provenance
 h5create(write_path, '/metadata/velocity_m_s',  [1 1], 'Datatype', 'double');
@@ -168,15 +171,63 @@ timestamp = int32(posixtime(datetime('now', 'TimeZone', 'UTC')));
 h5create(write_path, '/metadata/created_utc',    [1 1], 'Datatype', 'int32');
 h5write(write_path,  '/metadata/created_utc',    timestamp);
 
+% CALIBRATION dataset and 'type' attributes need the low-level API: h5create
+% cannot write a compound type. h5py maps complex64 to a compound with float32
+% fields 'r' and 'i' (1-D, as numpy writes res.x in TxCalibration.py), and
+% ReadFromH5py returns it as a complex ndarray.
+fid = H5F.open(write_path, 'H5F_ACC_RDWR', 'H5P_DEFAULT');
+fid_guard = onCleanup(@() H5F.close(fid));
+
+cplx_type = H5T.create('H5T_COMPOUND', 8);
+H5T.insert(cplx_type, 'r', 0, 'H5T_IEEE_F32LE');
+H5T.insert(cplx_type, 'i', 4, 'H5T_IEEE_F32LE');
+space = H5S.create_simple(1, n_elem, []);
+dset  = H5D.create(fid, 'CALIBRATION', cplx_type, space, 'H5P_DEFAULT');
+H5D.write(dset, cplx_type, 'H5S_ALL', 'H5S_ALL', 'H5P_DEFAULT', ...
+    struct('r', single(real(weights)), 'i', single(imag(weights))));
+H5D.close(dset); H5S.close(space); H5T.close(cplx_type);
+
+% 'type' attributes as SaveToH5py sets them (ProcType): arrays 'ndarray',
+% Python scalars 'scalar', dict groups 'dict' with key type 'str'.
+h5_write_type_attr(fid, '/CALIBRATION', 'ndarray');
+h5_write_type_attr(fid, '/DRIVE_phases_rad', 'ndarray');
+h5_write_type_attr(fid, '/DRIVE_amp_ratio', 'ndarray');
+h5_write_type_attr(fid, '/metadata', 'dict', 'str');
+for name = {'velocity_m_s', 'freq_hz', 'n_elem', 'created_utc'}
+    h5_write_type_attr(fid, ['/metadata/' name{1}], 'scalar');
+end
+clear fid_guard   % close before moving the file
+
 movefile(write_path, out_path);
 
 fprintf('BabelBrain weights saved: %s\n', out_path);
 fprintf('  N_elem=%d  velocity=%.4f m/s\n', n_elem, velocity);
 fprintf('\n  Python import:\n');
-fprintf('    import h5py, numpy as np\n');
-fprintf('    with h5py.File(''%s'', ''r'') as f:\n', out_path);
-fprintf('        w = f[''/CALIBRATION/real''][:] + 1j*f[''/CALIBRATION/imag''][:]\n');
+fprintf('    from BabelViscoFDTD.H5pySimple import ReadFromH5py\n');
+fprintf('    w = ReadFromH5py(''%s'')[''CALIBRATION'']\n', out_path);
 
+end
+
+
+function h5_write_type_attr(fid, obj_path, type_str, type_key)
+% Write SaveToH5py's string attribute 'type' (and 'type_key' for groups) as a
+% variable-length UTF-8 scalar, which h5py returns as str.
+obj_id = H5O.open(fid, obj_path, 'H5P_DEFAULT');
+obj_guard = onCleanup(@() H5O.close(obj_id));
+str_type = H5T.copy('H5T_C_S1');
+H5T.set_size(str_type, 'H5T_VARIABLE');
+H5T.set_cset(str_type, H5ML.get_constant_value('H5T_CSET_UTF8'));
+space = H5S.create('H5S_SCALAR');
+attrs = {'type', type_str};
+if nargin > 3
+    attrs(end+1, :) = {'type_key', type_key};
+end
+for k = 1:size(attrs, 1)
+    attr_id = H5A.create(obj_id, attrs{k, 1}, str_type, space, 'H5P_DEFAULT');
+    H5A.write(attr_id, 'H5ML_DEFAULT', attrs(k, 2));
+    H5A.close(attr_id);
+end
+H5S.close(space); H5T.close(str_type);
 end
 
 

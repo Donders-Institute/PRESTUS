@@ -2,8 +2,6 @@
 
 Notes for developers and for debugging the BabelBrain bridge. For using the backend see [BabelBrain backend](doc_babelbrain.md).
 
-> This section describes how the BabelBrain integration is wired inside PRESTUS. It is intended for developers working on the backend or extending GPU platform support.
-
 ## Call chain
 
 ```
@@ -17,255 +15,167 @@ prestus_pipeline.m
                  └─ BabelBrain RUN_SIM().RunCases()
 ```
 
-`babelbrain_wrapper.m` never imports Python directly. It constructs a command string and calls `system()`, which invokes `run_babelbrain_case.py` as a subprocess. All BabelBrain Python dependencies are therefore isolated in the conda environment pointed to by `babelbrain.python_env`; the MATLAB process only needs to call `system()`.
+The bridge runs in `babelbrain.python_env`, writes `*DataForSim.h5` to `<dir_cache>/<subject_id>/` and patches BabelBrain at runtime (never `external/`):
 
-`run_babelbrain_case.py` adds the BabelBrain source tree (`external/BabelBrain`) to `sys.path` at runtime, imports `TranscranialModeling.BabelIntegrationBASE` dynamically, and calls `RUN_SIM().RunCases()`. The output `*DataForSim.h5` is written to `<dir_cache>/<subject_id>/`; PRESTUS reads it back with `read_babelbrain_output.m`.
+| Patch | Effect | Disable (bridge flag, not a config key) |
+|---|---|---|
+| `_inject_prestus_materials` | Overwrites `MatFreq` from `--medium_properties_json` (attenuation converted from dB/(cm·MHz^y) to Np/m) | runs only without `--no_skull_atten_fix` |
+| `_patch_noncat_skull_attenuation` | Bone shear = 0 (fluid bone), so the specified skull attenuation is realised | `--no_skull_atten_fix` |
+| `_patch_zdomain_reference` | `CalculateDomainZReference` returns 0 (see [Output alignment](#output-alignment)) | `--no_zdomain_fix` |
+
+Without the skull-attenuation patch, injected bone attenuation is not realised (QCorr stays 1.0), although the material table looks correct.
 
 ## GPU backend selection and platform support
 
-`computing_backend` maps directly to BabelBrain's `ComputingBackend` integer:
-
-| Value | Backend | Supported hardware | Typical environment |
+| `computing_backend` | Backend | Hardware | Notes |
 |---|---|---|---|
-| `1` | CUDA | NVIDIA GPUs | Linux HPC / workstation with CUDA toolkit |
-| `2` | OpenCL | AMD GPUs, Intel GPUs, some NVIDIA | Linux, any OpenCL-capable GPU |
-| `3` | Metal | Apple Silicon (M1/M2/M3/M4) | macOS on ARM |
+| `1` | CUDA | NVIDIA GPUs | Linux; request a GPU in SLURM (`--gres=gpu:1`) |
+| `2` | OpenCL | AMD GPUs, Intel GPUs, some NVIDIA | Needs `pyopencl` in the BabelBrain environment |
+| `3` | Metal | Apple Silicon (M1/M2/M3/M4); macOS Intel with `environment_mac_x64-314.yml` (slow) | Only GPU acoustic solver on Apple Silicon |
 | `4` | CPU | Any | Fallback; much slower |
 
-**Mac / Apple Silicon.** Set `computing_backend: 3` (Metal). This is the recommended path on M-series Macs; `device_name` can be left at `'auto'`. k-Wave's CUDA binary is unavailable on Apple Silicon, so BabelBrain + Metal is the only GPU-accelerated acoustic solver available on that platform.
+`device_name: auto` picks the first GPU (`nvidia-smi`, `pyopencl`) or `'Apple'`. Set it explicitly to choose among several GPUs. Windows is untested (Unix-style path separators in `system()`).
 
-**Linux / NVIDIA.** Set `computing_backend: 1`. With `device_name: auto` the Python bridge auto-detects the first CUDA GPU via `nvidia-smi`, so you normally do not need to set `device_name` explicitly on SLURM clusters. Ensure the SLURM job requests a GPU (`--gres=gpu:1`).
+## Grid resolution
 
-**Linux / AMD or other OpenCL GPU.** Set `computing_backend: 2`. The bridge uses `pyopencl` to auto-detect the first available GPU device. Install `pyopencl` in the BabelBrain conda environment if not already present.
-
-**macOS Intel.** Metal is available but performance is limited on Intel integrated graphics. Use `computing_backend: 3` with `environment_mac_x64-314.yml`; for CPU-only runs use `computing_backend: 4`.
-
-**Windows.** PRESTUS has not been tested on Windows. BabelBrain ships an `environment_win-314.yml`; the MATLAB `system()` call uses Unix-style path separators which would need adjustment.
-
-## Device name auto-detection
-
-`run_babelbrain_case.py::resolve_device_name()` handles `device_name: auto` by detecting the appropriate device for the selected backend:
-
-- **CUDA (backend 1):** calls `nvidia-smi --query-gpu=name` and uses the first result.
-- **OpenCL (backend 2):** iterates `pyopencl.get_platforms()` and picks the first GPU device.
-- **Metal (backend 3):** resolves to `'Apple'`; no detection needed.
-
-Set `device_name` explicitly to target a specific GPU when multiple are present.
+BabelBrain's step is `SmallestSOS / (PPW × freq)` (`SmallestSOS` normally ≈1102.5 m/s, `DensityToSSoSPichardo`), but it takes the input array shape as its grid. `write_babelbrain_input.m` therefore resamples the mask (nearest-neighbour) to that step (`bb_native_res_mm`, logged as "BabelBrain native resolution").
 
 ## Transducer placement, ZSteering, and the drive phases
 
-BabelBrain builds its simulation domain with the transducer apex at `z_mm ≈ 0` and the **FocalSpot (target) voxel at `z_mm = ` preset `FocalLength`** (read from `Babel_{tx_system}/default.yaml`) — i.e. it assumes the transducer sits at its *natural* focal distance from the target. PRESTUS's geometry instead places the apex at `trans_pos` (bowl rear centre), i.e. `|focus_pos − trans_pos|` from the target. That distance equals `focal_distance_bowl` only when the target sits at the nominal focal depth; planned/pFOV placements generally differ (e.g. 71 mm vs 92 mm for R15473 at 85 mm EP with a 64 mm-deep target). On the way back, `resample_babelbrain_vol.m` anchors the `z_mm = FocalLength` plane onto PRESTUS's `focus_pos` (`prestus_dim3 = (z_mm − focal_length_mm)/res + focus_pos`), so any difference between the two distances **rigidly translates the pasted field by `|focus_pos − trans_pos| − FocalLength`** along the beam axis (−7.7 mm for R15473 with the target at 85 mm EP; −28.75 mm with the target at 64 mm EP). Electronic steering cannot compensate for that translation: a translated field of a differently-steered transducer is not the true field — the near-field lobe structure shifts with the translation while the drive physics differ.
-
-The wrapper therefore corrects the geometry **mechanically**:
+BabelBrain puts the apex at `z_mm ≈ 0` and the FocalSpot at preset `FocalLength` (`Babel_{tx_system}/default.yaml`). PRESTUS has the apex `|focus_pos − trans_pos|` from the target (e.g. 71 mm vs 92 mm for R15473 at 85 mm EP with a 64 mm-deep target). Uncorrected, the field shifts by `|focus_pos − trans_pos| − FocalLength` along the beam (−7.7 mm for R15473 with the target at 85 mm EP; −28.75 mm at 64 mm EP). `babelbrain_placement_correction.m` (shared with `export_babelbrain_inputs`) moves the transducer instead:
 
 ```
 TxMechanicalAdjustmentZ = preset_FocalLength − |focus_pos − trans_pos| · res_mm   (+ any user standoff)
 ```
 
-It is computed by `babelbrain_placement_correction.m` (shared with `export_babelbrain_inputs`). Only when `trans_pos` is unavailable does it fall back to `preset_FocalLength − focal_distance_bowl`, which assumes the target sits at the nominal focal depth. Using `focal_distance_bowl` for a target at a different depth places BabelBrain's transducer too far from (or too close to) the head, shifting the whole field — skull incidence, near-field lobes and focus — relative to the anatomy.
+The standoff is `babelbrain.tx_mech_adjust_z_m`. Without `trans_pos`, the fallback is `preset_FocalLength − focal_distance_bowl`. BabelBrain aims at `center_z = ZDim[FocalSpot] + ZSteering + TxMechanicalAdjustmentZ`, so transducer and aim move together.
 
-This shifts the Tx *inside BabelBrain's domain* (`BabelIntegrationANNULAR_ARRAY`, `CalculateRayleighFieldsForward`) so the apex sits at its true distance from the target; the focus-anchored resample is then also apex-aligned (distance-preserving). BabelBrain's internal Rayleigh phase reference aims at `center_z = ZDim[FocalSpot] + ZSteering + TxMechanicalAdjustmentZ`, so the mechanical adjustment shifts Tx and aim together — with `ZSteering = 0` the aim is always the **natural focus relative to the apex**.
+| Drive | `ZSteering` | Behaviour |
+|---|---|---|
+| Explicit phases (`tr.annular.elem_phase_rad`) | 0 | Weights carry the full drive as a delta from the flat natural-focus reference; BabelBrain reproduces the k-Wave/jwave/Rayleigh ring phases. `focal_calibration` only reports the predicted focus. |
+| No explicit phases | `aim_bowl − preset_FocalLength` | `aim_bowl` is the steer `D*` from `calibrate_focal_steering.m` (lands `flhm_center`/`peak` on `focal_distance_ep`) with `focal_calibration: true`, else `focal_distance_bowl`. |
+| `babelbrain.z_steering_m` set | pinned | Overrides both; the weight-delta reference follows `FocalLength + ZSteering`. |
 
-On top of the corrected geometry, the drive is set in one of two modes:
+`Single` and `BSonix` presets lack `TxDiam`/`FocalLength`, so the wrapper passes `--aperture` (max `elem_od_mm`) and `--focal_length` (`curv_radius_mm`).
 
-- **Explicit element phases** (`tr.annular.elem_phase_rad` present — calibrated/analytical configs): `ZSteering = 0` and the weights file carries the **full drive** as a delta from the natural-focus reference (where BabelBrain's internal ring phases are flat, all rings being equidistant from the centre of curvature). BabelBrain then reproduces *exactly* the per-ring phases that k-Wave/jwave/the Rayleigh model use — solver-benchmark parity by construction. `focal_calibration` runs **locate-only** in this mode: it reports the predicted focus of the fixed drive but never replaces it.
-- **No explicit phases** (geometric fallback): BabelBrain steers electronically, with the aim measured physically from the apex:
+**Free-water check.** With explicit phases, the BabelBrain axial profile must overlay the Rayleigh profile of the same phases. A rigid offset of near-field lobes and peak means the placement correction is missing. A lobe *shape* mismatch means the drive phases differ (e.g. weights delta referenced to the wrong aim).
 
-  ```
-  ZSteering = aim_bowl − preset_FocalLength
-  ```
+**Bowl rim.** A rim inside the domain makes BabelBrain snap the transducer back in whole voxels (log `Warning: Need to apply correction to reposition Tx for …`; non-zero `source_residual_mm`). `write_babelbrain_input.m` therefore trims `ceil((d_apex + bowl_depth)/dx) + 1` transducer-side slices (bowl depth 5.4 mm for R15473; `d_apex` negative if the apex is outside the grid). It warns if that slab contains tissue; it is zero-filled on paste-back.
 
-  where `aim_bowl` is the calibrated steer `D*` when `focal_calibration: true` (default; `calibrate_focal_steering.m` root-finds the geometric steer whose achieved `flhm_center`/`peak` lands on `focal_distance_ep`, correcting the diffraction focal shift), or `focal_distance_bowl` (uncalibrated).
+**Bone Q-correction.** Realised bone attenuation scales ~1/Q. A bone-slab phantom (6 mm cortical, 78.5 Np/m at 300 kHz, PPW 6) gave realised/specified attenuation 0.91 at Q = 1 (k-Wave 0.91), 0.29 at 3, 0.14 at 6, 0.087 at 10 and 0.063 at 14. BabelBrain's CT default of 3.0 gave transcranial Isppa 10.6 vs 7.6 W/cm² for k-Wave (sub-602 pFOV), so the non-CT path uses Q = 1. `babelbrain.q_correction` > 0 reaches `BabelFTD_Simulations_BASE.__init__` via `--q_correction` → `BABEL_PYTEST_QFACTOR`. MATLAB `setenv` does not work here, because `run_command` uses Java's ProcessBuilder with the JVM start-up environment.
 
-Pin `babelbrain.z_steering_m` to override the auto-derivation entirely (also bypasses calibration; the weight-delta reference follows the pinned aim `FocalLength + ZSteering`).
+## Calibration weights file
 
-**Free-water cross-check.** With explicit phases, the BabelBrain axial profile must overlay the analytic Rayleigh profile of the same phases in *both* the near-field lobes and the focal lobe. A rigid axial offset of ≈ `FocalLength − |focus_pos − trans_pos|` (near-field lobes shifted by the same amount as the peak) indicates the mechanical placement correction is missing; a *shape* mismatch of the near-field lobes indicates the effective drive phases differ (e.g. weights delta referenced to the wrong aim).
+The file stores deltas from BabelBrain's ring phases at its aim `FocalLength + ZSteering`:
 
-**Bowl rim vs. the source plane.** BabelBrain injects the Rayleigh field on the first domain slice on the transducer side and requires every source element to lie behind it; if the bowl rim protrudes into the domain it snaps the transducer back in whole voxels (`Warning: Need to apply correction to reposition Tx for …` in the BabelBrain log, and a non-zero `source_residual_mm` in the `_prestus_anchor.json` sidecar). This happens whenever any part of the bowl lies inside the grid: the rim sits one bowl depth (5.4 mm for R15473) on the target side of the apex, so the bowl spans `d_apex … d_apex + bowl_depth` from the transducer-side face (`d_apex` = apex distance into the grid, negative if the apex is outside). Examples: a pFOV crop that starts at `trans_pos` (source pushed 5.5 mm too far back), or the bone-slab phantom with the apex 7.5 mm inside the grid (13.5 mm, which shifted the BabelBrain focus ~14 mm proximally). `write_babelbrain_input.m` therefore trims `ceil((d_apex + bowl_depth)/dx) + 1` transducer-side slices from the BabelBrain mask (it is water inside the bowl concavity; a warning is raised if it contains tissue). The trimmed slab is zero-filled when the field is pasted back.
+```
+w[n] = exp(i × (elem_phase[n] − geometric_phase_at_aim[n]))
+```
 
-**Realised bone absorption (`q_correction`).** On the non-CT path the bone attenuation BabelBrain actually realises depends on the Q-factor correction the runner applies to the bone slots, and scales ~1/Q. A flat bone-slab phantom (6 mm cortical, 78.5 Np/m at 300 kHz, PPW 6; realised attenuation from paired runs with bone `alpha_coeff` as specified and set to 0) gave realised/specified attenuation 0.91 at Q = 1 (k-Wave 0.91), 0.29 at 3, 0.14 at 6, 0.087 at 10 and 0.063 at 14. BabelBrain's CT-mode `QCorrection` default of 3.0 is its calibration for its own CT-derived bone attenuation; applied to PRESTUS-specified `alpha_coeff` it removed two thirds of the bone attenuation (sub-602 pFOV transcranial Isppa 10.6 vs 7.6 W/cm² for k-Wave). The non-CT runner therefore uses Q = 1 by default. `babelbrain.q_correction` > 0 overrides it (and BabelBrain's CT-path value, via `--q_correction` → `BABEL_PYTEST_QFACTOR`, read in `BabelFTD_Simulations_BASE.__init__`). MATLAB `setenv` cannot be used instead: `run_command` launches Python via Java's ProcessBuilder, whose environment is the JVM start-up snapshot.
+- `/CALIBRATION` is a 1-D complex64 dataset (h5py compound `{r, i}`) as in BabelBrain's `SaveToH5py`; every root item has the `type` attribute `ReadFromH5py` requires. `convert_weights_if_needed` converts the split `/CALIBRATION/real` + `/imag` layout.
+- `export_babelbrain_weights` writes one weight per ring; the bridge expands them to sub-elements.
+- `import_babelbrain_weights` reads `TxCalibration` files (one weight per sub-element) given the per-ring element counts (6th argument).
 
-## Output alignment: tissue-marker anchoring and the ZDomainStart fix
+<a id="free-water-calibration-transfer"></a>
+## Free-water amplitude calibration
 
-**The problem.** BabelBrain's own `MaterialMap` — its internal record of the tissue mask it actually simulated on — is byte-identical to the mask PRESTUS wrote (`write_babelbrain_input.m`); BabelBrain never alters tissue. So if the returned field and material map are pasted back onto the PRESTUS grid at the wrong position, *every* downstream consumer that assumes k-Wave/jwave's "one shared grid, no internal resampling" invariant — `acoustic_analysis.m`'s per-tissue metrics (`Isppa_brain`/`Isppa_skull`), `thermal_analysis.m`'s per-tissue thermal/CEM43 metrics, the axial-profile and intensity-overlay plots, and any exported NIfTI compared against `medium_masks` in an external viewer — is silently wrong at tissue boundaries, most visibly at the skull-brain interface where BabelBrain's elastic-skull solver produces a real, physically-expected reflection hotspot.
+BabelBrain's `Correction = 100/(100 − ExpectedError(CFL))`, ×√2 (`BabelIntegrationBASE`) leaves a few % pressure bias at CFL ~0.5. `water_amp_calibration` compares the free-water field with `rayleigh_axial_intensity.m`. The factor transfers to tissue because the simulation is linear and the bias sits in the shared source chain. The transcranial timestep differs (sub-602 pFOV, R15473 300 kHz 6 PPW: CFL/water 0.300 → Correction 0.290 vs 0.471 → 0.465). The correction tracks it within ~2% in pressure (0.290/0.465 = 0.624 vs CFL ratio 0.637), ~4% in intensity.
 
-Two independent effects combined to create a multi-millimetre misalignment (observed: ~5.5 mm on a benchmark pFOV run):
+The thermal input is not rescaled, because BabelBrain renormalises it to `Isppa` (`PressureRatio = sqrt(Isppa·2ρc)/max(p_amp[brain])`).
 
-1. **`ZDomainStart`.** `CalculateRayleighFieldsForward` places the transducer at `Tx_z += TxMechanicalAdjustmentZ + ZDomainStart`, where `ZDomainStart = CalculateDomainZReference()` is a skin-surface heuristic (`GlobalStartSkin − LineOfSightStartSkin`) meant for BabelBrain's own GUI workflow with oblique trajectories through a full-head domain. PRESTUS already computes the correct `TxMechanicalAdjustmentZ` itself (see above) and hands BabelBrain a beam-aligned mask, so this extra term silently moves the source off the requested position.
-2. The (now-removed) resample anchor compensated for source mis-placement by shifting the paste-back to match the *source*, which correctly re-aligned the field to the transducer but dragged the (unchanged) tissue away from the original `medium_masks`.
+**Water baseline checks** (`babelbrain_wrapper.m`):
 
-**The fix.**
+- The `--water_only` run must get the same `--source_amp_pa` as the transcranial run. Otherwise BabelBrain drives at ~50 kPa and `freefield_isppa_wcm2` is ~(156.6/50)^2 ≈ 10x too low for R15473.
+- `Water_DataForSim.h5` is reused if present, unless `io.overwrite_files` is `'always'`/`'force'`. If the ISPPA-normalised field looks wrong, compare its mtime with the main `DataForSim.h5`.
 
-- `run_babelbrain_case.py` monkey-patches `SimulationConditionsBASE.CalculateDomainZReference` to return `0.0` (`_patch_zdomain_reference`, same policy as the existing skull-attenuation patch — no edits under `external/`), so the source is placed at exactly the requested `TxMechanicalAdjustmentZ`. Disable with the Python bridge's `--no_zdomain_fix` flag (not currently exposed as a `babelbrain.*` config option — same as `--no_skull_atten_fix`) to reproduce the un-patched behaviour.
-- `read_babelbrain_output.m` / `read_babelbrain_thermal.m` anchor the resample on **`/TargetLocation`** — the label-5 focal-marker voxel PRESTUS itself wrote at `focus_pos` — rather than on the source position. This is the exact inverse of the forward mask transform, so the tissue map lands back on `medium_masks` by construction (verified on a benchmark run: overall label agreement 83% → 99%, bone 20% → 98%). With the source correctly placed (previous point), one anchor now aligns tissue *and* field simultaneously — the marker-anchored paste is source-consistent too.
-- The passed-in `focal_length_mm` (preset `FocalLength`) is used only as a **fallback** when `/TargetLocation` is missing from the HDF5 (older files).
-- A per-run sidecar (`<target>_prestus_anchor.json`) now records the **realized-minus-requested source position** as a diagnostic (not an anchor correction): with the `ZDomainStart` fix active, the only remaining residual should be BabelBrain's whole-voxel source snap-back (≤ 1 native voxel). `read_babelbrain_output.m` warns when the residual exceeds 1.5 native voxels, which points at a missing/disabled `ZDomainStart` patch rather than a coordinate bug.
+## Water material
 
-This is fully general — no `medium_masks`/`segmentation` special-casing is needed anywhere downstream. `thermal_analysis.m` (and any other consumer that trusts `medium_masks`) automatically inherits correctly-aligned data because the BabelBrain acoustic step now returns output in the same PRESTUS-space convention k-Wave/jwave always provided.
+Simulated water comes from the module-level `Material` (the 1120 kHz `MatFreq` entry), so the injected `Water` line affects only `GetSmallestSOS`. Water is not injected, because it also sets the source factor `FactorConvPtoU`; the impedance difference is ~0.6%.
+
+## CT and air-region inputs
+
+- **CT.** `write_babelbrain_input.m` writes raw-HU `CT.nii.gz` on the `BabelViscoInput.nii.gz` grid. The bridge quantises it (uniform, 10-bit, BabelBrain's default) into the index map BabelBrain expects and writes `CT-cal.npz`. The wrapper passes `--use_ct`, `--ct_mapping` and optionally `--use_petra`.
+- **Air.** BabelBrain does not update the fields inside the air mask (`ReflectorMask`), so air needs no material and no tiny timestep. `bExtractAirRegions` is on only with `air_regions`, because PRESTUS otherwise supplies no air mask.
+- **Uncertainty.** Variants go in via `--medium_properties_json`; on the CT path only skin and brain apply.
+
+## Geometry rationale
+
+PRESTUS does not rotate its grid to the trajectory as BabelBrain's own workflow does (`BabelDatasetPreps.GetSkullMaskFromSimbNIBSSTL`), so the beam must lie on z. Multi-transducer support would need beam-aligned per-transducer domains (as `simulation.async_grid_mode: per_transducer` for k-Wave) and a thermal step that accepts a combined heat source.
+
+## Mode-specific behaviour
+
+- **`multi_isppa`.** The thermal result is named after the shared acoustic file (`<stem>-ThermalField_AllCombinations.h5`), so thermal jobs are serialised on HPC.
+- **Post-hoc water.** The wrapper passes `--water_only` under the baseline's target name, which enables cache reuse.
+- **Limited FOV.** The wrapper disables `bTightNarrowBeamDomain` on a cropped mask, because its lateral footprint under-shoots the beam near the skull.
+
+<a id="output-alignment-tissue-marker-anchoring-and-the-zdomainstart-fix"></a>
+## Output alignment
+
+Field and `MaterialMap` must land exactly on `medium_masks`.
+
+- **`ZDomainStart` = 0.** BabelBrain adds a skin-surface heuristic (`GlobalStartSkin − LineOfSightStartSkin`) to the source position in `CalculateRayleighFieldsForward`. PRESTUS already sets `TxMechanicalAdjustmentZ`, so the patch removes it. The log line "ZDomainStart neutralized: ... mm" shows the removed amount.
+- **Marker anchor.** The readers anchor the resample on `/TargetLocation`, the label-5 marker at `focus_pos` (benchmark: label agreement 83% → 99%, bone 20% → 98%). Preset `FocalLength` (`focal_length_mm`) is the fallback for files without it.
+
+`<target>_prestus_anchor.json` records realised-minus-requested source position. Expect ≤ 1 native voxel; `read_babelbrain_output.m` warns above 1.5, which points to a missing `ZDomainStart` patch.
 
 ## BabelBrain output format
 
-The bridge writes `*DataForSim.h5` under `<dir_cache>/<subject_id>/`. `read_babelbrain_output.m` reads:
+`sensor_data.p_max_all` is `/p_amp` (peak pressure [Pa], `[Nx, Ny, Nz]`), or `/p_amp_refocus` with `do_refocusing: true`. Axes are permuted to `[lateral X, lateral Y, axial]` (dim 3 = beam).
 
-- `/p_amp` — peak positive pressure [Pa], shape `[Nx, Ny, Nz]`
-- `/p_amp_refocus` — skull-corrected pressure (only when `do_refocusing: true`)
+| Item | Handling (change both sides together) |
+|---|---|
+| Acoustic arrays | BabelBrain flips them (`np.flip(axis=2)`) before saving, but not `z_vec`; the reader uses `zdim = z_vec_bb(end:-1:1)`. |
+| `/TargetLocation` | Computed before the flip; index the raw `/z_vec`. |
+| Input mask | `write_babelbrain_input.m` pre-flips (line ~132) to cancel BabelBrain's flip on load. |
+| Thermal arrays | Saved in `z_vec` order; not reversed. Resampled onto `parameters_th` from `thermal_stage`, anchored on the thermal focus (`grid.thermal_focus_pos_exact` etc. from `thermal_grid_setup`, else `transducer(1).focus_pos`). Rises over `BaselineTemperature`, so outside voxels read baseline. |
+| Interpolation | Fields `'linear'`; `MaterialMap` `method='mode'`, because `'nearest'` drops sub-voxel cortical bone. |
 
-`p_max_all` in the returned `sensor_data` struct is set to `/p_amp` (or `/p_amp_refocus` when refocusing is active), matching the convention used by `acoustic_wrapper`.
+The NIfTI affine comes from `grid_to_ras_affine.m`: `planimg.inv_transf`, `planimg.t1_header`, `planimg.fov_offset_ac`, then the dim-3 flip, in that order. A diagonal-only affine misaligns whenever `grid.mode` rotates the head (the default).
 
-## FOV/domain-coverage and focal-anchor debugging
+## Debugging: zero pressure near the transducer or skull
 
-`read_babelbrain_output.m` permutes and axis-flip-corrects the raw HDF5 field so that BabelBrain's
-`[Nx, Ny, Nz]` axes line up with PRESTUS's `[lateral X, lateral Y, axial]` convention (dim 3 = beam
-axis, matching `acoustic_grid_fov.m`'s `beam_dim = 3`). This axis handling is verified against the
-shared tissue-layer ordering in benchmark axial profiles (e.g. `plot_axial_profile.m` output), which
-lines up identically between the k-Wave and BabelBrain backends.
+Inspect `/MaterialMap`, `/p_amp`, `/TargetLocation` and `/z_vec` in `*DataForSim.h5`, then:
 
-A BabelBrain axial profile with no reflections and exactly-zero pressure over a stretch nearest the
-transducer/skull has two distinct possible causes that look identical in the final profile. **Inspect
-the raw `*DataForSim.h5` directly before assuming either one** (`h5py`/`h5disp` on `/MaterialMap`,
-`/p_amp`, `/TargetLocation`, `/z_vec`) — the BabelBrain log lines `ZShrink_L` / `ZShrink_R` (printed
-by `BabelIntegrationBASE.py` during domain sizing) tell you immediately whether narrow-beam cropping
-actually touched the proximal side for a given run; it is easy to assume it did when it didn't.
+| Check | Points to |
+|---|---|
+| Console "zero-filled (no BabelBrain data)" line non-zero | Domain too short; voxels outside it are zero-filled |
+| `ZShrink_L` > 0, `XShrink_*`/`YShrink_*`, or fewer tissue voxels in `MaterialMap` than in `BabelViscoInput.nii.gz` | Narrow-beam mode cropped tissue |
+| "BabelBrain native resolution" vs `grid.resolution_mm` | Mask not resampled to BabelBrain's step |
+| No `/TargetLocation` in the file | Fallback anchor; field may be shifted along the beam |
+| Skin→trabecular in a central-line label dump | Raw segmentation error |
 
-1. **Domain-coverage limit.** BabelBrain's own domain sizing (`--tight_narrow_beam` cropping when no
-   PRESTUS-side FOV crop is active, or its baseline PML/padding-offset sizing when the grid is already
-   FOV-cropped) determines how far its returned volume actually extends. `resample_babelbrain_vol.m`
-   maps that volume onto the PRESTUS grid with **zero-fill for any voxel outside the BabelBrain domain**
-   (`affine_resample_3d(..., method, 0)`), so a BabelBrain domain that genuinely stops short of the
-   skull reads back as "no reflections" when the data there is simply absent rather than physically
-   zero. Check the `ZShrink_L`/`ZShrink_R`/`XShrink_*`/`YShrink_*` log lines — nonzero values there
-   only occur when narrow-beam mode is actually active (no PRESTUS-side FOV crop). When it is active,
-   its ray-traced footprint estimate has been found to under-shoot the true beam width laterally near
-   the skull (the aperture is wide near the transducer, narrowing only toward the focus) — cross-check
-   against `BabelViscoInput.nii.gz`'s own voxel counts (does it actually contain skin/cortical/
-   trabecular voxels?) vs. the exported `DataForSim.h5` `MaterialMap`'s voxel counts to see whether
-   narrow-beam cropped away tissue that was genuinely present in the input. Also check the "BabelBrain
-   native resolution" log line for a mismatch against `grid.resolution_mm` — BabelBrain reuses the
-   input mask's voxel array shape directly as its own grid dimensions, so a resolution mismatch there
-   silently rescales the whole domain independent of any shrink settings.
+`simulation.debug: 1` writes axis plots (`sub-<id>_babelbrain_fov_debug<output_affix>.png`/`.csv`) and `sub-<id>_babelbrain_material_map<output_affix>.nii.gz` to `<dir_output>/debug/babelbrain/`.
 
-2. **Focal-anchor error.** The z-axis resample anchor is BabelBrain's own `/TargetLocation` — the
-   index where it placed the label-5 focal marker `write_babelbrain_input.m` wrote into the input
-   mask, i.e. exactly PRESTUS's `focus_pos` voxel (see
-   [Output alignment](doc_babelbrain_internals.md#output-alignment-tissue-marker-anchoring-and-the-zdomainstart-fix)). The
-   passed-in `focal_length_mm` (preset `FocalLength` / `TxMechanicalAdjustmentZ` / `ZSteering` chain
-   — see [Transducer placement](#transducer-placement-zsteering-and-the-drive-phases)) is used only
-   as a **fallback** when `/TargetLocation` is absent from the file (older BabelBrain HDF5s) — it is
-   never used to override or cross-check the marker when present. `/TargetLocation` is computed by
-   BabelBrain *before* it flips `p_amp`/`MaterialMap` along the depth axis, so reading it correctly
-   means indexing the **raw, unflipped** `/z_vec`, not the flip-corrected coordinate array
-   (`zdim`/`z_mm`) used for the data arrays — get this backwards and the anchor lands on the wrong
-   voxel. When the fallback *is* in use and disagrees with what the marker would have given (only
-   possible on files without `/TargetLocation`), the entire field is rigidly shifted along the beam
-   axis when resampled — real, non-zero BabelBrain data (including skull reflections) landing at the
-   wrong depth, some of it outside the PRESTUS grid (reads as the same "zero near the skull" symptom
-   as case 1).
+<a id="built-in-material-table"></a>
+## Built-in material table
 
-When `simulation.debug: 1` and a BabelBrain→PRESTUS resample occurs, `read_babelbrain_output.m` writes
-diagnostics to `<dir_output>/debug/babelbrain/`:
+Literature fits tabulated every 5 kHz from 100 to 1125 kHz (`TranscranialModeling/BabelIntegrationBASE.py`). They apply only if material injection fails.
 
-- `sub-<id>_babelbrain_fov_debug<output_affix>.png` — a stacked figure:
-  1. BabelBrain-native central-axis **pressure** profile (its own grid, before resampling), with the
-     `/TargetLocation` tissue-marker anchor at `z=0` and, only when the passed fallback anchor
-     differs from the marker actually used, a second line showing where that (unused) fallback would
-     have placed it.
-  2. The same axis, but for BabelBrain's own `/MaterialMap` (tissue index: 0=water, 1=skin,
-     2=cortical, 3=trabecular, 4=brain) — shows directly where BabelBrain itself thinks the skull is,
-     independent of any PRESTUS-side coordinate assumption.
-  3. The resampled PRESTUS-grid pressure profile, with the region outside the BabelBrain domain
-     shaded (zero-filled). The depth axis is beam-sign-corrected, so the shaded (truncated) side
-     always corresponds to the actual proximal/distal side of the domain regardless of which way the
-     beam runs along grid dimension 3.
-- `sub-<id>_babelbrain_fov_debug<output_affix>.csv` — coverage + anchor numbers as a table:
-  `bb_depth_rel_focus_min_mm` / `_max_mm`, `prestus_depth_rel_focus_min_mm` / `_max_mm`,
-  `zero_filled_proximal_mm` / `_distal_mm`, and `anchor_correction_applied_mm` (how far the geometric
-  estimate differs from `/TargetLocation`; normally ~0).
-- `sub-<id>_babelbrain_material_map<output_affix>.nii.gz` — BabelBrain's `/MaterialMap`, resampled
-  onto the PRESTUS grid with **nearest-neighbor** interpolation (never linear — this is integer label
-  data) so it can be overlaid directly against `medium_masks` / the T1 in an external viewer.
+| Tissue | Density [kg/m³] | Long. SoS [m/s] 300 / 500 / 650 kHz | Long. att. [Np/m] 300 / 500 / 650 kHz |
+|---|---|---|---|
+| Water | 1000 | 1500 / 1500 / 1500 | 0 / 0 / 0 |
+| Skin | 1116 | 1537 / 1537 / 1537 | 1.4 / 2.3 / 3.0 |
+| Brain | 1041 | 1562 / 1562 / 1562 | 2.1 / 3.5 / 4.5 |
+| White matter | 1041 | 1537 / 1537 / 1537 | 3.1 / 5.1 / 6.6 |
+| Gray matter | 1045 | 1520 / 1520 / 1520 | 1.3 / 2.2 / 2.9 |
+| CSF | 1007 | 1507 / 1507 / 1507 | 0.03 / 0.05 / 0.06 |
+| Cortical bone | 1897 | 2452 / 2476 / 2494 | 49 / 81 / 106 |
+| Trabecular bone | 1738 | 2148 / 2205 / 2247 | 49 / 81 / 105 |
 
-Run-time console lines summarize both checks even without inspecting the files:
+Bone longitudinal SoS is linear in frequency, fitted at 270 kHz and 836 kHz (Pichardo 2011). PRESTUS sets bone shear to 0:
 
-```
-[read_babelbrain_output] FOV coverage check: BabelBrain domain covers depth-from-focus [...] mm; PRESTUS grid requires [...] mm.
-[read_babelbrain_output] -> zero-filled (no BabelBrain data): X mm proximal (transducer side) / Y mm distal (far side) of the PRESTUS grid.
-[read_babelbrain_output] Anchor check: focal_length_mm=... mm (estimate) vs /TargetLocation=... mm (BabelBrain ground truth, mismatch ... mm) — using /TargetLocation for the resample anchor.
-```
+| Tissue | Shear SoS [m/s] 300 / 500 / 650 kHz | Shear att. [Np/m] 300 / 500 / 650 kHz |
+|---|---|---|
+| Cortical bone | 1473 / 1542 / 1594 | 99 / 164 / 214 |
+| Trabecular bone | 1270 / 1313 / 1345 | 99 / 164 / 214 |
+| All soft tissues | 0 / 0 / 0 | 0 / 0 / 0 |
 
-## BabelBrain pipeline stages and what to check at each one
+Versus PRESTUS defaults ([Medium properties](doc_medium.md)) at 500 kHz: cortical attenuation 81 vs ≈77 Np/m (13.3 dB/(cm·MHz), y = 1; about 6% higher), cortical SoS 2476 vs 2800 m/s (about 12% lower), brain SoS 1562 vs 1546 m/s (~1%).
 
-```
-write_babelbrain_input.m        PRESTUS medium_masks → BabelBrain label NIfTI (0-5)
-  Cortical/trabecular skull labels are derived from a single combined
-  (skull+cortical+trabecular) smoothed mask in preproc_medium_mask.m, with the
-  trabecular assignment constrained to that combined shell — trabecular cannot
-  extend past the cortical envelope (e.g. touch skin directly). A central-line
-  tissue-transition dump of the input NIfTI should never show skin→trabecular
-  with no cortical between them; if it does, check the raw segmentation itself.
-  The pre-flip (line ~132) must exactly cancel BabelBrain's own np.flip(axis=2)
-  on load — verify both sides together if either changes.
-  The NIfTI header (voxel -> RAS affine) is built by grid_to_ras_affine.m,
-  composing planimg.inv_transf (head-alignment rotation), planimg.t1_header
-  (T1's own affine), any acoustic-FOV-crop offset (planimg.fov_offset_ac,
-  set in prestus_pipeline.m right after acoustic_fov_crop), and the dim-3
-  flip above — in that order. This is what makes the written NIfTI overlay
-  correctly onto the T1/medium_masks; a purely diagonal/origin-only affine
-  (no rotation) will misalign whenever grid.mode rotates the head, which is
-  the default.
-
-run_babelbrain_case.py          Invokes RUN_SIM().RunCases(); patches material DB
-  _inject_prestus_materials only runs when --medium_properties_json is passed AND
-  --no_skull_atten_fix is NOT set — without the skull-attenuation fix, injected bone
-  attenuation is never realised (QCorr stays 1.0), reproducing near-zero skull
-  attenuation even though the Material table looks correctly populated.
-  BabelBrain computes its own SpatialStep from PPW and reuses the input mask's voxel
-  array shape directly as its own grid dimensions, without resampling to that
-  SpatialStep — write_babelbrain_input.m resamples the mask to BabelBrain's own
-  native resolution before writing so voxel spacing actually matches (see
-  bb_native_res_mm there); check the log's "BabelBrain native resolution" line if the
-  effective grid resolution is in question.
-  _patch_zdomain_reference (default on; --no_zdomain_fix disables) forces
-  CalculateDomainZReference to 0 so the source lands at exactly the requested
-  TxMechanicalAdjustmentZ — see "Output alignment" above. Check the run log's
-  "ZDomainStart neutralized: ... mm" line to see the magnitude BabelBrain would
-  otherwise have added.
-
-BabelIntegrationBASE.py         Domain sizing, Rayleigh forward-prop, FDTD, flip-before-save
-  --tight_narrow_beam domain shrink (XShrink/YShrink/ZShrink_L/R): only active when
-  no PRESTUS-side FOV crop is configured (babelbrain_wrapper.m disables it otherwise,
-  since the mask is already cropped to a beam-centred box matching k-Wave/jwave).
-  When active, check the run log's own `ZShrink_L <n>` / `ZShrink_R <n>` lines;
-  ZShrink_L>0 means the proximal (transducer/skull) side was actually cropped. It is
-  often 0 even with narrow-beam active, since only the far/beyond-focus side is
-  targeted by z_beyond_focus_mm — don't assume cropping without checking the log.
-  The lateral (XShrink/YShrink) crop has been found to under-estimate the beam's
-  true width near the skull, cropping away skull tissue that is genuinely present
-  in the input mask — this was the reason narrow-beam mode is disabled by default
-  whenever a PRESTUS-side FOV crop already exists.
-  /TargetLocation is BabelBrain's own record of where it placed the focal-spot
-  marker PRESTUS wrote into the input mask — this IS the resample anchor (see
-  "Output alignment" above), not merely a cross-check.
-  p_amp/MaterialMap are np.flip(axis=2)'d before being added to DataForSim; z_vec is
-  added AFTER that flip loop and is therefore NOT flipped — read_babelbrain_output.m's
-  zdim = z_vec_bb(end:-1:1) compensates for exactly this asymmetry. Do not change one
-  side without the other.
-
-read_babelbrain_output.m / read_babelbrain_thermal.m   h5 read, flip-correction, resample
-  Pressure/complex fields resample with 'linear' (resample_babelbrain_vol.m default);
-  MaterialMap (an INTEGER label field) is resampled with method='mode' (majority-vote
-  over the finer BabelBrain-native voxels landing in each PRESTUS cell) — 'nearest'
-  would drop thin structures (e.g. sub-voxel cortical bone) that miss the single
-  sample point.
-
-babelbrain_wrapper.m             Free-water ISPPA baseline (separate --water_only run)
-  The water-only baseline run is only regenerated if its Water_DataForSim.h5 doesn't
-  already exist in the cache dir (is_water_medium branch) — a stale Water_DataForSim.h5
-  left over from an earlier run (different transducer config, different geometry) will
-  be silently reused for ISPPA calibration (unless io.overwrite_files is 'always'/'force',
-  which deletes it first). If the ISPPA-normalized field looks wrong, check the
-  Water_DataForSim.h5's mtime against the main DataForSim.h5's.
-  The water-only run must receive the same --source_amp_pa as the transcranial run;
-  without it BabelBrain drives at its ~50 kPa default and freefield_isppa_wcm2 comes out
-  ~(156.6/50)^2 ≈ 10x too low for R15473 (the wrapper passes it since this fix — water
-  baselines cached from before it are wrong and must be regenerated).
-```
+<span style="font-size: 12px;">
+  <strong>References for BabelBrain fitting functions:</strong><br>
+  Pichardo, S. et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. <em>Phys Med Biol</em> <strong>56</strong>, 219–250 (2011). https://doi.org/10.1088/0031-9155/56/1/014<br>
+  Pichardo, S. et al. In-vitro characterization of multi-frequency ultrasound transducers for skull-induced phase aberrations. <em>Phys Med Biol</em> <strong>62</strong>, 6938–6962 (2017). https://doi.org/10.1088/1361-6560/aa7ccc<br>
+  Goss, S.A., Johnston, R.L. & Dunn, F. Comprehensive compilation of empirical ultrasonic properties of mammalian tissues. <em>J Acoust Soc Am</em> <strong>64</strong>, 423–457 (1978). https://doi.org/10.1121/1.382016<br>
+  Labuda, C. et al. Speed of Sound and Attenuation in Ex-Vivo Human Brain Tissue Sections. <em>IEEE TUFFC</em> <strong>69</strong>, 1280–1291 (2022). https://doi.org/10.1109/TUFFC.2022.3161443
+</span>

@@ -21,7 +21,10 @@ function jobs = multi_isppa_pipeline(parameters, options)
 % Platform behaviour:
 %   matlab     Stages run sequentially in the current MATLAB session.
 %   slurm/qsub Stage 1 is submitted; stages 2…N carry an afterok dependency
-%              on stage 1; stage N+1 depends on all thermal jobs.
+%              on stage 1; stage N+1 depends on all thermal jobs. With
+%              thermal_backend 'babelbrain' each thermal job also waits for
+%              the previous one (BabelBrain's thermal output file is named
+%              after the shared acoustic file, not the target).
 %              All jobs are submitted immediately without blocking.
 %
 % Overwrite semantics (see RESOLVE_CHAINED_OVERWRITE):
@@ -226,6 +229,8 @@ switch platform
         % ── Stages 2…N: Thermal per target ───────────────────────────────
         job_ids_thermal  = zeros(1, numel(targets));
         thermal_submitted = false(1, numel(targets));
+        bb_thermal = isfield(parameters, 'thermal_backend') && ...
+            strcmpi(parameters.thermal_backend, 'babelbrain');
 
         for ti = 1:numel(targets)
             affix    = affixes{ti};
@@ -246,6 +251,12 @@ switch platform
                     pt = hpc_add_dependency(pt, job_id_acoustic);
                 else
                     pt = hpc_add_dependency(pt, options.depend_job_ids);
+                end
+                % BabelBrain thermal writes <acoustic stem>-ThermalField_AllCombinations.h5
+                % next to the shared Stage-1 acoustic file and reads it back, whatever
+                % the target: parallel jobs would overwrite each other's result.
+                if bb_thermal && any(thermal_submitted)
+                    pt = hpc_add_dependency(pt, job_ids_thermal(find(thermal_submitted, 1, 'last')));
                 end
                 job_ids_thermal(ti)   = prestus_pipeline_start(pt);
                 thermal_submitted(ti) = true;

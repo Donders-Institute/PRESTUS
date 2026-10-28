@@ -158,6 +158,7 @@ The following documents the functions provided in PRESTUS.
 | `multi_isppa_pipeline`                  | Run acoustic simulation once, then thermal analysis at |
 | `path_log_setup`                        | Set up internal paths and logging, filename for output table |
 | `pose_workflow_pipeline`                | Transducer pose search, forward verification and final run in one call |
+| `posthoc_water_parameters`              | Parameters of one post-hoc free-water re-entry run |
 | `prestus_config_init`                   | Bootstrap a project-specific PRESTUS configuration folder |
 | `prestus_config_upgrade`                | Refresh a project's config_default.yaml from the toolbox |
 | `prestus_group_report_start`            | Entry point for the group HTML report and group MNI maps: study mode (runs from `study.manifest`) or subject mode (auto-discovered / listed subjects). |
