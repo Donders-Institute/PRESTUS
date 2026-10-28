@@ -259,6 +259,44 @@ def score_metrics(m, s):
     return score, int(np.argmin(score))
 
 
+def vertex_summary(m, s, score, vertex):
+    """Lines describing one skin vertex: its criteria, eligibility and rank.
+
+    Shown after each click in wb_view and in the review dialog.
+    """
+    n = len(score)
+    if not 0 <= vertex < n:
+        return [f"Vertex {vertex} is not on the skin surface ({n} vertices)."]
+
+    def fmt(v, unit):
+        return "n/a" if not np.isfinite(v) else f"{v:.1f} {unit}"
+
+    d = float(m["skin_target_distances"][vertex])
+    lines = [
+        f"Skin-target distance  {fmt(d, 'mm')} "
+        f"(optimal {s['optimal_distance']:.1f}, window "
+        f"{s['min_distance']:.1f}-{s['max_distance']:.1f} mm)",
+        f"Beam angle at skin    {fmt(float(m['skin_target_angles'][vertex]), 'deg')}",
+        f"Beam-target overlap   {fmt(float(m['skin_target_intersections'][vertex]), 'mm')}",
+        f"Skin-skull angle      {fmt(float(m['skin_skull_angles'][vertex]), 'deg')}",
+        f"Skull thickness       {fmt(float(m['skull_thickness'][vertex]), 'mm')}",
+    ]
+    n_eligible = int(np.isfinite(score).sum())
+    if np.isfinite(score[vertex]):
+        rank = int((score < score[vertex]).sum()) + 1
+        lines.append(f"Composite score       {score[vertex]:.4f} "
+                     f"(rank {rank} of {n_eligible} eligible)")
+    else:
+        reasons = []
+        if m["avoidance"][vertex] == 0:
+            reasons.append("in the avoidance mask (eyes, ears, air cavities)")
+        if d < s["min_distance"] or d > s["max_distance"]:
+            reasons.append("outside the distance window")
+        lines.append("Not eligible under the composite score"
+                     + (": " + "; ".join(reasons) if reasons else "") + ".")
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Per-vertex metrics
 # ---------------------------------------------------------------------------
@@ -440,8 +478,12 @@ def compute_metrics(PlanTUS, mesh_path, mask_path, output_path, s, log):
     }
 
 
-def write_planning_scene(PlanTUS, template, output_path, t1_path, mask_filename):
-    """Write <output_path>/scene.scene showing the metric maps (for wb_view)."""
+def write_planning_scene(PlanTUS, template, output_path, t1_path, mask_filename,
+                         with_thickness=True):
+    """Write <output_path>/scene.scene showing the metric maps (for wb_view).
+
+    with_thickness also loads the skull-thickness map (add_scene_metric).
+    """
     if not template:
         return None
     names = [
@@ -468,6 +510,66 @@ def write_planning_scene(PlanTUS, template, output_path, t1_path, mask_filename)
     ]
     scene_path = output_path + "/scene.scene"
     PlanTUS.create_scene(template, scene_path, names, values)
+    if with_thickness and os.path.isfile(
+            os.path.join(output_path, "skull_thickness_skin.func.gii")):
+        add_scene_metric(scene_path, "./skull_thickness_skin.func.gii")
+    return scene_path
+
+
+def add_scene_metric(scene_path, metric_path, structure="CORTEX_LEFT"):
+    """Add a metric file to a scene's spec file so wb_view loads it.
+
+    The PlanTUS planning template lists four criterion maps; the skull
+    thickness map is added this way. wb_view loads every selected file of the
+    scene's spec file, so the map appears as an overlay choice in each tab.
+    Returns False (scene unchanged) if the spec-file list is not found.
+    """
+    import re
+
+    with open(scene_path, "r", encoding="utf-8") as f:
+        txt = f.read()
+    m = re.search(r'(<ObjectArray Type="class" Name="dataFilesArray" Length=")(\d+)(">)'
+                  r'(.*?)(\n([ \t]*)</ObjectArray>)', txt, re.S)
+    if m is None:
+        return False
+    n = int(m.group(2))
+    ind = m.group(6)
+    element = (
+        f'\n{ind}    <Element Index="{n}">'
+        f'\n{ind}        <Object Type="class" Class="SpecFileDataFile" Name="specFileDataFile" Version="1">'
+        f'\n{ind}            <Object Type="enumeratedType" Name="dataFileType">METRIC</Object>'
+        f'\n{ind}            <Object Type="enumeratedType" Name="structure">{structure}</Object>'
+        f'\n{ind}            <Object Type="pathName" Name="fileName">{metric_path}</Object>'
+        f'\n{ind}            <Object Type="boolean" Name="selected">true</Object>'
+        f'\n{ind}        </Object>'
+        f'\n{ind}    </Element>')
+    txt = (txt[:m.start()] + m.group(1) + str(n + 1) + m.group(3) + m.group(4)
+           + element + m.group(5) + txt[m.end():])
+    with open(scene_path, "w", encoding="utf-8") as f:
+        f.write(txt)
+    return True
+
+
+def fix_placement_scene(output_path, vertex, t1_path):
+    """Point a vertex's placement scene (vtx<N>/scene.scene) at the T1.
+
+    PlanTUS writes the T1 as '../../../T1.nii.gz' (the m2m folder of its own
+    layout), which is not where PRESTUS keeps it. Returns the scene path, or
+    None if PlanTUS wrote no scene.
+    """
+    vtx_dir = os.path.join(output_path, "vtx" + str(vertex))
+    scene_path = os.path.join(vtx_dir, "scene.scene")
+    if not os.path.isfile(scene_path):
+        return None
+    with open(scene_path, "r", encoding="utf-8") as f:
+        txt = f.read()
+    # The file name is also the scene's name for the T1's display state.
+    marker = "\0T1_FILEPATH\0"
+    txt = (txt.replace("../../../T1.nii.gz", marker)
+              .replace("T1.nii.gz", os.path.basename(t1_path))
+              .replace(marker, os.path.relpath(t1_path, vtx_dir)))
+    with open(scene_path, "w", encoding="utf-8") as f:
+        f.write(txt)
     return scene_path
 
 
@@ -480,7 +582,9 @@ def place_vertex(PlanTUS, vertex, output_path, mask_path, t1_path, s,
     """Run PlanTUS.prepare_acoustic_simulation for one vertex.
 
     PlanTUS appends to *_Localite_XML.txt, so a re-run for the same vertex
-    would accumulate duplicate markers; the file is removed first.
+    would accumulate duplicate markers; the file is removed first. Returns
+    the vertex's placement scene (transducer and focus on skin and T1), or
+    None if PlanTUS wrote none.
     """
     mask_name = os.path.basename(mask_path).replace(".nii.gz", "").replace(".nii", "")
     xml_path = os.path.join(output_path, "vtx" + str(vertex),
@@ -496,6 +600,7 @@ def place_vertex(PlanTUS, vertex, output_path, mask_path, t1_path, s,
         "",  # no transducer surface model (generic model)
         s["focal_distance_list"], s["flhm_list"],
         placement_scene_template)
+    return fix_placement_scene(output_path, vertex, t1_path)
 
 
 def remove_stale_metrics(output_path, log):

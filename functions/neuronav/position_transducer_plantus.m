@@ -13,14 +13,16 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 % The function:
 %   1. Builds a PlanTUS transducer configuration YAML from PRESTUS parameters.
 %   2. Creates a spherical target mask around the focal point.
-%   3. Runs a Python subprocess — mode depends on parameters.simulation.interactive:
+%   3. Runs a Python subprocess — mode depends on placement.plantus.interactive
+%      ([] = follow parameters.simulation.interactive):
 %        interactive = 0 (default / HPC):
 %          prestus_plantus_launcher.py — headless, automatically selects the
 %          optimal skin vertex via weighted composite scoring.
 %        interactive = 1 (desktop):
 %          prestus_plantus_gui_launcher.py — computes the same scoring maps then
 %          opens Connectome Workbench so the user can inspect them visually,
-%          click a vertex and confirm placement interactively.
+%          click a vertex, see the transducer there and confirm or choose
+%          again in a dialog. Falls back to headless without a display.
 %   4. Loads the output *Localite.mat (position_matrix) written by PlanTUS.
 %   5. Converts the 4×4 RAS matrix to voxel positions via
 %      localite_matrix_to_positions (shared with the 'localite' mode).
@@ -73,6 +75,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 %   weight_skull_thickness          - Objective weight (default 0.2); bone path
 %                                     length along the skin normal, from
 %                                     m2m_sub-XXX/final_tissues.nii.gz
+%   interactive             - 1/true: choose the vertex in Connectome Workbench;
+%                             0/false: headless; [] (default): follow
+%                             simulation.interactive
 %   connectome_wb_path      - Path to Connectome Workbench bin/ (default '')
 %   save_metrics            - Write per-vertex criteria, composite score and
 %                             selected vertex to <work_dir>/plantus_metrics.mat
@@ -222,9 +227,18 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     %
     % placement.plantus.launcher_py_override (undocumented): when set, overrides the
     % launcher path directly — used by the test suite to inject mock scripts.
-    use_gui = isfield(parameters, 'simulation') && ...
-              isfield(parameters.simulation, 'interactive') && ...
-              parameters.simulation.interactive;
+    if isfield(pt, 'interactive') && ~isempty(pt.interactive)
+        use_gui = logical(pt.interactive);
+    else
+        use_gui = isfield(parameters, 'simulation') && ...
+                  isfield(parameters.simulation, 'interactive') && ...
+                  logical(parameters.simulation.interactive);
+    end
+    if use_gui && isunix && ~ismac && isempty(getenv('DISPLAY')) && isempty(getenv('WAYLAND_DISPLAY'))
+        warning('PRESTUS:plantus:noDisplay', ...
+            'No display for Connectome Workbench (e.g. a cluster job); PlanTUS runs headless.');
+        use_gui = false;
+    end
 
     if isfield(pt, 'launcher_py_override') && ~isempty(pt.launcher_py_override)
         launcher = char(pt.launcher_py_override);
@@ -245,7 +259,8 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
             end
             fprintf(['PlanTUS: interactive mode — Connectome Workbench will open.\n' ...
                      '  Click a skin vertex (click again to change it).\n' ...
-                     '  Close wb_view to confirm the last selected vertex.\n']);
+                     '  Close wb_view to place the last selected vertex, then use it\n' ...
+                     '  or choose another in the review dialog.\n']);
         else
             launcher = fullfile(fn_dir, 'prestus_plantus_launcher.py');
             if ~isfile(launcher)
@@ -269,9 +284,10 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     % In interactive mode the launcher's output is echoed live, so the user
     % sees the wb_view instructions and each selected vertex while the
     % window is open. The child's stdin is never connected, so the launcher
-    % is told to confirm by closing wb_view rather than by a console prompt.
+    % is told to confirm in a review dialog (Qt, shipped with SimNIBS) rather
+    % than by a console prompt; without Qt the last selected vertex is used.
     if use_gui
-        plantus_argv = [plantus_argv, {'--selection', 'last_click'}];
+        plantus_argv = [plantus_argv, {'--selection', 'review'}];
     end
     % Snapshot outputs from earlier runs so only a file this run wrote is used.
     previous_outputs = dir(fullfile(work_dir, '**', '*Localite.mat'));

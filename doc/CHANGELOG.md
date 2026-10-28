@@ -83,6 +83,9 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Placement report `sub-XXX_placement_<mode>.html` for every mode (`placement.report`, default `true`); for PlanTUS, a criteria evaluation with a weight sweep (`placement.plantus.evaluate`, default `true`)
 - PlanTUS distance window can be set (`placement.plantus.min_distance_mm`, `max_distance_mm`, `optimal_distance_mm`)
 - PlanTUS headless and interactive modes write the same outputs, including `plantus_metrics.mat` (`placement.plantus.save_metrics`)
+- PlanTUS interactive mode: each click prints the vertex's criteria and rank; after closing Workbench, the transducer is shown at the chosen vertex and a dialog offers to use it or choose another; the skull-thickness map is loaded in the planning scene
+- `placement.plantus.interactive` selects interactive PlanTUS without `simulation.interactive` or the MATLAB desktop; without a display, PlanTUS runs headless
+- Fixed: the PlanTUS placement scene (`vtx<N>/scene.scene`) did not find the T1
 - ⚠️ **Fixed:** RAS → voxel conversion was one voxel off along each axis; placements derived from RAS/MNI coordinates (Localite, MNI, heuristic MNI target, PlanTUS, `coordinate_space: ras`) move by one voxel compared with earlier runs
 - ⚠️ **Fixed:** configured voxel positions ignored the reorientation of a non-RAS+ planning T1; rerun runs whose T1 is not stored RAS+
 - ⚠️ **Fixed:** Localite placement used the transposed instrument matrix (transducer at the image origin); rerun Localite placements in file mode and via `placement.localite.enabled` (the multi-target toolkit was not affected)

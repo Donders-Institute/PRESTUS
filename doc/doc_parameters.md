@@ -403,7 +403,7 @@ See [doc_placement_mni.md](doc_placement_mni.md).
 
 #### `placement.plantus`
 
-See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactive selection is set by `simulation.interactive`.
+See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactive selection is set by `interactive`, which defaults to `simulation.interactive`.
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -426,6 +426,7 @@ See [doc_placement_plantus.md](doc_placement_plantus.md). Headless or interactiv
 | `weight_skull_thickness` | Weight: bone path length along the skin normal. | `0.2` | From `m2m_sub-XXX/final_tissues.nii.gz`; ignored if that file is missing. See [skull thickness](doc_placement_plantus.md#4e-skull-thickness-t_i). |
 | `save_metrics` | Write per-vertex criteria, score and selected vertex to `plantus_metrics.mat`. | `true` | Both modes. Used by the criteria evaluation and offline re-scoring. |
 | `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
+| `interactive` | Choose the vertex in Connectome Workbench. | `[]` | `1` = interactive, `0` = headless, `[]` = follow `simulation.interactive`. `1` needs a display but not the MATLAB desktop; without a display PlanTUS runs headless. |
 | `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed unless `wb_command` is on PATH or in the env's `bin/`; interactive mode also needs `wb_view`. |
 
 #### `placement.tus_entry`

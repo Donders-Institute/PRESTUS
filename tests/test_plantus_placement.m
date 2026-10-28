@@ -291,6 +291,41 @@ classdef test_plantus_placement < matlab.unittest.TestCase
             tc.verifyTrue(all(focus_pos >= 1), 'focus_pos must be inside the image grid');
         end
 
+        function test_interactive_setting_selects_launcher_mode(tc)
+            % placement.plantus.interactive overrides simulation.interactive;
+            % interactive runs ask for the review dialog (--selection review).
+            python_bin = find_system_python();
+            tc.assumeNotEmpty(python_bin, ...
+                'No Python 3 found — skipping integration test.');
+            p      = make_plantus_parameters(tc.TmpDir);
+            t1_hdr = write_synthetic_t1(tc.TmpDir, p);
+            write_fake_mesh(tc.TmpDir, p);
+            script_dir = fullfile(tc.TmpDir, 'mock_plantus');
+            make_fake_plantus_install(script_dir);
+            launcher_path = fullfile(tc.TmpDir, 'mock_launcher.py');
+            write_python_launcher(launcher_path, 'argv');
+            p.placement.plantus.script_path = script_dir;
+            p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
+            p.placement.plantus.launcher_py_override = launcher_path;
+            p.transducer(1).focus_pos = [100, 100, 130];
+            p.placement.plantus.mni_target_mm = [];
+
+            cases = {[], 0, false; [], 1, true; 1, 0, true; 0, 1, false};
+            for i = 1:size(cases, 1)
+                p.placement.plantus.interactive = cases{i, 1};
+                p.simulation.interactive = cases{i, 2};
+                if cases{i, 3} && isunix && ~ismac && isempty(getenv('DISPLAY'))
+                    continue   % no display: PlanTUS falls back to headless
+                end
+                evalc('position_transducer_plantus(p, t1_hdr);');
+                argv_file = dir(fullfile(tc.TmpDir, '**', 'argv.txt'));
+                argv = fileread(fullfile(argv_file(1).folder, argv_file(1).name));
+                tc.verifyEqual(contains(argv, '--selection review'), cases{i, 3}, ...
+                    sprintf('plantus.interactive=%s, simulation.interactive=%d', ...
+                    mat2str(cases{i, 1}), cases{i, 2}));
+            end
+        end
+
         function test_ras_to_voxel_round_trip(tc)
             % The known position_matrix written by the mock wrapper has
             % translation = [10 20 30] mm (RAS) and direction = [0 0 1].
@@ -618,6 +653,8 @@ function write_python_launcher(launcher_path, mode)
 %   'silent'     — Exits 0 without writing any output files.
 %   'check_yaml' — Parses the YAML config arg and echoes its keys to a
 %                  sidecar file, then also writes the Localite mat.
+%   'argv'       — Writes its options (argv after the four paths) to
+%                  argv.txt, then also writes the Localite mat.
 %
 % The launcher is called as:
 %   python launcher.py <t1> <mesh> <mask> <yaml> --plantus_root <root>
@@ -642,6 +679,20 @@ function write_python_launcher(launcher_path, mode)
                 '    sys.exit(99)', ...
                 'work_dir = os.path.dirname(sys.argv[3])', ...
                 'os.makedirs(work_dir, exist_ok=True)', ...
+                mat_write_snippet, ...
+            };
+
+        case 'argv'
+            lines = { ...
+                'import sys, os, numpy as np', ...
+                'try:', ...
+                '    import scipy.io as sio', ...
+                'except ImportError:', ...
+                '    sys.exit(99)', ...
+                'work_dir = os.path.dirname(sys.argv[3])', ...
+                'os.makedirs(work_dir, exist_ok=True)', ...
+                'with open(os.path.join(work_dir, "argv.txt"), "w") as fh:', ...
+                '    fh.write(" ".join(sys.argv[5:]))', ...
                 mat_write_snippet, ...
             };
 

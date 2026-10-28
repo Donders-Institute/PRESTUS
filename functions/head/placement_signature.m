@@ -33,6 +33,11 @@ end
     for f = {'work_dir', 'target_ras', 'script_path', 'env_path'}
         if isfield(s, f{1}); s = rmfield(s, f{1}); end
     end
+    % PlanTUS: interactive [] follows simulation.interactive, as before the
+    % key existed, so records written then still match
+    if isfield(s, 'interactive') && isempty(s.interactive)
+        s = rmfield(s, 'interactive');
+    end
     sig.settings = s;
     t = parameters.transducer;
     for f = {'trans_pos', 'focus_pos', 'trans_pos_ras', 'focus_pos_ras', ...

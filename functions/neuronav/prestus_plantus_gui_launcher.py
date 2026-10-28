@@ -11,12 +11,17 @@ directory.  PRESTUS reads that file once the subprocess exits.
 Metrics, scoring and outputs are shared with the headless launcher
 (plantus_common.py): the composite score is computed here too, and
 plantus_metrics.mat records both its optimum and the vertex placed.
+Each click prints the vertex's criteria, score and rank.
 
 Confirmation (--selection):
+  review      when wb_view closes, the last selected vertex is placed, its
+              transducer is shown in wb_view and a dialog asks to use it,
+              choose another vertex (wb_view reopens, no recomputation) or
+              cancel (needs PyQt5, shipped with SimNIBS; used by PRESTUS)
   prompt      yes/no console prompt after each click (needs a terminal stdin)
-  last_click  last selected vertex is placed when wb_view closes (used by
-              PRESTUS, which does not connect stdin)
-  auto        (default) prompt if stdin is a terminal, else last_click
+  last_click  last selected vertex is placed when wb_view closes
+  auto        (default) prompt if stdin is a terminal, else review if PyQt5
+              is available, else last_click
 
 Usage
 -----
@@ -24,7 +29,7 @@ python prestus_plantus_gui_launcher.py \
     <t1_filepath> <simnibs_mesh_filepath> \
     <target_mask_filepath> <tx_config_yaml> \
     --plantus_root <path_to_PlanTUS_installation> \
-    [--selection auto|prompt|last_click]
+    [--selection auto|review|prompt|last_click]
 
 Requirements
 ------------
@@ -36,14 +41,21 @@ Requirements
 import sys
 import os
 import argparse
+import html
 import re
+import shlex
 import subprocess
 import threading
+import time
 
 import numpy as np
 
 import plantus_compat
 import plantus_common as pc
+
+# A wb_view that exits this soon without a click is taken as having failed to
+# load the scene (e.g. a Workbench version that rejects an added map).
+SCENE_FAILURE_S = 15
 
 
 # ---------------------------------------------------------------------------
@@ -63,18 +75,59 @@ def parse_args():
     p.add_argument("--output_dir", default="",
                    help="Output directory (default: <mesh_dir>/PlanTUS/<mask_stem>, "
                         "the PlanTUS_wrapper.py location).")
-    p.add_argument("--selection", choices=["auto", "prompt", "last_click"],
+    p.add_argument("--selection", choices=["auto", "review", "prompt", "last_click"],
                    default="auto",
-                   help="How a clicked vertex is confirmed. 'prompt': yes/no at "
-                        "the console (needs an interactive terminal). "
-                        "'last_click': the last selected vertex is placed when "
-                        "wb_view closes (no stdin needed). 'auto' (default): "
-                        "'prompt' if stdin is a terminal, else 'last_click'.")
+                   help="How a clicked vertex is confirmed. 'review': the last "
+                        "selected vertex is placed when wb_view closes and a "
+                        "dialog asks to use it or choose again (needs PyQt5). "
+                        "'prompt': yes/no at the console (needs an interactive "
+                        "terminal). 'last_click': the last selected vertex is "
+                        "placed when wb_view closes. 'auto' (default): 'prompt' "
+                        "if stdin is a terminal, else 'review' if PyQt5 is "
+                        "available, else 'last_click'.")
     return p.parse_args()
 
 
 def log(msg):
     print(f"[prestus_plantus_gui_launcher] {msg}")
+
+
+def have_qt():
+    try:
+        import PyQt5.QtWidgets  # noqa: F401
+        return True
+    except Exception:  # noqa: BLE001 — any import failure means no dialog
+        return False
+
+
+def review_dialog(vertex, lines):
+    """Ask whether to use the placed vertex: 'use', 'again' or 'cancel'."""
+    from PyQt5 import QtCore, QtWidgets
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["PlanTUS"])
+    box = QtWidgets.QMessageBox()
+    box.setWindowTitle("PlanTUS: review placement")
+    box.setIcon(QtWidgets.QMessageBox.Question)
+    box.setTextFormat(QtCore.Qt.RichText)
+    box.setText(f"<b>Transducer placed at vertex {vertex}.</b><br>"
+                "Connectome Workbench shows the transducer and focus.")
+    box.setInformativeText("<pre>" + html.escape("\n".join(lines)) + "</pre>")
+    use = box.addButton("Use this position", QtWidgets.QMessageBox.AcceptRole)
+    again = box.addButton("Choose another vertex", QtWidgets.QMessageBox.ActionRole)
+    cancel = box.addButton("Cancel", QtWidgets.QMessageBox.RejectRole)
+    box.setDefaultButton(use)
+    box.setEscapeButton(cancel)
+    box.setWindowFlags(box.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+    box.raise_()
+    box.activateWindow()
+    box.exec_()
+    app.processEvents()
+    clicked = box.clickedButton()
+    if clicked is use:
+        return "use"
+    if clicked is again:
+        return "again"
+    return "cancel"
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +181,20 @@ def main():
     # calibration points, but the geometric fallback yields only one.
     plantus_compat.patch_compute_flhm(PlanTUS)
 
+    # prepare_acoustic_simulation ends with os.system("wb_view ... &") on the
+    # placement scene, before PRESTUS has pointed that scene at the T1. Its
+    # wb_view calls are recorded instead and the viewer is opened below.
+    import os as _os
+    _orig_os_system = _os.system
+    wb_view_calls = []
+
+    def _patched_os_system(cmd):
+        if "wb_view" in cmd:
+            wb_view_calls.append(cmd)
+            return 0
+        return _orig_os_system(cmd)
+    _os.system = _patched_os_system
+
     pc.remove_stale_metrics(output_path, log)
     target_roi_filepath = pc.stage_mask(mask_path, output_path)
 
@@ -157,98 +224,166 @@ def main():
                  + os.path.join(plantus_main_folder, "resources", "scene_templates"))
     scene_path = pc.write_planning_scene(PlanTUS, planning_template, output_path,
                                          t1_path, target_mask_filename)
+    with_thickness = True
 
     # Selection mode.  "prompt" asks yes/no at the console after each click,
     # which needs an interactive stdin.  When launched from MATLAB (via
     # run_command) stdin is a pipe nobody writes to, so input() would block
-    # forever -- there, "last_click" is used instead: every click updates the
-    # selection and the last selected vertex is placed once wb_view closes.
+    # forever -- there, "review" (a Qt dialog) or "last_click" is used.
     selection = args.selection
     if selection == "auto":
-        selection = "prompt" if sys.stdin is not None and sys.stdin.isatty() else "last_click"
+        if sys.stdin is not None and sys.stdin.isatty():
+            selection = "prompt"
+        else:
+            selection = "review" if have_qt() else "last_click"
+    elif selection == "review" and not have_qt():
+        log("PyQt5 not available in this Python; the last selected vertex is "
+            "placed without review.")
+        selection = "last_click"
+
+    placed = []
+    viewer = None
+
+    def open_viewer(placement_scene):
+        """Show a placement scene (transducer, focus) in a separate wb_view."""
+        nonlocal viewer
+        close_viewer()
+        if placement_scene:
+            viewer = subprocess.Popen(
+                ["wb_view", "-logging", "OFF", placement_scene],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=os.path.dirname(placement_scene))
+        wb_view_calls.clear()
+
+    def close_viewer():
+        nonlocal viewer
+        if viewer is not None and viewer.poll() is None:
+            viewer.terminate()
+        viewer = None
+
+    def summary(vertex):
+        lines = pc.vertex_summary(m, s, score, vertex)
+        if best_vertex is not None and vertex != best_vertex:
+            lines.append(f"Composite optimum     vertex {best_vertex}")
+        return lines
+
+    def place(vertex):
+        print(f"Generating placement for vertex {vertex}...")
+        placement_scene = pc.place_vertex(PlanTUS, vertex, output_path,
+                                          target_roi_filepath, t1_path, s,
+                                          placement_template)
+        placed.append(vertex)
+        print(f"Placement written for vertex {vertex}.")
+        return placement_scene
+
+    def planning_session():
+        """Open the planning scene; return the last clicked vertex (or None)."""
+        command = ["wb_view", "-logging", "FINER", str(scene_path)]
+        pattern = re.compile(r"Switched vertex to triangle nearest vertex\s+(\.\d+)")
+        clicked = None
+        process_line = False
+
+        from pynput import mouse
+
+        def on_click(x, y, button, pressed):
+            nonlocal process_line
+            if pressed:
+                process_line = True
+
+        listener = mouse.Listener(on_click=on_click)
+        listener.start()
+
+        # wb_view's stdout is discarded: only stderr (the logging stream) is
+        # read, and an unread stdout pipe could fill up and stall wb_view.
+        started = time.monotonic()
+        process = subprocess.Popen(
+            command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            cwd=output_path, text=True)
+
+        def read_output():
+            nonlocal clicked, process_line
+            while True:
+                output = process.stderr.readline()
+                if output == "" and process.poll() is not None:
+                    break
+                if process_line:
+                    match = pattern.search(output)
+                    if match:
+                        clicked = int(match.group(1).replace(".", ""))
+                        print(f"\nSwitched to vertex {clicked}")
+                        for line in summary(clicked):
+                            print("  " + line)
+                        if selection == "prompt":
+                            response = input(
+                                f"Generate transducer placement for vertex "
+                                f"{clicked}? (yes/no): ").strip().lower()
+                            if response == "yes":
+                                open_viewer(place(clicked))
+                            else:
+                                print("No action taken — click another vertex.")
+                        else:
+                            print("  Selected. Close wb_view to continue, or click another vertex.")
+                        process_line = False
+
+        output_thread = threading.Thread(target=read_output)
+        output_thread.start()
+        process.wait()
+        output_thread.join()
+        listener.stop()
+        failed = (clicked is None and process.returncode != 0
+                  and time.monotonic() - started < SCENE_FAILURE_S)
+        return clicked, failed
 
     print("[prestus_plantus_gui_launcher] Opening Connectome Workbench...")
     print("  Click on a skin vertex in wb_view to select the transducer position.")
+    print("  Each click prints the vertex's criteria and rank here.")
     if selection == "prompt":
         print("  Type 'yes' at the prompt to confirm and generate placement, then")
         print("  close wb_view to finish.")
+    elif selection == "review":
+        print("  Close wb_view to place the last selected vertex and review it;")
+        print("  close without clicking to abort.")
     else:
         print("  Click again to change the selection; the last selected vertex is")
         print("  used. Close wb_view to confirm (close without clicking to abort).")
 
-    command = ["wb_view", "-logging", "FINER", str(scene_path)]
-    pattern = re.compile(r"Switched vertex to triangle nearest vertex\s+(\.\d+)")
-    triangle_number = None
-    process_line = False
+    last = None
+    accepted = None
+    while True:
+        clicked, failed = planning_session()
+        if failed and with_thickness:
+            # Retry once with the template's four maps only.
+            log("wb_view exited at once; reopening without the skull-thickness map.")
+            scene_path = pc.write_planning_scene(PlanTUS, planning_template, output_path,
+                                                 t1_path, target_mask_filename,
+                                                 with_thickness=False)
+            with_thickness = False
+            continue
+        if clicked is not None:
+            last = clicked
+        if last is None:
+            sys.exit("[prestus_plantus_gui_launcher] wb_view closed without vertex selection. "
+                     "No Localite.mat written.")
+        if selection == "prompt":
+            break
+        if selection == "last_click":
+            open_viewer(place(last))
+            break
 
-    from pynput import mouse
-
-    def on_click(x, y, button, pressed):
-        nonlocal process_line
-        if pressed:
-            process_line = True
-
-    listener = mouse.Listener(on_click=on_click)
-    listener.start()
-
-    # wb_view's stdout is discarded: only stderr (the logging stream) is read,
-    # and an unread stdout pipe could fill up and stall wb_view.
-    process = subprocess.Popen(
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-        cwd=output_path, text=True)
-
-    placed = []
-
-    def place(vertex):
-        print(f"Generating placement for vertex {vertex}...")
-        pc.place_vertex(PlanTUS, vertex, output_path, target_roi_filepath,
-                        t1_path, s, placement_template)
-        placed.append(vertex)
-        if 0 <= vertex < len(score) and np.isfinite(score[vertex]):
-            rank = int((score < score[vertex]).sum()) + 1
-            print(f"Placement written for vertex {vertex} "
-                  f"(composite score {score[vertex]:.4f}, rank {rank} "
-                  f"of {int(np.isfinite(score).sum())} eligible).")
-        else:
-            print(f"Placement written for vertex {vertex} "
-                  f"(not eligible under the composite score).")
-
-    def read_output():
-        nonlocal triangle_number, process_line
-        while True:
-            output = process.stderr.readline()
-            if output == "" and process.poll() is not None:
-                break
-            if process_line:
-                match = pattern.search(output)
-                if match:
-                    triangle_number = int(match.group(1).replace(".", ""))
-                    print(f"\nSwitched to vertex {triangle_number}")
-                    if selection == "prompt":
-                        response = input(
-                            f"Generate transducer placement for vertex "
-                            f"{triangle_number}? (yes/no): ").strip().lower()
-                        if response == "yes":
-                            place(triangle_number)
-                        else:
-                            print("No action taken — click another vertex.")
-                    else:
-                        print("  Selected. Close wb_view to confirm, or click another vertex.")
-                    process_line = False
-
-    output_thread = threading.Thread(target=read_output)
-    output_thread.start()
-
-    process.wait()
-    output_thread.join()
-    listener.stop()
-
-    if triangle_number is None:
-        sys.exit("[prestus_plantus_gui_launcher] wb_view closed without vertex selection. "
-                 "No Localite.mat written.")
-
-    if selection == "last_click":
-        place(triangle_number)
+        # review: place, show the transducer, ask
+        placement_scene = place(last)
+        open_viewer(placement_scene)
+        if placement_scene is None:
+            log("PlanTUS wrote no placement scene; the transducer is not shown.")
+        choice = review_dialog(last, summary(last))
+        if choice == "use":
+            accepted = last
+            break
+        close_viewer()
+        if choice == "cancel":
+            sys.exit("[prestus_plantus_gui_launcher] Placement cancelled. "
+                     "PRESTUS does not use the vertices placed during review.")
+        print("[prestus_plantus_gui_launcher] Reopening wb_view: click another vertex.")
 
     # Exit non-zero when nothing was confirmed, so PRESTUS does not fall back
     # on a *Localite.mat left over from an earlier run.
@@ -256,9 +391,13 @@ def main():
         sys.exit("[prestus_plantus_gui_launcher] No placement confirmed. "
                  "No Localite.mat written.")
 
-    # PRESTUS uses the most recently written placement, i.e. the last one.
+    # PRESTUS uses the most recently written placement: the last one placed,
+    # which in review mode is the accepted vertex.
+    final = accepted if accepted is not None else placed[-1]
+    for line in summary(final):
+        print("  " + line)
     if s["save_metrics"]:
-        pc.save_metrics(output_path, m, s, score, best_vertex, placed[-1],
+        pc.save_metrics(output_path, m, s, score, best_vertex, final,
                         "gui", log)
     pc.run_evaluation(output_path, s, log)
 

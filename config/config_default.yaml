@@ -411,6 +411,9 @@ placement:
                               # two figures (plantus_evaluation.json/.csv/.png, ~10 s). Shown in the
                               # placement report (placement.report). Needs save_metrics.
     # --- Surface visualisation (optional) ---
+    interactive: []           # Choose the vertex in Connectome Workbench (1) or automatically (0);
+                              # [] = follow simulation.interactive. 1 works without the MATLAB desktop
+                              # (e.g. from the Nexus) but needs a display; without one PlanTUS runs headless.
     connectome_wb_path: ''    # Connectome Workbench bin/ (wb_command, wb_view); prepended to PATH.
                               # Empty = wb_command must be on PATH or in the Python env's bin/ (checked at start).
                               # wb_view is only opened in interactive mode.

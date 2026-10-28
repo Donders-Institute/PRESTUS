@@ -26,6 +26,8 @@ Known problems and their fixes, grouped by where they show up. Most entries link
 
 | Symptom | Cause and fix |
 |---|---|
+| PlanTUS interactive mode runs headless | No display was found (e.g. a cluster job or an SSH session without X forwarding); run it on a desktop or in a VNC session. |
+| PlanTUS places the last clicked vertex without a review dialog | PyQt5 is missing in the SimNIBS Python; it ships with SimNIBS, so check `placement.plantus.env_path`. |
 | PlanTUS stops because intermediate files are missing | `wb_command` (Connectome Workbench) is not found; install it in the SimNIBS environment or set `placement.plantus.connectome_wb_path` ([Installation](doc_installation.md#optional-plantus-dependencies)). |
 | TUS_entry: `replacement has 1 row, data has 0` | TUS_entry needs a solid head mask; check `placement.tus_entry.scalp_mask` ([TUS_entry](doc_placement_tus_entry.md#required-configuration)). |
 | MNI or RAS positions end up in the wrong place | Manual `ras`/`mni` coordinates are converted in the placement stage, so `modules.run_transducer_placement` must be `1` ([Placement](doc_placement.md#manual-coordinate-selection)). For MNI and Localite conventions see [Coordinate systems](doc_coordinate_systems.md). |
