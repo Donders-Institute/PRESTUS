@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from prestus_nexus.model import ConfigModel  # noqa: E402
 from prestus_nexus.session import Session  # noqa: E402
+from prestus_nexus.uncertainty import PROPERTIES  # noqa: E402
 from prestus_nexus.ui.main_window import STUDY, MainWindow  # noqa: E402
 
 
@@ -58,6 +59,37 @@ def test_advanced_options_toggle_and_override(window):
     window.model.set("grid.pml_size", 20)                                 # set advanced -> stays visible
     tab.refresh()
     assert _row(grid, "grid.pml_size").block.isVisibleTo(grid)
+
+
+def test_tissue_properties_locked_by_default(window, monkeypatch):
+    from PyQt6.QtWidgets import QMessageBox
+    page = window.pages["medium_properties"]
+    row = _row(page, "medium_properties.skull.sound_speed")
+    assert page.locked and not row.editor.isEnabled() and not row.reset.isEnabled()
+    assert not window.pages["grid"].lock_button.isVisibleTo(window.pages["grid"])
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    page.lock_button.click()                                              # declined: stays locked
+    assert page.locked and not row.editor.isEnabled()
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    page.lock_button.click()
+    assert not page.locked and row.editor.isEnabled()
+    page.lock_button.click()                                              # relocking needs no confirmation
+    assert page.locked and not row.editor.isEnabled()
+
+
+def test_uncertainty_card_lists_variants(window):
+    card = window.uncertainty_card
+    window.tabs.setCurrentWidget(window.tab_pages["simulation"])
+    assert not card.isVisibleTo(window)                                   # uncertainty off
+    window.model.set("simulation.uncertainty", True)
+    window.tab_pages["simulation"].refresh()
+    assert card.isVisibleTo(window)
+    assert not card.sets.errors
+    n_tissues = len(card.sets.sets["default"])
+    assert card.table.rowCount() == n_tissues * len(PROPERTIES)
+    if card.canvases:
+        assert len(card.canvases["brain"].figure.axes) == 7               # one column per plotted property
+        assert len(card.canvases["skull"].figure.axes) == 7
 
 
 def test_card_advanced_button_opens_one_card(window):
@@ -160,3 +192,25 @@ def test_placement_modes_greyed_without_segmentation(window, tmp_path):
     page.refresh()
     ed = _row(page, "placement.mode").editor
     assert ed.combo.model().item(ed._items.index("heuristic")).isEnabled()
+
+
+def test_plantus_actions_run_placement_only(window, monkeypatch):
+    from prestus_nexus.ui.main_window import RUN, VIEWER, PlantusActions
+    from prestus_nexus.ui.run_page import RunPage
+    ran = []
+    monkeypatch.setattr(RunPage, "run_script", lambda self, task, script: ran.append((task, script)) or True)
+    acts = window.pages["placement"].findChild(PlantusActions)
+    window.model.set("placement.mode", "manual")
+    acts.refresh()
+    assert acts.isHidden()
+    window.model.set("placement.mode", "plantus")
+    acts.refresh()
+    assert not acts.isHidden()
+    acts._run(True)
+    task, script = ran[0]
+    assert task == PlantusActions.TASK and script.name == "plantus_t.m"
+    assert "'placement.plantus.interactive', 1;" in script.read_text()
+    shown = []
+    monkeypatch.setattr(type(window), "show_special", lambda self, key: shown.append(key))
+    window.pages[RUN].finished.emit(PlantusActions.TASK, True)
+    assert shown == [VIEWER] and not acts._waiting

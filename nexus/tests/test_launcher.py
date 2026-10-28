@@ -25,6 +25,18 @@ def test_launcher_script(tmp_path, prestus_root):
     assert "platform" not in launcher.launcher_script(study, prestus_root, local=False).split("parameters =")[1]
 
 
+def test_plantus_script(tmp_path, prestus_root):
+    study = tmp_path / "config_pilot.yaml"
+    study.write_text("subject_id: 1\n")
+    path = launcher.write_plantus_script(study, prestus_root, interactive=True)
+    assert path.name == "plantus_pilot.m"
+    text = path.read_text()
+    assert "'placement.plantus.interactive', 1;" in text
+    assert "'simulation.interactive', 0;" in text and "'placement.reuse', 'never'" in text
+    assert "parameters.modules.run_transducer_placement = 1;" in text
+    assert "'placement.plantus.interactive', 0;" in launcher.plantus_script(study, prestus_root, False)
+
+
 def test_commands_wrap_sentinels(tmp_path, prestus_root):
     argv = launcher.validate_command("/x/matlab", tmp_path / "config_a.yaml", prestus_root)
     assert argv[:2] == ["/x/matlab", "-batch"]
@@ -124,3 +136,29 @@ def test_matlab_gui_entry_points_exist(prestus_root):
             "assert(~isempty(which('calibration_gui')) && nargin('calibration_gui') == 1)")
     proc = subprocess.run([MATLAB, "-batch", body], capture_output=True, text=True, timeout=600)
     assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+
+
+@pytest.mark.matlab
+@pytest.mark.skipif(MATLAB is None, reason="MATLAB not available")
+def test_plantus_script_loads_in_matlab(schema, prestus_root, tmp_path):
+    """The placement-only script's overrides load and leave only placement on."""
+    m = ConfigModel(schema)
+    for k, v in {"subject_id": 2, "path.sim": str(tmp_path), "simulation.medium": "water",
+                 "simulation.interactive": 1, "placement.mode": "plantus"}.items():
+        m.set(k, v)
+    study = m.save(tmp_path / "config_p.yaml")
+    script = launcher.plantus_script(study, prestus_root, interactive=True).replace(
+        "prestus_pipeline_start(parameters);",
+        "mods = parameters.modules; on = {}; for f = fieldnames(mods)', "
+        "if isnumeric(mods.(f{1})) && isscalar(mods.(f{1})) && mods.(f{1}) == 1, on{end+1} = f{1}; end, end\n"
+        "fprintf('ON=%s PT=%d SIM=%d REUSE=%s\\n', strjoin(on, ','), "
+        "parameters.placement.plantus.interactive, parameters.simulation.interactive, "
+        "parameters.placement.reuse);")
+    path = tmp_path / "plantus_check.m"
+    path.write_text(script)
+    proc = subprocess.run(launcher.run_command(MATLAB, path), capture_output=True, text=True,
+                          timeout=600, cwd=tmp_path)
+    out = proc.stdout + proc.stderr
+    assert proc.returncode == 0 and launcher.OK_SENTINEL in out, out[-2000:]
+    assert "ON=run_transducer_placement PT=1 SIM=0 REUSE=never" in out, out[-2000:]
+

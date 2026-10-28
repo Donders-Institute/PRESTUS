@@ -460,12 +460,14 @@ class MainWindow(QMainWindow):
                 nodes = schema.display_nodes(section)
                 if not nodes:
                     continue
-                page = SectionPage(self.model, section, nodes, schema.section_label(section))
+                page = SectionPage(self.model, section, nodes, schema.section_label(section),
+                                   locked=schema.section_is_locked(section))
                 page.changed.connect(self._changed)
                 self.pages[section] = page
                 self._section_tab[section] = key
                 if section == "placement":
                     page.add_extra(LocaliteActions(self))
+                    page.add_extra(PlantusActions(self))
                 if section == "timing":
                     from .timing_view import TimingPanel
                     self.timing_panel = TimingPanel(self.model)
@@ -1070,3 +1072,54 @@ class LocaliteActions(QWidget):
 
     def refresh(self) -> None:
         self.setVisible(self.window.model.get("placement.mode") == "localite")
+
+
+class PlantusActions(QWidget):
+    """Shown with placement.mode = plantus: run only the placement, then show it in the viewer."""
+
+    TASK = "PlanTUS placement"
+
+    def __init__(self, window: MainWindow):
+        super().__init__()
+        self.window = window
+        self._waiting = False
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 6)
+        note = QLabel("PlanTUS: run only the placement, without simulating. <b>Choose in Workbench</b> "
+                      "opens PlanTUS's maps (needs Connectome Workbench and a display); click a skin "
+                      "position, close Workbench, then use it or choose again in the review dialog. "
+                      "<b>Automatic</b> takes the best composite score. The result opens in the Viewer.")
+        note.setObjectName("CardSub")
+        note.setWordWrap(True)
+        h.addWidget(note, 1)
+        pick = QPushButton("Choose in Workbench…")
+        pick.setToolTip("Run PlanTUS and pick the transducer position on its criterion maps")
+        pick.clicked.connect(lambda: self._run(True))
+        h.addWidget(pick)
+        auto = QPushButton("Automatic")
+        auto.setToolTip("Run PlanTUS and place the transducer at the composite-score optimum")
+        auto.clicked.connect(lambda: self._run(False))
+        h.addWidget(auto)
+        self.refresh()
+
+    def _run(self, interactive: bool) -> None:
+        from .. import launcher
+        if not self.window.save():
+            return
+        script = launcher.write_plantus_script(self.window.model.path, self.window.prestus_root,
+                                               interactive)
+        page = self.window.show_special(RUN)
+        if page.run_script(self.TASK, script) and not self._waiting:
+            self._waiting = True
+            page.finished.connect(self._done)
+
+    def _done(self, task: str, ok: bool) -> None:
+        if task != self.TASK:
+            return
+        self.window.pages[RUN].finished.disconnect(self._done)
+        self._waiting = False
+        if ok and VIEWER in self.window.pages:
+            self.window.show_special(VIEWER)
+
+    def refresh(self) -> None:
+        self.setVisible(self.window.model.get("placement.mode") == "plantus")

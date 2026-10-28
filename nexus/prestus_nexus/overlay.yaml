@@ -63,7 +63,7 @@ sections:
   babelbrain:         {label: BabelBrain backend}
   elastic:            {label: Elastic skull model}
   time_reversal:      {label: Time reversal, advanced: true}
-  medium_properties:  {label: Medium properties, advanced: true}
+  medium_properties:  {label: Medium properties, advanced: true, locked: true}
 
 fields:
   # ── General ──────────────────────────────────────────────────────────
@@ -215,6 +215,7 @@ fields:
   placement.plantus.focal_distance_list: {kind: numbers, unit: mm}
   placement.plantus.flhm_list: {kind: numbers, unit: mm}
   placement.plantus.max_angle_deg: {unit: deg}
+  placement.plantus.interactive: {choices: [0, 1]}
 
   # ── Grid ─────────────────────────────────────────────────────────────
   grid.resolution_mm: {unit: mm}
@@ -846,6 +847,7 @@ display:
   placement.plantus.weight_skull_thickness: {label: "Weight: skull thickness"}
   placement.plantus.save_metrics: {label: Save per-vertex metrics, advanced: true}
   placement.plantus.evaluate: {label: Evaluate the placement, advanced: true}
+  placement.plantus.interactive: {label: Choose the vertex in Workbench, help: "1: pick the transducer position on PlanTUS's maps in Connectome Workbench and confirm it in a review dialog; 0: take the composite-score optimum. Not set: follow simulation.interactive. Run PlanTUS on this card uses 1."}
   placement.plantus.connectome_wb_path: {label: Connectome Workbench bin folder, advanced: true}
   placement.tus_entry: {label: TUS_entry}
   placement.tus_entry.*: {advanced: true}

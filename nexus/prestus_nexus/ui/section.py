@@ -58,7 +58,7 @@ class SectionPage(QFrame):
     advanced_toggled = pyqtSignal()     # the card's own 'advanced' button was used
 
     def __init__(self, model: ConfigModel, section: str, nodes: list[Node],
-                 title: str, parent: QWidget | None = None, subtitle: str = ""):
+                 title: str, parent: QWidget | None = None, subtitle: str = "", locked: bool = False):
         super().__init__(parent)
         self.setObjectName("Card")
         self.model = model
@@ -66,6 +66,7 @@ class SectionPage(QFrame):
         self.ti = 0
         self.show_advanced = False
         self.goal: str | None = None        # 'Tune for' goal: its keys are shown even when advanced
+        self.locked = locked                # read-only until unlocked (overlay 'locked')
         self.rows: list[_Row] = []
         self.groups: list[tuple[Node, QFrame]] = []
         self._top_rows: list[_Row] = []
@@ -86,6 +87,10 @@ class SectionPage(QFrame):
                                    "leave at their defaults.")
         self.adv_button.clicked.connect(self._toggle_card_advanced)
         head.addWidget(self.adv_button)
+        self.lock_button = QToolButton()
+        self.lock_button.clicked.connect(self._toggle_lock)
+        self.lock_button.setVisible(locked)
+        head.addWidget(self.lock_button)
         self.toggle = QToolButton(text="Hide")
         self.toggle.setToolTip("Collapse / expand")
         self.toggle.clicked.connect(self._toggle_body)
@@ -263,6 +268,20 @@ class SectionPage(QFrame):
         self.refresh()
         self.changed.emit()
 
+    def _toggle_lock(self) -> None:
+        if self.locked:
+            answer = QMessageBox.warning(
+                self, f"Unlock {self.title.text()}",
+                "These are the acoustic medium property values that simulated pressures and "
+                "temperatures depend on. Change them only for a documented reason (e.g. a sensitivity "
+                "analysis) and always report the values you used.\n\nUnlock for editing?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel)
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        self.locked = not self.locked
+        self.refresh()
+
     # ── visibility ──────────────────────────────────────────────────────
     def set_show_advanced(self, show: bool) -> None:
         self.show_advanced = show
@@ -365,18 +384,23 @@ class SectionPage(QFrame):
                 name = labels.label(row.node)
                 tags = self._tune_tags(row.node)
                 if self.model.is_modified(path, ti):
-                    row.label.setText(f"<b>{name}</b> <span style='color:#1f6fb2'>●</span>{tags}")
+                    row.label.setText(f"<b>{name}</b> <span style='color:{style.active()['accent']}'>●</span>{tags}")
                 elif self.model.from_library(path, ti):
-                    row.label.setText(f"{name} <span style='color:#9aa7b4'>· from library</span>{tags}")
+                    row.label.setText(f"{name} <span style='color:{style.active()['ink4']}'>· from library</span>{tags}")
                 else:
                     row.label.setText(f"{name}{tags}")
                 row.reset.setVisible(self.model.is_overridden(path, ti))
+                row.editor.setEnabled(not row.node.derived and not self.locked)
+                row.reset.setEnabled(not self.locked)
         walk(self._top_rows, self._top_groups)
         n_set = sum(1 for r in self.rows if self.model.is_overridden(r.node.path, self._ti_for(r.node)))
         self.count.setText(f"· {n_set} set" if n_set else "")
         n_hidden = self.hidden_advanced()
         self.adv_button.setVisible(n_hidden > 0 or (self.show_advanced and bool(self._advanced_rows())))
         self.adv_button.setText("Hide advanced" if self.show_advanced else f"+ {n_hidden} advanced")
+        self.lock_button.setText("🔒 Unlock" if self.locked else "Lock")
+        self.lock_button.setToolTip("Read-only: defaults most studies should not change. Click to edit."
+                                    if self.locked else "Make this card read-only again.")
 
     def focus_key(self, path: str, ti: int | None = None) -> None:
         """Scroll to (and focus) the row for a key; reveals advanced fields if needed."""

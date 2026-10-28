@@ -392,6 +392,9 @@ class Schema:
     def section_is_advanced(self, section: str) -> bool:
         return bool(self.sections.get(section, {}).get("advanced", False))
 
+    def section_is_locked(self, section: str) -> bool:
+        return bool(self.sections.get(section, {}).get("locked", False))
+
     def tune_label(self, goal: str) -> str:
         return self.tune_goals.get(goal, {}).get("label", goal.capitalize())
 

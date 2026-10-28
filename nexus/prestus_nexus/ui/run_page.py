@@ -478,7 +478,8 @@ class RunPage(QWidget):
             return
         if self.model.get("simulation.interactive") == 1:
             QMessageBox.warning(self, "Run", "simulation.interactive needs the MATLAB desktop; "
-                                "set it to 0 or run the launcher from MATLAB.")
+                                "set it to 0 or run the launcher from MATLAB. To choose a PlanTUS "
+                                "position in Workbench, set placement.plantus.interactive instead.")
             return
         path = self.write_launcher()
         if path is None or not self._ready():
