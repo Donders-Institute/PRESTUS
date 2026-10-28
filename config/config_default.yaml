@@ -460,6 +460,7 @@ grid:
                       #   For axisymmetric mode the radial dimension uses the WSWA variant.
                       # Integer (e.g. 20): fixed thickness; may slow FFT if grid_N + 2*pml_size
                       #   has large prime factors.
+  water_baseline_grid: 'beam' # Grid of the k-Wave free-water baseline: 'beam' (box around the source and beam: same free-field result, a fraction of the cost) | 'full' (the whole simulation grid)
   source_ppw: []      # Points Per Wavelength [default: calculated internally]
   min_ppw: 6          # Minimum acceptable PPW at the fundamental frequency; triggers a warning if violated
   source_cfl: 0.15    # Courant-Friedrichs-Lewy fraction

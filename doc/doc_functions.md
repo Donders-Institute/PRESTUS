@@ -135,6 +135,7 @@ The following documents the functions provided in PRESTUS.
 | `update_transducer_library`             | Add depth-specific refinements to a library YAML |
 | `validate_transducer_library`           | Validate calibration library against equipment configs |
 | `water_baseline`                        | Measure free-water ISPPA at the current source amplitude |
+| `water_baseline_box`                    | Grid, source and sensor of the free-water baseline cropped to the beam |
 | `write_axial_profiles`                  | Write axial profiles as a profile CSV plus YAML sidecar |
 
 #### CORE

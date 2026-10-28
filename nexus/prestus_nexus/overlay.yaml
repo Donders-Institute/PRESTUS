@@ -256,6 +256,8 @@ fields:
   jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
   time_reversal.placement_search.standoff_mm: {kind: yaml, unit: mm}
   time_reversal.placement_search.jitter_mm: {kind: yaml, unit: mm}
+  time_reversal.placement_search.jitter_mode: {kind: str, choices: [grid, scalp]}
+  grid.water_baseline_grid: {kind: str, choices: [beam, full]}
   time_reversal.pose_workflow.poses: {kind: yaml, help: "Pose ids of the pose table to verify as well, e.g. [12, 40]."}
   time_reversal.pose_workflow.aim: {kind: str, choices: [corrected, geometric, both]}
   time_reversal.pose_workflow.verify_fov: {kind: str, choices: [partial, full, config]}

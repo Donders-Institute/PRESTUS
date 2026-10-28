@@ -1,7 +1,8 @@
 function [freefield_isppa_wcm2, freefield_axial] = water_baseline(parameters, kgrid, source, sensor, source_labels)
 % WATER_BASELINE  Measure free-water ISPPA at the current source amplitude
 %
-% Runs a fast homogeneous water simulation using the current grid, source,
+% Runs a fast homogeneous water simulation using the current grid (k-Wave:
+% cropped to the source and beam, grid.water_baseline_grid), source,
 % and sensor, and returns the peak free-water ISPPA [W/cm²] at the focal
 % sensor. This value is stored as provenance alongside the cached acoustic
 % results so that any target_isppa_wcm2 can later be achieved by post-hoc
@@ -78,6 +79,14 @@ end
         sensor_data_baseline = jwave_wrapper(bp, kgrid, water_medium, source, source_labels);
     else
         %% k-Wave baseline path (default)
+        % grid.water_baseline_grid 'beam' (default): only the box around the
+        % source and the beam (WATER_BASELINE_BOX); in water nothing outside
+        % it reflects back, so the free-field result is the same
+        box_offset = zeros(1, kgrid.dim);
+        if ~isfield(parameters.grid, 'water_baseline_grid') || isempty(parameters.grid.water_baseline_grid) || ...
+                strcmpi(char(parameters.grid.water_baseline_grid), 'beam')
+            [kgrid, source, sensor, box_offset] = water_baseline_box(parameters, kgrid, source, sensor);
+        end
         pml_range = [];
         if isfield(parameters.grid, 'pml_size_range'); pml_range = parameters.grid.pml_size_range; end
         input_args = struct( ...
@@ -120,13 +129,14 @@ end
     % on the grid frame (axisymmetric grid or acoustic FOV crop).
     freefield_axial = struct('axial_distance_bowl', {}, 'axial_intensity', {});
     I_water = double(gather(sensor_data_baseline.p_max_all)).^2 / (2 * rho * c) * 1e-4;
+    if ~exist('box_offset', 'var'), box_offset = 0; end   % jwave: full grid
     for ti = 1:numel(parameters.transducer)
         freefield_axial(ti).axial_distance_bowl = [];
         freefield_axial(ti).axial_intensity     = [];
         try
             [freefield_axial(ti).axial_distance_bowl, freefield_axial(ti).axial_intensity] = ...
-                sample_beam_axis(I_water, parameters.transducer(ti).trans_pos, ...
-                                 parameters.transducer(ti).focus_pos, parameters.grid.resolution_mm);
+                sample_beam_axis(I_water, parameters.transducer(ti).trans_pos(:)' - box_offset, ...
+                                 parameters.transducer(ti).focus_pos(:)' - box_offset, parameters.grid.resolution_mm);
         catch ME
             warning('water_baseline:axialProfile', ...
                 'water_baseline: axial profile not extracted for transducer %d (%s).', ti, ME.message);

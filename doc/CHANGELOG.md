@@ -118,6 +118,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - `thermal.absorption_model: coefficient` sets heat deposition from per-tissue `medium_properties.*.absorption_coeff` instead of `absorption_fraction` (default stays `fraction`)
 - Partial acoustic FOV along the beam axis (`grid.acoustic_fov_length_mm`, `grid.acoustic_fov_diameter_mm`, `'auto'` from focal geometry) for deep targets; the thermal grid can match it (`thermal.match_acoustic_fov`)
 - Free-water grid `'auto'` sizing (`grid.water_margin_mm`, `grid.z_beyond_focus_mm`); matrix transducers placed by `trans_pos` / `focus_pos` keep `[144, 144, 400]`
+- `grid.water_baseline_grid: 'beam'` (default) runs the k-Wave free-water baseline on a box around the source and beam: the same free-field result at a fraction of the cost; `'full'` uses the whole grid
 - Time axis and steady state configurable: `grid.steady_state_transits`, `grid.steady_state_num_periods`, `grid.source_ppp`, `grid.sim_time_us`; PML and band-limiting options `grid.pml_size_range`, `grid.pml_alpha`, `grid.bli_tolerance`, `grid.bli_upsampling_rate`
 - Lower memory use for CW sources on `matlab_cpu` / `matlab_gpu`, also on axisymmetric grids
 - Axial-profile plot with tissue bands and the free-water O'Neil and k-Wave profiles; CSV gains `freewater_oneil_Wcm2` / `freewater_kwave_Wcm2`
