@@ -93,6 +93,17 @@ function tr = validate_annular_transducer(tr, t_i)
         annular_tr.elem_phase_deg = rad2deg(annular_tr.elem_phase_rad);
     elseif ~isfield(annular_tr, 'elem_phase_rad') && ~isfield(annular_tr, 'elem_phase_deg')
         error('Transducer %i; Phase must be specified as elem_phase_rad or elem_phase_deg.', t_i);
+    elseif ~isempty(annular_tr.elem_phase_deg) && isnumeric(annular_tr.elem_phase_deg) && ...
+            isnumeric(annular_tr.elem_phase_rad) && ...
+            (numel(annular_tr.elem_phase_rad) ~= numel(annular_tr.elem_phase_deg) || ...
+             any(abs(angle(exp(1i * (annular_tr.elem_phase_rad(:) - deg2rad(annular_tr.elem_phase_deg(:)))))) > 1e-6))
+        % Both set and different (e.g. elem_phase_deg changed after loading,
+        % leaving the derived elem_phase_rad stale): the source uses
+        % elem_phase_rad, so make it follow elem_phase_deg
+        warning('prestus:phaseMismatch', ...
+            ['Transducer %i; elem_phase_rad does not match elem_phase_deg; using elem_phase_deg. ' ...
+             'Set one of them, or both consistently.'], t_i);
+        annular_tr.elem_phase_rad = deg2rad(annular_tr.elem_phase_deg);
     end 
 
     % Backward-compatibility shim: rename deprecated elem_amp → elem_p_amp

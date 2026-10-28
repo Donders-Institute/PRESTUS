@@ -24,7 +24,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
     matrix_tr = tr.matrix;
 
     fprintf('Matrix transducer detected. Using kWaveArray (set to 1).\n');
-    parameters.use_kWaveArray = 1;
+    parameters.grid.use_kWaveArray = 1;
 
     % ---------------------------------------------------------------------
     % Steering configuration

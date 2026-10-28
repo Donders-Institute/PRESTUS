@@ -64,6 +64,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** calibration files (`*-F*mm-I*wpercm2.yaml`) recorded the default `target_isppa_wcm2` instead of their calibrated intensity, so a config built from one was rescaled to 30 W/cm². Set `target_isppa_wcm2` in configs built from older calibration files
 
 #### Transducers & sources
+- ⚠️ **Fixed:** matrix transducers with `grid.use_kWaveArray: 0` were not switched to the kWaveArray source as logged; rerun them
+- `elem_phase_deg` and `elem_phase_rad` that disagree warn (`prestus:phaseMismatch`); the source follows `elem_phase_deg`
 - Flat annular elements (`transducer.annular.curv_radius_mm: .inf`), kWaveArray source only
 - Matrix arrays: `matrix_shape.extract_from_file.rot_col` (per-element rotation), `matrix.elem_diameter_mm`, `matrix.elem_phase_override_deg`; Clover layouts with any number of leaves
 - ⚠️ **Changed:** Clover leaves are `clover.az_sep_deg` apart (default `360 / n_leaves`; was always 120°) and tilted by `clover.elevation_deg`; 1- and 2-leaf Clover layouts change
