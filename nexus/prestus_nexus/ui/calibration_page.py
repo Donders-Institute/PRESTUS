@@ -12,16 +12,20 @@ import datetime as _dt
 import math
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt, QTimer
+from PyQt6.QtGui import QFontDatabase
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-                             QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton,
-                             QScrollArea, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem,
-                             QToolButton, QVBoxLayout, QWidget)
+                             QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                             QListWidget, QListWidgetItem, QMenu, QMessageBox, QPlainTextEdit,
+                             QPushButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
+                             QStackedWidget, QTableWidget, QTableWidgetItem, QToolButton,
+                             QVBoxLayout, QWidget)
 
 from .. import calibration as cal
 from ..bridge import BridgeError, as_columns, as_floats, as_list
 from ..model import TX, is_empty
+from . import calibration_plots as cplots
+from . import style
 from .matlab_status import MatlabStatus
 
 try:
@@ -38,60 +42,163 @@ PROFILE_LINES = [("measured", "-", "Hydrophone"), ("interpolated", "--", "Interp
 
 
 class AdvancedDialog(QDialog):
-    """Advanced FIT_TRANSDUCER_MODEL options; only values that differ from the defaults are kept."""
+    """Advanced options, as "Advanced…" in calibration_gui.m: FIT_TRANSDUCER_MODEL options, the
+    desired-profile tolerance and the k-Wave drive calibration. Only values that differ from the
+    defaults are kept. "Start from preset" loads a calibration_fit_options preset; the page then
+    also applies its main-panel values (preset())."""
 
-    def __init__(self, current: dict, parent=None):
+    def __init__(self, current: dict, extra: dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Advanced fit options")
-        cur = dict(cal.ADVANCED_DEFAULTS, **current)
-        form = QFormLayout(self)
+        outer = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        body = QWidget()
+        form = QFormLayout(body)
+        scroll.setWidget(body)
+        outer.addWidget(scroll)
+        self.resize(480, 700)
+
+        self.pre = QComboBox()
+        self.pre.addItems(["(current settings)", *cal.PRESETS])
+        self.pre.setToolTip("calibration_fit_options preset: sets the main panel (free parameters, forward "
+                            "model, loss, near-field skip) and these options to the preset's values")
+        self.pre.currentTextChanged.connect(self._load_preset)
+        form.addRow("Start from preset", self.pre)
+        form.addRow(_header("Phase model"))
         self.pc = QComboBox()
         self.pc.addItems(["none", "linear", "monotonic"])
-        self.pc.setCurrentText(str(cur["PhaseConstraint"]))
         form.addRow("Phase constraint", self.pc)
-        self.sb = QLineEdit(_pair_text(cur["PhaseStepBounds"]))
+        self.sb = QLineEdit()
         self.sb.setPlaceholderText("lo, hi (rad); blank = default")
         form.addRow("Phase step bounds", self.sb)
-        self.lam = _spin(cur["Lambda"], 0, 100, 6)
+        self.lam = _spin(0, 0, 100, 6)
+        self.lam.setToolTip("Lambda: pull of the phase offsets towards geometric steering")
         form.addRow("Phase prior λ", self.lam)
-        self.lama = _spin(cur["LambdaAmp"], 0, 100, 6)
+        self.lama = _spin(0, 0, 100, 6)
+        self.lama.setToolTip("LambdaAmp: pull of the log ring gains towards equal gains")
         form.addRow("Gain prior λ", self.lama)
+        form.addRow(_header("Gains"))
+        self.ab = QLineEdit()
+        self.ab.setToolTip("AmpBounds: bounds on each ring gain relative to the prior")
+        form.addRow("Gain bounds (× prior)", self.ab)
+        self.pg = QLineEdit()
+        self.pg.setToolTip("PlausibleGain: gains outside (× mean) are flagged as a possible hardware fault")
+        form.addRow("Plausible gain (flag only)", self.pg)
+        form.addRow(_header("Amplitude and loss"))
         self.af = QComboBox()
         self.af.addItems(["shape", "absolute"])
-        self.af.setCurrentText(str(cur["AmplitudeFit"]))
         form.addRow("Amplitude fit", self.af)
         self.sv = QCheckBox("one drive for all depths (absolute)")
-        self.sv.setChecked(bool(cur["SharedVelocity"]))
         form.addRow("", self.sv)
-        self.fw = _spin(cur["FocalWeight"], 0, 1000, 3)
+        self.fw = _spin(0, 0, 1000, 3)
         form.addRow("Focal weight (0 = uniform)", self.fw)
-        self.win = QLineEdit(_pair_text(cur["FitWindowMm"]))
+        self.win = QLineEdit()
         self.win.setPlaceholderText("lo, hi (mm from EP); blank = all")
         form.addRow("Fit window", self.win)
-        self.zb = QLineEdit(_pair_text(cur["ZShiftBounds"]))
-        form.addRow("z shift bounds (mm)", self.zb)
+        form.addRow(_header("Near field"))
+        self.nfp = _spin(0, 0, 1000, 3)
+        self.nfp.setToolTip("NearFieldPenalty: penalises model near-field intensity above the measured near "
+                            "field (from 'From' to the near-field skip); 0 = off")
+        form.addRow("Near-field penalty", self.nfp)
+        self.nfm = _spin(0, 0, 10, 3)
+        self.nfm.setToolTip("NearFieldMargin: excess (× focal peak) tolerated before the penalty applies")
+        form.addRow("Margin (× focal peak)", self.nfm)
+        self.nfz = _spin(0, 0, 50, 1)
+        self.nfz.setSuffix(" mm")
+        self.nfz.setToolTip("NearFieldMinMm: start of the penalised near field (from the exit plane)")
+        form.addRow("From", self.nfz)
+        form.addRow(_header("Medium and optimiser"))
+        self.cw = _spin(1500, 1000, 2000, 1)
+        self.cw.setSuffix(" m/s")
+        form.addRow("Sound speed", self.cw)
+        self.rho = _spin(994, 500, 2000, 1)
+        self.rho.setSuffix(" kg/m³")
+        form.addRow("Density", self.rho)
         self.opt = QComboBox()
         self.opt.addItems(["lsqnonlin", "fexminimize", "globalsearch"])
-        self.opt.setCurrentText(str(cur["Optimizer"]))
         form.addRow("Optimiser", self.opt)
         self.pol = QCheckBox("polish")
-        self.pol.setChecked(bool(cur["Polish"]))
         form.addRow("", self.pol)
-        self.pop = QSpinBox(minimum=10, maximum=100000, value=int(cur["PopSize"]))
+        self.pop = QSpinBox(minimum=10, maximum=100000)
         form.addRow("FEX population", self.pop)
-        self.mfe = QSpinBox(minimum=100, maximum=100000000, value=int(cur["MaxFunEvals"]))
+        self.mfe = QSpinBox(minimum=100, maximum=100000000)
         form.addRow("Max. evaluations", self.mfe)
+        self.seed = QSpinBox(minimum=0, maximum=2**31 - 1)
+        form.addRow("Random seed", self.seed)
+        form.addRow(_header("Desired profiles"))
+        self.tol = _spin(0.01, 0, 10, 3)
+        self.tol.setSuffix(" mm")
+        self.tol.setToolTip("Tolerance: a desired depth this close to a measured one uses the measurement")
+        form.addRow("Same-depth tolerance", self.tol)
+        form.addRow(_header("k-Wave drive check"))
+        self.grid = QLineEdit()
+        self.grid.setPlaceholderText("blank = study config; auto; or nx ny nz")
+        self.grid.setToolTip("GridDims of the free-water grid: 'auto' (sized to the aperture and focus), "
+                             "[nx nz] / [nx ny nz], or blank for the study config's grid")
+        form.addRow("Grid", self.grid)
+        self.apply = QCheckBox("rescale the stored drives to the simulated ISPPA")
+        self.apply.setToolTip("ApplyCorrection; off: report only")
+        form.addRow("", self.apply)
         box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
                                | QDialogButtonBox.StandardButton.Reset)
         box.accepted.connect(self.accept)
         box.rejected.connect(self.reject)
         box.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self._reset)
-        form.addRow(box)
+        outer.addWidget(box)
         self._reset_all = False
+        self._fill(dict(cal.ADVANCED_DEFAULTS, **current), dict(cal.EXTRA_DEFAULTS, **extra))
+
+    def _fill(self, cur: dict, ext: dict) -> None:
+        self.pc.setCurrentText(str(cur["PhaseConstraint"]))
+        self.sb.setText(_pair_text(cur["PhaseStepBounds"]))
+        self.lam.setValue(float(cur["Lambda"]))
+        self.lama.setValue(float(cur["LambdaAmp"]))
+        self.ab.setText(_pair_text(cur["AmpBounds"]))
+        self.pg.setText(_pair_text(cur["PlausibleGain"]))
+        self.af.setCurrentText(str(cur["AmplitudeFit"]))
+        self.sv.setChecked(bool(cur["SharedVelocity"]))
+        self.fw.setValue(float(cur["FocalWeight"]))
+        self.win.setText(_pair_text(cur["FitWindowMm"]))
+        self.nfp.setValue(float(cur["NearFieldPenalty"]))
+        self.nfm.setValue(float(cur["NearFieldMargin"]))
+        self.nfz.setValue(float(cur["NearFieldMinMm"]))
+        self.cw.setValue(float(cur["CWater"]))
+        self.rho.setValue(float(cur["Rho"]))
+        self.opt.setCurrentText(str(cur["Optimizer"]))
+        self.pol.setChecked(bool(cur["Polish"]))
+        self.pop.setValue(int(cur["PopSize"]))
+        self.mfe.setValue(int(cur["MaxFunEvals"]))
+        self.seed.setValue(int(cur["Seed"]))
+        self.tol.setValue(float(ext["Tolerance"]))
+        g = ext["GridDims"]
+        self.grid.setText(" ".join(f"{float(x):g}" for x in g) if isinstance(g, (list, tuple)) else str(g or ""))
+        self.apply.setChecked(bool(ext["ApplyCorrection"]))
+
+    def _load_preset(self, name: str) -> None:
+        if name not in cal.PRESETS:
+            return
+        p = cal.PRESETS[name]
+        self._fill(dict(cal.ADVANCED_DEFAULTS, **{k: v for k, v in p.items() if k in cal.ADVANCED_DEFAULTS}),
+                   dict(cal.EXTRA_DEFAULTS, **self.extra()))
+
+    def preset(self) -> dict | None:
+        """The preset chosen in this dialog (its main-panel values apply too), or None."""
+        return None if self._reset_all else cal.PRESETS.get(self.pre.currentText())
 
     def _reset(self) -> None:
         self._reset_all = True
         self.accept()
+
+    def grid_dims(self):
+        t = self.grid.text().strip()
+        if not t or t == "auto":
+            return t
+        try:
+            v = [int(float(x)) for x in t.replace(",", " ").replace("[", " ").replace("]", " ").split()]
+        except ValueError:
+            return None
+        return v if len(v) in (2, 3) else None
 
     def values(self) -> dict:
         if self._reset_all:
@@ -102,8 +209,151 @@ class AdvancedDialog(QDialog):
              "MaxFunEvals": self.mfe.value(), "Polish": self.pol.isChecked(),
              "FocalWeight": self.fw.value(), "FitWindowMm": _pair(self.win.text()),
              "Lambda": self.lam.value(), "LambdaAmp": self.lama.value(),
-             "ZShiftBounds": _pair(self.zb.text()) or [-3, 3]}
-        return {k: x for k, x in v.items() if not cal._same(x, cal.ADVANCED_DEFAULTS[k])}
+             "AmpBounds": _pair(self.ab.text()) or cal.ADVANCED_DEFAULTS["AmpBounds"],
+             "PlausibleGain": _pair(self.pg.text()) or cal.ADVANCED_DEFAULTS["PlausibleGain"],
+             "NearFieldPenalty": self.nfp.value(), "NearFieldMargin": self.nfm.value(),
+             "NearFieldMinMm": self.nfz.value(), "CWater": self.cw.value(), "Rho": self.rho.value(),
+             "Seed": self.seed.value()}
+        return cal.non_default(v, cal.ADVANCED_DEFAULTS)
+
+    def extra(self) -> dict:
+        if self._reset_all:
+            return {}
+        g = self.grid_dims()
+        v = {"Tolerance": self.tol.value(), "GridDims": "" if g is None else g,
+             "ApplyCorrection": self.apply.isChecked()}
+        return cal.non_default(v, cal.EXTRA_DEFAULTS)
+
+
+class RingOptionsDialog(QDialog):
+    """fit_ring_profile options and plane scans (read_offaxis_scans), as "Ring profile options" in
+    calibration_gui.m; only values that differ from the defaults are kept."""
+
+    def __init__(self, current: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Ring profile options")
+        cur = dict(cal.RING_DEFAULTS, **current)
+        form = QFormLayout(self)
+        form.addRow(_header("Profile model (used when Ring profile = fit)"))
+        self.nsub = QSpinBox(minimum=1, maximum=32, value=int(cur["NSub"]))
+        form.addRow("Sub-rings per ring", self.nsub)
+        self.sm = _spin(cur["Smooth"], 0, 100, 3)
+        self.sm.setToolTip("Smooth: penalty between neighbouring sub-rings; 0 = none")
+        form.addRow("Smoothness", self.sm)
+        self.skip = _spin(cur["NearFieldSkipMm"], 0, 50, 1)
+        self.skip.setSuffix(" mm")
+        form.addRow("Near-field skip", self.skip)
+        self.ab = QLineEdit(_pair_text(cur["AmpBounds"]))
+        self.ab.setToolTip("AmpBounds: bounds on sub-ring weights and channel gains")
+        form.addRow("Weight bounds", self.ab)
+        form.addRow(_header("Optimiser"))
+        self.it = QSpinBox(minimum=1, maximum=100, value=int(cur["Iterations"]))
+        form.addRow("Alternations", self.it)
+        self.ns = QSpinBox(minimum=1, maximum=200, value=int(cur["NStarts"]))
+        form.addRow("Starts per depth", self.ns)
+        self.seed = QSpinBox(minimum=0, maximum=2**31 - 1, value=int(cur["Seed"]))
+        form.addRow("Random seed", self.seed)
+        self.ho = QCheckBox("leave-one-depth-out check (slower)", checked=bool(cur["HeldOut"]))
+        form.addRow("", self.ho)
+        form.addRow(_header("Plane / volume scans (off-axis data)"))
+        f_row = QHBoxLayout()
+        self.file = QLineEdit(str(cur["OffAxis"] or ""))
+        self.file.setPlaceholderText("blank = axial profiles only")
+        self.file.setToolTip("Sonic Concepts FUS Metrology export (.mat, folder or .zip) or a CSV with "
+                             "focus_ep_mm, x_mm, y_mm, z_ep_mm, intensity_wcm2 (read_offaxis_scans)")
+        f_row.addWidget(self.file, 1)
+        b = QToolButton(text="…")
+        b.clicked.connect(self._browse)
+        f_row.addWidget(b)
+        form.addRow("File", f_row)
+        self.kind = QComboBox()
+        self.kind.addItems(["all", "transverse", "axial", "volume"])
+        self.kind.setCurrentText(str(cur["Kind"]))
+        self.kind.setToolTip("transverse: XY planes; axial: XZ / YZ planes; volume: 3D scans")
+        form.addRow("Scans used", self.kind)
+        self.wt = _spin(cur["Weight"], 0, 100, 2)
+        self.wt.setToolTip("Weight of each plane relative to one axial profile")
+        form.addRow("Weight per plane", self.wt)
+        self.rmax = _spin(cur["RMaxMm"], 1, 200, 1)
+        self.rmax.setSuffix(" mm")
+        form.addRow("Radial range", self.rmax)
+        self.bin = _spin(cur["BinMm"], 0.05, 10, 2)
+        self.bin.setSuffix(" mm")
+        form.addRow("Radial bin", self.bin)
+        self.zbin = _spin(cur["ZBinMm"], 0.05, 10, 2)
+        self.zbin.setSuffix(" mm")
+        self.zbin.setToolTip("Axial bin of XZ / YZ planes and volumes: coarser = faster")
+        form.addRow("Axial-plane / volume z bin", self.zbin)
+        self.cen = QComboBox()
+        self.cen.addItems(["origin", "centroid"])
+        self.cen.setCurrentText(str(cur["Centre"]))
+        form.addRow("Transverse / volume centre", self.cen)
+        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+                               | QDialogButtonBox.StandardButton.Reset)
+        box.accepted.connect(self._accept)
+        box.rejected.connect(self.reject)
+        box.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self._reset)
+        form.addRow(box)
+        self._reset_all = False
+
+    def _browse(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Plane scans", self.file.text() or str(Path.home()),
+                                              "Plane scans (*.mat *.zip *.csv)")
+        if path:
+            self.file.setText(path)
+
+    def _accept(self) -> None:
+        f = self.file.text().strip()
+        if f and not Path(f).exists():
+            QMessageBox.warning(self, "Ring profile options", f"Not found: {f}")
+            return
+        self.accept()
+
+    def _reset(self) -> None:
+        self._reset_all = True
+        self.accept()
+
+    def values(self) -> dict:
+        if self._reset_all:
+            return {}
+        v = {"NSub": self.nsub.value(), "Smooth": self.sm.value(), "NearFieldSkipMm": self.skip.value(),
+             "AmpBounds": _pair(self.ab.text()) or cal.RING_DEFAULTS["AmpBounds"],
+             "Iterations": self.it.value(), "NStarts": self.ns.value(), "Seed": self.seed.value(),
+             "HeldOut": self.ho.isChecked(), "OffAxis": self.file.text().strip(),
+             "Kind": self.kind.currentText(), "Weight": self.wt.value(), "RMaxMm": self.rmax.value(),
+             "BinMm": self.bin.value(), "ZBinMm": self.zbin.value(), "Centre": self.cen.currentText()}
+        return cal.non_default(v, cal.RING_DEFAULTS)
+
+
+def _header(text: str) -> QLabel:
+    lab = QLabel(f"<b>{text}</b>")
+    return lab
+
+
+def _step(number: int, title: str, sub: str = "") -> tuple[QFrame, QVBoxLayout]:
+    """A numbered step group of the control column (#SubGroup look from style.py)."""
+    box = QFrame()
+    box.setObjectName("SubGroup")
+    v = QVBoxLayout(box)
+    v.setContentsMargins(10, 8, 10, 10)
+    v.setSpacing(6)
+    head = QLabel(f"{number}&nbsp;&nbsp;{title}" + (f"&nbsp;&nbsp;<span style='font-weight:400'>{sub}</span>"
+                                                     if sub else ""))
+    head.setObjectName("SubGroupTitle")
+    head.setTextFormat(Qt.TextFormat.RichText)
+    v.addWidget(head)
+    return box, v
+
+
+def _form() -> QFormLayout:
+    """A form that wraps a long label above its field instead of widening the column."""
+    f = QFormLayout()
+    f.setContentsMargins(0, 0, 0, 0)
+    f.setHorizontalSpacing(8)
+    f.setVerticalSpacing(6)
+    f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+    f.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+    return f
 
 
 def _spin(value, lo, hi, decimals) -> QDoubleSpinBox:
@@ -125,6 +375,28 @@ def _pair(text: str) -> list[float]:
     return sorted(v) if len(v) == 2 else []
 
 
+def _theme_axes(axes, c: dict) -> None:
+    """Axes, ticks, grid, title and legend in the active palette (light or dark)."""
+    for ax in axes:
+        ax.set_facecolor(c["surface"])
+        ax.tick_params(colors=c["ink3"], labelsize=8)
+        ax.xaxis.label.set_color(c["ink2"])
+        ax.yaxis.label.set_color(c["ink2"])
+        ax.title.set_color(c["ink"])
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        for s in ("left", "bottom"):
+            ax.spines[s].set_color(c["line2"])
+        for line in ax.get_xgridlines() + ax.get_ygridlines():
+            line.set_color(c["line"])
+        leg = ax.get_legend()
+        if leg is not None:
+            leg.get_frame().set_facecolor(c["surface"])
+            leg.get_frame().set_edgecolor(c["line"])
+            for txt in leg.get_texts():
+                txt.set_color(c["ink2"])
+
+
 class CalibrationPage(QWidget):
     def __init__(self, window, parent: QWidget | None = None):
         super().__init__(parent)
@@ -134,24 +406,36 @@ class CalibrationPage(QWidget):
         self.info: dict = {}                   # last 'open' / 'load' answer
         self.view: dict | None = None          # last 'view' / 'fit' answer
         self.advanced: dict = {}
+        self.extra: dict = {}                  # desired-profile tolerance, k-Wave options (non-defaults)
+        self.ring_options: dict = {}           # fit_ring_profile / plane-scan options (non-defaults)
         self.auto_depths: str | None = None    # desired-depths text this page filled in itself
         self.has_fit = False
         self._busy = False
+        # MATLAB starts only on an action that needs it (Load, Predict, Evaluate, Fit, Save,
+        # k-Wave); until then the page works from the library entry read in Python.
+        self._device: tuple[str, str, str] | None = None   # (serial, ds, library_path) shown
+        self._record_from: tuple[str, str] | None = None   # device whose meta.fit settings are applied
+        self.auto_csv: str | None = None       # CSV path this page filled in itself
+        self.entry: dict | None = None         # parsed library entry of the selected device
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 8, 12, 8)
         top = QHBoxLayout()
         top.addWidget(QLabel("Transducer"))
         self.tx = QComboBox()
-        self.tx.setMinimumWidth(340)
-        self.tx.currentIndexChanged.connect(lambda _i: self._open())
+        self.tx.setMinimumWidth(260)
+        self.tx.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.tx.currentIndexChanged.connect(lambda _i: self._select())
         top.addWidget(self.tx)
         self.coverage = QLabel()
         self.coverage.setObjectName("CardSub")
         self.coverage.setWordWrap(True)
         top.addWidget(self.coverage, 1)
-        self.status_widget = MatlabStatus(window.bridge())
+        bridge = window.bridge()
+        self.status_widget = MatlabStatus(bridge)
         top.addWidget(self.status_widget)
+        bridge.state_changed.connect(self._idle_status)     # after MatlabStatus._update
+        self._idle_status(getattr(bridge, "state", ""))
         outer.addLayout(top)
 
         split = QSplitter()
@@ -160,22 +444,39 @@ class CalibrationPage(QWidget):
         split.addWidget(self._results())
         split.setStretchFactor(0, 0)
         split.setStretchFactor(1, 1)
-        split.setSizes([380, 900])
+        split.setCollapsible(0, False)
+        split.setSizes([400, 880])
+        self._entry_timer = QTimer(self, singleShot=True, interval=300)
+        self._entry_timer.timeout.connect(self._draw_entry)
+        self.depths.textChanged.connect(lambda _t: self._entry_timer.start())
+        self._update_buttons()
 
     # ── layout ──────────────────────────────────────────────────────────
     def _controls(self) -> QWidget:
+        """Three numbered steps (Data, Fit, Save); the fit options most users keep at their
+        defaults sit in a collapsed "Fit options" section, the rest under Advanced…"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setMinimumWidth(360)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(340)
         body = QWidget()
-        form = QFormLayout(body)
+        col = QVBoxLayout(body)
+        col.setContentsMargins(0, 0, 6, 0)
+        col.setSpacing(8)
         scroll.setWidget(body)
 
+        # 1 Data
+        box, v = _step(1, "Data", "hydrophone profiles and the depths you need")
+        col.addWidget(box)
+        form = _form()
+        v.addLayout(form)
         csv_row = QHBoxLayout()
         self.csv = QLineEdit()
         self.csv.setPlaceholderText("hydrophone axial-profile CSV")
+        self.csv.textChanged.connect(lambda _t: self._update_buttons())
         csv_row.addWidget(self.csv, 1)
         b = QToolButton(text="…")
+        b.setToolTip("Choose a hydrophone axial-profile CSV")
         b.clicked.connect(self._browse_csv)
         csv_row.addWidget(b)
         self.load_btn = QPushButton("Load")
@@ -184,16 +485,24 @@ class CalibrationPage(QWidget):
         form.addRow("Profile CSV", csv_row)
 
         self.measured = QListWidget()
-        self.measured.setMaximumHeight(120)
-        self.measured.setToolTip("Measured depths to fit (Calibrate at: measured depths)")
-        form.addRow("Fit depths (measured)", self.measured)
+        self.measured.setMaximumHeight(96)
+        self.measured.setFlow(QListWidget.Flow.LeftToRight)
+        self.measured.setWrapping(True)
+        self.measured.setResizeMode(QListWidget.ResizeMode.Adjust)
+        fm = self.measured.fontMetrics()
+        self.measured.setGridSize(QSize(fm.horizontalAdvance("000.00") + 36, fm.height() + 6))
+        self.measured.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.measured.setToolTip("Measured depths to fit (Calibrate at: measured depths); untick to leave "
+                                 "a depth out")
+        form.addRow("Measured depths (mm)", self.measured)
 
         d_row = QHBoxLayout()
         self.depths = QLineEdit()
         self.depths.setPlaceholderText("20:5:60 or 30, 42.5, 50")
         self.depths.setToolTip("Depths from the exit plane")
+        self.depths.textChanged.connect(lambda _t: self._update_buttons())
         d_row.addWidget(self.depths, 1)
-        sd = QPushButton("Study depths")
+        sd = QPushButton("Study")
         sd.setToolTip("The depths this study uses with this device: focal depth settings (config and "
                       "manifest) and the target depth of each placement (exit plane → focus_pos)")
         sd.clicked.connect(self.use_study_depths)
@@ -206,24 +515,42 @@ class CalibrationPage(QWidget):
         d_row.addWidget(self.predict_btn)
         form.addRow("Desired depths (mm)", d_row)
 
-        p_row = QHBoxLayout()
-        self.align = QComboBox()
-        self.align.addItems(["label", "peak"])
-        self.align.setToolTip("Focus alignment when interpolating between measured depths: column "
-                              "focal-depth labels (default) or intensity peaks beyond the near field")
-        p_row.addWidget(self.align)
-        p_row.addWidget(QLabel("extrapolate ≤"))
-        self.extrap = _spin(0, 0, 50, 1)
-        self.extrap.setSuffix(" mm")
-        self.extrap.setToolTip("Desired depths up to this far outside the measured range get the nearest "
-                               "measured profile shifted; 0 = no extrapolation")
-        p_row.addWidget(self.extrap)
-        form.addRow("Desired profiles", p_row)
-
+        # 2 Fit
+        box, v = _step(2, "Fit")
+        col.addWidget(box)
+        form = _form()
+        v.addLayout(form)
         self.calat = QComboBox()
-        self.calat.addItem("Fit depths (measured)", "measured")
+        self.calat.addItem("Measured depths", "measured")
         self.calat.addItem("Desired depths", "desired")
+        self.calat.setToolTip("Fit at the ticked measured depths, or at the desired depths (profiles "
+                              "interpolated from the measured ones)")
         form.addRow("Calibrate at", self.calat)
+        self.isppa = _spin(30, 0.1, 1000, 1)
+        self.isppa.setSuffix(" W/cm²")
+        self.isppa.setToolTip("Reference ISPPA of the stored drives; defaults to transducer.target_isppa_wcm2")
+        form.addRow("Reference ISPPA", self.isppa)
+        a_row = QHBoxLayout()
+        self.fit_btn = QPushButton("Fit")
+        self.fit_btn.setProperty("primary", True)
+        self.fit_btn.clicked.connect(self.fit)
+        a_row.addWidget(self.fit_btn, 1)
+        self.eval_btn = QPushButton("Evaluate")
+        self.eval_btn.setToolTip("Geometric, library and fit at the measured depths (R² against the hydrophone)")
+        self.eval_btn.clicked.connect(self.evaluate_measured)
+        a_row.addWidget(self.eval_btn, 1)
+        self.opt_btn = QToolButton(text="Fit options ▸", checkable=True)
+        self.opt_btn.setToolTip("Ring profile, free parameters, forward model, loss and starts. The defaults "
+                                "suit most transducers.")
+        a_row.addWidget(self.opt_btn)
+        v.addLayout(a_row)
+
+        self.options = QWidget()
+        self.options.setVisible(False)
+        self.opt_btn.toggled.connect(self._toggle_options)
+        v.addWidget(self.options)
+        form = _form()
+        self.options.setLayout(form)
         self.ring = QComboBox()
         self.ring.addItem("keep the entry's", "auto")
         self.ring.addItem("fit (shared by all depths)", "fit")
@@ -232,99 +559,163 @@ class CalibrationPage(QWidget):
             "How each ring vibrates across its width (fit_ring_profile). Fit: every ring split into sub-rings "
             "with weights shared by all measured depths, then phases, gains and drive per depth; the near field "
             "from 4 mm is then fitted too. Improves transducers whose near-field / focal peak ratio uniform rings "
-            "cannot reproduce (e.g. CTX). Fitted on axial profiles only: the off-axis field is not validated.")
-        form.addRow("Ring profile", self.ring)
+            "cannot reproduce (e.g. CTX). Axial profiles alone do not determine the off-axis field: add plane "
+            "scans under Options… where available.")
+        r_row = QHBoxLayout()
+        r_row.addWidget(self.ring, 1)
+        self.rpo_btn = QPushButton("Options…")
+        self.rpo_btn.setToolTip("Sub-rings, smoothness, optimiser and plane scans (off-axis data) for the "
+                                "ring-profile fit")
+        self.rpo_btn.clicked.connect(self._ring_options)
+        r_row.addWidget(self.rpo_btn)
+        form.addRow("Ring profile", r_row)
         fp = QHBoxLayout()
         self.fp_phase = QCheckBox("phase", checked=True)
         self.fp_amp = QCheckBox("gain", checked=True)
         for w in (self.fp_phase, self.fp_amp):
             fp.addWidget(w)
+        fp.addStretch(1)
         form.addRow("Free parameters", fp)
         self.fwd = QComboBox()
         self.fwd.addItems(["rayleigh", "oneil"])
         form.addRow("Forward model", self.fwd)
         self.skip = _spin(10, 0, 50, 1)
         self.skip.setSuffix(" mm")
+        self.skip.setToolTip("Profile samples closer to the exit plane than this are left out of the loss")
         form.addRow("Near-field skip", self.skip)
         self.domain = QComboBox()
         self.domain.addItems(["intensity", "amplitude"])
         form.addRow("Loss on", self.domain)
-        self.huber = _spin(0.8, 0.001, 1, 3)
+        self.huber = _spin(0.8, 0.001, 100, 3)
+        self.huber.setToolTip("Pseudo-Huber scale on the peak-normalised profile; large (e.g. 10) = least squares")
         form.addRow("Huber δ", self.huber)
-        st_row = QHBoxLayout()
         self.nstarts = QSpinBox(minimum=1, maximum=200, value=16)
-        st_row.addWidget(self.nstarts)
+        self.nstarts.setToolTip("Random starts per depth")
+        form.addRow("Starts", self.nstarts)
+        p_row = QHBoxLayout()
+        self.align = QComboBox()
+        self.align.addItems(["label", "peak"])
+        self.align.setToolTip("Focus alignment when interpolating between measured depths: column "
+                              "focal-depth labels (default) or intensity peaks beyond the near field")
+        p_row.addWidget(self.align)
+        p_row.addWidget(QLabel("extrap. ≤"))
+        self.extrap = _spin(0, 0, 50, 1)
+        self.extrap.setSuffix(" mm")
+        self.extrap.setToolTip("Desired depths up to this far outside the measured range get the nearest "
+                               "measured profile shifted; 0 = no extrapolation")
+        p_row.addWidget(self.extrap)
+        form.addRow("Interpolation", p_row)
         self.adv_btn = QPushButton("Advanced…")
-        self.adv_btn.setToolTip("Phase constraints, absolute-intensity fit, global optimisers, focal weighting")
+        self.adv_btn.setToolTip("Phase constraints, absolute-intensity fit, global optimisers, focal weighting, "
+                                "near-field penalty, presets")
         self.adv_btn.clicked.connect(self._advanced)
-        st_row.addWidget(self.adv_btn)
-        form.addRow("Starts", st_row)
-        self.isppa = _spin(30, 0.1, 1000, 1)
-        self.isppa.setSuffix(" W/cm²")
-        self.isppa.setToolTip("Reference ISPPA of the stored drives; defaults to transducer.target_isppa_wcm2")
-        form.addRow("Reference ISPPA", self.isppa)
+        form.addRow("", self.adv_btn)
 
-        a_row = QHBoxLayout()
-        self.eval_btn = QPushButton("Evaluate measured")
-        self.eval_btn.setToolTip("Geometric, library and fit at the measured depths (R² against the hydrophone)")
-        self.eval_btn.clicked.connect(self.evaluate_measured)
-        a_row.addWidget(self.eval_btn)
-        self.fit_btn = QPushButton("Fit")
-        self.fit_btn.setProperty("primary", True)
-        self.fit_btn.clicked.connect(self.fit)
-        a_row.addWidget(self.fit_btn)
-        form.addRow(a_row)
-
+        # 3 Save
+        box, v = _step(3, "Save")
+        col.addWidget(box)
         self.lib_label = QLabel()
         self.lib_label.setWordWrap(True)
         self.lib_label.setObjectName("CardSub")
-        form.addRow("Save to", self.lib_label)
+        self.lib_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        v.addWidget(self.lib_label)
         s_row = QHBoxLayout()
         self.save_btn = QPushButton("Save entry")
-        self.save_btn.setToolTip("Write the fitted entry to transducer.library_path (with meta.fit)")
         self.save_btn.clicked.connect(self.save)
-        s_row.addWidget(self.save_btn)
-        ep = QPushButton("Export profiles…")
-        ep.clicked.connect(self._export_profiles)
-        s_row.addWidget(ep)
-        es = QPushButton("Export settings…")
-        es.clicked.connect(self._export_settings)
-        s_row.addWidget(es)
-        form.addRow(s_row)
-
+        s_row.addWidget(self.save_btn, 1)
+        self.export_btn = QPushButton("Export")
+        menu = QMenu(self.export_btn)
+        menu.addAction("Profiles (CSV)…", self._export_profiles)
+        menu.addAction("Fit settings (CSV)…", self._export_settings)
+        self.export_btn.setMenu(menu)
+        s_row.addWidget(self.export_btn, 1)
+        v.addLayout(s_row)
         k_row = QHBoxLayout()
+        self.kw_btn = QPushButton("k-Wave drive check…")
+        self.kw_btn.clicked.connect(self.kwave_check)
+        k_row.addWidget(self.kw_btn, 1)
         self.kw_grid = QComboBox()
         self.kw_grid.addItems(["3D", "axisymmetric"])
         self.kw_grid.setToolTip("Free-water grid, unless the study config sets grid.axisymmetric")
         k_row.addWidget(self.kw_grid)
-        self.kw_btn = QPushButton("k-Wave drive check…")
-        self.kw_btn.setToolTip("Per-depth fits: simulate each refined depth in free-water k-Wave with the "
-                               "study config's grid and platform, correct the drive to the simulated ISPPA "
-                               "and save the entry. Runs on the Run tab (minutes per depth).")
-        self.kw_btn.clicked.connect(self.kwave_check)
-        k_row.addWidget(self.kw_btn)
-        form.addRow("k-Wave", k_row)
+        v.addLayout(k_row)
+        self._tips = {
+            self.load_btn: "Read the profiles in MATLAB (starts MATLAB on first use)",
+            self.predict_btn: self.predict_btn.toolTip(),
+            self.eval_btn: self.eval_btn.toolTip(),
+            self.fit_btn: "Fit phases, gains and drive per depth to the hydrophone profiles",
+            self.save_btn: "Write the fitted entry to transducer.library_path (with meta.fit)",
+            self.export_btn: "Export the shown profiles or the fit settings as CSV",
+            self.kw_btn: "Per-depth fits: simulate each refined depth in free-water k-Wave with the "
+                         "study config's grid and platform, correct the drive to the simulated ISPPA "
+                         "and save the entry. Runs on the Run tab (minutes per depth).",
+        }
 
         self.log = QPlainTextEdit(readOnly=True)
-        self.log.setMinimumHeight(140)
-        form.addRow(self.log)
+        self.log.setMinimumHeight(110)
+        self.log.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+        self.log.setPlaceholderText("Messages from the calibration steps appear here.")
+        col.addWidget(self.log, 1)
         return scroll
 
+    def _toggle_options(self, on: bool) -> None:
+        self.options.setVisible(on)
+        self.opt_btn.setText("Fit options ▾" if on else "Fit options ▸")
+
     def _results(self) -> QWidget:
+        """Two views: the library entry (CalibrationCoverage, no MATLAB needed) and, once
+        MATLAB has answered, the profiles with a clickable per-depth R² strip."""
         w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        h = QHBoxLayout()
-        h.addWidget(QLabel("Show depth"))
-        self.show_depth = QComboBox()
-        self.show_depth.currentIndexChanged.connect(lambda _i: self._draw())
-        h.addWidget(self.show_depth)
-        h.addStretch(1)
-        v.addLayout(h)
+        outer = QVBoxLayout(w)
+        outer.setContentsMargins(0, 0, 0, 0)
+        bar = QHBoxLayout()
+        bar.setSpacing(0)
+        self.view_btns: dict[str, QToolButton] = {}
+        for key, text, tip in (("entry", "Library entry", "What the current library entry holds (no MATLAB)"),
+                               ("profiles", "Profiles", "Models against the hydrophone profiles (MATLAB)")):
+            b = QToolButton(text=text, checkable=True)
+            b.setToolTip(tip)
+            b.clicked.connect(lambda _c, k=key: self._show_view(k))
+            bar.addWidget(b)
+            self.view_btns[key] = b
+        bar.addSpacing(12)
+        self.depth_label = QLabel("Show depth")
+        bar.addWidget(self.depth_label)
+        self.show_depth = QComboBox()                   # kept in sync with the R² strip (hidden)
+        self.show_depth.currentIndexChanged.connect(lambda _i: self._depth_changed())
+        bar.addWidget(self.show_depth)
+        self.depth_label.hide()
+        self.show_depth.hide()
+        bar.addStretch(1)
+        outer.addLayout(bar)
+
+        self.views = QStackedWidget()
+        outer.addWidget(self.views, 1)
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 6, 0, 0)
+        self.hint = QLabel()
+        self.hint.setWordWrap(True)
+        self.hint.setObjectName("TabIntro")
+        v.addWidget(self.hint)
+        self.entry_plot = cplots.CalibrationCoverage(height=300)
+        v.addWidget(self.entry_plot, 1)
+        self.views.addWidget(page)
+
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 6, 0, 0)
+        self.strip_title = QLabel()
+        self.strip_title.setObjectName("CardSub")
+        v.addWidget(self.strip_title)
+        self.strip = cplots.R2Strip()
+        self.strip.selected.connect(self._strip_selected)
+        v.addWidget(self.strip)
         if FigureCanvasQTAgg is not None:
             self.fig = Figure(figsize=(7, 6), layout="constrained")
             self.ax_prof, self.ax_r2 = self.fig.subplots(2, 1, height_ratios=[1.3, 1])
             self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             v.addWidget(self.canvas, 3)
         else:
             self.fig = self.canvas = None
@@ -332,7 +723,79 @@ class CalibrationPage(QWidget):
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         v.addWidget(self.table, 1)
+        self.views.addWidget(page)
+        self._restyle_views()
+        self._show_view("entry")
         return w
+
+    def _restyle_views(self) -> None:
+        css = cplots._segmented_css(style.active())
+        keys = list(self.view_btns)
+        for i, k in enumerate(keys):
+            r = "border-top-left-radius: 5px; border-bottom-left-radius: 5px;" if i == 0 else \
+                "border-top-right-radius: 5px; border-bottom-right-radius: 5px;"
+            self.view_btns[k].setStyleSheet(css.replace("border-radius: 0;", "border-radius: 0; " + r))
+
+    def _show_view(self, key: str) -> None:
+        if key == "profiles" and self.view is None:
+            key = "entry"
+        self.views.setCurrentIndex(0 if key == "entry" else 1)
+        for k, b in self.view_btns.items():
+            b.setChecked(k == key)
+        self.view_btns["profiles"].setEnabled(self.view is not None)
+        self.view_btns["profiles"].setToolTip(
+            "Models against the hydrophone profiles" if self.view is not None else
+            "Available after Predict, Evaluate or Fit (they start MATLAB)")
+
+    def _depth_changed(self) -> None:
+        sel = self.show_depth.currentText()
+        try:
+            self.strip.select(None if sel in ("All depths", "") else float(sel))
+        except ValueError:
+            pass
+        self._draw()
+
+    def _strip_selected(self, depth: float) -> None:
+        if math.isnan(depth):
+            i = self.show_depth.findText("All depths")
+        else:
+            i = next((j for j in range(self.show_depth.count())
+                      if self.show_depth.itemText(j) not in ("All depths", "")
+                      and abs(float(self.show_depth.itemText(j)) - depth) < 0.01), -1)
+        if i >= 0:
+            self.show_depth.setCurrentIndex(i)          # draws via _depth_changed
+
+    def _idle_status(self, state: str) -> None:
+        """While MATLAB is off, say which actions start it."""
+        if state == "off":
+            c = style.active()
+            self.status_widget.label.setText(f"<span style='color:{c['ink3']}'>●</span> MATLAB starts when "
+                                             "you load, predict or fit")
+
+    def _update_buttons(self) -> None:
+        """Enable the step buttons for what is possible now; a disabled button says why."""
+        if not hasattr(self, "_tips"):
+            return
+        busy = self._busy
+        has_csv = bool(self.csv.text().strip()) or bool(self.info.get("csv"))
+        has_depths = bool(self.depths.text().strip())
+        why = {
+            self.load_btn: None if has_csv else "Enter or choose a profile CSV first",
+            self.predict_btn: None if has_depths else "Enter desired depths first (or click Study)",
+            self.eval_btn: None if has_csv or has_depths else
+            "Load a hydrophone profile CSV, or enter desired depths to predict",
+            self.fit_btn: None if has_csv else "Load a hydrophone profile CSV first (step 1)",
+            self.save_btn: None if self.has_fit else "Run Fit first: there is nothing to save yet",
+            self.export_btn: None if self.view is not None else
+            "Predict, Evaluate or Fit first: there are no profiles to export yet",
+            self.kw_btn: None if self.has_fit else "Needs a per-depth fit: run Fit first",
+        }
+        for b, reason in why.items():
+            if busy:
+                reason = "MATLAB is working…"
+            b.setEnabled(reason is None)
+            b.setToolTip(self._tips[b] if reason is None else f"{reason}.\n\n{self._tips[b]}")
+        self.tx.setEnabled(not busy)
 
     # ── state ───────────────────────────────────────────────────────────
     @property
@@ -344,9 +807,7 @@ class CalibrationPage(QWidget):
 
     def _set_busy(self, busy: bool, msg: str = "") -> None:
         self._busy = busy
-        for b in (self.load_btn, self.predict_btn, self.eval_btn, self.fit_btn, self.save_btn, self.kw_btn):
-            b.setEnabled(not busy)
-        self.tx.setEnabled(not busy)
+        self._update_buttons()
         if msg:
             self._say(msg)
 
@@ -371,8 +832,9 @@ class CalibrationPage(QWidget):
         return "" if is_empty(lib) else str(lib)
 
     def refresh(self) -> None:
-        """Called when the sub-tab is shown: follow the config's transducers (opens the
-        selected one in MATLAB, once per transducer / driving system / library folder)."""
+        """Called when the sub-tab is shown: follow the config's transducers and show the
+        selected one's library entry. MATLAB is not started here; once a user action has
+        opened the device in MATLAB, a change of the study's depths is predicted again."""
         items = self._transducers()
         keep = self.current()
         self.tx.blockSignals(True)
@@ -387,18 +849,88 @@ class CalibrationPage(QWidget):
                 self.tx.setCurrentIndex(idx)
         self.tx.blockSignals(False)
         lib = self.library_path()
-        self.lib_label.setText(f"<tt>{lib}</tt>" if lib else
-                               "<span style='color:#b8860b'>transducer.library_path is not set: Save "
-                               "asks for a folder and sets it.</span>")
+        self.lib_label.setText(f"Save to <tt>{lib}</tt>" if lib else
+                               f"<span style='color:{style.active()['amber']}'>transducer.library_path is "
+                               "not set: Save asks for a folder and sets it.</span>")
         if not items:
             self.coverage.setText("No transducer from the equipment library in this config "
                                   "(set transducer.serial on the Settings tab).")
+            self._device = None
+            self.entry = None
+            self.entry_plot.set_entry(None, empty_message="No transducer from the equipment library in this "
+                                      "config: set transducer.serial on the Settings tab.")
+            self.hint.setText("")
+            self._show_view("entry")
             return
-        self._open()
+        changed = self._select()                # the config or placement changed the depths
         cur = self.current()
         if not self._busy and cur is not None and self.opened == (cur[1], cur[2], self.library_path()):
-            if self._prefill_depths():          # the config or placement changed since
+            if changed:
                 self.predict()
+
+    def _select(self) -> bool:
+        """The selected device, from the library alone (no MATLAB): its entry, the fit
+        settings recorded in it, its hydrophone CSV and the study's depths. True when the
+        desired depths changed."""
+        cur = self.current()
+        if cur is None:
+            return False
+        key = (cur[1], cur[2], self.library_path())
+        if key != self._device:
+            if self._device is None or self._device[:2] != key[:2]:
+                self.auto_depths = None         # another device: the old depths do not apply
+                self.depths.clear()
+                if self.csv.text().strip() == (self.auto_csv or ""):
+                    self.csv.clear()
+                self.auto_csv = None
+                self.info, self.view, self.has_fit = {}, None, False
+                self.measured.clear()
+                target = self.model.get(f"{TX}.target_isppa_wcm2", cur[0])
+                if isinstance(target, (int, float)) and not isinstance(target, bool) and target > 0:
+                    self.isppa.setValue(float(target))
+            self._device = key
+            self.entry, path = cplots.load_entry(self.model.library, cur[1], cur[2], key[2])
+            meta = (self.entry or {}).get("meta") or {}
+            desc = (f"library entry {path.name} ({meta.get('calibration_type') or '?'}"
+                    f"{', ' + str(meta['last_updated']) if meta.get('last_updated') else ''})"
+                    if path else "no library entry: the geometric model is used")
+            self.coverage.setText(f"<b>{cur[1]}{'_' + cur[2] if cur[2] else ''}</b> · {desc}")
+            rec = meta.get("fit")
+            if isinstance(rec, dict) and self._record_from != key[:2]:
+                s, _depths = cal.settings_from_record(rec, self.settings())
+                self.apply_settings(s)
+                self._record_from = key[:2]
+                self._say(f"Fit settings taken from the entry (meta.fit: {rec.get('mode', '')}, "
+                          f"{rec.get('tool', '')}).")
+            csv = cplots.hydrophone_csv(self.entry, self.window.prestus_root)
+            if csv is not None and not self.csv.text().strip():
+                self.csv.setText(str(csv))
+                self.auto_csv = str(csv)
+                if not self.measured.count():
+                    self._fill_measured(cplots.csv_focal_depths(csv))
+            if self.opened is None or self.opened != key:
+                self._show_view("entry")
+        changed = self._prefill_depths()
+        self._draw_entry()
+        self._update_buttons()
+        return changed
+
+    def _draw_entry(self) -> None:
+        """The library entry against the desired depths, and what to do next."""
+        cur = self.current()
+        if cur is None:
+            return
+        depths = cal.parse_depths(self.depths.text()) or []
+        name = f"{cur[1]}{' with ' + cur[2] if cur[2] else ''}"
+        self.entry_plot.set_entry(self.entry, depths, name,
+                                  f"No calibration entry for {name}; the geometric model is used.")
+        if self.csv.text().strip():
+            nxt = ("Next: <b>Evaluate</b> compares the geometric, library and fitted models with the "
+                   "hydrophone profiles; <b>Fit</b> makes a new entry. Both start MATLAB.")
+        else:
+            nxt = ("Load a hydrophone profile CSV (step 1) to fit a new entry, or <b>Predict</b> the "
+                   "profiles at the desired depths (starts MATLAB).")
+        self.hint.setText(nxt)
 
     def _open(self, then=None) -> None:
         cur = self.current()
@@ -407,9 +939,6 @@ class CalibrationPage(QWidget):
         key = (cur[1], cur[2], self.library_path())
         if key == self.opened and then is None:
             return
-        target = self.model.get(f"{TX}.target_isppa_wcm2", cur[0])
-        if isinstance(target, (int, float)) and not isinstance(target, bool) and target > 0:
-            self.isppa.setValue(float(target))
         self._set_busy(True, f"Opening {cur[1]}{' / ' + cur[2] if cur[2] else ''} in MATLAB…")
         self.window.bridge().call(
             "nexus_calibration",
@@ -417,22 +946,33 @@ class CalibrationPage(QWidget):
              "library_path": key[2]},
             on_done=lambda out: self._opened(key, out, then), on_error=self._failed)
 
+    def _ensure_open(self, then) -> bool:
+        """True if the selected device is open in MATLAB; else open it (starting MATLAB) and
+        call then() afterwards."""
+        cur = self.current()
+        if cur is None:
+            return False
+        if self.opened == (cur[1], cur[2], self.library_path()):
+            return True
+        self._open(then=then)
+        return False
+
     def _opened(self, key, out: dict, then=None) -> None:
         self._set_busy(False)
-        if self.opened is None or self.opened[:2] != key[:2]:
-            self.auto_depths = None             # another device: the old depths do not apply
-            self.depths.clear()
         self.opened = key
         self.info = out
         self.has_fit = False
         self.view = None
-        self.csv.setText(out.get("csv") or "")
+        if not self.csv.text().strip() or self.csv.text().strip() == (self.auto_csv or ""):
+            self.csv.setText(out.get("csv") or "")
+            self.auto_csv = out.get("csv") or None
         self._fill_measured()
         entry = (f"library entry {Path(out['library_file']).name} ({out.get('calibration_type') or '?'}"
                  f"{', ' + out['last_updated'] if out.get('last_updated') else ''})"
                  if out.get("library_file") else "no library entry")
         self.coverage.setText(f"<b>{out['combo']}</b> · {entry}")
         self._say(f"{out['combo']}: {entry}")
+        self._update_buttons()
         if out.get("matrix"):
             self._say("Matrix transducer: geometry only. Prediction and fitting support annular arrays.")
             return
@@ -440,10 +980,12 @@ class CalibrationPage(QWidget):
         fallback = as_floats(out.get("default_depths"))
         if isinstance(rec, dict):
             s, depths = cal.settings_from_record(rec, self.settings())
-            self.apply_settings(s)
             fallback = depths or fallback
-            self._say(f"Fit settings taken from the entry (meta.fit: {rec.get('mode', '')}, "
-                      f"{rec.get('tool', '')}).")
+            if self._record_from != key[:2]:    # not yet applied from the YAML in _select
+                self.apply_settings(s)
+                self._record_from = key[:2]
+                self._say(f"Fit settings taken from the entry (meta.fit: {rec.get('mode', '')}, "
+                          f"{rec.get('tool', '')}).")
         self._prefill_depths(fallback)
         if then is not None:
             then()
@@ -452,13 +994,17 @@ class CalibrationPage(QWidget):
         else:
             self.predict()
 
-    def _fill_measured(self) -> None:
+    def _fill_measured(self, depths: list[float] | None = None) -> None:
+        """The measured depths (MATLAB's answer, else depths read from the CSV header); depths
+        the user unticked stay unticked when the same depths come back."""
+        off = {round(self.measured.item(i).data(Qt.ItemDataRole.UserRole), 2) for i in range(self.measured.count())
+               if self.measured.item(i).checkState() != Qt.CheckState.Checked}
         self.measured.clear()
-        for d in as_floats(self.info.get("measured_depths")):
+        for d in (as_floats(self.info.get("measured_depths")) if depths is None else depths):
             it = QListWidgetItem(f"{d:.2f}")
             it.setData(Qt.ItemDataRole.UserRole, d)
             it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            it.setCheckState(Qt.CheckState.Checked)
+            it.setCheckState(Qt.CheckState.Unchecked if round(d, 2) in off else Qt.CheckState.Checked)
             self.measured.addItem(it)
 
     def _manifest(self):
@@ -480,7 +1026,8 @@ class CalibrationPage(QWidget):
             near_field_skip_mm=self.skip.value(), domain=self.domain.currentText(),
             huber_delta=self.huber.value(), n_starts=self.nstarts.value(), isppa_wcm2=self.isppa.value(),
             align=self.align.currentText(), max_extrapolation_mm=self.extrap.value(),
-            calibrate_at=self.calat.currentData(), advanced=dict(self.advanced))
+            calibrate_at=self.calat.currentData(), advanced=dict(self.advanced), extra=dict(self.extra),
+            ring_options=dict(self.ring_options))
 
     def apply_settings(self, s: cal.FitSettings) -> None:
         self.ring.setCurrentIndex(max(0, self.ring.findData(s.ring_profile)))
@@ -496,17 +1043,44 @@ class CalibrationPage(QWidget):
         self.extrap.setValue(s.max_extrapolation_mm)
         self.calat.setCurrentIndex(self.calat.findData(s.calibrate_at))
         self.advanced = dict(s.advanced)
+        self.extra = dict(s.extra)
+        self.ring_options = dict(s.ring_options)
         self._update_advanced_button()
 
     def _advanced(self) -> None:
-        dlg = AdvancedDialog(self.advanced, self)
+        dlg = AdvancedDialog(self.advanced, self.extra, self)
         if dlg.exec():
+            if dlg.grid_dims() is None:
+                self._say("k-Wave grid: enter auto, nx nz or nx ny nz, or leave it blank; grid unchanged.")
+            p = dlg.preset()
+            if p:
+                self.fp_phase.setChecked("phase" in p["FreeParams"])
+                self.fp_amp.setChecked("amp" in p["FreeParams"])
+                self.fwd.setCurrentText(p["ForwardModel"])
+                self.domain.setCurrentText(p["Domain"])
+                self.huber.setValue(float(p["HuberDelta"]))
+                self.skip.setValue(float(p["NearFieldSkipMm"]))
+                self._say(f"Preset {dlg.pre.currentText()} loaded.")
             self.advanced = dlg.values()
+            ex = dlg.extra()
+            if dlg.grid_dims() is None and "GridDims" in self.extra:
+                ex["GridDims"] = self.extra["GridDims"]
+            self.extra = ex
             self._update_advanced_button()
 
+    def _ring_options(self) -> None:
+        dlg = RingOptionsDialog(self.ring_options, self)
+        if dlg.exec():
+            self.ring_options = dlg.values()
+            self._update_advanced_button()
+            if self.ring_options.get("OffAxis") and self.ring.currentData() != "fit":
+                self._say('Plane scans are used when Ring profile is set to "fit".')
+
     def _update_advanced_button(self) -> None:
-        n = len(self.advanced)
+        n = len(self.advanced) + len(self.extra)
         self.adv_btn.setText(f"Advanced ({n})" if n else "Advanced…")
+        n = len(self.ring_options)
+        self.rpo_btn.setText(f"Options ({n})" if n else "Options…")
 
     def _study_depths(self) -> tuple[list[float], str]:
         """Desired depths for the open device from the config, manifest and placement, and
@@ -580,6 +1154,8 @@ class CalibrationPage(QWidget):
         if not csv:
             return
 
+        self.auto_csv = None                    # chosen by the user now: keep it
+
         def loaded(out):
             self.info = out
             self.has_fit = False
@@ -599,12 +1175,16 @@ class CalibrationPage(QWidget):
                             "settings": self.settings().bridge_settings()}, self._show)
 
     def evaluate_measured(self) -> None:
+        if not self._ensure_open(self.evaluate_measured):
+            return
         if not self.info.get("csv"):
             self.predict()
             return
         self._call("view", {"predicted": False, "settings": self.settings().bridge_settings()}, self._show)
 
     def fit(self) -> None:
+        if not self._ensure_open(self.fit):
+            return
         if not self.info.get("csv"):
             self._say("Fitting needs measured profiles: load a CSV first.")
             return
@@ -702,9 +1282,11 @@ class CalibrationPage(QWidget):
 
         def written(_out):
             folder.mkdir(parents=True, exist_ok=True)
+            ko = self.settings().kwave_options()
             launcher.write_kwave_drive_script(
                 script, mat, self.window.prestus_root, lib, str(self.model.path),
-                self.kw_grid.currentText() == "axisymmetric", self.skip.value())
+                self.kw_grid.currentText() == "axisymmetric", self.skip.value(),
+                grid_dims=ko["GridDims"], apply_correction=ko["ApplyCorrection"])
             box = QMessageBox(self)
             box.setWindowTitle("k-Wave drive check")
             box.setText(f"Script written:\n{script}\n\nIt runs one free-water simulation per refined depth "
@@ -737,16 +1319,40 @@ class CalibrationPage(QWidget):
         if prev in items:
             self.show_depth.setCurrentText(prev)
         self.show_depth.blockSignals(False)
+        self._fill_strip()
+        self._show_view("profiles")
+        self._update_buttons()
         self._draw()
         self._fill_table()
+
+    def _fill_strip(self) -> None:
+        """Per-depth R² of the best model shown (fit, else library, else geometric) as
+        clickable bars; a click selects the depth in show_depth."""
+        v = self.view or {}
+        res = v.get("results") or {}
+        kind = next((k for k in ("fit", "library", "geometric") if res.get(k) and as_floats(res[k].get("r2"))), None)
+        depths = as_floats(v.get("depths"))
+        r2 = []
+        if kind is not None:
+            by = dict(zip(as_floats(res[kind].get("depths")), as_floats(res[kind].get("r2"))))
+            r2 = [next((y for x, y in by.items() if abs(x - d) < 0.01), float("nan")) for d in depths]
+        sel = self.show_depth.currentText()
+        cur = None if sel in ("All depths", "") else float(sel)
+        name = {"fit": "the fit", "library": "the library entry", "geometric": "the geometric model"}.get(kind, "")
+        self.strip.set_data(depths, r2, cur, allow_all=bool(v.get("predicted")), caption=name)
+        self.strip_title.setText(
+            f"R² of {name} per depth (green ≥ {cplots.R2_GOOD:g}, amber ≥ {cplots.R2_FAIR:g}, red below); "
+            "click a bar to show that depth" if kind else "Click a depth to show its profile")
 
     def _draw(self) -> None:
         if self.canvas is None or self.view is None:
             return
         v = self.view
+        c = style.active()
         ax, ax2 = self.ax_prof, self.ax_r2
         ax.clear()
         ax2.clear()
+        self.fig.set_facecolor(c["surface"])
         res = v.get("results") or {}
         types = as_list(v.get("profile_type"))
         sel = self.show_depth.currentText()
@@ -772,7 +1378,7 @@ class CalibrationPage(QWidget):
                         col = imeas[j] if j < len(imeas) else []
                         if t != ptype or not any(math.isfinite(x) for x in col):
                             continue
-                        ax.plot(z, col, ls, color="k", lw=1.6, label=label if first else None)
+                        ax.plot(z, col, ls, color=c["ink"], lw=1.6, label=label if first else None)
                         first = False
                 shown_meas = True
             label = name
@@ -785,7 +1391,7 @@ class CalibrationPage(QWidget):
                 ax.plot(z, imod[j], "-", color=colour, lw=1.1, label=label if n == 0 else None)
         depths = as_floats(v.get("depths"))
         for x in depths if show_all else [float(sel)]:
-            ax.axvline(x, ls=":", color="#bbbbbb", lw=0.8)
+            ax.axvline(x, ls=":", color=c["line2"], lw=0.8)
         ax.set_xlabel("Distance from exit plane (mm)")
         ax.set_ylabel("Normalised intensity")
         ax.set_title(f"{v.get('combo', '')} — {'all depths' if show_all else sel + ' mm'}"
@@ -803,22 +1409,23 @@ class CalibrationPage(QWidget):
             ax2.plot(as_floats(r.get("depths")), y, "-o", color=colour, ms=4, lw=1.1, label=name)
         geo = v.get("dist_geom_mm")
         if isinstance(geo, (int, float)):
-            ax2.axvline(geo, ls=":", color="#888888", lw=0.8)
+            ax2.axvline(geo, ls=":", color=c["ink4"], lw=0.8)
             ax2.annotate("natural focus", (geo, 0.02), xycoords=("data", "axes fraction"), fontsize=7,
-                         color="#666666", rotation=90)
+                         color=c["ink3"], rotation=90)
         if predicted and depths:
             lim = [min(depths), max(depths)]
-            ax2.plot(lim, lim, "k--", lw=0.9, label="Target")
+            ax2.plot(lim, lim, "--", color=c["ink"], lw=0.9, label="Target")
             fm = as_floats(v.get("measured_focus"))
-            for ptype, face, label in (("measured", "k", "Hydrophone"), ("interpolated", "none", "Interpolated profile"),
+            for ptype, face, label in (("measured", c["ink"], "Hydrophone"),
+                                       ("interpolated", "none", "Interpolated profile"),
                                        ("extrapolated", "none", "Extrapolated profile")):
                 pts = [(depths[j], fm[j]) for j in range(min(len(fm), len(depths)))
                        if j < len(types) and types[j] == ptype and math.isfinite(fm[j])]
                 if pts:
-                    ax2.plot(*zip(*pts), "*", ms=9, mfc=face, mec="k", ls="none", label=label)
+                    ax2.plot(*zip(*pts), "*", ms=9, mfc=face, mec=c["ink"], ls="none", label=label)
             span = as_floats(v.get("measured_span"))
             if len(span) == 2:
-                ax2.axvspan(span[0], span[1], color="#888888", alpha=0.08, label="Measured range")
+                ax2.axvspan(span[0], span[1], color=c["brand"], alpha=0.08, label="Measured range")
             ax2.set_xlabel("Target depth (mm from EP)")
             ax2.set_ylabel("Focus, FLHM centre (mm)")
         else:
@@ -830,6 +1437,7 @@ class CalibrationPage(QWidget):
         ax2.grid(True, alpha=0.3)
         if ax2.get_legend_handles_labels()[0]:
             ax2.legend(fontsize=8, loc="best")
+        _theme_axes((ax, ax2), c)
         self.canvas.draw_idle()
 
     def _fill_table(self) -> None:

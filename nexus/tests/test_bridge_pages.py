@@ -86,6 +86,9 @@ def window(app, schema, prestus_root, tmp_path, monkeypatch):
 def test_calibration_page_opens_the_config_transducer_and_fits(window):
     page = window.show_special(CALIBRATION)
     calls = window.fake.calls
+    assert calls == [] and page.depths.text() == "47.5"         # MATLAB starts on the first action
+    assert "CTX_250_001_SC_105_010" in page.coverage.text() and page.entry_plot.arrays["cal_range"]
+    page.evaluate_measured()
     assert calls[0][1]["action"] == "open" and calls[0][1]["serial"] == "CTX_250_001"
     assert calls[0][1]["driving_system"] == "SC_105_010" and calls[0][1]["library_path"] == ""
     assert calls[1][1]["action"] == "view" and calls[1][1]["predicted"] is False   # profiles loaded
@@ -120,6 +123,7 @@ def test_calibration_depths_follow_the_setting_and_the_placement(window, monkeyp
     page = window.show_special(CALIBRATION)
     assert page.depths.text() == "47.5, 52"                     # setting and placement target
     assert "transducer 1 target 52 mm" in page.log.toPlainText()
+    page.predict()                                              # opens MATLAB (lazy)
 
     window.model.set("transducer.focal_distance_ep", 45.0)      # config changed: follows
     page.refresh()
@@ -208,3 +212,38 @@ def test_localite_batch_saves_label_map_and_runs_script(window, monkeypatch):
     assert "1 sessions" in task and script.name == "ingest_study.m"
     text = script.read_text()
     assert "selection = {'sub-001', 'ses-01'};" in text and "neuronav_ingest_batch(parameters, selection" in text
+
+
+def test_calibration_advanced_and_ring_options_reach_matlab(window, tmp_path, monkeypatch):
+    from prestus_nexus.ui import calibration_page as cp
+    page = window.show_special(CALIBRATION)
+    planes = tmp_path / "planes.zip"
+    planes.write_bytes(b"")
+
+    def advanced_exec(dlg):                                     # preset, then two edits
+        dlg.pre.setCurrentText("oneil_phase_only")
+        dlg.nfm.setValue(0.2)
+        dlg.grid.setText("auto")
+        return 1
+
+    def ring_exec(dlg):
+        dlg.nsub.setValue(6)
+        dlg.file.setText(str(planes))
+        dlg.kind.setCurrentText("transverse")
+        return 1
+    monkeypatch.setattr(cp.AdvancedDialog, "exec", advanced_exec)
+    monkeypatch.setattr(cp.RingOptionsDialog, "exec", ring_exec)
+    page._advanced()
+    assert (page.fwd.currentText(), page.huber.value(), page.fp_amp.isChecked()) == ("oneil", 10, False)
+    assert page.advanced == {"Optimizer": "fexminimize", "Lambda": 0, "NearFieldPenalty": 0,
+                             "NearFieldMargin": 0.2}
+    assert page.extra == {"GridDims": "auto"} and page.adv_btn.text() == "Advanced (5)"
+    page.ring.setCurrentIndex(page.ring.findData("fit"))
+    page._ring_options()
+    assert page.rpo_btn.text() == "Options (3)"
+    page.fit()
+    s = window.fake.calls[-1][1]["settings"]
+    assert s["advanced"]["NearFieldMargin"] == 0.2 and s["huber_delta"] == 10
+    ro = s["ring_profile_options"]
+    assert ro["NSub"] == 6 and ro["OffAxis"] == str(planes) and ro["OffAxisOptions"]["Kind"] == "transverse"
+    assert window.fake.calls[-1][1]["ring_profile"] == "fit"

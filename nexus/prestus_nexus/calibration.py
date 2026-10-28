@@ -12,12 +12,31 @@ from . import placement as pl
 from .model import TX, ConfigModel, is_empty
 
 # Advanced FIT_TRANSDUCER_MODEL options and their fitter defaults, as advanced_defaults()
-# in calibration_gui.m; only values that differ are sent.
+# in calibration_gui.m; only values that differ are sent. Not offered: the z shift and the
+# steering sound speed (not applied at run time), ChannelGroups, Prior, EvaluateOnly.
 ADVANCED_DEFAULTS: dict[str, Any] = {
     "PhaseConstraint": "none", "PhaseStepBounds": [], "AmplitudeFit": "shape",
     "SharedVelocity": False, "Optimizer": "lsqnonlin", "PopSize": 5000, "MaxFunEvals": 200000,
     "Polish": True, "FocalWeight": 0, "FitWindowMm": [], "Lambda": 1e-3, "LambdaAmp": 1e-2,
-    "ZShiftBounds": [-3, 3],
+    "AmpBounds": [0.1, 10], "PlausibleGain": [0.5, 2], "NearFieldPenalty": 1, "NearFieldMargin": 0.1,
+    "NearFieldMinMm": 2, "CWater": 1500, "Rho": 994, "Seed": 1,
+}
+# Desired-profile and k-Wave drive calibration options of "Advanced…" (extra_defaults()).
+EXTRA_DEFAULTS: dict[str, Any] = {"Tolerance": 0.01, "GridDims": "", "ApplyCorrection": True}
+# FIT_RING_PROFILE and READ_OFFAXIS_SCANS options ("Ring profile" Options…, ring_defaults()).
+RING_DEFAULTS: dict[str, Any] = {
+    "NSub": 4, "Smooth": 0.3, "NearFieldSkipMm": 4, "AmpBounds": [0.1, 10], "Iterations": 6,
+    "NStarts": 12, "Seed": 1, "HeldOut": False, "OffAxis": "", "Kind": "all", "Weight": 1,
+    "RMaxMm": 30, "BinMm": 0.5, "ZBinMm": 1, "Centre": "origin",
+}
+_OFFAXIS_KEYS = ("Kind", "Weight", "RMaxMm", "BinMm", "ZBinMm", "Centre")
+# calibration_fit_options.m presets: main-panel values and advanced options (on top of the defaults).
+PRESETS: dict[str, dict[str, Any]] = {
+    "rayleigh_phase_gain": {"FreeParams": ["phase", "amp"], "ForwardModel": "rayleigh", "Domain": "intensity",
+                            "HuberDelta": 0.8, "Lambda": 1e-3, "NearFieldSkipMm": 10},
+    "oneil_phase_only": {"FreeParams": ["phase"], "ForwardModel": "oneil", "Optimizer": "fexminimize",
+                         "Domain": "intensity", "HuberDelta": 10, "Lambda": 0, "NearFieldPenalty": 0,
+                         "NearFieldSkipMm": 10},
 }
 _MANIFEST_EP = re.compile(r"^transducer(?:\((\d+)\))?\.focal_distance_ep$")
 
@@ -132,13 +151,36 @@ class FitSettings:
     align: str = "label"
     max_extrapolation_mm: float = 0.0
     calibrate_at: str = "measured"
-    advanced: dict[str, Any] = field(default_factory=dict)
+    advanced: dict[str, Any] = field(default_factory=dict)     # FIT_TRANSDUCER_MODEL, non-defaults
+    extra: dict[str, Any] = field(default_factory=dict)        # EXTRA_DEFAULTS keys, non-defaults
+    ring_options: dict[str, Any] = field(default_factory=dict) # RING_DEFAULTS keys, non-defaults
 
     def bridge_settings(self) -> dict:
         return {"forward_model": self.forward_model, "near_field_skip_mm": self.near_field_skip_mm,
                 "huber_delta": self.huber_delta, "n_starts": self.n_starts, "domain": self.domain,
                 "isppa_wcm2": self.isppa_wcm2, "align": self.align,
-                "max_extrapolation_mm": self.max_extrapolation_mm, "advanced": dict(self.advanced)}
+                "max_extrapolation_mm": self.max_extrapolation_mm,
+                "tolerance": self.extra.get("Tolerance", EXTRA_DEFAULTS["Tolerance"]),
+                "advanced": dict(self.advanced), "ring_profile_options": ring_profile_options(self.ring_options)}
+
+    def kwave_options(self) -> dict:
+        """GridDims / ApplyCorrection for kwave_calibrate_drive, with their defaults."""
+        return {k: self.extra.get(k, EXTRA_DEFAULTS[k]) for k in ("GridDims", "ApplyCorrection")}
+
+
+def ring_profile_options(flat: dict) -> dict:
+    """fit_ring_profile options (RingProfileOptions) from the flat RING_DEFAULTS form."""
+    v = dict(RING_DEFAULTS, **flat)
+    out = {k: v[k] for k in ("NSub", "Smooth", "NearFieldSkipMm", "AmpBounds", "Iterations", "NStarts",
+                             "Seed", "HeldOut")}
+    if v["OffAxis"]:
+        out["OffAxis"] = str(v["OffAxis"])
+        out["OffAxisOptions"] = {k: v[k] for k in _OFFAXIS_KEYS}
+    return out
+
+
+def non_default(values: dict, defaults: dict) -> dict:
+    return {k: x for k, x in values.items() if k not in defaults or not _same(x, defaults[k])}
 
 
 def _same(a: Any, b: Any) -> bool:
@@ -179,6 +221,17 @@ def settings_from_record(rec: dict | None, current: FitSettings) -> tuple[FitSet
             s.max_extrapolation_mm = float(po["MaxExtrapolationMm"])
     s.calibrate_at = "desired" if rec.get("calibrate_at") == "desired" else "measured"
     s.advanced = {k: fo[k] for k, d in ADVANCED_DEFAULTS.items() if k in fo and not _same(fo[k], d)}
+    s.extra = {k: x for k, x in current.extra.items() if k != "Tolerance"}   # k-Wave options: not in meta.fit
+    if isinstance(po, dict) and "Tolerance" in po and not _same(po["Tolerance"], EXTRA_DEFAULTS["Tolerance"]):
+        s.extra["Tolerance"] = float(po["Tolerance"])
+    rr = (rec.get("ring_profile") or {}).get("options") if isinstance(rec.get("ring_profile"), dict) else None
+    s.ring_options = {}
+    if isinstance(rr, dict):
+        flat = {k: x for k, x in rr.items() if k != "OffAxisOptions"}
+        flat.update(rr.get("OffAxisOptions") or {})
+        if flat.get("OffAxis") == "(struct)":
+            flat.pop("OffAxis")
+        s.ring_options = non_default({k: x for k, x in flat.items() if k in RING_DEFAULTS}, RING_DEFAULTS)
     depths = None
     if s.calibrate_at == "desired":
         d = rec.get("depths_ep_mm")

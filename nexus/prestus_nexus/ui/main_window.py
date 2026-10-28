@@ -490,7 +490,24 @@ class MainWindow(QMainWindow):
                 card = self._card("Transducer geometry", self.schematic,
                                   "Cross-section along the beam: elements, exit plane, geometric focus, the "
                                   "focal depth setting (✕) and the device's steering range.")
-                tab.set_side(card)
+                from .calibration_plots import CalibrationCoverage
+                self.cal_cov = CalibrationCoverage(height=220)
+                cov_card = self._card("Calibration coverage", self.cal_cov,
+                                      "What the library entry covers, from its YAML: fit quality, drive and "
+                                      "phase corrections per calibrated depth; this study's depths as lines.")
+                # Both cards at their natural height in one scrolling column, so a short
+                # window scrolls instead of squeezing the plot under its caption
+                column = QWidget()
+                cl = QVBoxLayout(column)
+                cl.setContentsMargins(0, 0, 4, 0)
+                cl.setSpacing(12)
+                card.setMinimumHeight(300)
+                cl.addWidget(card, 1)
+                cl.addWidget(cov_card)
+                side = QScrollArea()
+                side.setWidgetResizable(True)
+                side.setWidget(column)
+                tab.set_side(side)
                 from .calibration_page import CalibrationPage
                 calib = CalibrationPage(self)
                 self.pages[CALIBRATION] = calib
@@ -546,6 +563,22 @@ class MainWindow(QMainWindow):
         if RUN in self.pages and RESULTS in self.pages:
             self.pages[RUN].finished.connect(
                 lambda _task, ok: self.pages[RESULTS].refresh() if ok else None)
+
+    def _refresh_cal_cov(self) -> None:
+        """Calibration coverage of the transducer being edited (library YAML only, no MATLAB)."""
+        if not hasattr(self, "cal_cov"):
+            return
+        from .. import calibration as cal
+        m = self.model
+        tx = self.pages.get(TX)
+        ti = tx.ti if isinstance(tx, SectionPage) else 0
+        serial, ds, lib = (m.get(f"{TX}.serial", ti), m.get(f"{TX}.combo.ds_serial", ti),
+                           m.get(f"{TX}.library_path", ti))
+        serial = "" if is_empty(serial) else str(serial)
+        ds = "" if is_empty(ds) else str(ds)
+        lib = "" if is_empty(lib) else str(lib)
+        depths = cal.study_depths(m, serial, ds) if serial else []
+        self.cal_cov.set_device(m.library, serial, ds, lib, depths)
 
     @staticmethod
     def _card(title: str, widget: QWidget, sub: str = "") -> QFrame:
@@ -774,6 +807,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "schematic"):
             tx = self.pages.get(TX)
             self.schematic.set_transducer(tx.ti if isinstance(tx, SectionPage) else 0)
+            self._refresh_cal_cov()
         if hasattr(self, "io_preview"):
             self.io_preview.refresh()
         run = self.pages.get(RUN)

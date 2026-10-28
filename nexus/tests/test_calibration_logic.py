@@ -74,3 +74,31 @@ def test_single_free_param_from_yaml_scalar():
     s, depths = cal.settings_from_record({"mode": "per_depth", "fit_options": {"FreeParams": "phase"}},
                                          cal.FitSettings())
     assert s.free_params == ["phase"] and depths is None
+
+
+def test_ring_and_extra_options_round_trip():
+    s = cal.FitSettings(advanced={"NearFieldPenalty": 0, "AmpBounds": [0.2, 5]},
+                        extra={"Tolerance": 0.5, "GridDims": "auto", "ApplyCorrection": False},
+                        ring_options={"NSub": 6, "OffAxis": "/data/planes.zip", "Kind": "transverse"})
+    b = s.bridge_settings()
+    assert b["tolerance"] == 0.5 and b["advanced"] == {"NearFieldPenalty": 0, "AmpBounds": [0.2, 5]}
+    ro = b["ring_profile_options"]
+    assert ro["NSub"] == 6 and ro["Smooth"] == 0.3 and ro["OffAxis"] == "/data/planes.zip"
+    assert ro["OffAxisOptions"]["Kind"] == "transverse" and ro["OffAxisOptions"]["RMaxMm"] == 30
+    assert "OffAxis" not in cal.ring_profile_options({})                 # axial only
+    assert s.kwave_options() == {"GridDims": "auto", "ApplyCorrection": False}
+    # meta.fit as calibration_fit writes it: ring options nested, k-Wave options kept from the page
+    rec = {"mode": "per_depth", "fit_options": {"NearFieldPenalty": 0, "Seed": 1},
+           "profile_options": {"Align": "label", "Tolerance": 0.5},
+           "ring_profile": {"n_sub": 6, "options": ro}}
+    r, _ = cal.settings_from_record(rec, s)
+    assert r.advanced == {"NearFieldPenalty": 0}
+    assert r.extra == {"GridDims": "auto", "ApplyCorrection": False, "Tolerance": 0.5}
+    assert r.ring_options == {"NSub": 6, "OffAxis": "/data/planes.zip", "Kind": "transverse"}
+
+
+def test_presets_match_the_advanced_keys():
+    for name, p in cal.PRESETS.items():
+        main = {"FreeParams", "ForwardModel", "Domain", "HuberDelta", "NearFieldSkipMm"}
+        assert main <= set(p), name
+        assert set(p) - main <= set(cal.ADVANCED_DEFAULTS), name
