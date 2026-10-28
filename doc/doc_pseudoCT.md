@@ -7,16 +7,16 @@
 
 ![pct_ute_density](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ute_pct_density.png)
 
-PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield units. These can replace the skull layer of a layered simulation for continuous tissue property mapping. 
+PRESTUS can use UTE-based images as a source of pseudo-Hounsfield units. These replace the skull layer of a layered simulation for continuous tissue property mapping.
 
 > [!WARNING]
 > (pseudo-)HU mapping is an experimental feature in active development.
 
 ### Creating pseudoCTs from UTE scans
 
-0. **MR acquisition** 
+0. **MR acquisition**
 
-    Acquire an MR sequence with detailed bone contrast 
+    Acquire an MR sequence with detailed bone contrast.
 
     >**Example PETRA UTE parameters** (Carpino et al., 2023)
     TR: 3.32 ms
@@ -26,17 +26,17 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
     flip angle: 2°
     FoV: 294 mm
 
-1. **SimNIBS segmentation**. 
+1. **SimNIBS segmentation**
 
-    Perform a SimNIBS segmentation using a T1w and a PETRA UTE scan (instead of T2w) as inputs. You can either use the SimNIBS GUI or PRESTUS (**default**).
+    Run SimNIBS with a T1w and the PETRA UTE scan (instead of T2w) as inputs, either in PRESTUS (**default**) or in the SimNIBS GUI.
 
-2. **pseudoCT generation**. 
+2. **pseudoCT generation**
 
-    **Dependencies.** pseudoCT generation requires **FSL** (`fslmaths`), **ANTs** (`N4BiasFieldCorrection`, `SmoothImage`), and **MATLAB** on `PATH`. Set `startup.fsl_bin_path` and `startup.ants_bin_path` in your config so PRESTUS can prepend these to `PATH` at runtime. On HPC, also set `startup.matlab_bin_path`.
+    Requires **FSL** (`fslmaths`), **ANTs** (`N4BiasFieldCorrection`, `SmoothImage`) and **MATLAB** on `PATH`. Set `startup.fsl_bin_path` and `startup.ants_bin_path` so PRESTUS can prepend them to `PATH`. On HPC, also set `startup.matlab_bin_path`.
 
-    **Automated (default).** When `pct.enabled = 1`, PRESTUS calls `pct_create_pseudoCT.sh` automatically after SimNIBS segmentation — but only if `pseudoCT.nii.gz` does not exist yet. The UTE image is identified via `path.t2_pattern` (the same field used to pass it as the second SimNIBS input); SimNIBS registers it to the T1 as `m2m_sub-XXX/T2_reg.nii.gz`, which is only read. The resulting `pseudoCT.nii.gz`, `tissues_mask.nii.gz` and `pseudoCT.json` are written to `<path.pct>/sub-XXX/`, or to `<parent of path.seg>/pct/sub-XXX/` when `path.pct` is empty, next to the SimNIBS folder rather than inside it. Intermediate images and the log go to its `debug_pct/` subfolder, cluster job logs to `log_hpc/`. The `pseudoCT.json` sidecar records how the pseudo-CT was made (skull mapping, segmentation folder, PRESTUS version).
+    With `pct.enabled = 1`, PRESTUS runs `pct_create_pseudoCT.sh` after segmentation if `pseudoCT.nii.gz` does not exist yet. The UTE image is the one in `path.t2_pattern`, which SimNIBS registers to the T1 as `m2m_sub-XXX/T2_reg.nii.gz` (`UTE_reg.nii.gz` is also read).
 
-    Minimum config to enable the fully automated workflow:
+    Minimum config:
     ```yaml
     path:
       t2_pattern: 'sub-%1$03d_UTE.nii.gz'  # UTE image (used for both SimNIBS and pseudoCT)
@@ -56,41 +56,38 @@ PRESTUS supports the use of UTE-based images as a source of pseudo-Hounsfield un
       mapping_attenuation: 'k-plan'
     ```
 
-    **Reuse.** If `pseudoCT.nii.gz` already exists in the pseudo-CT folder when the pipeline runs, generation is skipped. Its `pseudoCT.json` must then record the current `pct.skull_mapping`; a pseudo-CT made with another mapping stops the run (`prestus:cache:signatureMismatch`; see `io.cache_signature_check`). Move the folder aside, or set `path.pct` to another folder, to generate one with the new mapping. A pseudo-CT without a sidecar is used with the warning `prestus:cache:unverified`. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs).
+    Outputs go to `<path.pct>/sub-XXX/`, or to `<parent of path.seg>/pct/sub-XXX/` when `path.pct` is empty:
 
-    **Manual fallback.** A pseudo-CT that older versions wrote into `m2m_sub-XXX/` is still used, with a warning (`PRESTUS:pct:legacyLocation`) to move it. Those versions also renamed `T2_reg.nii.gz` to `UTE_reg.nii.gz` inside `m2m_sub-XXX/`; either name is read. You can also run `pct_create_pseudoCT.sh` directly in bash before starting PRESTUS. An example wrapper is provided at `examples/createPseudoCT.sh`. Required modules: SimNIBS, FSL, ANTs.
+    | File / folder | Content |
+    |---|---|
+    | `pseudoCT.nii.gz`, `tissues_mask.nii.gz` | pseudo-CT and tissue mask |
+    | `pseudoCT.json` | sidecar: skull mapping, segmentation folder, PRESTUS version |
+    | `debug_pct/` | intermediate images and the log |
+    | `log_hpc/` | cluster job logs |
 
+    **Reuse.** An existing `pseudoCT.nii.gz` is used and not regenerated. Its `pseudoCT.json` must record the current `pct.skull_mapping`; otherwise the run stops with `prestus:cache:signatureMismatch` (see `io.cache_signature_check`). To regenerate, move the folder aside or set `path.pct` to another folder. A pseudo-CT without a sidecar is used with the warning `prestus:cache:unverified`. A pseudo-CT inside `m2m_sub-XXX/` is used with the warning `PRESTUS:pct:legacyLocation`; move it to the pseudo-CT folder. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs).
+
+    **Manual.** You can also run `pct_create_pseudoCT.sh` in bash before starting PRESTUS. An example wrapper is at `examples/createPseudoCT.sh`. Required modules: SimNIBS, FSL, ANTs.
 
 #### pseudoCT generation
 
-The following steps are used to create the pseudoCT:
-
-- UTE: Threshold at 0, apply bias field correction to remove inhomogeneity, normalize (divide by soft tissue peak value > i.e., normalised UTE intensity = 1)
-- Soft tissue value is identified with the MATLAB function `pct_soft_tissue_peak`
+- UTE: threshold at 0, bias field correction, then normalisation by the soft tissue peak (normalised UTE intensity = 1). `pct_soft_tissue_peak` finds the peak.
 - pHU Soft-tissue (normalised UTE intensity = 1): 42 HU (Wiesinger et al., 2018)
 - pHU Air: -1000 HU (Wiesinger et al., 2018; Miscouridou et al., 2022)
-- pHU Skull: Linear mapping
+- pHU Skull: linear mapping, set by `pct.skull_mapping`:
     - `miscouridou` | pHU = −2085 UTE + 2329
     - `carpino`     | pHU = -2194 UTE + 2236
     - `wiesinger`   | pHU = -2000 (UTE-1) + 42
     - `treeby`      | pHU = -2929.6 UTE + 3274.9 (ucl-bug/petra-to-ct; fitted to 80 kVp CT: use with `density_calibration: ucl_lowdose_80kvp`, see [below](#pairing-a-utehu-mapping-with-its-ct-calibration))
     - `custom`      | pHU = `pct.custom_slope` UTE + `pct.custom_intercept` (any other linear map)
-
-    The `kosciessa` fit is `pct_skullmapping_fit`: three points from the UTE histograms of charm cortical and trabecular bone (lower quarter-max crossing of the cortical histogram → 1900 HU, crossover of the two histograms → 700 HU, upper quarter-max crossing of the trabecular histogram around its x-weighted peak → 300 HU; bins 0.9–1.1 replaced by a spline against soft-tissue partial volume) and a least-squares line. The anchors, width level and interpolation window are options of `pct_skullmapping_fit`.
     - `kosciessa`   | individualized: pHU_trabecular=300 & pHU_trabecular_cortical = 700
-- 3D Gaussian smoothing (σ=0.8 voxels via ANTs’ SmoothImage) prevents abrupt tissue transitions in the simulation grid. To retain information in the skull layer, unsmoothed values are retained within an eroded skull mask that attempts to correct for partial volume effects.
 
-<span style="font-size:11px;">
-**References:**    
-Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).    
-Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).  
-Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).    
-Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.   
-</span>
+    `kosciessa` (`pct_skullmapping_fit`) fits a least-squares line through three points from the UTE histograms of charm cortical and trabecular bone: the lower quarter-max crossing of the cortical histogram → 1900 HU, the crossover of the two histograms → 700 HU, and the upper quarter-max crossing of the trabecular histogram around its x-weighted peak → 300 HU. Bins 0.9–1.1 are replaced by a spline against soft-tissue partial volume. The anchors, width level and interpolation window are options of `pct_skullmapping_fit`.
+- 3D Gaussian smoothing (σ=0.8 voxels via ANTs' SmoothImage) prevents abrupt tissue transitions in the simulation grid. Within an eroded skull mask, unsmoothed values are kept to limit partial volume effects.
 
 #### Pairing a UTE→HU mapping with its CT calibration
 
-A UTE→HU line returns HU on the scale of the CT it was fitted to. That scale depends on the scanner, the tube voltage (kVp) and the reconstruction kernel: at 80 kVp, for example, bone has about 1.35 times the HU it has at about 120 kVp. HU are only an intermediate step: what the simulation needs is density, and turning HU into density needs the calibration of the same CT. **The skull mapping and the density calibration are therefore one coupled choice**, set together with `pct.skull_mapping`, `pct.mapping_density: k-plan` and `pct.density_calibration`:
+A UTE→HU line returns HU on the scale of the CT it was fitted to. That scale depends on scanner, tube voltage (kVp) and reconstruction kernel: at 80 kVp, bone has about 1.35 times the HU it has at about 120 kVp. The simulation needs density, and turning HU into density needs the calibration of that same CT. **Set `pct.skull_mapping`, `pct.mapping_density: k-plan` and `pct.density_calibration` together:**
 
 | `skull_mapping` | CT the line was fitted to | `mapping_density` | `density_calibration` |
 |---|---|---|---|
@@ -108,292 +105,197 @@ pct:
   mapping_attenuation: 'k-plan'
 ```
 
-This also makes lines at other target kVp usable: fit a line (or a study-specific `custom` line) against CT of any protocol, scan a density phantom with the same protocol, and pass both. No conversion of HU between kVp is needed.
+`pct.density_calibration` values:
 
-Only `k-plan` reads the calibration. The other density mappings have a fixed, clinical HU scale built in (`k-wave`: Schneider et al.; `marsac`: 300–2000 HU; `air-tissue`, which `pichardo` and `mcdannold` need: about −1000 to 1000 HU), as do the HU-based sound speed and attenuation of `webb` (defaults for GE 120 kVp, B kernel; scanner-specific values via `pct.webb_*`). `aubry` and `mueller` rescale by the skull's own minimum and maximum HU, so they are insensitive to the HU scale, but they also remove differences in density level between subjects. Use them with lines on the clinical scale only, or with `k-plan` and the matching calibration otherwise.
+| Value | Table |
+|---|---|
+| `''` (default) | k-Plan default (`config/ct_calibration/kplan_default.csv`) |
+| `'ucl_lowdose_80kvp'` | UCL low-dose CT (GE Revolution, 80 kVp, BONEPLUS; CIRS 062M phantom): the CT behind `skull_mapping: treeby`. Bone has about 1.35× the default's HU for the same density |
+| `'cph2025'` | petra2density's phantom calibration, the CT behind its line −2080.02·UTE + 2133.23 (use `skull_mapping: custom`). Bone has about 0.85× the default's HU |
+| a path | any CSV with two columns, HU and density [kg/m³] (lines starting with `#` are comments), e.g. a phantom scan of your own scanner or a table that goes with a study-specific `custom` line |
 
-PRESTUS warns when `skull_mapping: treeby` is used without `mapping_density: k-plan` and `density_calibration: ucl_lowdose_80kvp`.
+Tables are applied piecewise linearly and extrapolated linearly beyond their end points. For a line fitted at another kVp, scan a density phantom with the same protocol and pass its table; no HU conversion between kVp is needed. `medium_setup` prints the resolved table and records it in the medium statistics.
+
+Only `k-plan` reads the calibration; with another density mapping it is ignored, with a warning. The other mappings assume a fixed, clinical HU scale:
+
+- `k-wave`: Schneider et al.; `marsac`: 300–2000 HU; `air-tissue` (needed by `pichardo` and `mcdannold`): about −1000 to 1000 HU.
+- `webb` sound speed and attenuation: GE 120 kVp, B kernel by default; scanner-specific values via `pct.webb_*`.
+- `aubry` and `mueller` rescale by the skull's own minimum and maximum HU. They are insensitive to the HU scale but remove between-subject differences in density level.
+
+Use these with lines on the clinical scale only; otherwise use `k-plan` with the matching calibration. PRESTUS warns when `skull_mapping: treeby` is used without `mapping_density: k-plan` and `density_calibration: ucl_lowdose_80kvp`.
 
 ### Using (pseudo-)CTs to inform acoustic properties
 
-Hounsfield Units can be used to inform acoustic properties in the bone layer of a SimNIBS segmentation. This is a subtype of a `layered` medium.
+Set `pct.enabled: 1` and choose a mapping for each of density, sound speed and attenuation. The pseudo-CT is read from the pseudo-CT folder above. This is a subtype of a `layered` medium. Mappings apply only within the uniform skull mask. A property set to `"none"`, or with its field missing, keeps the uniform `skull` value. Defaults below are those in `config_default.yaml`.
 
-To inform skull properties by pCTs in simulations, set `parameters.use_pseudoCT = 1`, define `parameters.t2_path_template` as the `pseudoCT.nii.gz` in the simnibs output directory, and choose the desired acoustic parameter mapping algorithms. The current code supports the following mappings optionally model density, speed of sounds, and attenuation in the skull bone. When set to `"none"` or when the parameter field is deleted/missing, each property will revert to the uniform `skull` value. The defaults highlighted below are the ones specified in the `config_default.yaml`. 
+>[!warning] The most suitable mapping remains an active area of research. All mappings should therefore be treated as experimental. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43).
 
->[!warning] The most suitable mapping remains an active area of research. All mappings should therefore be treated as experimental. See [this issue](https://github.com/Donders-Institute/PRESTUS/issues/43). Mappings will exclusively be applied within the uniform skull mask.
+Several mappings use the porosity of Aubry et al. (2003), with the max. skull HU denominator from Guo et al. (2019):
+
+$$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
 
 #### Mapping skull density
 
-Mapping algorithm is governed by `pct_mapping_density`.
+Set by `pct.mapping_density`.
 
-- `k-plan` | 4-part piecewise linear fit based on k-Plan defaults (**default**) <br>
+- `k-plan` | 4-part piecewise linear fit based on k-Plan defaults (**default**)
 
-    **Acoustic simulations**    
-    Piece-wise linear mapping between HU and mass density in kg/m^3 using k-Plan default calibration [see k-Plan documentation](https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration):
-    
+    Piece-wise linear mapping between HU and mass density in kg/m^3 ([k-Plan documentation](https://dispatch.k-plan.io/static/docs/planning-images.html#ct-calibration)):
+
     $$ \rho_\text{skull} = \text{fit_pairwiselinear}(\text{HU}, \text{density}) $$
     ```
     HU = [-990, 60, 1000, 1950]
     density = [1.2, 1060, 1530, 2150]
     ```
 
-    Density estimates are regularized at the minimum to the water density specified in the configuration.
+    `pct.density_calibration` replaces this table ([see above](#pairing-a-utehu-mapping-with-its-ct-calibration)). The minimum is regularised to the configured water density. Sound speed and attenuation of the k-plan pipeline follow from density.
 
-    **CT calibration (`pct.density_calibration`).** HU depend on the CT scanner, tube voltage (kVp) and reconstruction kernel; k-Plan's default table is an average over vendors, and k-Plan recommends a calibration per scanner and protocol. A UTE→HU line returns HU on the scale of the CT it was fitted to, so the density step should use that CT's table. `pct.density_calibration` replaces the default table:
+    > Note: k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularizes data ranges. PRESTUS does not enforce this.
 
-    | Value | Table |
-    |---|---|
-    | `''` (default) | k-Plan default (`config/ct_calibration/kplan_default.csv`) |
-    | `'ucl_lowdose_80kvp'` | UCL low-dose CT (GE Revolution, 80 kVp, BONEPLUS; CIRS 062M phantom): the CT behind `skull_mapping: treeby`. Bone has about 1.35× the default's HU for the same density |
-    | `'cph2025'` | petra2density's phantom calibration, the CT behind its line −2080.02·UTE + 2133.23 (use `skull_mapping: custom`). Bone has about 0.85× the default's HU |
-    | a path | any CSV with two columns, HU and density [kg/m³] (lines starting with `#` are comments), e.g. a phantom scan of your own scanner or a table that goes with a study-specific `custom` line |
+    **Thermal simulations** use a fixed bone density:
 
-    Tables are applied piecewise linearly and extrapolated linearly beyond their end points, as the default. The setting applies to `mapping_density: k-plan` only (a warning is issued otherwise); the resolved table is printed by `medium_setup` and recorded in the medium statistics. Sound speed and attenuation of the k-plan pipeline follow from density and are unaffected otherwise.
-
-    > Note: k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularized data ranges. Such density regularization is not currently enforced in PRESTUS...
-
-    **Thermal simulations**     
-    Overwrite bone density prior to the thermal simulation:
-   
     $$ \rho_\text{skull} = 1850 \, \text{kg/m}^3 $$
 
-    <br>
+- `k-wave` | 4-part piecewise linear fit based on Schneider et al. (1996)
 
-- `k-wave` |  4-part piecewise linear fit based on Schneider et al. (1996) <br>
-
-    PseudoCT values are initially shifted by +1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php).   
+    Pseudo-CT values are shifted by +1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php).
 
     $$ \rho_\text{skull} = \text{hounsfield2density}(\text{HU} + 1000) $$
 
-    Density estimates are regularized at the minimum to the water density specified in the configuration, and a max. skull density `rho_bone = 2100` kg/m3.
+    Density is regularised at the minimum to the configured water density and at a max. skull density `rho_bone = 2100` kg/m3.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Schneider, U., Pedroni, E., and Lomax A., "The calibration of CT Hounsfield units for radiotherapy treatment planning," Phys. Med. Biol., 41, pp. 111-124 (1996).
-    </span>
-    <br>
+- `marsac` | Marsac et al. (2017)
 
-- `marsac` | Marsac et al. (2017) <br>
-
-    This algorithm initially regularizes skull pHU to a range of `HU_min = 300` and `HU_max = 2000`. Note that in contrast to Marsac et al., 2017, PRESTUS regularizes pHU values instead of excluding pHU < HU_min from the skull mask as the latter is prone to create skull holes.
+    Skull pHU are clipped to `HU_min = 300` and `HU_max = 2000`. Unlike Marsac et al., 2017, PRESTUS clips pHU < HU_min instead of excluding them from the skull mask, which would create skull holes.
 
     $$ \rho_\text{skull} = \rho_\text{water} + (\rho_\text{bone} - \rho_\text{water}) \cdot \frac{\text{HU} - \text{HU}_\text{min}}{\text{HU}_\text{max} - \text{HU}_\text{min}} $$
 
     with max. skull density `rho_bone = 2100` kg/m3.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017). <br>
-    </span>
-    <br>
+- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003)
 
-- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003) <br>
+    Mixture of bone and water density, both from the configuration:
 
-    This algorithm first estimates the porosity as:
-
-    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
-
-    This uses the max. skull HU denominator from Guo et al., 2019.  
-    Skull density is then estimated as the mixture of bone and water density composites:
-    
     $$ \rho_\text{skull} = \rho_\text{water} \cdot \phi_\text{skull} + \rho_\text{bone} \cdot (1 - \phi_\text{skull}) $$
 
-    Respective tissue sound speed properties are extracted from the configuration.
+- `air-tissue` | Linear air-to-bone calibration (BabelBrain-compatible)
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
-    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
-    </span>
-    <br>
-
-- `air-tissue` | Linear air-to-bone calibration (BabelBrain-compatible) <br>
-
-    Linear HU→density calibrated between air (HU ≈ −1000) and cortical bone (HU ≈ 1000), matching the `HUtoDensityAirTissue` function used by BabelBrain in its Pichardo and McDannold workflows.
+    Linear HU→density between air (HU ≈ −1000) and cortical bone (HU ≈ 1000), as `HUtoDensityAirTissue` in BabelBrain's Pichardo and McDannold workflows:
 
     $$ \rho_\text{skull} = 1.01237293 \cdot \text{HU} + 1013.67 $$
 
-    Density is regularized at the minimum to water density. **Use this algorithm when `pct_mapping_soundspeed` or `pct_mapping_attenuation` is set to `pichardo` or `mcdannold`**, as those methods require a density input derived from the same calibration.
-
-    <br>
+    The minimum is regularised to water density. **Use this algorithm when `pct.mapping_soundspeed` or `pct.mapping_attenuation` is `pichardo` or `mcdannold`**: those need density from the same calibration.
 
 #### Mapping skull sound speed
 
-Mapping algorithm is governed by `pct_mapping_soundspeed`.
+Set by `pct.mapping_soundspeed`.
 
-- `k-plan` | Density-based mapping (**default**) <br>
+| Value | Mapping |
+|---|---|
+| `k-plan` (**default**) | density-based, [k-Plan](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#converting-the-primary-planning-image-to-material-properties) |
+| `marsac` | density-based, Marsac et al. (2017) |
+| `aubry` | porosity-based, Aubry et al. (2003) |
+| `webb` | linear in HU, Webb et al. (2018) |
+| `pichardo` | frequency-dependent ρ→c, Pichardo et al. 2D interpolation map |
+| `mcdannold` | polynomial ρ→c, McDannold et al. |
 
-    Implements [the k-Plan mapping](https://dispatch.k-plan.io/static/docs/simulation-pipeline.html#converting-the-primary-planning-image-to-material-properties):
+For `k-plan`, `webb`, `pichardo` and `mcdannold`, the minimum sound speed is regularised to water sound speed.
+
+- `k-plan`
 
     $$ c_\text{skull} = 1.33 \cdot \rho_\text{skull} + 167 $$
 
-    The minimum sound speed in skull bone is regularized to water sound speed.  
+- `marsac`
 
-- `marsac` | Density-based mapping according to Marsac et al. (2017) <br>
-    
     $$ c_\text{skull} = c_\text{water} + (c_\text{bone} - c_\text{water}) \cdot \frac{\rho_\text{skull} - \rho_\text{water}}{\rho_\text{bone} - \rho_\text{water}} $$
 
-    with max. speed of sound in skull `c_skull = 3360` m/s and max. skull density `rho_bone = 2100` kg/m3. Respective water properties are extracted from the configuration.
+    with max. speed of sound in skull `c_skull = 3360` m/s and max. skull density `rho_bone = 2100` kg/m3. Water properties come from the configuration.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017). <br>
-    </span>
-    <br>
+- `aubry`
 
-- `aubry` | "Porosity"-based mapping based on Aubry et al. (2003) <br>
-
-    This algorithm first estimates the porosity as:
-
-    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
-
-    This uses the max. skull HU denominator from Guo et al., 2019.  
-    Skull sound speed is then estimated as the mixture of bone and water sound speed composites:
-    
     $$ c_\text{skull} = c_\text{water} \cdot \phi_\text{skull} + c_\text{bone} \cdot (1 - \phi_\text{skull}) $$
 
-    Respective tissue sound speed properties are extracted from the configuration.
+    Tissue sound speeds come from the configuration.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
-    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).
-    </span>
-    <br>
-
-- `webb` | Linear HU-based mapping from Webb et al. (2018) <br>
+- `webb`
 
     $$ c_\text{skull} = \text{slope} \cdot \text{HU} + \text{intercept} \times 1000 $$
 
-    Default parameters (GE 120 kVp, B kernel, 0.5 × 0.6 mm resolution): slope = 0.75, intercept = 1.32 (giving c = 0.75 · HU + 1320 m/s). Scanner-specific values from Webb et al. Tables I and II can be set via `pct.webb_sos_slope` and `pct.webb_sos_intercept` in the config.
+    Defaults (GE 120 kVp, B kernel, 0.5 × 0.6 mm resolution): slope = 0.75, intercept = 1.32 (c = 0.75 · HU + 1320 m/s). Set scanner-specific values from Webb et al. Tables I and II with `pct.webb_sos_slope` and `pct.webb_sos_intercept`.
 
-    The minimum sound speed is regularized to water sound speed.
+- `pichardo`
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Velocity and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **65**(7):1111–1124 (2018). DOI: 10.1109/TUFFC.2018.2827899
-    </span>
-    <br>
-
-- `pichardo` | Frequency-dependent ρ→c from Pichardo et al. 2D interpolation map <br>
-
-    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal speed of sound [m/s] as a function of tissue density [kg/m³] and frequency [MHz]. Interpolation is bilinear with nearest-neighbour extrapolation. MATLAB cannot read the Blosc-compressed H5 without the filter plugin, so PRESTUS falls back to the same table in `functions/medium/MapPichardo.mat`.
+    Reads `MapPichardo.h5` from the BabelBrain submodule: longitudinal speed of sound [m/s] as a function of density [kg/m³] and frequency [MHz]. Interpolation is bilinear with nearest-neighbour extrapolation. MATLAB cannot read the Blosc-compressed H5 without the filter plugin, so PRESTUS uses the same table in `functions/medium/MapPichardo.mat`.
 
     Requires:
-    - `pct_mapping_density: air-tissue` (or another density algorithm run first)
+    - `pct.mapping_density: air-tissue` (or another density algorithm run first)
     - BabelBrain submodule initialised at `external/BabelBrain`
     - Simulation frequency specified in `parameters.transducer(1).freq_hz`
 
-    The minimum sound speed is regularized to water sound speed.
-
-    <span style="font-size: 12px;">
-    **References:**    
-    Pichardo, S., et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. *Phys. Med. Biol.* **56**(1):219–250 (2011). DOI: 10.1088/0031-9155/56/1/014
-    </span>
-    <br>
-
-- `mcdannold` | Polynomial ρ→c from McDannold et al. <br>
-
-    Fourth-order polynomial relating tissue density to longitudinal speed of sound:
+- `mcdannold`
 
     $$ c_\text{skull} = \frac{1}{p(\rho_\text{skull})} $$
 
     where $p(\rho) = -2.79 \times 10^{-18}\,\rho^4 + 5.31 \times 10^{-16}\,\rho^3 + 1.69 \times 10^{-10}\,\rho^2 - 7.63 \times 10^{-7}\,\rho + 1.24 \times 10^{-3}$.
 
-    Requires density to be filled first (use `pct_mapping_density: air-tissue` or `marsac`). The minimum sound speed is regularized to water sound speed.
-
-    <span style="font-size: 12px;">
-    **References:**    
-    McDannold, N., et al. Transcranial magnetic resonance imaging-guided focused ultrasound surgery of brain tumors: initial findings in 3 patients. *Neurosurgery* **66**(2):323–332 (2010).
-    </span>
-    <br>
+    Requires density first (`pct.mapping_density: air-tissue` or `marsac`).
 
 #### Mapping skull attenuation
 
-Mapping algorithm is governed by `pct_mapping_attenuation`.
+Set by `pct.mapping_attenuation`.
 
 - `k-plan` | Uniform fixed (**default**)
 
     $$ \alpha_\text{skull} = \alpha_\text{coeff} $$
 
-    k-Plan fixes the attenuation coeff. to `13.3` and frequency power law to `1`. To allow more flexibility, this variant reads in the alpha power values specified for the respective bone segmentation (`trabecular` or `cortical`) from the current config. To replicate k-Plan's setup, specify `alpha_coeff = 13.3` and `alpha_power = 1` in the skull bone medium configuration.
+    Reads `alpha_coeff` and `alpha_power` of `medium_properties.skull` from the config, and warns when they differ from k-Plan's fixed `13.3` and `1`. To replicate k-Plan, set `alpha_coeff = 13.3` and `alpha_power = 1` for skull.
 
-    <br>
-
-- `mueller` | Algorithm specified in Mueller et al. (2017). <br>
+- `mueller` | Mueller et al. (2017)
 
     $$ \alpha_\text{skull} = \alpha_\text{min} + (\alpha_\text{max} - \alpha_\text{min}) \left(1 - \frac{\text{HU} - \text{HU}_\text{min}}{\text{HU}_\text{max} - \text{HU}_\text{min}}\right)^{0.5} $$
 
-    with `α_min` = 4 and `α_max` = 8.7 (see Yakuub et al., 2023).     
-    
-    These 𝛼 estimates are based on 500 kHz (i.e., 𝛼(f); see Aubry, J.-F., 2022 for prior benchmark simulations). However, we require `alpha_0` in `𝛼(f) = alpha_0 x f[MHz] ^ y`. We therefore estimate `alpha_0 = 𝛼(f)/0.5^y` with  `y` being the specified `alpha_power`for the skull tissue.
-    
-    <span style="font-size: 12px;">
-    **References:**    
-    Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave modelsa).  J. Acoust. Soc. Am. 152, 1003–1019 (2022).  
-    Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).  
-    Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023).
-    </span>     
-    <br>
+    with `α_min` = 4 and `α_max` = 8.7 (see Yaakub et al., 2023). These are 𝛼(f) at 500 kHz (see Aubry, J.-F., 2022 for benchmark simulations). PRESTUS converts them to `alpha_0` in `𝛼(f) = alpha_0 x f[MHz] ^ y` as `alpha_0 = 𝛼(f)/0.5^y`, with `y` the skull `alpha_power`.
 
-- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003) <br>
+- `aubry` | "Porosity-based" mapping based on Aubry et al. (2003)
 
-    This algorithm first estimates the porosity as:
-
-    $$ \phi_\text{skull} = 1 - \frac{\text{HU}}{\text{HU}_\text{max}} $$
-
-    This uses the max. skull HU denominator from Guo et al., 2019.  
-    Skull attenuation is then estimated as:
-    
     $$ \alpha_\text{skull} = \alpha_\text{min} + (\alpha_\text{max} - \alpha_\text{min}) \cdot \phi_\text{skull}^{0.5} $$
 
     with `α_min = 0.2` and `α_max = 8` (Aubry et al., 2003).
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).  
-    Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).  
-    </span>
-    <br>
-
-- `webb` | Exponential HU-based model from Webb et al. (2020) <br>
-
-    Per-voxel attenuation coefficient as a function of HU and frequency:
+- `webb` | Exponential HU-based model from Webb et al. (2020)
 
     $$ \alpha_\text{skull}(f) = \alpha_0 \cdot \left(\frac{f}{1\,\text{MHz}}\right)^{\beta} \cdot \exp(c \cdot \text{HU}) $$
 
-    Output is converted to k-Wave's `alpha_coeff` [dB/cm/MHz$^\beta$] format with `alpha_power = β`. Default parameters (GE 120 kVp, B kernel, 0.5 × 0.6 mm): α₀ = 26, β = 1.3, c = −0.0016. Scanner-specific values from Webb et al. Table IV can be set via `pct.webb_att_alpha0`, `pct.webb_att_beta`, and `pct.webb_att_c` in the config.
+    Output is k-Wave `alpha_coeff` [dB/cm/MHz$^\beta$] with `alpha_power = β`. Defaults (GE 120 kVp, B kernel, 0.5 × 0.6 mm): α₀ = 26, β = 1.3, c = −0.0016. Set scanner-specific values from Webb et al. Table IV with `pct.webb_att_alpha0`, `pct.webb_att_beta` and `pct.webb_att_c`.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Attenuation and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **68**(5):1532–1545 (2020). DOI: 10.1109/TUFFC.2020.3039743
-    </span>
-    <br>
+- `pichardo` | Frequency-dependent ρ→Att from Pichardo et al. 2D interpolation map
 
-- `pichardo` | Frequency-dependent ρ→Att from Pichardo et al. 2D interpolation map <br>
+    Reads longitudinal attenuation [Np/m] from `MapPichardo.h5` as a function of density [kg/m³] and frequency [MHz]. The value at the simulation frequency is converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1` (linear frequency scaling assumed). Prerequisites as for `pichardo` sound speed; density must be filled first.
 
-    Uses the `MapPichardo.h5` look-up table from the BabelBrain submodule, which encodes longitudinal attenuation [Np/m] as a function of tissue density [kg/m³] and frequency [MHz]. The map value at the simulation frequency is converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1` (linear frequency scaling assumed).
-
-    Requires the same prerequisites as `pichardo` sound speed mapping (see above), plus the `density` argument being pre-filled (pass density to `medium_pct_attenuation`).
-
-    <span style="font-size: 12px;">
-    **References:**    
-    Pichardo, S., et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. *Phys. Med. Biol.* **56**(1):219–250 (2011). DOI: 10.1088/0031-9155/56/1/014
-    </span>
-    <br>
-
-- `mcdannold` | Polynomial ρ→Att from McDannold et al. with linear frequency scaling <br>
-
-    Fourth-order polynomial relating tissue density to attenuation, scaled linearly with frequency relative to a 660 kHz reference:
+- `mcdannold` | Polynomial ρ→Att from McDannold et al. with linear frequency scaling
 
     $$ \alpha_\text{skull}(f) = p(\rho_\text{skull}) \cdot \frac{f}{660\,\text{kHz}} $$
 
     where $p(\rho) = 1.36 \times 10^{-10}\,\rho^4 - 1.41 \times 10^{-6}\,\rho^3 + 5.40 \times 10^{-3}\,\rho^2 - 9.02\,\rho + 5.71 \times 10^{3}$ [Np/m].
 
-    Converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1`. Requires density to be filled first.
+    Converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1`. Requires density first.
 
-    <span style="font-size: 12px;">
-    **References:**    
-    McDannold, N., et al. Transcranial magnetic resonance imaging-guided focused ultrasound surgery of brain tumors: initial findings in 3 patients. *Neurosurgery* **66**(2):323–332 (2010).
-    </span>
-    <br>
+### References
+
+<span style="font-size: 12px;">
+Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).<br>
+Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave modelsa).  J. Acoust. Soc. Am. 152, 1003–1019 (2022).<br>
+Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.<br>
+Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus—an in vitro study. Skelet. Radiol. 41, 557–568 (2012).<br>
+Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).<br>
+Marsac, L. et al. Ex Vivo Optimisation of a Heterogeneous Speed of Sound Model of the Human Skull for Non-Invasive Transcranial Focused Ultrasound at 1 MHz. International Journal of Hyperthermia. 33. 635–645 (2017).<br>
+McDannold, N., et al. Transcranial magnetic resonance imaging-guided focused ultrasound surgery of brain tumors: initial findings in 3 patients. *Neurosurgery* **66**(2):323–332 (2010).<br>
+Miscouridou, M., Pineda-Pardo, J. A., Stagg, C. J., Treeby, B. E. & Stanziola, A. Classical and Learned MR to Pseudo-CT Mappings for Accurate Transcranial Ultrasound Simulation. IEEE Trans. Ultrason., Ferroelectr., Freq. Control 69, 2896–2905 (2022).<br>
+Mueller, J. K., Ai, L., Bansal, P. & Legon, W. Numerical Evaluation of the Skull for Human Neuromodulation with Transcranial Focused Ultrasound. Journal of Neural Engineering. 14. 066012 (2017).<br>
+Pichardo, S., et al. Multi-frequency characterization of the speed of sound and attenuation coefficient for longitudinal transmission of freshly excised human skulls. *Phys. Med. Biol.* **56**(1):219–250 (2011). DOI: 10.1088/0031-9155/56/1/014<br>
+Schneider, U., Pedroni, E., and Lomax A., "The calibration of CT Hounsfield units for radiotherapy treatment planning," Phys. Med. Biol., 41, pp. 111-124 (1996).<br>
+Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Velocity and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **65**(7):1111–1124 (2018). DOI: 10.1109/TUFFC.2018.2827899<br>
+Webb, T. D., et al. Measurements of the Relationship Between CT Hounsfield Units and Acoustic Attenuation and How It Changes With Photon Energy and Reconstruction Kernel. *IEEE Trans Ultrason Ferroelectr Freq Control* **68**(5):1532–1545 (2020). DOI: 10.1109/TUFFC.2020.3039743<br>
+Wiesinger, F. et al. Zero TE-based pseudo-CT image conversion in the head and its application in PET/MR attenuation correction and MR-guided radiation therapy planning. Magn. Reson. Med. 80, 1440–1451 (2018).<br>
+Yaakub, S. N. et al. Pseudo-CTs from T1-Weighted MRI for Planning of Low-Intensity Transcranial Focused Ultrasound Neuromodulation: An Open-Source Tool. Brain Stimulation. 16. 75–78 (2023).
+</span>

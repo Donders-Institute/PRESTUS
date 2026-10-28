@@ -135,7 +135,7 @@ Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull
 | `ants_simg_path` | ANTs Singularity image (`.simg`/`.sif`). | When set, ANTs tools run via `singularity exec`. |
 | `modules_to_load` | HPC environment modules loaded before pseudoCT generation. | e.g. `['matlab/R2023b', 'fsl/6.0.7', 'ants/2.5.3']` |
 | `paths_to_add` | Paths to add with `addpath()`. | [cell] e.g. `{"path/to/x"}` |
-| `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to config file location |
+| `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to the MATLAB working directory |
 
 ---
 

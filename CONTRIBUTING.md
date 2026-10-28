@@ -25,6 +25,13 @@ PRESTUS is a research tool, and we strive for transparency, reproducibility, and
 - **Backward Compatibility:** Remain backward-compatible where possible. If not feasible, document the necessary changes and impacts in your code, issue, and pull request.
 - **Data Handling:** If your contribution involves new datasets or changes to data processing, include metadata and a description of data provenance, quality, and any preprocessing steps.
 
+## Documentation and Changelog
+
+Keep the docs and the changelog short; they are read by users, not reviewers.
+
+- **Changelog** (`doc/CHANGELOG.md`): one line per change, grouped by area (`#### Calibration`, `#### Placement`, ...), as in v0.6.1. Say what changed for the user, not how or why. Mark fixes that change results with ⚠️ **Fixed:** and add the one consequence a user must act on (e.g. "rerun X"). No `Docs:`/`Tests:` lines, no function internals, no rationale; those belong in the commit message and pull request.
+- **Doc pages** (`doc/doc_*.md`): describe current behaviour as tasks (what to set, what to run, what you get). No history ("used to", "was"), no fix narratives, no test names, no implementation details a user does not act on (put those in code comments or `doc_architecture.md`). Explain a topic once and link to it. Prefer a short example over a paragraph.
+
 ## How to Submit Changes
 - Create a new branch for your feature or fix.
 - Ensure (to the best of your ability) that your features work as expected and the pipeline remains functional. Unit tests have not yet been implemented, so please verify your changes manually and describe your testing process.

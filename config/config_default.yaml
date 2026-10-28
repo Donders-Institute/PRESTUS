@@ -73,7 +73,7 @@ startup:
   ants_simg_path: ''    # Path to ANTs Singularity image (.simg/.sif); if set, ANTs tools are run via singularity exec
   modules_to_load: []   # HPC environment modules to load before pCT generation (e.g. ['matlab/R2023b','fsl/6.0.7','ants/2.5.3'])
   paths_to_add: []      # Additional paths to add with addpath()
-  subpaths_to_add: []   # Paths to add recursively with addpath(genpath()); relative to config file location
+  subpaths_to_add: []   # Paths to add recursively with addpath(genpath()); relative to the MATLAB working directory
 
 #------------ I/O management
 

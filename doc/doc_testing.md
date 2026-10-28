@@ -5,7 +5,7 @@ PRESTUS is tested at five levels, from checks that take seconds and run on every
 | Level | What it guarantees | Command | Needs | Time | Runs |
 |---|---|---|---|---|---|
 | 0 Static | Docs match the code, the site builds, the Nexus works | see [Level 0](#level-0-static-checks) | Python | ~2 min | CI, every push |
-| 1 Unit | Every function's logic, incl. config, placement, scaling, caches, HPC parsing, reports | `run_all_tests('unit')` | MATLAB | ~5 min | CI, every push |
+| 1 Unit | Every function's logic, incl. config, placement, scaling, caches, HPC parsing, reports | `run_all_tests('unit')` | MATLAB | ~15 min (macOS, checkout on a network drive; less on a local disk) | CI, every push |
 | 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~10 min (2D) | CI weekly; 3D on a GPU node before a release |
 | 3 Pipeline | Whole pipeline on synthetic and real data, numbers stable against a reference | `run_all_tests('water')` … `('demo_golden')` | k-Wave CPU; SimNIBS outputs; demo data | 10 min – hours | before a release |
 | 4 Backends | jwave / BabelBrain agree with k-Wave; Nexus ↔ MATLAB round trip | `runtests('tests/test_jwave.m')` etc. | conda envs, GPU, MATLAB | 10–60 min | after backend or environment changes |
