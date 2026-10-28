@@ -88,7 +88,7 @@ switch options.FillMethod
         else
             vol(bg) = cast(options.FillValue, class(vol));
         end
-        niftiwrite(vol, strrep(mni_file, '.nii.gz', ''), hdr, 'Compressed', true);
+        niftiwrite(vol, strrep(mni_file, '.nii.gz', '.nii'), hdr, 'Compressed', true);
 
     case 'nearest'
         if isempty(options.FovMask)
@@ -102,7 +102,7 @@ switch options.FillMethod
             vol_tmp(bg) = NaN;
             vol_tmp = nearest_fill_nan(vol_tmp);
             vol(bg) = vol_tmp(bg);
-            niftiwrite(vol, strrep(mni_file, '.nii.gz', ''), hdr, 'Compressed', true);
+            niftiwrite(vol, strrep(mni_file, '.nii.gz', '.nii'), hdr, 'Compressed', true);
         end
 end
 end

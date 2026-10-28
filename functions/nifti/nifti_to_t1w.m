@@ -114,10 +114,12 @@ function niftiwrite_gz(data, filepath, hdr)
 % compressgz which fails under macOS Full Disk Access restrictions.
 nii_path = [filepath '.nii'];
 gz_path  = [filepath '.nii.gz'];
+% Pass the full .nii name: without it niftiwrite treats any dot in the
+% name (e.g. affix '_th0.50mm') as the extension and truncates there.
 if nargin < 3
-    niftiwrite(data, filepath);
+    niftiwrite(data, nii_path);
 else
-    niftiwrite(data, filepath, hdr);
+    niftiwrite(data, nii_path, hdr);
 end
 if exist(gz_path, 'file'), delete(gz_path); end
 % run_command invokes gzip directly via argv, no shell at all -- nii_path

@@ -10,7 +10,7 @@ function alpha_db_cm = get_alpha_coeff(medium, freq)
 %   alpha_db_cm = get_alpha_coeff(medium, freq)
 %
 % Input:
-%   medium      - tissue type name matching a field in load_parameters().medium
+%   medium      - tissue type name matching a field in load_parameters().medium_properties
 %                 (e.g., 'brain', 'skull')
 %   freq        - source frequency [Hz]
 %
@@ -25,7 +25,7 @@ arguments
 end
 
     % Load tissue-specific parameters for the specified medium
-    medium = load_parameters().medium.(medium);
+    medium = load_parameters().medium_properties.(medium);
 
     % Compute the attenuation coefficient using tissue-specific parameters
     % `alpha_coeff` and `alpha_power` define the scaling relationship

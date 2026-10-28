@@ -57,11 +57,11 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
 
     %% Determine slice index if not provided
     if isempty(plot_options.slice_ind) || plot_options.slice_ind == 0
-        plot_options.slice_ind = trans_pos_grid(plot_options.slice_dim); % Use transducer position as default slice index
+        plot_options.slice_ind = round(trans_pos_grid(plot_options.slice_dim)); % Use transducer position as default slice index
     end
 
     %% Pad T1 image to ensure it includes transducer position (Positive/Post-padding)
-    im_size = max([size(t1_image); trans_pos_grid; focus_pos_grid]);
+    im_size = max([size(t1_image); ceil(trans_pos_grid); ceil(focus_pos_grid)]);   % positions may be fractional
     if ~isequal(im_size, size(t1_image))
         pad_post = im_size - size(t1_image);
         t1_image = cat(1, t1_image, zeros([pad_post(1), size(t1_image,2), size(t1_image,3)], class(t1_image)));
@@ -76,7 +76,7 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
 
     %% Define slicing indices based on specified dimension and index
     slice_pointer = repmat({':'}, 1, 3); % Initialize slicing indices for all dimensions
-    slice_pointer{plot_options.slice_dim} = plot_options.slice_ind; % Set slicing index for specified dimension
+    slice_pointer{plot_options.slice_dim} = min(max(round(plot_options.slice_ind), 1), im_size(plot_options.slice_dim)); % Set slicing index for specified dimension
 
     %% Extract T1 slice along specified axis
     t1_slice = double(t1_image(slice_pointer{:})); % Extract slice using slicing indices

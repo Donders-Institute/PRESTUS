@@ -22,6 +22,7 @@ function tf = should_save_output(io, specific_field)
 % Other outputs, not affected by io.save_matrices (built-in default):
 %   save_MNI               (1)  MNI-space NIfTIs
 %   save_property_maps     (0)  per-property NIfTIs
+%   save_kwave_medium      (0)  k-Wave medium in the acoustic cache (async sets 1)
 %   any other field        (1)
 %
 % Use as:
@@ -50,7 +51,8 @@ end
         'save_matrices',          false);
     other_defaults = struct( ...
         'save_MNI',               true, ...
-        'save_property_maps',     false);
+        'save_property_maps',     false, ...
+        'save_kwave_medium',      false);
 
     % 1. explicitly set per-step flag
     if is_set(io, specific_field)

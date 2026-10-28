@@ -129,7 +129,7 @@ end
         for ki = 1:numel(grp_a)
             k = grp_a(ki);
             if ~needs_t1w(k); continue; end
-            niftiwrite(backtransf_a(:,:,:,ki), orig_files{k}, orig_hdr, 'Compressed', true);
+            niftiwrite(backtransf_a(:,:,:,ki), [orig_files{k} '.nii'], orig_hdr, 'Compressed', true);
         end
 
         % Write Group B volumes (with CEM43 floor correction)
@@ -142,7 +142,7 @@ end
             else
                 v = backtransf_hrise(:,:,:,ki);
             end
-            niftiwrite(v, orig_files{k}, orig_hdr, 'Compressed', true);
+            niftiwrite(v, [orig_files{k} '.nii'], orig_hdr, 'Compressed', true);
         end
 
     else

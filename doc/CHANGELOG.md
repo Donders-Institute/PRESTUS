@@ -42,6 +42,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** a run reusing another run's grid cache (`io.preproc_affix`) replaced its own transducer settings (drive, phases, ISPPA targets) with those of the run that built the grid; rerun runs on another run's grid whose transducer settings differ from it
 - ⚠️ **Fixed:** NIfTI outputs were truncated at the first dot in `io.output_affix` (e.g. `_th0.50mm` → `_th0`), so runs with dotted affixes overwrote each other's NIfTIs; rerun them
 - Fixed: `io.save_matrices: 1` had no effect with the default config
+- `io.save_kwave_medium` defaults to `0`: acoustic caches no longer hold the k-Wave medium (async per-transducer runs still store it)
 - Fixed: `get_alpha_coeff` read a non-existent medium field
 - Fixed: acoustic caches whose free-water ISPPA was stored as a gpuArray could not be read back
 - The parameter summary and HTML report state the free-water ISPPA a run models; a target that differs from the drive's calibration ISPPA, or the default target on an uncalibrated drive, warns (`prestus:isppa:targetVsCalibration`)

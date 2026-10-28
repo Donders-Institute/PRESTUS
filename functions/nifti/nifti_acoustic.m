@@ -129,7 +129,7 @@ end
 
         for k = 1:n_cont
             if ~needs_t1w(k); continue; end
-            niftiwrite(backtransf(:,:,:,k), orig_files{k}, orig_hdr, 'Compressed', true);
+            niftiwrite(backtransf(:,:,:,k), [orig_files{k} '.nii'], orig_hdr, 'Compressed', true);
         end
 
         % Focal masks: nearest-neighbour back-transform (binary, order-0)
@@ -142,7 +142,7 @@ end
             mask_hdr.Datatype = 'uint8';
             mask_t1w = affine_resample_3d(uint8(mask_raw{mi}), ...
                 planimg.inv_transf, size(planimg.t1_image_orig), 'nearest', 0);
-            niftiwrite(uint8(mask_t1w > 0), orig_files{k}, mask_hdr, 'Compressed', true);
+            niftiwrite(uint8(mask_t1w > 0), [orig_files{k} '.nii'], mask_hdr, 'Compressed', true);
         end
     else
         for k = 1:n_cont
