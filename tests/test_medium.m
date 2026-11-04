@@ -82,7 +82,9 @@ classdef test_medium < matlab.unittest.TestCase
             [km, plus] = quiet_medium_setup(p, zeros(p.grid.dims));
             tc.verifyFalse(isfield(km, 'temp_0'));
             tc.verifyFalse(isfield(km, 'absorption_fraction'));
-            tc.verifyEqual(sort(fieldnames(plus)), sort({'temp_0'; 'absorption_fraction'}));
+            tc.verifyEqual(sort(fieldnames(plus)), ...
+                sort({'temp_0'; 'absorption_np'; 'absorption_fraction'; 'absorption_from_coeff'}));
+            tc.verifyFalse(plus.absorption_from_coeff);
             tc.verifySize(km.sound_speed, p.grid.dims);
         end
 
@@ -107,14 +109,13 @@ classdef test_medium < matlab.unittest.TestCase
 
         function test_absorption_coeff_converted_to_np_per_m(tc)
             % absorption_coeff [dB/(cm MHz^y)] with y = alpha_power, in Np/m at f
-            p = medium_params();
-            p.thermal.absorption_model = 'coefficient';
+            p = use_coefficients(medium_params());
             [masks, tissues] = slab_masks(p);
             [~, plus] = quiet_medium_setup(p, masks);
-            tc.verifyEqual(sort(fieldnames(plus)), sort({'temp_0'; 'absorption_np'}));
+            tc.verifyTrue(plus.absorption_from_coeff);
             f_mhz = p.transducer.freq_hz / 1e6;
             for t = 1:numel(tissues)
-                ref = tc.Cfg.medium_properties.(tissues{t});
+                ref = p.medium_properties.(tissues{t});
                 tc.verifyEqual(unique(plus.absorption_np(masks == t)), ...
                     ref.absorption_coeff * f_mhz^ref.alpha_power * 100 / (20*log10(exp(1))), ...
                     'RelTol', 1e-12, tissues{t});
@@ -126,54 +127,118 @@ classdef test_medium < matlab.unittest.TestCase
             p = medium_params();
             [masks, tissues] = slab_masks(p);
             [km_f, plus_f] = quiet_medium_setup(p, masks);
-            p.thermal.absorption_model = 'coefficient';
+            tc.verifyFalse(plus_f.absorption_from_coeff);
+            p = use_coefficients(p);
             [~, plus_c] = quiet_medium_setup(p, masks);
             w = 2*pi*p.transducer.freq_hz;
             alpha_np_f = db2neper(km_f.alpha_coeff .* plus_f.absorption_fraction, km_f.alpha_power) .* w.^km_f.alpha_power;
             for t = 1:numel(tissues)
                 ref = tc.Cfg.medium_properties.(tissues{t});
-                if ref.absorption_fraction == 1 && ref.absorption_coeff == ref.alpha_coeff
+                if ref.absorption_fraction == 1
                     v = masks == t;
                     tc.verifyEqual(plus_c.absorption_np(v), alpha_np_f(v), 'RelTol', 1e-9, tissues{t});
                 end
             end
         end
 
-        function test_absorption_coeff_required_in_coefficient_mode(tc)
-            p = medium_params();
-            p.thermal.absorption_model = 'coefficient';
-            p.medium_properties.brain = rmfield(p.medium_properties.brain, 'absorption_coeff');
-            masks = slab_masks(p);
-            tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:missingAbsorptionCoeff');
+        function test_mixed_fields_keep_coefficient_and_fraction(tc)
+            % brain as fraction, other tissues as coefficient: both maps are
+            % effective for every tissue (coefficient = fraction x attenuation)
+            p = use_coefficients(medium_params());
+            p.medium_properties.brain.absorption_fraction = 0.77;
+            p.medium_properties.brain.absorption_coeff = [];
+            [masks, tissues] = slab_masks(p);
+            [~, plus] = quiet_medium_setup(p, masks);
+            tc.verifyTrue(plus.absorption_from_coeff);
+            db2np = @(a, y) a * (p.transducer.freq_hz / 1e6)^y * 100 / (20*log10(exp(1)));
+            for t = 1:numel(tissues)
+                ref = p.medium_properties.(tissues{t});
+                v = masks == t;
+                if strcmp(tissues{t}, 'brain')
+                    np = db2np(0.77 * ref.alpha_coeff, ref.alpha_power);
+                    frac = 0.77;
+                else
+                    np = db2np(ref.absorption_coeff, ref.alpha_power);
+                    frac = ref.absorption_coeff / ref.alpha_coeff;
+                end
+                tc.verifyEqual(unique(plus.absorption_np(v)), np, 'RelTol', 1e-12, tissues{t});
+                tc.verifyEqual(unique(plus.absorption_fraction(v)), frac, 'RelTol', 1e-12, tissues{t});
+            end
         end
 
-        function test_absorption_model_resolution(tc)
+        function test_absorption_properties_report_both(tc)
+            p = use_coefficients(medium_params(), {'skull'});
+            b = tc.Cfg.medium_properties.brain;
+            s = p.medium_properties.skull;
+            a = thermal_absorption_properties(p, 'brain');
+            tc.verifyEqual(a.model, 'fraction');
+            tc.verifyEqual(a.absorption_coeff, b.absorption_fraction * b.alpha_coeff, 'RelTol', 1e-12);
+            a = thermal_absorption_properties(p, 'skull');
+            tc.verifyEqual(a.model, 'coefficient');
+            tc.verifyEqual(a.absorption_fraction, s.absorption_coeff / s.alpha_coeff, 'RelTol', 1e-12);
+            tc.verifyFalse(a.attenuation_mapped);
+        end
+
+        function test_absorption_model_follows_set_field(tc)
             p = medium_params();
-            tc.verifyEqual(thermal_absorption_model(p), 'fraction');      % shipped default
-            p.thermal.absorption_model = 'coefficient';
-            [m, forced] = thermal_absorption_model(p);
+            tc.verifyEqual(thermal_absorption_model(p, 'brain'), 'fraction');   % shipped default
+            p.medium_properties.brain.absorption_fraction = NaN;                % NaN is unset: fraction 1
+            tc.verifyEqual(thermal_absorption_property(p, 'brain', 'absorption_fraction'), 1);
+            p = use_coefficients(p);
+            [m, forced] = thermal_absorption_model(p, 'brain');
             tc.verifyEqual(m, 'coefficient'); tc.verifyFalse(forced);
-            p.pct.enabled = 1; p.pct.mapping_attenuation = 'none';       % fixed skull values
-            tc.verifyEqual(thermal_absorption_model(p), 'coefficient');
-            p.pct.mapping_attenuation = 'k-plan';                         % mapped skull attenuation
-            [m, forced] = thermal_absorption_model(p);
+            p.pct.enabled = 1; p.pct.mapping_attenuation = 'none';             % fixed skull values
+            tc.verifyEqual(thermal_absorption_model(p, 'skull'), 'coefficient');
+            p.pct.mapping_attenuation = 'k-plan';                               % mapped skull attenuation
+            tc.verifyEqual(thermal_absorption_model(p, 'brain'), 'coefficient'); % only the skull is mapped
+            [m, forced] = thermal_absorption_model(p, 'skull');
             tc.verifyEqual(m, 'fraction'); tc.verifyTrue(forced);
-            p.thermal.absorption_model = 'other';
-            tc.verifyError(@() thermal_absorption_model(p), 'thermal_absorption_model:unknownModel');
+            a = thermal_absorption_properties(p, 'skull');                      % coefficient applied as fraction
+            tc.verifyEqual(a.absorption_fraction, 3.78 / p.medium_properties.skull.alpha_coeff, 'RelTol', 1e-12);
+            p.medium_properties.brain.absorption_fraction = 0.5;                % both set after loading
+            tc.verifyError(@() thermal_absorption_model(p, 'brain'), 'thermal_absorption_model:bothSet');
         end
 
-        function test_fraction_mode_cache_signature_ignores_absorption_coeff(tc)
-            % caches written before absorption_coeff existed stay valid in fraction mode
+        function test_config_layer_clears_other_absorption_field(tc)
+            dir = tc.createTemporaryFolder();
+            write_yaml(fullfile(dir, 'coeff.yaml'), 'medium_properties:\n  skull:\n    absorption_coeff: 3.78\n');
+            write_yaml(fullfile(dir, 'frac.yaml'), 'medium_properties:\n  skull:\n    absorption_fraction: 0.3\n');
+            write_yaml(fullfile(dir, 'both.yaml'), ...
+                'medium_properties:\n  skull:\n    absorption_coeff: 3.78\n    absorption_fraction: 0.3\n');
+            p = load_parameters('coeff.yaml', dir);                             % clears the default fraction
+            tc.verifyEqual(p.medium_properties.skull.absorption_coeff, 3.78);
+            tc.verifyEmpty(p.medium_properties.skull.absorption_fraction);
+            tc.verifyEqual(p.medium_properties.brain.absorption_fraction, tc.Cfg.medium_properties.brain.absorption_fraction);
+            tc.verifyEqual(thermal_absorption_model(p, 'skull'), 'coefficient');
+            p = load_parameters('coeff.yaml', dir, 'frac.yaml', dir);           % a later layer switches back
+            tc.verifyEqual(p.medium_properties.skull.absorption_fraction, 0.3);
+            tc.verifyEmpty(p.medium_properties.skull.absorption_coeff);
+            p = load_parameters('coeff.yaml', dir, {'medium_properties.skull.absorption_fraction', 0.3}); % overrides
+            tc.verifyEqual(thermal_absorption_model(p, 'skull'), 'fraction');
+            tc.verifyEmpty(p.medium_properties.skull.absorption_coeff);
+            tc.verifyError(@() load_parameters('both.yaml', dir), 'medium_absorption_layer:bothSet');
+        end
+
+        function test_absorption_coeff_must_be_a_number(tc)
+            p = use_coefficients(medium_params());
+            p.medium_properties.brain.absorption_coeff = -1;
+            masks = slab_masks(p);
+            tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:badAbsorptionCoeff');
+        end
+
+        function test_cache_signature_keeps_the_set_absorption_field(tc)
+            % caches written before absorption_coeff existed stay valid for fractions
             p = medium_params();
             sig = cache_signature(p, 'medium');
-            tc.verifyFalse(isfield(sig, 'absorption_model'));
             tc.verifyFalse(isfield(sig.medium_properties.brain, 'absorption_coeff'));
-            p.thermal.absorption_model = 'coefficient';
+            tc.verifyTrue(isfield(sig.medium_properties.brain, 'absorption_fraction'));
+            p = use_coefficients(p, {'skull'});
             sig = cache_signature(p, 'medium');
-            tc.verifyEqual(sig.absorption_model, 'coefficient');
-            tc.verifyTrue(isfield(sig.medium_properties.brain, 'absorption_coeff'));
-            sig = cache_signature(p, 'acoustic');
             tc.verifyFalse(isfield(sig.medium_properties.brain, 'absorption_coeff'));
+            tc.verifyTrue(isfield(sig.medium_properties.skull, 'absorption_coeff'));
+            tc.verifyFalse(isfield(sig.medium_properties.skull, 'absorption_fraction'));
+            sig = cache_signature(p, 'acoustic');
+            tc.verifyFalse(isfield(sig.medium_properties.skull, 'absorption_coeff'));
         end
 
     end
@@ -220,6 +285,35 @@ function p = medium_params()
     p.transducer.freq_hz = 500e3;
     p.pct.enabled = 0;
     p.headmodel.smooth_properties = false;
+end
+
+function p = use_coefficients(p, tissues)
+% absorption_coeff instead of absorption_fraction: 3.78 for the skull layers,
+% alpha_coeff (all attenuation absorbed) for the others
+    if nargin < 2
+        tissues = fieldnames(p.medium_properties);
+    end
+    for t = 1:numel(tissues)
+        m = p.medium_properties.(tissues{t});
+        if startsWith(tissues{t}, 'skull')
+            m.absorption_coeff = 3.78;
+        else
+            m.absorption_coeff = m.alpha_coeff;
+        end
+        m.absorption_fraction = [];
+        p.medium_properties.(tissues{t}) = m;
+    end
+end
+
+function v = thermal_absorption_property(p, tissue, field)
+    a = thermal_absorption_properties(p, tissue);
+    v = a.(field);
+end
+
+function write_yaml(file, text)
+    fid = fopen(file, 'w');
+    fprintf(fid, text);
+    fclose(fid);
 end
 
 function [masks, tissues] = slab_masks(p)

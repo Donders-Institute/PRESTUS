@@ -201,19 +201,31 @@ else
     tissues = fieldnames(parameters.layers);
 end
 
+% absorption: the effective coefficient and fraction, whichever the tissue specifies
 props = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
-         'thermal_conductivity', 'specific_heat_capacity', 'perfusion', 'absorption_fraction'};
+         'thermal_conductivity', 'specific_heat_capacity', 'perfusion', ...
+         'absorption_coeff', 'absorption_fraction'};
 labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz·cm)]', ...
           'Attn: Freq^Power [-]', 'Thermal Cond. [W/(m·K)]', 'Heat Cap. [J/(kg·K)]', ...
-          'Perfusion [1/s]', 'Absorption Fraction [-]'};
-if strcmp(thermal_absorption_model(parameters), 'coefficient')
-    props{end} = 'absorption_coeff';
-    labels{end} = 'Absorption (1 MHz) [dB/(MHz·cm)]';
-end
+          'Perfusion [1/s]', 'Absorption (1 MHz) [dB/(MHz·cm)]', 'Absorption Fraction [-]'};
 
 for t_idx = 1:length(tissues)
     tissue = tissues{t_idx};
-    print_tissue_props(parameters, tissue, props, labels);
+    params_eff = parameters;
+    absorption_model = '';
+    if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, tissue)
+        absorption = thermal_absorption_properties(parameters, tissue);
+        params_eff.medium_properties.(tissue).absorption_coeff    = absorption.absorption_coeff;
+        params_eff.medium_properties.(tissue).absorption_fraction = absorption.absorption_fraction;
+        absorption_model = absorption.model;
+        if absorption.forced
+            absorption_model = [absorption_model ' (from absorption_coeff)'];
+        end
+        if absorption.attenuation_mapped
+            absorption_model = [absorption_model ', pseudo-CT attenuation'];
+        end
+    end
+    print_tissue_props(params_eff, tissue, props, labels, absorption_model);
 end
 
 %% 6. Thermal Sequence
@@ -430,7 +442,7 @@ else
 end
 end
 
-function print_tissue_props(params, tissue, props, labels)
+function print_tissue_props(params, tissue, props, labels, absorption_model)
     has_props = false;
     for p_idx = 1:length(props)
         prop = props{p_idx}; label = labels{p_idx};
@@ -444,6 +456,8 @@ function print_tissue_props(params, tissue, props, labels)
                 fmt = '%.0f';
             elseif strcmp(prop, 'alpha_coeff')
                 fmt = '%.4f';
+            elseif strcmp(prop, 'absorption_coeff')
+                fmt = '%.4g';
             else
                 fmt = '%.3f';
             end
@@ -451,6 +465,9 @@ function print_tissue_props(params, tissue, props, labels)
             fprintf('    %-28s %s %s\n', label, sprintf(fmt, val), unit);
             has_props = true;
         end
+    end
+    if has_props && nargin > 4 && ~isempty(absorption_model)
+        fprintf('    %-28s %s\n', 'Absorption Model', absorption_model);
     end
     if ~has_props
         fprintf('    No properties defined\n');

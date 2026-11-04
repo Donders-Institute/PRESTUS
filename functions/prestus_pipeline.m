@@ -178,7 +178,13 @@ function [parameters] = prestus_pipeline(parameters, options)
     log_timer('stop','medium');
 
     log_timer('start', 'nifti_medium', parameters.io.dir_output);
-    nifti_medium(parameters, planimg, medium_masks, kwave_medium, pseudoCT);
+    % property maps include the effective absorption maps kept in medium_plus
+    medium_maps = kwave_medium;
+    for f = intersect(fieldnames(medium_plus), {'absorption_fraction', 'absorption_np'})'
+        medium_maps.(f{1}) = medium_plus.(f{1});
+    end
+    nifti_medium(parameters, planimg, medium_masks, medium_maps, pseudoCT);
+    clear medium_maps
     log_timer('stop', 'nifti_medium');
     clear bone_mask
 

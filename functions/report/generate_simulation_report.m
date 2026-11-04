@@ -143,7 +143,7 @@ try
 
     % Section 6: pseudoCT [Optional] (collapsed by default)
     try
-        if isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
+        if pct_skull_mapped(parameters)
             html_parts{end+1} = html_utils.collapsible('pseudo-CT', ...
                 build_pseudoCT_section(parameters), ...
                 false, 'pseudoCT');
@@ -499,7 +499,7 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
     end
     html = [html '<table class="info-table">'];
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
-    if is_layered && isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
+    if is_layered && pct_skull_mapped(parameters)
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span> <span class="badge badge-gray">pseudo-CT (Continuous Skull)</span></td></tr>', html_utils.escape(medium))];
     elseif is_layered
         html = [html sprintf('<tr><th>Medium</th><td>%s <span class="badge badge-amber">Layered (Realistic Head)</span></td></tr>', html_utils.escape(medium))];
@@ -786,8 +786,7 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
     jw_ver_str   = '';   % j-Wave version not yet captured at runtime
 
     % pseudoCT
-    use_pct    = isfield(parameters, 'pct') && ...
-                 isfield(parameters.pct, 'enabled') && parameters.pct.enabled;
+    use_pct    = pct_skull_mapped(parameters);
     pct_method = '';
     if use_pct
         pct_method = safe_field(parameters.pct, 'skull_mapping', 'unknown');
@@ -981,7 +980,7 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
     elseif use_jwave_acoustic
         solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'helmholtz');
         precision_str = iff(~isempty(jw_precision), html_utils.escape(jw_precision), 'single');
-        % PML: jwave reads grid.pml_size (jwave.pml_size is ignored); the resolved
+        % PML: jwave reads grid.pml_size; the resolved
         % thickness is recorded in grid.pml_size_effective by acoustic_stage.
         pml_str = fmt_pml(pml);
         solver_desc = 'frequency-domain Helmholtz (GMRES)';
@@ -1131,22 +1130,20 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
                 'were estimated by solving the Pennes bioheat equation '           ...
                 '(Pennes, 1948) over the full sonication protocol described above.'];
             if is_layered
-                if strcmp(thermal_absorption_model(parameters), 'coefficient')
-                    absorption_row  = {'absorption_coeff', '&#945;<sub>abs</sub>', '%.3g', '&#8201;dB/(cm&#8201;MHz<sup>y</sup>)'};
-                    absorption_text = 'and acoustic absorption coefficient &#945;<sub>abs</sub>, with the attenuation power law y)';
-                else
-                    absorption_row  = {'absorption_fraction', 'a', '%.2g', ''};
-                    absorption_text = 'and fraction of acoustic attenuation converted to heat a)';
-                end
-                thermal_props = tissue_props_sentence(parameters, ...
-                    [{'thermal_conductivity',   'k',         '%.3g', '&#8201;W/(m&#8201;K)'; ...
-                      'specific_heat_capacity', 'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
-                      'specific_heat',          'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
-                      'perfusion',              'w<sub>b</sub>', '%.3g', '&#8201;kg/(m<sup>3</sup>&#8201;s)'}; ...
-                     absorption_row], ...
+                % absorption: the effective coefficient and fraction of every
+                % tissue, and which of the two each tissue specifies
+                [params_abs, absorption_spec] = effective_absorption(parameters);
+                thermal_props = tissue_props_sentence(params_abs, ...
+                    {'thermal_conductivity',   'k',         '%.3g', '&#8201;W/(m&#8201;K)'; ...
+                     'specific_heat_capacity', 'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
+                     'specific_heat',          'C',         '%.0f', '&#8201;J/(kg&#8201;K)'; ...
+                     'perfusion',              'w<sub>b</sub>', '%.3g', '&#8201;kg/(m<sup>3</sup>&#8201;s)'; ...
+                     'absorption_coeff',       '&#945;<sub>abs</sub>', '%.3g', '&#8201;dB/(cm&#8201;MHz<sup>y</sup>)'; ...
+                     'absorption_fraction',    'a',         '%.2g', ''}, ...
                     ['Tissue thermal properties (thermal conductivity k, specific heat C, ' ...
-                     'blood perfusion w<sub>b</sub>, ' absorption_text ' were']);
-                thermal_solver_str = [thermal_solver_str thermal_props];
+                     'blood perfusion w<sub>b</sub>, acoustic absorption coefficient &#945;<sub>abs</sub> ' ...
+                     'with the attenuation power law y, and absorbed fraction of attenuation a = &#945;<sub>abs</sub>/&#945;) were']);
+                thermal_solver_str = [thermal_solver_str thermal_props absorption_spec];
             end
         end
         para5 = [b('Thermal simulations.') thermal_solver_str ' ' cem43_formula];
@@ -1320,6 +1317,47 @@ end
 function s = ref(tag, text_html)
 % Format a single reference list item.
     s = sprintf('<li>%s</li>', text_html);
+end
+
+function [params_abs, spec] = effective_absorption(parameters)
+% parameters with the effective absorption_coeff and absorption_fraction of
+% each layer (THERMAL_ABSORPTION_PROPERTIES), and a methods sentence naming
+% the tissues whose absorption was specified as a coefficient or a fraction
+    params_abs = parameters;
+    spec = '';
+    if ~isfield(parameters, 'medium_properties') || ~isfield(parameters, 'layers')
+        return
+    end
+    by_coeff = {}; by_fraction = {}; mapped = false;
+    layer_names = fieldnames(parameters.layers);
+    for i = 1:numel(layer_names)
+        name = layer_names{i};
+        if ~isfield(parameters.medium_properties, name) || ~isstruct(parameters.medium_properties.(name)); continue; end
+        a = thermal_absorption_properties(parameters, name);
+        params_abs.medium_properties.(name).absorption_coeff    = a.absorption_coeff;
+        params_abs.medium_properties.(name).absorption_fraction = a.absorption_fraction;
+        label = html_utils.escape(strrep(name, '_', ' '));
+        if strcmp(a.model, 'coefficient')
+            by_coeff{end+1} = label; %#ok<AGROW>
+        else
+            by_fraction{end+1} = label; %#ok<AGROW>
+        end
+        mapped = mapped || a.attenuation_mapped;
+    end
+    parts = {};
+    if ~isempty(by_coeff)
+        parts{end+1} = ['as a coefficient for ' strjoin(by_coeff, ', ')];
+    end
+    if ~isempty(by_fraction)
+        parts{end+1} = ['as a fraction of attenuation for ' strjoin(by_fraction, ', ')];
+    end
+    if ~isempty(parts)
+        spec = [' Absorption was specified ' strjoin(parts, ' and ') '.'];
+    end
+    if mapped
+        spec = [spec ' Skull values refer to the configured skull attenuation; ' ...
+                'the skull absorption fraction was applied to the pseudo-CT mapped attenuation.'];
+    end
 end
 
 function s = tissue_props_sentence(parameters, props, lead)
@@ -1573,7 +1611,8 @@ function html = build_medium_properties_section(parameters)
         return
     end
 
-    med = parameters.medium_properties;
+    params_abs = effective_absorption(parameters); % both absorption quantities per tissue
+    med = params_abs.medium_properties;
     layer_names = fieldnames(parameters.layers);
 
     valid_tissues = {};
@@ -1605,10 +1644,8 @@ function html = build_medium_properties_section(parameters)
              'thermal_conductivity', 'Thermal cond.', 'W/(m·K)'; ...
              'specific_heat_capacity', 'Specific heat', 'J/(kg·K)'; ...
              'perfusion', 'Perfusion rate', 'kg/(m³·s)'; ...
+             'absorption_coeff', 'Absorption coeff.', 'dB/(MHz^y·cm)'; ...
              'absorption_fraction', 'Absorption fraction', 'Fraction'};
-    if strcmp(thermal_absorption_model(parameters), 'coefficient')
-        props(end, :) = {'absorption_coeff', 'Absorption coeff.', 'dB/(MHz^y·cm)'};
-    end
 
     html = '<div class="table-wrapper"><table class="data-table">';
     html = [html '<thead><tr><th>Property</th><th>Unit</th>'];
@@ -2473,7 +2510,7 @@ function html = build_toc(parameters, is_layered, extra_html)
     end
 
     % pCT (pCT only)
-    if isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && parameters.pct.enabled
+    if pct_skull_mapped(parameters)
         html = [html '<a href="#pseudoCT">pseudo-CT</a>'];
     end
 

@@ -134,7 +134,7 @@ sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_di
 % skull bone density is fixed for thermal simulation
 % (note that downstream metrics such as sound speed contribute to pressure, but are not input to kWaveDiffusion)
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
-if parameters.pct.enabled ==1 && ...
+if pct_skull_mapped(parameters) && ...
     (~isfield(parameters, 'pct') || ~isfield(parameters.pct, 'mapping_density') || strcmp(parameters.pct.mapping_density, 'k-plan'))
     skull_i = find(ismember(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
     % [k-Plan] use fixed density for thermal simulation
@@ -147,9 +147,9 @@ end
 % etc.); temp_0 and the absorption map were stored separately in medium_plus
 % and were not expanded at that point.
 if isfield(kwave_medium, 'absorption_np')
-    absorption_field = 'absorption_np';         % thermal.absorption_model = 'coefficient'
+    absorption_field = 'absorption_np';         % any tissue with absorption model 'coefficient'
 else
-    absorption_field = 'absorption_fraction';   % thermal.absorption_model = 'fraction'
+    absorption_field = 'absorption_fraction';   % all tissues with absorption model 'fraction'
 end
 if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
     Nlateral  = parameters.grid.axisym_bilateral_dims(2);
@@ -218,7 +218,7 @@ clear alpha_np p;
 
 % remove unexpected fields from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');
-kwave_medium = rmfield(kwave_medium, absorption_field);
+kwave_medium = rmfield(kwave_medium, intersect(fieldnames(kwave_medium), {'absorption_fraction', 'absorption_np'}));
 
 % if perfusion was specified, implement it by specifying blood temperature
 if ~all(isnan(kwave_medium.perfusion_coeff))

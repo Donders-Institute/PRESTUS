@@ -139,7 +139,12 @@ if run_new_sim
     end
 
     kwave_medium.temp_0              = medium_plus.temp_0;
-    if isfield(medium_plus, 'absorption_np')
+    % absorption_np when any tissue uses an absorption coefficient; runs with
+    % fractions only keep the fraction x attenuation path (medium caches from
+    % before absorption_from_coeff hold one of the two maps)
+    if isfield(medium_plus, 'absorption_np') && ...
+            (~isfield(medium_plus, 'absorption_fraction') || ...
+             (isfield(medium_plus, 'absorption_from_coeff') && medium_plus.absorption_from_coeff))
         kwave_medium.absorption_np = medium_plus.absorption_np;
     else
         kwave_medium.absorption_fraction = medium_plus.absorption_fraction;

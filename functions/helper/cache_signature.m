@@ -52,18 +52,20 @@ function sig = cache_signature(parameters, kind)
             sig.grid = drop_acoustic_fov(sig.grid);
         case 'medium'
             sig.grid = drop_acoustic_fov(sig.grid);
-            % absorption_coeff only enters the medium with thermal.absorption_model = 'coefficient'
-            use_coeff = strcmp(thermal_absorption_model(parameters), 'coefficient');
-            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), use_coeff);
-            if use_coeff
-                sig.absorption_model = 'coefficient';
+            % an uncertainty bound variant of a pseudo-CT run: homogeneous skull
+            % (field only when set, so other caches keep their signature)
+            if ~pct_skull_mapped(parameters) && isstruct(sig.pct) && isfield(sig.pct, 'enabled') && ...
+                    isequal(sig.pct.enabled, 1)
+                sig.homogeneous_skull = true;
             end
+            % a tissue's medium uses absorption_coeff or absorption_fraction, whichever is set
+            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), parameters);
         case 'acoustic'
             % A pressure map reused by a later run (path.acoustic_input): its
             % grid and medium, but not the thermal-only grid settings, so the
             % thermal stage can be re-run on another grid.
             sig.subject_id = get_field(parameters, {'subject_id'});
-            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), false);
+            sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), []);
             if isstruct(sig.grid)
                 g = fieldnames(sig.grid);
                 sig.grid = rmfield(sig.grid, g(startsWith(g, 'thermal_')));
@@ -121,16 +123,29 @@ function v = get_field(s, path)
     v = s;
 end
 
-function mp = drop_absorption_coeff(mp, keep)
-% absorption_coeff is thermal-only and unused with thermal.absorption_model = 'fraction'
-    if keep || ~isstruct(mp)
+function mp = drop_absorption_coeff(mp, parameters)
+% absorption_coeff is thermal-only and unused by tissues that set
+% absorption_fraction, as is an emptied absorption_fraction by tissues that
+% set absorption_coeff; parameters = [] drops absorption_coeff from every tissue
+    if ~isstruct(mp)
         return
     end
     for t = fieldnames(mp)'
-        if isstruct(mp.(t{1})) && isfield(mp.(t{1}), 'absorption_coeff')
+        if ~isstruct(mp.(t{1}))
+            continue
+        end
+        by_fraction = isempty(parameters) || strcmp(thermal_absorption_model(parameters, t{1}), 'fraction') && ...
+            ~thermal_absorption_forced(parameters, t{1});
+        if by_fraction && isfield(mp.(t{1}), 'absorption_coeff')
             mp.(t{1}) = rmfield(mp.(t{1}), 'absorption_coeff');
+        elseif ~by_fraction && isfield(mp.(t{1}), 'absorption_fraction')
+            mp.(t{1}) = rmfield(mp.(t{1}), 'absorption_fraction');
         end
     end
+end
+
+function tf = thermal_absorption_forced(parameters, tissue)
+    [~, tf] = thermal_absorption_model(parameters, tissue);
 end
 
 function g = drop_acoustic_fov(g)

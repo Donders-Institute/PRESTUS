@@ -566,8 +566,8 @@ Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, 
 | `thermal_conductivity` | Thermal conductivity. | W/m/°C — Tissue Properties DB |
 | `specific_heat_capacity` | Specific heat capacity. | J/kg/°C — Tissue Properties DB |
 | `perfusion` | Perfusion / heat transfer rate. | mL/min/kg — Tissue Properties DB |
-| `absorption_fraction` | Fraction of attenuation converted to heat. Used with `thermal.absorption_model: fraction`. | [0–1] — Pinton et al., 2012 |
-| `absorption_coeff` | Absorption coefficient, with the power law `alpha_power`. Used with `thermal.absorption_model: coefficient`. | dB/cm/MHz — Pinton et al., 2012 |
+| `absorption_fraction` | Fraction of attenuation converted to heat. Set this or `absorption_coeff`; a config layer that sets one empties the other ([Heat deposition](doc_simulations-thermal.md#heat-deposition)). Default for every tissue. | [0–1] — Pinton et al., 2012 |
+| `absorption_coeff` | Absorption coefficient, with the power law `alpha_power`; empty by default. Set this or `absorption_fraction`. | dB/cm/MHz — Pinton et al., 2012 |
 
 ---
 
@@ -601,7 +601,6 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `absorption_model` | How acoustic heat deposition is specified: `fraction` (`medium_properties.*.absorption_fraction` × attenuation) or `coefficient` (`medium_properties.*.absorption_coeff`). | `fraction` | One model per run. With pseudo-CT attenuation mapping (`pct.mapping_attenuation` other than `none`), `coefficient` falls back to `fraction` with a warning (`medium_setup:absorptionModelForced`). See [Heat deposition](doc_simulations-thermal.md#heat-deposition). |
 | `cem43_iso` | CEM43 form used in the HTML report (dashboard, safety verdict, methods text): ISO 14708-3 / ITRUSST (`1`) or k-Wave `kWaveDiffusion` (`0`). | `0` | Both forms are always computed and written to CSV, NIfTI and figures. With `thermal_backend: babelbrain` it is set to `0` with a warning (`prestus:cem43IsoBabelBrain`): BabelBrain does not compute the ISO form. |
 | `temp_0.{tissue}` | Initial temperature per tissue compartment [°C]. | `37` | Tissues: `water`, `skull`, `brain`, `skin`, `skull_trabecular`, `skull_cortical` |
 | `sensor_xy_halfsize` | Sensor window half-size for temperature recording [grid units]. | `100` | |

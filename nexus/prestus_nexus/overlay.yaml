@@ -250,7 +250,6 @@ fields:
   # ── Timing & thermal ─────────────────────────────────────────────────
   timing.*: {unit: s}
   timing.equal_step_duration: {kind: flag, unit: ''}
-  thermal.absorption_model: {kind: str, choices: [fraction, coefficient]}
   thermal.cem43_iso: {kind: flag}
   thermal.temp_0.*: {unit: °C}
   thermal.sensor_xy_halfsize: {unit: grid points}
@@ -292,7 +291,7 @@ fields:
   medium_properties.*.density: {unit: kg/m³}
   medium_properties.*.thermal_conductivity: {unit: W/m/°C}
   medium_properties.*.specific_heat_capacity: {unit: J/kg/°C}
-  medium_properties.*.absorption_coeff: {unit: dB/(cm·MHz^y)}
+  medium_properties.*.absorption_coeff: {kind: number, unit: dB/(cm·MHz^y), help: "Alternative to absorption_fraction: set one of the two per tissue"}
 
 deprecated:
   # Converted or reported by functions/legacy/upgrade_config_keys.m (configs from v0.5.0 on):

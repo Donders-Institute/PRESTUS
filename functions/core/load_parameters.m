@@ -124,6 +124,7 @@ function parameters = load_parameters(varargin)
         report_stale_project_default(default_config_path, parameters, project_defaults);
         parameters = mergestruct(parameters, project_defaults);
         parameters = restore_struct_arrays(parameters, project_defaults);
+        parameters = medium_absorption_layer(parameters, project_defaults, default_config_path);
     end
     known_keys  = parameters;          % for the unknown-key check below
     % default ISPPA target, recorded below when no config layer sets one (ISPPA_INTENT)
@@ -157,6 +158,8 @@ function parameters = load_parameters(varargin)
         target_set = target_set || sets_target(extra_parameters);
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
+        if isstruct(extra_config_file); extra_config_file = 'struct input'; end
+        parameters = medium_absorption_layer(parameters, extra_parameters, extra_config_file);
     elseif nargs == 2
         extra_config_file = varargin{1};
         extra_config_location = varargin{2};
@@ -166,6 +169,7 @@ function parameters = load_parameters(varargin)
         target_set = target_set || sets_target(extra_parameters);
         parameters = mergestruct(parameters, extra_parameters);
         parameters = restore_struct_arrays(parameters, extra_parameters);
+        parameters = medium_absorption_layer(parameters, extra_parameters, extra_config_file);
     elseif nargs > 2
         % Check that extra inputs come in pairs (filename, location)
         if mod(numel(varargin), 2) ~= 0
@@ -181,6 +185,7 @@ function parameters = load_parameters(varargin)
             target_set = target_set || sets_target(extra_parameters);
             parameters = mergestruct(parameters, extra_parameters);
             parameters = restore_struct_arrays(parameters, extra_parameters);
+            parameters = medium_absorption_layer(parameters, extra_parameters, extra_config_file);
         end
     end
 
@@ -188,6 +193,7 @@ function parameters = load_parameters(varargin)
     if ~isempty(overrides)
         overrides = upgrade_config_keys(overrides, 'overrides');
         parameters = apply_config_overrides(parameters, overrides);
+        parameters = medium_absorption_layer(parameters, override_layer(overrides), 'overrides');
         target_set = target_set || any(~cellfun(@isempty, regexp(cellstr(string(overrides(:, 1))), ...
             '^(transducer(\(\d+\))?|calibration)\.target_isppa_wcm2$', 'once')));
     end
@@ -409,6 +415,20 @@ function parameters = load_parameters(varargin)
         print_parameter_summary(parameters)
     end
 
+end
+
+function layer = override_layer(overrides)
+% medium_properties.<tissue>.absorption_* overrides as a layer struct (MEDIUM_ABSORPTION_LAYER)
+    layer = struct();
+    if isstruct(overrides)
+        overrides = [{overrides.key}', {overrides.value}'];
+    end
+    for i = 1:size(overrides, 1)
+        tok = regexp(char(overrides{i, 1}), '^medium_properties\.(\w+)\.(absorption_fraction|absorption_coeff)$', 'tokens', 'once');
+        if ~isempty(tok)
+            layer.medium_properties.(tok{1}).(tok{2}) = overrides{i, 2};
+        end
+    end
 end
 
 function tf = sets_target(s)

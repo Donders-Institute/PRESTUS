@@ -122,7 +122,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: defacing also covers `T2_reg.nii.gz`; skull hole filling works when bone has a single label; aligning to the natural focus without `focus_pos` failed
 
 #### Acoustic / Thermal
-- `thermal.absorption_model: coefficient` sets heat deposition from per-tissue `medium_properties.*.absorption_coeff` instead of `absorption_fraction` (default stays `fraction`)
+- Each tissue sets heat deposition as `medium_properties.*.absorption_fraction` (default) or `absorption_coeff`; a config layer that sets one empties the other, and setting both in one layer errors
+- Logs, run summary and HTML methods give each tissue's effective absorption coefficient and fraction; property maps include `absorption_np` and `absorption_fraction`
 - Partial acoustic FOV along the beam axis (`grid.acoustic_fov_length_mm`, `grid.acoustic_fov_diameter_mm`, `'auto'` from focal geometry) for deep targets; the thermal grid can match it (`thermal.match_acoustic_fov`)
 - Free-water grid `'auto'` sizing (`grid.water_margin_mm`, `grid.z_beyond_focus_mm`); matrix transducers placed by `trans_pos` / `focus_pos` keep `[144, 144, 400]`
 - `grid.water_baseline_grid: 'beam'` (default) runs the k-Wave free-water baseline on a box around the source and beam: the same free-field result at a fraction of the cost; `'full'` uses the whole grid
