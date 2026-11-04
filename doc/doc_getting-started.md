@@ -1,4 +1,4 @@
-# Your first simulation
+# Your First Simulation
 
 This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no SimNIBS, a few minutes on a CPU) and then points to what changes for a head simulation.
 

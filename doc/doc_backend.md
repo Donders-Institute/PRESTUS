@@ -1,4 +1,4 @@
-# Simulation backends
+# Simulation Backends
 
 !!! note "At a glance"
     - **What:** The simulation engines PRESTUS can use: k-Wave (default), an elastic k-Wave skull model, BabelBrain and jwave.

@@ -1,4 +1,4 @@
-# Multi-ISPPA mode
+# Multi-ISPPA Mode
 
 !!! note "At a glance"
     - **What:** One acoustic simulation, scaled to several free-water target intensities, each with its own thermal simulation and report.

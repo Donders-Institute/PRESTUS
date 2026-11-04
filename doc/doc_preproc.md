@@ -1,4 +1,4 @@
-# Head preprocessing
+# Head Preprocessing
 
 !!! note "At a glance"
     - **What:** How the SimNIBS segmentation becomes the simulation grid: rotation, rescaling, smoothing, skull hole filling and cropping.

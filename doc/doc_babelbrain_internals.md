@@ -1,4 +1,4 @@
-# BabelBrain backend: integration internals
+# BabelBrain Backend: Integration Internals
 
 Notes for developers and for debugging the BabelBrain bridge. For using the backend see [BabelBrain backend](doc_babelbrain.md).
 

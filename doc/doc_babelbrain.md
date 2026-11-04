@@ -1,4 +1,4 @@
-# BabelBrain backend
+# BabelBrain Backend
 
 !!! note "At a glance"
     - **What:** BabelBrain as an alternative acoustic solver, thermal solver, or both. k-Wave stays the default.

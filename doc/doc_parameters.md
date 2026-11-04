@@ -1,4 +1,4 @@
-## PRESTUS parameters
+# PRESTUS Parameters
 
 Parameters are organised in nested structs that map directly to YAML keys. `config_default.yaml` defines all parameters and their default values and should not be edited; a study config is merged on top and only needs the values that differ (see [Configuring a study](doc_configuration.md) for the full layering, project defaults and overrides). Parameters can also be set in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
 

@@ -1,4 +1,4 @@
-# Medium properties
+# Medium Properties
 
 !!! note "At a glance"
     - **What:** The three kinds of medium (`water`, `layered`, `phantom`) and the default acoustic and thermal properties of each tissue.

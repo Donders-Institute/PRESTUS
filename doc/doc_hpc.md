@@ -1,4 +1,4 @@
-# Running on a cluster (HPC)
+# Running on a Cluster (HPC)
 
 !!! note "At a glance"
     - **What:** Running PRESTUS as jobs on a computing cluster.

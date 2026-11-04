@@ -1,4 +1,4 @@
-# Limited acoustic FOV
+# Limited Acoustic FOV
 
 !!! note "At a glance"
     - **What:** Running the acoustic simulation on a smaller box around the beam to save time and memory.

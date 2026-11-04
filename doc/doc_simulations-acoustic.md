@@ -1,4 +1,4 @@
-# Acoustic simulations
+# Acoustic Simulations
 
 !!! note "At a glance"
     - **What:** How the acoustic simulation is set up: grid sampling, intensity targeting, memory use and 2D axisymmetric runs.

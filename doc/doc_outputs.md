@@ -1,4 +1,4 @@
-# Simulation outputs
+# Simulation Outputs
 
 !!! note "At a glance"
     - **What:** Every file, table column and folder a run writes, and how a later run can start from them.

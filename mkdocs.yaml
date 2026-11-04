@@ -40,9 +40,9 @@ nav:
   - 🚀 Get Started:
     - Concepts: doc_concepts.md
     - Installation: doc_installation.md
-    - Your first simulation: doc_getting-started.md
-    - Reading your results: doc_results.md
-    - Configuring a study: doc_configuration.md
+    - Your First Simulation: doc_getting-started.md
+    - Reading Your Results: doc_results.md
+    - Configuring a Study: doc_configuration.md
     - PRESTUS Nexus: doc_nexus.md
     - MATLAB GUI: doc_gui.md
   - 🧠 Head Model:
@@ -81,7 +81,7 @@ nav:
     - Uncertainty Analysis: doc_uncertainty.md
   - ⚙️ Backends:
     - Overview: doc_backend.md
-    - k-Wave (default): doc_kwave.md
+    - k-Wave (Default): doc_kwave.md
     - BabelBrain: doc_babelbrain.md
     - jwave: doc_jwave.md
   - 📚 Reference:
@@ -89,7 +89,7 @@ nav:
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
     - Coordinate Systems: doc_coordinate_systems.md
-    - How PRESTUS works: doc_architecture.md
+    - How PRESTUS Works: doc_architecture.md
   - 🛟 Help:
     - Troubleshooting: doc_troubleshooting.md
     - Changelog: CHANGELOG.md

@@ -1,4 +1,4 @@
-# jwave acoustic backend
+# jwave Acoustic Backend
 
 !!! note "At a glance"
     - **What:** jwave as an alternative acoustic solver, with a frequency-domain Helmholtz solve for continuous-wave runs.

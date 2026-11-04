@@ -219,7 +219,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: `matlab -batch` and SLURM/PBS sessions no longer prompt for consent; they print the notice and record nothing
 
 #### Documentation
-- Navigation regrouped by workflow; new pages *Your first simulation*, *Configuring a study*, *How PRESTUS works*, *Concepts*, *Glossary*, *Reading your results*, and Troubleshooting
+- Navigation regrouped by workflow; new pages *Your First Simulation*, *Configuring a Study*, *How PRESTUS Works*, *Concepts*, *Glossary*, *k-Wave*, *Reading Your Results*, and *Troubleshooting*
 - Fixed: `config_tutorial.yaml` nested transducer positions under an unused key and referenced a missing element file; the tutorial matrix config gave the element size in m (5.317e-3) instead of mm
 
 ---

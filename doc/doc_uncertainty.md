@@ -1,4 +1,4 @@
-# Uncertainty quantification
+# Uncertainty Quantification
 
 !!! note "At a glance"
     - **What:** Five simulations of the same setup: the default medium and four variants at the ITRUSST tissue property bounds, with one report that gives the range of each safety metric.

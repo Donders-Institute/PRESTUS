@@ -1,4 +1,4 @@
-# How PRESTUS works
+# How PRESTUS Works
 
 !!! note "At a glance"
     - **What:** How a run is put together: config assembly, where it executes, what each stage reads, writes and caches, and the conventions that keep results consistent.

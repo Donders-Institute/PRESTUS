@@ -1,4 +1,4 @@
-# Group analysis
+# Group Analysis
 
 !!! note "At a glance"
     - **What:** Running many subjects or conditions from one table, and summarising them in group maps and a group report.

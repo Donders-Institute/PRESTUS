@@ -1,4 +1,4 @@
-# Thermal simulations
+# Thermal Simulations
 
 !!! note "At a glance"
     - **What:** How to describe the sonication protocol (pulses, trains, repetitions) and how heating and thermal dose are computed.

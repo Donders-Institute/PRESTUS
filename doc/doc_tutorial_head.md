@@ -1,4 +1,4 @@
-# Tutorial: a head simulation
+# Tutorial: A Head Simulation
 
 !!! warning "Draft"
     This tutorial has not yet been run end to end on the current PRESTUS version. Runtimes and the values under *What you should see* are placeholders (marked **TODO**) until a test run fills them in. It is not yet linked from the navigation.

@@ -1,4 +1,4 @@
-# Localite ingestion: GUI and script workflows
+# Localite Ingestion: GUI and Script Workflows
 
 !!! note "At a glance"
     - **What:** Turning raw Localite exports into ingested, named targets that `placement.mode: localite` reads, with the GUI or a script.

@@ -1,4 +1,4 @@
-# Time reversal: refocusing, aberration report and pose search
+# Time Reversal: Refocusing, Aberration Report and Pose Search
 
 !!! warning "Draft"
     This feature is new and not yet validated against forward simulations. Treat its predictions as a ranking signal and check any pose or phase set you intend to use with a regular acoustic simulation.

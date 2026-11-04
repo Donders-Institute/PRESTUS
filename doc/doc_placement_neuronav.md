@@ -1,4 +1,4 @@
-# Neuronavigation read-in
+# Neuronavigation Read-In
 
 !!! note "At a glance"
     - **What:** Simulating the transducer pose that was recorded with Localite neuronavigation during the experiment.

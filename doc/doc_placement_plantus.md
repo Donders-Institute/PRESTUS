@@ -1,4 +1,4 @@
-# PlanTUS placement
+# PlanTUS Placement
 
 !!! note "At a glance"
     - **What:** Placement with the external PlanTUS tool, which scores scalp positions on several criteria (distance, angles, skull thickness, beam–target overlap).

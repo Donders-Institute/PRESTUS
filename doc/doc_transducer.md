@@ -1,4 +1,4 @@
-# Transducer definition
+# Transducer Definition
 
 !!! note "At a glance"
     - **What:** The fields that define a transducer: type, frequency, element geometry, drive, phases and position.

@@ -1,4 +1,4 @@
-# Multi-target extraction toolkit
+# Multi-Target Extraction Toolkit
 
 !!! note "At a glance"
     - **What:** Tools to extract several planned targets from Localite exports in one go.

@@ -1,4 +1,4 @@
-# Adding and maintaining library entries
+# Adding and Maintaining Library Entries
 
 !!! note "At a glance"
     - **What:** How to add a transducer or driving system that is not in the shipped library, and how maintainers rebuild or contribute shipped entries.

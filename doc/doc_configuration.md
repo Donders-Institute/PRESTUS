@@ -1,4 +1,4 @@
-# Configuring a study
+# Configuring a Study
 
 All PRESTUS settings live in YAML config files. You never write a complete config: PRESTUS starts from its defaults, and your files contain only what differs. This page explains how the files are combined, how to set up a project folder, and how to override settings per run. Every parameter is listed in [Parameters](doc_parameters.md).
 
