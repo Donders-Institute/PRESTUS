@@ -96,7 +96,7 @@ On a workstation without a job scheduler, also set `platform: matlab`: the defau
 | Position and target | `placement.*`, `transducer.trans_pos`/`focus_pos` | [Placement](doc_placement.md) |
 | Protocol and heating | `timing.*`, `thermal.*` | [Thermal](doc_simulations-thermal.md) |
 | Which stages run | `modules.*` | [Modules](doc_modules.md) |
-| Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backend](doc_backend.md) |
+| Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backends](doc_backend.md), [k-Wave](doc_kwave.md) |
 | Output files | `io.*` | [Outputs](doc_outputs.md) |
 
 ## Configs from earlier PRESTUS versions

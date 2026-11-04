@@ -4,7 +4,7 @@
 
 # PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation
 
-PRESTUS is an open-source MATLAB toolbox for imaging-informed simulations of transcranial ultrasound stimulation (TUS). From a T1-weighted MRI it builds a head model, places a transducer, simulates the acoustic field and the heating it causes, and writes a report with the metrics used for planning and safety reporting. Simulations run with the [k-Wave engine](doc_backend.md) on a laptop, a GPU workstation or a cluster.
+PRESTUS is an open-source MATLAB toolbox for imaging-informed simulations of transcranial ultrasound stimulation (TUS). From a T1-weighted MRI it builds a head model, places a transducer, simulates the acoustic field and the heating it causes, and writes a report with the metrics used for planning and safety reporting. Simulations run with the [k-Wave engine](doc_kwave.md) on a laptop, a GPU workstation or a cluster.
 
 PRESTUS is intended for basic research. It is not approved for clinical use.
 

@@ -91,7 +91,7 @@ A head (`layered`) simulation adds an MRI, a SimNIBS segmentation and a target. 
 | Transducer position and target | `transducer.trans_pos`/`focus_pos`, or a `placement.mode` | [Placement](doc_placement.md) |
 | Sonication protocol (for heating) | `timing.*`, `modules.run_heating_sims: 1` | [Thermal](doc_simulations-thermal.md) |
 
-On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: matlab_gpu` or `cpp_gpu`, see [Backend](doc_backend.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
+On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: matlab_gpu` or `cpp_gpu`, see [k-Wave](doc_kwave.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
 
 ## 4. Next steps
 

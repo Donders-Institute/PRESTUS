@@ -19,7 +19,7 @@ modules:
   run_water_baseline: auto  # free-water baseline for the ISPPA scaling
 ```
 
-The simulation models compressional waves (P-waves) in isotropic media and computes pressure and velocity fields. Shear waves are not modelled explicitly; their scattering contributes to the bulk attenuation coefficient. This makes the run faster and less memory-intensive than an elastic simulation. An elastic skull model is available as a separate backend ([`kwave_elastic`](doc_backend.md#k-wave-elastic-backend-shear-waves), draft).
+The simulation models compressional waves (P-waves) in isotropic media and computes pressure and velocity fields. Shear waves are not modelled explicitly; their scattering contributes to the bulk attenuation coefficient. This makes the run faster and less memory-intensive than an elastic simulation. An elastic skull model is available as a separate backend ([`kwave_elastic`](doc_kwave.md#elastic-skull-model-shear-waves), draft).
 
 !!! note "Turning off acoustic simulations"
     With `modules.run_acoustic_sims: 0`, PRESTUS loads the existing acoustic results from the cache (subject to `io.overwrite_files`; see [Overwrite behaviour](doc_outputs.md#overwrite-behaviour)). This lets a follow-up thermal simulation reuse an earlier acoustic run. Other modules behave differently: turning them off may skip the step without loading existing data.

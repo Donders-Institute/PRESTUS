@@ -132,7 +132,7 @@ The Nexus runs where you edit configs and needs a display; the others run where 
 
 ### Optional: C++ binaries
 
-For the `cpp_cpu` and `cpp_gpu` code types, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). Compiling and selecting binaries is described in [Backends](doc_backend.md).
+For the `cpp_cpu` and `cpp_gpu` code types, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
 
 ### Optional: PlanTUS dependencies
 

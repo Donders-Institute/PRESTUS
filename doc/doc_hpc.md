@@ -45,7 +45,7 @@ Some modes split one run into several chained jobs that pass results through cac
 | `hpc.ld_library_path` | `''` | Extra shared-library path for SimNIBS, if `charm` reports `undefined symbol` errors |
 | `hpc.name` | `'default'` | `'snellius'` selects the Snellius partition presets (`snellius.*`) |
 
-All keys are listed in [Parameters](doc_parameters.md#high-performance-computing-hpc). Which simulations need a GPU and which settings are fastest is described in [Backend](doc_backend.md). The time and memory earlier runs needed are summarised under [Resource estimates](#resource-estimates-from-earlier-runs).
+All keys are listed in [Parameters](doc_parameters.md#high-performance-computing-hpc). Which simulations need a GPU and which settings are fastest is described in [k-Wave](doc_kwave.md). The time and memory earlier runs needed are summarised under [Resource estimates](#resource-estimates-from-earlier-runs).
 
 ## GPU support
 

@@ -16,7 +16,7 @@ PRESTUS can run [jwave](https://github.com/ucl-bug/jwave) in place of k-Wave for
 | **GPU backends** | CUDA (via MATLAB `gpuArray` or C++ binary) | NVIDIA CUDA only |
 | **Thermal simulation** | Yes (`kWaveDiffusion`) | Not supported |
 
-jwave uses the same scalar acoustic model as k-Wave: no shear waves in bone and no Rayleigh pre-step. The `medium_properties` PRESTUS assigns apply to both equally, so results are directly comparable. See [Simulation backends](doc_backend.md) for the k-Wave backend options.
+jwave uses the same scalar acoustic model as k-Wave: no shear waves in bone and no Rayleigh pre-step. The `medium_properties` PRESTUS assigns apply to both equally, so results are directly comparable. See [k-Wave](doc_kwave.md) for the k-Wave backend options.
 
 ## Quick start
 

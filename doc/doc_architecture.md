@@ -113,7 +113,7 @@ With several transducers each target is that transducer's own free-water ISPPA. 
 
 ## Acoustic and thermal backends
 
-`acoustic_backend` (`kwave`, `jwave`, `babelbrain`) and `thermal_backend` (`kwave`, `babelbrain`) select the solver; everything before and after the solver call is shared. `run_acoustic_backend` dispatches the acoustic call, so a fresh run and a re-run after a stale cache use the same backend and the same scaling. `simulation.code_type` selects k-Wave's MATLAB or C++ code on CPU or GPU. See [Backend](doc_backend.md).
+`acoustic_backend` (`kwave`, `jwave`, `babelbrain`) and `thermal_backend` (`kwave`, `babelbrain`) select the solver; everything before and after the solver call is shared. `run_acoustic_backend` dispatches the acoustic call, so a fresh run and a re-run after a stale cache use the same backend and the same scaling. `simulation.code_type` selects k-Wave's MATLAB or C++ code on CPU or GPU. See [Backends](doc_backend.md) and [k-Wave](doc_kwave.md).
 
 ## Logging and provenance
 

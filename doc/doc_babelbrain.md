@@ -99,7 +99,7 @@ Put the environment directory (the one containing `bin/python`) into `babelbrain
 | **Narrow-beam domain** | Optional (see [limited FOV](doc_limited_fov.md)) | Off by default (the pre-focal field would not be returned); enable with `babelbrain.tight_narrow_beam: true`. Always off when `grid.acoustic_fov_length_mm` is set (mask already cropped) |
 | **GPU backends** | CUDA, MATLAB GPU arrays | CUDA, OpenCL, Metal (Apple Silicon) |
 
-See [Simulation backends](doc_backend.md) for the k-Wave backend options.
+See [k-Wave](doc_kwave.md) for the k-Wave backend options.
 
 !!! warning "Tissue properties and comparability"
     On the default label-mask path, PRESTUS writes `medium_properties` to `<target>_medium_properties.json`. BabelBrain then uses PRESTUS density, sound speed and attenuation for skin, cortical bone, trabecular bone and brain (an undifferentiated `skull` fills both bone slots), with shear = 0. Remaining differences are the solver and the bone Q-correction (`q_correction`), so validate against a k-Wave run before relying on absolute values.

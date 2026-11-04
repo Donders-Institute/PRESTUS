@@ -18,7 +18,7 @@ Parameters are organised in nested structs that map directly to YAML keys. `conf
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `medium` | Simulation medium type. | `'layered'` | `water` / `layered` / `phantom`. Mandatory. |
-| `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [doc_backend.md](doc_backend.md). |
+| `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [k-Wave](doc_kwave.md). |
 | `precision` | Computational precision for acoustic and thermal simulations. | `'single'` | `single` / `double` |
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
 | `debug` | Verbose debug mode with additional intermediate outputs. | `0` | `1 = yes`, `0 = no` |
@@ -36,7 +36,7 @@ Top-level keys (not nested under `simulation`). Pre-processing (segmentation, me
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `babelbrain` takes one transducer, with the beam along the grid z axis (not `grid.mode: ras_plus`); see [BabelBrain geometry limits](doc_babelbrain.md#geometry-limits). `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_backend.md#k-wave-elastic-backend-shear-waves)). |
+| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `babelbrain` takes one transducer, with the beam along the grid z axis (not `grid.mode: ras_plus`); see [BabelBrain geometry limits](doc_babelbrain.md#geometry-limits). `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_kwave.md#elastic-skull-model-shear-waves)). |
 | `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain`, one transducer and no `path.acoustic_input`; invalid combinations error at config load. jwave has no thermal solver — pair it with `kwave`. |
 
 #### BabelBrain settings (`babelbrain`)
@@ -89,7 +89,7 @@ Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thick
 
 #### Elastic skull settings (`elastic`)
 
-Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull`, `skull_cortical`, `skull_trabecular`). Attenuations are power laws a·f^y [dB/(cm·MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact. Sources and rationale: [k-Wave elastic backend](doc_backend.md#k-wave-elastic-backend-shear-waves).
+Used when `acoustic_backend: kwave_elastic`. Applied to the skull layers (`skull`, `skull_cortical`, `skull_trabecular`). Attenuations are power laws a·f^y [dB/(cm·MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact. Sources and rationale: [k-Wave elastic backend](doc_kwave.md#elastic-skull-model-shear-waves).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -664,7 +664,7 @@ Multi-subject studies with per-run settings; see [Group analysis](doc_group.md#s
 
 ### High-performance computing (`hpc`)
 
-See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
+See [k-Wave](doc_kwave.md) and [HPC](doc_hpc.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|

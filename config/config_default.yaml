@@ -631,7 +631,7 @@ jwave:
   dry_run: false            # Write the HDF5 solver inputs only; the pipeline stops after the acoustic stage and caches nothing
   cleanup_cache: true       # Delete the HDF5 solver input from the cache after a successful run (rewritten every run); set false to keep it for debugging
 
-#------------ Elastic (shear-wave) skull model (used when acoustic_backend = 'kwave_elastic'; see doc_backend.md)
+#------------ Elastic (shear-wave) skull model (used when acoustic_backend = 'kwave_elastic'; see doc_kwave.md)
 # Applied to the skull layers (skull, skull_cortical, skull_trabecular). Attenuations are power laws
 # a*f^y [dB/(cm MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact.
 elastic:

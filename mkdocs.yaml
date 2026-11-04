@@ -80,7 +80,8 @@ nav:
     - Sequential: doc_sequential.md
     - Uncertainty Analysis: doc_uncertainty.md
   - ⚙️ Backends:
-    - Overview & k-Wave: doc_backend.md
+    - Overview: doc_backend.md
+    - k-Wave (default): doc_kwave.md
     - BabelBrain: doc_babelbrain.md
     - jwave: doc_jwave.md
   - 📚 Reference:
