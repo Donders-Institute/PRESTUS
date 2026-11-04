@@ -55,32 +55,37 @@ prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
     'Overrides', {'grid.resolution_mm', 2})                         % quick debug run of one row
 ```
 
-- **Config errors surface first.** All selected rows are loaded before anything runs. The dry run prints each row's placement mode, target, transducer, planned depth, target intensity and platform, and writes `<path.sim>/group/<name>/log/plan_<time>.tsv`. A real launch writes `launch_<time>.tsv` with the job ID and status per row.
-- **Platform.** Each run is started with `prestus_pipeline_start` and its own `platform`. On `matlab` the rows run one after another; a failing row is logged and the others continue (unless `'StopOnError', true`). On `slurm`/`qsub` there is one job per row, or a job graph for uncertainty, multi-ISPPA and async rows.
-- **One report at the end.** Study runs switch off the per-subject group report (`modules.generate_group_report = 0`, unless the manifest sets it). The study report is built once at the end: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail). Rows that submit a job graph return no single final job ID; for those, run `prestus_group_report_start(cfg)` once their jobs have finished.
+??? note "Details: dry run, platform and the study report"
+    - **Config errors surface first.** All selected rows are loaded before anything runs. The dry run prints each row's placement mode, target, transducer, planned depth, target intensity and platform, and writes `<path.sim>/group/<name>/log/plan_<time>.tsv`. A real launch writes `launch_<time>.tsv` with the job ID and status per row.
+    - **Platform.** Each run is started with `prestus_pipeline_start` and its own `platform`. On `matlab` the rows run one after another; a failing row is logged and the others continue (unless `'StopOnError', true`). On `slurm`/`qsub` there is one job per row, or a job graph for uncertainty, multi-ISPPA and async rows.
+    - **One report at the end.** Study runs switch off the per-subject group report (`modules.generate_group_report = 0`, unless the manifest sets it). The study report is built once at the end: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail). Rows that submit a job graph return no single final job ID; for those, run `prestus_group_report_start(cfg)` once their jobs have finished.
 
 ### Manifest columns
 
-| Column | Meaning |
-|---|---|
-| `subject_id` | Required. Integer, `003` or `sub-003`. |
-| `condition` | Optional run label (target, protocol, session, …). Becomes the run's output affix and the grouping variable in the group report. |
-| `include` | Optional `1`/`0`, `true`/`false`, `yes`/`no`; default `1`. |
-| `config` | Optional per-row YAML merged over the study config. The path is relative to the manifest. |
-| `notes` | Ignored free text (also `note`, `comment`). |
-| any dotted config key | A per-run value, e.g. `placement.localite.target`, `transducer.focal_distance_ep`, `grid.resolution_mm`. Struct arrays take an index: `transducer(2).trans_pos` for the second transducer of a multi-transducer setup. A plain `transducer.x` is only allowed while the config defines one transducer. |
+`subject_id` is the only required column; any dotted config key sets a per-run value.
 
-Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_MD`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
+??? note "Details: column reference and cell syntax"
+    | Column | Meaning |
+    |---|---|
+    | `subject_id` | Required. Integer, `003` or `sub-003`. |
+    | `condition` | Optional run label (target, protocol, session, …). Becomes the run's output affix and the grouping variable in the group report. |
+    | `include` | Optional `1`/`0`, `true`/`false`, `yes`/`no`; default `1`. |
+    | `config` | Optional per-row YAML merged over the study config. The path is relative to the manifest. |
+    | `notes` | Ignored free text (also `note`, `comment`). |
+    | any dotted config key | A per-run value, e.g. `placement.localite.target`, `transducer.focal_distance_ep`, `grid.resolution_mm`. Struct arrays take an index: `transducer(2).trans_pos` for the second transducer of a multi-transducer setup. A plain `transducer.x` is only allowed while the config defines one transducer. |
+
+    Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_MD`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
 
 ### Output names
 
-Each run writes the usual per-subject outputs to `<path.sim>/sub-XXX/`, distinguished by its output affix:
+Each run writes the usual per-subject outputs to `<path.sim>/sub-XXX/`, distinguished by its output affix.
 
-- An explicit `io.output_affix` column (or row-config value) is used as is.
-- Otherwise the condition is appended to the study affix with `-`. For example, study affix `pilot` with condition `M1` gives `_desc-pilot-M1`; without a study affix, condition `M1` gives `_desc-M1`.
-- The result is sanitised like any `io.output_affix`.
+??? note "Details: affix rules and clashes"
+    - An explicit `io.output_affix` column (or row-config value) is used as is.
+    - Otherwise the condition is appended to the study affix with `-`. For example, study affix `pilot` with condition `M1` gives `_desc-pilot-M1`; without a study affix, condition `M1` gives `_desc-M1`.
+    - The result is sanitised like any `io.output_affix`.
 
-Two included rows that would write to the same files (same subject, affix, medium and `path.sim`) are rejected before anything runs. Give them distinct conditions.
+    Two included rows that would write to the same files (same subject, affix, medium and `path.sim`) are rejected before anything runs. Give them distinct conditions.
 
 ??? note "Details: merge order"
     For each row, later sources win:
@@ -91,10 +96,13 @@ Two included rows that would write to the same files (same subject, affix, mediu
 
 ### From Localite ingestion
 
-Ingest the recordings on the Nexus's *Placement ▸ Localite* page or with `neuronav_gui` (single sessions via *Write outputs*, many via *Ingest all sessions…* / the batch window), then use **Import from Localite…** on the Nexus's Study tab (or the shortcut on the Placement tab). The importer reads what ingestion writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
+Ingest the recordings on the Nexus's *Placement ▸ Localite* page or with `neuronav_gui` (single sessions via *Write outputs*, many via *Ingest all sessions…* / the batch window), then use **Import from Localite…** on the Nexus's Study tab (or the shortcut on the Placement tab).
 
-- **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
-- **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_MD, R_MD]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.
+??? note "Details: importer files and row layouts"
+    The importer reads what ingestion writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
+
+    - **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
+    - **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_MD, R_MD]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.
 
 PRESTUS reads the ingested markers itself at run time, so no positions are copied into the manifest.
 
@@ -102,18 +110,19 @@ PRESTUS reads the ingested markers itself at run time, so no positions are copie
 
 With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `run_nifti_creation` on), each run writes `sub-XXX_<medium><affix>_targeting.csv` next to its per-subject CSV. The analysis reads the focal-mask NIfTIs and never fails the pipeline; unavailable measures are `NaN`. Targets and ROIs can differ per run: set `analysis.target_mni_mm` or `analysis.target_roi_mni` as manifest columns. With several transducers, the planned focus and beam axis of `transducer(1)` are used.
 
-| Columns | Meaning |
-|---|---|
-| `condition`, `placement_mode`, `target_label`, `transducer_name`, `n_transducers`, `focal_distance_ep_planned_mm`, `target_isppa_wcm2` | The run's settings, shown in the report's study design table. |
-| `focal_centroid_ras_*`, `peak_ras_*` | Centroid of the −3 dB focal volume (brain-masked) and the intensity peak inside it, in T1 RAS mm. |
-| `planned_focus_ras_*`, `planned_trans_ras_*` | Focus and transducer positions resolved by placement, recorded before the grid stage, in RAS mm. |
-| `focus_error_mm` | Distance between the focal centroid and the planned focus. |
-| `focus_error_axial_mm`, `focus_error_lateral_mm` | That error along and across the planned beam axis (transducer → planned focus); axial `> 0` means the simulated focus is deeper than planned. |
-| `peak_error_mm` | Distance between the peak and the planned focus. |
-| `focal_centroid_mni_*`, `peak_mni_*` | The same positions in MNI mm (needs `io.save_MNI`). |
-| `target_mni_*`, `target_mni_source` | The intended MNI target: `analysis.target_mni_mm`, else the MNI target of the placement mode (`placement.heuristic` / `placement.plantus` `.mni_target_mm`, `placement.mni.focus_pos_mm`). |
-| `target_error_mni_mm`, `peak_target_error_mni_mm` | Distance from the MNI focal centroid (or peak) to the MNI target. |
-| `roi_volume_mm3`, `roi_overlap_mm3`, `roi_focal_fraction`, `roi_coverage`, `roi_mean_intensity`, `roi_max_intensity`, `roi_centroid_dist_mm` | With `analysis.target_roi_mni` (an MNI NIfTI mask, any grid): ROI volume, overlap with the focal volume, fraction of the focal volume inside the ROI, fraction of the ROI covered, intensity in the ROI (`intensity_quantity` = Ipa, else Itp), and the distance between the centroids. |
+??? note "Details: targeting CSV columns"
+    | Columns | Meaning |
+    |---|---|
+    | `condition`, `placement_mode`, `target_label`, `transducer_name`, `n_transducers`, `focal_distance_ep_planned_mm`, `target_isppa_wcm2` | The run's settings, shown in the report's study design table. |
+    | `focal_centroid_ras_*`, `peak_ras_*` | Centroid of the −3 dB focal volume (brain-masked) and the intensity peak inside it, in T1 RAS mm. |
+    | `planned_focus_ras_*`, `planned_trans_ras_*` | Focus and transducer positions resolved by placement, recorded before the grid stage, in RAS mm. |
+    | `focus_error_mm` | Distance between the focal centroid and the planned focus. |
+    | `focus_error_axial_mm`, `focus_error_lateral_mm` | That error along and across the planned beam axis (transducer → planned focus); axial `> 0` means the simulated focus is deeper than planned. |
+    | `peak_error_mm` | Distance between the peak and the planned focus. |
+    | `focal_centroid_mni_*`, `peak_mni_*` | The same positions in MNI mm (needs `io.save_MNI`). |
+    | `target_mni_*`, `target_mni_source` | The intended MNI target: `analysis.target_mni_mm`, else the MNI target of the placement mode (`placement.heuristic` / `placement.plantus` `.mni_target_mm`, `placement.mni.focus_pos_mm`). |
+    | `target_error_mni_mm`, `peak_target_error_mni_mm` | Distance from the MNI focal centroid (or peak) to the MNI target. |
+    | `roi_volume_mm3`, `roi_overlap_mm3`, `roi_focal_fraction`, `roi_coverage`, `roi_mean_intensity`, `roi_max_intensity`, `roi_centroid_dist_mm` | With `analysis.target_roi_mni` (an MNI NIfTI mask, any grid): ROI volume, overlap with the focal volume, fraction of the focal volume inside the ROI, fraction of the ROI covered, intensity in the ROI (`intensity_quantity` = Ipa, else Itp), and the distance between the centroids. |
 
 The same analysis runs post hoc with `targeting_analysis(parameters, 'PlannedFocus', f, 'PlannedTrans', t)` (T1 voxel positions).
 

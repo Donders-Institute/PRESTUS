@@ -160,18 +160,21 @@ transducer:
 
 The per-transducer acoustic runs always record a free-water baseline, which the combine step needs for scaling.
 
-**Multi-ISPPA sweep.** A vector `target_isppa_wcm2` triggers a sweep. Every transducer carries either a scalar (held fixed) or a vector of the same length:
+**Multi-ISPPA sweep.** A vector `target_isppa_wcm2` triggers a sweep.
 
-```yaml
-transducer:
-  - name: CTX500-A
-    target_isppa_wcm2: [3.0, 5.0, 10.0]   # swept across 3 points
+??? note "Details: multi-ISPPA sweep"
+    Every transducer carries either a scalar (held fixed) or a vector of the same length:
 
-  - name: CTX500-B
-    target_isppa_wcm2: 2.0                  # fixed across all 3 sweep points
-```
+    ```yaml
+    transducer:
+      - name: CTX500-A
+        target_isppa_wcm2: [3.0, 5.0, 10.0]   # swept across 3 points
 
-This gives three combine + thermal pairs (A→3.0, 5.0, 10.0; B→2.0 each time).
+      - name: CTX500-B
+        target_isppa_wcm2: 2.0                  # fixed across all 3 sweep points
+    ```
+
+    This gives three combine + thermal pairs (A→3.0, 5.0, 10.0; B→2.0 each time).
 
 ### Physical model
 
@@ -202,13 +205,14 @@ This gives three combine + thermal pairs (A→3.0, 5.0, 10.0; B→2.0 each time)
 | `'shared'` (default) | One grid for all transducers, aligned and cropped as in [Grid alignment](#grid-alignment) and [Grid cropping](#grid-cropping). | Default. |
 | `'per_transducer'` | Each transducer gets the grid a solo run would use. `combine_async_intensity` resamples every field onto transducer(1)'s grid via each run's `planimg` sidecar. | Per-transducer focal distance, ISPPA or focal volume must match a solo run, or the transducers are widely separated or steeply angled. |
 
-```yaml
-simulation:
-  transducer_coupling: async
-  async_grid_mode: per_transducer   # default: 'shared'
-```
+??? note "Details: grid mode choice and accuracy"
+    ```yaml
+    simulation:
+      transducer_coupling: async
+      async_grid_mode: per_transducer   # default: 'shared'
+    ```
 
-In `shared` mode an off-axis beam is voxelised at an angle, so its per-transducer results can differ from a solo run. The difference shrinks with resolution; at 2 mm (2.5 points per wavelength at 300 kHz) a beam 41° off axis lost 16% of its free-water ISPPA. In `per_transducer` mode the resampling (linear interpolation; parts outside transducer(1)'s grid are dropped) costs accuracy instead. `per_transducer` scales better with N: each grid stays sized to its own transducer, at the cost of N preproc jobs.
+    In `shared` mode an off-axis beam is voxelised at an angle, so its per-transducer results can differ from a solo run. The difference shrinks with resolution; at 2 mm (2.5 points per wavelength at 300 kHz) a beam 41° off axis lost 16% of its free-water ISPPA. In `per_transducer` mode the resampling (linear interpolation; parts outside transducer(1)'s grid are dropped) costs accuracy instead. `per_transducer` scales better with N: each grid stays sized to its own transducer, at the cost of N preproc jobs.
 
 ### Output files
 
@@ -222,11 +226,15 @@ sub-001_layered_desc-asyncJoint.csv
 sub-001_layered_report_desc-asyncJoint.html
 ```
 
-A 3-point sweep writes `..._desc-asyncCombinedS01.mat` to `S03` and `sub-001_layered_desc-asyncJointS01.csv` to `S03`.
+??? note "Details: sweep and affix naming"
+    A 3-point sweep writes `..._desc-asyncCombinedS01.mat` to `S03` and `sub-001_layered_desc-asyncJointS01.csv` to `S03`.
 
-With `io.output_affix` (e.g. `run1`), every affix starts with it: `_desc-run1_trans-01`, `_desc-run1_desc-asyncJoint`. The per-transducer runs also write their own CSV and acoustic NIfTIs at the simulated drive level; the Nexus Results tab shows them under the joint result.
+    With `io.output_affix` (e.g. `run1`), every affix starts with it: `_desc-run1_trans-01`, `_desc-run1_desc-asyncJoint`. The per-transducer runs also write their own CSV and acoustic NIfTIs at the simulated drive level; the Nexus Results tab shows them under the joint result.
 
-**Resumption.** Re-running `prestus_pipeline_start` with the same config resumes from the last incomplete stage. With `io.overwrite_files: always` (default), preproc, acoustic and combine resume from their caches; the joint and water-validation stages always re-run. `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
+**Resumption.** Re-running `prestus_pipeline_start` with the same config resumes from the last incomplete stage.
+
+??? note "Details: resumption"
+    With `io.overwrite_files: always` (default), preproc, acoustic and combine resume from their caches; the joint and water-validation stages always re-run. `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
 ??? note "Details: pipeline stages, HPC options and provenance"
     | Stage | Count | Affix |
