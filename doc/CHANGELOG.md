@@ -115,6 +115,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - `pct.skull_mapping: custom` with `pct.custom_slope` / `pct.custom_intercept`
 - `pct.density_calibration` selects the HU→density table of `mapping_density: k-plan` (`kplan_default`, `ucl_lowdose_80kvp`, `cph2025`, or a CSV); default `''` keeps results unchanged. PRESTUS warns when `treeby` is not paired with `ucl_lowdose_80kvp`
 - `pct_skullmapping_fit` exposes the `kosciessa` histogram fit and its settings
+- `pct_predict_skull_properties` predicts the skull properties a pseudo-CT run will model, without simulating
 - ⚠️ **Fixed:** `pct.skull_mapping: treeby` used the intercept 3247.9 HU instead of 3274.9 HU; treeby pseudo-CTs are 27 HU low in the skull, regenerate them
 - ⚠️ **Fixed:** the `kosciessa` fit took width crossings around the histogram maximum, not around the identified peaks; rerun `kosciessa` pCTs that warn or whose `pCT_skull_mapping.png` shows a near-zero trabecular mode
 - ⚠️ **Changed:** `smooth_img` pads by edge replication; smoothed masks and maps differ from earlier runs in the outermost voxels
@@ -165,10 +166,16 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 
 #### Advanced modes (uncertainty, multi-ISPPA, sequential)
 - Uncertainty composes with multi-ISPPA sweeps and async multi-transducer runs, with one report per sweep point; uncertainty is the outer mode on every platform
-- `simulation.uncertainty_conservative` and `simulation.uncertainty_liberal` choose the medium files of the two uncertainty variants (default: the shipped `config/uncertainty/` files); `options.*_config` still takes precedence
+- Uncertainty mode runs five variants: default, Temp-H / Temp-L (the ITRUSST tissue-property bounds that maximise / minimise brain heating) and Trans-H / Trans-L (the acoustic bounds that maximise / minimise brain intensity; acoustic only). See [doc_uncertainty.md](doc_uncertainty.md)
+- `simulation.uncertainty_temp_high`, `_temp_low`, `_trans_high` and `_trans_low` choose the variants' medium files (default: the shipped `config/uncertainty/` files); `options.<variant>_config` takes precedence
+- ⚠️ The liberal / conservative variants are replaced: new medium bounds and output affixes (`_desc-temphigh`, `_desc-templow`, `_desc-transhigh`, `_desc-translow`), and `options.liberal_config`, `options.conservative_config` and `options.affixes.liberal` / `.conservative` now stop with `uncertainty_pipeline:legacyVariant`. Re-run uncertainty runs
+- The uncertainty report ranges acoustic metrics over the Trans pair and thermal metrics over the Temp pair, and lists every variant's values
+- ⚠️ **Fixed:** uncertainty safety cards and range-table rows were coloured by the conservative variant; they now follow the highest value of the default and the metric's pair. Regenerate uncertainty reports
 - ⚠️ **Fixed:** uncertainty variants shared one medium cache file and overwrote each other with `io.save_medium_cache: 1`; rerun uncertainty runs that used it
 - Fixed: the uncertainty report is named after the default variant's affix, so runs with different `io.output_affix` no longer overwrite each other's report; HPC resume finds existing reports and variant CSVs
 - Fixed: the uncertainty CSV is saved without an extra `tabular/` folder; variant and report jobs no longer run their own free-water baseline
+- ⚠️ With `pct.enabled: 1`, the uncertainty bound variants use a homogeneous skull layer on the pseudo-CT run's head geometry; only the default maps the skull from the pseudo-CT. Re-run pseudo-CT uncertainty runs
+- The uncertainty report of a pseudo-CT run has a Pseudo-CT Skull vs. Bounds section: the default run's skull property histograms against the bound variants' skull values
 - Fixed: `multi_isppa_pipeline` warned about missing thermal output for every intensity (wrong CSV name)
 
 #### Study setup & group analysis
@@ -197,6 +204,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 #### Nexus & GUIs
 - Fixed: the Nexus suggested `transducer.target_isppa_wcm2` for the old `set_intensity_w_per_cm2`, which is the drive's calibration ISPPA (`transducer.tx_calibration.isppa_wcm2`)
 - **PRESTUS Nexus** (`nexus/`, *experimental*): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)
+- The Nexus Pseudo-CT sub-tab plots the in-skull property distributions against the band of the uncertainty bound variants' skull values, with the fraction of skull voxels outside it; **Predict skull properties** predicts them before a run
 - `prestus_gui` is deprecated in favour of the PRESTUS Nexus; it still works and warns on start. `neuronav_gui` and `calibration_gui` remain supported.
 - `neuronav_gui`: stand-alone Localite ingest GUI with series QC, batch window and MNI view of batch targets
 - `calibration_gui` and the Nexus Calibration page expose every calibration fit option and save how an entry was fitted (`meta.fit`)

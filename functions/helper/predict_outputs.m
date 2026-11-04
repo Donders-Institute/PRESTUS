@@ -187,7 +187,7 @@ switch mode
         jobs{end+1} = '1 summary report job (final stage)';
 
     case 'uncertainty'
-        variants = {'default', 'liberal', 'conservative'};
+        variants = uncertainty_variants();
         % Output affix suffix of each sweep point an inner pipeline writes ('' when not nested).
         switch nested
             case 'multi_isppa'
@@ -203,15 +203,14 @@ switch mode
                 point_suffixes = {''};
         end
         for k = 1:numel(variants)
-            v = variants{k};
-            if strcmp(v, 'default')
-                variant_affix = base_affix;
-            else
-                variant_affix = [base_affix, '_desc-', v];
+            variant_affix = [base_affix, variants(k).desc];
+            vlabel = [variants(k).label, ' variant'];
+            if strcmp(variants(k).pair, 'trans')
+                vlabel = [vlabel, ' (acoustic only)'];
             end
             for j = 1:numel(point_suffixes)
                 affix = [variant_affix, point_suffixes{j}];
-                label = [v, ' variant'];
+                label = vlabel;
                 if numel(point_suffixes) > 1
                     label = sprintf('%s, sweep point %d/%d', label, j, numel(point_suffixes));
                 end
@@ -222,11 +221,11 @@ switch mode
             end
             if strcmp(nested, 'multi_isppa')
                 artifacts(end+1) = art(sprintf('sub-%03d_%s_desc-multiIsppa_report%s.html', ...
-                    subject_id, medium, variant_affix), [v, ' variant: summary comparing all targets']); %#ok<AGROW>
+                    subject_id, medium, variant_affix), [vlabel, ': summary comparing all targets']); %#ok<AGROW>
             end
         end
         for j = 1:numel(point_suffixes)
-            label = 'combined uncertainty report (default/liberal/conservative)';
+            label = 'combined uncertainty report (default, Temp-H/L, Trans-H/L)';
             if numel(point_suffixes) > 1
                 label = sprintf('%s, sweep point %d/%d', label, j, numel(point_suffixes));
             end
@@ -236,20 +235,23 @@ switch mode
         switch nested
             case 'multi_isppa'
                 jobs{end+1} = '1 preprocessing job (stage 1)';
-                jobs{end+1} = sprintf(['3 multi-ISPPA runs, one per variant (default, liberal, ' ...
-                    'conservative): each 1 acoustic job, %d thermal jobs and 1 summary job'], ...
+                jobs{end+1} = sprintf(['5 multi-ISPPA runs, one per variant (default, Temp-H, Temp-L, ' ...
+                    'Trans-H, Trans-L): default, Temp-H and Temp-L each 1 acoustic job, %d thermal jobs ' ...
+                    'and 1 summary job; Trans-H and Trans-L run acoustic only, without thermal jobs'], ...
                     numel(point_suffixes));
-                jobs{end+1} = sprintf('%d uncertainty report job(s) — one per target (stage 5)', ...
+                jobs{end+1} = sprintf('%d uncertainty report job(s), one per target (stage 7)', ...
                     numel(point_suffixes));
             case 'async'
-                jobs{end+1} = ['3 async multi-transducer runs, one per variant (default, liberal, ' ...
-                    'conservative), each with its own preprocessing, acoustic, combine and joint jobs'];
-                jobs{end+1} = sprintf('%d uncertainty report job(s) — one per sweep point (stage 5)', ...
+                jobs{end+1} = ['5 async multi-transducer runs, one per variant (default, Temp-H, ' ...
+                    'Temp-L, Trans-H, Trans-L), each with its own preprocessing, acoustic, combine and ' ...
+                    'joint jobs; Trans-H and Trans-L run acoustic only'];
+                jobs{end+1} = sprintf('%d uncertainty report job(s), one per sweep point (stage 7)', ...
                     numel(point_suffixes));
             otherwise
                 jobs{end+1} = '1 preprocessing job (stage 1)';
-                jobs{end+1} = '3 variant simulation jobs: default, liberal, conservative (stages 2-4)';
-                jobs{end+1} = '1 uncertainty report job (stage 5)';
+                jobs{end+1} = ['5 variant simulation jobs: default, Temp-H, Temp-L, Trans-H, Trans-L ' ...
+                    '(stages 2-6); Trans-H and Trans-L run acoustic only'];
+                jobs{end+1} = '1 uncertainty report job (stage 7)';
         end
 end
 if ~strcmp(mode, 'single')

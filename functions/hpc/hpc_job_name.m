@@ -3,7 +3,7 @@ function job_name = hpc_job_name(parameters)
 %
 % Constructs a job name in the format PREFIX_sub-NNN[_affix], where PREFIX
 % defaults to 'PRESTUS' (overridable via parameters.hpc.job_prefix) and affix
-% is appended from io.output_affix when set (e.g. '_liberal' → 'liberal').
+% is appended from io.output_affix when set (e.g. '_desc-temphigh' → 'desc-temphigh').
 % If parameters.hpc.job_name is already set, it is returned unchanged.
 %
 % Use as:
@@ -39,10 +39,10 @@ function job_name = hpc_job_name(parameters)
     job_name = [prefix '_' subj_id_string];
 
     % Append output affix when present so that uncertainty pipeline variants
-    % (default / _liberal / _conservative) produce distinguishable job names.
+    % (default, _desc-temphigh, _desc-templow, ...) produce distinguishable job names.
     if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') && ...
             ~isempty(parameters.io.output_affix)
-        % Strip leading underscore for readability: '_liberal' -> 'liberal'
+        % Strip leading underscore for readability: '_desc-temphigh' -> 'desc-temphigh'
         affix = char(parameters.io.output_affix);
         affix = regexprep(affix, '^_', '');
         job_name = [job_name '_' affix];

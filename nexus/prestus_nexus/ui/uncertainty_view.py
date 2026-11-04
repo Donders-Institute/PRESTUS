@@ -1,6 +1,8 @@
-"""Simulation tab card, shown while simulation.uncertainty is on: the default, conservative and
-liberal medium properties side by side, and their ranges for brain and skull (one column per
-property with its own scale, as in the ITRUSST tissue-property overview)."""
+"""Simulation tab card, shown while simulation.uncertainty is on: the default medium properties
+and the four variants (Temp-H/L bound heating, Trans-H/L bound intensity) side by side, and the
+range of each pair for brain and skull (one column per property with its own scale, as in the
+ITRUSST tissue-property overview). The Trans pair runs acoustic only, so thermal properties show
+the Temp pair alone."""
 
 from __future__ import annotations
 
@@ -26,7 +28,7 @@ SKULL_TICK = {"skull": "S", "skull_trabecular": "T", "skull_cortical": "C"}
 
 
 def _fmt(v) -> str:
-    if v is None:
+    if v is None or v == [] or v == "":
         return "—"
     try:
         return f"{float(v):.4g}"
@@ -35,13 +37,34 @@ def _fmt(v) -> str:
 
 
 def _colours(c: dict) -> dict:
-    return {"default": c["ink"], "conservative": c["info"], "liberal": c["red"]}
+    # report convention: thermal content warm, acoustic content cool
+    return {"default": c["ink"], "temp": c["thermal"], "trans": c["accent"]}
+
+
+PAIR_DX = {"temp": -0.17, "trans": 0.17}        # x offset of each pair within a tissue column
+BOUND_MARKER = {"high": "^", "low": "v"}
+
+
+def pair_values(sets: unc.PropertySets, pair: str, tissue: str, key: str) -> dict[str, tuple[float, bool]]:
+    """{'high'|'low': (value, inherited)} for a pair; empty for the trans pair on a thermal
+    property (acoustic only, so the inherited default is no bound) or when neither file sets it."""
+    if pair == "trans" and key in unc.THERMAL:
+        return {}
+    out = {}
+    for bound, variant in zip(("high", "low"), unc.PAIRS[pair]):
+        x = sets.value(variant, tissue, key) if variant in sets.sets else None
+        if isinstance(x, (int, float)):
+            out[bound] = (float(x), sets.inherited(variant, tissue, key))
+    if all(inh for _, inh in out.values()):
+        return {}
+    return out
 
 
 def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) -> None:
-    """One column per property, each on its own scale: a bar spans the conservative–liberal
-    range, ticks mark the two variants (dotted where inherited from the default), a dot the
-    default."""
+    """One column per property, each on its own scale. Per tissue, the Temp pair (left) and the
+    Trans pair (right) each draw a bar between their two values, with a marker per variant
+    (hollow where inherited from the default); a tick marks the default. Thermal properties
+    show the Temp pair only."""
     fig.clear()
     fig.set_facecolor(c["surface"])
     col = _colours(c)
@@ -51,24 +74,27 @@ def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) 
         ax.set_facecolor(c["surface"])
         values = []
         for gi, tissue in enumerate(tissues):
-            v = {k: sets.value(k, tissue, key) for k in ("default", *unc.VARIANTS) if k in sets.sets}
-            v = {k: float(x) for k, x in v.items() if isinstance(x, (int, float))}
-            values += list(v.values())
-            bounds = [v[k] for k in unc.VARIANTS if k in v]
-            if len(bounds) == 2:
-                lo, hi = min(bounds), max(bounds)
-                ax.bar(gi, hi - lo, bottom=lo, width=0.42, color=c["line2"], zorder=1)
-            for k in unc.VARIANTS:
-                if k in v:
-                    ax.hlines(v[k], gi - 0.34, gi + 0.34, color=col[k], linewidth=2, zorder=2,
-                              linestyles=":" if sets.inherited(k, tissue, key) else "-")
-            if "default" in v:
-                ax.plot(gi, v["default"], "o", color=col["default"], markersize=4, zorder=3)
+            for pair in unc.PAIRS:
+                v = pair_values(sets, pair, tissue, key)
+                if not v:
+                    continue
+                x = gi + PAIR_DX[pair]
+                values += [val for val, _ in v.values()]
+                if len(v) == 2:
+                    ax.vlines(x, min(val for val, _ in v.values()), max(val for val, _ in v.values()),
+                              color=col[pair], linewidth=2.5, alpha=0.45, zorder=1)
+                for bound, (val, inh) in v.items():
+                    ax.plot(x, val, BOUND_MARKER[bound], color=col[pair], markersize=5, zorder=3,
+                            markerfacecolor=c["surface"] if inh else col[pair])
+            d = sets.value("default", tissue, key)
+            if isinstance(d, (int, float)):
+                values.append(float(d))
+                ax.hlines(float(d), gi - 0.34, gi + 0.34, color=col["default"], linewidth=1.2, zorder=2)
         if values:
             lo, hi = min(values), max(values)
             pad = (hi - lo) * 0.12 or abs(hi) * 0.1 or 1
             ax.set_ylim(lo - pad, hi + pad)
-        if key == "attenuation":
+        if key in ("attenuation", "absorption"):
             unit = f"{unit} @ {sets.freq_mhz:g} MHz"
         ax.set_title(f"{label}\n{unit}" if unit else label, fontsize=8, color=c["ink2"])
         ax.set_xlim(-0.6, len(tissues) - 0.4)
@@ -81,19 +107,23 @@ def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) 
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             ax.spines[side].set_color(c["line2"])
-    handles = [Line2D([], [], color=col["default"], marker="o", linestyle="none", markersize=4, label="Default"),
-               Line2D([], [], color=col["conservative"], linewidth=2, label="Conservative (lower bound)"),
-               Line2D([], [], color=col["liberal"], linewidth=2, label="Liberal (upper bound)"),
-               Line2D([], [], color=c["ink3"], linewidth=2, linestyle=":", label="not in the variant file: default used")]
-    leg = fig.legend(handles=handles, loc="upper center", ncol=4, fontsize=7, frameon=False,
+    handles = [Line2D([], [], color=col["default"], linewidth=1.2, label="Default"),
+               Line2D([], [], color=col["temp"], linewidth=2.5, alpha=0.6, label="Temp-H/L (heating bounds)"),
+               Line2D([], [], color=col["trans"], linewidth=2.5, alpha=0.6,
+                      label="Trans-H/L (intensity bounds, acoustic only)"),
+               Line2D([], [], color=c["ink3"], marker="^", linestyle="none", markersize=5, label="H variant"),
+               Line2D([], [], color=c["ink3"], marker="v", linestyle="none", markersize=5, label="L variant"),
+               Line2D([], [], color=c["ink3"], marker="o", markerfacecolor=c["surface"], linestyle="none",
+                      markersize=5, label="hollow: not in the variant file, default used")]
+    leg = fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=7, frameon=False,
                      bbox_to_anchor=(0.5, 1.0))
     for text in leg.get_texts():
         text.set_color(c["ink2"])
-    fig.subplots_adjust(left=0.05, right=0.96, top=0.72, bottom=0.12, wspace=0.9)
+    fig.subplots_adjust(left=0.05, right=0.96, top=0.68, bottom=0.12, wspace=0.9)
 
 
 class UncertaintyCard(QFrame):
-    """Default / conservative / liberal medium properties; hidden unless simulation.uncertainty."""
+    """Default and Temp-H/L, Trans-H/L medium properties; hidden unless simulation.uncertainty."""
 
     def __init__(self, model, prestus_root: str | Path, parent=None):
         super().__init__(parent)
@@ -126,9 +156,9 @@ class UncertaintyCard(QFrame):
                 v.addWidget(canvas)
                 self.canvases[name] = canvas
 
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 4 + len(unc.VARIANTS))
         self.table.setHorizontalHeaderLabels(["Tissue", "Property", "Unit", "Default",
-                                              "Conservative", "Liberal"])
+                                              *(unc.VARIANT_SHORT[v] for v in unc.VARIANTS)])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -180,7 +210,8 @@ class UncertaintyCard(QFrame):
                 if sets.freq_from_transducer else
                 f"No transducer frequency set: attenuation is compared at {sets.freq_mhz:g} MHz.")
         lines.append("Each variant file is merged onto the default medium properties; tissues and "
-                     "properties a file does not list (greyed below) keep the default. " + freq)
+                     "properties a file does not list (greyed below) keep the default. Trans-H/L run "
+                     "acoustic only, so their thermal properties are not used. " + freq)
         self.note.setText("<br>".join(lines))
 
     def _fill_table(self, sets: unc.PropertySets, c: dict) -> None:
@@ -191,7 +222,7 @@ class UncertaintyCard(QFrame):
         self.table.setRowCount(len(rows))
         grey = QColor(c["ink4"])
         for r, (tissue, (key, label, unit)) in enumerate(rows):
-            if key == "attenuation":
+            if key in ("attenuation", "absorption"):
                 unit = f"{unit} @ {sets.freq_mhz:g} MHz"
             cells = [unc.TISSUE_LABEL.get(tissue, tissue), label, unit,
                      _fmt(sets.value("default", tissue, key))]
@@ -200,6 +231,10 @@ class UncertaintyCard(QFrame):
             for i, variant in enumerate(unc.VARIANTS, start=4):
                 if variant not in sets.sets:
                     item = QTableWidgetItem("—")
+                elif variant in unc.PAIRS["trans"] and key in unc.THERMAL:
+                    item = QTableWidgetItem("—")
+                    item.setForeground(grey)
+                    item.setToolTip("Trans variants run acoustic only: thermal properties are not used")
                 else:
                     item = QTableWidgetItem(_fmt(sets.value(variant, tissue, key)))
                     if sets.inherited(variant, tissue, key):

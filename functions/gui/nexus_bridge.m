@@ -16,7 +16,7 @@ function nexus_bridge(bridge_dir, options)
 %   stop                the Nexus asks the session to end
 %
 % Only the functions in the allow-list can be called (NEXUS_CALIBRATION,
-% NEXUS_NEURONAV, NEXUS_PING); arguments are decoded with jsondecode. The
+% NEXUS_NEURONAV, NEXUS_PCT, NEXUS_PING); arguments are decoded with jsondecode. The
 % session ends after IdleTimeout seconds without requests, since it holds a
 % MATLAB licence. Long work (batch ingestion, k-Wave) does not go through
 % the bridge: the Nexus runs it as a script on its Run tab.
@@ -33,7 +33,7 @@ function nexus_bridge(bridge_dir, options)
 %   HeartbeatTimeout - seconds without a Nexus heartbeat before it ends (default 60)
 %   Poll             - seconds between checks for requests (default 0.05)
 %
-% See also: NEXUS_CALIBRATION, NEXUS_NEURONAV, NEXUS_PROGRESS, PRESTUS_NEXUS
+% See also: NEXUS_CALIBRATION, NEXUS_NEURONAV, NEXUS_PCT, NEXUS_PROGRESS, PRESTUS_NEXUS
 
 arguments
     bridge_dir (1,:) char
@@ -42,7 +42,7 @@ arguments
     options.Poll (1,1) double = 0.05
 end
 
-    allowed = {'nexus_calibration', 'nexus_neuronav', 'nexus_ping'};
+    allowed = {'nexus_calibration', 'nexus_neuronav', 'nexus_pct', 'nexus_ping'};
     root = get_prestus_path();
     % genpath over a network drive takes seconds: add the trees only when missing, and of
     % external/ only what the façades use (YAML, Localite XML, the fexminimize optimiser)

@@ -1,91 +1,20 @@
 # Uncertainty quantification
 
-> **⚠ Experimental feature.** The uncertainty quantification workflow is under active development. The liberal and conservative medium property ranges shipped with PRESTUS are informed by published literature but should not be interpreted as formally validated bounds. They reflect plausible variation in tissue acoustic properties but will not capture all sources of simulation uncertainty. Parameter interactions can be non-linear — both amongst tissue properties and with subject-specific head anatomy such as skull thickness and morphology. Additionally, analysis choices such as the degree of image smoothing applied to the segmentation independently affect intensity and thermal estimates. The liberal and conservative variants are therefore best understood as illustrative scenarios that bracket a plausible range, not as guaranteed worst- or best-case predictions.
+!!! note "At a glance"
+    - **What:** Five simulations of the same setup: the default medium and four variants at the ITRUSST tissue property bounds, with one report that gives the range of each safety metric.
+    - **When you need it:** When a safety assessment should state how much in-situ intensity and heating depend on the assumed tissue properties.
+    - **Before you start:** A working study config; `simulation.uncertainty: true` and, on a cluster, a GPU budget for five runs.
 
-TUS simulations of wave propagation through the skull involve acoustic and thermal medium properties (e.g., speed of sound, density, attenuation) that are not precisely known for any individual subject. Published values vary considerably across studies. This uncertainty has direct implications for safety assessments: the true in-situ intensity and heating at a given location may differ from the simulated value depending on which tissue properties are assumed.
+!!! warning "Experimental feature"
+    The uncertainty quantification workflow is under active development. The variant medium properties shipped with PRESTUS are the lower and upper bounds of the ITRUSST tissue property table. They are not formally validated bounds, and they do not capture all sources of simulation uncertainty. Each variant combines the bounds chosen one property at a time; parameter interactions can be non-linear, both amongst tissue properties and with subject-specific head anatomy such as skull thickness and morphology. Analysis choices such as the degree of image smoothing applied to the segmentation also affect intensity and thermal estimates. Treat the variants as scenarios that bracket a plausible range, not as guaranteed worst- or best-case predictions.
 
-PRESTUS provides an **uncertainty mode** that makes these assumptions explicit. Rather than running a single simulation with one set of tissue properties, the uncertainty mode runs three parallel simulations — *default*, *liberal*, and *conservative* — each with a different but internally consistent set of medium properties. A dedicated postprocessing step then compares outcomes and produces an uncertainty report that summarises the range of plausible values for each safety metric.
+The acoustic and thermal medium properties of the skull and brain (speed of sound, density, attenuation) are not precisely known for any individual subject, and published values vary across studies. The true in-situ intensity and heating at a location may therefore differ from the simulated value depending on which tissue properties are assumed. Uncertainty mode makes these assumptions explicit: it runs the *default* medium and four variants built from the ITRUSST tissue property bounds, then compares the outcomes in one report.
 
 ![PRESTUS uncertainty](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/prestus_uncertainty.png)
 
----
+## Basic usage
 
-## Conceptual framework
-
-The three simulation variants are defined as:
-
-| Variant | Interpretation | Expected effect |
-|---|---|---|
-| **Default** | Best-estimate medium properties | Reference simulation |
-| **Liberal** | Acoustic tissue parameter combination that tends to produce higher acoustic intensity at the target and reduced heating in the skull (e.g., lower skull attenuation, lower skull absorption fraction) | Indicative upper range of in-situ exposure |
-| **Conservative** | Acoustic tissue parameter combination that tends to produce lower acoustic intensity at the target and increased heating in the skull (e.g., higher skull attenuation, higher skull absorption fraction) | Indicative lower range of in-situ exposure |
-
-The liberal/conservative distinction follows the logic that different parameter choices affect different stages of wave propagation in opposite directions. For example, higher skull attenuation reduces intracranial intensity (beneficial) but increases skull heating (adverse). The liberal and conservative parameter sets are therefore not simply "high" and "low" across all properties — they are tailored to yield the highest and lowest plausible values for the metrics of interest (intracranial intensity and heating).
-
----
-
-## Medium property ranges
-
-The following table summarises the default, liberal, and conservative medium acoustic properties currently implemented in PRESTUS.
-
-<details markdown>
-<summary>Brain and Skull property tables</summary>
-
-### Brain
-
-| Property | Conservative | Default | Liberal | Unit |
-|---|---|---|---|---|
-| Sound speed | 1520 | 1546 | 1568 | m/s |
-| Density | 1046 | 1046 | 1046 | kg/m³ |
-| Attenuation coeff. | 0.94 | 0.59 | 0.36 | dB/(cm·MHz) |
-| Attenuation power | 1.0 | 1.2 | 1.0 | — |
-| Thermal conductivity | 0.48 | 0.51 | 0.55 | W/(m·K) |
-| Specific heat | 3583 | 3630 | 3696 | J/(kg·K) |
-| Perfusion | 196 | 559 | 809 | mL/min/kg |
-| Absorption fraction | 0.80 | 1.00 | 1.00 | — |
-| Absorption coeff. | 0.752 | 0.59 | 0.36 | dB/(cm·MHz<sup>y</sup>) |
-
-### Skull
-
-| Property | Conservative | Default | Liberal | Unit |
-|---|---|---|---|---|
-| Sound speed | 2822 | 2800 | 2257 | m/s |
-| Density | 1908 | 1850 | 1178 | kg/m³ |
-| Attenuation coeff. | 24.4 | 13.3 | 6.9 | dB/(cm·MHz) |
-| Attenuation power | 1.0 | 1.0 | 1.0 | — |
-| Thermal conductivity | 0.31 | 0.32 | 0.32 | W/(m·K) |
-| Specific heat | 1313 | 1793 | 2626 | J/(kg·K) |
-| Perfusion | 10 | 20 | 30 | mL/min/kg |
-| Absorption fraction | 1.00 | 0.28 | 0.16 | — |
-| Absorption coeff. | 24.4 | 3.78 | 1.104 | dB/(cm·MHz) |
-
-> **Rationale for skull properties.** The conservative variant uses high attenuation and high acoustic impedance (high density × sound speed), which reflects a denser, more calcified skull: more acoustic energy is lost before reaching the brain, so intracranial intensity is lower. Conversely, the liberal variant uses a skull with low impedance and low attenuation, which allows more energy through to the brain. The absorption fraction modulates how much of the attenuated energy is converted to heat: a lower fraction means less skull heating per unit attenuation. In practice, the liberal variant thus produces higher intracranial intensity *and* allows more limited skull heating estimates relative to the default.
-
-> **Multi-compartment skull models.** When a segmentation includes separate skull sub-compartments (e.g., `skull_cortical` and `skull_trabecular`), the same liberal and conservative values are currently applied identically to all skull compartments. This is a known simplification — in reality, cortical and trabecular bone have distinct acoustic properties. Users modelling detailed skull microstructure should consider customising the uncertainty configs (see [Customising medium property ranges](#customising-medium-property-ranges)) to assign compartment-specific ranges.
-
-</details>
-
----
-
-## Workflow
-
-The uncertainty mode consists of five stages, of which stages 2–4 can run in parallel:
-
-```
-Stage 1: Preprocessing & source setup  (serial; must complete before stages 2–4)
-    ↓
-Stage 2: Default simulation             ┐
-Stage 3: Liberal simulation             ├── parallel acoustic + thermal jobs
-Stage 4: Conservative simulation        ┘
-    ↓
-Stage 5: Uncertainty report generation  (serial; runs once all three output files are present)
-```
-
-Uncertainty mode can be combined with sequential simulations — see [Sequential simulations with uncertainty mode](doc_sequential.md#sequential-simulations-with-uncertainty-mode) for details.
-
-All five stages are managed automatically when `parameters.simulation.uncertainty = true` is set before calling `prestus_pipeline`. This is the same entry point used for standard simulations — no separate function call is required.
-
-### Basic usage
+Set `simulation.uncertainty = true` and call the usual entry point:
 
 ```matlab
 prestus_path = '/path/to/PRESTUS';
@@ -103,34 +32,130 @@ parameters.path.sim               = '/absolute/path/to/sim_outputs';  % must be 
 prestus_pipeline_start(parameters);
 ```
 
-`prestus_pipeline_start` detects `simulation.uncertainty = true` on HPC and redirects to `uncertainty_pipeline` before submitting a single job. On MATLAB, `prestus_pipeline` handles the redirect after `path_log_setup` has run. The per-variant parameter structs built internally have `simulation.uncertainty` cleared, so there is no recursion.
+On a local MATLAB session (`platform = 'matlab'`) the stages run one after another. On HPC (`platform = 'slurm'` or `'qsub'`) all jobs are submitted immediately with scheduler dependencies, and no MATLAB session is held open ([HPC usage](#hpc-usage)).
 
-On a local MATLAB session (`platform = 'matlab'`) the five stages run sequentially. On HPC (`platform = 'slurm'` or `'qsub'`) all five jobs are submitted immediately: stages 2–4 with a dependency on stage 1, and stage 5 with a dependency on all three simulation jobs. No MATLAB session is held open during execution.
+Uncertainty mode can be combined with sequential simulations; see [Sequential simulations with uncertainty mode](doc_sequential.md#sequential-simulations-with-uncertainty-mode).
+
+## Conceptual framework
+
+The five simulation variants are:
+
+| Variant | Label | Medium properties | Runs heating | Used for |
+|---|---|---|---|---|
+| `default` | Default | PRESTUS default medium | as `modules.run_heating_sims` | Reference simulation |
+| `temp_high` | Temp-H | per property, the bound that maximises brain heating | yes | Upper end of thermal metrics |
+| `temp_low` | Temp-L | per property, the bound that minimises brain heating | yes | Lower end of thermal metrics |
+| `trans_high` | Trans-H | per acoustic property, the bound that maximises brain intensity | no | Upper end of acoustic metrics |
+| `trans_low` | Trans-L | per acoustic property, the bound that minimises brain intensity | no | Lower end of acoustic metrics |
+
+The bounds come from the ITRUSST one-at-a-time sensitivity analysis, which varied each tissue property between its lower and upper bound with all other properties at reference. Two pairs are needed because brain sound speed, density and attenuation and skull sound speed push heating and intensity in opposite directions: higher brain attenuation, for example, raises heating in the brain but lowers the intensity that reaches deeper targets. A single high/low pair would therefore bound neither metric. The Trans variants vary acoustic properties only and run without heating.
+
+## Medium property ranges
+
+The tables list the default medium (`config/config_default.yaml`) and the four variant files in `config/uncertainty/`. Attenuation and absorption coefficients are in dB/(cm·MHz^y); the variant values are the ITRUSST 500 kHz values converted with y = 1 (`alpha_coeff` = α_500 kHz / 0.5). "–" marks a property the variant file does not list: the Trans variants run no heating, so their thermal properties are not used.
+
+??? note "Details: brain and skull property tables"
+    **Brain**
+
+    | Property | Default | Temp-H | Temp-L | Trans-H | Trans-L | Unit |
+    |---|---|---|---|---|---|---|
+    | Sound speed | 1546 | 1573 | 1520 | 1520 | 1573 | m/s |
+    | Density | 1046 | 1040 | 1050 | 1050 | 1040 | kg/m³ |
+    | Attenuation coeff. | 0.59 | 0.984 | 0.308 | 0.308 | 0.984 | dB/(cm·MHz^y) |
+    | Attenuation power | 1.2 | 1 | 1 | 1 | 1 | – |
+    | Thermal conductivity | 0.51 | 0.48 | 0.55 | – | – | W/(m·K) |
+    | Specific heat | 3630 | 3525 | 3718 | – | – | J/(kg·K) |
+    | Perfusion | 559 | 196 | 809 | – | – | mL/min/kg |
+    | Absorption fraction | 1 | 1 | 0.29 | – | – | – |
+
+    **Skull**
+
+    The variant values apply to `skull`, `skull_trabecular` and `skull_cortical` alike. The Default column shows `skull`; the default values of the two sub-compartments are in [Medium](doc_medium.md).
+
+    | Property | Default | Temp-H | Temp-L | Trans-H | Trans-L | Unit |
+    |---|---|---|---|---|---|---|
+    | Sound speed | 2800 | 2871 | 2190 | 2190 | 2871 | m/s |
+    | Density | 1850 | 1080 | 1991 | 1080 | 1991 | kg/m³ |
+    | Attenuation coeff. | 13.3 | 8.04 | 23.4 | 8.04 | 23.4 | dB/(cm·MHz^y) |
+    | Attenuation power | 1 | 1 | 1 | 1 | 1 | – |
+    | Thermal conductivity | 0.32 | 0.30 | 0.36 | – | – | W/(m·K) |
+    | Specific heat | 1793 | 826 | 2524 | – | – | J/(kg·K) |
+    | Perfusion | 20 | 0 | 30 | – | – | mL/min/kg |
+    | Absorption | fraction 0.28 | coeff. 8.04 | coeff. 2.1 | – | – | –, dB/(cm·MHz^y) |
+
+    **Rationale.** Temp-H combines low skull attenuation and density, which let more energy into the brain, with high brain attenuation and full brain absorption, which convert more of it to heat, and with the thermal bounds that raise temperature (low conductivity, specific heat and perfusion). Temp-L takes the opposite bound of each. Trans-H combines low skull impedance and attenuation with low brain attenuation, so more energy reaches the target; Trans-L takes the opposite bound of each. Skull density and attenuation take the same bound in Temp-H and Trans-H; brain sound speed, density and attenuation and skull sound speed take opposite bounds.
+
+    **Multi-compartment skull models.** With separate `skull_cortical` and `skull_trabecular` compartments, both get the single ITRUSST skull bound. To assign compartment-specific ranges, use your own variant files (see [Customising medium property ranges](#customising-medium-property-ranges)).
+
+## Workflow
+
+The uncertainty mode consists of seven stages, of which stages 2–6 can run in parallel:
+
+```
+Stage 1: Preprocessing & source setup  (serial; must complete before stages 2–6)
+    ↓
+Stage 2: Default simulation             ┐
+Stage 3: Temp-H simulation              │  acoustic + thermal
+Stage 4: Temp-L simulation              ├─ parallel jobs
+Stage 5: Trans-H simulation             │  acoustic only
+Stage 6: Trans-L simulation             ┘
+    ↓
+Stage 7: Uncertainty report generation  (serial; runs once all five output files are present)
+```
+
+Variants share the stage-1 head and grid caches; each maps its own medium, cached under its own affix. Only the properties defined in a variant file change; all other settings (transducer, grid, paths) are inherited from the base config. With `pct.enabled: 1`, stages 3–6 use a homogeneous skull layer (see [Pseudo-CT runs](#pseudo-ct-runs)).
+
+??? note "Details: what happens inside"
+    `prestus_pipeline_start` detects `simulation.uncertainty = true` on HPC and redirects to `uncertainty_pipeline` before submitting a single job. On MATLAB, `prestus_pipeline` handles the redirect after `path_log_setup` has run. The per-variant parameter structs built internally have `simulation.uncertainty` cleared, so there is no recursion. `uncertainty_pipeline` builds one parameter struct per stage from the base parameters and dispatches them:
+
+    | Stage | Modules enabled | `io.output_affix` | Medium override |
+    |---|---|---|---|
+    | 1 | source setup only | `''` | none |
+    | 2 | acoustic + thermal (as `modules.run_heating_sims`) | `<base>` | none (default) |
+    | 3 | acoustic + thermal | `<base>_desc-temphigh` | `config_medium_temp_high.yaml` |
+    | 4 | acoustic + thermal | `<base>_desc-templow` | `config_medium_temp_low.yaml` |
+    | 5 | acoustic only | `<base>_desc-transhigh` | `config_medium_trans_high.yaml` |
+    | 6 | acoustic only | `<base>_desc-translow` | `config_medium_trans_low.yaml` |
+    | 7 | uncertainty report | `''` | none |
+
+    `<base>` is the base config's `io.output_affix` (usually empty).
+
+    You can also call `uncertainty_pipeline` directly if you need to bypass `prestus_pipeline`:
+
+    ```matlab
+    uncertainty_pipeline(parameters, options);
+    ```
 
 ### Customising options
 
-The variants' medium files can also be set in the config:
+The variants' medium files can be set in the config:
 
 ```yaml
 simulation:
   uncertainty: true
-  uncertainty_conservative: /path/to/my_medium_conservative.yaml   # absolute path, or a file name in config/uncertainty/
-  uncertainty_liberal: my_medium_liberal.yaml
+  uncertainty_temp_high: /path/to/my_medium_temp_high.yaml   # absolute path, or a file name in config/uncertainty/
+  uncertainty_temp_low: my_medium_temp_low.yaml
+  uncertainty_trans_high: ''                                 # '' = shipped file
+  uncertainty_trans_low: ''
 ```
 
-Empty (the default) uses the shipped `config/uncertainty/config_medium_<variant>.yaml`. Each file is merged onto the run's config, so tissues and properties it does not list keep their `medium_properties` values; the shipped files list brain and the three skull layers only. The `options.*_config` arguments below take precedence.
-
+Empty (the default) uses the shipped `config/uncertainty/config_medium_<variant>.yaml`. Each file is merged onto the run's config, so tissues and properties it does not list keep their `medium_properties` values; the shipped files list brain and the three skull layers only. A file that sets `absorption_coeff` for a tissue clears the inherited `absorption_fraction`, and the other way round. The `options.*_config` arguments below take precedence.
 
 Uncertainty-specific options can be passed as the second argument to `prestus_pipeline`:
 
 ```matlab
-options.affixes.default       = '';
-options.affixes.liberal       = '_liberal';
-options.affixes.conservative  = '_conservative';
+% Output affixes (defaults: base affix, then _desc-temphigh, _desc-templow, ...):
+options.affixes.default    = '';
+options.affixes.temp_high  = '_desc-temphigh';
+options.affixes.temp_low   = '_desc-templow';
+options.affixes.trans_high = '_desc-transhigh';
+options.affixes.trans_low  = '_desc-translow';
 
-% Override built-in medium configs with study-specific files:
-options.liberal_config      = '/path/to/my_medium_liberal.yaml';
-options.conservative_config = '/path/to/my_medium_conservative.yaml';
+% Override the medium files with study-specific files:
+options.temp_high_config  = '/path/to/my_medium_temp_high.yaml';
+options.temp_low_config   = '/path/to/my_medium_temp_low.yaml';
+options.trans_high_config = '/path/to/my_medium_trans_high.yaml';
+options.trans_low_config  = '/path/to/my_medium_trans_low.yaml';
 
 % HPC wall times:
 options.stage1_timelimit  = '00:30:00';
@@ -140,40 +165,32 @@ options.report_timelimit  = '00:30:00';
 prestus_pipeline(parameters, options);
 ```
 
-You can also call `uncertainty_pipeline` directly if you need to bypass `prestus_pipeline`:
+`options.liberal_config`, `options.conservative_config` and `options.affixes.liberal` / `.conservative` stop the run with `uncertainty_pipeline:legacyVariant`; use the options above instead.
 
-```matlab
-uncertainty_pipeline(parameters, options);
+## Customising medium property ranges
+
+The shipped variant files are in `config/uncertainty/`. To use study-specific ranges, copy and edit one of them:
+
+```yaml
+# my_medium_temp_high.yaml: only override what you want to change
+medium_properties:
+  skull:
+    alpha_coeff: 6.0
+    absorption_coeff: 6.0
 ```
 
-### What happens inside
+Pass it via the config (`simulation.uncertainty_temp_high`) or via options:
 
-`uncertainty_pipeline` builds four parameter structs from the base parameters and dispatches them:
+```matlab
+options.temp_high_config = '/path/to/my_medium_temp_high.yaml';
+prestus_pipeline(parameters, options);
+```
 
-| Stage | Modules enabled | `io.output_affix` | Medium override |
-|---|---|---|---|
-| 1 | source setup only | `''` | none |
-| 2 | acoustic + thermal | `<base>` | none (default) |
-| 3 | acoustic + thermal | `<base>_desc-liberal` | `config_medium_liberal.yaml` |
-| 4 | acoustic + thermal | `<base>_desc-conservative` | `config_medium_conservative.yaml` |
-| 5 | uncertainty report | `''` | none |
-
-`<base>` is the base config's `io.output_affix` (usually empty). Variants share the stage-1 head and grid caches; each maps its own medium, cached under its own affix.
-
-The medium override YAMLs are merged on top of the base parameters using `MergeStruct`, so only the properties defined in the override file are changed — all other settings (transducer, grid, paths) are inherited from the base config.
-
-> **Resuming a partial run.** On HPC, each stage is skipped automatically if its sentinel output already exists (see [Resuming a partial run](#resuming-a-partial-run) below). Only the missing stages are resubmitted, and scheduler dependencies are set only for jobs that were actually submitted.
-
-The built-in medium override configs live in `config/uncertainty/`:
-
-- `config_medium_liberal.yaml` — low-impedance, low-attenuation skull; higher brain intensity
-- `config_medium_conservative.yaml` — high-impedance, high-attenuation skull; lower brain intensity
-
----
+Only the properties present in the file are changed; all other settings are inherited from the base config. A Trans variant file needs no thermal properties, since the Trans variants run no heating.
 
 ## Output files
 
-Each simulation variant writes its outputs into the shared `path.sim` output folder (or a subject subfolder), identified by `io.output_affix`:
+Each simulation variant writes its outputs into the shared `path.sim` output folder (or a subject subfolder), identified by `io.output_affix`. The Trans variants write no thermal outputs (`maxT`, `thermal_max`, `heating_res`).
 
 | File pattern | Description | Kept when `save_matrices` is `0` or empty |
 |---|---|---|
@@ -187,107 +204,90 @@ Each simulation variant writes its outputs into the shared `path.sim` output fol
 | `debug/sub-NNN_after_rotating_and_scaling.mat` | Intermediate head model (debug) | **removed** |
 | `debug/sub-NNN_layered_after_cropping_and_smoothing.mat` | Intermediate skull grid (debug) | **removed** |
 
-> **Automatic cleanup.** When `parameters.io.save_matrices` is `0` or empty (the default), the pipeline deletes the files marked **removed** above after the uncertainty report (stage 5) has been written. This is handled by `cleanup_uncertainty_intermediates`, called automatically on both the MATLAB and HPC platforms. Cleanup only runs after stage 5 completes, so a failed run can be resumed beforehand.
+!!! note "Automatic cleanup"
+    When `parameters.io.save_matrices` is `0` or empty (the default), the pipeline deletes the files marked **removed** above after the uncertainty report (stage 7) has been written (`cleanup_uncertainty_intermediates`, on both the MATLAB and HPC platforms). Cleanup only runs after stage 7 completes, so a failed run can be resumed beforehand.
 
-The uncertainty report is written as:
+The uncertainty report is written as `sub-NNN_layered_desc-uncertainty_report<base>.html`. The name ends with the default variant's affix, so runs with different base affixes keep separate reports. With a nested multi-ISPPA sweep or async run there is one report per sweep point, e.g. `sub-NNN_layered_desc-uncertainty_report<base>_desc-isppa030.html` (see [below](#combining-with-a-multi-isppa-sweep-or-async-transducers)).
 
-| File | Description |
-|---|---|
-| `sub-NNN_layered_desc-uncertainty_report<base>.html` | Unified uncertainty HTML report |
+## Uncertainty report contents
 
-The report name ends with the default variant's affix, so runs with different base affixes keep separate reports. With a nested multi-ISPPA sweep or async run there is one report per sweep point, e.g. `sub-NNN_layered_desc-uncertainty_report<base>_desc-isppa030.html` (see [below](#combining-with-a-multi-isppa-sweep-or-async-transducers)).
+The uncertainty report is a self-contained HTML file. Acoustic metrics (ISPPA, MI, pressure, focal metrics, half-maximum volume) are reported with the Trans range (Trans-L to Trans-H); thermal metrics (temperature rise, maximum temperature, CEM43) with the Temp range (Temp-L to Temp-H). Every table lists the values of all five variants; the Trans variants show N/A for thermal metrics.
 
----
+- **Safety dashboard**: colour-coded cards for all ITRUSST consensus safety metrics (MI, CEM43, temperature rise, absolute temperature). Each card shows the **default** value with the range of the relevant pair annotated. The bar spans a metric-specific minimum (37 °C for absolute temperatures, 0 elsewhere) to `max(max_sim, limit)`; ticks mark the variant values. The card colour follows the highest value of the default and the pair.
+- **Acoustic results**: range table with the values of all variants and the Trans range for key acoustic metrics. Row colour follows the highest value of the default and the Trans pair.
+- **Thermal results**: range table with the values of all variants and the Temp range for thermal metrics (maxT, temperature rise, CEM43 per tissue); row colour follows the highest value of the default and the Temp pair. Side-by-side temperature-vs-time images (`thermal_max`) of the default and Temp variants. Per-layer and global timeseries plots show temperature and CEM43 over time with the Temp-L to Temp-H band shaded around the default trajectory.
+- **Pseudo-CT skull vs. bounds**: with `pct.enabled: 1`, histograms of the default run's mapped skull properties against the band of the bound variants' skull values (see [Pseudo-CT runs](#pseudo-ct-runs)).
+- **Additional maps**: side-by-side maximum temperature maps across the default and Temp variants.
+- **Raw data tables**: full CSV output tables for each variant.
 
 ## Combining with a multi-ISPPA sweep or async transducers
 
-Uncertainty composes with the two other chained modes. When the base config is a multi-ISPPA sweep (a vector `transducer.target_isppa_wcm2`) or an async multi-transducer run (`simulation.transducer_coupling: async`), each variant runs that pipeline with its own medium, and stage 5 writes one uncertainty report per sweep point. Uncertainty is always the outer mode, on every platform.
+Uncertainty composes with the two other chained modes. When the base config is a multi-ISPPA sweep (a vector `transducer.target_isppa_wcm2`) or an async multi-transducer run (`simulation.transducer_coupling: async`), each of the five variants runs that pipeline with its own medium, and stage 7 writes one uncertainty report per sweep point. The Trans variants run no thermal jobs. Uncertainty is always the outer mode, on every platform.
 
 | | Multi-ISPPA sweep | Async transducers |
 |---|---|---|
 | Stage 1 | shared preprocessing, as above | not run: each variant's async stage 0 builds its own grid and medium |
-| Stages 2–4 | per variant: [`multi_isppa_pipeline`](doc_multiintensity.md) (acoustic, one thermal job per target, summary) | per variant: [`async_transducer_pipeline`](doc_multitransducer.md) (stage 0, acoustic per transducer, combine and joint per sweep point) |
+| Stages 2–6 | per variant: [`multi_isppa_pipeline`](doc_multiintensity.md) (acoustic, one thermal job per target, summary) | per variant: [`async_transducer_pipeline`](doc_multitransducer.md) (stage 0, acoustic per transducer, combine and joint per sweep point) |
 | Variant outputs | `<variant affix>_desc-isppaNNN` | `<variant affix>_desc-asyncJoint` or `_desc-asyncJointSjj` |
-| Stage 5 | one report per target | one report per sweep point |
+| Stage 7 | one report per target | one report per sweep point |
 
-On HPC, `uncertainty_pipeline` submits each variant's inner jobs itself. Job names carry the variant (`PRESTUS-u3-liberal-mi2-thermal_isppa030_sub-001`), the multi-ISPPA acoustic jobs wait for stage 1, and every report job waits for all the variants' jobs. Options for the inner pipeline (e.g. `options.thermal_timelimit`) pass through the `options` struct given to `prestus_pipeline_start`.
+On HPC, `uncertainty_pipeline` submits each variant's inner jobs itself. Job names carry the stage and variant (`PRESTUS-u3-temp_high-mi2-thermal_isppa030_sub-001`), the multi-ISPPA acoustic jobs wait for stage 1, and every report job waits for all the variants' jobs. Options for the inner pipeline (e.g. `options.thermal_timelimit`) pass through the `options` struct given to `prestus_pipeline_start`.
 
 Not supported: sequential follow-up runs (`options.sequential_configs`) in nested mode, and a multi-ISPPA sweep with more than one coherent transducer (as without uncertainty). Both stop with an error before any job is submitted.
 
----
-
-## Uncertainty report contents
-
-The uncertainty report (`generate_uncertainty_report.m`) is a self-contained HTML file that includes:
-
-- **Safety dashboard** — Color-coded cards for all ITRUSST consensus safety metrics (MI, CEM43, temperature rise, absolute temperature). Each card shows the **default** value with the liberal–conservative range annotated. The bar spans a metric-specific minimum (37 °C for absolute temperatures, 0 elsewhere) to `max(max_sim, limit)`. The colored fill extends to `min(max_sim, limit)`; three ticks mark the liberal (blue), default (black), and conservative (brown) values. Color is determined by the conservative value.
-- **Acoustic results** — Range table showing liberal / default / conservative values for key acoustic metrics (ISPPA, focal distance, MI, half-maximum volume).
-- **Thermal results** — Range table for thermal metrics (maxT, temperature rise, CEM43 per tissue). Side-by-side temperature-vs-time images (`thermal_max`) across liberal, default, and conservative variants. Per-layer and global uncertainty-band timeseries plots show temperature and CEM43 over time with liberal/conservative shaded envelopes around the default trajectory.
-- **Additional maps** — Side-by-side maximum temperature maps across variants.
-- **Raw data tables** — Full CSV output tables for each variant.
-
----
-
 ## Resuming a partial run
 
-The uncertainty pipeline supports automatic resumption on both platforms.
+Re-run the same call. On HPC, a stage whose sentinel file exists is skipped and no scheduler dependency is created for it; only the missing stages are resubmitted. To rerun a stage, delete its sentinel file before resubmitting. With `io.overwrite_files: 'always'`, stages 2–7 are always resubmitted (stage 1 still resumes from its cache); with `'force'`, stage 1 is resubmitted too. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
-**HPC (slurm/qsub).** Before submitting each job, the pipeline checks for a sentinel file. If the sentinel exists, the job is skipped entirely and no scheduler dependency is created for it:
+On the MATLAB platform there is no stage-level skip. Resumability relies on `io.overwrite_files = 'never'` (the default for variant stages unless the base config sets `'always'`): each file write inside the pipeline is skipped if the file already exists, so a restarted run fast-forwards through completed steps file by file.
 
-| Stage | Sentinel file | Location |
-|---|---|---|
-| 1 — Preprocessing | `sub-NNN_<medium>_cropped_smoothed.mat` | `<output_dir>/cache/` |
-| 2 — Default sim | `sub-NNN_<medium><base>.csv` | `<output_dir>/` |
-| 3 — Liberal sim | `sub-NNN_<medium><base>_desc-liberal.csv` | `<output_dir>/` |
-| 4 — Conservative sim | `sub-NNN_<medium><base>_desc-conservative.csv` | `<output_dir>/` |
-| 5 — Report | `sub-NNN_<medium>_desc-uncertainty_report<base>.html` | `<output_dir>/` |
+??? note "Details: sentinel files"
+    | Stage | Sentinel file | Location |
+    |---|---|---|
+    | 1, Preprocessing | `sub-NNN_<medium>_cropped_smoothed.mat` | `<output_dir>/cache/` |
+    | 2, Default sim | `sub-NNN_<medium><base>.csv` | `<output_dir>/` |
+    | 3, Temp-H sim | `sub-NNN_<medium><base>_desc-temphigh.csv` | `<output_dir>/` |
+    | 4, Temp-L sim | `sub-NNN_<medium><base>_desc-templow.csv` | `<output_dir>/` |
+    | 5, Trans-H sim | `sub-NNN_<medium><base>_desc-transhigh.csv` | `<output_dir>/` |
+    | 6, Trans-L sim | `sub-NNN_<medium><base>_desc-translow.csv` | `<output_dir>/` |
+    | 7, Report | `sub-NNN_<medium>_desc-uncertainty_report<base>.html` | `<output_dir>/` |
 
-In nested mode (below) the variants' inner pipelines apply their own per-stage checks, and each per-point report is skipped when its file exists.
-
-To rerun a stage, delete its sentinel file before resubmitting. With `io.overwrite_files: 'always'`, stages 2–5 are always resubmitted (stage 1 still resumes from its cache); with `'force'`, stage 1 is resubmitted too. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
-
-**MATLAB platform.** There is no stage-level skip logic. Instead, resumability relies on `io.overwrite_files = 'never'` (the default for variant stages unless the base config sets `'always'`): each individual file write inside the pipeline is skipped if the file already exists. This means a restarted MATLAB run will fast-forward through completed steps file-by-file rather than stage-by-stage.
-
----
+    In nested mode (above) the variants' inner pipelines apply their own per-stage checks, and each per-point report is skipped when its file exists.
 
 ## HPC usage
 
-When `platform` is `'slurm'` or `'qsub'`, `uncertainty_pipeline` submits all five jobs immediately using scheduler dependencies (`--dependency=afterok` for SLURM). Stages 2–4 depend on stage 1; stage 5 depends on all three simulation jobs. If stage 1 fails, all downstream jobs are automatically cancelled (`--kill-on-invalid-dep=yes`). No MATLAB session is held open during execution.
+When `platform` is `'slurm'` or `'qsub'`, all seven jobs are submitted immediately using scheduler dependencies (`--dependency=afterok` for SLURM). Stages 2–6 depend on stage 1; stage 7 depends on all five simulation jobs. If stage 1 fails, all downstream jobs are cancelled (`--kill-on-invalid-dep=yes`). No MATLAB session is held open during execution.
 
-Stages 1 and 5 (preprocessing and report) do not require a GPU and are submitted to the scheduler's default CPU queue. Stages 2–4 inherit the GPU resources from the base config. To override the queue for CPU stages use `options.stage1_partition = 'gpu'` and `options.report_partition = 'gpu'`.
+Stages 1 and 7 (preprocessing and report) do not require a GPU and are submitted to the scheduler's default CPU queue. Stages 2–6 inherit the GPU resources from the base config. To override the queue for CPU stages use `options.stage1_partition = 'gpu'` and `options.report_partition = 'gpu'`.
 
-This requires that `hpc_submit_job` supports the `parameters.hpc.depend_job_id` (single) and `parameters.hpc.depend_job_ids` (array) fields — see [doc_hpc.md](doc_hpc.md).
+??? note "Details: job names and dependencies"
+    Job names are `PRESTUS-u1-preproc_sub-XXX`, `PRESTUS-u<k>-sim-<variant>_sub-XXX` for stages k = 2–6 (e.g. `PRESTUS-u3-sim-temp_high_sub-001`) and `PRESTUS-u7-report_sub-XXX`.
 
----
+    This requires that `hpc_submit_job` supports the `parameters.hpc.depend_job_id` (single) and `parameters.hpc.depend_job_ids` (array) fields; see [doc_hpc.md](doc_hpc.md).
 
-## Customising medium property ranges
+## Pseudo-CT runs
 
-The built-in overrides are in `config/uncertainty/`. To use study-specific ranges, copy and edit either file:
+With `pct.enabled: 1`, only the default variant maps the skull from the [pseudo-CT](doc_pseudoCT.md). The four bound variants use the same head geometry (preprocessing and grid caches) but give the `skull` layer the homogeneous values of their medium file. The brain and thermal bounds apply as in other runs. The `skull_cortical` and `skull_trabecular` layers are never mapped from the pseudo-CT.
 
-```yaml
-# my_medium_liberal.yaml — only override what you want to change
-medium_properties:
-  skull:
-    alpha_coeff: 5.0
-    absorption_fraction: 0.12
-```
+The range then compares the pseudo-CT skull with homogeneous skulls at the ITRUSST bounds. It brackets the default only where the mapped skull properties lie within those bounds, and it does not express the uncertainty of the pseudo-CT transform itself. Mapped values can fall largely outside the bounds, so check them before interpreting the range:
 
-Pass it via options:
+- The uncertainty report's **Pseudo-CT Skull vs. Bounds** section plots the default run's skull density, sound speed and attenuation (or a prediction, when they are not cached) against the band of the bound variants' skull values and states the share of voxels outside it.
+- Before simulating, `pct_predict_skull_properties` or **Predict skull properties** on the Nexus Pseudo-CT sub-tab predicts the modelled skull properties. The Nexus shows the default run's values instead when they exist.
 
 ```matlab
-options.liberal_config = '/path/to/my_medium_liberal.yaml';
-prestus_pipeline(parameters, options);
+parameters = load_parameters('config_study.yaml');
+parameters.subject_id = 1;
+stats = pct_predict_skull_properties(parameters);  % writes cache/sub-001_<medium>_pct_prediction.json
+stats.properties.sound_speed                        % mapped skull sound speed: mean, percentiles, histogram
+stats.bounds                                        % skull values of each bound variant
 ```
 
-Only the properties present in the override file are changed; all other settings are inherited from the base config.
+The prediction applies the configured `pct.mapping_*` to the skull voxels of the head-preprocessing cache when it exists (`stats.source = 'grid'`, as modelled), else of `pseudoCT.nii.gz` and `tissues_mask.nii.gz` before cropping, resampling and smoothing (`'native'`).
 
----
+??? note "References"
+    The variant bounds are the lower and upper values of the ITRUSST tissue property table (in preparation) and the property directions of its one-at-a-time sensitivity analysis. Sources cited in the table for the bounds include:
 
-## References
-
-The liberal and conservative parameter ranges are informed by published measurements and systematic reviews of transcranial ultrasound tissue properties:
-
-- Aubry, J.-F., et al. ITRUSST consensus on safety of transcranial focused ultrasound. *Brain Stimulation* (2025). https://doi.org/10.1016/j.brs.2025.10.007
-- Deffieux, T., & Konofagou, E. E. Numerical study of a simple transcranial focused ultrasound system applied to blood–brain barrier opening. *IEEE Trans Ultrason Ferroelectr Freq Control* **57**, 2637–2653 (2010).
-- Pinton, G., et al. Attenuation, scattering, and absorption of ultrasound in the skull bone. *Med Phys* **39**, 299–307 (2012). https://doi.org/10.1118/1.3668316
-- Marsac, L., et al. Ex vivo optimisation of a heterogeneous speed of sound model of the human skull for non-invasive transcranial focused ultrasound at 1 MHz. *Int J Hyperthermia* **33**, 635–645 (2017).
+    - Aubry, J.-F., et al. ITRUSST consensus on safety of transcranial focused ultrasound. *Brain Stimulation* (2025). https://doi.org/10.1016/j.brs.2025.10.007 (safety limits of the report)
+    - Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave models. *J Acoust Soc Am* **152**, 1003–1019 (2022) (skull reference values).
+    - Lyons, M. E., & Parker, K. J. Absorption and attenuation in soft tissues. II. Experimental results. *IEEE Trans Ultrason Ferroelectr Freq Control* **35**, 511–521 (1988) (lower brain attenuation and absorption).
+    - White, P. J., Clement, G. T., & Hynynen, K. Longitudinal and shear mode ultrasound propagation in human skull bone. *Ultrasound Med Biol* **32**, 1085–1096 (2006). https://doi.org/10.1016/j.ultrasmedbio.2006.03.015 (lower skull attenuation, upper skull absorption).

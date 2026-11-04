@@ -566,9 +566,9 @@ def uncertainty_issues(model: ConfigModel) -> list[Issue]:
     """uncertainty_pipeline.m errors when a variant's medium file is missing (configNotFound)."""
     if model.get("simulation.uncertainty") is not True:
         return []
-    from .uncertainty import property_sets
+    from .uncertainty import VARIANT_SHORT, property_sets
     sets = property_sets(model, model.schema.toolbox_path.parent.parent)
-    return [Issue("error", f"simulation.uncertainty_{variant}", f"{variant.capitalize()} variant: {why}")
+    return [Issue("error", f"simulation.uncertainty_{variant}", f"{VARIANT_SHORT[variant]} variant: {why}")
             for variant, why in sets.errors.items()]
 
 

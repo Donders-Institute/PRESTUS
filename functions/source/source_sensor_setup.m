@@ -255,8 +255,8 @@ end
     kgrid.setTime(simulation_time_points, grid_time_step);
 
     % Create source (transducer with focuspoint).
-    % Always use output_affix so each simulation variant (default, liberal,
-    % conservative) computes its own kwave_source.mat with the correct time
+    % Always use output_affix so each simulation variant (default, Temp-H/L,
+    % Trans-H/L) computes its own kwave_source.mat with the correct time
     % axis for that variant's medium speed.  preproc_affix is intentionally
     % NOT used here — it only applies to head-preprocessing file lookups in
     % preproc_head.m.

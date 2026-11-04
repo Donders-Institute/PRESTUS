@@ -77,8 +77,10 @@ fields:
   simulation.interactive: {kind: flag}
   simulation.debug: {kind: flag}
   simulation.transducer_coupling: {choices: [coherent, async]}
-  simulation.uncertainty_conservative: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
-  simulation.uncertainty_liberal: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  simulation.uncertainty_temp_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  simulation.uncertainty_temp_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  simulation.uncertainty_trans_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  simulation.uncertainty_trans_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
 
   # ── Paths & environment ──────────────────────────────────────────────
   path.anat: {kind: dir}
@@ -664,8 +666,10 @@ display:
   simulation.transducer_coupling: {label: Multi-transducer coupling}
   simulation.async_grid_mode: {label: Async grid mode, advanced: true}
   simulation.uncertainty: {label: Uncertainty analysis, advanced: true}
-  simulation.uncertainty_conservative: {label: Conservative medium file (lower bound), help: "Medium properties of the conservative variant: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_conservative.yaml. Tissues and properties the file does not list keep the default medium properties."}
-  simulation.uncertainty_liberal: {label: Liberal medium file (upper bound), help: "Medium properties of the liberal variant: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_liberal.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_temp_high: {label: Temp-H medium file (max. heating), help: "Medium properties of the Temp-H variant, the ITRUSST bounds that maximise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_high.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_temp_low: {label: Temp-L medium file (min. heating), help: "Medium properties of the Temp-L variant, the ITRUSST bounds that minimise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_low.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_trans_high: {label: Trans-H medium file (max. intensity), help: "Medium properties of the Trans-H variant, the ITRUSST bounds that maximise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_high.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
+  simulation.uncertainty_trans_low: {label: Trans-L medium file (min. intensity), help: "Medium properties of the Trans-L variant, the ITRUSST bounds that minimise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_low.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
 
   # Paths
   path.anat: {label: Anatomical images folder}

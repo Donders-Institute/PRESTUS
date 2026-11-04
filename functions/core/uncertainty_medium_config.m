@@ -1,19 +1,21 @@
 function file = uncertainty_medium_config(parameters, variant)
 % UNCERTAINTY_MEDIUM_CONFIG  Medium-property YAML of one uncertainty variant.
 %
-%   file = uncertainty_medium_config(parameters, 'liberal')
-%   file = uncertainty_medium_config(parameters, 'conservative')
+%   file = uncertainty_medium_config(parameters, 'temp_high')
 %
-% Reads simulation.uncertainty_<variant>. An absolute path is used as is; a
+% variant is one of the non-default names of UNCERTAINTY_VARIANTS
+% ('temp_high', 'temp_low', 'trans_high', 'trans_low'). Reads
+% simulation.uncertainty_<variant>. An absolute path is used as is; a
 % relative path or file name is looked up in config/uncertainty/. Empty or
 % absent selects the shipped config/uncertainty/config_medium_<variant>.yaml.
 % The file is not checked here; uncertainty_pipeline errors when it is missing.
 %
-% See also: UNCERTAINTY_PIPELINE
+% See also: UNCERTAINTY_PIPELINE, UNCERTAINTY_VARIANTS
 
-    if ~any(strcmp(variant, {'liberal', 'conservative'}))
+    names = setdiff({uncertainty_variants().name}, {'default'}, 'stable');
+    if ~any(strcmp(variant, names))
         error('uncertainty_medium_config:badVariant', ...
-            'Variant must be ''liberal'' or ''conservative'', not ''%s''.', variant);
+            'Variant must be one of %s, not ''%s''.', strjoin(names, ', '), variant);
     end
     folder = fullfile(get_prestus_path(), 'config', 'uncertainty');
     key = ['uncertainty_' variant];

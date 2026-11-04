@@ -656,8 +656,12 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_water_baseline     = 0;
-    p.modules.run_heating_sims       = 1;
-    p.modules.run_thermal_analysis   = 1;
+    % An acoustic-only uncertainty variant (Trans-H/L) reports the combined
+    % intensity without heating.
+    heating = ~(isfield(base, 'uncertainty') && isfield(base.uncertainty, 'acoustic_only') && ...
+                base.uncertainty.acoustic_only);
+    p.modules.run_heating_sims       = heating;
+    p.modules.run_thermal_analysis   = heating;
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 1;
     p.io.acoustic_cache_affix        = affix_combined;
@@ -672,7 +676,7 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};  % the combined field was computed on these
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 0;
-    p.io.save_thermal_matrices       = 1;
+    p.io.save_thermal_matrices       = heating;
     p.simulation.interactive         = 0;
     p.simulation.transducer_coupling = 'coherent';
 end

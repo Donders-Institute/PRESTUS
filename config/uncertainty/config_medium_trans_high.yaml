@@ -1,0 +1,33 @@
+# Trans-H: medium properties that maximise brain intensity (uncertainty variant trans_high).
+#
+# Per acoustic property, the bound that raised brain intensity in the ITRUSST one-at-a-time
+# sweep. Acoustic only: the uncertainty pipeline does not run heating for this variant, so no
+# thermal properties are listed.
+#
+# Brain and skull values: lower (LOW) or upper (HIGH) bound of each property in the ITRUSST
+# tissue property table (PRESTUS_itrusst data/tissue_parameters.csv and tissue_setups.csv;
+# sources in data/tissue_parameters_source.md). Attenuation and absorption are 1 MHz
+# coefficients with y = 1 (alpha_coeff = alpha_500kHz / 0.5). The single skull bound is used
+# for all skull compartments. Tissues and properties not listed keep the default medium.
+
+medium_properties:
+  brain:
+    sound_speed: 1520
+    density: 1050
+    alpha_coeff: 0.308
+    alpha_power: 1
+  skull:
+    sound_speed: 2190
+    density: 1080
+    alpha_coeff: 8.04
+    alpha_power: 1
+  skull_trabecular:
+    sound_speed: 2190
+    density: 1080
+    alpha_coeff: 8.04
+    alpha_power: 1
+  skull_cortical:
+    sound_speed: 2190
+    density: 1080
+    alpha_coeff: 8.04
+    alpha_power: 1

@@ -120,16 +120,16 @@ classdef test_babelbrain_modes < matlab.unittest.TestCase
             uncertainty_pipeline(p);
             jobs = recorded();
             base = p.io.output_affix;
-            names = {'default', 'liberal', 'conservative'};
-            affixes = {base, [base '_desc-liberal'], [base '_desc-conservative']};
+            variants = uncertainty_variants();
+            names = {variants.name};
+            affixes = cellfun(@(d) [base d], {variants.desc}, 'UniformOutput', false);
             repo = fileparts(fileparts(mfilename('fullpath')));
-            expected = {p.medium_properties, ...
-                yaml_medium(fullfile(repo, 'config', 'uncertainty', 'config_medium_liberal.yaml')), ...
-                yaml_medium(fullfile(repo, 'config', 'uncertainty', 'config_medium_conservative.yaml'))};
+            expected = [{p.medium_properties}, cellfun(@(n) yaml_medium(fullfile(repo, 'config', ...
+                'uncertainty', ['config_medium_' n '.yaml'])), names(2:end), 'UniformOutput', false)];
 
             [masks, fp, tp] = phantom_masks(p, {'skin', 'skull_cortical', 'skull_trabecular', 'brain'});
-            c_cort = zeros(1, 3);
-            for v = 1:3
+            c_cort = zeros(1, numel(names));
+            for v = 1:numel(names)
                 sims = jobs(cellfun(@(j) strcmp(j.output_affix, affixes{v}) && ...
                     j.p.modules.run_acoustic_sims == 1, jobs));
                 tc.assertNumElements(sims, 1, names{v});
@@ -151,6 +151,7 @@ classdef test_babelbrain_modes < matlab.unittest.TestCase
                 tc.verifyFalse(has_flag(argv, '--use_ct'));
                 c_cort(v) = js.skull_cortical.sound_speed;
             end
+            % default 2800, low bound 2190 (Temp-L, Trans-H), high bound 2871 (Temp-H, Trans-L)
             tc.verifyEqual(numel(unique(c_cort)), 3, 'variants differ in cortical sound speed');
         end
 

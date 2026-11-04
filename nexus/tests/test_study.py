@@ -47,7 +47,7 @@ def test_affixes_match_matlab_rule():
     for r in ({"subject_id": "1", "condition": "M1"}, {"subject_id": "1", "condition": "PUL"},
               {"subject_id": "2", "io.output_affix": "custom"}, {"subject_id": "3"}):
         m.add_row(r)
-    assert m.affixes("_desc-liberal") == ["_desc-liberal-M1", "_desc-liberal-PUL", "_desc-custom", "_desc-liberal"]
+    assert m.affixes("_desc-temphigh") == ["_desc-temphigh-M1", "_desc-temphigh-PUL", "_desc-custom", "_desc-temphigh"]
     assert m.affixes("") == ["_desc-M1", "_desc-PUL", "_desc-custom", ""]
     assert sanitize_affix("cond A") == "_desc-cond_A"
 

@@ -2,40 +2,47 @@ function jobs = uncertainty_pipeline(parameters, options)
 % UNCERTAINTY_PIPELINE  Run the full PRESTUS uncertainty quantification workflow
 %
 % Rather than a single simulation with one set of tissue properties, this
-% pipeline runs three variants (default, liberal, conservative) and combines
-% them into a unified uncertainty HTML report.
+% pipeline runs five variants (UNCERTAINTY_VARIANTS: default, Temp-H, Temp-L,
+% Trans-H, Trans-L) and combines them into a unified uncertainty HTML report.
 %
 % Pipeline stages:
 %   Stage 1  Preprocessing & source setup          (always serial)
 %   Stage 2  Default simulation      ─┐
-%   Stage 3  Liberal simulation       ├─ parallel on HPC, sequential in MATLAB
-%   Stage 4  Conservative simulation ─┘
-%   Stage 5  Uncertainty report generation         (after stages 2–4)
+%   Stage 3  Temp-H simulation        │
+%   Stage 4  Temp-L simulation        ├─ parallel on HPC, sequential in MATLAB
+%   Stage 5  Trans-H simulation       │  (Trans-H/L: acoustic only)
+%   Stage 6  Trans-L simulation      ─┘
+%   Stage 7  Uncertainty report generation         (after stages 2–6)
 %
 % Nested chained modes: when the base config is itself a multi-ISPPA sweep
 % (vector transducer.target_isppa_wcm2) or an async multi-transducer run
 % (simulation.transducer_coupling: async), each variant runs that pipeline
 % (MULTI_ISPPA_PIPELINE / ASYNC_TRANSDUCER_PIPELINE) with the variant's medium,
-% and Stage 5 writes one uncertainty report per sweep point. Uncertainty is
+% and Stage 7 writes one uncertainty report per sweep point. Uncertainty is
 % always the outer mode. A multi-ISPPA variant reuses the Stage-1 head/grid
 % caches; an async variant builds its own (async Stage 0), so Stage 1 is not
 % run. Inner-pipeline options (e.g. .thermal_timelimit) pass through options.
 % Sequential follow-up runs are not supported in nested mode.
 %
-% Variant definitions:
-%   Default      Best-estimate medium properties (reference)
-%   Liberal      Low skull impedance / attenuation → higher intracranial
-%                intensity; represents the worst-case safety scenario
-%   Conservative High skull impedance / attenuation → lower intracranial
-%                intensity; represents the lower plausible bound
+% Variant definitions (ITRUSST tissue-property bounds, config/uncertainty/):
+%   Default      PRESTUS default medium properties; with pct.enabled, the
+%                skull is mapped from the pseudo-CT
+%   Temp-H/L     Per property, the bound that maximises / minimises brain
+%                heating; acoustic + thermal
+%   Trans-H/L    Per acoustic property, the bound that maximises / minimises
+%                brain intensity; acoustic only
+%   The pairs differ because brain sound speed, density and attenuation and
+%   skull sound speed raise heating and intensity in opposite directions.
+%   With pct.enabled, the four bound variants share the pseudo-CT run's head
+%   geometry but give the skull layer the homogeneous values of their file.
 %
 % Platform behaviour:
 %   matlab       Stages run sequentially in the current MATLAB session.
-%   slurm/qsub   All five jobs are submitted immediately. Stages 2–4 carry
-%                an afterok dependency on stage 1; stage 5 carries afterok
-%                dependencies on all three simulation jobs. In nested mode
+%   slurm/qsub   All seven jobs are submitted immediately. Stages 2–6 carry
+%                an afterok dependency on stage 1; stage 7 carries afterok
+%                dependencies on all five simulation jobs. In nested mode
 %                the variants' inner job graphs are submitted from here, and
-%                each Stage-5 report waits for every job they submitted.
+%                each per-point report waits for every job they submitted.
 %                prestus_pipeline_start must return the submitted job id as
 %                its first output argument.
 %
@@ -48,27 +55,28 @@ function jobs = uncertainty_pipeline(parameters, options)
 %                path.sim, and transducer/grid settings;
 %                do NOT set io.output_affix — this function manages it
 %   options    - pipeline knobs (optional, default: struct()):
-%                .affixes             — struct(.default, .liberal, .conservative)
-%                                       filename suffixes per variant
-%                .liberal_config      — path to liberal medium YAML override
-%                .conservative_config — path to conservative medium YAML override
-%                                       (default: simulation.uncertainty_liberal /
-%                                       _conservative, else the shipped files;
-%                                       see UNCERTAINTY_MEDIUM_CONFIG)
+%                .affixes             — struct with one field per variant name
+%                                       (default, temp_high, temp_low, trans_high,
+%                                       trans_low): filename suffixes per variant
+%                .<name>_config       — path to the medium YAML of variant <name>
+%                                       (e.g. .temp_high_config; default:
+%                                       simulation.uncertainty_<name>, else the
+%                                       shipped file; see UNCERTAINTY_MEDIUM_CONFIG)
 %                .stage1_timelimit    — HPC wall time for stage 1 (default '12:00:00')
-%                .sim_timelimit       — HPC wall time for stages 2-4 (default '06:00:00')
-%                .report_timelimit    — HPC wall time for stage 5 (default '00:30:00')
+%                .sim_timelimit       — HPC wall time for stages 2-6 (default '06:00:00')
+%                .report_timelimit    — HPC wall time for stage 7 (default '00:30:00')
 %                .stage1_memorylimit  — RAM in GB for stage 1 (default: scheduler default)
 %                .stage1_partition    — partition for stage 1 (default: scheduler default)
-%                .report_partition    — partition for stage 5 (default: scheduler default)
-%                .sim_memorylimit     — RAM in GB for stages 2-4 (default: inherit)
-%                .report_memorylimit  — RAM in GB for stage 5 (default: inherit)
+%                .report_partition    — partition for the report stage (default: scheduler default)
+%                .sim_memorylimit     — RAM in GB for stages 2-6 (default: inherit)
+%                .report_memorylimit  — RAM in GB for stage 7 (default: inherit)
 %                .sequential_configs  — struct of follow-up run parameter structs
 %                                       (config_2, config_3, …) for sequential
 %                                       thermal continuation with matched uncertainty
-%                                       variants (default/liberal/conservative thermal
-%                                       outputs are passed to the corresponding variant
-%                                       of the next run)
+%                                       variants (the thermal outputs of the default
+%                                       and Temp variants are passed to the same
+%                                       variant of the next run; Trans variants
+%                                       re-run acoustic only)
 %
 % Output:
 %   jobs       - struct with .all: every scheduler job ID submitted (stage 1,
@@ -76,7 +84,8 @@ function jobs = uncertainty_pipeline(parameters, options)
 %                [] when run in MATLAB. Lets a caller make later jobs depend
 %                on this run.
 %
-% See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE, GENERATE_UNCERTAINTY_REPORT
+% See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE, GENERATE_UNCERTAINTY_REPORT,
+%           UNCERTAINTY_VARIANTS
 
 arguments
     parameters   struct
@@ -87,26 +96,28 @@ end
 %% Resolve options — fill in defaults for any unset fields
 % =========================================================================
 
+variants = uncertainty_variants();
+reject_legacy_options(options);
 if ~isfield(options, 'affixes')
     % If the caller has already set io.output_affix on the base parameters,
     % use it as the default variant's affix so existing naming is preserved.
-    % Liberal and conservative affixes are always appended on top of that base.
+    % The other variants' descriptors are always appended on top of that base.
     base_affix = '';
     if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') && ...
             ~isempty(parameters.io.output_affix)
         base_affix = parameters.io.output_affix;
     end
-    options.affixes = struct( ...
-        'default',      base_affix, ...
-        'liberal',      [base_affix '_desc-liberal'], ...
-        'conservative', [base_affix '_desc-conservative']);
+    options.affixes = struct();
+    for v = 1:numel(variants)
+        options.affixes.(variants(v).name) = [base_affix variants(v).desc];
+    end
 end
 % Variant medium files: options.* > simulation.uncertainty_<variant> > shipped file.
-if ~isfield(options, 'liberal_config')
-    options.liberal_config      = uncertainty_medium_config(parameters, 'liberal');
-end
-if ~isfield(options, 'conservative_config')
-    options.conservative_config = uncertainty_medium_config(parameters, 'conservative');
+for v = 2:numel(variants)
+    key = [variants(v).name '_config'];
+    if ~isfield(options, key)
+        options.(key) = uncertainty_medium_config(parameters, variants(v).name);
+    end
 end
 if ~isfield(options, 'stage1_timelimit');    options.stage1_timelimit    = '12:00:00'; end
 if ~isfield(options, 'sim_timelimit');       options.sim_timelimit       = '06:00:00'; end
@@ -151,12 +162,13 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %
 %   io.overwrite_simnibs  Hardcoded to 0 for the same reason.
 %
-%   io.save_grid_cache         Stage 1: 1 (write cache for stages 2–4)
-%                              Stages 2–4: 0 (already written)
-%   io.save_source_matrices    Stage 1: 1 (write source for stages 2–4)
-%                              Stages 2–4: 0 (already written)
+%   io.save_grid_cache         Stage 1: 1 (write cache for stages 2–6)
+%                              Stages 2–6: 0 (already written)
+%   io.save_source_matrices    Stage 1: 1 (write source for stages 2–6)
+%                              Stages 2–6: 0 (already written)
 %   io.save_acoustic_matrices  All stages: 0 (large; not needed after analysis)
-%   io.save_thermal_matrices   Stages 2–4: inherited from base modules.run_heating_sims
+%   io.save_thermal_matrices   Default and Temp variants: inherited from base
+%                              modules.run_heating_sims; Trans variants and
 %                              Stage 1: 0 (no thermal sim)
 %
 %   simulation.interactive  Hardcoded to 0; HPC jobs cannot show dialogs.
@@ -216,16 +228,17 @@ end
 ow = resolve_chained_overwrite(parameters);
 jobs = struct('all', []);
 
-p_stage1       = make_stage1_params(parameters, ow);
+p_stage1   = make_stage1_params(parameters, ow);
 
-p_default      = make_sim_params(parameters, ...
-                     options.affixes.default, [], ow);
-p_liberal      = make_sim_params(parameters, ...
-                     options.affixes.liberal, options.liberal_config, ow);
-p_conservative = make_sim_params(parameters, ...
-                     options.affixes.conservative, options.conservative_config, ow);
+n_var      = numel(variants);
+p_variants = cell(1, n_var);
+for v = 1:n_var
+    p_variants{v} = make_sim_params(parameters, options.affixes.(variants(v).name), ...
+                        get_variant_medium_config(variants(v).name, options), ...
+                        variants(v).heating, ow);
+end
 
-% Pre-assign deterministic log file paths for all five stages so that
+% Pre-assign deterministic log file paths for all seven stages so that
 % generate_uncertainty_report can locate each stage's timing data.
 % Using a single pipeline-run timestamp keeps file names stable across
 % MATLAB and HPC (where the paths must be encoded before job submission).
@@ -236,21 +249,22 @@ medium     = parameters.simulation.medium;
 
 logs_dir = fullfile(output_dir, 'log');
 if ~isfolder(logs_dir); mkdir(logs_dir); end
-log_files.stage1      = fullfile(logs_dir, sprintf('%s_%s_stage1_%s.txt',               subj, medium, run_ts));
-log_files.default     = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.default,      run_ts));
-log_files.liberal     = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.liberal,      run_ts));
-log_files.conservative= fullfile(logs_dir, sprintf('%s_%s%s_%s.txt',                    subj, medium, options.affixes.conservative, run_ts));
-log_files.report      = fullfile(logs_dir, sprintf('%s_%s_desc-report_%s.txt',          subj, medium, run_ts));
+log_files.stage1 = fullfile(logs_dir, sprintf('%s_%s_stage1_%s.txt', subj, medium, run_ts));
+for v = 1:n_var
+    log_files.(variants(v).name) = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt', ...
+        subj, medium, options.affixes.(variants(v).name), run_ts));
+end
+log_files.report = fullfile(logs_dir, sprintf('%s_%s_desc-report_%s.txt', subj, medium, run_ts));
 
-p_stage1.io.log_file       = log_files.stage1;
+p_stage1.io.log_file = log_files.stage1;
 if isempty(nested)
     % Nested variants are job graphs: each inner job writes its own log.
-    p_default.io.log_file      = log_files.default;
-    p_liberal.io.log_file      = log_files.liberal;
-    p_conservative.io.log_file = log_files.conservative;
+    for v = 1:n_var
+        p_variants{v}.io.log_file = log_files.(variants(v).name);
+    end
 end
 
-p_report       = make_report_params(parameters, options.affixes, log_files, ow);
+p_report       = make_report_params(parameters, options.affixes, log_files, ow, options);
 
 % =========================================================================
 %% Sequential config pre-processing
@@ -278,44 +292,48 @@ switch platform
 
     % ---------------------------------------------------------------------
     case 'matlab'
-    % All five stages run sequentially in the current MATLAB session.
+    % All seven stages run sequentially in the current MATLAB session.
     % ---------------------------------------------------------------------
 
         if ~isempty(nested)
             run_nested_matlab(parameters, options, nested, platform, ...
-                {p_default, p_liberal, p_conservative}, p_stage1, log_files, ow);
+                p_variants, p_stage1, log_files, ow);
             return
         end
 
         run_stage(1, 'Preprocessing & source setup', @() prestus_pipeline(p_stage1));
-        run_stage(2, 'Default simulation',           @() prestus_pipeline(p_default));
-        run_stage(3, 'Liberal simulation',           @() prestus_pipeline(p_liberal));
-        run_stage(4, 'Conservative simulation',      @() prestus_pipeline(p_conservative));
+        for v = 1:n_var
+            run_stage(v + 1, variant_stage_label(variants(v)), ...
+                      @() prestus_pipeline(p_variants{v}));
+        end
 
         % Warn about any missing variant outputs before attempting report
         assert_variant_outputs_exist(parameters, options.affixes);
-        run_stage(5, 'Uncertainty report',           @() prestus_pipeline(p_report));
+        run_stage(n_var + 2, 'Uncertainty report', @() prestus_pipeline(p_report));
 
         % Clean up intermediate files when save_matrices = 0
         if ~should_save_output(parameters.io, 'save_matrices')
             cleanup_uncertainty_intermediates(parameters, options.affixes);
         end
 
-        % Sequential runs: each follow-up run repeats the three uncertainty
-        % variants, with each variant inheriting the thermal end-state from
-        % the matched variant of the prior run.
+        % Sequential runs: each follow-up run repeats the uncertainty
+        % variants; the default and Temp variants inherit the thermal
+        % end-state from the matched variant of the prior run.
         if has_sequential
             seq_run_params = run_sequential_matlab(parameters, options, run_index_start);
             % Generate combined sequential uncertainty report.
             % Prepend run-1 params so the base run appears as the first entry.
-            all_default = [{p_default},      seq_run_params.default];
-            all_liberal = [{p_liberal},      seq_run_params.liberal];
-            all_cons    = [{p_conservative}, seq_run_params.conservative];
+            % Its bands span the Temp pair (the Trans variants have no heating).
+            all_runs = struct();
+            for v = 1:n_var
+                all_runs.(variants(v).name) = [p_variants(v), seq_run_params.(variants(v).name)];
+            end
             try
                 generate_sequential_report( ...
-                    all_default, {}, ...
-                    struct('liberal_params_list', {all_liberal}, ...
-                           'conservative_params_list', {all_cons}));
+                    all_runs.default, {}, ...
+                    struct('high_params_list', {all_runs.temp_high}, ...
+                           'low_params_list',  {all_runs.temp_low}, ...
+                           'high_label', 'Temp-H', 'low_label', 'Temp-L'));
             catch ME_seq_rep
                 warning('uncertainty_pipeline:seqReport', ...
                     'Sequential uncertainty report failed: %s', ME_seq_rep.message);
@@ -335,8 +353,8 @@ switch platform
 
         % Run prefix: 'r1-' when sequential configs are present, '' otherwise.
         % This keeps job names unambiguous when multiple runs are chained
-        % (r1-u2-default, r2-u2-default, …) while staying backwards-compatible
-        % with single-run submissions (u1-preproc, u2-default, …).
+        % (r1-u2-default, r2-u2-default, …); single-run submissions are
+        % named u1-preproc, u2-sim-default, …
         has_sequential = isfield(options, 'sequential_configs') && ...
                          ~isempty(fieldnames(options.sequential_configs));
         if has_sequential
@@ -347,7 +365,7 @@ switch platform
 
         if ~isempty(nested)
             jobs.all = submit_nested_hpc(parameters, options, nested, platform, ...
-                {p_default, p_liberal, p_conservative}, p_stage1, log_files, ow);
+                p_variants, p_stage1, log_files, ow);
             return
         end
 
@@ -355,7 +373,7 @@ switch platform
         % Skip if the head preprocessing cache already exists.
         % Sentinel: cache/sub-NNN_<medium>_cropped_smoothed.mat
         % (written by preproc_head with preproc_affix = '').
-        % When skipped, stages 2–4 are submitted without an afterok
+        % When skipped, stages 2–6 are submitted without an afterok
         % dependency so they can start immediately.
         preproc_sentinel = fullfile(output_dir, 'cache', ...
             sprintf('sub-%03d_%s_cropped_smoothed.mat', subject_id, medium));
@@ -374,34 +392,23 @@ switch platform
         end
         fprintf('\n');
 
-        % ── Stages 2–4 ───────────────────────────────────────────────────
+        % ── Stages 2–6 ───────────────────────────────────────────────────
         % Each variant is skipped if its output CSV already exists.
         % If not skipped, it depends on stage 1 (when stage 1 was submitted).
-        sim_stages = { ...
-            'Stage 2', 'default',      p_default,      options.affixes.default;      ...
-            'Stage 3', 'liberal',      p_liberal,      options.affixes.liberal;       ...
-            'Stage 4', 'conservative', p_conservative, options.affixes.conservative   ...
-        };
-        job_names = { ...
-            sprintf('PRESTUS-%su2-sim-default_%s',      run_prefix, subj); ...
-            sprintf('PRESTUS-%su3-sim-liberal_%s',       run_prefix, subj); ...
-            sprintf('PRESTUS-%su4-sim-conservative_%s',  run_prefix, subj)  ...
-        };
-        job_ids_sim = zeros(1, 3);
-        sim_submitted = false(1, 3);
-        for si = 1:3
-            stage_label = sim_stages{si, 1};
-            variant     = sim_stages{si, 2};
-            p_sim       = sim_stages{si, 3};
-            affix       = sim_stages{si, 4};
-            csv_file    = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
-            fprintf('[%s] Submitting %s simulation    ', stage_label, variant);
+        job_ids_sim   = zeros(1, n_var);
+        sim_submitted = false(1, n_var);
+        for si = 1:n_var
+            variant  = variants(si).name;
+            p_sim    = p_variants{si};
+            csv_file = fullfile(output_dir, ...
+                sprintf('sub-%03d_%s%s.csv', subject_id, medium, options.affixes.(variant)));
+            fprintf('[Stage %d] Submitting %s simulation    ', si + 1, variant);
             if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
             else
                 p_sim.hpc.timelimit = options.sim_timelimit;
-                p_sim.hpc.job_name  = job_names{si};
+                p_sim.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', ...
+                                              run_prefix, si + 1, variant, subj);
                 p_sim               = apply_memorylimit(p_sim, options.sim_memorylimit);
                 if ~isempty(job_id_stage1)
                     p_sim.hpc.depend_job_id = job_id_stage1;
@@ -413,22 +420,19 @@ switch platform
             end
         end
         fprintf('\n');
-        job_id_default      = job_ids_sim(1);
-        job_id_liberal      = job_ids_sim(2);
-        job_id_conservative = job_ids_sim(3);
 
-        % ── Stage 5 ──────────────────────────────────────────────────────
+        % ── Stage 7 ──────────────────────────────────────────────────────
         % Skip if the report already exists.
         % Depends on whichever simulation jobs were actually submitted.
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, options.affixes.default));
-        fprintf('[Stage 5] Submitting uncertainty report      ');
+        fprintf('[Stage %d] Submitting uncertainty report      ', n_var + 2);
         if isfile(report_file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
             job_id_report = [];
         else
             p_report.hpc.timelimit  = options.report_timelimit;
-            p_report.hpc.job_name   = sprintf('PRESTUS-%su5-report_%s', run_prefix, subj);
+            p_report.hpc.job_name   = sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj);
             p_report                = apply_memorylimit(p_report, options.report_memorylimit);
             p_report                = strip_gpu_requirements(p_report, options.report_partition);
             pending_sim_ids = job_ids_sim(sim_submitted);
@@ -441,7 +445,7 @@ switch platform
         fprintf('\n');
 
         % ── Sequential runs (HPC) ────────────────────────────────────────
-        % Each sequential run submits its three variants with afterok on the
+        % Each sequential run submits its variants with afterok on the
         % prior run's report job, then submits its own report job.
         all_submitted_ids = [job_id_stage1, job_ids_sim(sim_submitted), job_id_report];
         if has_sequential
@@ -473,14 +477,13 @@ end % uncertainty_pipeline
 % =========================================================================
 
 function seq_affixes = make_seq_affixes(seq_number, base_affixes)
-% Derive variant affixes for sequential run <seq_number>.
-% The default variant gets the seq suffix alone; liberal and conservative
-% append their descriptor on top of that.
+% Derive variant affixes for sequential run <seq_number>: each variant's
+% affix with the seq suffix appended.
     seq_suffix = sprintf('_seq%d', seq_number);
-    seq_affixes = struct( ...
-        'default',      [base_affixes.default      seq_suffix], ...
-        'liberal',      [base_affixes.liberal       seq_suffix], ...
-        'conservative', [base_affixes.conservative  seq_suffix]);
+    seq_affixes = struct();
+    for f = fieldnames(base_affixes)'
+        seq_affixes.(f{1}) = [base_affixes.(f{1}) seq_suffix];
+    end
 end
 
 function p = wire_thermal_handoff(p, nii_dir, prior_affix, subject_id, medium)
@@ -502,11 +505,36 @@ function [sorted_fields, sorted_numbers] = sort_seq_configs(seq_configs)
 end
 
 function medium_config = get_variant_medium_config(variant_name, options)
-% Return the YAML override path for a given variant name.
-    switch variant_name
-        case 'liberal';      medium_config = options.liberal_config;
-        case 'conservative'; medium_config = options.conservative_config;
-        otherwise;           medium_config = [];
+% Return the YAML override path for a given variant name ([] for default).
+    if strcmp(variant_name, 'default')
+        medium_config = [];
+    else
+        medium_config = options.([variant_name '_config']);
+    end
+end
+
+function label = variant_stage_label(variant)
+    label = sprintf('%s simulation', variant.label);
+    if ~variant.heating
+        label = [label ' (acoustic only)'];
+    end
+end
+
+function reject_legacy_options(options)
+% The liberal / conservative variants of v0.6 were replaced by the Temp and
+% Trans pairs; their options do not map onto either pair.
+    legacy = {'liberal_config', 'conservative_config'};
+    used = legacy(isfield(options, legacy));
+    if isfield(options, 'affixes') && isstruct(options.affixes) && ...
+            any(isfield(options.affixes, {'liberal', 'conservative'}))
+        used{end+1} = 'affixes.liberal / affixes.conservative';
+    end
+    if ~isempty(used)
+        error('uncertainty_pipeline:legacyVariant', ...
+            ['options.%s belong to the removed liberal/conservative variants. Use ' ...
+             'options.temp_high_config, .temp_low_config, .trans_high_config, ' ...
+             '.trans_low_config and options.affixes.<variant> (see UNCERTAINTY_VARIANTS ' ...
+             'and doc_uncertainty.md).'], strjoin(used, ', options.'));
     end
 end
 
@@ -514,8 +542,8 @@ end
 
 function seq_run_params = run_sequential_matlab(base_parameters, options, run_index_start)
 % Execute sequential uncertainty runs on the MATLAB platform.
-% Returns a struct with fields .default, .liberal, .conservative — each a
-% cell array of parameter structs (one per sequential run), for passing to
+% Returns a struct with one field per variant name, each a cell array of
+% parameter structs (one per sequential run), for passing to
 % generate_sequential_report.
 
     subject_id = base_parameters.subject_id;
@@ -527,7 +555,12 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
     [sorted_fields, sorted_numbers] = sort_seq_configs(options.sequential_configs);
     ow = resolve_chained_overwrite(base_parameters);
 
-    seq_run_params = struct('default', {{}}, 'liberal', {{}}, 'conservative', {{}});
+    variants       = uncertainty_variants();
+    n_var          = numel(variants);
+    seq_run_params = struct();
+    for vi = 1:n_var
+        seq_run_params.(variants(vi).name) = {};
+    end
     prior_affixes  = options.affixes;
 
     for si = 1:numel(sorted_fields)
@@ -536,18 +569,18 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
         seq_num    = sorted_numbers(si);
         seq_aff    = make_seq_affixes(seq_num, options.affixes);
 
-        variant_names = {'default', 'liberal', 'conservative'};
-        stage_nums    = [2, 3, 4];
-        p_variants    = cell(1, 3);
+        p_variants = cell(1, n_var);
 
-        for vi = 1:3
-            vname       = variant_names{vi};
+        for vi = 1:n_var
+            vname       = variants(vi).name;
             cur_affix   = seq_aff.(vname);
             prior_affix = prior_affixes.(vname);
             med_cfg     = get_variant_medium_config(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, ow);
-            p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, variants(vi).heating, ow);
+            if variants(vi).heating
+                p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+            end
 
             % Assign log file
             p_v.io.log_file = fullfile(logs_dir, ...
@@ -557,28 +590,26 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
         end
 
         % Build report params for this sequential run
-        seq_log_files.stage1       = '';
-        seq_log_files.default      = p_variants{1}.io.log_file;
-        seq_log_files.liberal      = p_variants{2}.io.log_file;
-        seq_log_files.conservative = p_variants{3}.io.log_file;
-        seq_log_files.report       = fullfile(logs_dir, ...
+        seq_log_files.stage1 = '';
+        for vi = 1:n_var
+            seq_log_files.(variants(vi).name) = p_variants{vi}.io.log_file;
+        end
+        seq_log_files.report = fullfile(logs_dir, ...
             sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
-        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow);
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow, options);
 
         % Run
-        run_stage(2, sprintf('Default simulation (r%d)', run_idx), ...
-            @() prestus_pipeline(p_variants{1}));
-        run_stage(3, sprintf('Liberal simulation (r%d)', run_idx), ...
-            @() prestus_pipeline(p_variants{2}));
-        run_stage(4, sprintf('Conservative simulation (r%d)', run_idx), ...
-            @() prestus_pipeline(p_variants{3}));
+        for vi = 1:n_var
+            run_stage(vi + 1, sprintf('%s (r%d)', variant_stage_label(variants(vi)), run_idx), ...
+                @() prestus_pipeline(p_variants{vi}));
+        end
         assert_variant_outputs_exist(seq_p_base, seq_aff);
-        run_stage(5, sprintf('Uncertainty report (r%d)', run_idx), ...
+        run_stage(n_var + 2, sprintf('Uncertainty report (r%d)', run_idx), ...
             @() prestus_pipeline(p_rep));
 
-        seq_run_params.default{end+1}      = p_variants{1};
-        seq_run_params.liberal{end+1}      = p_variants{2};
-        seq_run_params.conservative{end+1} = p_variants{3};
+        for vi = 1:n_var
+            seq_run_params.(variants(vi).name){end+1} = p_variants{vi};
+        end
 
         prior_affixes = seq_aff;
     end
@@ -589,7 +620,7 @@ end
 function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         base_parameters, options, initial_report_job_id, subj, run_index_start)
 % Submit sequential uncertainty runs to the HPC scheduler.
-% Each run's three variants depend on the prior run's report job.
+% Each run's variants depend on the prior run's report job.
 % Returns all submitted job IDs and the final report job ID.
 
     subject_id = base_parameters.subject_id;
@@ -606,8 +637,8 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
     prior_job_id_report = initial_report_job_id;
     prior_affixes      = options.affixes;
 
-    variant_names = {'default', 'liberal', 'conservative'};
-    stage_nums    = [2, 3, 4];
+    variants = uncertainty_variants();
+    n_var    = numel(variants);
 
     for si = 1:numel(sorted_fields)
         run_idx    = run_index_start + si - 1;
@@ -616,31 +647,35 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         seq_num    = sorted_numbers(si);
         seq_aff    = make_seq_affixes(seq_num, options.affixes);
 
-        job_ids_sim  = zeros(1, 3);
-        sim_submitted = false(1, 3);
+        job_ids_sim   = zeros(1, n_var);
+        sim_submitted = false(1, n_var);
+        seq_log_files = struct('stage1', '');
 
-        for vi = 1:3
-            vname       = variant_names{vi};
+        for vi = 1:n_var
+            vname       = variants(vi).name;
             cur_affix   = seq_aff.(vname);
             prior_affix = prior_affixes.(vname);
             med_cfg     = get_variant_medium_config(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, ow);
-            p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, variants(vi).heating, ow);
+            if variants(vi).heating
+                p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+            end
             p_v.io.log_file = fullfile(logs_dir, ...
                 sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, cur_affix, run_idx, run_ts));
+            seq_log_files.(vname) = p_v.io.log_file;
 
             csv_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s_output_table%s.csv', subject_id, medium, cur_affix));
+                sprintf('sub-%03d_%s%s.csv', subject_id, medium, cur_affix));
 
-            stage_label = sprintf('[r%d-u%d]', run_idx, stage_nums(vi));
+            stage_label = sprintf('[r%d-u%d]', run_idx, vi + 1);
             fprintf('%s Submitting %s simulation    ', stage_label, vname);
             if isfile(csv_file) && ~ow.rerun_outputs
                 fprintf('— output exists, skipping.\n');
             else
                 p_v.hpc.timelimit = options.sim_timelimit;
                 p_v.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', ...
-                    run_prefix, stage_nums(vi), vname, subj);
+                    run_prefix, vi + 1, vname, subj);
                 p_v = apply_memorylimit(p_v, options.sim_memorylimit);
                 if ~isempty(prior_job_id_report)
                     p_v.hpc.depend_job_id = prior_job_id_report;
@@ -653,27 +688,20 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         fprintf('\n');
 
         % Report job for this sequential run
-        seq_log_files.stage1       = '';
-        seq_log_files.default      = fullfile(logs_dir, ...
-            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.default,      run_idx, run_ts));
-        seq_log_files.liberal      = fullfile(logs_dir, ...
-            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.liberal,      run_idx, run_ts));
-        seq_log_files.conservative = fullfile(logs_dir, ...
-            sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, seq_aff.conservative, run_idx, run_ts));
-        seq_log_files.report       = fullfile(logs_dir, ...
+        seq_log_files.report = fullfile(logs_dir, ...
             sprintf('sub-%03d_%s_desc-report_r%d_%s.txt', subject_id, medium, run_idx, run_ts));
 
-        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow);
+        p_rep = make_report_params(seq_p_base, seq_aff, seq_log_files, ow, options);
         report_file = fullfile(output_dir, ...
-            sprintf('sub-%03d_%s%s_uncertainty_report.html', subject_id, medium, seq_aff.default));
+            sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, seq_aff.default));
 
-        fprintf('[r%d-u5] Submitting uncertainty report    ', run_idx);
+        fprintf('[r%d-u%d] Submitting uncertainty report    ', run_idx, n_var + 2);
         if isfile(report_file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
             prior_job_id_report = [];
         else
             p_rep.hpc.timelimit = options.report_timelimit;
-            p_rep.hpc.job_name  = sprintf('PRESTUS-%su5-report_%s', run_prefix, subj);
+            p_rep.hpc.job_name  = sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj);
             p_rep = apply_memorylimit(p_rep, options.report_memorylimit);
             p_rep = strip_gpu_requirements(p_rep, options.report_partition);
             pending = job_ids_sim(sim_submitted);
@@ -771,32 +799,30 @@ function inner = inner_options(options, prefix, depend_ids)
 end
 
 function reports = make_point_reports(parameters, options, runs, log_files, ow)
-% One uncertainty report per sweep point j, comparing the three variants'
+% One uncertainty report per sweep point j, comparing the variants'
 % outputs at that point. Returns a struct array with .params, .suffix, .file.
     n_points = numel(runs{1}.output_affixes);
     if any(cellfun(@(r) numel(r.output_affixes), runs) ~= n_points)
         error('uncertainty_pipeline:pointMismatch', ...
             'The uncertainty variants produced different numbers of sweep points.');
     end
-    variant_affixes = {options.affixes.default, options.affixes.liberal, options.affixes.conservative};
+    names = {uncertainty_variants().name};
     reports = struct('params', {}, 'suffix', {}, 'file', {});
     for j = 1:n_points
         % Each point's affix is <variant affix><point suffix>; the suffix is shared.
-        suffix = point_suffix(runs{1}.output_affixes{j}, variant_affixes{1});
-        for v = 2:3
-            if ~strcmp(point_suffix(runs{v}.output_affixes{j}, variant_affixes{v}), suffix)
+        suffix = point_suffix(runs{1}.output_affixes{j}, options.affixes.(names{1}));
+        affixes = struct();
+        for v = 1:numel(names)
+            if ~strcmp(point_suffix(runs{v}.output_affixes{j}, options.affixes.(names{v})), suffix)
                 error('uncertainty_pipeline:pointMismatch', ...
                     'Sweep point %d has different output affixes across variants.', j);
             end
+            affixes.(names{v}) = runs{v}.output_affixes{j};
         end
-        affixes = struct( ...
-            'default',      runs{1}.output_affixes{j}, ...
-            'liberal',      runs{2}.output_affixes{j}, ...
-            'conservative', runs{3}.output_affixes{j});
         lf = log_files;
         [d, n, e] = fileparts(log_files.report);
         lf.report = fullfile(d, [n suffix e]);
-        p = make_report_params(parameters, affixes, lf, ow);
+        p = make_report_params(parameters, affixes, lf, ow, options);
         reports(j).params = p;
         reports(j).suffix = suffix;
         reports(j).file   = fullfile(get_output_dir(parameters), sprintf( ...
@@ -819,18 +845,18 @@ function run_nested_matlab(parameters, options, nested, platform, p_variants, p_
     if strcmp(nested, 'multi_isppa')
         run_stage(1, 'Preprocessing & source setup', @() prestus_pipeline(p_stage1));
     end
-    labels = {'Default', 'Liberal', 'Conservative'};
-    runs = cell(1, 3);
-    for v = 1:3
+    variants = uncertainty_variants();
+    runs = cell(1, numel(variants));
+    for v = 1:numel(variants)
         fprintf('────────────────────────────────────────\n');
-        fprintf('[Stage %d] %s simulation (%s)\n', v + 1, labels{v}, strrep(nested, '_', '-'));
+        fprintf('[Stage %d] %s (%s)\n', v + 1, variant_stage_label(variants(v)), strrep(nested, '_', '-'));
         fprintf('────────────────────────────────────────\n');
         runs{v} = run_variant(p_variants{v}, nested, platform, inner_options(options, '', []));
     end
     reports = make_point_reports(parameters, options, runs, log_files, ow);
     for j = 1:numel(reports)
         assert_variant_outputs_exist(parameters, reports(j).params.uncertainty.affixes);
-        run_stage(5, sprintf('Uncertainty report%s', reports(j).suffix), ...
+        run_stage(numel(variants) + 2, sprintf('Uncertainty report%s', reports(j).suffix), ...
                   @() prestus_pipeline(reports(j).params));
     end
 end
@@ -858,9 +884,10 @@ function submitted_ids = submit_nested_hpc(parameters, options, nested, platform
     end
     fprintf('\n');
 
-    variants = {'default', 'liberal', 'conservative'};
-    runs = cell(1, 3);
-    for v = 1:3
+    variants = {uncertainty_variants().name};
+    report_stage = numel(variants) + 2;
+    runs = cell(1, numel(variants));
+    for v = 1:numel(variants)
         fprintf('[Stage %d] %s variant (%s)\n', v + 1, variants{v}, strrep(nested, '_', '-'));
         prefix  = sprintf('u%d-%s-', v + 1, variants{v});
         runs{v} = run_variant(p_variants{v}, nested, platform, ...
@@ -873,14 +900,14 @@ function submitted_ids = submit_nested_hpc(parameters, options, nested, platform
     reports = make_point_reports(parameters, options, runs, log_files, ow);
     report_ids = [];
     for j = 1:numel(reports)
-        fprintf('[Stage 5] Uncertainty report%s  ', reports(j).suffix);
+        fprintf('[Stage %d] Uncertainty report%s  ', report_stage, reports(j).suffix);
         if isfile(reports(j).file) && ~ow.rerun_outputs
             fprintf('— report exists, skipping.\n');
             continue
         end
         p = reports(j).params;
         p.hpc.timelimit = options.report_timelimit;
-        p.hpc.job_name  = sprintf('PRESTUS-u5-report%s_%s', reports(j).suffix, subj);
+        p.hpc.job_name  = sprintf('PRESTUS-u%d-report%s_%s', report_stage, reports(j).suffix, subj);
         p               = apply_memorylimit(p, options.report_memorylimit);
         p               = strip_gpu_requirements(p, options.report_partition);
         p               = hpc_add_dependency(p, variant_ids);
@@ -901,7 +928,7 @@ end
 function p = make_stage1_params(base, ow)
 % Stage 1: preprocessing and source setup only — no simulation.
 %
-% Produces the shared head-preprocessing cache used by all three simulation
+% Produces the shared head-preprocessing cache used by all simulation
 % variants (skull, tissue masks, etc.). Each variant computes its own kwave
 % source matrix (via io.output_affix) because the time axis depends on the
 % variant's medium sound speed.
@@ -925,8 +952,9 @@ function p = make_stage1_params(base, ow)
     p                                  = strip_gpu_requirements(p);
 end
 
-function p = make_sim_params(base, affix, medium_config, ow)
-% Stages 2–4: full acoustic + thermal simulation.
+function p = make_sim_params(base, affix, medium_config, heating, ow)
+% Stages 2–6: acoustic simulation, plus thermal when heating is true and the
+% base config runs it (heating = false for the acoustic-only Trans variants).
 %
 % If medium_config is a valid YAML path, its properties are merged on top
 % of the base parameters (only the overridden fields change; all transducer,
@@ -943,6 +971,7 @@ function p = make_sim_params(base, affix, medium_config, ow)
         end
         extra = yaml.loadFile(char(medium_config), 'ConvertToArray', true);
         p     = mergestruct(p, extra);
+        p     = medium_absorption_layer(p, extra, char(medium_config));
     end
 
     p.modules.run_source_setup         = 1;
@@ -950,7 +979,14 @@ function p = make_sim_params(base, affix, medium_config, ow)
     % Thermal steps: inherit from base config rather than forcing on.
     % run_heating_sims = 0 in the base will produce acoustic-only uncertainty
     % variants, which is valid when thermal estimation is not requested.
-    run_thermal = isfield(base.modules, 'run_heating_sims') && base.modules.run_heating_sims;
+    run_thermal = heating && isfield(base.modules, 'run_heating_sims') && base.modules.run_heating_sims;
+    % Nested multi-ISPPA / async pipelines run their own thermal jobs; this
+    % flag keeps them acoustic only for a non-heating variant.
+    p.uncertainty.acoustic_only        = ~heating;
+    % With a pseudo-CT, only the default variant maps the skull from it; the
+    % bound variants keep its head geometry with a homogeneous skull layer
+    % (PCT_SKULL_MAPPED).
+    p.uncertainty.homogeneous_skull    = ~isempty(medium_config);
     p.modules.run_heating_sims         = run_thermal;
     p.modules.run_thermal_analysis     = run_thermal && ...
                                          isfield(base.modules, 'run_thermal_analysis') && ...
@@ -978,13 +1014,13 @@ function p = make_sim_params(base, affix, medium_config, ow)
     p.simulation.interactive           = 0;
 end
 
-function p = make_report_params(base, affixes, log_files, ow)
-% Stage 5: generate the uncertainty report only — no simulation.
+function p = make_report_params(base, affixes, log_files, ow, options)
+% Stage 7: generate the uncertainty report only — no simulation.
 %
 % The affixes struct is passed through parameters.uncertainty.affixes so
-% that generate_uncertainty_report can locate the three variant output files.
-% log_files is a struct with fields stage1, default, liberal, conservative,
-% report — pre-assigned paths that allow the report to parse per-stage timing.
+% that generate_uncertainty_report can locate the variant output files.
+% log_files is a struct with fields stage1, report and one per variant name
+% — pre-assigned paths that allow the report to parse per-stage timing.
     p = clear_uncertainty_flag(base);
     if ~isempty(nested_mode(base))
         % The report reads the variants' outputs only; an async run has no
@@ -1008,6 +1044,13 @@ function p = make_report_params(base, affixes, log_files, ow)
     p.simulation.interactive         = 0;
     p.uncertainty.affixes            = affixes;
     p.uncertainty.log_files          = log_files;
+    % Medium file of each bound variant, for the pseudo-CT comparison
+    p.uncertainty.medium_files       = struct();
+    for v = uncertainty_variants()
+        if ~strcmp(v.name, 'default')
+            p.uncertainty.medium_files.(v.name) = get_variant_medium_config(v.name, options);
+        end
+    end
     % The report is named after the default variant's affix (base affix and,
     % in nested mode, the sweep point), so runs with different affixes coexist.
     p.uncertainty.report_suffix      = affixes.default;
@@ -1052,22 +1095,17 @@ end
 
 function assert_variant_outputs_exist(parameters, affixes)
 % Warn (not error) for each simulation variant whose output CSV is missing.
-% Called before stage 5 on the MATLAB platform so the user knows in advance
-% that the report will be incomplete rather than discovering it after the
-% fact inside generate_uncertainty_report.
+% Called before the report stage on the MATLAB platform so the user knows in
+% advance that the report will be incomplete rather than discovering it after
+% the fact inside generate_uncertainty_report.
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
     output_dir = get_output_dir(parameters);
 
-    variants = { ...
-        'Conservative', affixes.conservative; ...
-        'Default',      affixes.default;      ...
-        'Liberal',      affixes.liberal        ...
-    };
-
-    for v = 1:size(variants, 1)
-        label  = variants{v, 1};
-        affix  = variants{v, 2};
+    variants = uncertainty_variants();
+    for v = 1:numel(variants)
+        label  = variants(v).label;
+        affix  = affixes.(variants(v).name);
         csv    = fullfile(output_dir, ...
             sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix));
         if ~isfile(csv)

@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 
 from .model import ConfigModel, is_empty
 from .study import sanitize_affix
+from .uncertainty import PAIRS, VARIANT_SHORT
+from .uncertainty import VARIANTS as UNCERTAINTY_VARIANTS
+
+ACOUSTIC_ONLY = PAIRS["trans"]         # uncertainty variants without heating
 
 _MODE_FUNCTION = {
     "async": "async_transducer_pipeline",
@@ -197,34 +201,41 @@ def predict(model: ConfigModel) -> Plan:
         else:
             point_suffixes = [""]
         n_pts = len(point_suffixes)
-        for variant in ("default", "liberal", "conservative"):
-            variant_affix = base_affix if variant == "default" else f"{base_affix}_desc-{variant}"
+        for variant in ("default", *UNCERTAINTY_VARIANTS):
+            # output affix as in uncertainty_variants.m: _desc-<name without underscore>
+            variant_affix = base_affix if variant == "default" else f"{base_affix}_desc-{variant.replace('_', '')}"
+            vlabel = f"{VARIANT_SHORT[variant]} variant"
+            if variant in ACOUSTIC_ONLY:
+                vlabel += " (acoustic only)"
             for j, suffix in enumerate(point_suffixes, start=1):
                 affix = variant_affix + suffix
-                label = f"{variant} variant" + (f", sweep point {j}/{n_pts}" if n_pts > 1 else "")
+                label = vlabel + (f", sweep point {j}/{n_pts}" if n_pts > 1 else "")
                 artifacts.append(Artifact(f"{tag}_{medium}{affix}.csv", f"{label} metrics"))
                 artifacts.append(Artifact(f"{tag}_{medium}_report{affix}.html", f"{label} report"))
             if nested == "multi_isppa":
                 artifacts.append(Artifact(f"{tag}_{medium}_desc-multiIsppa_report{variant_affix}.html",
-                                           f"{variant} variant: summary comparing all targets"))
+                                           f"{vlabel}: summary comparing all targets"))
         for j, suffix in enumerate(point_suffixes, start=1):
-            label = "combined uncertainty report (default/liberal/conservative)"
+            label = "combined uncertainty report (default, Temp-H/L, Trans-H/L)"
             if n_pts > 1:
                 label = f"{label}, sweep point {j}/{n_pts}"
             artifacts.append(Artifact(f"{tag}_{medium}_desc-uncertainty_report{base_affix}{suffix}.html", label))
         if nested == "multi_isppa":
             jobs.append("1 preprocessing job (stage 1)")
-            jobs.append("3 multi-ISPPA runs, one per variant (default, liberal, conservative): "
-                        f"each 1 acoustic job, {n_pts} thermal jobs and 1 summary job")
-            jobs.append(f"{n_pts} uncertainty report job(s) — one per target (stage 5)")
+            jobs.append("5 multi-ISPPA runs, one per variant (default, Temp-H, Temp-L, Trans-H, Trans-L): "
+                        f"default, Temp-H and Temp-L each 1 acoustic job, {n_pts} thermal jobs and 1 summary "
+                        "job; Trans-H and Trans-L run acoustic only, without thermal jobs")
+            jobs.append(f"{n_pts} uncertainty report job(s), one per target (stage 7)")
         elif nested == "async":
-            jobs.append("3 async multi-transducer runs, one per variant (default, liberal, conservative), "
-                        "each with its own preprocessing, acoustic, combine and joint jobs")
-            jobs.append(f"{n_pts} uncertainty report job(s) — one per sweep point (stage 5)")
+            jobs.append("5 async multi-transducer runs, one per variant (default, Temp-H, Temp-L, Trans-H, "
+                        "Trans-L), each with its own preprocessing, acoustic, combine and joint jobs; "
+                        "Trans-H and Trans-L run acoustic only")
+            jobs.append(f"{n_pts} uncertainty report job(s), one per sweep point (stage 7)")
         else:
             jobs.append("1 preprocessing job (stage 1)")
-            jobs.append("3 variant simulation jobs: default, liberal, conservative (stages 2-4)")
-            jobs.append("1 uncertainty report job (stage 5)")
+            jobs.append("5 variant simulation jobs: default, Temp-H, Temp-L, Trans-H, Trans-L (stages 2-6); "
+                        "Trans-H and Trans-L run acoustic only")
+            jobs.append("1 uncertainty report job (stage 7)")
 
     if mode != "single":
         if platform_used == "hpc":

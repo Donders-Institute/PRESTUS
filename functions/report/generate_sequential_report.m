@@ -6,7 +6,8 @@ function report_path = generate_sequential_report(run_params_list, run_labels, r
 %   (2) Thermal timeseries (temperature and CEM43) concatenated across all runs,
 %       drawn as per-layer SVG line plots with run-boundary markers
 %   (3) When uncertainty_variant_params is provided, additional shaded-band
-%       plots showing the liberal–conservative envelope per run per metric
+%       plots showing the envelope of a high and a low variant (the uncertainty
+%       pipeline passes Temp-H / Temp-L) per run per metric
 %
 % The voxelwise-max intensity NIfTI is saved alongside the report and also
 % referenced in the HTML.
@@ -22,10 +23,12 @@ function report_path = generate_sequential_report(run_params_list, run_labels, r
 %                              for the DEFAULT variant, one per run
 %   run_labels               - (optional) (1×N) cell array of short string labels
 %   uncertainty_variant_params - (optional) struct with fields:
-%                              .liberal_params_list     — (1×N) cell of params structs
-%                              .conservative_params_list — (1×N) cell of params structs
+%                              .high_params_list — (1×N) cell of params structs
+%                              .low_params_list  — (1×N) cell of params structs
+%                              .high_label, .low_label — (optional) legend names
+%                              (default 'High', 'Low')
 %                              When present, timeseries plots show shaded
-%                              liberal–conservative bands around the default line.
+%                              high–low bands around the default line.
 %   run_affixes              - (optional) (1×N) cell array of structs, each with
 %                              fields .output_affix and .thermal_cache_affix.
 %                              Built by sequential_pipeline and used for all file
@@ -44,9 +47,12 @@ arguments
     uncertainty_variant_params   (1,1) struct = struct()
 end
 
-has_uncertainty = isfield(uncertainty_variant_params, 'liberal_params_list') && ...
-                  isfield(uncertainty_variant_params, 'conservative_params_list') && ...
-                  ~isempty(uncertainty_variant_params.liberal_params_list);
+has_uncertainty = isfield(uncertainty_variant_params, 'high_params_list') && ...
+                  isfield(uncertainty_variant_params, 'low_params_list') && ...
+                  ~isempty(uncertainty_variant_params.high_params_list);
+band_labels = {'High', 'Low'};
+if isfield(uncertainty_variant_params, 'high_label'); band_labels{1} = char(uncertainty_variant_params.high_label); end
+if isfield(uncertainty_variant_params, 'low_label');  band_labels{2} = char(uncertainty_variant_params.low_label);  end
 
 report_path = '';
 
@@ -205,15 +211,15 @@ try
     % Thermal timeseries
     try
         if has_uncertainty
-            unc_lib_data  = load_variant_run_data(uncertainty_variant_params.liberal_params_list,      base_p, medium);
-            unc_cons_data = load_variant_run_data(uncertainty_variant_params.conservative_params_list, base_p, medium);
+            unc_lib_data  = load_variant_run_data(uncertainty_variant_params.high_params_list, base_p, medium);
+            unc_cons_data = load_variant_run_data(uncertainty_variant_params.low_params_list,  base_p, medium);
         else
             unc_lib_data  = {};
             unc_cons_data = {};
         end
         html_parts{end+1} = html_utils.collapsible('Thermal Timeseries', ...
             build_thermal_timeseries(run_data, run_labels, is_layered, subject_id, medium, ...
-                unc_lib_data, unc_cons_data), ...
+                unc_lib_data, unc_cons_data, band_labels), ...
             true, 'thermal');
     catch ME
         html_parts{end+1} = html_utils.section_error('Thermal Timeseries', ME);
@@ -685,12 +691,14 @@ function img = find_intensity_image(dir_img, subject_id, medium, affix)
 end
 
 function html = build_thermal_timeseries(run_data, run_labels, is_layered, subject_id, medium, ...
-        unc_lib_data, unc_cons_data)
-% unc_lib_data / unc_cons_data: cell arrays of run_data structs for liberal /
-% conservative variants (one entry per sequential run). Empty = no uncertainty bands.
+        unc_lib_data, unc_cons_data, band_labels)
+% unc_lib_data / unc_cons_data: cell arrays of run_data structs for the high /
+% low variant (one entry per sequential run). Empty = no uncertainty bands.
+% band_labels: {high label, low label} for the caption.
 
     if nargin < 6; unc_lib_data = {}; end
     if nargin < 7; unc_cons_data = {}; end
+    if nargin < 8; band_labels = {'High', 'Low'}; end
     has_unc = ~isempty(unc_lib_data) && ~isempty(unc_cons_data);
 
     html = '';
@@ -775,7 +783,7 @@ function html = build_thermal_timeseries(run_data, run_labels, is_layered, subje
     caption = '';
     if has_unc
         caption = ['<p style="font-size:0.85em;color:#64748b;margin:4px 0 12px;">' ...
-            'Solid line: default variant. Shaded area: liberal&#8211;conservative range. ' ...
+            sprintf('Solid line: default variant. Shaded area: %s&#8211;%s range. ', band_labels{:}) ...
             'Run boundaries marked with dashed vertical lines.</p>'];
     end
 
@@ -893,8 +901,8 @@ end
 
 function svg_html = build_ts_svg_with_band(def_layers, lib_layers, con_layers, layer_names, ...
         time_axis, run_boundaries, run_labels, y_label, y_floor, transform_fn)
-% Like build_ts_svg but adds a per-layer shaded band between liberal and
-% conservative variants around the default line.
+% Like build_ts_svg but adds a per-layer shaded band between the high and
+% low variants around the default line.
 
     palette = {'#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#64748b'};
 

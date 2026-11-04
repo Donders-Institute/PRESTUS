@@ -10,8 +10,8 @@ function cleanup_uncertainty_intermediates(parameters, affixes)
 % Input:
 %   parameters - PRESTUS config with subject_id and simulation.medium;
 %                used by GET_OUTPUT_DIR to resolve the cache folder
-%   affixes    - struct with fields .default, .liberal, .conservative
-%                (suffix strings for each uncertainty variant)
+%   affixes    - struct with one suffix string per uncertainty variant
+%                (field names as in UNCERTAINTY_VARIANTS)
 %
 % See also: GET_OUTPUT_DIR, UNCERTAINTY_PIPELINE
 
@@ -36,9 +36,9 @@ end
 
     cache_dir = fullfile(output_dir, 'cache');
 
-    % Heating result matrices for all three variants
+    % Heating result matrices of all variants
     if ~should_save_output(parameters.io, 'save_thermal_matrices')
-        variant_affixes = {affixes.default, affixes.liberal, affixes.conservative};
+        variant_affixes = struct2cell(affixes)';
         for i = 1:numel(variant_affixes)
             af = variant_affixes{i};
             f  = fullfile(cache_dir, sprintf('%s_%s%s_heating_res.mat', subj, medium, af));

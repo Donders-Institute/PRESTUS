@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
 from prestus_nexus.equipment import EquipmentLibrary  # noqa: E402
 from prestus_nexus.model import ConfigModel  # noqa: E402
 from prestus_nexus.session import Session  # noqa: E402
-from prestus_nexus.ui.main_window import CALIBRATION, LOCALITE, MainWindow  # noqa: E402
+from prestus_nexus.ui.main_window import CALIBRATION, LOCALITE, PCT, MainWindow  # noqa: E402
 
 FIX = Path(__file__).parent / "fixtures" / "bridge"
 
@@ -33,6 +33,7 @@ class FakeBridge(QObject):
         super().__init__()
         self.state, self.error, self.calls = "ready", "", []
         self.fail: dict[str, tuple[str, str]] = {}
+        self.handlers: dict = {}            # fn -> args -> result, for facades without fixtures
 
     def stop(self):
         pass
@@ -45,7 +46,9 @@ class FakeBridge(QObject):
         if action in self.fail:
             on_error(BridgeError(*self.fail[action]))
             return
-        if fn == "nexus_calibration":
+        if fn in self.handlers:
+            out = self.handlers[fn](args)
+        elif fn == "nexus_calibration":
             name = {"open": "calibration_open", "load": "calibration_open",
                     "view": "calibration_view_predicted" if args.get("predicted") else "calibration_view_measured",
                     "fit": "calibration_fit_per_depth"
@@ -247,3 +250,53 @@ def test_calibration_advanced_and_ring_options_reach_matlab(window, tmp_path, mo
     ro = s["ring_profile_options"]
     assert ro["NSub"] == 6 and ro["OffAxis"] == str(planes) and ro["OffAxisOptions"]["Kind"] == "transverse"
     assert window.fake.calls[-1][1]["ring_profile"] == "fit"
+
+
+def test_pct_page_predicts_and_prefers_the_default_run(window, tmp_path, monkeypatch):
+    import nibabel as nib
+    import numpy as np
+    m = window.model
+    m.set("subject_id", 3)
+    m.set("path.pct", str(tmp_path / "pct"))
+    m.set("path.sim", str(tmp_path / "sim"))
+    m.set("simulation.medium", "layered")
+    (tmp_path / "pct" / "sub-003").mkdir(parents=True)
+    nib.save(nib.Nifti1Image(np.zeros((4, 4, 4), np.float32), np.eye(4)),
+             str(tmp_path / "pct" / "sub-003" / "pseudoCT.nii.gz"))
+    m.save(tmp_path / "config_study.yaml")
+    window.dirty = False
+    monkeypatch.setattr(MainWindow, "matlab_path", lambda self: "/fake/matlab")
+    cache = tmp_path / "sim" / "sub-003" / "cache"
+    prop = {"min": 1800, "max": 2200, "histogram": {"counts": [3, 5], "edges": [1800, 2000, 2200]}}
+    const = {"min": 4.7, "max": 4.7, "histogram": {"counts": 8, "edges": [4.2, 5.2]}}
+
+    def predict(args):
+        cache.mkdir(parents=True, exist_ok=True)
+        out = cache / "sub-003_layered_pct_prediction.json"
+        out.write_text(json.dumps({"predicted": True, "source": "native", "n_voxels": 8,
+                                   "properties": {"density": prop, "alpha_coeff": const},
+                                   "reference": {"skull": {"density": 1850}}}))
+        return {"file": str(out), "source": "native", "n_voxels": 8}
+    window.fake.handlers["nexus_pct"] = predict
+
+    page = window.show_special(PCT)
+    assert page.predict_btn.isEnabled() and page.stats_file is None
+    page.predict()
+    fn, args = window.fake.calls[-1]
+    assert fn == "nexus_pct" and args == {"action": "predict", "config": str(m.path)}
+    assert page.stats_kind == "predicted" and "predicted from the pseudo-CT (native voxels" in page.stats_title.text()
+    att = page.axes[3]
+    assert len(att.patches) >= 1 and any("constant 4.7" in t.get_text() for t in att.texts)
+    assert page.fig.legends and "Bound variants (homogeneous skull)" in \
+        [t.get_text() for t in page.fig.legends[0].get_texts()]
+
+    (cache / "sub-003_layered_medium_stats.json").write_text(json.dumps(
+        {"n_voxels": 8, "properties": {"density": prop}, "reference": {"skull": {"density": 1850}}}))
+    page._load_stats()
+    assert page.stats_kind == "real" and "mapped skull of the default run" in page.stats_title.text()
+    assert "a prediction also exists" in page.stats_note.text()
+
+    window.fake.fail["predict"] = ("No pseudoCT.nii.gz found", "pct_predict_skull_properties:notFound")
+    page.predict()
+    assert "Prediction failed: No pseudoCT.nii.gz found" in page.stats_note.text()
+    assert page.predict_btn.isEnabled()

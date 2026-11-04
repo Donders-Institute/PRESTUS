@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-ALLOWED = ("nexus_calibration", "nexus_neuronav", "nexus_ping")
+ALLOWED = ("nexus_calibration", "nexus_neuronav", "nexus_pct", "nexus_ping")
 IDLE_TIMEOUT_S = 1800          # MATLAB ends after this long without requests (it holds a licence)
 HEARTBEAT_TIMEOUT_S = 60       # ... or when the Nexus has not touched the heartbeat for this long
 HEARTBEAT_EVERY_S = 10

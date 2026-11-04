@@ -1,9 +1,12 @@
 """Medium-property sets of the uncertainty variants (functions/core/uncertainty_medium_config.m).
 
-With simulation.uncertainty on, PRESTUS runs the default medium and two variants: conservative
-(lower bound of intensity and heating) and liberal (upper bound). Each variant's file is merged
-onto the run's config (uncertainty_pipeline.m, make_sim_params), so a tissue or property the
-file does not list keeps its medium_properties value.
+With simulation.uncertainty on, PRESTUS runs the default medium and four variants in two pairs
+(functions/uncertainty/uncertainty_variants.m). Temp-H / Temp-L take, per property, the ITRUSST
+bound that maximises / minimises brain heating. Trans-H / Trans-L take, per acoustic property,
+the bound that maximises / minimises brain intensity; they run acoustic only, so their files
+list no thermal properties. Each variant's file is merged onto the run's config
+(uncertainty_pipeline.m, make_sim_params), so a tissue or property the file does not list keeps
+its medium_properties value.
 """
 
 from __future__ import annotations
@@ -15,9 +18,14 @@ from typing import Any
 from .merge import is_empty, mergestruct
 from .yamlio import load_file
 
-VARIANTS = ("conservative", "liberal")
-VARIANT_LABEL = {"default": "Default", "conservative": "Conservative (lower bound)",
-                 "liberal": "Liberal (upper bound)"}
+VARIANTS = ("temp_high", "temp_low", "trans_high", "trans_low")
+VARIANT_LABEL = {"default": "Default", "temp_high": "Temp-H (max. heating)",
+                 "temp_low": "Temp-L (min. heating)", "trans_high": "Trans-H (max. intensity)",
+                 "trans_low": "Trans-L (min. intensity)"}
+VARIANT_SHORT = {"default": "Default", "temp_high": "Temp-H", "temp_low": "Temp-L",
+                 "trans_high": "Trans-H", "trans_low": "Trans-L"}
+# pair -> (high variant, low variant); the trans pair runs without heating
+PAIRS = {"temp": ("temp_high", "temp_low"), "trans": ("trans_high", "trans_low")}
 BRAIN = ("brain",)
 SKULL = ("skull", "skull_trabecular", "skull_cortical")
 TISSUE_LABEL = {"brain": "Brain", "skin": "Skin", "water": "Water", "skull": "Skull (single layer)",
@@ -32,11 +40,15 @@ PROPERTIES = [
     ("thermal_conductivity", "Thermal conductivity", "W/m/°C"),
     ("specific_heat_capacity", "Specific heat", "J/kg/°C"),
     ("perfusion", "Perfusion", "mL/min/kg"),
+    ("absorption", "Absorption", "dB/cm"),
     ("absorption_fraction", "Absorption fraction", ""),
     ("absorption_coeff", "Absorption coefficient", "dB/(cm·MHz^y)"),
 ]
+THERMAL = ("thermal_conductivity", "specific_heat_capacity", "perfusion", "absorption",
+           "absorption_fraction", "absorption_coeff")
+ABSORPTION = ("absorption_fraction", "absorption_coeff")
 PLOTTED = ("sound_speed", "density", "attenuation", "thermal_conductivity",
-           "specific_heat_capacity", "perfusion", "absorption_fraction")
+           "specific_heat_capacity", "perfusion", "absorption")
 FALLBACK_MHZ = 0.5          # the ITRUSST property database compares attenuation at 0.5 MHz
 
 
@@ -54,14 +66,36 @@ class PropertySets:
         if prop == "attenuation":
             a, y = props.get("alpha_coeff"), props.get("alpha_power")
             return attenuation_db_cm(a, y, self.freq_mhz)
-        return props.get(prop)
+        if prop == "absorption":
+            # heat deposition at the transducer frequency: the coefficient, else the fraction of the attenuation
+            y = props.get("alpha_power")
+            if not is_empty(props.get("absorption_coeff")):
+                return attenuation_db_cm(props["absorption_coeff"], y, self.freq_mhz)
+            att = attenuation_db_cm(props.get("alpha_coeff"), y, self.freq_mhz)
+            frac = props.get("absorption_fraction")
+            return att * float(frac) if att is not None and isinstance(frac, (int, float)) else None
+        value = props.get(prop)
+        return None if is_empty(value) else value
 
     def inherited(self, variant: str, tissue: str, prop: str) -> bool:
         """The variant's value comes from medium_properties, not from its own file."""
         own = self.listed.get(variant, {}).get(tissue, {})
         if prop == "attenuation":
             return "alpha_coeff" not in own and "alpha_power" not in own
+        if prop in ("absorption", *ABSORPTION):
+            return not any(not is_empty(own.get(k)) for k in ABSORPTION)
         return prop not in own
+
+
+def absorption_layer(merged: dict, layer: dict) -> dict:
+    """medium_absorption_layer.m: a layer that sets one absorption field of a tissue clears the other."""
+    for tissue, props in layer.items():
+        if not isinstance(props, dict) or not isinstance(merged.get(tissue), dict):
+            continue
+        for key, other in (ABSORPTION, ABSORPTION[::-1]):
+            if not is_empty(props.get(key)) and other in merged[tissue]:
+                merged[tissue][other] = []
+    return merged
 
 
 def attenuation_db_cm(alpha_coeff: Any, alpha_power: Any, f_mhz: float) -> float | None:
@@ -125,5 +159,5 @@ def property_sets(model, prestus_root: str | Path) -> PropertySets:
             out.errors[variant] = f"{path.name} has no medium_properties block"
             continue
         out.listed[variant] = listed
-        out.sets[variant] = mergestruct(base, listed)
+        out.sets[variant] = absorption_layer(mergestruct(base, listed), listed)
     return out

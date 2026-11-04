@@ -17,7 +17,6 @@ The following documents the functions provided in PRESTUS.
 | `acoustic_water_baseline`               | Decide and run the free-water baseline simulation. |
 | `acoustic_wrapper`                      | Set up acoustic simulation |
 | `assemble_limited_fov_fields`           | Back-project and combine N limited-FOV acoustic results. |
-| `assemble_pfov_fields`                  | Deprecated alias of ASSEMBLE_LIMITED_FOV_FIELDS. |
 | `axisymmetric_output_mode`              | Form into which axisymmetric results are expanded |
 | `cache_acoustic`                        | Save or load the slim acoustic results cache. |
 | `coherent_drive_calibration`            | Set each transducer's drive to its own ISPPA target (coherent runs) |
@@ -94,7 +93,6 @@ The following documents the functions provided in PRESTUS.
 | `generate_calibration_report`           | Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup. |
 | `interpolate_axial_profiles`            | Axial intensity profiles at desired focal depths from measured ones |
 | `kwave_calibrate_drive`                 | Calibrate the drive of per-depth refinements in free-water k-Wave (rescale to the simulated ISPPA) and report agreement with the measured profiles |
-| `kwave_check_refinement`                | Deprecated name of KWAVE_CALIBRATE_DRIVE |
 | `kwave_drive_metrics`                   | Absolute agreement of a simulated free-water profile with its target |
 | `library_add_conditions`                | Add dephased drive conditions to a library entry [EXPERIMENTAL] |
 | `library_add_refinements`               | Merge depth-specific phase offsets (and drives) into a library entry |
@@ -199,6 +197,7 @@ The following documents the functions provided in PRESTUS.
 | `nexus_bridge`                          | Persistent MATLAB session that serves the PRESTUS Nexus |
 | `nexus_calibration`                     | Transducer calibration for the PRESTUS Nexus (through NEXUS_BRIDGE) |
 | `nexus_neuronav`                        | Localite marker ingestion for the PRESTUS Nexus (through NEXUS_BRIDGE) |
+| `nexus_pct`                             | Pseudo-CT steps of the PRESTUS Nexus, served by NEXUS_BRIDGE |
 | `nexus_ping`                            | Answer a NEXUS_BRIDGE health check |
 | `nexus_progress`                        | Report progress of the current NEXUS_BRIDGE request to the Nexus |
 | `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs [DEPRECATED: use `prestus_nexus`]. |
@@ -254,6 +253,7 @@ The following documents the functions provided in PRESTUS.
 | `confirm_overwriting`                   | Check overwriting (manual). |
 | `confirmation_dlg`                      | Present confirmation dialogue. |
 | `default_log_file`                      | Timestamped pipeline log (diary) path for a run |
+| `distribution_stats`                    | Summary statistics and histogram of a numeric vector |
 | `ensure_hdf5_plugin_path`               | Set HDF5_PLUGIN_PATH so MATLAB's h5read/h5write don't fail |
 | `find_min_factor`                       | Find the number with the smallest maximum factor in a range. |
 | `find_pseudoct_dir`                     | Folder holding this subject's existing pseudoCT.nii.gz |
@@ -346,6 +346,7 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `fitPowerLawParamsMulti`                | Fit power law absorption parameters for highly absorbing media. |
 | `get_alpha_coeff`                       | Computes the amplitude attenuation coefficient for a given medium and frequency. |
+| `medium_absorption_layer`               | Keep one absorption field per tissue when merging a config layer |
 | `medium_elastic_properties`             | Build the k-Wave elastic medium (compressional + shear) from a fluid medium |
 | `medium_pct_attenuation`                | Skull: pCT-informed attenuation mapping |
 | `medium_pct_density`                    | Skull: pCT-informed density mapping |
@@ -419,7 +420,9 @@ The following documents the functions provided in PRESTUS.
 | `check_pct_sidecar`                     | Refuse an existing pseudo-CT made with other settings |
 | `fit_pairwiselinear`                    | Perform a pairwise linear fit between HU and density values with optional plot. |
 | `pct_create_pCT_run`                    | Submit a pseudoCT generation job |
+| `pct_predict_skull_properties`          | Skull properties a pseudo-CT run will model, without simulating |
 | `pct_signature`                         | Settings a pseudo-CT depends on, and the resolved skull mapping |
+| `pct_skull_mapped`                      | True when the skull layer's properties come from the pseudo-CT |
 | `pct_skullexpand`                       | Load SimNIBS NIfTIs + headers, run skull rubber wrap, save output. |
 | `pct_skullmapping`                      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug] |
 | `pct_skullmapping_fit`                  | Subject-specific UTE->HU line from cortical / trabecular UTE histograms |
@@ -500,6 +503,7 @@ The following documents the functions provided in PRESTUS.
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `cem43_iso_increment`                   | ISO thermal-dose (CEM43) increment for one time step |
 | `thermal_absorption_model`              | Resolve how acoustic heat deposition is specified |
+| `thermal_absorption_properties`         | Absorption model, coefficient and fraction of one tissue |
 | `thermal_analysis`                      | Analyze output of thermal simulations |
 | `thermal_grid_setup`                    | Build an independent k-Wave grid for thermal simulation |
 | `thermal_parameters`                    | Checks and converts protocol timing setup for thermal estimation |
@@ -575,3 +579,4 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `cleanup_uncertainty_intermediates`     | Delete large intermediate cache files after uncertainty analysis |
+| `uncertainty_variants`                  | The simulation variants of the uncertainty pipeline |

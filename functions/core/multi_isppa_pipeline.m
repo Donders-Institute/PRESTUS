@@ -368,9 +368,13 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix, ow)
     p.modules.run_source_setup       = 0;   % kgrid/source/sensor come from acoustic cache
     p.modules.run_acoustic_sims      = 0;   % load from cache
     p.modules.run_water_baseline     = 0;
-    p.modules.run_heating_sims       = 1;
-    run_thermal = ~isfield(base.modules, 'run_thermal_analysis') || ...
-                  base.modules.run_thermal_analysis;
+    % An acoustic-only uncertainty variant (Trans-H/L) scales and reports
+    % each point without heating.
+    heating = ~(isfield(base, 'uncertainty') && isfield(base.uncertainty, 'acoustic_only') && ...
+                base.uncertainty.acoustic_only);
+    p.modules.run_heating_sims       = heating;
+    run_thermal = heating && (~isfield(base.modules, 'run_thermal_analysis') || ...
+                  base.modules.run_thermal_analysis);
     p.modules.run_thermal_analysis   = run_thermal;
     p.modules.run_posthoc_water_sims = 0;
     p.modules.generate_report        = 1;
@@ -385,7 +389,7 @@ function p = make_thermal_params(base, target_isppa, affix, base_affix, ow)
     p.io.reuse_upstream_caches       = {'head', 'grid', 'medium'};
     p.io.overwrite_simnibs           = 0;
     p.io.save_acoustic_matrices      = 0;
-    p.io.save_thermal_matrices       = isfield(base.modules, 'run_heating_sims') && ...
+    p.io.save_thermal_matrices       = heating && isfield(base.modules, 'run_heating_sims') && ...
                                        base.modules.run_heating_sims;
     p.simulation.interactive         = 0;
 end

@@ -33,11 +33,14 @@ simulation:
                                 #   'async'     — each transducer is simulated independently and
                                 #                 intensities are summed incoherently before thermal
                                 #                 simulation (models asynchronous / non-overlapping firing)
-  uncertainty_conservative: ''  # Medium properties of the conservative (lower-bound) variant of simulation.uncertainty: a YAML file
-                                #   with a medium_properties block, merged onto this config (absolute path, or a file name
-                                #   in config/uncertainty/). '' = config/uncertainty/config_medium_conservative.yaml
-  uncertainty_liberal: ''       # Medium properties of the liberal (upper-bound) variant, as above.
-                                #   '' = config/uncertainty/config_medium_liberal.yaml
+  uncertainty_temp_high: ''     # Medium properties of the Temp-H variant of simulation.uncertainty (bounds that maximise brain
+                                #   heating): a YAML file with a medium_properties block, merged onto this config (absolute
+                                #   path, or a file name in config/uncertainty/). '' = config/uncertainty/config_medium_temp_high.yaml
+  uncertainty_temp_low: ''      # Temp-L variant (bounds that minimise brain heating), as above. '' = config_medium_temp_low.yaml
+  uncertainty_trans_high: ''    # Trans-H variant (bounds that maximise brain intensity; acoustic only), as above.
+                                #   '' = config_medium_trans_high.yaml
+  uncertainty_trans_low: ''     # Trans-L variant (bounds that minimise brain intensity; acoustic only), as above.
+                                #   '' = config_medium_trans_low.yaml
 
 #------------ Paths
 

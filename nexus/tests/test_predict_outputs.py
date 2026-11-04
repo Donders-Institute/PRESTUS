@@ -87,8 +87,11 @@ def test_uncertainty_mode(schema):
     plan = predict(m)
     assert plan.mode == "uncertainty"
     names = [a.name for a in plan.artifacts]
-    assert len(names) == 7   # 3 variants x (csv + html) + combined report
-    assert "sub-003_layered_desc-liberal.csv" in names
+    assert len(names) == 11  # 5 variants x (csv + html) + combined report
+    assert "sub-003_layered_desc-temphigh.csv" in names
+    assert "sub-003_layered_desc-translow.csv" in names
+    assert any("5 variant simulation jobs" in j and "(stages 2-6)" in j for j in plan.jobs)
+    assert any("1 uncertainty report job (stage 7)" in j for j in plan.jobs)
     assert "sub-003_layered_desc-uncertainty_report.html" in names
 
 
@@ -114,10 +117,10 @@ def test_uncertainty_nests_multi_isppa_sweep(schema):
     assert plan.mode == "uncertainty"
     assert plan.nested == "multi_isppa"
     names = [a.name for a in plan.artifacts]
-    # 3 variants x 2 targets x (csv + html) + 3 summaries + 2 uncertainty reports
-    assert len(names) == 17
-    assert "sub-003_layered_desc-liberal_desc-isppa030.csv" in names
-    assert "sub-003_layered_desc-multiIsppa_report_desc-conservative.html" in names
+    # 5 variants x 2 targets x (csv + html) + 5 summaries + 2 uncertainty reports
+    assert len(names) == 27
+    assert "sub-003_layered_desc-temphigh_desc-isppa030.csv" in names
+    assert "sub-003_layered_desc-multiIsppa_report_desc-transhigh.html" in names
     assert "sub-003_layered_desc-uncertainty_report_desc-isppa010.html" in names
     assert any("2 uncertainty report job(s)" in j for j in plan.jobs)
 
@@ -132,7 +135,7 @@ def test_uncertainty_nests_async_sweep(schema):
     plan = predict(m)
     assert plan.nested == "async"
     names = [a.name for a in plan.artifacts]
-    assert "sub-003_layered_desc-liberal_desc-asyncJointS02.csv" in names
+    assert "sub-003_layered_desc-templow_desc-asyncJointS02.csv" in names
     assert "sub-003_layered_desc-uncertainty_report_desc-asyncJointS01.html" in names
 
 

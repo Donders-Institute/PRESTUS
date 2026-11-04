@@ -319,7 +319,7 @@ end
 
         lbl(gl, 8, 1, 'Uncertainty mode');
         chk(gl, 8, 2, 'simulation.uncertainty', false, ...
-            'Run default / liberal / conservative variants + combined report');
+            'Run default, Temp-H/L and Trans-H/L variants + combined report');
         sp(gl, 9);
 
         sec(gl, 10, 'Pipeline Modules');

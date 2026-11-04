@@ -1,9 +1,11 @@
 function report_path = generate_uncertainty_report(parameters, affixes)
 % GENERATE_UNCERTAINTY_REPORT  Generate an uncertainty-range HTML simulation report
 %
-% Loads acoustic and thermal CSV tables and heating .mat files from three
-% simulation variants (default, liberal, conservative), computes ranges
-% across them, and writes a self-contained HTML report.
+% Loads acoustic and thermal CSV tables and heating .mat files from the
+% simulation variants (UNCERTAINTY_VARIANTS: default, Temp-H, Temp-L, Trans-H,
+% Trans-L) and writes a self-contained HTML report. Acoustic metrics are
+% ranged over the Trans pair, thermal metrics over the Temp pair; colours
+% follow the highest value of the default and that pair.
 %
 % Use as:
 %   report_path = generate_uncertainty_report(parameters)
@@ -14,17 +16,17 @@ function report_path = generate_uncertainty_report(parameters, affixes)
 %                must point to the shared output folder; the optional
 %                parameters.uncertainty.report_suffix (the default variant's
 %                affix, e.g. '_desc-isppa030') is appended to the report file name
-%   affixes    - struct with fields .default, .liberal, .conservative
-%                (defaults: '', '_liberal', '_conservative')
+%   affixes    - struct with one field per variant name (default: each
+%                variant's descriptor, e.g. .temp_high = '_desc-temphigh')
 %
 % Output:
 %   report_path - path to the generated HTML report file
 %
-% See also: GENERATE_SIMULATION_REPORT, GET_RISK_LIMITS
+% See also: GENERATE_SIMULATION_REPORT, GET_RISK_LIMITS, UNCERTAINTY_VARIANTS
 
 arguments
     parameters  (1,1) struct
-    affixes     (1,1) struct = struct('default', '', 'liberal', '_desc-liberal', 'conservative', '_desc-conservative')
+    affixes     (1,1) struct = default_affixes()
 end
 
 report_path = '';
@@ -43,12 +45,14 @@ try
     % to 0, which would incorrectly trigger the free-water branch).
     is_layered = contains(medium, {'layered', 'phantom'});
 
-    %% Load the three CSV tables
-    variant_affixes = {affixes.liberal, affixes.default, affixes.conservative};
-    variant_labels  = {'Liberal', 'Default', 'Conservative'};
+    %% Load the variants' CSV tables
+    variants        = uncertainty_variants();
+    n_var           = numel(variants);
+    variant_affixes = cellfun(@(n) affixes.(n), {variants.name}, 'UniformOutput', false);
+    variant_labels  = {variants.label};
 
-    tables = cell(1, 3);
-    for v = 1:3
+    tables = cell(1, n_var);
+    for v = 1:n_var
         csv_path = fullfile(output_dir, ...
             sprintf('sub-%03d_%s%s.csv', subject_id, medium, variant_affixes{v}));
         if isfile(csv_path)
@@ -68,8 +72,8 @@ try
     %% Load heating timeseries from .mat files (if available)
     % Only load the fields needed for the SVG timeseries plot to limit memory use.
     heating_fields = {'timeseries', 't_array_s', 'focal_plume_T', 'T_time'};
-    heating = cell(1, 3);
-    for v = 1:3
+    heating = cell(1, n_var);
+    for v = 1:n_var
         mat_path = fullfile(output_dir, 'cache', ...
             sprintf('sub-%03d_%s_heating_res%s.mat', subject_id, medium, variant_affixes{v}));
         if isfile(mat_path)
@@ -112,19 +116,29 @@ try
     html_parts{end+1} = build_toc(is_layered, any(~cellfun(@isempty, heating)));
 
     % Header
-    html_parts{end+1} = build_header(subject_id, medium, parameters, affixes);
+    html_parts{end+1} = build_header(subject_id, medium, parameters, variants, variant_affixes);
 
     % Safety dashboard (ranges)
     try
-        html_parts{end+1} = build_safety_dashboard(tables, variant_labels, is_layered);
+        html_parts{end+1} = build_safety_dashboard(tables, variants, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Safety Dashboard', ME);
+    end
+
+    % Pseudo-CT skull of the default variant against the bound variants' homogeneous skull
+    if pct_skull_mapped(parameters)
+        try
+            html_parts{end+1} = html_utils.collapsible('Pseudo-CT Skull vs. Bounds', ...
+                build_pct_bounds_section(parameters, variants, affixes.default), true, 'pct');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Pseudo-CT Skull vs. Bounds', ME);
+        end
     end
 
     % Acoustic summary
     try
         html_parts{end+1} = html_utils.collapsible('Acoustic Results', ...
-            build_acoustic_section(tables, variant_labels, variant_affixes, parameters, subject_id, medium, is_layered), ...
+            build_acoustic_section(tables, variants, variant_affixes, parameters, subject_id, medium, is_layered), ...
             true, 'acoustic');
     catch ME
         html_parts{end+1} = html_utils.section_error('Acoustic Results', ME);
@@ -137,7 +151,7 @@ try
     if has_thermal
         try
             html_parts{end+1} = html_utils.collapsible('Thermal Results', ...
-                build_thermal_section(tables, heating, variant_labels, variant_affixes, parameters, subject_id, medium), ...
+                build_thermal_section(tables, heating, variants, variant_affixes, parameters, subject_id, medium), ...
                 true, 'thermal');
         catch ME
             html_parts{end+1} = html_utils.section_error('Thermal Results', ME);
@@ -147,7 +161,7 @@ try
     % Side-by-side intensity images
     try
         html_parts{end+1} = html_utils.collapsible('Additional Maps', ...
-            build_images_section(variant_affixes, variant_labels, parameters, subject_id, medium, is_layered), ...
+            build_images_section(variants, variant_affixes, parameters, subject_id, medium, is_layered), ...
             true, 'images');
     catch ME
         html_parts{end+1} = html_utils.section_error('Additional Maps', ME);
@@ -155,7 +169,7 @@ try
 
     % Timing summary
     try
-        timing_html = build_timing_section(parameters, variant_affixes, variant_labels);
+        timing_html = build_timing_section(parameters, variants);
         if ~isempty(timing_html)
             html_parts{end+1} = html_utils.collapsible('Pipeline Timing', timing_html, false, 'timing');
         end
@@ -212,22 +226,63 @@ end
 %  SECTION BUILDERS
 %% ========================================================================
 
-function html = build_header(subject_id, medium, parameters, affixes)
+function affixes = default_affixes()
+    affixes = struct();
+    for v = uncertainty_variants()
+        affixes.(v.name) = v.desc;
+    end
+end
+
+function trio = pair_trio(variants, pair)
+% Indices [high, default, low] of a pair ('temp' | 'trans') in variants.
+    trio = [find(strcmp({variants.pair}, pair) & strcmp({variants.bound}, 'high')), ...
+            find(strcmp({variants.name}, 'default')), ...
+            find(strcmp({variants.pair}, pair) & strcmp({variants.bound}, 'low'))];
+end
+
+function pair = metric_pair(name)
+% Thermal metrics are ranged over the Temp pair, all others over the Trans pair.
+    if ~isempty(regexp(name, '^(maxT|riseT|endT|CEM43)', 'once'))
+        pair = 'temp';
+    else
+        pair = 'trans';
+    end
+end
+
+function label = pair_label(pair)
+    label = [upper(pair(1)) pair(2:end)];
+end
+
+function vals = metric_values(tables, name)
+% Last row of column name in each variant's table (NaN when absent).
+    vals = NaN(1, numel(tables));
+    for v = 1:numel(tables)
+        if ~isempty(tables{v}) && ismember(name, tables{v}.Properties.VariableNames)
+            col = tables{v}.(name);
+            if isnumeric(col) && ~isempty(col)
+                vals(v) = col(end);
+            end
+        end
+    end
+end
+
+function html = build_header(subject_id, medium, parameters, variants, variant_affixes)
     html = '<section class="report-section" id="header">';
     html = [html '<h1>PRESTUS Uncertainty Report</h1>'];
     html = [html '<table class="info-table">'];
     html = [html sprintf('<tr><th>Subject</th><td>sub-%03d</td></tr>', subject_id)];
     html = [html sprintf('<tr><th>Medium</th><td>%s</td></tr>', html_utils.escape(medium))];
-    html = [html sprintf('<tr><th>Default affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.default))];
-    html = [html sprintf('<tr><th>Liberal affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.liberal))];
-    html = [html sprintf('<tr><th>Conservative affix</th><td><code>%s</code></td></tr>', html_utils.escape(affixes.conservative))];
+    for v = 1:numel(variants)
+        html = [html sprintf('<tr><th>%s affix</th><td><code>%s</code></td></tr>', ...
+            html_utils.escape(variants(v).label), html_utils.escape(variant_affixes{v}))]; %#ok<AGROW>
+    end
     html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.dir_output))];
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     html = [html '</table>'];
     html = [html '</section>'];
 end
 
-function html = build_safety_dashboard(tables, variant_labels, is_layered)
+function html = build_safety_dashboard(tables, variants, is_layered)
     limits = struct();
     if is_layered
         limits = get_risk_limits(true);
@@ -243,35 +298,26 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
     else
         html = [html '<div class="medium-banner medium-layered">' ...
             'Values shown for the <strong>default</strong> variant. ' ...
-            'Range annotations span liberal to conservative.</div>'];
+            'Ranges span the Trans pair (acoustic metrics) or the Temp pair (thermal metrics).</div>'];
     end
 
     html = [html '<div class="safety-grid">'];
 
-    % variant order: liberal=1, default=2, conservative=3
     for i = 1:length(metric_names)
         name = metric_names{i};
         info = limits.(name);
 
-        % Extract values from all three variants
-        vals = NaN(1, 3);
-        for v = 1:3
-            if ~isempty(tables{v}) && ismember(name, tables{v}.Properties.VariableNames)
-                col = tables{v}.(name);
-                if isnumeric(col) && ~isempty(col)
-                    vals(v) = col(end);
-                end
-            end
-        end
+        % Default, high and low variant of the pair that bounds this metric
+        pair = metric_pair(name);
+        trio = pair_trio(variants, pair);
+        vals = metric_values(tables, name);
+        high_val    = vals(trio(1));
+        display_val = vals(trio(2));
+        low_val     = vals(trio(3));
 
-        % Display default (index 2); bar length and color driven by conservative (index 3)
-        display_val = vals(2);
-        liberal_val = vals(1);
-        cons_val    = vals(3);
-
+        % Colour follows the highest of default, high and low
         display_unit = info.unit;
-        color_val = cons_val;
-        if isnan(color_val); color_val = display_val; end
+        color_val = max([high_val, display_val, low_val], [], 'omitnan');
         color = risk_color(color_val, info.limit);
 
         html = [html sprintf('<div class="safety-card safety-%s">', color)];
@@ -283,10 +329,10 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
         else
             html = [html sprintf('<div class="safety-value">%.3g</div>', display_val)];
 
-            % Range annotation: liberal to conservative
-            if ~isnan(liberal_val) && ~isnan(cons_val)
-                html = [html sprintf('<div class="risk-limit">%.3g &ndash; %.3g %s (lib&ndash;cons)</div>', ...
-                    liberal_val, cons_val, display_unit)];
+            % Range annotation: low to high variant of the pair
+            if ~isnan(high_val) && ~isnan(low_val)
+                html = [html sprintf('<div class="risk-limit">%.3g &ndash; %.3g %s (%s)</div>', ...
+                    min(low_val, high_val), max(low_val, high_val), display_unit, pair_label(pair))];
             elseif ~isinf(info.limit)
                 html = [html sprintf('<div class="risk-limit">NSR limit: %.3g %s</div>', info.limit, display_unit)];
             else
@@ -301,7 +347,7 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
                     scale_min = 0;
                 end
 
-                all_vals_finite = [liberal_val, display_val, cons_val];
+                all_vals_finite = [high_val, display_val, low_val];
                 all_vals_finite = all_vals_finite(~isnan(all_vals_finite));
                 min_sim = min(all_vals_finite);
                 max_sim = max(all_vals_finite);
@@ -320,17 +366,17 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
                 limit_line = sprintf('<div class="safety-bar-limit" style="left:%.1f%%"></div>', lim_pct);
 
                 markers = '';
-                if ~isnan(liberal_val)
-                    pct = (liberal_val - scale_min) / scale_range * 100;
-                    markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--liberal" style="left:%.1f%%"></div>', pct)];
+                if ~isnan(low_val)
+                    pct = (low_val - scale_min) / scale_range * 100;
+                    markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--low" style="left:%.1f%%"></div>', pct)];
                 end
                 if ~isnan(display_val)
                     pct = (display_val - scale_min) / scale_range * 100;
                     markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--default" style="left:%.1f%%"></div>', pct)];
                 end
-                if ~isnan(cons_val)
-                    pct = (cons_val - scale_min) / scale_range * 100;
-                    markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--conservative" style="left:%.1f%%"></div>', pct)];
+                if ~isnan(high_val)
+                    pct = (high_val - scale_min) / scale_range * 100;
+                    markers = [markers sprintf('<div class="safety-bar-marker safety-bar-marker--high" style="left:%.1f%%"></div>', pct)];
                 end
 
                 % Scale range printed directly above the bar
@@ -345,20 +391,21 @@ function html = build_safety_dashboard(tables, variant_labels, is_layered)
 
     html = [html '</div>'];
     html = [html '<p class="safety-footnote">Non-significant risk limits: ITRUSST consensus (Aubry et al., 2025). ' ...
-        '<strong>Card colour</strong> reflects the <strong>conservative</strong> variant: ' ...
+        '<strong>Card colour</strong> reflects the highest value of the default and the metric''s pair ' ...
+        '(Trans-H/L for acoustic metrics, Temp-H/L for thermal metrics): ' ...
         'green &lt;50% of limit, amber 50&ndash;100%, red exceeds limit. ' ...
         '<strong>Value</strong> shown for the <em>default</em> variant; ' ...
-        '<strong>lib&ndash;cons range</strong> printed below the value. ' ...
-        '<strong>Scale</strong> (above bar): fixed axis range — baseline (0 or 37&thinsp;&deg;C for temperature) to max(simulated, NSR limit). ' ...
-        '<strong>Bar</strong>: simulated range from minimum (liberal) to maximum (conservative) variant. ' ...
+        'the pair''s <strong>range</strong> is printed below the value. ' ...
+        '<strong>Scale</strong> (above bar): fixed axis range from baseline (0 or 37&thinsp;&deg;C for temperature) to max(simulated, NSR limit). ' ...
+        '<strong>Bar</strong>: simulated range across the default and the pair. ' ...
         'Grey dashed line = NSR limit. ' ...
         'Ticks: &#x25A0;&nbsp;black&nbsp;=&nbsp;default, ' ...
-        '<span style="color:#2563eb">&#x25A0;</span>&nbsp;blue&nbsp;=&nbsp;liberal, ' ...
-        '<span style="color:#92400e">&#x25A0;</span>&nbsp;brown&nbsp;=&nbsp;conservative.</p>'];
+        '<span style="color:#b91c1c">&#x25A0;</span>&nbsp;red&nbsp;=&nbsp;high (Temp-H / Trans-H), ' ...
+        '<span style="color:#2563eb">&#x25A0;</span>&nbsp;blue&nbsp;=&nbsp;low (Temp-L / Trans-L).</p>'];
     html = [html '</section>'];
 end
 
-function html = build_acoustic_section(tables, variant_labels, variant_affixes, parameters, subject_id, medium, is_layered)
+function html = build_acoustic_section(tables, variants, variant_affixes, parameters, subject_id, medium, is_layered)
     html = '';
 
     % Summary range table
@@ -372,15 +419,16 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
     end
 
     html = [html '<h3>Key Acoustic Metrics</h3>'];
-    html = [html build_range_table(tables, variant_labels, key_metrics)];
+    html = [html build_range_table(tables, variants, key_metrics)];
 
-    % Intensity images — y-slice only (3 columns: liberal | default | conservative)
-    html = [html '<h3 style="margin-top:24px;">Intensity Maps (Liberal | Default | Conservative)</h3>'];
+    % Intensity images — y-slice only (3 columns: Trans-H | Default | Trans-L)
+    trio = pair_trio(variants, 'trans');
+    html = [html sprintf('<h3 style="margin-top:24px;">Intensity Maps (%s | %s | %s)</h3>', variants(trio).label)];
     html = [html '<div class="image-grid image-grid--3col">'];
     any_intensity = false;
-    for v = 1:3
+    for v = trio
         aff = variant_affixes{v};
-        lbl = variant_labels{v};
+        lbl = variants(v).label;
         img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s_intensity_y%s.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
@@ -398,7 +446,7 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
     html = [html '</div>'];
 end
 
-function html = build_thermal_section(tables, heating, variant_labels, variant_affixes, parameters, subject_id, medium)
+function html = build_thermal_section(tables, heating, variants, variant_affixes, parameters, subject_id, medium)
     html = '';
 
     key_metrics = {'maxT', 'maxT_brain', 'maxT_skull', 'maxT_skin', ...
@@ -406,15 +454,16 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
                    'CEM43_brain', 'CEM43_skull', 'CEM43_skin'};
 
     html = [html '<h3>Thermal Metrics</h3>'];
-    html = [html build_range_table(tables, variant_labels, key_metrics)];
+    html = [html build_range_table(tables, variants, key_metrics)];
 
-    % Temperature vs. Time images (thermal_max, Liberal | Default | Conservative)
-    html = [html '<h3 style="margin-top:24px;">Temperature vs. Time (Liberal | Default | Conservative)</h3>'];
+    % Temperature vs. Time images (thermal_max, Temp-H | Default | Temp-L)
+    trio = pair_trio(variants, 'temp');
+    html = [html sprintf('<h3 style="margin-top:24px;">Temperature vs. Time (%s | %s | %s)</h3>', variants(trio).label)];
     html = [html '<div class="image-grid image-grid--3col">'];
     any_thermal_max = false;
-    for v = 1:3
+    for v = trio
         aff = variant_affixes{v};
-        lbl = variant_labels{v};
+        lbl = variants(v).label;
         img_path = fullfile(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s_thermal_max%s.png', subject_id, medium, aff));
         img_html = html_utils.embed_image(img_path, lbl, lbl);
@@ -431,11 +480,13 @@ function html = build_thermal_section(tables, heating, variant_labels, variant_a
     html = [html '</div>'];
 
     % Uncertainty band timeseries plots (separate plots, generated from .mat data)
+    % over the Temp pair, in [high, default, low] order.
+    heating = heating(trio);
     has_ts = any(~cellfun(@isempty, heating));
     if has_ts
         caption = ['<p style="font-size:0.85em;color:#64748b;margin:4px 0 12px;">' ...
-            'Shaded area: liberal&#8211;conservative range. ' ...
-            'Solid line: default variant. Dashed lines: liberal (red) / conservative (gray).</p>'];
+            'Shaded area: Temp-H&#8211;Temp-L range. ' ...
+            'Solid line: default variant. Dashed lines: Temp-H (red) / Temp-L (gray).</p>'];
 
         html = [html '<h3 style="margin-top:28px;">Temperature Timeseries — Global Maximum (Uncertainty)</h3>'];
         html = [html caption];
@@ -484,8 +535,10 @@ function layer_names = get_ts_layer_names(heating, metric)
     end
 end
 
-function html = build_images_section(variant_affixes, variant_labels, parameters, subject_id, medium, is_layered)
+function html = build_images_section(variants, variant_affixes, parameters, subject_id, medium, is_layered)
+% Thermal maps of the Temp pair and the default (the Trans variants run no heating).
     html = '';
+    trio = pair_trio(variants, 'temp');
 
     image_specs = {};
     if is_layered
@@ -500,9 +553,9 @@ function html = build_images_section(variant_affixes, variant_labels, parameters
         html = [html sprintf('<h3>%s</h3>', html_utils.escape(title))];
         html = [html '<div class="image-grid image-grid--3col">'];
         any_found = false;
-        for v = 1:3
+        for v = trio
             aff = variant_affixes{v};
-            lbl = variant_labels{v};
+            lbl = variants(v).label;
             img_path = sprintf(pattern, aff);
             img_html = html_utils.embed_image(img_path, lbl, lbl);
             if ~isempty(img_html)
@@ -521,7 +574,7 @@ end
 
 function html = build_tables_section(tables, variant_labels, is_layered)
     html = '';
-    for v = 1:3
+    for v = 1:numel(tables)
         if isempty(tables{v})
             html = [html sprintf('<h3>%s</h3><p class="placeholder">Table not found.</p>', ...
                 html_utils.escape(variant_labels{v}))];
@@ -536,8 +589,9 @@ end
 %  RANGE TABLE
 %% ========================================================================
 
-function html = build_range_table(tables, variant_labels, metric_names)
-% Build a table with one row per metric, columns: metric | conservative | default | liberal | range
+function html = build_range_table(tables, variants, metric_names)
+% Build a table with one row per metric, columns: metric | one per variant |
+% range over the metric's pair (Trans for acoustic, Temp for thermal) | limit
     limits = struct();
     if is_layered_limits(metric_names)
         limits = get_risk_limits(true);
@@ -545,25 +599,18 @@ function html = build_range_table(tables, variant_labels, metric_names)
 
     html = '<div class="table-wrapper"><table class="data-table"><thead><tr>';
     html = [html '<th>Metric</th>'];
-    for v = 1:3
-        html = [html sprintf('<th>%s</th>', html_utils.escape(variant_labels{v}))];
+    for v = 1:numel(variants)
+        html = [html sprintf('<th>%s</th>', html_utils.escape(variants(v).label))];
     end
     html = [html '<th>Range</th><th>Limit</th></tr></thead><tbody>'];
 
     for m = 1:numel(metric_names)
         name = metric_names{m};
 
-        vals = NaN(1, 3);
-        for v = 1:3
-            if ~isempty(tables{v}) && ismember(name, tables{v}.Properties.VariableNames)
-                col = tables{v}.(name);
-                if isnumeric(col) && ~isempty(col)
-                    vals(v) = col(end);
-                end
-            end
-        end
+        vals = metric_values(tables, name);
+        trio = pair_trio(variants, metric_pair(name));
 
-        % Determine limit & color for worst-case (liberal = index 3)
+        % Limit, and colour from the highest value of default and pair
         limit_val = Inf;
         limit_str = '—';
         if isfield(limits, name)
@@ -574,13 +621,12 @@ function html = build_range_table(tables, variant_labels, metric_names)
                 limit_str = sprintf('inf %s', limits.(name).unit);
             end
         end
-        worst = vals(3);
-        if isnan(worst); worst = nanmax(vals); end
+        worst = max(vals(trio), [], 'omitnan');
         row_color = risk_color(worst, limit_val);
 
         html = [html sprintf('<tr class="row-%s">', row_color)];
         html = [html sprintf('<td><strong>%s</strong></td>', html_utils.escape(name))];
-        for v = 1:3
+        for v = 1:numel(vals)
             if isnan(vals(v))
                 html = [html '<td>N/A</td>'];
             else
@@ -588,8 +634,9 @@ function html = build_range_table(tables, variant_labels, metric_names)
             end
         end
 
-        % Range column
-        valid = vals(~isnan(vals));
+        % Range column: default and the metric's pair
+        valid = vals(trio);
+        valid = valid(~isnan(valid));
         if numel(valid) >= 2
             html = [html sprintf('<td>%.3g &ndash; %.3g</td>', min(valid), max(valid))];
         elseif numel(valid) == 1
@@ -614,12 +661,103 @@ function tf = is_layered_limits(metric_names)
 end
 
 %% ========================================================================
+%  PSEUDO-CT SKULL VS. BOUNDS
+%% ========================================================================
+
+function html = build_pct_bounds_section(parameters, variants, default_affix)
+% Histograms of the default variant's pseudo-CT skull properties (the
+% medium_stats cache of MEDIUM_SETUP, else PCT_PREDICT_SKULL_PROPERTIES) with
+% the band of the bound variants' homogeneous skull values.
+    stats_file = fullfile(parameters.io.dir_output, 'cache', sprintf('sub-%03d_%s_medium_stats%s.json', ...
+        parameters.subject_id, parameters.simulation.medium, default_affix));
+    if isfile(stats_file)
+        stats = jsondecode(fileread(stats_file));
+        origin = sprintf('mapped skull of the default run (%s)', html_utils.escape(stats_file));
+    else
+        stats = pct_predict_skull_properties(parameters, write=false);
+        origin = sprintf('predicted from the pseudo-CT (%s voxels), no medium_stats cache found', stats.source);
+    end
+
+    bounds = struct();
+    for v = variants(~strcmp({variants.name}, 'default'))
+        file = '';
+        if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'medium_files') && ...
+                isfield(parameters.uncertainty.medium_files, v.name)
+            file = parameters.uncertainty.medium_files.(v.name);
+        end
+        if isempty(file); file = uncertainty_medium_config(parameters, v.name); end
+        try
+            m = yaml.loadFile(char(file), 'ConvertToArray', true);
+            bounds.(v.name) = m.medium_properties.skull;
+        catch
+        end
+    end
+
+    props = {'density', 'Density [kg/m&#179;]'; 'sound_speed', 'Sound speed [m/s]'; ...
+             'alpha_coeff', 'Attenuation [dB/(cm&#183;MHz^y)]'};
+    html = ['<p style="font-size:0.85em;color:#64748b;margin:0 0 12px;">The default variant maps the skull ' ...
+        'from the pseudo-CT; the bound variants give the same skull voxels the homogeneous values of their ' ...
+        'medium file. Histogram: ' origin '. Shaded band: range of the bound variants'' skull values. ' ...
+        sprintf('Mapping: density %s, sound speed %s, attenuation %s.</p>', ...
+        html_utils.escape(char(stats.mapping.density)), html_utils.escape(char(stats.mapping.sound_speed)), ...
+        html_utils.escape(char(stats.mapping.attenuation)))];
+    html = [html '<div class="image-grid image-grid--3col">'];
+    for k = 1:size(props, 1)
+        key = props{k, 1};
+        vals = cellfun(@(n) bounds.(n).(key), fieldnames(bounds));
+        if isfield(stats.properties, key)
+            html = [html '<figure>' pct_histogram_svg(stats.properties.(key), vals, props{k, 2}) '</figure>']; %#ok<AGROW>
+        end
+    end
+    html = [html '</div>'];
+end
+
+function svg = pct_histogram_svg(dist, band_vals, x_label)
+% Inline SVG histogram with a shaded band [min, max] of band_vals and the
+% share of voxels in bins whose centre lies outside it.
+    W = 320; H = 200; pl = 10; pr = 10; pt = 22; pb = 34;
+    counts = double(dist.histogram.counts(:)');
+    edges  = double(dist.histogram.edges(:)');
+    lo = min(band_vals); hi = max(band_vals);
+    x0 = min([edges(1), lo]); x1 = max([edges(end), hi]);
+    if x1 <= x0; x1 = x0 + 1; end
+    pad = 0.04 * (x1 - x0); x0 = x0 - pad; x1 = x1 + pad;
+    sx = @(x) pl + (x - x0) / (x1 - x0) * (W - pl - pr);
+    cmax = max([counts, 1]);
+    sy = @(c) H - pb - c / cmax * (H - pt - pb);
+    svg = sprintf(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" ' ...
+        'style="width:100%%;height:auto;background:white;border-radius:4px;">'], W, H);
+    if ~isempty(band_vals)
+        svg = [svg sprintf('<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="#d98a1f" fill-opacity="0.22"/>', ...
+            sx(lo), pt, max(sx(hi) - sx(lo), 1.5), H - pt - pb)];
+    end
+    for i = 1:numel(counts)
+        svg = [svg sprintf('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#8d9db6"/>', ...
+            sx(edges(i)), sy(counts(i)), max(sx(edges(i+1)) - sx(edges(i)), 0.5), H - pb - sy(counts(i)))]; %#ok<AGROW>
+    end
+    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#cbd5e1"/>', pl, H - pb, W - pr, H - pb)];
+    for t = [x0 + pad, (x0 + x1) / 2, x1 - pad]
+        svg = [svg sprintf('<text x="%.1f" y="%d" text-anchor="middle" font-size="9" fill="#64748b">%.3g</text>', ...
+            sx(t), H - pb + 12, t)]; %#ok<AGROW>
+    end
+    svg = [svg sprintf('<text x="%d" y="%d" text-anchor="middle" font-size="10" fill="#475569">%s</text>', ...
+        W / 2, H - 4, x_label)];
+    if sum(counts) > 0 && ~isempty(band_vals)
+        centres = (edges(1:end-1) + edges(2:end)) / 2;
+        outside = sum(counts(centres < lo | centres > hi)) / sum(counts);
+        svg = [svg sprintf('<text x="%d" y="%d" text-anchor="end" font-size="10" fill="#1e293b">%.0f%% outside</text>', ...
+            W - pr, 14, 100 * outside)];
+    end
+    svg = [svg '</svg>'];
+end
+
+%% ========================================================================
 %  UNCERTAINTY TIMESERIES SVG PLOT
 %% ========================================================================
 
 function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, layer)
 % Build an inline SVG showing a timeseries metric with uncertainty band across
-% the three variants (liberal=1, default=2, conservative=3).
+% three variants (high=1, default=2, low=3; the Temp pair).
 %
 % metric  - field name in heating{v}.timeseries, e.g. 'T' or 'CEM43'
 % y_floor - lower y-axis bound (37 for temperature, 0 for CEM43)
@@ -694,7 +832,7 @@ function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, 
     x_scale = plot_w / max(n_pts - 1, 1);
     y_scale = plot_h / y_range;
 
-    % Band polygon: liberal (index 1) forward then conservative (index 3) backward
+    % Band polygon: high (index 1) forward then low (index 3) backward
     band_pts = '';
     for i = 1:n_pts
         x   = pad_l + (i-1) * x_scale;
@@ -764,12 +902,12 @@ function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, 
     if ~isempty(strtrim(band_pts))
         svg = [svg sprintf('<polygon points="%s" fill="#3b82f6" fill-opacity="0.15" stroke="none"/>', band_pts)];
     end
-    % Liberal (dashed red)
+    % High (dashed red)
     lib_pts = variant_pts(1);
     if ~isempty(strtrim(lib_pts))
         svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/>', lib_pts)];
     end
-    % Conservative (dashed gray)
+    % Low (dashed gray)
     cons_pts = variant_pts(3);
     if ~isempty(strtrim(cons_pts))
         svg = [svg sprintf('<polyline points="%s" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>', cons_pts)];
@@ -786,9 +924,9 @@ function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, 
     svg = [svg sprintf('<rect x="%d" y="%d" width="150" height="64" rx="3" fill="white" fill-opacity="0.85" stroke="#e2e8f0"/>', lx, ly)];
     svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#1d4ed8" stroke-width="2"/><text x="%d" y="%d" font-size="10" fill="#475569">Default</text>', ...
         lx+6, ly+16, lx+26, ly+16, lx+30, ly+20)];
-    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Liberal</text>', ...
+    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Temp-H</text>', ...
         lx+6, ly+32, lx+26, ly+32, lx+30, ly+36)];
-    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Conservative</text>', ...
+    svg = [svg sprintf('<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/><text x="%d" y="%d" font-size="10" fill="#475569">Temp-L</text>', ...
         lx+6, ly+48, lx+26, ly+48, lx+30, ly+52)];
     svg = [svg '</svg>'];
 
@@ -832,8 +970,8 @@ function timing = parse_timing_from_log(log_path)
     end
 end
 
-function html = build_timing_section(parameters, variant_affixes, variant_labels)
-% Build an HTML table showing per-step wall times across all five pipeline
+function html = build_timing_section(parameters, variants)
+% Build an HTML table showing per-step wall times across all pipeline
 % stages, using the pre-assigned log file paths in
 % parameters.uncertainty.log_files.
 % Returns empty string if no timing data is found.
@@ -842,20 +980,20 @@ function html = build_timing_section(parameters, variant_affixes, variant_labels
         html = '';
         return;
     end
-    lf = parameters.uncertainty.log_files;  % struct: stage1, default, liberal, conservative, report
+    lf = parameters.uncertainty.log_files;  % struct: stage1, report and one field per variant name
 
     % Stage 1: preprocessing steps (preproc, medium, source)
     t_stage1 = parse_timing_from_log(char(lf.stage1));
 
-    % Stages 2–4: simulation variants (acoustic, thermal, total pipeline)
-    % variant_affixes = {liberal, default, conservative}
-    t_variants = cell(1, 3);
-    variant_log_fields = {'liberal', 'default', 'conservative'};
-    for v = 1:3
-        t_variants{v} = parse_timing_from_log(char(lf.(variant_log_fields{v})));
+    % Stages 2–6: simulation variants (acoustic, thermal, total pipeline)
+    t_variants = cell(1, numel(variants));
+    for v = 1:numel(variants)
+        if isfield(lf, variants(v).name)
+            t_variants{v} = parse_timing_from_log(char(lf.(variants(v).name)));
+        end
     end
 
-    % Stage 5: report
+    % Stage 7: report
     t_report = parse_timing_from_log(char(lf.report));
 
     any_data = ~isempty(t_stage1) || any(~cellfun(@isempty, t_variants)) || ~isempty(t_report);
@@ -879,9 +1017,18 @@ function html = build_timing_section(parameters, variant_affixes, variant_labels
         'prestus_pipeline',  'Total (pipeline)',     'total';   ...
     };
 
-    % Column headers: Stage 1 | Liberal | Default | Conservative | Report
-    col_labels = [{'Stage 1'}, variant_labels, {'Report'}];
-    col_colors = {'#475569', '#1d4ed8', '#1e293b', '#92400e', '#475569'};
+    % Column headers: Stage 1 | one per variant | Report
+    col_labels = [{'Stage 1'}, {variants.label}, {'Report'}];
+    pair_colors = struct('temp', '#b91c1c', 'trans', '#1d4ed8');
+    col_colors = cell(1, numel(variants));
+    for v = 1:numel(variants)
+        if isempty(variants(v).pair)
+            col_colors{v} = '#1e293b';
+        else
+            col_colors{v} = pair_colors.(variants(v).pair);
+        end
+    end
+    col_colors = [{'#475569'}, col_colors, {'#475569'}];
 
     html = '<p style="font-size:0.82em;color:#64748b;margin:0 0 12px;">Wall times from pre-assigned log files for each pipeline stage. Steps skipped due to caching are shown as —.</p>';
     html = [html '<div style="overflow-x:auto"><table class="range-table" style="min-width:600px">'];
@@ -933,8 +1080,8 @@ function html = build_timing_section(parameters, variant_affixes, variant_labels
             html = [html '<td style="color:#e2e8f0">·</td>']; %#ok<AGROW>
         end
 
-        % Variant columns (liberal, default, conservative)
-        for v = 1:3
+        % Variant columns
+        for v = 1:numel(variants)
             if strcmp(src, 'variant') || strcmp(src, 'total')
                 html = [html cell_html(lookup(t_variants{v}, key))]; %#ok<AGROW>
             else
@@ -988,8 +1135,8 @@ newline ...
 '.safety-bar { height: 100%; border-radius: 2px; position: absolute; z-index: 1; }' newline ...
 '.safety-bar-marker { position: absolute; top: -5px; width: 4px; height: 14px; border-radius: 1px; transform: translateX(-50%); z-index: 2; }' newline ...
 '.safety-bar-marker--default      { background: #1e293b; }' newline ...
-'.safety-bar-marker--liberal      { background: #2563eb; }' newline ...
-'.safety-bar-marker--conservative { background: #92400e; }' newline ...
+'.safety-bar-marker--high         { background: #b91c1c; }' newline ...
+'.safety-bar-marker--low          { background: #2563eb; }' newline ...
 '.safety-bar-limit { position: absolute; top: -3px; width: 2px; height: 10px; background: #94a3b8; border-radius: 0; transform: translateX(-50%); z-index: 1; border-left: 1px dashed #64748b; }' newline ...
 '.safety-green .safety-bar { background: var(--green); }' newline ...
 '.safety-amber .safety-bar { background: var(--amber); }' newline ...

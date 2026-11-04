@@ -48,10 +48,10 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             out = uncertainty_pipeline(p);
             jobs = recorded();
             base = p.io.output_affix;
-            variants = {base, [base '_desc-liberal'], [base '_desc-conservative']};
+            [name, variants, heating] = variant_list(base);
 
-            % 1 stage-1 + 3 x (acoustic + 2 thermal + summary) + 2 reports
-            tc.verifyNumElements(jobs, 15);
+            % 1 stage-1 + 5 x (acoustic + 2 per-point + summary) + 2 reports
+            tc.verifyNumElements(jobs, 23);
             tc.verifyEqual(sort(out.all), sort(cellfun(@(j) j.id, jobs)), ...
                 'every submitted job is returned to the caller');
             verify_no_reentry(tc, jobs);
@@ -62,8 +62,7 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             tc.verifyTrue(all(isnan(s1{1}.targets{1})), 'stage 1 must not carry the sweep');
 
             all_variant_ids = s1{1}.id;
-            for v = 1:3
-                name = {'default', 'liberal', 'conservative'};
+            for v = 1:numel(name)
                 ac = find_jobs(jobs, sprintf('u%d-%s-mi1-acoustic', v + 1, name{v}));
                 tc.verifyNumElements(ac, 1);
                 tc.verifyEqual(ac{1}.depend, s1{1}.id, 'acoustic waits for stage 1');
@@ -78,6 +77,8 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
                     tc.verifyEqual(th{k}.preproc_affix, '');
                     tc.verifyEqual(th{k}.medium_affix, variants{v});
                     tc.verifyTrue(isscalar(th{k}.targets{1}));
+                    tc.verifyEqual(logical(th{k}.modules.run_heating_sims), heating(v), ...
+                        sprintf('%s: heating only for the default and Temp variants', name{v}));
                 end
                 tc.verifyEqual(sort(cellfun(@(j) j.output_affix, th, 'UniformOutput', false)), ...
                     sort({[variants{v} '_desc-isppa010'], [variants{v} '_desc-isppa030']}));
@@ -86,7 +87,7 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
                 all_variant_ids = [all_variant_ids, ac{1}.id, cellfun(@(j) j.id, th), sm{1}.id]; %#ok<AGROW>
             end
 
-            reports = find_jobs(jobs, 'u5-report');
+            reports = find_jobs(jobs, 'u7-report');
             tc.verifyNumElements(reports, 2);
             suffixes = sort(cellfun(@(j) j.report_suffix, reports, 'UniformOutput', false));
             tc.verifyEqual(suffixes, {[base '_desc-isppa010'], [base '_desc-isppa030']}, ...
@@ -97,8 +98,9 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
                 tc.verifyEqual(sort(r.depend), sort(all_variant_ids), ...
                     'each report waits for every variant job');
                 tc.verifyEqual(r.report_affixes.default, r.report_suffix);
-                tc.verifyEqual(r.report_affixes.liberal, [variants{2} point]);
-                tc.verifyEqual(r.report_affixes.conservative, [variants{3} point]);
+                for v = 2:numel(name)
+                    tc.verifyEqual(r.report_affixes.(name{v}), [variants{v} point]);
+                end
                 tc.verifyEqual(r.modules.run_grid_setup, 0);
                 tc.verifyTrue(all(isnan(r.targets{1})));
             end
@@ -113,17 +115,16 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             uncertainty_pipeline(p);
             jobs = recorded();
             base = p.io.output_affix;
-            variants = {base, [base '_desc-liberal'], [base '_desc-conservative']};
+            [name, variants, heating] = variant_list(base);
 
-            % No stage 1; 3 x (preproc + 2 acoustic + 2 combine + 2 joint) + 2 reports
-            tc.verifyNumElements(jobs, 23);
+            % No stage 1; 5 x (preproc + 2 acoustic + 2 combine + 2 joint) + 2 reports
+            tc.verifyNumElements(jobs, 37);
             verify_no_reentry(tc, jobs);
             verify_unique_names(tc, jobs);
             tc.verifyEmpty(find_jobs(jobs, 'u1-preproc'));
 
             variant_ids = [];
-            name = {'default', 'liberal', 'conservative'};
-            for v = 1:3
+            for v = 1:numel(name)
                 vj = find_jobs(jobs, sprintf('u%d-%s-at', v + 1, name{v}));
                 tc.verifyNumElements(vj, 7);
                 pp = find_jobs(vj, '-pp_');
@@ -139,10 +140,12 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
                 th = find_jobs(vj, '-th');
                 tc.verifyEqual(sort(cellfun(@(j) j.output_affix, th, 'UniformOutput', false)), ...
                     sort({[variants{v} '_desc-asyncJointS01'], [variants{v} '_desc-asyncJointS02']}));
+                tc.verifyEqual(cellfun(@(j) logical(j.modules.run_heating_sims), th), ...
+                    repmat(heating(v), 1, 2), sprintf('%s: joint jobs heat only for default and Temp', name{v}));
                 variant_ids = [variant_ids, cellfun(@(j) j.id, vj)]; %#ok<AGROW>
             end
 
-            reports = find_jobs(jobs, 'u5-report');
+            reports = find_jobs(jobs, 'u7-report');
             tc.verifyNumElements(reports, 2);
             for k = 1:2
                 tc.verifyEqual(sort(reports{k}.depend), sort(variant_ids));
@@ -156,11 +159,12 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             p.transducer(1).target_isppa_wcm2 = [10 30];
             uncertainty_pipeline(p);
             jobs = recorded();
-            tc.verifyNumElements(jobs, 15);
+            tc.verifyNumElements(jobs, 23);
             verify_no_reentry(tc, jobs);
             kinds = cellfun(@stage_kind, jobs, 'UniformOutput', false);
             tc.verifyEqual(kinds, [{'stage1'}, ...
                 repmat({'acoustic', 'thermal', 'thermal', 'summary'}, 1, 3), ...
+                repmat({'acoustic', 'point', 'point', 'summary'}, 1, 2), ...
                 {'report', 'report'}]);
         end
 
@@ -176,7 +180,7 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             p.transducer(1).target_isppa_wcm2 = [10 30];
             prestus_pipeline_start(p);
             jobs = recorded();
-            tc.verifyNumElements(jobs, 15);
+            tc.verifyNumElements(jobs, 23);
             tc.verifyEqual(stage_kind(jobs{1}), 'stage1');
             tc.verifyEqual(stage_kind(jobs{end}), 'report');
         end
@@ -202,13 +206,65 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             p = base_parameters(tc.TmpDir, 'slurm');
             uncertainty_pipeline(p);
             jobs = recorded();
-            tc.verifyNumElements(jobs, 5);
+            tc.verifyNumElements(jobs, 7);
             verify_no_reentry(tc, jobs);
-            r = find_jobs(jobs, 'u5-report');
+            r = find_jobs(jobs, 'u7-report');
             tc.verifyNumElements(r, 1);
             tc.verifyEqual(r{1}.report_suffix, p.io.output_affix, ...
                 'report named after the base affix');
             tc.verifyEqual(r{1}.modules.run_grid_setup, p.modules.run_grid_setup);
+        end
+
+        function plainVariantsMediumAndHeating(tc)
+            % One job per variant: its medium file is merged in, and only the
+            % default and Temp variants run heating.
+            p = base_parameters(tc.TmpDir, 'slurm');
+            uncertainty_pipeline(p);
+            jobs = recorded();
+            [name, variants, heating] = variant_list(p.io.output_affix);
+            folder = fullfile(get_prestus_path(), 'config', 'uncertainty');
+            for v = 1:numel(name)
+                sim = find_jobs(jobs, sprintf('u%d-sim-%s_', v + 1, name{v}));
+                tc.assertNumElements(sim, 1, name{v});
+                tc.verifyEqual(sim{1}.output_affix, variants{v});
+                tc.verifyEqual(logical(sim{1}.modules.run_heating_sims), heating(v), name{v});
+                tc.verifyEqual(logical(sim{1}.modules.run_thermal_analysis), heating(v), name{v});
+                if v > 1
+                    file = yaml.loadFile(fullfile(folder, ['config_medium_' name{v} '.yaml']), ...
+                        'ConvertToArray', true);
+                    tc.verifyEqual(sim{1}.p.medium_properties.skull.sound_speed, ...
+                        file.medium_properties.skull.sound_speed, name{v});
+                    tc.verifyEqual(sim{1}.p.medium_properties.brain.alpha_power, 1, name{v});
+                end
+            end
+        end
+
+        function pctOnlyInDefaultVariant(tc)
+            % With a pseudo-CT, the bound variants keep the shared head
+            % geometry (pct stays enabled) but model a homogeneous skull.
+            p = base_parameters(tc.TmpDir, 'slurm');
+            p.pct.enabled = 1;
+            uncertainty_pipeline(p);
+            jobs = recorded();
+            [name, ~, ~] = variant_list(p.io.output_affix);
+            for v = 1:numel(name)
+                sim = find_jobs(jobs, sprintf('u%d-sim-%s_', v + 1, name{v}));
+                tc.assertNumElements(sim, 1, name{v});
+                tc.verifyEqual(sim{1}.p.pct.enabled, 1, name{v});
+                tc.verifyEqual(pct_skull_mapped(sim{1}.p), v == 1, name{v});
+            end
+            r = find_jobs(jobs, 'u7-report');
+            tc.verifyEqual(sort(fieldnames(r{1}.p.uncertainty.medium_files)), sort(name(2:end))');
+        end
+
+        function legacyOptionsError(tc)
+            p = base_parameters(tc.TmpDir, 'slurm');
+            tc.verifyError(@() uncertainty_pipeline(p, struct('liberal_config', 'x.yaml')), ...
+                'uncertainty_pipeline:legacyVariant');
+            tc.verifyError(@() uncertainty_pipeline(p, struct('affixes', ...
+                struct('default', '', 'liberal', '_l', 'conservative', '_c'))), ...
+                'uncertainty_pipeline:legacyVariant');
+            tc.verifyEmpty(recorded(), 'nothing may be submitted before the error');
         end
 
         function predictOutputsNested(tc)
@@ -218,7 +274,7 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             tc.verifyEqual(plan.mode, 'uncertainty');
             tc.verifyEqual(plan.nested, 'multi_isppa');
             names = {plan.artifacts.name};
-            tc.verifyNumElements(names, 17);
+            tc.verifyNumElements(names, 27);
             tc.verifyTrue(any(strcmp(names, sprintf( ...
                 'sub-001_%s_desc-uncertainty_report%s_desc-isppa030.html', ...
                 p.simulation.medium, p.io.output_affix))));
@@ -234,6 +290,14 @@ end
 % ======================================================================
 %% Fixtures
 % ======================================================================
+
+function [names, affixes, heating] = variant_list(base)
+% Variant names, output affixes and heating flags in run order.
+    v = uncertainty_variants();
+    names   = {v.name};
+    affixes = cellfun(@(d) [base d], {v.desc}, 'UniformOutput', false);
+    heating = [v.heating];
+end
 
 function p = base_parameters(tmp, platform)
     p = make_minimal_parameters(fullfile(tmp, 'sims'));
@@ -339,6 +403,8 @@ function kind = stage_kind(j)
         kind = 'acoustic';
     elseif m.run_heating_sims
         kind = 'thermal';
+    elseif isfield(m, 'generate_report') && m.generate_report
+        kind = 'point';     % acoustic-only per-point job (Trans variants)
     else
         kind = 'stage1';
     end
