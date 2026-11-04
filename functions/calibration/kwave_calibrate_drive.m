@@ -35,9 +35,9 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
 %                        Without platform: SLURM/qsub if detected, else local.
 %     .WorkDir         - scratch folder (default tempdir/prestus_kwave_drive/<key>)
 %     .Axisymmetric    - use a 2D axisymmetric grid unless SimConfig sets
-%                        grid.axisymmetric (default false: the axisymmetric
-%                        free-water grid currently puts the focus far short
-%                        of the target; see doc_calibration.md)
+%                        grid.axisymmetric (default false: 3D removes the
+%                        drive error; the axisymmetric grid is faster but
+%                        leaves up to about 3 %; see doc_calibration.md)
 %     .GridDims        - free-water grid: 'auto' (sized to the aperture and
 %                        focal depth, WATER_GRID_DIMS) or [Nx Ny Nz] / [Nlat Nax];
 %                        default: SimConfig's grid.default_dims, else config_default
