@@ -1,231 +1,169 @@
-# Installation Guide
+# Installation
 
 !!! note "At a glance"
-    - **What:** What you need depends on how far you go: MATLAB, PRESTUS and k-Wave are enough for a free-water simulation; SimNIBS adds head simulations; the Python environments further down are only for optional features.
+    - **What:** MATLAB, PRESTUS and k-Wave are enough for a free-water simulation. SimNIBS adds head simulations. The Python environments further down are for optional features only.
     - **When you need it:** Before your [first simulation](doc_getting-started.md).
-    - **Before you start:** MATLAB (R2023b is the current default; see below). Installing SimNIBS takes the most time, so start with the free-water simulation if you only want to try PRESTUS.
+    - **Before you start:** MATLAB R2023b (other versions may work; R2023b is the tested default). Installing SimNIBS takes the most time, so start with the free-water simulation if you only want to try PRESTUS.
 
-## PRESTUS installation
+## What you need
 
-Download and install these tools:
+| Component | Needed for | Where it comes from |
+|---|---|---|
+| MATLAB R2023b | Everything | MathWorks. More recent versions can cause issues on HPCs with GPUs. |
+| PRESTUS with its submodules (k-Wave 1.4.1, export_fig, FEX-minimize, xml2struct) | Everything | The recursive clone below |
+| SimNIBS 4 | Head simulations (segmentation with `charm`) | [SimNIBS installation](#simnibs-installation) |
+| k-Wave C++ binaries | `cpp_cpu` and `cpp_gpu` code types | [Optional: C++ binaries](#optional-c-binaries) |
+| Python environments | BabelBrain or jwave backends, PlanTUS and TUS_entry placement, the Nexus | [Optional components](#optional-components) |
 
-- `MATLAB (R2023b)`. Other versions may work as well, but R2023b is the current default deployment. Especially on HPCs with GPUs, more recent MATLAB versions can cause issues. The HPC scripts currently hardcode the MATLAB R2023b module on the Donders HPC.
-- [`SimNIBS 4`](https://github.com/simnibs/simnibs) (see [SimNIBS installation](#simnibs-installation))
-- external | They are automatically included as submodules if this repository is recursively cloned (see below). They must be added on MATLAB startup.
-    - [`k-Wave (1.4.1)`](https://github.com/ucl-bug/k-wave.git). While k-Wave 1.4 is supported, version 1.4.1 (currently [GitHub exclusive](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) introduced GPU support for thermal simulations with kWaveDiffusion. We therefore recommend cloning k-Wave 1.4.1 from GitHub.
-    - [`export_fig`](https://github.com/altmany/export_fig)
-    - [`FEX-minimize`](https://github.com/rodyo/FEX-minimize.git)
-    - [`xml2struct`](https://github.com/joe-of-all-trades/xml2struct)
+## Install PRESTUS
 
-Major dependencies are included as submodules in the toolbox folder. 
-If you clone this repository, you can retrieve the submodules as follows:
-```
+Clone the repository with its submodules. This fetches k-Wave and the other MATLAB dependencies into `external/`:
+
+```bash
 git clone --recurse-submodules https://github.com/Donders-Institute/PRESTUS.git
-```
-
-If you want to recursively clone the `development` branch, you can use the following command:
-```
+# or the development branch:
 git clone --recurse-submodules -b development https://github.com/Donders-Institute/PRESTUS.git
 ```
 
-*Note: If you do not clone this repository, you must manually download the external dependencies listed above, and place them in the respective PRESTUS subdirectory.*
+Then add PRESTUS to the MATLAB path at the start of every session, as `simple_main.m` does:
 
-If you cloned this repository in the past, and updated it, you can retrieve submodules as follows:
-```
-cd PRESTUS
-git submodule init
-git submodule update
+```matlab
+addpath(genpath('functions')); addpath(genpath('config')); addpath(genpath('external'));
 ```
 
-Ensure that the paths and subfolders are added in MATLAB. See `simple_main.m` for an example.
+That is all a free-water simulation needs. Continue with [Your first simulation](doc_getting-started.md) and come back here for SimNIBS when you want a head simulation.
 
-#### Donders Institute HPC Cluster
+??? note "Details: submodules and manual downloads"
+    k-Wave 1.4 is supported, but version 1.4.1 (currently [GitHub only](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) adds GPU support for thermal simulations with `kWaveDiffusion`, so the submodule points there. If you updated an existing clone, fetch the submodules with:
 
-When working on the Donders High-Performance-Computing cluster, PRESTUS and its dependencies (SimNIBS, k-Wave) are already installed. Note that this may not be the most recent version of either the `main` or `development` branch.
+    ```bash
+    cd PRESTUS
+    git submodule init
+    git submodule update
+    ```
 
-Load a SimNIBS module (`module avail simnibs` lists the installed versions; add the `module load` line to your `.bashrc` to load it at login) and add an installed PRESTUS version to your MATLAB path, e.g. `addpath('/opt/prestus/dev')` (`ls /opt/prestus` lists the versions). The centrally installed versions lag behind `main` and `development`; for current features, clone PRESTUS yourself as described above.
+    Without git, download [k-Wave](https://github.com/ucl-bug/k-wave.git), [export_fig](https://github.com/altmany/export_fig), [FEX-minimize](https://github.com/rodyo/FEX-minimize.git) and [xml2struct](https://github.com/joe-of-all-trades/xml2struct) yourself and place them in the matching `external/` subfolders.
 
-For more information on HPC usage, see the [HPC guide](doc_hpc.md)
+??? note "Details: Donders Institute HPC cluster"
+    On the Donders HPC, PRESTUS and its dependencies (SimNIBS, k-Wave) are installed centrally, but these versions lag behind `main` and `development`. Load a SimNIBS module (`module avail simnibs` lists them; put the `module load` line in your `.bashrc`) and add an installed PRESTUS to your MATLAB path, e.g. `addpath('/opt/prestus/dev')` (`ls /opt/prestus` lists the versions). For current features, clone PRESTUS yourself as above. The example dataset can be copied to your home directory:
 
-If you want to get started with simulations, you can use the PRESTUS example dataset. This command will copy the dataset to your home directory:
+    ```bash
+    cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
+    ```
 
-```
-cp /opt/prestus/example_data/PRESTUS_example_data.zip ${HOME}
-```
-
-#### [Optional: Download C++ binaries]
-
-For the `cpp_cpu` and `cpp_gpu` modes, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them into `k-Wave/binaries/`; see also the instructions [here](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php).
-
-For more information on installing, (potentially) compiling, and specifying C++ binaries, see [the backend documentation](doc_backend.md).
-
-## Python and conda environments
-
-PRESTUS itself is MATLAB, but several optional parts run in their own Python (or R) environment. Keep them separate: their dependencies conflict, and most are only needed on the machine that runs that part.
-
-| Environment | Needed for | Create with | Where PRESTUS finds it |
-|---|---|---|---|
-| SimNIBS (e.g. `simnibs_v4.6.0`, or `PRESTUS_env_4.6.0` incl. PlanTUS and Workbench) | Head segmentation (`charm`), PlanTUS placement | `examples/setup_PRESTUS_env.sh` or the SimNIBS `environment_linux.yml` (see [below](#simnibs-installation)) | `simnibs_bin_path` |
-| BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([doc_babelbrain.md](doc_babelbrain.md)) | `babelbrain.python_env` |
-| jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([doc_jwave.md](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
-| `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([doc_placement.md](doc_placement.md)) | `placement.tus_entry.env_path` |
-| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `conda env create -f nexus/environment.yml` ([doc_nexus.md](doc_nexus.md#installation)) | `prestus_nexus(Python='<env>/bin/python')`; default `python3` |
-
-The Nexus runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
+    The HPC scripts hardcode the MATLAB R2023b module. See [Running on a cluster](doc_hpc.md).
 
 ## SimNIBS installation
 
-You additionally need to install [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4). We recommend installing SimNIBS within an **anaconda environment** (especially on HPC clusters that often constrict individual user permissions). This allows for the flexible installation of multiple SimNIBS versions.
-You can follow the [official installation guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
+Head simulations need [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) for the `charm` segmentation. Install it in its own conda environment; this also works on clusters that restrict user permissions and lets several SimNIBS versions coexist.
 
-#### Automated setup script
-
-For convenience, an example bash script is provided that creates a self-contained `PRESTUS_env_4.6.0` conda environment with SimNIBS and all optional dependencies (PlanTUS, Connectome Workbench) in one step:
+The quickest route is the setup script in `examples/`, which creates a `PRESTUS_env_4.6.0` environment with SimNIBS and the optional PlanTUS and Connectome Workbench dependencies in one step:
 
 ```bash
 bash examples/setup_PRESTUS_env.sh
 ```
 
 Optional flags:
-- `--no-plantus` — skip PlanTUS Python dependencies (`nilearn`, `vtk`, `h5py`)
-- `--no-workbench` — skip Connectome Workbench (e.g. if `wb_command` is available as an HPC module)
 
-The script prints the exact `simnibs_bin_path` and `env_path` values to add to your PRESTUS config once complete.
+- `--no-plantus`: skip the PlanTUS Python packages (`nilearn`, `vtk`, `h5py`)
+- `--no-workbench`: skip Connectome Workbench (e.g. when `wb_command` is available as an HPC module)
 
-The following is a step-by-step guide to install SIMNIBS on the Linux computing cluster. Some steps and filepaths may differ between computing environments.
+When it finishes, the script prints the `simnibs_bin_path` and `env_path` values to put in your config. Alternatively, follow the [official conda guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
 
-1. Log in to the cluster
-2. Open terminal
-3. Start an interactive session to come into another execution node (change walltime and memory as needed)  
-    
-    QSUB: `qsub -I -X -N 'simnibs' -l walltime=01:00:00,mem=8g` 
-    SLURM (Donders default): `srun --pty --x11 -J simnibs -t 1:00:00 --mem=8G bash` 
+### Specifying SimNIBS paths in PRESTUS
 
-4. Download the environment for the desired SIMNIBS version to your home directory (i.e., `/home/neuromod/USER`)
+Tell PRESTUS where the environment is, in the config or in MATLAB:
 
-    `wget https://github.com/simnibs/simnibs/releases/download/v4.6.0/environment_linux.yml -O ~/environment_linux_v4.6.0.yml`. This includes dependencies such as Python, MATLAB Runtime, and other prerequisites.
-
-    <br>
-
-    > **SimNIBS environment versions**
-    Multiple SimNIBS 4+ environment versions are available: 
-    https://github.com/simnibs/simnibs/releases/download/v4.0.0/environment_linux.yml   
-    https://github.com/simnibs/simnibs/releases/download/v4.1.0/environment_linux.yml   
-    https://github.com/simnibs/simnibs/releases/download/v4.5.0/environment_linux.yml   
-    https://github.com/simnibs/simnibs/releases/download/v4.6.0/environment_linux.yml   
-    To download the latest environment, select the following:   
-    https://github.com/simnibs/simnibs/releases/latest/download/environment_linux.yml   
-
-    <br>
-
-5. Navigate to your home directory (i.e., `cd ~`)
-6. Load the anaconda environment    
-
-    e.g., `module load anaconda3/2020.07`   
-
-7. Create the anaconda environment
-
-    `conda env create -f ~/environment_linux_v4.6.0.yml -n simnibs_v4.6.0`
-    
-    This will create an environment in `~/.conda/envs/`.    
-
-8. Activate the simnibs environment 
-
-    `source activate simnibs_v4.6.0`    
-
-9. Install the desired SimNIBS version
-
-    `pip install https://github.com/simnibs/simnibs/releases/download/v4.6.0/simnibs-4.6.0-cp311-cp311-linux_x86_64.whl` 
-    
-    <br>
-    
-    > **SimNIBS versions**  
-    Multiple SimNIBS 4+ LINUX versions are available:   
-    https://github.com/simnibs/simnibs/releases/download/v4.0.0/simnibs-4.0.0-cp39-cp39-linux_x86_64.whl    
-    https://github.com/simnibs/simnibs/releases/download/v4.1.0/simnibs-4.1.0-cp39-cp39-linux_x86_64.whl    
-    https://github.com/simnibs/simnibs/releases/download/v4.5.0/simnibs-4.5.0-cp311-cp311-linux_x86_64.whl  
-    https://github.com/simnibs/simnibs/releases/download/v4.6.0/simnibs-4.6.0-cp311-cp311-linux_x86_64.whl  
-    To download the latest environment, select the following:   
-    https://github.com/simnibs/simnibs/releases/latest  
-
-    <br>
-
-10. [Optional] To setup menu icons, file association, the MATLAB library, and add SimNIBS to the system path, run the postinstall_simnibs script
-
-    ```
-    mkdir $HOME/SimNIBS_v4.6.0
-    postinstall_simnibs --setup-links -d $HOME/SimNIBS_v4.6.0
-    ```
-
-#### [Optional: Starting SimNIBS after first installation]
-
-Exit out of everything and following the steps below for starting SimNIBS after first installation to check whether installation was successful. If installation was successful you should now be able to see the SimNIBS gui.
-
-1. Start an interactive session (see Step 3 [above](#simnibs-installation))
-2. `module load anaconda3/2020.07`
-3. `source activate simnibs_v4.6.0`
-4. `simnibs_gui`
-5. To close the virtual SimNIBS environment: `conda deactivate`
-
-#### Specifying SimNIBS paths in PRESTUS
-
-In PRESTUS, specify (in the config, or in MATLAB as below) the path to the SimNIBS binaries and, if needed, the path to shared libraries for GCC 7.2.0:
-```
+```matlab
 parameters.startup.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.conda', 'envs', 'simnibs_v4.6.0', 'bin');
 parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";   % only if charm reports 'undefined symbol' errors
 ```
 
-#### [Optional: PlanTUS dependencies]
+??? note "Details: manual SimNIBS installation on a Linux cluster"
+    Some steps and paths differ between clusters.
 
-If you intend to use the `PLANTUS` transducer placement mode, additional Python packages are required in the SimNIBS environment. These are not included in the default SimNIBS installation.
+    1. Log in and start an interactive session (adjust walltime and memory):
 
-Activate the SimNIBS environment and install the missing packages:
+        QSUB: `qsub -I -X -N 'simnibs' -l walltime=01:00:00,mem=8g`
+        SLURM (Donders default): `srun --pty --x11 -J simnibs -t 1:00:00 --mem=8G bash`
+
+    2. Download the environment file for the SimNIBS version you want to your home directory:
+
+        `wget https://github.com/simnibs/simnibs/releases/download/v4.6.0/environment_linux.yml -O ~/environment_linux_v4.6.0.yml`
+
+        Other versions: replace `v4.6.0` with `v4.0.0`, `v4.1.0` or `v4.5.0`, or use `https://github.com/simnibs/simnibs/releases/latest/download/environment_linux.yml`.
+
+    3. Load anaconda and create the environment (it lands in `~/.conda/envs/`):
+
+        ```bash
+        module load anaconda3/2020.07
+        conda env create -f ~/environment_linux_v4.6.0.yml -n simnibs_v4.6.0
+        source activate simnibs_v4.6.0
+        ```
+
+    4. Install SimNIBS into it:
+
+        `pip install https://github.com/simnibs/simnibs/releases/download/v4.6.0/simnibs-4.6.0-cp311-cp311-linux_x86_64.whl`
+
+        Other wheels: `v4.0.0` and `v4.1.0` are `cp39`, `v4.5.0` and `v4.6.0` are `cp311`; see the [releases](https://github.com/simnibs/simnibs/releases/latest).
+
+    5. Optional: menu icons, file associations, the MATLAB library and the system path:
+
+        ```bash
+        mkdir $HOME/SimNIBS_v4.6.0
+        postinstall_simnibs --setup-links -d $HOME/SimNIBS_v4.6.0
+        ```
+
+    To check the installation later: start an interactive session, `module load anaconda3/2020.07`, `source activate simnibs_v4.6.0`, `simnibs_gui`. The SimNIBS window should open. `conda deactivate` leaves the environment.
+
+## Optional components
+
+PRESTUS itself is MATLAB, but several optional parts run in their own Python (or R) environment. Keep them separate: their dependencies conflict, and most are only needed on the machine that runs that part.
+
+| Environment | Needed for | Create with | Where PRESTUS finds it |
+|---|---|---|---|
+| SimNIBS (e.g. `simnibs_v4.6.0`, or `PRESTUS_env_4.6.0` incl. PlanTUS and Workbench) | Head segmentation (`charm`), PlanTUS placement | `examples/setup_PRESTUS_env.sh` or the SimNIBS `environment_linux.yml` (see [above](#simnibs-installation)) | `simnibs_bin_path` |
+| BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([BabelBrain](doc_babelbrain.md)) | `babelbrain.python_env` |
+| jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([jwave](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
+| `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([Placement](doc_placement.md)) | `placement.tus_entry.env_path` |
+| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `conda env create -f nexus/environment.yml` ([Nexus](doc_nexus.md#installation)) | `prestus_nexus(Python='<env>/bin/python')`; default `python3` |
+
+The Nexus runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
+
+### Optional: C++ binaries
+
+For the `cpp_cpu` and `cpp_gpu` code types, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). Compiling and selecting binaries is described in [Backends](doc_backend.md).
+
+### Optional: PlanTUS dependencies
+
+The `plantus` placement mode needs extra Python packages in the SimNIBS environment (the setup script installs them unless `--no-plantus` was given):
 
 ```bash
 source activate simnibs_v4.6.0
 pip install nilearn vtk h5py pynput
-```
-
-Verify the installation:
-
-```bash
 python -c "import nilearn; import vtk; import h5py; import pynput; print('PlanTUS dependencies OK')"
 ```
 
-#### [Optional: Defacing dependencies]
+PlanTUS also needs `wb_command` (Connectome Workbench). Without it PlanTUS only warns, but intermediate files are not created and the pipeline fails. Either install it into the SimNIBS environment, where PRESTUS finds it in the environment's `bin/` without further settings:
 
-If you intend to use MRI defacing (`segmentation.deface: 1`), `pydeface` must be installed in the SimNIBS environment:
+```bash
+conda install -c conda-forge connectome-workbench
+```
+
+or, on a cluster where Workbench is a module that MATLAB's Python subprocess does not see, point PRESTUS at its binary folder:
+
+```yaml
+placement:
+  plantus:
+    connectome_wb_path: "/path/to/workbench/bin_linux64"
+```
+
+### Optional: defacing
+
+MRI defacing (`segmentation.deface: 1`) needs `pydeface` in the SimNIBS environment:
 
 ```bash
 source activate simnibs_v4.6.0
 pip install pydeface
-```
-
-Verify the installation:
-
-```bash
 python -c "import pydeface; print('pydeface OK')"
-pydeface --help
 ```
-
-> **Note on `wb_command`**  
-> PlanTUS also requires `wb_command` (Connectome Workbench) for surface processing and volume operations (e.g. `volume-fill-holes`). Although PlanTUS only prints a warning when it is missing rather than aborting immediately, the absence of `wb_command` causes intermediate files to not be created and the pipeline will fail.
->
-> **Option 1 — Install into the conda environment (recommended):**  
-> If you install `connectome-workbench` into the same environment as SimNIBS (e.g. `PRESTUS_env_4.6.0`), no additional path configuration is needed. PRESTUS automatically searches the environment's `bin/` directory:
-> ```bash
-> conda install -c conda-forge connectome-workbench
-> ```
->
-> **Option 2 — Load as an HPC module and specify the path in PRESTUS:**  
-> On HPC clusters, Connectome Workbench is often available as a module but may not be loaded when MATLAB spawns the Python subprocess. Set `connectome_wb_path` to the directory containing the `wb_command` binary:
-> ```yaml
-> placement:
->   plantus:
->     connectome_wb_path: "/path/to/workbench/bin_linux64"
-> ```
-> or in MATLAB:
-> ```matlab
-> parameters.placement.plantus.connectome_wb_path = '/path/to/workbench/bin_linux64';
-> ```
-> To find the correct path after loading the module: `module load connectome-workbench && which wb_command`.

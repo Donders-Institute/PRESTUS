@@ -5,52 +5,72 @@
     - **When you need it:** After a session, to simulate where the transducer actually was.
     - **Before you start:** Localite exports of the session and the planning T1 that was loaded into Localite.
 
-Extracting neuronavigation coordinates for post-hoc ultrasound simulations is critical to verify and predict the focus of the realized stimulation sites during neuromodulation experiments. Neuronavigation systems provide spatial tracking of the ultrasound transducer position relative to the individual subject’s anatomy in real-time. 
+PRESTUS reads transducer poses recorded with the Localite neuronavigation system and simulates them post hoc, to verify the focus of the realised stimulation. An example demo (without data) is in `examples/demo_localite.m`.
 
-PRESTUS provides functions that aim to facilitate the read-in and preprocessing of positions recorded with the Localite system. 
-To get started, see an example demo (without provided data) in `/examples/demo_localite.m`.
+Localite data pass through two stages. **Ingestion** (`neuronav_gui`, or `neuronav_ingest_markers` in a script; see [GUI and script workflows](doc_placement_neuronav_workflows.md)) reads the raw exports of one subject and session, averages each recorded series and writes one normalised file pair. **Placement** (`placement.mode: 'localite'`) reads that pair, or in file mode a single XML you point to.
 
-Three Localite XML file types are supported. All are parsed via the same pipeline (`neuronav_compute_series_statistics`), which handles single markers, repeated trigger trains, and multi-position recordings uniformly.
+## Placing the transducer from a recorded pose
 
-<details markdown>
-<summary>Localite XML file formats — TriggerMarkers, GUMMarkers, InstrumentMarker</summary>
+Set `placement.mode: 'localite'`. The pose's column 4 (position) and column 1 (beam direction) become the transducer and focus positions.
 
-### `TriggerMarkers`
+!!! warning "Focal distance required"
+    `transducer.focal_distance_ep` (or `focal_distance_bowl`) must be set for Localite placement; `config_default.yaml` ships it as `[]`. Other placement modes derive it from `trans_pos`/`focus_pos`, but here those positions are what the step produces. If neither is set, `localite_matrix_to_positions` raises `PRESTUS:localite:missingConfig` naming the missing field. The same check covers `placement.mode = 'plantus'`, which resolves its final position through the same function.
 
-Multiple triggers can be sent during stimulation to acquire updates to the transducer location over time. Files are named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations are averaged within each position series (identified by time-gap segmentation). Multiple positions per recording session are supported.
+### Automatic mode: ingested markers
 
-### `GUMMarkers`
+Leave `placement.localite.file` empty. The ingested pair under `path.localite_post` is read. If it does not exist yet and `path.localite_raw` is set, ingestion runs first (with `neuronav.coil_map` if configured, otherwise for the requested series only, named `series_<position>` or `target`).
 
-These files contain one or more static marker positions. Each `Element` in the file is expected to be of type `EntryTargetPair` (with a `Target/Marker/ColVec3D` position and a `Rotation/RotationReference/ColVec3D` beam direction), from which a synthetic 4×4 matrix is constructed.
+```yaml
+path:
+  localite_raw:  '/data/localite_raw'
+  localite_post: '/data/derivatives/localite'
+placement:
+  mode: 'localite'
+  localite:
+    session: 2          # -> ses-02
+    target: 'L_MD'      # ingested target name, or leave '' and use:
+    position: 2         # detected-series index, matched against series_index in the JSON sidecar
+```
 
-> **Mixed-type GUMMarkers files.** Some Localite versions write a `GUMMarkerList` file that mixes `EntryTargetPair` and `InstrumentMarker` elements (`type="InstrumentMarker"` on the `Element` tag). Each element becomes its own series: `InstrumentMarker` elements keep their recorded 4×4 pose, `EntryTargetPair` elements the synthesized matrix. Only the former are instrument poses; placement refuses an `EntryTargetPair` series (`PRESTUS:localite:notAPose`).
+To choose series and names interactively, ingest with `neuronav_gui` first; placement then only reads the result. A raw series that was not ingested is an error (`PRESTUS:localite:noSeries`), and an untracked series (position at the origin) is refused.
 
-### `InstrumentMarker`
+### File mode: a single XML file
 
-Static instrument positions stored as full 4×4 matrices in an `InstrumentMarkerList` file. Each `InstrumentMarker` entry contains a `Marker/Matrix4D` block with the same `data{row}{col}` field layout as TriggerMarkers. The ingested output of `neuronav_ingest_markers` uses this format.
+Set `placement.localite.file`. TriggerMarkers, GUMMarkers and InstrumentMarker files are accepted; the type is detected from the content.
 
-### `EntryTarget` (not for position/angle -- see the multi-target toolkit)
+```yaml
+placement:
+  mode: 'localite'
+  localite:
+    file: '/path/to/TriggerMarkers_Coil0_20240820122011842.xml'
+    position: 2        # detected series in the file (1-based, after the pulse-count filter), or:
+    target: ''         # description of an InstrumentMarker / GUMMarkers entry
+```
 
-Some Localite versions export an `EntryTargetList` XML containing flat `Target/Marker/ColVec3D` and `Rotation/RotationReference/ColVec3D` entries at the top level (not wrapped in `GUMMarkerList/Element`). This format is **not** handled by `neuronav_compute_series_statistics` and is never used for position/angle computation in the placement pipeline below -- that restriction is deliberate, not a gap; see "Choosing a file" below for why.
+### Several transducers (bilateral setups)
 
-It **is** read by a separate function, `neuronav_read_entry_target`, for exactly one purpose: matching a static, operator-confirmed brain-target label against a `target_map` in multi-target studies (e.g. "does this subject's EntryTarget export confirm a 'PUL' target, and if so, where?"). If you need that -- naming multiple targets per session and resolving each one's confirmed coordinate with source-tracked fallbacks -- see [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md), a toolkit layered on top of everything in this document rather than a replacement for it.
+`target` and `position` take one entry per transducer; transducer *i* uses entry *i*, and each gets its own pose. A single value applies to every transducer. A list of the wrong length is an error (`PRESTUS:localite:listLength`).
 
-</details>
+```yaml
+placement:
+  mode: 'localite'
+  localite:
+    session: 2
+    target: [L_MD, R_MD]   # transducer(1) -> L_MD, transducer(2) -> R_MD
+```
 
-### Choosing a file: realized angle vs. planned trajectory
+### Many subjects and sessions
 
-The file types above answer different questions. Picking the wrong one will silently mismatch your reported angle and your reported target — read this before choosing which file to use.
+For a study, the Nexus's Study tab turns the `neuronav_gui` outputs into manifest rows (**Import from Localite…**). It reads `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files under `path.localite_post`, and makes either one run per target, or one run per session with the targets assigned to transducers 1, 2, … (left first, alphabetical, or a given order). The runs use `placement.mode: localite`, so PRESTUS reads the ingested markers itself. See [Group analysis](doc_group.md#from-localite-ingestion).
 
-- **The realized angle at the moment of stimulation** is only available from `TriggerMarkers` (the tracked pose during the actual pulses, averaged per series) or `InstrumentMarker` (a static saved pose). Both store a genuine, measured rotation. Use one of these if you need "the angle at which we stimulated."
-- **`GUMMarkers` (`EntryTargetPair`) does not carry a measured angle.** Its 4×4 matrix is *synthesized* from the static `Target` point plus a `RotationReference` vector — and that reference is frequently left unset in the source file (`<Rotation angle="0.0" used="false">`). When `used="false"`, the "angle" `neuronav_compute_series_statistics` produces from it is a placeholder, not captured stimulation data. Only treat it as a real angle if the source XML has `Rotation used="true"`.
-- **Static planned Entry/Target coordinates are never read by the placement pipeline below.** This includes the `Target` field inside a `GUMMarkers` `EntryTargetPair`, and a standalone `EntryTarget.xml` read via `neuronav_read_entry_target`. `position_transducer_localite` → `localite_matrix_to_positions` never reads them, and never will — see the axis-projection point below for why. **If you are only running single-target placement, these static coordinates are entirely optional** — TriggerMarkers or InstrumentMarker alone is sufficient; no GUMMarkers or EntryTarget export is required. They matter only for the separate multi-target extraction toolkit ([doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)), which uses them for two things: identifying which planned target a given coil's series corresponds to (`neuronav_match_entry_targets`), and, for studies that supply pre-hoc planned coordinates, as an independent cross-check against those (`neuronav_resolve_target`).
-- **The reported focus position is axis-projected, not a stored coordinate.** `localite_matrix_to_positions` computes it as `focus_pos = trans_pos + focal_distance_bowl * ref_vec`, where `trans_pos = ref_pos + tracker_to_bowl_mm * ref_vec` is the bowl rear centre (with the default exit-plane origin this equals `ref_pos + focal_distance_ep * ref_vec`) — projecting forward from the *tracked* position along the *tracked* beam axis by the transducer's calibrated focal distance. This keeps the reported target self-consistent with the reported angle. A separately-clicked static Target point would not necessarily lie on the tracked beam axis at all, and could silently disagree with the reported angle if used instead.
+??? note "Details: entry points and standalone use"
+    Placement runs in `preproc_transducer_placement`; the older `placement.localite.enabled = 1` switch in `preproc_head` uses the same code. Both go through `neuronav_localite_pose`, and the pose's column 4 (position) and column 1 (beam direction) go to `localite_matrix_to_positions`. All paths share the same XML parser and position math.
 
-### Localite I/O
+    For multi-position or multi-session workflows outside the pipeline, call `neuronav_ingest_markers` → `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m` and the [multi-target toolkit](doc_placement_neuronav_multitarget.md)). Average transducer and target locations can be provided in several coordinate spaces; native image space is the one PRESTUS uses. Standard-space definitions (experimental) allow e.g. plotting average transducer positions in standard space.
 
-Localite data pass through two stages (run them from the GUI or a script — see [GUI and script workflows](doc_placement_neuronav_workflows.md)). **Ingestion** (`neuronav_ingest_markers`, or the `neuronav_gui` front-end) reads the raw exports of one subject/session, averages each recorded series and writes one normalized file pair. **Placement** (`placement.mode: 'localite'`) and the multi-target toolkit read that pair — or, in file mode, a single XML you point to.
+## Localite I/O
 
-#### Input layout
+### Input layout
 
 ```
 <path.localite_raw>/
@@ -71,13 +91,13 @@ This is Localite's own export structure placed below a `sub-XXX/ses-XX/` pair; n
 | Marker type | TriggerMarkers first; GUMMarkers only if no usable TriggerMarkers file exists |
 | Newest wins | Files are ordered by the 17-digit timestamp in the file name (file dates change on copying) |
 | Size | TriggerMarkers files ≤ 10 kB (no or few pulses) are skipped |
-| De-duplication | A file byte-identical to one in the previous session (`ses-(XX-1)`) is skipped — Localite re-exports older sessions |
+| De-duplication | A file byte-identical to one in the previous session (`ses-(XX-1)`) is skipped; Localite re-exports older sessions |
 | Series | TriggerMarkers pulses are split into series at time gaps > 3× the median interval; series whose pulse count differs from `expected_segment_length` (default 80) by more than 20 are dropped (`[]` keeps all) |
 | Coils | Without `neuronav.coil_map`: Coil0 only. With it: one `TriggerMarkers_Coil<N>` file per entry; each coil contributes one series per configured sequence; untracked blocks (all positions at 0) are skipped |
 
-The planning T1 that Localite coordinates refer to (see below) is looked up as `<path.localite_t1>/[sub-XXX/]<path.localite_t1_pattern>` (default pattern `sub-XXX_*T1*.nii*`; `path.localite_t1` defaults to `path.localite_raw`).
+The planning T1 that Localite coordinates refer to (see [Coordinate transforms](#coordinate-transforms)) is looked up as `<path.localite_t1>/[sub-XXX/]<path.localite_t1_pattern>` (default pattern `sub-XXX_*T1*.nii*`; `path.localite_t1` defaults to `path.localite_raw`).
 
-#### Output layout
+### Output layout
 
 ```
 <path.localite_post>/sub-XXX/ses-XX/
@@ -98,7 +118,7 @@ The planning T1 that Localite coordinates refer to (see below) is looked up as `
 
 With `io.overwrite_files: 'never'`, an existing pair is kept.
 
-#### Path keys
+### Path keys
 
 | Key | Meaning |
 |---|---|
@@ -109,166 +129,29 @@ With `io.overwrite_files: 'never'`, an existing pair is kept.
 | `path.localite_export` | Outputs meant for import into Localite (heuristic placement: position table, plot, Localite-ready T1), per subject in `sub-XXX/` |
 | `path.localite` | **Deprecated.** Read as `path.localite_raw` and as `path.localite_export` when those are empty (with a warning for the former) |
 
-### Pipeline entry point
+## Which file to use: realised angle or planned trajectory
 
-Set `placement.mode: 'localite'` to place the transducer from a recorded Localite pose (`preproc_transducer_placement`; the older `placement.localite.enabled = 1` switch in `preproc_head` uses the same code). Both modes go through `neuronav_localite_pose`, and the pose's column 4 (position) and column 1 (beam direction) go to `localite_matrix_to_positions`.
+The Localite file types answer different questions. The wrong one silently mismatches the reported angle and the reported target.
 
-#### File mode — single XML file
+- **The realised angle at the moment of stimulation** is only available from `TriggerMarkers` (the tracked pose during the pulses, averaged per series) or `InstrumentMarker` (a static saved pose). Both store a measured rotation.
+- **`GUMMarkers` (`EntryTargetPair`) carries no measured angle.** Its 4×4 matrix is synthesised from the static `Target` point and a `RotationReference` vector, which is often unset in the source file (`<Rotation angle="0.0" used="false">`). With `used="false"`, the angle `neuronav_compute_series_statistics` produces is a placeholder. Treat it as a real angle only if the source XML has `Rotation used="true"`.
+- **Static planned Entry/Target coordinates are never read by placement.** This includes the `Target` field of a `GUMMarkers` `EntryTargetPair` and a standalone `EntryTarget.xml`. For single-target placement they are optional: TriggerMarkers or InstrumentMarker alone is sufficient. They matter only for the [multi-target toolkit](doc_placement_neuronav_multitarget.md), which uses them to identify which planned target a coil's series corresponds to (`neuronav_match_entry_targets`) and as a cross-check against pre-hoc planned coordinates (`neuronav_resolve_target`).
+- **The reported focus position is axis-projected, not a stored coordinate.** `localite_matrix_to_positions` computes `focus_pos = trans_pos + focal_distance_bowl * ref_vec`, where `trans_pos = ref_pos + tracker_to_bowl_mm * ref_vec` is the bowl rear centre (with the default exit-plane origin this equals `ref_pos + focal_distance_ep * ref_vec`): it projects forward from the tracked position along the tracked beam axis by the calibrated focal distance. This keeps the reported target self-consistent with the reported angle. A separately clicked static Target point need not lie on the tracked beam axis.
 
-Set `placement.localite.file`. TriggerMarkers, GUMMarkers and InstrumentMarker files are accepted; the type is detected from the content.
+??? note "Details: Localite XML file formats"
+    All formats are parsed by `neuronav_compute_series_statistics`, which handles single markers, repeated trigger trains and multi-position recordings alike.
 
-```yaml
-placement:
-  mode: 'localite'
-  localite:
-    file: '/path/to/TriggerMarkers_Coil0_20240820122011842.xml'
-    position: 2        # detected series in the file (1-based, after the pulse-count filter), or:
-    target: ''         # description of an InstrumentMarker / GUMMarkers entry
-```
+    **TriggerMarkers.** Multiple triggers can be sent during stimulation to record the transducer location over time. Files are named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations are averaged within each position series (identified by time-gap segmentation). Multiple positions per recording session are supported.
 
-#### Automatic mode — ingested markers
+    **GUMMarkers.** One or more static marker positions. Each `Element` is expected to be of type `EntryTargetPair` (with a `Target/Marker/ColVec3D` position and a `Rotation/RotationReference/ColVec3D` beam direction), from which a synthetic 4×4 matrix is constructed. Some Localite versions write a `GUMMarkerList` file that mixes `EntryTargetPair` and `InstrumentMarker` elements (`type="InstrumentMarker"` on the `Element` tag). Each element becomes its own series: `InstrumentMarker` elements keep their recorded 4×4 pose, `EntryTargetPair` elements the synthesised matrix. Only the former are instrument poses; placement refuses an `EntryTargetPair` series (`PRESTUS:localite:notAPose`).
 
-Leave `placement.localite.file` empty. The ingested pair under `path.localite_post` is read; if it does not exist yet and `path.localite_raw` is set, ingestion runs first (with `neuronav.coil_map` if configured, otherwise for the requested series only, named `series_<position>` or `target`).
+    **InstrumentMarker.** Static instrument positions stored as full 4×4 matrices in an `InstrumentMarkerList` file. Each `InstrumentMarker` entry contains a `Marker/Matrix4D` block with the same `data{row}{col}` field layout as TriggerMarkers. The ingested output of `neuronav_ingest_markers` uses this format.
 
-```yaml
-path:
-  localite_raw:  '/data/localite_raw'
-  localite_post: '/data/derivatives/localite'
-placement:
-  mode: 'localite'
-  localite:
-    session: 2          # -> ses-02
-    target: 'L_MD'      # ingested target name, or leave '' and use:
-    position: 2         # detected-series index, matched against series_index in the JSON sidecar
-```
+    **EntryTarget** (not for position or angle). Some Localite versions export an `EntryTargetList` XML with flat `Target/Marker/ColVec3D` and `Rotation/RotationReference/ColVec3D` entries at the top level (not wrapped in `GUMMarkerList/Element`). `neuronav_compute_series_statistics` does not read it, and placement never uses it. `neuronav_read_entry_target` reads it for one purpose: matching an operator-confirmed brain-target label against a `target_map` in multi-target studies (see the [multi-target toolkit](doc_placement_neuronav_multitarget.md)).
 
-To choose series and names interactively, ingest with `neuronav_gui` first; placement then only reads the result. A raw series that was not ingested is an error (`PRESTUS:localite:noSeries`) rather than a silent fallback, and an untracked series (position at the origin) is refused.
+## Transducer offset (`tracker_to_bowl_mm`)
 
-#### Several transducers (bilateral setups)
-
-`target` and `position` take one entry per transducer; transducer *i* uses entry *i*, and each gets its own pose. A single value still applies to every transducer, and a list of the wrong length is an error (`PRESTUS:localite:listLength`).
-
-```yaml
-placement:
-  mode: 'localite'
-  localite:
-    session: 2
-    target: [L_MD, R_MD]   # transducer(1) -> L_MD, transducer(2) -> R_MD
-```
-
-#### Many subjects and sessions
-
-For a study, the Nexus's Study tab turns the `neuronav_gui` outputs into manifest rows (**Import from Localite…**). It reads `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files under `path.localite_post`, and makes either one run per target, or one run per session with the targets assigned to transducers 1, 2, … (left first, alphabetical, or a given order). The runs use `placement.mode: localite`, so PRESTUS reads the ingested markers itself. See [Group analysis](doc_group.md#from-localite-ingestion).
-
-#### Standalone / batch use
-
-For multi-position or multi-session workflows outside the pipeline, use `neuronav_ingest_markers` → `neuronav_select_localite` → `neuronav_compute_series_statistics` → `neuronav_convert_trigger_to_voxels` directly (see `examples/demo_localite.m` and [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md)).
-
-All paths share the same XML parser and position math (`localite_matrix_to_positions`). The reference distance from the IR tracker attachment point to the transducer exit plane is derived automatically from transducer geometry (`curv_radius_mm − dist_geom_ep_mm`) when defined, with fallback to `parameters.placement.localite.reference_distance_mm`.
-
-> **`transducer.focal_distance_ep` (or `focal_distance_bowl`) must be set explicitly for Localite placement — there is no default.** `config_default.yaml` ships it as `[]`, and unlike other placement modes it cannot be derived automatically here: the usual fallback computes it from `trans_pos`/`focus_pos`, but in Localite mode those positions are exactly what this step is trying to produce, so the fallback never has anything to work from. `localite_matrix_to_positions` validates this upfront and raises a clear `PRESTUS:localite:missingConfig` error naming the missing field if neither is set — this same check also covers `placement.mode = 'plantus'`, since PlanTUS placement resolves its final position through the same function.
-
-Average transducer and target locations can be provided in multiple coordinate spaces (native image space being the most relevant for PRESTUS). The functions also facilitate standard-space definitions (experimental), e.g., to plot average transducer positions in standard space.
-
-### Neuronavigation Coordinate Transforms
-
-See the [coordinate system documentation](doc_coordinate_systems.md).
-
-Recorded Localite coordinates are relative to a neuronavigation planning image (e.g., `T1_forneuronav`) that was loaded in the neuronavigation software. Neuronavigation software writes this planning image with a **zero-origin, diagonal affine** (`world = voxel × voxel_size_mm`) rather than a scanner-isocenter world-space affine. Localite trigger matrices are therefore in **planning-image space**, not scanner world-space RAS.
-
-The `InstrumentMarker` XML written by `neuronav_ingest_markers` preserves these coordinates as-is and labels the coordinate space `"RAS"` — meaning the axes are RAS-oriented, but the origin remains at the image corner (zero-origin). To convert to voxels, use `ras_to_grid()` with the **planning T1 header**, not the SimNIBS m2m T1 header. The m2m T1 has a full world-space affine; applying its inverse to planning-image coordinates displaces positions by tens of millimetres.
-
-When SimNIBS is run on the planning T1, the resulting `m2m_{sub}/T1.nii.gz` shares the same voxel grid (SimNIBS preserves voxel dimensions and layout, updating only the affine). Voxel indices computed via `ras_to_grid(localite_mm, planning_t1_header)` are therefore directly valid for PRESTUS simulations that load the m2m T1 — no reprojection is needed. See [Coordinate Reference Systems](doc_coordinate_systems.md#localite-planning-image-zero-origin-affine-and-simnibs-voxel-grid).
-
-SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.nii.gz` segmentation image, so PRESTUS applies a transform from the planning to the segmentation image before porting coordinates to MNI space.
-
-1.	Trigger to Voxel (`neuronav_convert_trigger_to_voxels`): → subject voxel indices
-2.	Voxel → mm (`neuronav_grid_to_mm_batch`): → subject mm
-3.	Native mm → MNI mm (`neuronav_apply_deformation`): → MNI mm
-
-[Optional]: Interpolate average positions across subjects
-
-4.	Aggregate means in MNI mm across subjects (`neuronav_get_group_mean_mni`)
-5.	Group mean MNI mm → subject mm (`neuronav_apply_inverse_deformation`)
-6.	Subject mm → subject voxel (`neuronav_mm_to_voxel`)
-
-#### Coordinate Spaces in neuronav functions
-
-- `neuronav_convert_trigger_to_voxels`
-	- Localite/trigger data (planning-image space mm, zero-origin RAS) → subject (native) voxel space via planning T1 header
-- `neuronav_grid_to_mm_batch`
-	- Input: Subject voxel indices (i,j,k)
-	- Operation: Uses subject’s T1 NIfTI affine transform
-	- Output: Subject native mm coordinates (in scanner/world space)
-- `neuronav_apply_deformation` (forward warp)
-	- Input: Native mm locations
-	- Operation: Queries subject’s Conform2MNI_nonl.nii.gz (subject-native → MNI (mm))
-	- Output: MNI mm coordinates (for reporting/plotting/averaging)
-- `neuronav_get_group_mean_mni`
-	- Input: CSVs containing columns like Mtrans_pos_MNI_x/y/z (all from previous function outputs)
-	- Operation: Aggregates these MNI mm locations across subjects/sessions, computes mean (in mm)
-	- Output: MNI mm group-mean locations (still in millimeters, not voxels)
-- `neuronav_apply_inverse_deformation` (inverse warp)
-	- Input: MNI mm group-mean locations (x, y, z in mm)
-	- Operation: Uses subject’s MNI2Conform_nonl.nii.gz nonlinear field to map standard points back into that subject’s native space.
-	- Output: Native mm location (in subject’s world/scanner space, for that subject)
-- `neuronav_mm_to_voxel` (helper)
-	- Input: Native mm (x, y, z) location
-	- Operation: Uses subject T1 affine to map mm → voxel (i, j, k)
-	- Output: Subject voxel indices for subsequent image work or storage
-- `neuronav_export_session_csv`
-	- Columns include:
-	- Native (subject) voxel indices for target/transducer: (i, j, k from subject’s grid)
-	- Native mm coordinates (if desired): (x, y, z in subject’s scanner space)
-	- MNI mm coordinates for each (from deformation step): (x, y, z in standard space)
-	- MNI voxel indices (may be inaccurate with limited FOVs)
-
----
-
-<details markdown>
-<summary>Localite matrix origin: physical interpretation and calibration</summary>
-
-### Background
-
-The Localite 4×4 transformation matrix encodes the pose of an IR-tracked instrument. Column 4 (the translation vector) gives the 3D position in RAS mm; column 1 (the first axis) gives the beam direction (from the coil/transducer face toward the target). These are the only two columns used by PRESTUS.
-
-**What PRESTUS models as the transducer position** is the *bowl rear centre* — the geometric axis point at the back of the bowl housing. This is `bowl_pos` in k-Wave's `makeBowl`, from which the acoustic focus is offset by `focal_distance_bowl` along the beam direction. The acoustic focus position is therefore self-consistent with this convention.
-
-**The physical meaning of the Localite matrix origin (column 4) is not fixed** — it depends on how the instrument was registered in the Localite instrument definition at the time of recording. Possible interpretations and their implications:
-
-| Possible matrix origin | Value of `tracker_to_bowl_mm` |
-|---|---|
-| Exit plane centre | `-(curv_radius_mm − dist_geom_ep_mm)` (negative; bowl rear is behind exit plane) |
-| Bowl rear centre | `0` |
-| IR tracker cluster centroid | Measured distance from cluster to bowl rear centre (likely negative) |
-| Housing reference point | Measured distance from reference to bowl rear centre |
-
-The default geometry-derived formula (`-(curv_radius_mm − dist_geom_ep_mm)`) **assumes the matrix origin is at the exit plane**, placing the bowl rear centre behind it by the bowl depth. This assumption holds only if the Localite instrument was registered with the exit plane as the origin — which is a common convention, but is not guaranteed.
-
-An incorrect assumption introduces a systematic spatial error along the beam axis equal to the difference between the assumed and actual origin.
-
-### How to determine the correct offset
-
-**Option 1 — Localite instrument definition file (recommended)**
-
-The Localite instrument definition is an XML file typically stored in the Localite software installation under `Instruments/` or provided by the instrument manufacturer. Open it and locate the `<ReferencePoint>` or `<Origin>` tag. This describes what physical point the matrix origin corresponds to and its distance from key transducer landmarks in mm.
-
-**Option 2 — Empirical measurement (ruler / phantom)**
-
-1. Place the transducer on a flat phantom surface and record a Localite position.
-2. Measure the distance from the phantom surface (= exit plane) to the IR tracker attachment on the housing.
-3. The bowl rear centre is approximately `curv_radius_mm − dist_geom_ep_mm` mm behind the exit plane.
-4. Set `tracker_to_bowl_mm` = (bowl rear centre position) − (matrix origin position), in mm along the beam axis.
-
-Alternatively, acquire an MR image of a gel phantom with the transducer in place and compare the PRESTUS-predicted bowl voxel position against the visible gel/transducer interface.
-
-**Option 3 — Contact Localite support**
-
-The instrument registration specification can be confirmed by Localite (https://www.localite.de). Provide the instrument type and firmware version used during the recording.
-
-### Setting the calibrated offset in PRESTUS
-
-Once the offset is known, set it explicitly in your config:
+PRESTUS models the transducer position as the bowl rear centre (`bowl_pos` in k-Wave's `makeBowl`); the acoustic focus lies `focal_distance_bowl` beyond it along the beam direction. What the Localite matrix origin (column 4) refers to depends on how the instrument was registered in Localite. The offset from that origin to the bowl rear centre is taken, in this order, from `placement.localite.tracker_to_bowl_mm` (explicit), the transducer geometry `-(curv_radius_mm − dist_geom_ep_mm)` (assumes the origin is at the exit plane) or `placement.localite.reference_distance_mm` (fallback). A wrong assumption shifts the whole simulation along the beam axis by the difference between the assumed and actual origin.
 
 ```yaml
 placement:
@@ -277,6 +160,53 @@ placement:
                               # negative = bowl rear is on the housing side (away from head)
 ```
 
-`tracker_to_bowl_mm` takes priority over the geometry-derived distance and over `reference_distance_mm`. The geometry-derived fallback (`-(curv_radius_mm − dist_geom_ep_mm)`) remains available when transducer geometry is fully specified and the matrix origin is known to be at the exit plane.
+??? note "Details: determining the offset"
+    Column 4 of the Localite 4×4 matrix is the position in RAS mm; column 1 is the beam direction (from the transducer face toward the target). These are the only two columns PRESTUS uses.
 
-</details>
+    | Possible matrix origin | Value of `tracker_to_bowl_mm` |
+    |---|---|
+    | Exit plane centre | `-(curv_radius_mm − dist_geom_ep_mm)` (negative; bowl rear is behind exit plane) |
+    | Bowl rear centre | `0` |
+    | IR tracker cluster centroid | Measured distance from cluster to bowl rear centre (likely negative) |
+    | Housing reference point | Measured distance from reference to bowl rear centre |
+
+    **Option 1: Localite instrument definition file (recommended).** The instrument definition is an XML file, stored in the Localite installation under `Instruments/` or provided by the manufacturer. Its `<ReferencePoint>` or `<Origin>` tag describes which physical point the matrix origin corresponds to and its distance from transducer landmarks in mm.
+
+    **Option 2: Empirical measurement (ruler / phantom).** Place the transducer on a flat phantom surface and record a Localite position. Measure the distance from the phantom surface (= exit plane) to the IR tracker attachment on the housing. The bowl rear centre is about `curv_radius_mm − dist_geom_ep_mm` mm behind the exit plane. Set `tracker_to_bowl_mm` = (bowl rear centre position) − (matrix origin position), in mm along the beam axis. Alternatively, acquire an MR image of a gel phantom with the transducer in place and compare the PRESTUS-predicted bowl voxel position against the visible gel/transducer interface.
+
+    **Option 3: Contact Localite support** (https://www.localite.de) with the instrument type and firmware version used during the recording.
+
+    `tracker_to_bowl_mm` takes priority over the geometry-derived distance and over `reference_distance_mm`. The geometry-derived fallback applies when the transducer geometry is fully specified and the matrix origin is known to be at the exit plane.
+
+## Coordinate transforms
+
+See the [coordinate system documentation](doc_coordinate_systems.md).
+
+Recorded Localite coordinates are relative to the planning image (e.g. `T1_forneuronav`) loaded in the neuronavigation software. That image has a **zero-origin, diagonal affine** (`world = voxel × voxel_size_mm`), not a scanner-isocentre world-space affine. Localite trigger matrices are therefore in **planning-image space**, not scanner world-space RAS.
+
+The `InstrumentMarker` XML written by `neuronav_ingest_markers` keeps these coordinates as they are and labels the space `"RAS"`: the axes are RAS-oriented, but the origin remains at the image corner. To convert to voxels, use `ras_to_grid()` with the **planning T1 header**, not the SimNIBS m2m T1 header. The m2m T1 has a full world-space affine; applying its inverse to planning-image coordinates displaces positions by tens of millimetres.
+
+When SimNIBS is run on the planning T1, the resulting `m2m_{sub}/T1.nii.gz` shares the same voxel grid (SimNIBS keeps voxel dimensions and layout and updates only the affine). Voxel indices from `ras_to_grid(localite_mm, planning_t1_header)` are therefore valid for PRESTUS simulations that load the m2m T1; no reprojection is needed. See [Coordinate Reference Systems](doc_coordinate_systems.md#localite-planning-image-zero-origin-affine-and-simnibs-voxel-grid).
+
+SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.nii.gz` segmentation image, so PRESTUS applies a transform from the planning to the segmentation image before porting coordinates to MNI space. The chain is:
+
+1. Trigger to voxel (`neuronav_convert_trigger_to_voxels`): subject voxel indices
+2. Voxel to mm (`neuronav_grid_to_mm_batch`): subject mm
+3. Native mm to MNI mm (`neuronav_apply_deformation`): MNI mm
+
+Optional, to average positions across subjects:
+
+4. Aggregate means in MNI mm across subjects (`neuronav_get_group_mean_mni`)
+5. Group mean MNI mm to subject mm (`neuronav_apply_inverse_deformation`)
+6. Subject mm to subject voxel (`neuronav_mm_to_voxel`)
+
+??? note "Details: coordinate spaces of the neuronav functions"
+    | Function | Input | Operation | Output |
+    |---|---|---|---|
+    | `neuronav_convert_trigger_to_voxels` | Localite/trigger data (planning-image space mm, zero-origin RAS) | Planning T1 header | Subject (native) voxel indices |
+    | `neuronav_grid_to_mm_batch` | Subject voxel indices (i, j, k) | Subject T1 NIfTI affine | Subject native mm (scanner/world space) |
+    | `neuronav_apply_deformation` (forward warp) | Native mm locations | Queries the subject's `Conform2MNI_nonl.nii.gz` | MNI mm (for reporting, plotting, averaging) |
+    | `neuronav_get_group_mean_mni` | CSVs with columns like `Mtrans_pos_MNI_x/y/z` | Mean across subjects/sessions | MNI mm group-mean locations (mm, not voxels) |
+    | `neuronav_apply_inverse_deformation` (inverse warp) | MNI mm group-mean locations | Subject's `MNI2Conform_nonl.nii.gz` nonlinear field | Native mm location in that subject's world/scanner space |
+    | `neuronav_mm_to_voxel` (helper) | Native mm (x, y, z) | Subject T1 affine | Subject voxel indices |
+    | `neuronav_export_session_csv` | | | Native voxel indices for target and transducer, native mm, MNI mm (from the deformation step) and MNI voxel indices (may be inaccurate with limited FOVs) |

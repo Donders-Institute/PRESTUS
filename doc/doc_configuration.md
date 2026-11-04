@@ -2,8 +2,6 @@
 
 All PRESTUS settings live in YAML config files. You never write a complete config: PRESTUS starts from its defaults, and your files contain only what differs. This page explains how the files are combined, how to set up a project folder, and how to override settings per run. Every parameter is listed in [Parameters](doc_parameters.md).
 
----
-
 ## How a config is assembled
 
 `load_parameters` builds one `parameters` struct from up to four layers, each merged onto the previous one:
@@ -23,7 +21,7 @@ parameters = load_parameters('config_projectX.yaml', cfg_dir, ...
                              {'subject_id', 3; 'io.output_affix', 'M1'});         % plus overrides
 ```
 
-The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default. Lists of transducers (`transducer(2)`, …) keep their own fields.
+The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default. Lists of transducers (`transducer(2)`, …) keep their own fields. One exception: `medium_properties.<tissue>.absorption_fraction` and `absorption_coeff` exclude each other, so a layer that sets one empties the other (see [Heat deposition](doc_simulations-thermal.md#heat-deposition)).
 
 Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
 

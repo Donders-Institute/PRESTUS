@@ -2,8 +2,6 @@
 
 A finished run leaves a folder of files. This page tells you which ones to open first, what to check, and how to read the safety summary. Every file and column is described in [Outputs & Reports](doc_outputs.md); terms are defined in [Concepts and glossary](doc_concepts.md).
 
----
-
 ## Where to look
 
 Results are in `<path.sim>/sub-XXX/`. Open these first:
@@ -70,7 +68,7 @@ More known messages and their fixes are in [Troubleshooting](doc_troubleshooting
 
 ## Uncertainty of the estimate
 
-Simulated intensities and temperatures depend on assumed tissue properties, which are uncertain, especially for the skull. To see how much your results could change, run the [uncertainty mode](doc_uncertainty.md) (default, liberal and conservative tissue properties), or use subject-specific skull properties from a [pseudo-CT](doc_pseudoCT.md).
+Simulated intensities and temperatures depend on assumed tissue properties, which are uncertain, especially for the skull. To see how much your results could change, run the [uncertainty mode](doc_uncertainty.md) (default tissue properties and the ITRUSST bounds that maximise and minimise heating and intensity), or use subject-specific skull properties from a [pseudo-CT](doc_pseudoCT.md).
 
 ## Methods text
 

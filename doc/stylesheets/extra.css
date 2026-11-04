@@ -1,0 +1,130 @@
+/* Content images: never wider than the text column, never taller than the viewport. */
+.md-typeset img {
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+}
+.md-typeset img.logo {
+  display: block;
+  max-width: 260px;
+  margin: 0 0 1rem 0;
+}
+/* Glossary definition lists: term in bold, definition indented, compact spacing. */
+.md-typeset dl dt {
+  font-weight: 600;
+  margin-top: 0.6em;
+}
+.md-typeset dl dd {
+  margin: 0.15em 0 0 1.25em;
+}
+
+/* Sidebars: narrower and denser than the Material default (screens >= 960px). */
+@media screen and (min-width: 60em) {
+  .md-sidebar--primary {
+    width: 11rem;
+  }
+  .md-sidebar--secondary {
+    width: 10rem;
+  }
+  /* The site title is already in the header; don't repeat it above the nav. */
+  .md-nav--primary > .md-nav__title {
+    display: none;
+  }
+  .md-sidebar .md-nav,
+  .md-nav--primary :is(.md-nav__title, .md-nav__item) {
+    font-size: 0.64rem;
+    line-height: 1.25;
+  }
+  .md-sidebar .md-nav__item .md-nav__link {
+    margin-top: 0.4em;
+  }
+  /* Section headings: clear break above, tight to their items below. */
+  .md-nav--primary .md-nav__item--section {
+    margin: 1.1em 0 0;
+  }
+  .md-nav--primary .md-nav__item--section:first-child {
+    margin-top: 0;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 0.1em;
+  }
+}
+
+/* Material only shows the navigation sidebar from 1220px and uses the mobile
+   drawer below that. Keep the sidebar layout down to 960px (tablet breakpoint),
+   undoing the drawer styles. The theme's JS sizes the sidebar only from 1220px,
+   so the scroll height is set here. */
+@media screen and (min-width: 60em) and (max-width: 76.1875em) {
+  .md-header__button[for="__drawer"] {
+    display: none;
+  }
+  .md-header__button.md-logo {
+    display: inline-block;
+  }
+  [dir] .md-sidebar--primary,
+  [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
+    position: sticky;
+    top: 2.4rem;
+    left: auto;
+    right: auto;
+    height: auto;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+    background-color: transparent;
+    z-index: auto;
+  }
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    position: static;
+    margin: 0 0.2rem;
+    max-height: calc(100vh - 4.8rem);
+    overflow-y: auto;
+  }
+  .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-left: 1.2rem;
+  }
+  .md-nav--primary,
+  .md-nav--primary .md-nav {
+    position: static;
+    display: block;
+    height: auto;
+    background-color: transparent;
+    z-index: auto;
+  }
+  .md-nav--primary .md-nav__toggle ~ .md-nav {
+    display: block;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .md-nav--primary .md-nav__item--nested > .md-nav > .md-nav__title {
+    display: none;
+  }
+  .md-nav--primary .md-nav__title ~ .md-nav__list {
+    overflow: visible;
+    box-shadow: none;
+    background-color: transparent;
+    scroll-snap-type: none;
+  }
+  [dir] .md-nav--primary .md-nav__item {
+    border-top: 0;
+    padding: 0 0 0 0.6rem;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
+    padding: 0;
+  }
+  .md-nav--primary .md-nav__link {
+    padding: 0;
+  }
+  .md-nav--primary .md-nav__link .md-nav__icon {
+    display: none;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    pointer-events: none;
+  }
+  .md-nav--primary .md-nav__item--section.md-nav__item--active > .md-nav__link {
+    color: inherit;
+  }
+}

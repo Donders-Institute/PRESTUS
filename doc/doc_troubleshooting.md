@@ -1,6 +1,11 @@
 # Troubleshooting
 
-Known problems and their fixes, grouped by where they show up. Most entries link to the page that explains the behaviour. If you solve an issue that is not listed here, please add it. If you find an error in the pipeline or have a suggestion, please [open an issue on GitHub](https://github.com/Donders-Institute/PRESTUS/issues).
+!!! note "At a glance"
+    - **What:** Known problems and their fixes, grouped by where they show up.
+    - **When you need it:** When a run stops with one of the messages below, or a result lands in the wrong place.
+    - **Before you start:** The error identifier or warning text from the MATLAB console or the `log/` folder.
+
+Most entries link to the page that explains the behaviour. If you solve an issue that is not listed here, add it. If you find an error in the pipeline or have a suggestion, [open an issue on GitHub](https://github.com/Donders-Institute/PRESTUS/issues).
 
 ## Setup and starting a run
 

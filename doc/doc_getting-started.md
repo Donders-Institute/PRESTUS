@@ -4,7 +4,7 @@ This page takes you from a fresh installation to a finished simulation and its o
 
 Before you start, install PRESTUS and its MATLAB dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_concepts.md#glossary) open alongside.
 
----
+If you prefer forms to code, the [PRESTUS Nexus](doc_nexus.md) builds the same config from a T1 and the defaults, and runs it. The steps below show what the Nexus writes for you.
 
 ## 1. A free-water simulation
 
@@ -49,7 +49,7 @@ parameters.transducer.focus_pos = [36, 36, 64];
 prestus_pipeline_start(parameters);
 ```
 
-When it finishes, `out/sub-001/` holds the results:
+The run takes a few minutes on a CPU. When it finishes, `out/sub-001/` holds the results:
 
 - `sub-001_water.csv`: the metrics table (ISPPA, focal distance, focal volume, …);
 - `sub-001_water_report.html`: the HTML report with the safety dashboard and figures;

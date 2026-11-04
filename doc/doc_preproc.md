@@ -5,56 +5,55 @@
     - **When you need it:** Rarely: the defaults suit most studies. Read it when the skull looks wrong in the report, or to understand why the grid has the size it has.
     - **Before you start:** A `layered` simulation with a SimNIBS segmentation.
 
-PRESTUS preprocesses `layered` segmentations to set up simulation grids.
+PRESTUS turns a `layered` segmentation into a simulation grid in five steps. Each has one or two settings; the defaults are listed with them.
 
 ![preprocessing](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/preprocessing.png)
 
-### Orientation
+## Orientation
 
-PRESTUS aligns the simulation grid before cropping. The alignment strategy is controlled by `grid.mode`:
+`grid.mode` sets how the head is rotated before cropping, so that the beam runs along the grid's z axis:
 
-| Mode | Description |
+| Mode | What it does |
 |---|---|
-| `focal_axis` (default) | Rotates the volume so the mean beam axis of all transducers aligns with z. The beams are averaged as axes, not directions (`mean_beam_axis`): a beam pointing against transducer(1)'s is reversed first. For N=1 this equals `transducer_axis`; beams converging from the same side give their bisector; opposed (bilateral) beams give the bisector of the two axes, so each beam is tilted from z by about half the angle between their axes (two beams 41° off exactly opposed: 21° each). z points along transducer(1)'s beam. Falls back to transducer(1)'s axis if the mean axis vector is shorter than `grid.focal_axis_min_norm` (default 0.5), which for two transducers cannot happen (minimum 0.71). Implemented in `preproc_align_to_mean_focal_axis`. |
-| `transducer_axis` | Rotates the volume so the focal axis of transducer(1) aligns with z. Useful when transducer(1) is the primary beam and other transducers are secondary. Implemented in `preproc_align_to_focal_axis`. |
-| `ras_plus` | No rotation; only isotropic rescaling to the requested grid resolution. Preserves world-space (RAS+) orientation. |
+| `focal_axis` (default) | Rotates the volume so that the mean beam axis of all transducers aligns with z. With one transducer this is its beam axis. |
+| `transducer_axis` | Rotates so that the beam axis of transducer(1) aligns with z. Use it when other transducers are secondary. |
+| `ras_plus` | No rotation; only isotropic rescaling to the grid resolution. Keeps the world-space (RAS+) orientation. |
 | `principal_axis` | Removed; errors. Use `focal_axis`. |
 
-In all modes the returned `scale_rotate_recenter_matrix` encodes the full T1-space → rotated/rescaled-grid transform, which is used downstream to map all transducer positions into the simulation space. 
+??? note "Details: how the mean beam axis is formed"
+    Beams are averaged as axes, not directions (`mean_beam_axis`): a beam pointing against transducer(1)'s is reversed first. Beams converging from the same side give their bisector; opposed (bilateral) beams give the bisector of the two axes, so each beam is tilted from z by about half the angle between their axes (two beams 41° off exactly opposed: 21° each). z points along transducer(1)'s beam. If the mean axis vector is shorter than `grid.focal_axis_min_norm` (default 0.5), transducer(1)'s axis is used instead; for two transducers this cannot happen (minimum 0.71). Implemented in `preproc_align_to_mean_focal_axis` (`focal_axis`) and `preproc_align_to_focal_axis` (`transducer_axis`). In all modes the returned `scale_rotate_recenter_matrix` encodes the full T1-space to grid transform, used to map every transducer and target position into the simulation space.
 
-### Scaling
+## Scaling
 
-The 3D planning image is then resliced to the requested grid resolution by isotropic scaling and centered regridding. These steps are applied to the planning image, the segmentation, and the bone mask (or (p)CT, if specified). For masks, nearest neighbor interpolation is used, for continuous values (e.g., from a (pseudo-)CT, linear interpolation is applied).
+The planning image, the segmentation and the bone mask (or (pseudo-)CT) are resliced to `grid.resolution_mm` by isotropic scaling and centred regridding. Masks use nearest-neighbour interpolation; continuous images such as a (pseudo-)CT use linear interpolation.
 
-### Medium Mapping (incl. segmentation smoothing)
+## Layer mapping and smoothing
 
-Segmentations are mapped onto the requested layer medium masks (to later assign acoustic properties). The standard (10-tissue) SimNIBS 4 segmentation will be converted into the (by default 5) specified layers (controlled by `layers`). If a segmentation for the requested layer is not available, requested layers will be removed from the specification. All segmentation IDs that are not explicitly assigned in dedicated layers are automatically included in a baseline water layer. Medium maps contain layer indices corresponding to the respective layer label position in the medium properties (`medium_properties`). This allows for flexibility in requested layers with stable medium ids (unless `medium_properties` is edited).
+The SimNIBS segmentation (10 tissues) is mapped onto the layers in `layers` (5 by default). Labels not assigned to a layer become water. A requested layer without a segmentation label is dropped. Each layer index corresponds to its position in `medium_properties`, so layers can be added or removed without changing the ids of the others.
 
-Each layer is smoothed using one of the algorithms below. The size of smoothing kernels refer to the grid size of the medium mask, NOT the original dimensions of the planning image. If a multi-layer skull model is requested, both cortical and trabecular layers are initially combined into a skull segment and smoothed. Subsequently, the trabecular bone layer is smoothed and added.
+Each layer mask is smoothed and binarised. Settings:
 
-Multiple smoothing algorithms are available:  
-- `gaussian` (default) uses `imgaussfilt` / `imgaussfilt3` for isotropic blurring, yielding smooth gradients and moderate edge erosion (default: 1 mm FWHM kernel, converted to voxels at runtime)
-- `box` applies a uniform convolution, which is fastest, but also blocky and prone to skull holes at low binarization thresholds (default: 1 mm kernel)
-- `off` disables smoothing entirely, passing the raw segmentation mask through without any filtering or binarization
+| Setting | Default | Options |
+|---|---|---|
+| `headmodel.smooth_method` | `gaussian` | `gaussian` (isotropic blur, smooth edges, moderate erosion), `box` (uniform kernel, fastest, blocky, prone to skull holes), `off` (raw mask, no filtering or binarisation) |
+| `headmodel.smooth_fwhm_mm` | 1 mm | Kernel size in mm, converted to voxels at the grid resolution (not the T1 resolution) |
+| `headmodel.smooth_threshold_skull`, `headmodel.smooth_threshold_other` | 0.5 | Binarisation threshold after smoothing; higher gives a thinner mask |
+| `headmodel.skull_fill_method` | `rubberwrap` | `rubberwrap` (skull inflation) or `imclose`; holes become cortical skull |
 
-Different binarization thresholds can be defined for skull (default: 50%) and other tissues (default: 50%). 
+With a two-layer skull, cortical and trabecular bone are first combined, smoothed and hole-filled as one skull; the trabecular layer is then smoothed and added inside it.
 
-PRESTUS attempts to enforce skull continuity (i.e., absence of holes) either by applying a 'rubberwrap' skull inflation algorithm (default) or 'imclose' to the skull layer. This is controlled by `headmodel.skull_fill_method`. Potential holes are converted to (cortical) skull. 
+## Cropping
 
-### Cropping
+The grid is cropped tightly around the head, every transducer bowl and a PML buffer, which keeps the simulation as small as possible. Two settings change the crop:
 
-To increase computational efficiency, the grid is tightly cropped around the head. The cropping factor is determined by the edges of the layered medium and the location of the transducer(s). [Prior to adding the transducer, the grid can optionally be expanded via `parameters.headmodel.head_pad_mm`, which applies symmetric padding and can avoid that the transducer ends out of grid bounds. This should not impact later computational efficiency of the simulation, as regions beyond the transducer + PML will afterwards be cropped]. To guide the bounds of the head area of interest in the simulation, the CSF segmentation (if available) will be expanded by `parameters.headmodel.csf_expansion` [in mm, converted to voxels at the current grid resolution] to guide bounds of the layered medium. Areas outside of the crop mask will be assigned to the water layer (and are eligible for cropping). Tight crop dimensions are then defined by enclosing the layered medium mask, the transducer geometry, plus a PML buffer. This is followed by FFT-optimized resizing via `find_min_factor`, which expands dimensions up to `parameters.grid.max_expand` voxels for faster FFT convolution. The medium is anchored at the original origin (transducer/target unchanged relative to head), with symmetric expansion/padding around the content to fit FFT requirements while maintaining anatomical alignment for k-Wave propagation.
+- `headmodel.csf_expansion` [mm]: how far beyond the CSF segmentation the head region extends. Voxels outside become water and are eligible for cropping.
+- `headmodel.head_pad_mm`: symmetric padding added before the transducer is placed, so that a transducer far from the scalp does not fall outside the grid. Regions beyond the transducer and the PML are cropped again afterwards, so this does not slow the simulation.
 
-**Multi-transducer cropping.** When multiple transducers are configured, the crop mask includes the bowl geometry of *every* transducer, not only the first. This is important for bilateral setups (e.g., two transducers on opposite temporal sides targeting the thalamus): without including the contralateral transducer bowl, the front of the grid would be bounded only by the CSF-expanded head tissue, which extends to the far scalp plus `csf_expansion` mm — leaving unnecessary space. With all bowls included, the crop is tight to the outermost water-bath region of each transducer. Grid alignment and rotation are still driven by the first transducer's focal axis; the positions of additional transducers are mapped into the same rotated/rescaled space before the crop bounds are computed.
+??? note "Details: crop bounds and FFT-friendly sizes"
+    The crop box encloses the layered medium mask, the bowl geometry of every transducer, and a PML buffer. With several transducers all bowls count, which matters for bilateral set-ups: without the contralateral bowl, that side of the grid would be bounded only by the CSF-expanded head and would carry unused space. Alignment and rotation still follow the first transducer's axis; the other transducers are mapped into the same space before the bounds are computed. The box is then enlarged by up to `grid.max_expand` voxels per dimension to sizes with small prime factors (`find_min_factor`), which makes k-Wave's FFTs faster. The medium stays anchored at its origin, so transducer and target do not move relative to the head. All transformations are concatenated and applied to the transducer and target positions.
 
-All image transformations are concatenated to update transducer and target positions. 
+## Smoothing of the property maps
 
-### Acoustic property mapping
+Sharp transitions between tissues reflect sound. `headmodel.smooth_properties: true` smooths the acoustic property maps themselves, with the same `smooth_method` and `smooth_fwhm_mm` as above. It is off by default. Pseudo-CTs made with PRESTUS already smooth the skull edges ([pseudo-CT](doc_pseudoCT.md)), so property smoothing is usually not wanted with them. Recommended settings are an active area of investigation.
 
-See [acoustic property mapping](doc_medium.md).
-
-### Smoothing of acoustic property maps
-
-Sharp transitions in the acoustic properties of adjacent media can result in substantial wave reflections. To smoothen tissue transitions, acoustic property maps can be smoothed prior to the simulation. This is governed by `parameters.headmodel.smooth_properties`. Identical smoothing will be applied to all acoustic property maps. This smoothing is deactivated by default, in part to allow users to set the desired smoothing kernel at the intended grid size. If set to `true`, this will apply the same smoothing parameters as used during the creation of the medium maps (`headmodel.smooth_method` and `headmodel.smooth_fwhm_mm`, default: 1 mm FWHM gaussian).
-
-> pCT. If pCTs are generated using PRESTUS, they automatically have smoothing applied at the skull edges ([see the pCT documentation](doc_pseudoCT.md)). If acoustic properties are mapped from pCTs, smoothing of the resulting acoustic property maps may not be intended. Recommended settings are an active area of investigation. 
+Which property each tissue gets is described in [Medium properties](doc_medium.md).

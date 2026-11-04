@@ -1,43 +1,29 @@
 # PRESTUS Telemetry
 
-PRESTUS can optionally send anonymous usage statistics to help the developers
-understand which features and platforms are in active use. Participation is
-entirely voluntary. No data is ever sent without an explicit opt-in.
+!!! note "At a glance"
+    - **What:** Optional, anonymous usage statistics: one event per pipeline run, sent only after an explicit opt-in.
+    - **When you need it:** To decide whether to opt in, to change your decision, or to silence the prompt on a cluster.
+    - **Before you start:** Nothing; your decision lives in `~/.prestus/telemetry.json`.
+
+PRESTUS can send anonymous usage statistics so the developers can see which features and platforms are in use. Participation is voluntary. No data is sent without an explicit opt-in.
 
 ## Opt-in / opt-out
 
-On each pipeline run PRESTUS prints a short notice and asks whether to enable
-telemetry. How that prompt is shown depends on the session:
+On each pipeline run PRESTUS prints a short notice and asks whether to enable telemetry. How the prompt appears depends on the session:
 
 - **Interactive console session**: a `y`/`n` prompt that blocks until you answer.
-- **GUI session** (`prestus_gui`, deprecated): a modal **Allow / Decline / Ask me later**
-  dialog shown once at startup, before the "Run Simulation" button (which may
-  dispatch to a background worker with no console) can be pressed.
-- **Non-interactive session** (`matlab -batch` with or without a display,
-  deployed app, SLURM/PBS job, or a session with neither desktop nor
-  display; see [below](#non-interactive-environments-batch-runs-hpc-jobs)):
-  no prompt of any kind is shown and the run never waits for an answer.
+- **GUI session** (`prestus_gui`, deprecated): a modal **Allow / Decline / Ask me later** dialog shown once at startup, before the "Run Simulation" button can be pressed.
+- **Non-interactive session** (`matlab -batch`, deployed app, SLURM/PBS job, or a session with neither desktop nor display; see [below](#non-interactive-environments-batch-runs-hpc-jobs)): no prompt is shown and the run never waits for an answer.
 
-The prompt repeats every run until you give an explicit answer. Your decision
-is stored in:
+The prompt repeats every run until you give an explicit answer. Your decision is stored in `~/.prestus/telemetry.json`. To change it:
 
-```
-~/.prestus/telemetry.json
-```
-
-You can change your decision at any time:
-
-- **Opt out**: set `"opt_in": false` in that file, or run
-  `telemetry_setup_reset()` in MATLAB to be asked again on the next run.
+- **Opt out**: set `"opt_in": false` in that file, or run `telemetry_setup_reset()` in MATLAB to be asked again on the next run.
 - **Opt in**: set `"opt_in": true` in the same file.
-
-`telemetry_set_consent(true)` or `telemetry_set_consent(false)` records the
-decision without any prompt.
+- **Either, without a prompt**: `telemetry_set_consent(true)` or `telemetry_set_consent(false)`.
 
 ### Per-process override: `PRESTUS_TELEMETRY`
 
-The `PRESTUS_TELEMETRY` environment variable sets the decision for one MATLAB
-process, without a prompt and without writing `~/.prestus/telemetry.json`:
+The `PRESTUS_TELEMETRY` environment variable sets the decision for one MATLAB process, without a prompt and without writing `~/.prestus/telemetry.json`:
 
 | Value (case-insensitive) | Effect for this process |
 |---|---|
@@ -46,60 +32,36 @@ process, without a prompt and without writing `~/.prestus/telemetry.json`:
 | unset or empty | No override: the recorded decision applies, or the prompt/notice described above. |
 | anything else | Warning `prestus:telemetry:invalidEnv` (once per value per MATLAB session), then treated as unset. |
 
-`PRESTUS_TELEMETRY=off` takes precedence over a recorded decision: it sends
-nothing even after an opt-in. `PRESTUS_TELEMETRY=on` never overrides a recorded
-opt-out (a site-wide setting must not undo a user's explicit choice); it only
-applies when no decision is recorded. The recorded decision is never changed by
-the variable. Use `telemetry_set_consent` for a lasting choice.
-Set the variable before MATLAB starts, e.g.
-`PRESTUS_TELEMETRY=off matlab -batch "..."` or `export PRESTUS_TELEMETRY=off`
-in a job script, or with `setenv('PRESTUS_TELEMETRY', 'off')` in the session.
+`PRESTUS_TELEMETRY=off` takes precedence over a recorded decision: it sends nothing even after an opt-in. `PRESTUS_TELEMETRY=on` never overrides a recorded opt-out; it only applies when no decision is recorded. The variable never changes the recorded decision; use `telemetry_set_consent` for a lasting choice. Set the variable before MATLAB starts (`PRESTUS_TELEMETRY=off matlab -batch "..."`, or `export PRESTUS_TELEMETRY=off` in a job script) or with `setenv('PRESTUS_TELEMETRY', 'off')` in the session.
 
 ### Non-interactive environments (batch runs, HPC jobs)
 
 PRESTUS never prompts, and never waits for an answer, in these sessions:
 
-- `matlab -batch` runs (detected with `batchStartupOptionUsed`, R2019a and
-  later), whether or not a display is attached: cron jobs, CI runners and
-  scripts started from a terminal;
-- deployed applications and jobs under SLURM (`SLURM_JOB_ID`) or PBS/Torque
-  (`PBS_JOBID`);
-- sessions with neither the MATLAB desktop nor a display (e.g.
-  `matlab -nodisplay -r ...` from cron). An interactive `matlab -nodisplay`
-  terminal session is also treated this way; record a decision there with
-  `telemetry_set_consent`.
+- `matlab -batch` runs (detected with `batchStartupOptionUsed`, R2019a and later), whether or not a display is attached: cron jobs, CI runners and scripts started from a terminal;
+- deployed applications and jobs under SLURM (`SLURM_JOB_ID`) or PBS/Torque (`PBS_JOBID`);
+- sessions with neither the MATLAB desktop nor a display (e.g. `matlab -nodisplay -r ...` from cron). An interactive `matlab -nodisplay` terminal session is also treated this way; record a decision there with `telemetry_set_consent`.
 
-The full notice is printed to stdout (visible in job logs) on every run, but
-**no decision is recorded and no data is sent** unless consent was already
-recorded or `PRESTUS_TELEMETRY=on` is set. The notice reappears on every run
-until you record a decision or set `PRESTUS_TELEMETRY`.
+The full notice is printed to stdout (visible in job logs) on every run, but **no decision is recorded and no data is sent** unless consent was already recorded or `PRESTUS_TELEMETRY=on` is set. The notice reappears on every run until you record a decision or set `PRESTUS_TELEMETRY`.
 
 To opt in from an HPC environment, either:
 
 1. Run PRESTUS once interactively (e.g. on a login node) and answer `y`,
 2. Run `telemetry_set_consent(true)` (or `false` to opt out) in MATLAB,
 3. Set `PRESTUS_TELEMETRY=on` (or `off`) in the job script, for that job only, or
-4. Create `~/.prestus/telemetry.json` manually:
-   ```json
-   {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
-   ```
+4. Create `~/.prestus/telemetry.json` by hand:
+
+    ```json
+    {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
+    ```
 
 ### Technical vs. deployment runs
 
-Test and CI runs that exercise `prestus_pipeline` (e.g. via
-`run_all_tests('water'|'head'|'acoustic'|'all'|'physics'|...)`) are tagged
-`run_type: technical` automatically, so their pass/fail rate can be tracked
-separately from real deployment usage on the
-[usage statistics](doc_usage_statistics.md) page. Set
-`PRESTUS_RUN_TYPE=technical` yourself when running PRESTUS purely to validate
-an install or a pipeline change; leave it unset for real runs (default:
-`deployment`).
+Test and CI runs that exercise `prestus_pipeline` are tagged `run_type: technical` automatically, so their pass/fail rate can be tracked separately from real deployment usage on the [usage statistics](doc_usage_statistics.md) page. Set `PRESTUS_RUN_TYPE=technical` yourself when running PRESTUS purely to validate an install or a pipeline change; leave it unset for real runs (default: `deployment`).
 
 ## What is collected
 
-Each pipeline run emits one event: `run_end` (on clean exit) or `run_error`
-(if the pipeline throws an unhandled exception). The table below lists every
-field that may be sent.
+Each pipeline run emits one event: `run_end` (on clean exit) or `run_error` (if the pipeline throws an unhandled exception). The tables below list every field that may be sent. Subject IDs, file paths and directory names are not collected, because they could contain identifiable information.
 
 ### System resources
 
@@ -137,7 +99,7 @@ All system resource fields are collected inside `try/catch` blocks and fall back
 | `code_type` | k-Wave code variant: `matlab_cpu`, `matlab_gpu`, `cpp_cpu`, `cpp_gpu` |
 | `precision` | Floating-point precision: `single` or `double` |
 | `hpc_name` | HPC cluster name if running on a known cluster; `unknown` otherwise |
-| `use_gpu` | Boolean — whether a GPU device is configured |
+| `use_gpu` | Boolean: whether a GPU device is configured |
 
 ### Simulation configuration
 
@@ -145,7 +107,7 @@ All system resource fields are collected inside `try/catch` blocks and fall back
 |---|---|
 | `medium` | Medium type: `water` or `layered` |
 | `layers` | List of tissue layer names (e.g. `["skin","skull","brain"]`) |
-| `pct_enabled` | Boolean — whether pseudo-CT is enabled |
+| `pct_enabled` | Boolean: whether pseudo-CT is enabled |
 | `pct_density` | Name of the density mapping used for pCT (string, not values) |
 | `pct_speed` | Name of the sound-speed mapping used for pCT |
 | `pct_atten` | Name of the attenuation mapping used for pCT |
@@ -167,9 +129,7 @@ All system resource fields are collected inside `try/catch` blocks and fall back
 |---|---|
 | `duration_s` | Total pipeline wall-clock time in seconds |
 | `status` | `"success"` or `"error"` |
-| `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`) — **no message text** is transmitted |
-
-Subject IDs, file paths, or directory names that carries a risk of containing identifiable information is not collected.
+| `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`); **no message text** is transmitted |
 
 ## Usage statistics
 
