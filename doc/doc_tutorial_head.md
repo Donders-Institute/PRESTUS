@@ -3,7 +3,7 @@
 !!! warning "Draft"
     This tutorial has not yet been run end to end on the current PRESTUS version. Runtimes and the values under *What you should see* are placeholders (marked **TODO**) until a test run fills them in. It is not yet linked from the navigation.
 
-This tutorial runs a complete head simulation on *Ernie*, the example head that comes with SimNIBS: segmentation, placement from MNI coordinates, the acoustic simulation, the thermal simulation, and the report. It builds on [Your first simulation](doc_getting-started.md); terms are explained in [Concepts and glossary](doc_concepts.md).
+This tutorial runs a complete head simulation on *Ernie*, the example head that comes with SimNIBS: segmentation, placement from MNI coordinates, the acoustic simulation, the thermal simulation, and the report. It builds on [Your first simulation](doc_getting-started.md); terms are explained in the [Glossary](doc_glossary.md).
 
 !!! note "At a glance"
     - **What:** one subject, one target, a transducer from the library, acoustic and thermal simulation.

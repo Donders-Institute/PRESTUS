@@ -3,7 +3,7 @@
 !!! note "At a glance"
     - **What:** The coordinate spaces PRESTUS uses (voxel, RAS, MNI, simulation grid) and how it converts between them.
     - **When you need it:** When positions end up in the wrong place, or before changing any coordinate transform in the code.
-    - **Before you start:** Nothing; for the basic idea see [Concepts](doc_concepts.md#head-model).
+    - **Before you start:** Nothing; for the basic idea see [Glossary](doc_glossary.md#head-model).
 
 ## Canonical convention
 

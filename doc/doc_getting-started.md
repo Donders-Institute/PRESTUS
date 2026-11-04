@@ -2,7 +2,7 @@
 
 This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no SimNIBS, a few minutes on a CPU) and then points to what changes for a head simulation.
 
-Before you start, install PRESTUS and its MATLAB dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_concepts.md#glossary) open alongside.
+Before you start, install PRESTUS and its MATLAB dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_glossary.md) open alongside.
 
 If you prefer forms to code, the [PRESTUS Nexus](doc_nexus.md) builds the same config from a T1 and the defaults, and runs it. The steps below show what the Nexus writes for you.
 

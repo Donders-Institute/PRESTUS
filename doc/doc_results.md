@@ -1,6 +1,6 @@
 # Reading your results
 
-A finished run leaves a folder of files. This page tells you which ones to open first, what to check, and how to read the safety summary. Every file and column is described in [Outputs & Reports](doc_outputs.md); terms are defined in [Concepts and glossary](doc_concepts.md).
+A finished run leaves a folder of files. This page tells you which ones to open first, what to check, and how to read the safety summary. Every file and column is described in [Outputs & Reports](doc_outputs.md); terms are defined in the [Glossary](doc_glossary.md).
 
 ## Where to look
 

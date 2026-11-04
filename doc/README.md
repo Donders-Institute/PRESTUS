@@ -12,7 +12,7 @@ PRESTUS is intended for basic research. It is not approved for clinical use.
 
 New to PRESTUS? Follow these in order:
 
-1. [Concepts and glossary](doc_concepts.md): what PRESTUS does, and the terms used throughout.
+1. [Concepts](doc_concepts.md): what PRESTUS does, in one picture. Unfamiliar terms are in the [Glossary](doc_glossary.md).
 2. [Installation](doc_installation.md): MATLAB, PRESTUS and k-Wave are enough to begin.
 3. [Your first simulation](doc_getting-started.md): a free-water run in a few minutes, then what a head simulation needs.
 4. [Reading your results](doc_results.md): what to check in the report, and how to read the safety summary.

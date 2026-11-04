@@ -38,7 +38,7 @@ theme:
 nav:
   - 🏠 Home: README.md
   - 🚀 Get Started:
-    - Concepts & Glossary: doc_concepts.md
+    - Concepts: doc_concepts.md
     - Installation: doc_installation.md
     - Your first simulation: doc_getting-started.md
     - Reading your results: doc_results.md
@@ -84,6 +84,7 @@ nav:
     - BabelBrain: doc_babelbrain.md
     - jwave: doc_jwave.md
   - 📚 Reference:
+    - Glossary: doc_glossary.md
     - Parameters: doc_parameters.md
     - Functions: doc_functions.md
     - Coordinate Systems: doc_coordinate_systems.md
