@@ -54,6 +54,16 @@ See [transducer placement](doc_placement.md) for how a position is chosen.
 
 In `water` simulations with annular arrays, the placement is determined from the edge of the PML layer.
 
+??? note "Details: positions in mm for phantom and water simulations"
+    For phantom and water simulations the transducer and focus positions can be given in millimetres rather than voxel indices, with two optional config fields:
+
+    | Field | Description |
+    |---|---|
+    | `trans_pos_mm` | Transducer position in mm from the centre of grid voxel `[1, 1, 1]` (`[x, y, z]`; 0 mm = voxel 1). Converted to voxel indices at runtime as `round(mm / grid.resolution_mm) + 1`. |
+    | `focus_pos_mm` | Focus position in mm from the centre of grid voxel `[1, 1, 1]` (`[x, y, z]`). Same conversion applies. |
+
+    These fields are resolution-independent: the same config works unchanged when `grid.resolution_mm` changes. When both voxel-index and mm fields are present, the mm fields take precedence. Phantom NIfTI outputs reuse the input header, so world-space orientation and voxel dimensions stay consistent across all pipeline stages.
+
 ## Transducer-target distance
 
 ![PRESTUS transducer distance definitions](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/transducer_distances.png)
