@@ -21,11 +21,14 @@ parameters = load_parameters('config_projectX.yaml', cfg_dir, ...
                              {'subject_id', 3; 'io.output_affix', 'M1'});         % plus overrides
 ```
 
-The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default. Lists of transducers (`transducer(2)`, …) keep their own fields. One exception: `medium_properties.<tissue>.absorption_fraction` and `absorption_coeff` exclude each other, so a layer that sets one empties the other (see [Heat deposition](doc_simulations-thermal.md#heat-deposition)).
+The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default.
 
-Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
+??? note "Details: merge rules and validation"
+    Lists of transducers (`transducer(2)`, …) keep their own fields. One exception: `medium_properties.<tissue>.absorption_fraction` and `absorption_coeff` exclude each other, so a layer that sets one empties the other (see [Heat deposition](doc_simulations-thermal.md#heat-deposition)).
 
-You can also change the struct in MATLAB after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception are the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
+    Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
+
+You can also change the struct in MATLAB after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception is the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
 
 ## A project config folder
 
@@ -44,7 +47,8 @@ This writes two files:
 
 Load them with `load_parameters('config_projectX.yaml', '/path/to/project/config')`. PRESTUS looks for the project `config_default.yaml` next to the study config, else in the folder you pass, else in the current folder (with the warning `prestus:cwdDefault`).
 
-When PRESTUS later adds new settings, a project copy made earlier does not contain them. They then take their toolbox default, and `load_parameters` warns (`prestus:staleProjectDefault`). `prestus_config_upgrade(folder)` replaces the copy with the current toolbox default, keeps a dated backup, and can first write the values your copy pinned differently into the study config, so the simulation settings stay the same. The Nexus offers the same under **Tools ▸ Update project defaults…**.
+??? note "Details: updating a project copy of the defaults"
+    When PRESTUS later adds new settings, a project copy made earlier does not contain them. They then take their toolbox default, and `load_parameters` warns (`prestus:staleProjectDefault`). `prestus_config_upgrade(folder)` replaces the copy with the current toolbox default, keeps a dated backup, and can first write the values your copy pinned differently into the study config, so the simulation settings stay the same. The Nexus offers the same under **Tools ▸ Update project defaults…**.
 
 ## What a study config usually contains
 
@@ -86,34 +90,36 @@ modules:
   run_heating_sims: 1
 ```
 
-On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects SLURM or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group.md#study-setup)). Where to look next:
+On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects SLURM or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group.md#study-setup)).
 
-| Topic | Keys | Page |
-|---|---|---|
-| Paths and input images | `path.*`, `startup.*` | [Parameters](doc_parameters.md#data-paths-path) |
-| Medium and tissue properties | `simulation.medium`, `layers`, `medium_properties`, `pct.*` | [Medium Setup](doc_medium.md), [pseudo-CT](doc_pseudoCT.md) |
-| Transducer | `transducer.*` | [Transducer](doc_transducer.md), [Transducer Library](doc_transducer_library.md) |
-| Position and target | `placement.*`, `transducer.trans_pos`/`focus_pos` | [Placement](doc_placement.md) |
-| Protocol and heating | `timing.*`, `thermal.*` | [Thermal](doc_simulations-thermal.md) |
-| Which stages run | `modules.*` | [Modules](doc_modules.md) |
-| Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backends](doc_backend.md), [k-Wave](doc_kwave.md) |
-| Output files | `io.*` | [Outputs](doc_outputs.md) |
+??? note "Details: where to look next"
+    | Topic | Keys | Page |
+    |---|---|---|
+    | Paths and input images | `path.*`, `startup.*` | [Parameters](doc_parameters.md#data-paths-path) |
+    | Medium and tissue properties | `simulation.medium`, `layers`, `medium_properties`, `pct.*` | [Medium Setup](doc_medium.md), [pseudo-CT](doc_pseudoCT.md) |
+    | Transducer | `transducer.*` | [Transducer](doc_transducer.md), [Transducer Library](doc_transducer_library.md) |
+    | Position and target | `placement.*`, `transducer.trans_pos`/`focus_pos` | [Placement](doc_placement.md) |
+    | Protocol and heating | `timing.*`, `thermal.*` | [Thermal](doc_simulations-thermal.md) |
+    | Which stages run | `modules.*` | [Modules](doc_modules.md) |
+    | Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backends](doc_backend.md), [k-Wave](doc_kwave.md) |
+    | Output files | `io.*` | [Outputs](doc_outputs.md) |
 
 ## Configs from earlier PRESTUS versions
 
 Configs written for PRESTUS v0.5.0 or later load as they are. `load_parameters` converts each renamed key to its current name, in every config layer and in the overrides, and lists the conversions in one warning (`prestus:renamedConfigKey`). Update the config with the names from that list; the [Nexus](doc_nexus.md) marks the same keys when you open the file.
 
-A few old keys have no exact counterpart. These stop the run (`prestus:legacyConfigKey`) with a message naming the key to set instead:
+??? note "Details: old keys without a current name"
+    A few old keys have no exact counterpart. These stop the run (`prestus:legacyConfigKey`) with a message naming the key to set instead:
 
-| Old key | Set instead |
-|---|---|
-| `smooth_window` [voxels] | `headmodel.smooth_fwhm_mm` [mm] |
-| `expected_focal_distance_mm` | `transducer.focal_distance_ep` (from the exit plane) or `transducer.focal_distance_bowl` (from the bowl apex) |
-| `pseudoCT_variant: marquet` | `pct.mapping_density`, `pct.mapping_soundspeed`, `pct.mapping_attenuation` |
-| `calibration.weights: 0` | `calibration.opt_weights` (now 0 = uniform weighting) |
-| `subject_subfolder: 0`, custom `seg_labels` | not supported: outputs always go to `sub-XXX` folders, and the SimNIBS charm labels are fixed |
+    | Old key | Set instead |
+    |---|---|
+    | `smooth_window` [voxels] | `headmodel.smooth_fwhm_mm` [mm] |
+    | `expected_focal_distance_mm` | `transducer.focal_distance_ep` (from the exit plane) or `transducer.focal_distance_bowl` (from the bowl apex) |
+    | `pseudoCT_variant: marquet` | `pct.mapping_density`, `pct.mapping_soundspeed`, `pct.mapping_attenuation` |
+    | `calibration.weights: 0` | `calibration.opt_weights` (now 0 = uniform weighting) |
+    | `subject_subfolder: 0`, custom `seg_labels` | not supported: outputs always go to `sub-XXX` folders, and the SimNIBS charm labels are fixed |
 
-A config that sets an old key and its current name to different values also stops the run. Conversion covers names only: defaults that changed since your config was written (for example `transducer.target_isppa_wcm2`) apply unless the config sets them, as listed in the [changelog](CHANGELOG.md). `calibration.skip_front_peak_mm` kept its name but is now measured from the exit plane rather than the bowl apex.
+    A config that sets an old key and its current name to different values also stops the run. Conversion covers names only: defaults that changed since your config was written (for example `transducer.target_isppa_wcm2`) apply unless the config sets them, as listed in the [changelog](CHANGELOG.md). `calibration.skip_front_peak_mm` kept its name but is now measured from the exit plane rather than the bowl apex.
 
 ## Editing configs with a GUI
 

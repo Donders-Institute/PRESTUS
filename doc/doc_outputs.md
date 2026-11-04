@@ -77,71 +77,67 @@ The **mechanical index** per voxel is MI = p⁻ / √f, with p⁻ the peak raref
 
 ### Acoustic metrics
 
-#### Global
+??? note "Details: global acoustic columns"
+    | Column | Unit | Description |
+    |---|---|---|
+    | `subject_id` | none | Subject identifier |
+    | `freq_Hz` | Hz | Transducer centre frequency |
+    | `Isppa` | W/cm² | ISPPA: maximum pulse-average intensity across the entire simulation grid |
+    | `Isppa_after_exitplane` | W/cm² | Maximum IPA beyond the transducer exit plane (or within brain if modelled) |
+    | `real_focal_distance_mm` | mm | Distance from the transducer face to the location of maximum IPA |
+    | `Ipa_target` | W/cm² | IPA at the specified target coordinate |
+    | `Ipa_target_radius` | W/cm² | Mean IPA within a sphere of radius `analysis.focus_area_radius` mm centred on the target |
+    | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
+    | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
 
-| Column | Unit | Description |
-|---|---|---|
-| `subject_id` | none | Subject identifier |
-| `freq_Hz` | Hz | Transducer centre frequency |
-| `Isppa` | W/cm² | ISPPA: maximum pulse-average intensity across the entire simulation grid |
-| `Isppa_after_exitplane` | W/cm² | Maximum IPA beyond the transducer exit plane (or within brain if modelled) |
-| `real_focal_distance_mm` | mm | Distance from the transducer face to the location of maximum IPA |
-| `Ipa_target` | W/cm² | IPA at the specified target coordinate |
-| `Ipa_target_radius` | W/cm² | Mean IPA within a sphere of radius `analysis.focus_area_radius` mm centred on the target |
-| `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
-| `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
+    Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; ITRUSST limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_dist_mm`), computed beyond the transducer exit plane.
 
-Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; ITRUSST limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_dist_mm`), computed beyond the transducer exit plane.
-
-#### Tissue-specific *(layered simulations only)*
-
-| Column | Unit | Description |
-|---|---|---|
-| `Isppa_brain` | W/cm² | Maximum IPA within brain tissue (GM + WM) |
-| `Isppa_skull` | W/cm² | Maximum IPA within skull bone |
-| `Isppa_skin` | W/cm² | Maximum IPA within skin |
-| `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
-| `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
-| `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
-| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (also written for water/free-field runs). Max pressure safety limit: 2 MPa |
-| `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
-| `MI_brain` | none | Maximum mechanical index within brain tissue (GM + WM) |
-| `MI_skull` | none | Maximum mechanical index within skull bone |
-| `MI_skin` | none | Maximum mechanical index within skin |
-| `MI_tc` | none | **Transcranial MI**: maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
-| `Ix_brain_vox`, `Iy_brain_vox`, `Iz_brain_vox` | voxels | Grid coordinates of peak IPA within brain |
-| `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −3 dB intensity region within brain (IPA ≥ 50 % of `Isppa_brain`); equals `focal_vol_3dB_mm3` |
-| `focal_vol_3dB_mm3` | mm³ | Volume of the −3 dB focal zone within brain (IPA ≥ 50 % of peak; 10·log₁₀(0.5) = −3 dB) |
-| `focal_vol_6dB_mm3` | mm³ | Volume of the −6 dB focal zone within brain (IPA ≥ 25 % of peak = pressure ≥ 50 % of peak; FWHM) |
-| `focal_centroid_3dB_dist_mm` | mm | Distance from the transducer to the geometric centroid of the −3 dB focal region |
+??? note "Details: tissue-specific acoustic columns (layered simulations only)"
+    | Column | Unit | Description |
+    |---|---|---|
+    | `Isppa_brain` | W/cm² | Maximum IPA within brain tissue (GM + WM) |
+    | `Isppa_skull` | W/cm² | Maximum IPA within skull bone |
+    | `Isppa_skin` | W/cm² | Maximum IPA within skin |
+    | `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
+    | `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
+    | `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
+    | `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (also written for water/free-field runs). Max pressure safety limit: 2 MPa |
+    | `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
+    | `MI_brain` | none | Maximum mechanical index within brain tissue (GM + WM) |
+    | `MI_skull` | none | Maximum mechanical index within skull bone |
+    | `MI_skin` | none | Maximum mechanical index within skin |
+    | `MI_tc` | none | **Transcranial MI**: maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
+    | `Ix_brain_vox`, `Iy_brain_vox`, `Iz_brain_vox` | voxels | Grid coordinates of peak IPA within brain |
+    | `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −3 dB intensity region within brain (IPA ≥ 50 % of `Isppa_brain`); equals `focal_vol_3dB_mm3` |
+    | `focal_vol_3dB_mm3` | mm³ | Volume of the −3 dB focal zone within brain (IPA ≥ 50 % of peak; 10·log₁₀(0.5) = −3 dB) |
+    | `focal_vol_6dB_mm3` | mm³ | Volume of the −6 dB focal zone within brain (IPA ≥ 25 % of peak = pressure ≥ 50 % of peak; FWHM) |
+    | `focal_centroid_3dB_dist_mm` | mm | Distance from the transducer to the geometric centroid of the −3 dB focal region |
 
 ### Thermal metrics *(only written when heating simulations are run)*
 
 Temperature is simulated over the full sonication protocol (on/off cycles) with the Pennes bioheat equation. All values are spatial maxima within the respective tissue.
 
-#### Global
+??? note "Details: global thermal columns"
+    | Column | Unit | Description |
+    |---|---|---|
+    | `maxT` | °C | Global maximum temperature reached at any point during sonication |
+    | `endT` | °C | Global maximum temperature at the end of the last sonication pulse |
+    | `maxCEM43` | min | Global maximum CEM43 (kWave form) over the full protocol |
+    | `maxCEM43end` | min | Global maximum CEM43 (kWave form) at end of last pulse |
+    | `maxCEM43iso` | min | Global maximum CEM43 (ISO form) over the full protocol |
+    | `maxCEM43isoend` | min | Global maximum CEM43 (ISO form) at end of last pulse |
 
-| Column | Unit | Description |
-|---|---|---|
-| `maxT` | °C | Global maximum temperature reached at any point during sonication |
-| `endT` | °C | Global maximum temperature at the end of the last sonication pulse |
-| `maxCEM43` | min | Global maximum CEM43 (kWave form) over the full protocol |
-| `maxCEM43end` | min | Global maximum CEM43 (kWave form) at end of last pulse |
-| `maxCEM43iso` | min | Global maximum CEM43 (ISO form) over the full protocol |
-| `maxCEM43isoend` | min | Global maximum CEM43 (ISO form) at end of last pulse |
-
-#### Tissue-specific
-
-| Column | Unit | Description |
-|---|---|---|
-| `maxT_brain/skull/skin` | °C | Maximum temperature in each tissue during sonication. ITRUSST limit: 39 °C |
-| `endT_brain/skull/skin` | °C | Maximum temperature in each tissue at end of last pulse |
-| `riseT_brain/skull/skin` | °C | Maximum temperature rise above baseline (maxT − baseline). ITRUSST limit: 2 °C |
-| `rise_endT_brain/skull/skin` | °C | Temperature rise above baseline at end of last pulse |
-| `CEM43_brain/skull/skin` | min | Maximum CEM43 (kWave form) in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
-| `CEM43_end_brain/skull/skin` | min | CEM43 (kWave form) in each tissue at end of last pulse |
-| `CEM43iso_brain/skull/skin` | min | Maximum CEM43 (ISO form) in each tissue |
-| `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at end of last pulse |
+??? note "Details: tissue-specific thermal columns"
+    | Column | Unit | Description |
+    |---|---|---|
+    | `maxT_brain/skull/skin` | °C | Maximum temperature in each tissue during sonication. ITRUSST limit: 39 °C |
+    | `endT_brain/skull/skin` | °C | Maximum temperature in each tissue at end of last pulse |
+    | `riseT_brain/skull/skin` | °C | Maximum temperature rise above baseline (maxT − baseline). ITRUSST limit: 2 °C |
+    | `rise_endT_brain/skull/skin` | °C | Temperature rise above baseline at end of last pulse |
+    | `CEM43_brain/skull/skin` | min | Maximum CEM43 (kWave form) in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
+    | `CEM43_end_brain/skull/skin` | min | CEM43 (kWave form) in each tissue at end of last pulse |
+    | `CEM43iso_brain/skull/skin` | min | Maximum CEM43 (ISO form) in each tissue |
+    | `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at end of last pulse |
 
 Both CEM43 formulations are always computed; see [Thermal simulations](doc_simulations-thermal.md) for the formulas. The HTML report shows the one selected by `parameters.thermal.cem43_iso`.
 
@@ -171,37 +167,34 @@ PRESTUS exports 3D volumes (2D for axisymmetric simulations) in subject-native T
 - Subject T1 space: `sub-XXX_<medium>_T1w<affix>_<type>.nii.gz`
 - MNI space: `sub-XXX_<medium>_MNI<affix>_<type>.nii.gz`
 
-### Medium maps *(written after medium setup)*
+??? note "Details: medium maps (written after medium setup)"
+    | Type | Resampling | Description |
+    |---|---|---|
+    | `medium_masks` | nearest | Tissue label mask (integer indices) |
+    | `sound_speed` | nearest | Speed of sound [m/s]; edges filled with water value |
+    | `density` | nearest | Mass density [kg/m³]; edges filled with water value |
+    | `alpha_coeff` | nearest | Absorption coefficient [dB/MHz/cm]; edges filled with water value |
 
-| Type | Resampling | Description |
-|---|---|---|
-| `medium_masks` | nearest | Tissue label mask (integer indices) |
-| `sound_speed` | nearest | Speed of sound [m/s]; edges filled with water value |
-| `density` | nearest | Mass density [kg/m³]; edges filled with water value |
-| `alpha_coeff` | nearest | Absorption coefficient [dB/MHz/cm]; edges filled with water value |
+??? note "Details: acoustic maps (written after acoustic analysis)"
+    | Type | Description |
+    |---|---|
+    | `intensity` | Pulse-average intensity (IPA) [W/cm²] |
+    | `MI` | Mechanical index |
+    | `pressure` | Peak pressure [Pa]; with a JSON sidecar so a later run can start from it ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)) |
+    | `focal_mask_3dB` | −3 dB focal zone binary mask (IPA ≥ 50 % of peak; restricted to brain for layered, to beyond-exit-plane for free-field) |
+    | `focal_mask_6dB` | −6 dB / FWHM focal zone binary mask (IPA ≥ 25 % of peak = P ≥ Pmax/2; same region restriction) |
 
-### Acoustic maps *(written after acoustic analysis)*
-
-| Type | Description |
-|---|---|
-| `intensity` | Pulse-average intensity (IPA) [W/cm²] |
-| `MI` | Mechanical index |
-| `pressure` | Peak pressure [Pa]; with a JSON sidecar so a later run can start from it ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)) |
-| `focal_mask_3dB` | −3 dB focal zone binary mask (IPA ≥ 50 % of peak; restricted to brain for layered, to beyond-exit-plane for free-field) |
-| `focal_mask_6dB` | −6 dB / FWHM focal zone binary mask (IPA ≥ 25 % of peak = P ≥ Pmax/2; same region restriction) |
-
-### Thermal maps *(written after thermal analysis)*
-
-| Type | Description |
-|---|---|
-| `heating` | Maximum temperature during sonication [°C] |
-| `heating_end` | Temperature at end of last pulse [°C] |
-| `heatrise` | Temperature rise above baseline [°C] |
-| `heatrise_end` | Temperature rise above baseline at end of last pulse [°C] |
-| `CEM43` | CEM43 thermal dose, kWave form [min] |
-| `CEM43_end` | CEM43 (kWave) at end of last pulse [min] |
-| `CEM43_iso` | CEM43 thermal dose, ISO form [min] |
-| `CEM43_iso_end` | CEM43 (ISO) at end of last pulse [min] |
+??? note "Details: thermal maps (written after thermal analysis)"
+    | Type | Description |
+    |---|---|
+    | `heating` | Maximum temperature during sonication [°C] |
+    | `heating_end` | Temperature at end of last pulse [°C] |
+    | `heatrise` | Temperature rise above baseline [°C] |
+    | `heatrise_end` | Temperature rise above baseline at end of last pulse [°C] |
+    | `CEM43` | CEM43 thermal dose, kWave form [min] |
+    | `CEM43_end` | CEM43 (kWave) at end of last pulse [min] |
+    | `CEM43_iso` | CEM43 thermal dose, ISO form [min] |
+    | `CEM43_iso_end` | CEM43 (ISO) at end of last pulse [min] |
 
 ---
 
@@ -259,12 +252,13 @@ PRESTUS keeps two kinds of intermediate results apart:
 - **Within-run caches** (`cache/` of a simulation folder) are reloaded only by the run that wrote them, or a re-run of it. `io.overwrite_files` decides reuse ([Overwrite behaviour](#overwrite-behaviour)).
 - **Stage outputs** are complete results that a later, separate run starts from. Each has a BIDS-style JSON sidecar whose `signature` lists the settings the output depends on. The later run compares it with its own settings.
 
-| Stage output | Sidecar | Picked up by | Compared settings |
-|---|---|---|---|
-| SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | none (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | none |
-| Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) |
-| Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
-| Pressure map, `nii/T1w/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
+??? note "Details: stage outputs and compared settings"
+    | Stage output | Sidecar | Picked up by | Compared settings |
+    |---|---|---|---|
+    | SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | none (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | none |
+    | Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) |
+    | Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
+    | Pressure map, `nii/T1w/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
 
 `io.cache_signature_check` handles a mismatch (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
 
@@ -331,15 +325,18 @@ Use `force` when an input of the intermediate caches has changed: transducer pla
 
 ## Cache reuse checks
 
-Grid, medium and acoustic caches are named by subject, medium and affix only. Each cache therefore stores the settings it depends on (`cache_signature`). When a cache is reused (under `io.overwrite_files: never`, after a declined overwrite prompt, or in the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
+Grid, medium and acoustic caches are named by subject, medium and affix only. Each cache therefore stores the settings it depends on (`cache_signature`). A reused cache built from different settings stops the run by default (`io.cache_signature_check`).
 
-| Value | Effect |
-|---|---|
-| `error` (default) | Stop with `prestus:cache:signatureMismatch`, naming the differing keys. |
-| `warn` | Warn and reuse the cache anyway. |
-| `off` | No check. |
+??? note "Details: mismatch handling"
+    When a cache is reused (under `io.overwrite_files: never`, after a declined overwrite prompt, or in the intermediate stages of a chained pipeline under `always`) and the settings differ, `io.cache_signature_check` decides:
 
-A cache without a signature is reused with the warning `prestus:cache:unverified`. Stage-output sidecars are checked the same way ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)).
+    | Value | Effect |
+    |---|---|
+    | `error` (default) | Stop with `prestus:cache:signatureMismatch`, naming the differing keys. |
+    | `warn` | Warn and reuse the cache anyway. |
+    | `off` | No check. |
+
+    A cache without a signature is reused with the warning `prestus:cache:unverified`. Stage-output sidecars are checked the same way ([Starting from earlier stage outputs](#starting-from-earlier-stage-outputs)).
 
 ??? note "Details: what each cache compares"
     | Cache | Compared settings |
