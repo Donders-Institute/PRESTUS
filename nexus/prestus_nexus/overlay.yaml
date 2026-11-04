@@ -399,7 +399,6 @@ deprecated:
   transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}
   transducer.matrix.elem_amp: {use: transducer.matrix.elem_p_amp, source: validate_matrix_transducer.m}
   calibration.target_isppa_wcm2: {use: transducer.target_isppa_wcm2, source: load_parameters.m}
-  jwave.pml_size: {use: grid.pml_size, ignored: true, source: jwave_wrapper.m}
   io.external_acoustic_nifti: {use: path.acoustic_input, source: load_parameters.m}
 
 extra:

@@ -134,12 +134,6 @@ if isfield(parameters, 'jwave')
     jw = parameters.jwave;
 end
 
-if isfield(jw, 'pml_size')
-    warning('jwave_wrapper:ignoredField', ...
-        ['parameters.jwave.pml_size is ignored. ' ...
-         'Set parameters.grid.pml_size instead (shared with k-Wave).']);
-end
-
 python_env     = get_field(jw, 'python_env',     '');
 python_env_gpu = get_field(jw, 'python_env_gpu', '');
 use_gpu        = get_field(jw, 'use_gpu',        []);   % [] = auto-detect

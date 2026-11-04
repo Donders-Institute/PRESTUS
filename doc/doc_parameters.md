@@ -71,7 +71,7 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
 
 #### jwave settings (`jwave`)
 
-Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size` (`jwave.pml_size` is ignored). Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+Used when `acoustic_backend: jwave`. `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
