@@ -10,7 +10,9 @@ The Default column of the parameter tables is also compared with the value in
 config_default.yaml, for rows under a heading that names the section in
 backticks (e.g. "### I/O management (`io`)" or "#### `placement.mtnu`") and
 whose Default cell is a single code literal (`0`, `'auto'`, `[1, 2]`, `[] → 1`
-reads as `[]`). Exit status 1 lists undocumented keys and differing defaults.
+reads as `[]`). Tables inside collapsible blocks (indented by four spaces) are
+checked as well; there a bold-only line naming the section in backticks
+(e.g. "**`placement.manual`**") sets the section like a heading. Exit status 1 lists undocumented keys and differing defaults.
 
 Usage:
     python tools/docs/check_param_docs.py
@@ -97,9 +99,13 @@ def default_mismatches(config, doc: str) -> list[str]:
     prefix = None
     default_col = None
     for line in doc.splitlines():
-        heading = re.match(r"^#{2,6}\s", line)
+        # Folded content (`??? note` blocks) is indented. A bold-only line
+        # (e.g. "**`placement.manual`**") acts as a heading.
+        line = line.lstrip()
+        heading = re.match(r"^#{2,6}\s", line) or re.fullmatch(r"\*\*[^*]+\*\*:?", line.rstrip())
         if heading:
-            m = re.search(r"\(`([\w.]+)`", line) or re.match(r"^#{2,6}\s+`([\w.]+)`", line)
+            m = (re.search(r"\(`([\w.]+)`", line) or re.match(r"^#{2,6}\s+`([\w.]+)`", line)
+                 or re.match(r"^\*\*`([\w.]+)`", line))
             prefix = m.group(1) if m else None
             default_col = None
             continue
