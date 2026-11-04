@@ -55,22 +55,24 @@ The window has one tab per area; each shows its config sections as cards:
 | Study | study name, targeting & analysis | study manifest editor |
 | Run | pipeline stages, where to run, HPC | run log, YAML review |
 
-- Each field has a readable name. Hovering over it or clicking **?** shows the full help from `config_default.yaml`, the config key and the default.
-- Changed values are marked ●, fields filled from the equipment library are marked *from library*, and ↺ resets a field.
-- A tab's label shows a red (errors) or amber (warnings only) dot with the number of problems in its fields. Its tooltip also counts the changed values.
-- Fields appear only when they apply to the current modes (e.g. the Localite settings only with `placement.mode: localite`).
-- *Placement mode* marks each mode for the configured subject. **Unavailable** (greyed out; the tooltip names the missing input) means PRESTUS cannot produce an input the mode needs: no T1, no SimNIBS segmentation (PlanTUS: also the mesh `sub-XXX.msh`) and no `startup.simnibs_bin_path` to run charm, or no recorded Localite poses. **Needs setup** means charm will run first or the mode's tool paths are still empty. Tool paths never grey a mode out, since they are only shown once it is selected. The mode in use always stays selectable, and why it cannot run yet is written under the field.
+??? note "Details: fields, change marks and mode availability"
+    - Each field has a readable name. Hovering over it or clicking **?** shows the full help from `config_default.yaml`, the config key and the default.
+    - Changed values are marked ●, fields filled from the equipment library are marked *from library*, and ↺ resets a field.
+    - A tab's label shows a red (errors) or amber (warnings only) dot with the number of problems in its fields. Its tooltip also counts the changed values.
+    - Fields appear only when they apply to the current modes (e.g. the Localite settings only with `placement.mode: localite`).
+    - *Placement mode* marks each mode for the configured subject. **Unavailable** (greyed out; the tooltip names the missing input) means PRESTUS cannot produce an input the mode needs: no T1, no SimNIBS segmentation (PlanTUS: also the mesh `sub-XXX.msh`) and no `startup.simnibs_bin_path` to run charm, or no recorded Localite poses. **Needs setup** means charm will run first or the mode's tool paths are still empty. Tool paths never grey a mode out, since they are only shown once it is selected. The mode in use always stays selectable, and why it cannot run yet is written under the field.
 
 ### Advanced options
 
 Each tab hides the settings most studies leave at their defaults, and says how many are hidden.
 
-- **+ n advanced** in a card's header shows that card's advanced settings (*Hide advanced* folds them again). **Show advanced options** shows them on every card of the tab, including the fully advanced sections.
-- An advanced setting that holds a value is always shown. Jumping to an issue opens the card it is on.
-- **Locked cards.** The tissue properties card (`medium_properties`) is read-only. **🔒 Unlock** asks for confirmation and makes it editable for the session; **Lock** reverts. Values from a loaded config still apply.
-- **Uncertainty variants.** With *Uncertainty analysis* on, the Simulation tab shows the four variant medium files and a card listing the default, Temp-H, Temp-L, Trans-H and Trans-L properties, with the brain and skull range of each pair plotted one property per column. Thermal properties show the Temp pair only. Greyed values are not in the variant file and use the default.
-- **Pseudo-CT sub-tab.** Shows `pseudoCT.nii.gz` over the T1 and the in-skull distributions of the mapped skull properties against the band of the uncertainty bound variants' skull values, with the fraction of skull voxels outside it. The distributions come from the default run when it exists; otherwise **Predict skull properties** predicts them without simulating, labelled as a prediction. See [Pseudo-CT runs](doc_uncertainty.md#pseudo-ct-runs).
-- **Tune for** (Speed, Accuracy, Memory, Disk space) shows the settings that affect that goal, advanced ones included, on every tab, and marks them after their label (e.g. *Grid resolution · speed, accuracy, memory*). The goal is highlighted. The tag says only what a setting affects; check its help (**?**) before changing it. Set it back to **,** to return to the normal view.
+??? note "Details: advanced controls, locked cards and Tune for"
+    - **+ n advanced** in a card's header shows that card's advanced settings (*Hide advanced* folds them again). **Show advanced options** shows them on every card of the tab, including the fully advanced sections.
+    - An advanced setting that holds a value is always shown. Jumping to an issue opens the card it is on.
+    - **Locked cards.** The tissue properties card (`medium_properties`) is read-only. **🔒 Unlock** asks for confirmation and makes it editable for the session; **Lock** reverts. Values from a loaded config still apply.
+    - **Uncertainty variants.** With *Uncertainty analysis* on, the Simulation tab shows the four variant medium files and a card listing the default, Temp-H, Temp-L, Trans-H and Trans-L properties, with the brain and skull range of each pair plotted one property per column. Thermal properties show the Temp pair only. Greyed values are not in the variant file and use the default.
+    - **Pseudo-CT sub-tab.** Shows `pseudoCT.nii.gz` over the T1 and the in-skull distributions of the mapped skull properties against the band of the uncertainty bound variants' skull values, with the fraction of skull voxels outside it. The distributions come from the default run when it exists; otherwise **Predict skull properties** predicts them without simulating, labelled as a prediction. See [Pseudo-CT runs](doc_uncertainty.md#pseudo-ct-runs).
+    - **Tune for** (Speed, Accuracy, Memory, Disk space) shows the settings that affect that goal, advanced ones included, on every tab, and marks them after their label (e.g. *Grid resolution · speed, accuracy, memory*). The goal is highlighted. The tag says only what a setting affects; check its help (**?**) before changing it. Set it back to **,** to return to the normal view.
 
 ??? note "Details: what counts as advanced"
     - *Setup:* extra MATLAB paths, FSL/ANTs locations, HPC modules for pseudo-CT, the individual `io.save_*` switches, external acoustic NIfTI.
@@ -84,37 +86,43 @@ Each tab hides the settings most studies leave at their defaults, and says how m
 
 ### Transducer tab
 
-- Pick a device and driving system from `config/equipment`, or enter custom geometry.
-- The panel shows the focal range (`min_foc`/`max_foc`) and which calibration entry PRESTUS will use.
-- With several transducers, transducer 2 and later inherit transducer 1's values unless set.
-- The cross-section on the right draws the elements, exit plane, geometric focus, the focal depth you set (✕) and the device's steering range.
-- The *Calibration* sub-tab compares, fits and saves library entries for the config's transducers ([Calibration page](#calibration-page)).
+Pick a device and driving system from `config/equipment`, or enter custom geometry.
+??? note "Details: device panel, drawing and Calibration sub-tab"
+    - The panel shows the focal range (`min_foc`/`max_foc`) and which calibration entry PRESTUS will use.
+    - With several transducers, transducer 2 and later inherit transducer 1's values unless set.
+    - The cross-section on the right draws the elements, exit plane, geometric focus, the focal depth you set (✕) and the device's steering range.
+    - The *Calibration* sub-tab compares, fits and saves library entries for the config's transducers ([Calibration page](#calibration-page)).
 
 ### Placement viewer
 
 The Placement tab has two sub-tabs: **Settings** (the `placement`/Localite cards) and **Viewer** (manual placement), which takes the full tab width.
 
-- Axial, coronal and sagittal T1 slices with the segmentation overlay. Without a T1, the viewer shows what is missing and a button to the field.
-- **Click sets** (*Focus* · *Transducer* · *Browse*) chooses what a click on a slice does: set the focus or the transducer (bowl apex), or with *Browse* move the crosshair without writing anything (scrolling always browses). The bowl is drawn from the device geometry.
-- With several transducers, every bowl, beam axis and acoustic FOV box is drawn; the ones not selected are dimmed. Each FOV box is resolved from its own transducer (`'auto'` diameter and length), as PRESTUS does: coherent coupling simulates their union, async coupling one box per transducer ([details](doc_multitransducer.md#partial-acoustic-fov)).
-- **+**/**−** by the transducer selector add or remove a transducer without switching to the Transducer tab.
-- **Coordinates…** opens a row to type X/Y/Z directly instead of clicking. **RAS mm** or **Voxel** need no conversion. **MNI mm** is converted to this subject's space with SimNIBS when you click, which needs the subject's `m2m_sub-XXX` folder; **Set focus** uses the nonlinear warp and **Set transducer** the affine, as in [MNI placement](doc_placement_mni.md#how-a-position-is-resolved). **Go to** only moves the crosshair.
-- With manual placement, the readout's red flags are also listed in the Issues panel, for every transducer: a target more than 2 mm from the focal depth setting, an exit plane (centre or rim) inside the scalp, and beam rays through an eye. They are checked once the viewer (or the Run tab) has loaded the T1 and segmentation; clicking one opens the viewer on that transducer.
-- *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Transducer at focal depth* (under **More**, with the gap) instead puts the transducer where the focal depth setting lands on the target. **View** holds the overlay opacity, the FOV size and *Centre on focus*.
-- **Beam:** with a segmentation, the readout adds skull on the beam (mean ± SD over 37 rays from the aperture to the focus; the central ray), the mean skull incidence (amber above 20°), the gap between the exit-plane rim and the scalp along the beam (mean ± SD; red when the minimum is negative, i.e. the transducer cuts into the head; a large SD means uneven contact) and the share of rays that pass an eye. These are the measures of the placement comparison (`placement.beam_qc`).
-- The readout keeps two depths apart: the **target depth** (exit plane → `focus_pos`, from the placement) and the **focal depth setting** (`focal_distance_ep`, the depth set on the equipment). For annular arrays the setting selects the calibrated phases, so the simulated focus lands at the setting even when the target is deeper or shallower; the readout gives the difference (red above 2 mm). *Set focal depth to target* copies the target depth into the setting.
-- Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
-- Positions are written in the space set by `placement.manual.coordinate_space` (`voxel` or `ras`). See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
-- Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.
-- With `placement.mode: localite`, the Placement card offers *Localite page* and *Import into study…*; the *Localite* sub-tab detects, names and writes the recorded series of a session ([Localite page](#localite-page)).
-- With `placement.mode: plantus`, the Placement card runs only the [PlanTUS placement](doc_placement_plantus.md#running-plantus): *Choose in Workbench…* opens PlanTUS's maps to pick the position, *Automatic* takes the composite-score optimum. The run shows on the Run tab, and the Viewer opens on the result.
+??? note "Details: using the viewer"
+    - Axial, coronal and sagittal T1 slices with the segmentation overlay. Without a T1, the viewer shows what is missing and a button to the field.
+    - **Click sets** (*Focus* · *Transducer* · *Browse*) chooses what a click on a slice does: set the focus or the transducer (bowl apex), or with *Browse* move the crosshair without writing anything (scrolling always browses). The bowl is drawn from the device geometry.
+    - With several transducers, every bowl, beam axis and acoustic FOV box is drawn; the ones not selected are dimmed. Each FOV box is resolved from its own transducer (`'auto'` diameter and length), as PRESTUS does: coherent coupling simulates their union, async coupling one box per transducer ([details](doc_multitransducer.md#partial-acoustic-fov)).
+    - **+**/**−** by the transducer selector add or remove a transducer without switching to the Transducer tab.
+    - **Coordinates…** opens a row to type X/Y/Z directly instead of clicking. **RAS mm** or **Voxel** need no conversion. **MNI mm** is converted to this subject's space with SimNIBS when you click, which needs the subject's `m2m_sub-XXX` folder; **Set focus** uses the nonlinear warp and **Set transducer** the affine, as in [MNI placement](doc_placement_mni.md#how-a-position-is-resolved). **Go to** only moves the crosshair.
+    - With manual placement, the readout's red flags are also listed in the Issues panel, for every transducer: a target more than 2 mm from the focal depth setting, an exit plane (centre or rim) inside the scalp, and beam rays through an eye. They are checked once the viewer (or the Run tab) has loaded the T1 and segmentation; clicking one opens the viewer on that transducer.
+    - *Snap to scalp* keeps the beam axis and puts the exit plane a chosen gap outside the scalp. *Transducer at focal depth* (under **More**, with the gap) instead puts the transducer where the focal depth setting lands on the target. **View** holds the overlay opacity, the FOV size and *Centre on focus*.
+    - **Beam:** with a segmentation, the readout adds skull on the beam (mean ± SD over 37 rays from the aperture to the focus; the central ray), the mean skull incidence (amber above 20°), the gap between the exit-plane rim and the scalp along the beam (mean ± SD; red when the minimum is negative, i.e. the transducer cuts into the head; a large SD means uneven contact) and the share of rays that pass an eye. These are the measures of the placement comparison (`placement.beam_qc`).
+    - The readout keeps two depths apart: the **target depth** (exit plane → `focus_pos`, from the placement) and the **focal depth setting** (`focal_distance_ep`, the depth set on the equipment). For annular arrays the setting selects the calibrated phases, so the simulated focus lands at the setting even when the target is deeper or shallower; the readout gives the difference (red above 2 mm). *Set focal depth to target* copies the target depth into the setting.
+    - Trajectories can be imported from Brainsight (NIfTI coordinates) or 3D Slicer, using BabelBrain's conventions.
+    - Positions are written in the space set by `placement.manual.coordinate_space` (`voxel` or `ras`). See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
+??? note "Details: other placement modes"
+    - Other placement modes are shown read-only: the Localite pose from the `neuronav_gui` outputs, the heuristic choice from `transducer_positioning`, and for every mode the positions the last run's placement stage resolved (`<path.sim>/sub-XXX/sub-XXX_placement<affix>.json`). To get them without simulating, run the pipeline once with only `modules.run_transducer_placement` enabled.
+    - With `placement.mode: localite`, the Placement card offers *Localite page* and *Import into study…*; the *Localite* sub-tab detects, names and writes the recorded series of a session ([Localite page](#localite-page)).
+    - With `placement.mode: plantus`, the Placement card runs only the [PlanTUS placement](doc_placement_plantus.md#running-plantus): *Choose in Workbench…* opens PlanTUS's maps to pick the position, *Automatic* takes the composite-score optimum. The run shows on the Run tab, and the Viewer opens on the result.
 
 ??? note "Details: MNI coordinates in the viewer"
     **MNI mm** is converted with SimNIBS's `mni2subject_coords` CLI tool, the same one-shot external call `mni2subject_coords_LDfix.m` uses; it runs only when you click, not on every redraw. It needs the `m2m_sub-XXX` folder (under `path.seg`/`path.anat`) for both the nonlinear and affine transform. Setting `startup.simnibs_bin_path` alone is not enough, and the viewer says so (distinctly from "SimNIBS's bin folder isn't set") when the m2m folder is missing. **Set focus** uses the nonlinear warp (most accurate in-brain) and **Set transducer** the affine (`12dof`, well-defined outside the brain too). If the m2m folder exists but its nonlinear warp failed or was never produced, **Set focus** retries with the affine and says so; this does not help when SimNIBS has not been run at all. **Go to** moves the crosshair using the focus's transform, or the transducer's if *Click sets transducer* is selected. **Set focus** / **Set transducer** only work with `placement.manual.coordinate_space` set to `voxel` or `ras`. A study using `coordinate_space: mni` writes MNI values directly (PRESTUS converts them at placement-stage runtime) and is not shown in the viewer; type an MNI point and use **Go to** to look at the matching subject-space location.
 
 ### Issues panel
 
-The panel lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied, and (manual placement) the placement viewer's checks. Clicking an issue opens its tab and field, showing advanced options if needed. The panel is closed by default: the header shows the error and warning counts, and clicking them (or **View ▸ Issues…**, Ctrl+Shift+I) opens the list. It closes on Esc, a click outside, or a click on an issue.
+The panel lists config problems before PRESTUS loads or runs the study; open it from the error and warning counts in the header.
+
+??? note "Details: what the panel checks"
+    The panel lists what PRESTUS would otherwise report only at load or run time: unknown or misspelt keys (with suggestions), deprecated keys, wrong types and values, backend combinations and frequency mismatches, missing inputs and missing calibration entries, a `target_isppa_wcm2` that cannot be met (no library calibration and `modules.run_water_baseline: 0`) or that adds a free-water simulation (`auto`), a project `config_default.yaml` that lacks keys added to PRESTUS since it was copied, and (manual placement) the placement viewer's checks. Clicking an issue opens its tab and field, showing advanced options if needed. The panel is closed by default: the header shows the error and warning counts, and clicking them (or **View ▸ Issues…**, Ctrl+Shift+I) opens the list. It closes on Esc, a click outside, or a click on an issue.
 
 ### Run tab
 
@@ -148,12 +156,13 @@ The panel lists what PRESTUS would otherwise report only at load or run time: un
 
 Runs many subjects with per-run settings. See [Group analysis](doc_group.md#study-setup).
 
-- The table (the study manifest, `study.manifest`) has one row per simulation run; settings not in the table come from the study config. A single subject does not need it. *How to fill the table* shows the steps and an example.
-- *Add subjects…* adds one run per subject ID (`1-12, 15, sub-020`). *Add setting column…* adds a config key to vary per run (empty cell = the study value) or the run columns `include`, `config` and `notes`; hovering over a column header shows its help. *More* holds adding an empty row, removing rows or a column, and *Save table as…*.
-- The table is saved to the *Table file* (relative to the config). Without one, the first save writes `<config name>_runs.tsv` next to the config and sets `study.manifest`.
-- *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. See [Group analysis](doc_group.md#from-localite-ingestion).
-- The summary under the table checks the manifest as you type: subject IDs, `include` values, unknown keys (with suggestions), and rows that would write to the same outputs.
-- *Check all runs* saves the table and runs `prestus_study_start(config, 'DryRun', true)`. *Run all runs locally* writes `run_study_<study>.m` and runs it; *Write launcher script* only writes it. These stay disabled while the table is empty. *Build group report* runs `prestus_group_report_start(config)` (group maps + report). Checks, runs and the report stream to the Run tab.
+??? note "Details: the run table"
+    - The table (the study manifest, `study.manifest`) has one row per simulation run; settings not in the table come from the study config. A single subject does not need it. *How to fill the table* shows the steps and an example.
+    - *Add subjects…* adds one run per subject ID (`1-12, 15, sub-020`). *Add setting column…* adds a config key to vary per run (empty cell = the study value) or the run columns `include`, `config` and `notes`; hovering over a column header shows its help. *More* holds adding an empty row, removing rows or a column, and *Save table as…*.
+    - The table is saved to the *Table file* (relative to the config). Without one, the first save writes `<config name>_runs.tsv` next to the config and sets `study.manifest`.
+    - *Import from Localite…* reads the `neuronav_gui` outputs under `path.localite_post` (`neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json`). It makes one run per target, or one run per session with the targets assigned to transducers 1, 2, …, with a preview before adding. See [Group analysis](doc_group.md#from-localite-ingestion).
+    - The summary under the table checks the manifest as you type: subject IDs, `include` values, unknown keys (with suggestions), and rows that would write to the same outputs.
+    - *Check all runs* saves the table and runs `prestus_study_start(config, 'DryRun', true)`. *Run all runs locally* writes `run_study_<study>.m` and runs it; *Write launcher script* only writes it. These stay disabled while the table is empty. *Build group report* runs `prestus_group_report_start(config)` (group maps + report). Checks, runs and the report stream to the Run tab.
 
 ## Timing diagram and TUS calculator
 
@@ -165,14 +174,18 @@ The [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/) (Rad
 - **Import from TUS calculator…** reads a settings file downloaded from the calculator (JSON or YAML). It shows the values it will set (in seconds), and optionally also sets the frequency and target Isppa.
 - **Open TUS calculator ↗** opens the web app.
 
-Both use the same ramp convention: the ramp duration is the rise (= fall) time at each end of a pulse (`timing.pulse_ramp_dur`, `timing.pulse_ramp_shape` `linear` or `tukey`). PRESTUS models pulse ramps only, so the calculator's pulse-train and repetition ramps are exported as 0 and reported when an imported file sets them. A level disabled in the calculator sets the corresponding PRESTUS durations to 0.
+??? note "Details: ramp convention"
+    Both use the same ramp convention: the ramp duration is the rise (= fall) time at each end of a pulse (`timing.pulse_ramp_dur`, `timing.pulse_ramp_shape` `linear` or `tukey`). PRESTUS models pulse ramps only, so the calculator's pulse-train and repetition ramps are exported as 0 and reported when an imported file sets them. A level disabled in the calculator sets the corresponding PRESTUS durations to 0.
 
 ## MATLAB session
 
-The Calibration and Localite pages compute in MATLAB, with the same functions as `calibration_gui` and `neuronav_gui`. The Nexus keeps one MATLAB session open (`nexus_bridge`, started with `matlab -batch` the first time an action needs it, e.g. *Load*, *Predict* or *Fit* on the Calibration page or *Detect series* on the Localite page; showing a page does not start it). The MATLAB binary is the one set on the Run tab. The first call takes as long as MATLAB needs to start (15–60 s); later ones take only the computation. The pages show the session's state (*starting*, *ready*, *working*), and **Stop** ends it.
+The Calibration and Localite pages compute in MATLAB, with the same functions as `calibration_gui` and `neuronav_gui`.
 
-- The session ends by itself after 30 min without use, since it holds a MATLAB licence, and when the Nexus quits or stops answering. The next call starts a new one, and the pages open their transducer or session again.
-- Long work does not use the session: batch ingestion and the k-Wave drive check are written as scripts and run on the Run tab, where the log streams and *Stop* works.
+??? note "Details: when the session starts and ends"
+    The Nexus keeps one MATLAB session open (`nexus_bridge`, started with `matlab -batch` the first time an action needs it, e.g. *Load*, *Predict* or *Fit* on the Calibration page or *Detect series* on the Localite page; showing a page does not start it). The MATLAB binary is the one set on the Run tab. The first call takes as long as MATLAB needs to start (15–60 s); later ones take only the computation. The pages show the session's state (*starting*, *ready*, *working*), and **Stop** ends it.
+
+    - The session ends by itself after 30 min without use, since it holds a MATLAB licence, and when the Nexus quits or stops answering. The next call starts a new one, and the pages open their transducer or session again.
+    - Long work does not use the session: batch ingestion and the k-Wave drive check are written as scripts and run on the Run tab, where the log streams and *Stop* works.
 
 ??? note "Details: how the session exchanges data"
     The Nexus and MATLAB exchange JSON files in a temporary folder. MATLAB runs only `nexus_calibration`, `nexus_neuronav` and `nexus_ping` from it.
@@ -183,36 +196,40 @@ The Calibration and Localite pages compute in MATLAB, with the same functions as
 
 The controls are grouped in three steps: **1 Data** (profile CSV, measured and desired depths), **2 Fit** (where to calibrate, reference ISPPA, *Fit*, *Evaluate*) and **3 Save** (save, *Export*, k-Wave drive check). The fitter's settings (ring profile, free parameters, forward model, near-field skip, loss, Huber δ, starts) are under **Fit options**, collapsed by default, because the defaults suit most fits.
 
-Until MATLAB has answered, the right-hand side shows the current library entry from its YAML alone:
+??? note "Details: the plots"
+    Until MATLAB has answered, the right-hand side shows the current library entry from its YAML alone:
 
-- **Quality:** the global model's R² per calibrated depth, with the geometric and per-depth-fit medians as reference lines.
-- **Drive:** the drive amplitude per depth.
-- **Phases:** each ring's phase correction per depth, unwrapped; steps over 30° between neighbouring depths are marked.
+    - **Quality:** the global model's R² per calibrated depth, with the geometric and per-depth-fit medians as reference lines.
+    - **Drive:** the drive amplitude per depth.
+    - **Phases:** each ring's phase correction per depth, unwrapped; steps over 30° between neighbouring depths are marked.
 
-The calibrated range is shaded and this study's depths are drawn as lines, coloured by whether the entry covers them. The same plot sits under the transducer drawing on the Settings sub-tab. After *Predict*, *Evaluate* or *Fit*, the *Profiles* view shows the profiles with a bar per depth coloured by R² (green ≥ 0.9, amber ≥ 0.8, red below); clicking a bar shows that depth.
+    The calibrated range is shaded and this study's depths are drawn as lines, coloured by whether the entry covers them. The same plot sits under the transducer drawing on the Settings sub-tab. After *Predict*, *Evaluate* or *Fit*, the *Profiles* view shows the profiles with a bar per depth coloured by R² (green ≥ 0.9, amber ≥ 0.8, red below); clicking a bar shows that depth.
 
-- **Transducer** lists the config's transducers that use a device from `config/equipment`; the driving system and `transducer.library_path` are taken from the config. The current library entry is the one PRESTUS would use (the user folder first, then `config/calibration`).
-- **Profile CSV** defaults to the combination's `char_data_path` under `local/profiles`. Loading it shows the geometric model and the library entry against the measured profiles (R² per depth).
-- **Desired depths** and **Predict** model any depths through the runtime library path, with the measured, interpolated or (within *extrapolate ≤*) extrapolated profile at each depth. The desired depths are prefilled with the depths this study uses with the device: the focal depth settings (`focal_distance_ep` or `_bowl` of every matching transducer, and the manifest's `transducer[(i)].focal_distance_ep` columns) and each matching transducer's target depth in the placement viewer (exit plane → `focus_pos`, 0.1 mm). They follow the config and placement each time the page is shown, until you type your own; **Study depths** fills them in again. Without either, the depths of the entry's `meta.fit`, then the device's defaults, are used. The plot then shows focus against target per depth, and the table the phases and drive each depth resolves to.
-- **Ring profile** (*keep the entry's* / *fit* / *uniform rings*) selects the within-ring velocity profile ([Transducer library](doc_calibration.md#optional-within-ring-velocity-profile)); *fit* fits it on the measured profiles before the per-depth fits. **Options…** sets the profile fit and a plane-scan file (off-axis data) fitted with the axial profiles.
-- **Fit** calibrates per-depth refinements at the ticked measured depths or at the desired depths. **Reference ISPPA** defaults to `transducer.target_isppa_wcm2`. *Advanced…* holds the fitter's further options (as in `calibration_gui`; see [Calibration](doc_calibration.md#refining-a-library-entry-to-your-hydrophone-profiles)), the desired-profile tolerance and the k-Wave drive check's grid and correction, and loads a preset.
-- **Save entry** writes `<serial>[_<ds>].yaml` to `transducer.library_path`. If that is not set, it asks for a folder and sets it in the config. The entry records how it was fitted (`meta.fit`), and opening it later restores those settings. The device panel on the Settings sub-tab then shows the new entry as the one PRESTUS will use.
-- **k-Wave drive check…** (per-depth fits) writes the unsaved fit and `calibration/kwave_drive_<combo>.m` next to the config. The script runs `kwave_calibrate_drive` with the study config's grid and platform, then saves the drive-corrected entry. Run it on the Run tab, or yourself (e.g. on the cluster); it takes minutes per depth.
-- *Export profiles…* and *Export settings…* write the same CSVs as `calibration_gui`.
+??? note "Details: the controls"
+    - **Transducer** lists the config's transducers that use a device from `config/equipment`; the driving system and `transducer.library_path` are taken from the config. The current library entry is the one PRESTUS would use (the user folder first, then `config/calibration`).
+    - **Profile CSV** defaults to the combination's `char_data_path` under `local/profiles`. Loading it shows the geometric model and the library entry against the measured profiles (R² per depth).
+    - **Desired depths** and **Predict** model any depths through the runtime library path, with the measured, interpolated or (within *extrapolate ≤*) extrapolated profile at each depth. The desired depths are prefilled with the depths this study uses with the device: the focal depth settings (`focal_distance_ep` or `_bowl` of every matching transducer, and the manifest's `transducer[(i)].focal_distance_ep` columns) and each matching transducer's target depth in the placement viewer (exit plane → `focus_pos`, 0.1 mm). They follow the config and placement each time the page is shown, until you type your own; **Study depths** fills them in again. Without either, the depths of the entry's `meta.fit`, then the device's defaults, are used. The plot then shows focus against target per depth, and the table the phases and drive each depth resolves to.
+    - **Ring profile** (*keep the entry's* / *fit* / *uniform rings*) selects the within-ring velocity profile ([Transducer library](doc_calibration.md#optional-within-ring-velocity-profile)); *fit* fits it on the measured profiles before the per-depth fits. **Options…** sets the profile fit and a plane-scan file (off-axis data) fitted with the axial profiles.
+    - **Fit** calibrates per-depth refinements at the ticked measured depths or at the desired depths. **Reference ISPPA** defaults to `transducer.target_isppa_wcm2`. *Advanced…* holds the fitter's further options (as in `calibration_gui`; see [Calibration](doc_calibration.md#refining-a-library-entry-to-your-hydrophone-profiles)), the desired-profile tolerance and the k-Wave drive check's grid and correction, and loads a preset.
+    - **Save entry** writes `<serial>[_<ds>].yaml` to `transducer.library_path`. If that is not set, it asks for a folder and sets it in the config. The entry records how it was fitted (`meta.fit`), and opening it later restores those settings. The device panel on the Settings sub-tab then shows the new entry as the one PRESTUS will use.
+    - **k-Wave drive check…** (per-depth fits) writes the unsaved fit and `calibration/kwave_drive_<combo>.m` next to the config. The script runs `kwave_calibrate_drive` with the study config's grid and platform, then saves the drive-corrected entry. Run it on the Run tab, or yourself (e.g. on the cluster); it takes minutes per depth.
+    - *Export profiles…* and *Export settings…* write the same CSVs as `calibration_gui`.
 
 Matrix transducers and new equipment entries (`calibration_gui`'s *View geometry* and *New…*) are only available in `calibration_gui`.
 
 ## Localite page
 
-*Placement ▸ Localite* ingests Localite recordings with the study config's settings (`path.localite_raw`/`_post`, `placement.localite.*`, `io.overwrite_files`, `neuronav.*`). These are edited on the Settings sub-tab (*Edit settings*), not on the page. The config is saved before each step, because MATLAB reads it with `load_parameters` as a run does. The steps are those of `neuronav_gui` ([doc_placement_neuronav.md](doc_placement_neuronav.md)):
+*Placement ▸ Localite* ingests Localite recordings with the study config's settings (`path.localite_raw`/`_post`, `placement.localite.*`, `io.overwrite_files`, `neuronav.*`). These are edited on the Settings sub-tab (*Edit settings*), not on the page. The config is saved before each step, because MATLAB reads it with `load_parameters` as a run does. The steps are those of `neuronav_gui` ([doc_placement_neuronav.md](doc_placement_neuronav.md)).
 
-1. **Detect series** (`neuronav_detect_series`, `neuronav_name_series`) lists the series of the chosen subject and session with their QC (pulses, position and rotation deviation, tracking flags). Each series is named after the coil table, the planned target nearest its beam axis, or `series_<k>`. Tabs show the pulse positions in 3-D (with the beam direction and the planned targets), the deviation per pulse, the marker files found and the log.
-2. **Write outputs** (`neuronav_check_target_map`, `neuronav_ingest_markers`) writes the ticked series under their (editable) names and colours to `path.localite_post/sub-XXX/ses-XX/`. When the inputs or the settings change after detection, the page asks you to detect again.
+??? note "Details: detect series and write outputs"
+    1. **Detect series** (`neuronav_detect_series`, `neuronav_name_series`) lists the series of the chosen subject and session with their QC (pulses, position and rotation deviation, tracking flags). Each series is named after the coil table, the planned target nearest its beam axis, or `series_<k>`. Tabs show the pulse positions in 3-D (with the beam direction and the planned targets), the deviation per pulse, the marker files found and the log.
+    2. **Write outputs** (`neuronav_check_target_map`, `neuronav_ingest_markers`) writes the ticked series under their (editable) names and colours to `path.localite_post/sub-XXX/ses-XX/`. When the inputs or the settings change after detection, the page asks you to detect again.
 
-- **Use in this study** sets `placement.localite.session` and `.target` to the written session and target(s) (one per transducer).
-- **Import into study…** builds manifest rows from all ingested sessions (Study tab).
-- **Ingest all sessions…** scans every session (`neuronav_scan_sessions`) and lists the planned-target labels found, whose target names you can edit (*Group labels by stem*, *Use labels as found*). *Save label map and run batch* writes the map to `neuronav.target_labels` and the write mode to `neuronav.batch_write`, then runs `ingest_<study>.m` (`neuronav_ingest_batch` on the ticked sessions) on the Run tab.
-- **MNI view…** maps `neuronav_ingest_summary.csv` to MNI space with each subject's SimNIBS warp (`neuronav_summary_to_mni`, needs `path.seg`). It plots transducer, focus and beam axis over the MNI152 head outline, with filters per subject, session and target.
+??? note "Details: using the written outputs, batch ingestion and MNI view"
+    - **Use in this study** sets `placement.localite.session` and `.target` to the written session and target(s) (one per transducer).
+    - **Import into study…** builds manifest rows from all ingested sessions (Study tab).
+    - **Ingest all sessions…** scans every session (`neuronav_scan_sessions`) and lists the planned-target labels found, whose target names you can edit (*Group labels by stem*, *Use labels as found*). *Save label map and run batch* writes the map to `neuronav.target_labels` and the write mode to `neuronav.batch_write`, then runs `ingest_<study>.m` (`neuronav_ingest_batch` on the ticked sessions) on the Run tab.
+    - **MNI view…** maps `neuronav_ingest_summary.csv` to MNI space with each subject's SimNIBS warp (`neuronav_summary_to_mni`, needs `path.seg`). It plots transducer, focus and beam axis over the MNI152 head outline, with filters per subject, session and target.
 
 ## MATLAB GUIs
 

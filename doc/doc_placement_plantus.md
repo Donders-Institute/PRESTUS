@@ -42,15 +42,18 @@ Both modes compute the same maps and composite score (steps 2 to 5a) and write t
 
 ### 1  Parse inputs
 
-PRESTUS writes a flat transducer YAML for PlanTUS. `position_transducer_plantus.m` derives the skin–target distance window from the transducer calibration, unless `placement.plantus.min_distance_mm`, `max_distance_mm` and `optimal_distance_mm` are set:
+PRESTUS writes a flat transducer YAML for PlanTUS.
 
-| Field | Value written by PRESTUS (when not set) |
-|-------|--------------------------|
-| `min_distance` | `max(0, min(focal_distance_list) − max(flhm_list))` |
-| `max_distance` | `max(focal_distance_list) + max(flhm_list)` |
-| `optimal_distance` | `mean(focal_distance_list)`, the desired skin–target distance |
+??? note "Details: the skin–target distance window"
+    `position_transducer_plantus.m` derives the skin–target distance window from the transducer calibration, unless `placement.plantus.min_distance_mm`, `max_distance_mm` and `optimal_distance_mm` are set:
 
-If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead. For a steerable array, list the steering depths in `focal_distance_list` and set the window to the steering range. The default margin (the largest FLHM, often > 50 mm) otherwise admits skin spots the focus cannot reach.
+    | Field | Value written by PRESTUS (when not set) |
+    |-------|--------------------------|
+    | `min_distance` | `max(0, min(focal_distance_list) − max(flhm_list))` |
+    | `max_distance` | `max(focal_distance_list) + max(flhm_list)` |
+    | `optimal_distance` | `mean(focal_distance_list)`, the desired skin–target distance |
+
+    If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead. For a steerable array, list the steering depths in `focal_distance_list` and set the window to the steering range. The default margin (the largest FLHM, often > 50 mm) otherwise admits skin spots the focus cannot reach.
 
 ??? note "Details: launcher inputs and the FLHM fit"
     | Input | Description |
@@ -66,18 +69,22 @@ If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead. For a steer
 
 ### 2  Convert SimNIBS mesh to surfaces
 
-`PlanTUS.convert_simnibs_mesh_to_surface` extracts `.surf.gii` surfaces from the `.msh` mesh:
+`PlanTUS.convert_simnibs_mesh_to_surface` extracts `.surf.gii` surfaces from the `.msh` mesh.
 
-| Surface | SimNIBS tags | File |
-|---------|-------------|------|
-| Skin | 1005 | `skin.surf.gii` |
-| Skull | 1007, 1008 | `skull.surf.gii` |
+??? note "Details: surfaces extracted"
+    | Surface | SimNIBS tags | File |
+    |---------|-------------|------|
+    | Skin | 1005 | `skin.surf.gii` |
+    | Skull | 1007, 1008 | `skull.surf.gii` |
 
-SimNIBS also produces `skull.stl`, used for the skull-entry angle (4d).
+    SimNIBS also produces `skull.stl`, used for the skull-entry angle (4d).
 
 ### 3  Avoidance mask
 
-Skin vertices over air cavities and sinuses, within 30 mm of each eye centre and within 15 mm of the tragus are excluded from the composite score (`avoidance == 0`), and the mask is eroded by `transducer_radius` mm as a safety margin. The step needs `fslmaths`, `wb_command`, `mri_tessellate`, `mris_convert` and `final_tissues.nii.gz`. If any is missing, the step is skipped with a warning and all vertices remain eligible.
+Skin vertices over air cavities and near the eyes and ears are excluded from the composite score.
+
+??? note "Details: excluded vertices and required tools"
+    Skin vertices over air cavities and sinuses, within 30 mm of each eye centre and within 15 mm of the tragus are excluded from the composite score (`avoidance == 0`), and the mask is eroded by `transducer_radius` mm as a safety margin. The step needs `fslmaths`, `wb_command`, `mri_tessellate`, `mris_convert` and `final_tissues.nii.gz`. If any is missing, the step is skipped with a warning and all vertices remain eligible.
 
 ??? note "Details: how the mask is built (`create_avoidance_mask`)"
     1. **Air cavities / sinuses**: vertices whose outward normal ray hits air in `final_tissues.nii.gz` (holes filled with `wb_command -volume-fill-holes`, tessellated with `mri_tessellate`).
@@ -87,59 +94,71 @@ Skin vertices over air cavities and sinuses, within 30 mm of each eye centre and
 
 ### 4  Per-vertex scoring metrics
 
-| Metric | Definition | Better |
-|---|---|---|
-| 4a Skin–target distance `d_i` | Euclidean distance from vertex *i* to the target mask's centre of mass (`PlanTUS.roi_center_of_gravity`). The score uses the absolute deviation from `optimal_distance`; vertices outside `[min_distance, max_distance]` are excluded (see 5a). | Lower deviation |
-| 4b Skin–target angle `α_i` | Angle (degrees) between the skin normal and the vector to the target centre. | Lower |
-| 4c Skin–target intersection `x_i` | Path length of the 200 mm outward-normal ray inside the target mask STL (`PlanTUS.stl_from_nii`); chords are summed for several entry–exit pairs. | Higher |
-| 4d Skin–skull angle `β_i` | Angle between the skin normal and the skull normal where the 40 mm ray meets the skull. NaN (worst) where it meets no skull. | Lower |
+PlanTUS scores every skin vertex on five metrics: 4a to 4d here, 4e below.
+
+??? note "Details: metrics 4a to 4d"
+    | Metric | Definition | Better |
+    |---|---|---|
+    | 4a Skin–target distance `d_i` | Euclidean distance from vertex *i* to the target mask's centre of mass (`PlanTUS.roi_center_of_gravity`). The score uses the absolute deviation from `optimal_distance`; vertices outside `[min_distance, max_distance]` are excluded (see 5a). | Lower deviation |
+    | 4b Skin–target angle `α_i` | Angle (degrees) between the skin normal and the vector to the target centre. | Lower |
+    | 4c Skin–target intersection `x_i` | Path length of the 200 mm outward-normal ray inside the target mask STL (`PlanTUS.stl_from_nii`); chords are summed for several entry–exit pairs. | Higher |
+    | 4d Skin–skull angle `β_i` | Angle between the skin normal and the skull normal where the 40 mm ray meets the skull. NaN (worst) where it meets no skull. | Lower |
 
 #### 4e  Skull thickness  `t_i`
 
-Bone path length (mm) along the 4d ray. `final_tissues.nii.gz` (next to the SimNIBS mesh) is sampled every 0.25 mm (nearest voxel) up to 50 mm from the skin. Bone samples (labels 4, 7, 8: bone, compact, spongy) are counted until the first intracranial sample (labels 1–3: WM, GM, CSF). Lower is better.
+Bone path length (mm) along the 4d ray.
 
-`t_i` is NaN (worst) where the ray meets no bone or reaches no intracranial tissue within 50 mm (face, neck, skull base). Without `final_tissues.nii.gz`, `t_i` is NaN everywhere, a warning is logged and `weight_skull_thickness` is ignored.
+??? note "Details: sampling and missing values"
+    `final_tissues.nii.gz` (next to the SimNIBS mesh) is sampled every 0.25 mm (nearest voxel) up to 50 mm from the skin. Bone samples (labels 4, 7, 8: bone, compact, spongy) are counted until the first intracranial sample (labels 1–3: WM, GM, CSF). Lower is better.
+
+    `t_i` is NaN (worst) where the ray meets no bone or reaches no intracranial tissue within 50 mm (face, neck, skull base). Without `final_tissues.nii.gz`, `t_i` is NaN everywhere, a warning is logged and `weight_skull_thickness` is ignored.
 
 ??? note "Details: known artefacts"
     A few vertices get implausibly thin values (≤ 1 mm): neck rays reaching the spinal canal, and skin next to the ear where CHARM places bone or CSF directly under the skin. These vertices also have large skin–target angles and are rarely chosen unless thickness dominates the weights.
 
 ### 5a  Composite scoring (both modes; headless selects the optimum)
 
-Each metric is min–max normalised to **[0, 1]** over its finite values. NaN or infinite values are set to 1 (worst), also for the inverted intersection metric.
+PlanTUS combines the normalised metrics into a weighted composite score; headless mode places the vertex with the minimum score.
 
-```
-score_i = ( w_dist  × norm(|d_i − optimal_distance|)
-          + w_ang   × norm(α_i)
-          + w_inter × (1 − norm(x_i))
-          + w_skull × norm(β_i)
-          + w_thick × norm(t_i) )
-        ÷ (w_dist + w_ang + w_inter + w_skull + w_thick)
-```
+??? note "Details: the composite score"
+    Each metric is min–max normalised to **[0, 1]** over its finite values. NaN or infinite values are set to 1 (worst), also for the inverted intersection metric.
 
-If `t_i` is unavailable (all NaN, or an older `plantus_metrics.mat` without it), `w_thick` is dropped from numerator and denominator. Vertices with `avoidance == 0`, `d_i < min_distance` or `d_i > max_distance` get `score = inf`. Headless mode places the vertex with the **minimum** score. Interactive mode reports that optimum before `wb_view` opens, and the score and rank of each placed vertex. A few outlying vertices (e.g. 40 mm skull-base rays for `t_i`) compress the spread and weaken that criterion below its nominal weight.
+    ```
+    score_i = ( w_dist  × norm(|d_i − optimal_distance|)
+              + w_ang   × norm(α_i)
+              + w_inter × (1 − norm(x_i))
+              + w_skull × norm(β_i)
+              + w_thick × norm(t_i) )
+            ÷ (w_dist + w_ang + w_inter + w_skull + w_thick)
+    ```
 
-**Criteria evaluation** (`placement.plantus.evaluate`, default `true`; needs `save_metrics`) re-scores the placement under 12 weight sets (configured, equal, one criterion at 0.55 with the rest sharing 0.45, and each criterion alone) and writes, next to the metrics file:
+    If `t_i` is unavailable (all NaN, or an older `plantus_metrics.mat` without it), `w_thick` is dropped from numerator and denominator. Vertices with `avoidance == 0`, `d_i < min_distance` or `d_i > max_distance` get `score = inf`. Headless mode places the vertex with the **minimum** score. Interactive mode reports that optimum before `wb_view` opens, and the score and rank of each placed vertex. A few outlying vertices (e.g. 40 mm skull-base rays for `t_i`) compress the spread and weaken that criterion below its nominal weight.
 
-| File | Contents |
-|------|----------|
-| `plantus_evaluation.json` | Placed vertex (rank, each criterion's value and % of eligible vertices that are better), per-criterion ranges over eligible vertices, the weight sweep and diagnostics; read by the [placement report](doc_placement.md#placement-report) |
-| `plantus_weight_sensitivity.csv` | One row per weight set: chosen vertex, its criteria, distance to the placed vertex |
-| `plantus_criteria_maps.png` | Each criterion and the composite score on the skin (4 views) |
-| `plantus_weight_sensitivity.png` | Criteria at the placed spot and at each weight set's choice; all chosen spots on the skin |
+**Criteria evaluation** (`placement.plantus.evaluate`) re-scores the placement under 12 weight sets and flags settings under which a criterion cannot discriminate.
 
-Diagnostics flag settings under which a criterion cannot discriminate between positions:
+??? note "Details: criteria evaluation"
+    **Criteria evaluation** (`placement.plantus.evaluate`, default `true`; needs `save_metrics`) re-scores the placement under 12 weight sets (configured, equal, one criterion at 0.55 with the rest sharing 0.45, and each criterion alone) and writes, next to the metrics file:
 
-| Code | Condition |
-|------|-----------|
-| `distance_range_unconstrained` | `[min_distance, max_distance]` excludes < 5% of the skin outside the avoidance mask (e.g. a large `flhm_list` value) |
-| `intersection_sparse` | Beam–target intersection non-zero at < 2% of eligible vertices (small target mask) |
-| `<criterion>_unavailable` / `_nan` | Criterion undefined at all / > 25% of eligible vertices |
-| `placed_ineligible` | Placed vertex excluded under the configured scoring (interactive selection) |
-| `placed_not_optimum` | Placed vertex is not the composite optimum (interactive selection) |
-| `tradeoff_<criterion>` | At the placed vertex a weighted criterion is worse than at > 50% of eligible vertices |
-| `weight_sensitive` | A single-criterion-heavy weight set moves the chosen spot > 20 mm |
+    | File | Contents |
+    |------|----------|
+    | `plantus_evaluation.json` | Placed vertex (rank, each criterion's value and % of eligible vertices that are better), per-criterion ranges over eligible vertices, the weight sweep and diagnostics; read by the [placement report](doc_placement.md#placement-report) |
+    | `plantus_weight_sensitivity.csv` | One row per weight set: chosen vertex, its criteria, distance to the placed vertex |
+    | `plantus_criteria_maps.png` | Each criterion and the composite score on the skin (4 views) |
+    | `plantus_weight_sensitivity.png` | Criteria at the placed spot and at each weight set's choice; all chosen spots on the skin |
 
-Warnings also go to the placement log. Evaluation failures never abort a placement.
+    Diagnostics flag settings under which a criterion cannot discriminate between positions:
+
+    | Code | Condition |
+    |------|-----------|
+    | `distance_range_unconstrained` | `[min_distance, max_distance]` excludes < 5% of the skin outside the avoidance mask (e.g. a large `flhm_list` value) |
+    | `intersection_sparse` | Beam–target intersection non-zero at < 2% of eligible vertices (small target mask) |
+    | `<criterion>_unavailable` / `_nan` | Criterion undefined at all / > 25% of eligible vertices |
+    | `placed_ineligible` | Placed vertex excluded under the configured scoring (interactive selection) |
+    | `placed_not_optimum` | Placed vertex is not the composite optimum (interactive selection) |
+    | `tradeoff_<criterion>` | At the placed vertex a weighted criterion is worse than at > 50% of eligible vertices |
+    | `weight_sensitive` | A single-criterion-heavy weight set moves the chosen spot > 20 mm |
+
+    Warnings also go to the placement log. Evaluation failures never abort a placement.
 
 ??? note "Details: `plantus_metrics.mat` and offline re-scoring"
     `plantus_metrics.mat` (`placement.plantus.save_metrics`, default `true`) is written to `<output_dir>/plantus_metrics.mat`. It holds skin coordinates, normals and faces, the target centre, `d_i`, `α_i`, `x_i`, `β_i`, `t_i` (`skull_thickness`), the avoidance mask, the composite score, `best_vertex` (composite optimum), `selected_vertex` (vertex placed), `selection_mode` (`auto` headless, `gui` interactive, `manual` after `--do_only_trajectory`), `min_distance`, `max_distance`, `optimal_distance` and the weights. Vertex indices and faces are 0-based. Each run deletes an existing `plantus_metrics.mat` first, even with `save_metrics: false`.
@@ -150,33 +169,37 @@ Warnings also go to the placement log. Evaluation failures never abort a placeme
 
 With `placement.plantus.interactive = 1`, `wb_view` opens a scene with the maps 4a–4d, one per tab. The skull-thickness map (`skull_thickness_skin.func.gii`) is loaded too and can be chosen as an overlay in any tab. Each click replaces the selection and prints the vertex's criteria, composite score and rank (and the composite optimum) to the log.
 
-Closing `wb_view` places the last selected vertex (step 6) and opens its placement scene (transducer and focus on skin and T1) in a second `wb_view`. A review dialog then offers *Use this position*, *Choose another vertex* (the planning scene reopens; metrics are not recomputed) or *Cancel* (the launcher exits non-zero and PRESTUS stops). Closing the planning scene without a click reviews the previous vertex, or aborts if there is none.
+??? note "Details: review dialog and requirements"
+    Closing `wb_view` places the last selected vertex (step 6) and opens its placement scene (transducer and focus on skin and T1) in a second `wb_view`. A review dialog then offers *Use this position*, *Choose another vertex* (the planning scene reopens; metrics are not recomputed) or *Cancel* (the launcher exits non-zero and PRESTUS stops). Closing the planning scene without a click reviews the previous vertex, or aborts if there is none.
 
-Interactive mode requires:
+    Interactive mode requires:
 
-- A graphical display (desktop or VNC session; not a batch/HPC job). The MATLAB desktop is not needed: `placement.plantus.interactive = 1` also works under `matlab -batch` and from the Nexus
-- `pynput` (mouse listener); on Linux it needs an X display, on macOS Accessibility permission for the terminal/MATLAB
-- Connectome Workbench `wb_view`, on `PATH` or via `placement.plantus.connectome_wb_path`
-- PyQt5 for the review dialog (part of SimNIBS)
+    - A graphical display (desktop or VNC session; not a batch/HPC job). The MATLAB desktop is not needed: `placement.plantus.interactive = 1` also works under `matlab -batch` and from the Nexus
+    - `pynput` (mouse listener); on Linux it needs an X display, on macOS Accessibility permission for the terminal/MATLAB
+    - Connectome Workbench `wb_view`, on `PATH` or via `placement.plantus.connectome_wb_path`
+    - PyQt5 for the review dialog (part of SimNIBS)
 
 ??? note "Details: the `--selection` launcher option"
     `--selection` sets how a vertex is confirmed: `review` (the dialog above; PRESTUS uses it), `prompt` (`Generate transducer placement for vertex N? (yes/no)` after each click, for a terminal), `last_click` (no review) and `auto` (default: `prompt` when stdin is a terminal, else `review` if PyQt5 is available, else `last_click`). If no vertex is confirmed, the launcher exits non-zero. If `wb_view` exits at once without a click, the planning scene is reopened without the skull-thickness map.
 
 ### 6  Placement geometry
 
-For the selected vertex, PlanTUS computes the beam direction and the transducer centre (`prepare_acoustic_simulation`) and writes a 4 × 4 Localite position matrix (RAS mm). Outputs go to `<output_dir>/vtx<N>/`, where `<output_dir>` is the per-target [placement run folder](doc_outputs.md#where-outputs-live) `<path.placement>/sub-XXX/plantus/<target_name>/`:
+For the selected vertex, PlanTUS computes the beam direction and the transducer centre (`prepare_acoustic_simulation`) and writes a 4 × 4 Localite position matrix (RAS mm).
 
-| File | Contents |
-|------|----------|
-| `*_Localite.mat` | `position_matrix` (4×4, RAS mm), **used by PRESTUS** |
-| `*_Localite.txt` | Plain-text copy |
-| `*_kPlan.mat` | Same matrix in k-Plan convention (m, axes permuted) |
-| `*_Localite_XML.txt` | Fake Localite XML snippet (rewritten on each run) |
-| `focus_position_matrix_*.txt` | Focus point transform |
-| `transducer_*.surf.gii` | Transducer surface model at position |
-| `scene.scene` | Workbench placement scene (both modes; opened only in interactive mode) |
+??? note "Details: output files"
+    Outputs go to `<output_dir>/vtx<N>/`, where `<output_dir>` is the per-target [placement run folder](doc_outputs.md#where-outputs-live) `<path.placement>/sub-XXX/plantus/<target_name>/`:
 
-`<output_dir>` itself holds the skin/skull surfaces, the metric maps (`distances_skin`, `distances_skin_thresholded`, `angles_skin`, `target_intersection_skin`, `skin_skull_angles_skin`, `skull_thickness_skin`, `avoidance_skin`; `.func.gii`), the planning `scene.scene` and `plantus_metrics.mat`.
+    | File | Contents |
+    |------|----------|
+    | `*_Localite.mat` | `position_matrix` (4×4, RAS mm), **used by PRESTUS** |
+    | `*_Localite.txt` | Plain-text copy |
+    | `*_kPlan.mat` | Same matrix in k-Plan convention (m, axes permuted) |
+    | `*_Localite_XML.txt` | Fake Localite XML snippet (rewritten on each run) |
+    | `focus_position_matrix_*.txt` | Focus point transform |
+    | `transducer_*.surf.gii` | Transducer surface model at position |
+    | `scene.scene` | Workbench placement scene (both modes; opened only in interactive mode) |
+
+    `<output_dir>` itself holds the skin/skull surfaces, the metric maps (`distances_skin`, `distances_skin_thresholded`, `angles_skin`, `target_intersection_skin`, `skin_skull_angles_skin`, `skull_thickness_skin`, `avoidance_skin`; `.func.gii`), the planning `scene.scene` and `plantus_metrics.mat`.
 
 ??? note "Details: beam direction and transducer centre"
     For the selected vertex *v*:
