@@ -181,6 +181,7 @@ Finite-difference time-domain solver. `jwave.fd_accuracy` sets the spatial stenc
 | `cleanup_cache` | bool | `true` | Delete the HDF5 input (`*_jwave_input*.h5`, several GB for a head grid) from `io.dir_cache` after a successful run. It is rewritten on every run, so it is never reused. Dry runs and runs that error (e.g. Helmholtz residual above threshold) keep it. |
 | `gmres_restart` | int | `10` | GMRES Krylov subspace size. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `gmres_maxiter` | int | `1000` | Maximum GMRES outer iterations. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
+| `gmres_tol` | float | `1e-3` | GMRES convergence tolerance. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `helmholtz_operator` | string | `'conservative'` | Density term: `'conservative'` or `'jwave'` (jwave's built-in). Helmholtz solver only. See [Density term](#density-term-helmholtz_operator). |
 | `fd_accuracy` | int | `8` | Spatial stencil order. `finite_differences` solver only. |
 | `convergence_threshold` | float | `0.05` | Relative spectral residual above which the result is rejected. Helmholtz solver only. By default this **errors**; see `ignore_convergence_threshold`. |

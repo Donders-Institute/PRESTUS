@@ -274,6 +274,7 @@ fields:
   jwave.python_env_gpu: {kind: path}
   jwave.use_gpu: {kind: tristate}
   jwave.precision: {choices: [single, double]}
+  jwave.solver: {choices: [helmholtz, pseudo_spectral, finite_differences]}
   babelbrain: {visible_if: {key: acoustic_backend, in: [babelbrain]}}
   elastic: {visible_if: {key: acoustic_backend, in: [kwave_elastic]}}
   elastic.shear_mapping: {choices: [pichardo, 'off']}

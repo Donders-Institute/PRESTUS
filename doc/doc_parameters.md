@@ -79,15 +79,20 @@ Used when `acoustic_backend: jwave`.
 
 ??? note "Details: jwave settings"
 
-    `solver` defaults to `helmholtz`. PML thickness is set by `grid.pml_size`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
+    PML thickness is set by `grid.pml_size`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
     | `python_env` | Python environment or executable with jwave. | `''` | Empty = system `python3`. |
     | `python_env_gpu` | GPU-capable Python environment. | `''` | Empty = same as `python_env`. |
     | `use_gpu` | Use GPU acceleration. | `~` | `true` / `false` / `~` (auto-detect). |
+    | `solver` | jwave solver. | `'helmholtz'` | `helmholtz` (frequency-domain GMRES) / `pseudo_spectral` (time-domain, as `kspaceFirstOrder*`) / `finite_differences` (time-domain, FD stencils). |
+    | `fd_accuracy` | FD stencil order. | `8` | `finite_differences` only. |
     | `gmres_restart` | GMRES restart parameter (Krylov subspace size). | `10` | jwave's default; larger values can destabilise GMRES in single precision. |
     | `gmres_maxiter` | Maximum GMRES iterations. | `1000` | jwave's default. |
+    | `gmres_tol` | GMRES convergence tolerance. | `1.0e-3` | jwave's default. |
+    | `convergence_threshold` | Relative Helmholtz residual above which the run errors. | `0.05` | See `ignore_convergence_threshold`. |
+    | `ignore_convergence_threshold` | Warn instead of erroring above `convergence_threshold`. | `false` | The unconverged result is then returned. |
     | `helmholtz_operator` | Density term of the Helmholtz solver. | `'conservative'` | `conservative`: ρ∇·((1/ρ)∇p), source scaled by the local sound speed. `jwave`: jwave's built-in term, which underestimates transmission through density jumps (~20 % through a skull plate). See [jwave: density term](doc_jwave.md#density-term-helmholtz_operator). |
     | `precision` | Computational precision. | `'single'` | `single` / `double` |
     | `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
