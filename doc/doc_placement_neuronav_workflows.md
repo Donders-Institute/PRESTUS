@@ -126,16 +126,49 @@ The [multi-target toolkit](doc_placement_neuronav_multitarget.md) reads the inge
 ## GUI workflow
 
 ```matlab
-neuronav_gui('study.yaml')
+neuronav_gui                   % empty form
+neuronav_gui('study.yaml')     % pre-fill from a study config
+neuronav_gui(parameters)       % pre-fill from a parameter struct
 ```
 
-- **Single session** (main window): choose subject and session, **▶ Detect series**, check the series table (names, **Name from**, QC flags, 3-D plot), **✓ Write outputs**. See [doc_gui.md](doc_gui.md#localite-ingest-gui).
-- **Many sessions** (**▦ Batch…**): the window scans the raw root and lists every session with its marker files, planned labels and whether it is already ingested.
-    1. Tick sessions (**All**, **None**, **Not yet ingested**, or individually).
-    2. Check the label table on the right; group or rename targets.
-    3. Choose **Write** `all` or `named`, then **▶ Run batch**. Each session's status updates as it is processed; written targets are listed below and in the summary CSV.
-- **◎ MNI view…** (in the Batch window) maps the summary CSV to MNI space and plots transducer, focus and beam axis of every subject and session over an MNI head outline, with tick filters per subject, session and target. See [doc_gui.md](doc_gui.md#localite-ingest-gui).
-- **⬇ Save settings…** writes the settings (including the label map) as YAML for scripts or later GUI sessions.
+### Single session
+
+1. Set the raw root (containing `<sub>/<ses>/<loc folder>/…`; leave **Localite folder** empty if the export sits directly under `<ses>/`) and the output root. The full layout is in [Localite I/O](doc_placement_neuronav.md#localite-io). The subject and session dropdowns list the `sub-*` / `ses-*` folders found; they can also be typed (a bare number `2` means `ses-02`).
+2. **▶ Detect series** detects the series into a temporary folder; nothing is written yet. Check the series table and the plots.
+3. Tick the series to keep, check each target name (and optionally set a `#rrggbb` colour), then **✓ Write outputs**. Changing any input after detection disables writing until series are detected again.
+
+??? note "Details: settings read from a config, the series table and the pulse filter"
+    Settings read from a config (all optional): `path.localite_raw` (falls back to `path.localite`), `path.localite_post`, `placement.localite.loc_folder` / `voxel_size` / `expected_segment_length` / `session`, `io.overwrite_files`, `neuronav.coil_map`.
+
+    The series table lists every detected series with pulse count, position deviation (mm from the series mean position), rotation deviation (rad from the mean orientation) and a flag for untracked series (all positions at the origin). The tabs show a 3-D plot of every pulse position (small dot = one pulse, ring = series mean, arrow = beam direction; no arrow for GUMMarkers), per-pulse deviation traces (one dot per pulse), all raw marker files found with the one used marked, and the captured log/warnings.
+
+    The **Pulses per series** filter (`expected_segment_length`, default 80) drops TriggerMarkers series whose pulse count differs from it by more than 20; leave it blank to keep all series.
+
+### Target names
+
+With **Suggest from planned targets** ticked (default), detection also names each series after the planned target it was aimed at. The **Name from** column shows the source and the off-axis distance and depth of each match (or the nearest miss), and the 3-D plot marks the candidates (×) and the axis to each matched target. Names typed into the coil table are kept. **↻ Re-apply to series** re-runs the naming after changing the tolerance or depth window.
+
+A pose aimed at a target missing from the export takes the nearest remaining one, so check depth and distance: a match far outside the usual focal depth is suspect. Narrow **Target depth** around the focal distance to reject it. On the example data, all recorded poses whose planned target was in the export matched it, 0.7–4 mm off-axis.
+
+??? note "Details: how series are matched to planned targets"
+    The naming runs `neuronav_read_label_candidates` and `neuronav_suggest_target_names`:
+
+    - Candidates are the named, set targets of the session's latest `EntryTarget` export and of the `EntryTargetPair`s in its GUMMarkers exports. Each label is kept once, at its most recent position.
+    - A recorded pose (TriggerMarkers series, or a GUMMarkers `InstrumentMarker`) takes the candidate closest to its beam axis (the line from the mean position along matrix column 1), provided it lies within **Axis tolerance** (default 10 mm) and at a depth inside **Target depth** (default 0–150 mm).
+    - A GUMMarkers `EntryTargetPair` series uses its own label; when a pose in the same file matched that label, the pair becomes `<label>_target` and the pose keeps the bare name. Repeated blocks on one target get `_rep2`, `_rep3`, ….
+
+??? note "Details: single-coil and multi-coil"
+    With the coil table empty, ingest uses the newest non-duplicate `TriggerMarkers_Coil0` file (falling back to `GUMMarkers`) and every detected series becomes a row. With one row per coil, ingest uses `neuronav.coil_map`: it reads one file per coil and keeps one series per target listed for that coil, skipping untracked blocks. For a coil that recorded several blocks, enter comma-separated target names (e.g. `L_MD, L_MD` → `L_MD_1`, `L_MD_2`).
+
+### Many sessions
+
+**▦ Batch…** opens a window that scans the raw root and lists every session with its marker files, planned labels and whether it is already ingested.
+
+1. Tick sessions (**All**, **None**, **Not yet ingested**, or individually).
+2. Check the label table on the right; group or rename targets.
+3. Choose **Write** `all` or `named`, then **▶ Run batch**. Each session's status updates as it is processed; written targets are listed below and in the summary CSV.
+
+**⬇ Save settings…** writes the settings (including the label map) as YAML for scripts or later GUI sessions.
 
 The Batch window calls `neuronav_ingest_batch` with the main window's settings, so a saved settings file reproduces a GUI batch run in a script:
 
@@ -143,6 +176,16 @@ The Batch window calls `neuronav_ingest_batch` with the main window's settings, 
 p = load_parameters('neuronav_settings.yaml');
 neuronav_ingest_batch(p, {'sub-001', 'ses-01'; 'sub-002', 'ses-01'});
 ```
+
+### MNI view
+
+**◎ MNI view…** (in the Batch window) maps the summary CSV to MNI space and plots transducer, focus and beam axis of every subject and session over an MNI head outline.
+
+??? note "Details: loading, filtering and saving the MNI view"
+    **MNI view** reads the summary CSV (default `<output root>/neuronav_ingest_summary.csv`, i.e. every session ingested so far) and, on **▶ Load & map to MNI**, maps each target's transducer, focus and Localite pose to MNI mm. Set **SimNIBS root** (`path.seg`); the planning T1 is found as in the main window (`path.localite_t1`). Subjects without a warp or planning T1 are listed in the status line and left out. The 3-D plot shows transducers (●), foci (◆), the beam axis between them and optionally the tracker pose (▲) over a head outline. Tick or untick subjects, sessions and targets in the three tables, colour by target, subject or session, and hover a point for its subject, session and target. **⬇ Save CSV…** writes the summary with the MNI columns.
+
+??? note "Details: warp and head outline"
+    The mapping uses `neuronav_summary_to_mni`: planning T1 → `m2m_<sub>/final_tissues.nii.gz` → `m2m_<sub>/toMNI/Conform2MNI_nonl.nii.gz`. The outline is taken from **Head template**: SimNIBS's `MNI152_T1_1mm.nii.gz` when a SimNIBS installation is found (`startup.simnibs_bin_path`, or the default install folder); left empty, it is taken from the first mapped subject's `final_tissues_MNI.nii.gz`.
 
 ??? note "Details: functions"
     | Function | Role |
