@@ -1,4 +1,4 @@
-# Multi-Transducer Modeling
+# Multi-Transducer Modelling
 
 !!! note "At a glance"
     - **What:** Several transducers in one layered simulation, firing together (`coherent`) or in separate windows (`async`).

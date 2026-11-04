@@ -1,4 +1,4 @@
-# Advanced Modeling
+# Advanced Modelling
 
 !!! note "At a glance"
     - **What:** Pipelines that run several related simulations from one config: uncertainty bounds, several target intensities, several transducers, or a sequence of sonications.

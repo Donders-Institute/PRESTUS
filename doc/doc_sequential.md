@@ -2,7 +2,7 @@
 
 !!! note "At a glance"
     - **What:** A chain of simulations in which each heating run starts from the temperature and CEM43 maps of the previous one.
-    - **When you need it:** When you stimulate from different coordinates in sequence and want the cumulative thermal state (for stimulation in parallel, see [Multi-Transducer Modeling](doc_multitransducer.md)).
+    - **When you need it:** When you stimulate from different coordinates in sequence and want the cumulative thermal state (for stimulation in parallel, see [Multi-Transducer Modelling](doc_multitransducer.md)).
     - **Before you start:** One config per sonication, loaded as structs.
 
 ## Basic usage
