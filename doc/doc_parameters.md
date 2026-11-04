@@ -261,7 +261,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `elem_width_mm` | Element width [mm], along x. | `rect` elements: size along x; `disc`/`bowl`: sets the equal-area diameter. |
 | `elem_diameter_mm` | Aperture diameter of `disc`/`bowl` elements [mm]. | Optional. Empty = equal-area diameter from `elem_width_mm` × `elem_height_mm` (flat disc area for `disc`, spherical-cap area for `bowl`). Also sets the element size in the transducer mask. |
 | `elem_phase_override_deg` | Calibrated per-element phases [deg]. | Optional, one value per element (after Clover replication). Replaces the geometric steering phases toward `focus_pos`; element orientation is unchanged. Empty = geometric steering. |
-| `use_steering_correction` | Scale the element drive by the steering correction k(target). | Default `true`. Used when the transducer library (or `steering_correction`) holds one; see [Steering correction of matrix arrays](doc_transducer_library.md#steering-correction-of-matrix-arrays). |
+| `use_steering_correction` | Scale the element drive by the steering correction k(target). | Default `true`. Used when the transducer library (or `steering_correction`) holds one; see [Steering correction of matrix arrays](doc_calibration.md#steering-correction-of-matrix-arrays). |
 | `steering_correction` | Steering correction given inline. | Optional struct as written by `build_steering_correction`. Empty = from the transducer library. |
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
 | `is_curved` | Whether the array has a curved surface. | `false` = flat array: every element faces +z, `curv_radius_mm` is not used, `elem_shape` must be `rect` or `disc`. |

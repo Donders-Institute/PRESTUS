@@ -62,7 +62,7 @@ Thermal metrics only appear when a thermal simulation ran (`modules.run_heating_
 | The highest intensity is in the skin or skull rather than the brain | Expected to some degree near the transducer; a hot spot at the scalp can also mean poor contact or a transducer placed into the head. Check the placement report. |
 | The focus is much shallower or deeper than the setting | Strong skull refraction, or a target depth outside the transducer's range (`min_foc`–`max_foc` of the device). |
 | Warnings about points per wavelength (PPW) in the log | The grid is too coarse for the frequency; results near the focus may be inaccurate ([Spatial and temporal sampling](doc_simulations-acoustic.md#spatial-and-temporal-sampling)). |
-| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Transducer Library](doc_transducer_library.md#optional-free-water-k-wave-drive-calibration)). |
+| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Transducer Library](doc_calibration.md#optional-free-water-k-wave-drive-calibration)). |
 
 More known messages and their fixes are in [Troubleshooting](doc_troubleshooting.md).
 

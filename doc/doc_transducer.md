@@ -87,7 +87,7 @@ Not supported: the makeBowl source (`use_kWaveArray: 0`), BabelBrain, transducer
 
 A matrix array consists of many small elements on a curved or flat surface. Each element is driven with an independent phase delay, so the focus can be steered electronically in three dimensions without moving the transducer.
 
-Use a matrix array when your hardware supports electronic steering (e.g. a phased array system) or to simulate volumetric targeting without repositioning the transducer. The focal pressure a steered array delivers can be calibrated against hydrophone measurements over the steering range: see [Steering correction of matrix arrays](doc_transducer_library.md#steering-correction-of-matrix-arrays).
+Use a matrix array when your hardware supports electronic steering (e.g. a phased array system) or to simulate volumetric targeting without repositioning the transducer. The focal pressure a steered array delivers can be calibrated against hydrophone measurements over the steering range: see [Steering correction of matrix arrays](doc_calibration.md#steering-correction-of-matrix-arrays).
 
 Phase delays are computed from the geometry of each element, `trans_pos` and `focus_pos`; no manual phase input is required. `elem_phase_override_deg` replaces them with calibrated phases.
 

@@ -1,7 +1,7 @@
 function prof = read_axial_profiles(csv_path)
 % READ_AXIAL_PROFILES  Read a hydrophone axial-profile CSV (one column per focal depth)
 %
-% Format (doc_transducer_library.md, Appendix): a title row, then a row whose
+% Format (doc_calibration.md, Appendix): a title row, then a row whose
 % columns 2..end are the focal depths [mm from EP], then one row per axial
 % position with the distance from the exit plane [mm] in column 1 and the
 % measured intensity [W/cm²] per focal depth. Ragged/NaN columns and rows are

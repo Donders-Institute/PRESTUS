@@ -37,7 +37,7 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
 %     .Axisymmetric    - use a 2D axisymmetric grid unless SimConfig sets
 %                        grid.axisymmetric (default false: the axisymmetric
 %                        free-water grid currently puts the focus far short
-%                        of the target; see doc_transducer_library.md)
+%                        of the target; see doc_calibration.md)
 %     .GridDims        - free-water grid: 'auto' (sized to the aperture and
 %                        focal depth, WATER_GRID_DIMS) or [Nx Ny Nz] / [Nlat Nax];
 %                        default: SimConfig's grid.default_dims, else config_default

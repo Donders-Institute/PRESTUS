@@ -32,7 +32,7 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 %
 % Input:
 %   combo_name       - '{tran_serial}_{ds_serial}', e.g. 'CTX_250_001_SC_105_010'
-%   profile_csv      - axial profile CSV (doc_transducer_library.md, Appendix)
+%   profile_csv      - axial profile CSV (doc_calibration.md, Appendix)
 %   out_library_path - folder to write {combo_name}.yaml into (created if needed).
 %                      An existing entry there is updated; otherwise the shipped
 %                      entry (config/calibration/) is copied first.

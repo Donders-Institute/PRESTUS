@@ -5,7 +5,7 @@
     - **When you need it:** Your device has no entry in `config/equipment/` or `config/calibration/`.
     - **Before you start:** The device geometry (ring diameters, curvature, exit-plane distance, focal range); for a refined entry, hydrophone axial profiles.
 
-How the library works, how studies use it and how to refine an entry to your own hydrophone profiles is described in [Transducer Library](doc_transducer_library.md).
+How studies use the library is described in [Transducer Library](doc_transducer_library.md); fitting an entry to hydrophone profiles in [Calibration](doc_calibration.md).
 
 ## Adding a new transducer or driving system
 
@@ -23,9 +23,9 @@ How the library works, how studies use it and how to refine an entry to your own
         # char_data_path: add when hydrophone data is available
     ```
 
-2. Generate a geometric baseline ([Level 1](doc_transducer_library.md#level-1-geometry-only-baseline-no-hydrophone-data)).
+2. Generate a [geometric baseline](#geometric-baseline-entry-no-hydrophone-data).
 3. Use it in study configs with `combo.ds_serial: MY_NEW_DS`.
-4. Refine ([Level 2](doc_transducer_library.md#level-2-refine-to-your-own-hydrophone-profiles-optional)) when hydrophone data is available.
+4. [Refine it](doc_calibration.md#refining-a-library-entry-to-your-hydrophone-profiles) when hydrophone data is available.
 
 ### New transducer (not in equipment config)
 
@@ -49,7 +49,7 @@ How the library works, how studies use it and how to refine an entry to your own
     ```
 
 2. Run `check_equipment_config(equip_path)` to validate the geometry and its physical plausibility.
-3. Continue from [Level 1](doc_transducer_library.md#level-1-geometry-only-baseline-no-hydrophone-data).
+3. Continue with the [geometric baseline](#geometric-baseline-entry-no-hydrophone-data).
 
 ### New transducer from the GUI
 
@@ -70,16 +70,28 @@ Click **New…** under the transducer list in `calibration_gui`. The form takes 
 
     **View geometry** draws the selected transducer the same way. Matrix transducers are geometry only in the calibration GUI: the axial forward model behind prediction and fitting (`axial_transfer_matrix`, `steering_path_lengths`) is defined for annular arrays.
 
+### Geometric baseline entry (no hydrophone data)
+
+For a transducer or driving system that is not in the shipped library:
+
+```matlab
+COMBOS_TO_RUN = {'MY_SERIAL_MY_DS_SERIAL'};              % a combo without char_data_path
+LIBRARY_PATH  = '/project/my_study/transducer_library';  % omit to write config/calibration/
+run(fullfile(prestus_root, 'functions', 'calibration', 'build_transducer_library.m'))
+```
+
+This writes an entry with an empty offset (pure geometric steering). Accuracy equals the geometric baseline in the [shipped combos](doc_transducer_library.md#shipped-combos) table. Add the device to `config/equipment/` first (above).
+
 ## Rebuild a shipped entry
 
-Maintainers only. Set `char_data_path` in `config/equipment/{serial}.yaml` and run `build_transducer_library`. `CHAR_DATA_ROOT` defaults to `local/profiles/` (see [Input file formats](doc_transducer_library.md#appendix-input-file-formats)), and `LIBRARY_PATH` to `config/calibration/`. A missing profile CSV is an error; it does not fall back silently to a geometry-only entry. Then check the entry:
+Maintainers only. Set `char_data_path` in `config/equipment/{serial}.yaml` and run `build_transducer_library`. `CHAR_DATA_ROOT` defaults to `local/profiles/` (see [Input file formats](doc_calibration.md#appendix-input-file-formats)), and `LIBRARY_PATH` to `config/calibration/`. A missing profile CSV is an error; it does not fall back silently to a geometry-only entry. Then check the entry:
 
 ```matlab
 validate_transducer_library(library_path, equip_path)   % must report no 'error'
 ```
 
 ??? note "Details: what the build fits and records"
-    Every measured depth becomes a refinement (`PER_DEPTH_FIT_OPTIONS`, as in [Level 2](doc_transducer_library.md#level-2-refine-to-your-own-hydrophone-profiles-optional)), on a geometric global model with the measured drive per depth. `meta.quality` records:
+    Every measured depth becomes a refinement (`PER_DEPTH_FIT_OPTIONS`, as in [Calibration](doc_calibration.md#refining-a-library-entry-to-your-hydrophone-profiles)), on a geometric global model with the measured drive per depth. `meta.quality` records:
 
     - the in-sample R² (median, min) and the geometric R²;
     - the **held-out interpolation** R²: each interior depth predicted from its two neighbours, without axial shift, as at run time.

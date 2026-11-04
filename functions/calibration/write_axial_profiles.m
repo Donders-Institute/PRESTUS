@@ -1,7 +1,7 @@
 function write_axial_profiles(prof, csv_path, meta)
 % WRITE_AXIAL_PROFILES  Write axial profiles as a profile CSV plus YAML sidecar
 %
-% Writes the layout READ_AXIAL_PROFILES reads (doc_transducer_library.md,
+% Writes the layout READ_AXIAL_PROFILES reads (doc_calibration.md,
 % Appendix): a title row, a row with the focal depths [mm from EP], then one
 % row per axial position (distance from the exit plane [mm], intensity
 % [W/cm²] per depth). Columns that are entirely NaN ('unavailable') are

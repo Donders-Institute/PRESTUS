@@ -10,7 +10,7 @@
 %
 % QUICK START
 %   1. Put your axial profile CSVs in local/profiles/ (default CHAR_DATA_ROOT;
-%      layout in doc_transducer_library.md, Appendix), or set CHAR_DATA_ROOT to
+%      layout in doc_calibration.md, Appendix), or set CHAR_DATA_ROOT to
 %      another folder ('' if char_data_path entries are absolute).
 %   2. Optionally restrict processing with COMBOS_TO_RUN.
 %   3. Run the script. Results are written to config/calibration/ inside the repo.
