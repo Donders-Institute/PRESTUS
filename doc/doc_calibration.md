@@ -331,10 +331,9 @@ Presets come from `calibration_fit_options`. Any `fit_transducer_model` option c
 
 A requested depth within 0.5 mm of a measured one uses that measurement.
 
-??? note "Details: interpolated profiles and the gap warning"
+??? note "Details: interpolated profiles, the gap warning, and interpolating fits instead"
     Any other depth is interpolated from its two neighbouring measured profiles (aligned on their focus, `profile_align`) and then fitted, and is stored with `profile_type: interpolated`. A warning is issued when the neighbouring measurements are more than `max_gap_mm` (default 10 mm) apart.
 
-??? note "Details: interpolating profiles vs interpolating fits"
     Between calibrated depths, studies interpolate the stored offsets and gains (`library_model_at_depth`). On held-out measured depths both ways predict the profile about equally well when the measured depths are up to ~10 mm apart (median R² 0.975 each, vs 0.976 for a direct fit and 0.90 for geometric steering). Fitting the interpolated profile is more robust where the focal behaviour changes quickly. Neither bridges a large gap across a change in focal behaviour.
 
 ## Calibration and ISPPA targeting

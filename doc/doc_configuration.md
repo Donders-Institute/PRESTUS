@@ -1,5 +1,10 @@
 # Configuring a Study
 
+!!! note "At a glance"
+    - **What:** How PRESTUS combines its defaults, your project defaults, your study files and per-run overrides into one config.
+    - **When you need it:** To set up a study, or to change settings for one subject or run.
+    - **Before you start:** PRESTUS installed ([Installation](doc_installation.md)).
+
 All PRESTUS settings live in YAML config files. You never write a complete config: PRESTUS starts from its defaults, and your files contain only what differs. This page explains how the files are combined, how to set up a project folder, and how to override settings per run. Every parameter is listed in [Parameters](doc_parameters.md).
 
 ## How a config is assembled

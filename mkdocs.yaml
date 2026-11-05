@@ -37,7 +37,7 @@ theme:
 
 nav:
   - 🏠 Home: README.md
-  - 🚀 Get Started:
+  - 🧭 Get Started:
     - Concepts: doc_concepts.md
     - Installation: doc_installation.md
     - Your First Simulation: doc_getting-started.md

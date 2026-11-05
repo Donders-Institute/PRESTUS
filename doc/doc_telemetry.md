@@ -67,7 +67,9 @@ Each pipeline run emits one event: `run_end` (on clean exit) or `run_error` (if 
 
 In short: system resources, software versions, a random installation ID, the execution environment, simulation and transducer settings, and the run outcome (an error identifier, never the message text).
 
-??? note "Details: system resources"
+### System resources
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `os_version` | OS version string (macOS: `sw_vers -productVersion`; Linux: kernel release; Windows: `ver` output). Returns `'unknown'` on error. |
@@ -79,7 +81,9 @@ In short: system resources, software versions, a random installation ID, the exe
 
     All system resource fields are collected inside `try/catch` blocks and fall back to `'unknown'` or `NaN` on any error, so they never cause the telemetry payload to fail.
 
-??? note "Details: identity"
+### Identity
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `event` | Event type: `run_end` or `run_error` |
@@ -93,7 +97,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `kwave_ver` | k-Wave toolbox version string as reported by `getComputerInfo` |
     | `platform` | CPU architecture string from `computer('arch')` (e.g. `maci64`, `glnxa64`) |
 
-??? note "Details: execution environment"
+### Execution environment
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `sim_platform` | Execution platform: `matlab`, `slurm`, `qsub`, etc. |
@@ -102,7 +108,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `hpc_name` | HPC cluster name if running on a known cluster; `unknown` otherwise |
     | `use_gpu` | Boolean: whether a GPU device is configured |
 
-??? note "Details: simulation configuration"
+### Simulation configuration
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `medium` | Medium type: `water` or `layered` |
@@ -114,7 +122,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `modules_enabled` | Names of the `modules.*` flags set to 1 (e.g. `["run_acoustic_sims","run_heating_sims"]`) |
     | `pipeline_mode` | Pipeline mode of the run: `single`, `async` (asynchronous multi-transducer), `multi_isppa` or `sequential` |
 
-??? note "Details: transducer"
+### Transducer
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `transducer_type` | Transducer geometry type (e.g. `focused_bowl`) |
@@ -122,7 +132,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `freq_hz` | Nominal operating frequency in Hz |
     | `n_transducer_elements` | Number of transducer elements (`elem_n` from the transducer config) |
 
-??? note "Details: outcome (run_end / run_error only)"
+### Outcome (`run_end` / `run_error` only)
+
+??? note "Details: fields"
     | Field | Description |
     |---|---|
     | `duration_s` | Total pipeline wall-clock time in seconds |
