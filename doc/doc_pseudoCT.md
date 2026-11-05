@@ -70,7 +70,7 @@ Outputs go to `<path.pct>/sub-XXX/`, or to `<parent of path.seg>/pct/sub-XXX/` w
 
 | `skull_mapping` | pHU |
 |---|---|
-| `kosciessa` (**default**) | individualised: a line fitted per subject through pHU_trabecular=300 & pHU_trabecular_cortical = 700 |
+| `kosciessa` (**default**) | individualised: a line fitted per subject through three UTE histogram points set to 1900, 700 and 300 HU (see below) |
 | `miscouridou` | pHU = −2085 UTE + 2329 |
 | `carpino` | pHU = -2194 UTE + 2236 |
 | `wiesinger` | pHU = -2000 (UTE-1) + 42 |
@@ -277,7 +277,7 @@ To see the skull properties a run will model before simulating, call `pct_predic
 
 ??? note "References"
     - Aubry, J.-F., et al. Experimental demonstration of noninvasive transskull adaptive focusing based on prior computed tomography scans. *J Acoust Soc Am* **113**, 84–93 (2003).
-    - Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave modelsa). J. Acoust. Soc. Am. 152, 1003–1019 (2022).
+    - Aubry, J.-F. et al. Benchmark problems for transcranial ultrasound simulation: Intercomparison of compressional wave models. J. Acoust. Soc. Am. 152, 1003–1019 (2022).
     - Carpino et al. (2024). Transcranial ultrasonic stimulation of the human amygdala to modulate threat learning. MSc thesis.
     - Fat, D. L. et al. The Hounsfield value for cortical bone geometry in the proximal humerus: an in vitro study. Skelet. Radiol. 41, 557–568 (2012).
     - Guo, S., et al. Feasibility of ultrashort echo time images using full-wave acoustic and thermal modeling for transcranial MRI-guided focused ultrasound (tcMRgFUS) planning. *Phys. Med. Biol.* **64**, 095008 (2019).

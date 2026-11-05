@@ -42,19 +42,19 @@ The search converts the target to subject space with SimNIBS tools, finds candid
 
 ## Removing ear locations (optional)
 
-Transducer locations over the ears are not wanted. Candidates within `tp_ear_radius` (radius of the no-go zone, mm) around `tp_left_ear_center` and `tp_right_ear_center` (approximate ear coordinates, voxels) are removed when these are set.
+Transducer locations over the ears are not wanted. Candidates within `placement.heuristic.ear_radius` (radius of the no-go zone in voxels, default 35) around `left_ear_center` and `right_ear_center` (approximate ear coordinates, voxels) are removed when the centres are set.
 
 ## Selecting the position
 
-The accepted intersection with the skin is set by `tp_criterion_intersection`. If no candidate meets it, the criterion is expanded by `tp_expand_step` (default: 1%) until one does.
+The accepted intersection with the skull is set by `placement.heuristic.criterion_intersection`. If no candidate meets it, the criterion is expanded by `expand_step` (default: 1%) until one does. The keys below sit under `placement.heuristic`; an empty value (`[]`, the default) switches a criterion off.
 
 | Criterion | Default | Explanation |
 |:----------|---------------|-------------|
-| `tp_criterion_intersect` | < 0.05 | [Fraction] Reduce skull traversal |
-| `tp_criterion_skin_mean` | NaN  | [Quantile] Short EP distance to skin |
-| `tp_criterion_skull_mean` | NaN | [Quantile] Short EP distance to skull |
-| `tp_criterion_skin_var` | NaN | [Quantile] Coherent transducer exit plane toward skin (e.g. little curvature) |
-| `tp_criterion_skull_var` | NaN | [Quantile] Coherent transducer exit plane toward skull surface (irregular bone distorts phase and the wavefront) |
+| `criterion_intersection` | < 0.05 | [Fraction] Reduce skull traversal |
+| `criterion_skin_mean` | `[]` (off) | [Quantile] Short EP distance to skin |
+| `criterion_skull_mean` | `[]` (off) | [Quantile] Short EP distance to skull |
+| `criterion_skin_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skin (e.g. little curvature) |
+| `criterion_skull_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skull surface (irregular bone distorts phase and the wavefront) |
 
 Among the candidates that meet the criteria, the one closest to the target is selected. The output table gives its coordinates in **voxel (grid space)**, **mm (Localite space)** and **mm (RAS+ space)**, based on the image header of the segmentation image.
 

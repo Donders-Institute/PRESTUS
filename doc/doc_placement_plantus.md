@@ -65,7 +65,7 @@ PRESTUS writes a flat transducer YAML for PlanTUS.
 
     The YAML is flat. Key fields: `max_distance`, `min_distance`, `optimal_distance`, `transducer_diameter`, `plane_offset`, `additional_offset`, `focal_distance_list`, `flhm_list`, five `weight_*` scalars. Without `optimal_distance` in the YAML, the launcher uses `(min_distance + max_distance) / 2`.
 
-    PlanTUS fits FLHM against focal distance with a cubic, which needs at least 4 points. With fewer (e.g. the single O'Neill estimate when no axial profile CSV is given), the launchers (`plantus_compat.py`) interpolate linearly and hold FLHM constant outside the calibrated range. Non-finite pairs are dropped.
+    PlanTUS fits FLHM against focal distance with a cubic, which needs at least 4 points. With fewer (e.g. the single O'Neil estimate when no axial profile CSV is given), the launchers (`plantus_compat.py`) interpolate linearly and hold FLHM constant outside the calibrated range. Non-finite pairs are dropped.
 
 ### 2  Convert SimNIBS mesh to surfaces
 

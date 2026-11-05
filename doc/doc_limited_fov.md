@@ -5,7 +5,7 @@
     - **When you need it:** Optional: for large grids, fine resolutions or many runs.
     - **Before you start:** A working head simulation to compare against.
 
-A full k-Wave acoustic simulation on a whole-head grid is slow and memory-intensive when only the focal zone and near field matter. The acoustic FOV crops the k-Wave domain to a beam-axis-aligned box before the simulation and back-projects the result onto the full grid afterwards. The thermal simulation always runs on the full head grid.
+A full k-Wave acoustic simulation on a whole-head grid is slow and memory-intensive when only the focal zone and near field matter. The acoustic FOV crops the acoustic domain (k-Wave, BabelBrain or jwave) to a beam-axis-aligned box before the simulation and back-projects the result onto the full grid afterwards. The thermal simulation always runs on the full head grid.
 
 ## Quick start
 

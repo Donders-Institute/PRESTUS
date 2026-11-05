@@ -26,11 +26,11 @@ PRESTUS then runs one acoustic simulation, caches it, and runs the thermal analy
 Each thermal stage writes output under its own affix. For `target_isppa_wcm2: [10, 30]`:
 
 ```
-sub-001_layered_output_table_isppa010.csv
-sub-001_layered_report_isppa010.html
-sub-001_layered_output_table_isppa030.csv
-sub-001_layered_report_isppa030.html
-sub-001_layered_multi_isppa_report.html   ← summary
+sub-001_layered_desc-isppa010.csv
+sub-001_layered_report_desc-isppa010.html
+sub-001_layered_desc-isppa030.csv
+sub-001_layered_report_desc-isppa030.html
+sub-001_layered_desc-multiIsppa_report.html   ← summary
 ```
 
 ## Validity of post-hoc scaling
@@ -58,7 +58,7 @@ Each stage checks for its sentinel output file before submitting (HPC) or runnin
                 Loads cached acoustic results.
                 Scales p_max_all by sqrt(target / baseline).
                 Runs thermal simulation and analysis.
-                Writes output files with affix _isppaNNN (NNN = integer W/cm²).
+                Writes output files with affix _desc-isppaNNN (NNN = integer W/cm²).
                 Generates per-target HTML report.
 
     [Stage N+1] Summary report (optional, default: on)

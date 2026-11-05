@@ -239,7 +239,7 @@ Not supported: sequential follow-up runs (`options.sequential_configs`) in neste
 
 Re-run the same call. On HPC, a stage whose sentinel file exists is skipped and no scheduler dependency is created for it; only the missing stages are resubmitted. To rerun a stage, delete its sentinel file before resubmitting. With `io.overwrite_files: 'always'`, stages 2–7 are always resubmitted (stage 1 still resumes from its cache); with `'force'`, stage 1 is resubmitted too. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour).
 
-On the MATLAB platform there is no stage-level skip. Resumability relies on `io.overwrite_files = 'never'` (the default for variant stages unless the base config sets `'always'`): each file write inside the pipeline is skipped if the file already exists, so a restarted run fast-forwards through completed steps file by file.
+On the MATLAB platform there is no stage-level skip. Resumability relies on setting `io.overwrite_files: 'never'` in the base config (the shipped default is `'always'`): each file write inside the pipeline is skipped if the file already exists, so a restarted run fast-forwards through completed steps file by file.
 
 ??? note "Details: sentinel files"
     | Stage | Sentinel file | Location |

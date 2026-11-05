@@ -113,7 +113,7 @@ In short: system resources, software versions, a random installation ID, the exe
 ??? note "Details: fields"
     | Field | Description |
     |---|---|
-    | `medium` | Medium type: `water` or `layered` |
+    | `medium` | Medium type: `water`, `layered` or `phantom` |
     | `layers` | List of tissue layer names (e.g. `["skin","skull","brain"]`) |
     | `pct_enabled` | Boolean: whether pseudo-CT is enabled |
     | `pct_density` | Name of the density mapping used for pCT (string, not values) |

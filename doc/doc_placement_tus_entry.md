@@ -5,6 +5,9 @@
     - **When you need it:** When good mechanical contact of the transducer is the main concern.
     - **Before you start:** R with TUS_entry in a conda environment, and a SimNIBS segmentation (or another head mask).
 
+!!! warning "Experimental feature"
+    TUS_entry placement is under active development and is not yet covered by the PRESTUS test suite. Check the [placement report](doc_placement.md#placement-report) before simulating.
+
 `placement.mode: 'tus_entry'` runs the [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) R toolbox as an optional placement backend. It selects the scalp entry point with the smallest coupling geometry error: the standard deviation of the transducer-disk-edge to scalp distances along the trajectory, subject to an optional depth constraint. TUS_entry optimises **mechanical fit** (how perpendicular the transducer disk sits on the scalp); PlanTUS optimises **acoustic objectives** (beam–target overlap, skull thickness).
 
 ```yaml

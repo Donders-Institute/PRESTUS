@@ -87,9 +87,9 @@ run_all_tests('itrusst')       % 2D BM1 bowl + piston, 3D BM1 bowl
 run_all_tests('physics_3d')    % 3D O'Neil check
 ```
 
-The 3D variants (tags `physics_3d`, `itrusst_3d`; ~6 M voxels at 0.5 mm) belong on a GPU node: set `PRESTUS_PHYSICS_CODE_TYPE` (e.g. `cpp_gpu`) and submit the MATLAB call as a job. Their tolerances are provisional (focal pressure 5 %, position 1 mm) until their first run on the reference node.
+The 3D variants (tags `physics_3d`, `itrusst_3d`; ~6 M voxels at 0.5 mm) belong on a GPU node: set `PRESTUS_PHYSICS_CODE_TYPE` (e.g. `cpp_gpu`) and submit the MATLAB call as a job. Their tolerances are provisional (focal pressure 5 %, position 1 mm; ITRUSST L∞ 10 % and L2 6 %; O'Neil focal length 10 %) until their first run on the reference node.
 
-**Tolerance policy.** A benchmark's tolerances are set from its first passing run on the reference machine plus a margin, recorded with that run's values in the test file, and then kept fixed. Loosen a tolerance only together with an explanation in the changelog; a benchmark that starts failing after a change is a finding, not a test to adjust. (These benchmarks found that the axisymmetric source dropped part of its band-limited footprint and raised the focal pressure by 6–11 %, and that it placed the rings of an annular array at the apex plane instead of on the bowl; see the changelog.)
+**Tolerance policy.** A benchmark's tolerances are set from its first passing run on the reference machine plus a margin, recorded with that run's values in the test file, and then kept fixed. Loosen a tolerance only together with an explanation in the changelog; a benchmark that starts failing after a change is a finding, not a test to adjust.
 
 ---
 

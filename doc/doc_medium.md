@@ -31,7 +31,7 @@ Which layers a `layered` simulation contains is set under `layers`. A layer whos
 
 The properties below apply in a full layered simulation. They are set under `medium_properties` in `config_default.yaml` ([Parameters](doc_parameters.md#tissue-acoustic-thermal-properties-medium_properties)) and can be changed per tissue in your study config, for example for a more conservative estimate of intensity or heating. The defaults follow the literature and commercially available tools; they are not ground truth. The [uncertainty mode](doc_uncertainty.md) runs the ITRUSST bounds for you.
 
-| Tissue | Density [kg/m³] | Sound speed [m/s] | Attenuation coefficient [dB/(cm·MHz^y)] | Attenuation power law (y) | Thermal conductivity [W/(m·K)] | Specific heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption fraction | Absorption coefficient [dB/(cm·MHz^y)] |
+| Tissue | Density [kg/m³] | Sound speed [m/s] | Attenuation coefficient [dB/(cm·MHz^y)] | Attenuation power law (y) | Thermal conductivity [W/(m·K)] | Specific heat [J/(kg·K)] | Perfusion [mL/min/kg] | Absorption fraction | Equivalent absorption coefficient [dB/(cm·MHz^y)] |
 |---|---|---|---|---|---|---|---|---|---|
 | Water | 994 | 1500 | 0.00217 | 2 | 0.6 | 4178 | 0 | 1 | 0.00217 |
 | Brain | 1046 | 1546 | 0.59 | 1.2 | 0.51 | 3630 | 559 | 1 | 0.59 |
@@ -39,6 +39,8 @@ The properties below apply in a full layered simulation. They are set under `med
 | Skull (single layer) | 1850 | 2800 | 13.3 | 1 | 0.32 | 1793 | 20 | 0.28 | 3.78 |
 | Skull (cortical) | 1850 | 2800 | 13.3 | 1 | 0.32 | 1313 | 10 | 0.28 | 3.78 |
 | Skull (trabecular) | 1700 | 2300 | 13.3 | 1 | 0.32 | 2274 | 30 | 0.28 | 3.78 |
+
+The defaults set `absorption_fraction`; `absorption_coeff` stays empty. The last column is the coefficient to set instead (for skull, the Pinton et al. value from which the fraction 0.28 is rounded).
 
 ```yaml
 # example: a more conservative skull for heating
@@ -54,7 +56,7 @@ For thermal simulations, PRESTUS uses only part of the attenuation as absorbed e
 The skull default of 0.28 lies between the BabelBrain default (16 %) and the k-Plan default (100 %). More measurements are needed to narrow the uncertainty about how much acoustic energy the skull absorbs.
 
 ??? note "Details: where the skull absorption fraction comes from"
-    The bulk attenuation coefficient includes contributions from both longitudinal and shear waves. Longitudinal waves contribute most (about 80 %, Wang et al., 2018) to absorption and heating in the skull (Pinton et al., 2012; White et al., 2006). For longitudinal and shear waves, absorption values of 2.7 dB/cm²/MHz and 5.4 dB/cm²/MHz have been reported (Pinton et al., 2012), with a bulk attenuation of 13.3 dB/cm²/MHz. PRESTUS therefore assumes absorption fraction = (longitudinal absorption + 0.2 × shear absorption) / bulk attenuation = (2.7 + 0.2 × 5.4) / 13.3 = 0.28. The equivalent `absorption_coeff` is 2.7 + 0.2 × 5.4 = 3.78 dB/(cm·MHz).
+    The bulk attenuation coefficient includes contributions from both longitudinal and shear waves. Longitudinal waves contribute most (about 80 %, Wang et al., 2018) to absorption and heating in the skull (Pinton et al., 2012; White et al., 2006). For longitudinal and shear waves, absorption values of 2.7 dB/(cm·MHz) and 5.4 dB/(cm·MHz) have been reported (Pinton et al., 2012), with a bulk attenuation of 13.3 dB/(cm·MHz). PRESTUS therefore assumes absorption fraction = (longitudinal absorption + 0.2 × shear absorption) / bulk attenuation = (2.7 + 0.2 × 5.4) / 13.3 = 0.28. The equivalent `absorption_coeff` is 2.7 + 0.2 × 5.4 = 3.78 dB/(cm·MHz).
 
 ??? note "References"
     - Pinton, G., Aubry, J., Bossy, E., Muller, M., Pernot, M., & Tanter, M. Attenuation, scattering, and absorption of ultrasound in the skull bone. *Med Phys* **39**, 299–307 (2012). https://doi.org/10.1118/1.3668316

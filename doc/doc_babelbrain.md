@@ -55,6 +55,15 @@ thermal_backend:  babelbrain   # BabelBrain Pennes BHTE instead of k-Wave; needs
       focal_calibration: true              # geometric fallback only: steer so the achieved FWHM-centre lands at focal_distance_ep;
                                            # locate-only (report) when explicit element phases exist
       focal_calibration_target: flhm_center # quantity placed at focal_distance_ep: 'flhm_center' | 'peak'
+      profile_calibration: false   # annular explicit phases only: refit BabelBrain phases to the O'Neil axial profile
+      water_amp_calibration: true  # scale output so the free-water peak matches Rayleigh for the same drive
+      use_rayleigh_for_water: false # water-only solver: false = full-wave FDTD, true = Rayleigh integral
+      ct_mapping: ''               # HU-to-property mapping for CT-based skull; empty = label-based path
+      air_regions: false           # pseudo-CT path only: internal air as pressure-release reflector mask
+      air_hu_window: [-1200, -400] # HU range classified as air
+      air_keep_boundary: false     # keep air components touching the domain boundary
+      cleanup_cache: true          # delete the per-subject BabelBrain cache after reading
+      dry_run: false               # prepare inputs only; stop after the acoustic stage
       # isppa_w_per_cm2: ~         # thermal only; leave empty: derived from the scaled acoustic field (in-situ brain peak)
     ```
 
@@ -218,7 +227,7 @@ BabelBrain only accepts named presets. Set `babelbrain.tx_system` to choose one.
 | Single-element bowl (any `elem_n: 1` annular) | `Single` | 1 | from `curv_radius_mm` | from `elem_od_mm` | any |
 | IGT 64-channel phased array | `IGT64_500` | 64 | – | – | 500 kHz |
 
-The `Single` and `BSonix` presets need `transducer.annular.curv_radius_mm` and `transducer.annular.elem_od_mm`.
+The `Single` and `BSonix` presets (`BSonix` only when set as `tx_system`) need `transducer.annular.curv_radius_mm` and `transducer.annular.elem_od_mm`.
 
 ## Calibration weights
 

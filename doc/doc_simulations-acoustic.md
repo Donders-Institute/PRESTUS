@@ -173,7 +173,7 @@ What applies in axisymmetric mode:
 - The source keeps every grid point with a non-zero band-limited-interpolation weight, as the 3D path and k-Wave do.
 
 !!! note "Axisymmetric 2D vs. 3D output"
-    Axisymmetric simulations are 3D simulations performed on 2D input grids. When heating is requested in the pipeline, the acoustic outputs are provided in 3D, because PRESTUS assumes a 3D heating simulation follows. For 2D outputs, deactivate heating. A 2D heating simulation is possible by first running the acoustic 2D simulation without heating, then running heating with that output while the acoustic simulation is deactivated (or not overwritten).
+    Axisymmetric simulations are 3D simulations performed on 2D input grids. `grid.axisymmetric_output` sets the form of the results: `'auto'` (default) expands them to 3D for `phantom` media and when heating follows, and keeps the 2D plane otherwise; `'2d'` keeps the mirrored plane (no heating); `'3d'` always expands.
 
 ### Backend compatibility
 
