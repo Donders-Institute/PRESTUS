@@ -20,7 +20,7 @@
 ??? note "Details: compiling the CUDA binary for your GPU"
     To use C++ with GPU support you may need to recompile the binary for your GPU version (for example the A100 GPUs on the Donders HPC).
 
-    - Download the [LINUX source files for k-Wave 1.3](http://www.k-wave.org/download.php). This includes the Makefile to compile the binary.
+    - Download the [Linux C++/CUDA source files](http://www.k-wave.org/download.php) (version 1.3; the C++ code is versioned separately from the k-Wave 1.4.1 MATLAB toolbox). This includes the Makefile to compile the binary.
     - Follow the compilation instructions by [TU Delft](https://qiweb.tudelft.nl/sysman/kwave_hpc.html). Include your GPU type in the Makefile.
     - Example scripts for compiling binaries on the Donders HPC are in `PRESTUS/examples/hpc_compile...`
     - For the Donders HPC, a precompiled binary is available [here](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/kspaceFirstOrder-CUDA).
