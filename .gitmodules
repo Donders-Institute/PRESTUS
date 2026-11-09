@@ -9,7 +9,7 @@
 [submodule "external/k-wave"]
 	path = external/k-wave
 	url = https://github.com/ucl-bug/k-wave.git
-	# 2d98012
+	# 94e5583	v1.4.1 + user manual
 [submodule "external/FEX-minimize"]
 	path = external/FEX-minimize
 	url = https://github.com/rodyo/FEX-minimize.git
