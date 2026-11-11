@@ -250,7 +250,7 @@ function fig = calibration_gui(options)
         end
         st.lib = load_entry();
         say(sprintf('%s: %s', combo_name(), ternary(isempty(st.lib), 'no library entry', ...
-            sprintf('library entry (%s)', char(string(get_field(get_field(st.lib, 'meta', []), 'calibration_type', '?')))))));
+            sprintf('library entry (%s)', char(string(get_nonempty_field(get_nonempty_field(st.lib, 'meta', []), 'calibration_type', '?')))))));
         apply_fit_record(st.lib);
         if ~isempty(ui.csv.Value); on_load(); else; on_predict(); end
     end
@@ -639,17 +639,17 @@ function fig = calibration_gui(options)
             t  = st.equip.trans.(nt.tmpl.Value);
             tr = t.transducer;
             nt.serial.Value = ''; nt.name.Value = '';
-            nt.manu.Value   = char(string(get_field(t, 'manufact', '')));
+            nt.manu.Value   = char(string(get_nonempty_field(t, 'manufact', '')));
             nt.freq.Value   = tr.freq_hz / 1e3;
-            nt.fmin.Value   = get_field(t, 'min_foc', nt.fmin.Value);
-            nt.fmax.Value   = get_field(t, 'max_foc', nt.fmax.Value);
+            nt.fmin.Value   = get_nonempty_field(t, 'min_foc', nt.fmin.Value);
+            nt.fmax.Value   = get_nonempty_field(t, 'max_foc', nt.fmax.Value);
             if is_matrix(t)
                 m = tr.matrix;
                 nt.type.Value = 'matrix';
-                nt.rc.Value  = get_field(m, 'curv_radius_mm', nt.rc.Value);
-                nt.dep.Value = get_field(m, 'dist_geom_ep_mm', nt.dep.Value);
-                nt.m_steer.Value  = char(get_field(m, 'steering', nt.m_steer.Value));
-                nt.m_curved.Value = logical(get_field(m, 'is_curved', true));
+                nt.rc.Value  = get_nonempty_field(m, 'curv_radius_mm', nt.rc.Value);
+                nt.dep.Value = get_nonempty_field(m, 'dist_geom_ep_mm', nt.dep.Value);
+                nt.m_steer.Value  = char(get_nonempty_field(m, 'steering', nt.m_steer.Value));
+                nt.m_curved.Value = logical(get_nonempty_field(m, 'is_curved', true));
                 nt.m_D.Value      = m.outer_diameter_mm;
                 nt.m_shape.Value  = char(m.elem_shape);
                 nt.m_w.Value = m.elem_width_mm; nt.m_h.Value = m.elem_height_mm;
@@ -660,9 +660,9 @@ function fig = calibration_gui(options)
                         g = gs.rect;
                         nt.r_nrow.Value = g.elem_n_row; nt.r_ncol.Value = g.elem_n_col;
                         nt.r_sh.Value = g.elem_spacing_height_mm; nt.r_sw.Value = g.elem_spacing_width_mm;
-                        nt.r_sp.Value = get_field(g, 'sparsity_factor', 1);
+                        nt.r_sp.Value = get_nonempty_field(g, 'sparsity_factor', 1);
                     case 'fibonacci'
-                        nt.f_n.Value = gs.fibonacci.elem_n; nt.f_kerf.Value = get_field(gs.fibonacci, 'kerf_mm', 0);
+                        nt.f_n.Value = gs.fibonacci.elem_n; nt.f_kerf.Value = get_nonempty_field(gs.fibonacci, 'kerf_mm', 0);
                     case 'fermat'
                         nt.fm_n.Value = gs.fermat.elem_n;
                 end
@@ -672,7 +672,7 @@ function fig = calibration_gui(options)
                 nt.type.Value = 'annular';
                 nt.rc.Value   = a.curv_radius_mm;
                 nt.dep.Value  = a.dist_geom_ep_mm;
-                nt.nch.Value  = get_field(t, 'n_elem', a.elem_n);
+                nt.nch.Value  = get_nonempty_field(t, 'n_elem', a.elem_n);
                 nt.id.Value   = strjoin(compose('%g', a.elem_id_mm(:)'), ', ');
                 nt.od.Value   = strjoin(compose('%g', a.elem_od_mm(:)'), ', ');
             end
@@ -1214,25 +1214,25 @@ function fig = calibration_gui(options)
     function apply_fit_record(lib)
         % Start from the settings this entry was fitted with (meta.fit, written
         % by CALIBRATION_SAVE_ENTRY); entries without it keep the current settings
-        rec = get_field(get_field(lib, 'meta', []), 'fit', []);
+        rec = get_nonempty_field(get_nonempty_field(lib, 'meta', []), 'fit', []);
         if ~isstruct(rec); return; end
-        fo = get_field(rec, 'fit_options', struct());
+        fo = get_nonempty_field(rec, 'fit_options', struct());
         ui.ring.Value = 'auto';   % refits keep the entry's ring profile unless changed
-        free = cellstr(get_field(fo, 'FreeParams', {'phase', 'amp'}));
+        free = cellstr(get_nonempty_field(fo, 'FreeParams', {'phase', 'amp'}));
         ui.fp_phase.Value = ismember('phase', free);
         ui.fp_amp.Value   = ismember('amp', free);
         for c = {'ForwardModel', 'fwd'; 'Domain', 'domain'}'
-            v = char(get_field(fo, c{1}, ''));
+            v = char(get_nonempty_field(fo, c{1}, ''));
             if any(strcmp(ui.(c{2}).Items, v)); ui.(c{2}).Value = v; end
         end
         for c = {'NearFieldSkipMm', 'skip'; 'HuberDelta', 'huber'; 'NStarts', 'nstarts'}'
             if isfield(fo, c{1}); ui.(c{2}).Value = double(fo.(c{1})); end
         end
-        ui.isppa.Value = double(get_field(rec, 'isppa_wcm2', ui.isppa.Value));
-        po = get_field(rec, 'profile_options', struct());
-        if any(strcmp(ui.align.Items, char(get_field(po, 'Align', '')))); ui.align.Value = char(po.Align); end
+        ui.isppa.Value = double(get_nonempty_field(rec, 'isppa_wcm2', ui.isppa.Value));
+        po = get_nonempty_field(rec, 'profile_options', struct());
+        if any(strcmp(ui.align.Items, char(get_nonempty_field(po, 'Align', '')))); ui.align.Value = char(po.Align); end
         if isfield(po, 'MaxExtrapolationMm'); ui.extrap.Value = double(po.MaxExtrapolationMm); end
-        desired = strcmp(char(get_field(rec, 'calibrate_at', 'measured')), 'desired');
+        desired = strcmp(char(get_nonempty_field(rec, 'calibrate_at', 'measured')), 'desired');
         ui.calat.Value = ui.calat.Items{1 + desired};
         if desired
             ui.pred.Value = strjoin(compose('%g', double(rec.depths_ep_mm(:)')), ', ');
@@ -1243,11 +1243,11 @@ function fig = calibration_gui(options)
                 st.adv.(f{1}) = fo.(f{1});
             end
         end
-        st.pext = non_default(struct('Tolerance', double(get_field(po, 'Tolerance', 0.01))), extra_defaults());
+        st.pext = non_default(struct('Tolerance', double(get_nonempty_field(po, 'Tolerance', 0.01))), extra_defaults());
         st.rpo = struct();
-        rr = get_field(get_field(rec, 'ring_profile', struct()), 'options', struct());
+        rr = get_nonempty_field(get_nonempty_field(rec, 'ring_profile', struct()), 'options', struct());
         if isstruct(rr)
-            oo = get_field(rr, 'OffAxisOptions', struct());
+            oo = get_nonempty_field(rr, 'OffAxisOptions', struct());
             for f = fieldnames(oo)'; rr.(f{1}) = oo.(f{1}); end
             R0 = ring_defaults(); v = struct();
             for f = fieldnames(R0)'
@@ -1256,8 +1256,8 @@ function fig = calibration_gui(options)
             st.rpo = non_default(v, R0);
         end
         update_advanced_button();
-        say(sprintf('Fit settings taken from the entry (meta.fit: %s, %s, %s).', char(get_field(rec, 'mode', '')), ...
-            char(get_field(rec, 'tool', '')), char(string(get_field(lib.meta, 'last_updated', '')))));
+        say(sprintf('Fit settings taken from the entry (meta.fit: %s, %s, %s).', char(get_nonempty_field(rec, 'mode', '')), ...
+            char(get_nonempty_field(rec, 'tool', '')), char(string(get_nonempty_field(lib.meta, 'last_updated', '')))));
     end
 
     function p = selected_profiles()
@@ -1348,10 +1348,6 @@ function v = opt(s, f, d)
     if isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
 end
 
-function v = get_field(s, f, d)
-    if isstruct(s) && isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
-end
-
 function s = num2str_blank(x)
     if isfinite(x); s = num2str(x); else; s = ''; end
 end
@@ -1393,8 +1389,8 @@ end
 
 function s = default_predict_depths(t)
     if is_matrix(t); s = ''; return; end
-    lo = get_field(t, 'min_foc', 0.5 * t.transducer.annular.dist_geom_ep_mm);
-    hi = get_field(t, 'max_foc', 1.2 * t.transducer.annular.dist_geom_ep_mm);
+    lo = get_nonempty_field(t, 'min_foc', 0.5 * t.transducer.annular.dist_geom_ep_mm);
+    hi = get_nonempty_field(t, 'max_foc', 1.2 * t.transducer.annular.dist_geom_ep_mm);
     lo = 5 * ceil(lo / 5); hi = 5 * floor(hi / 5);
     if hi <= lo; hi = lo + 5; end
     s = sprintf('%g:5:%g', lo, hi);
@@ -1429,7 +1425,7 @@ function info = draw_transducer_geometry(axs, axf, t)
         a  = tr.annular; R = a.curv_radius_mm; curved = true;
         id = a.elem_id_mm(:)'; od = a.elem_od_mm(:)'; n = numel(od);
         if numel(id) ~= n || n == 0; error('enter matching inner and outer diameters'); end
-        nch = double(get_field(t, 'n_elem', n));
+        nch = double(get_nonempty_field(t, 'n_elem', n));
         if nch >= 1 && nch <= n && mod(n, nch) == 0
             grp = kron(1:nch, ones(1, n / nch));
         else
@@ -1499,7 +1495,7 @@ function info = draw_transducer_geometry(axs, axf, t)
     yl = 1.15 * rmax;
     plot(axs, [z_ep z_ep], [-yl yl], 'k:', 'LineWidth', 1, 'DisplayName', 'Exit plane');
     if curved; plot(axs, R, 0, 'k+', 'MarkerSize', 10, 'LineWidth', 1.5, 'DisplayName', 'Geometric focus'); end
-    fmin = get_field(t, 'min_foc', []); fmax = get_field(t, 'max_foc', []);
+    fmin = get_nonempty_field(t, 'min_foc', []); fmax = get_nonempty_field(t, 'max_foc', []);
     zmax = max([R * curved, z_ep + 10]);
     if ~isempty(fmin) && ~isempty(fmax)
         plot(axs, z_ep + [fmin fmax], [0 0], '-', 'Color', [0.85 0.37 0.01], 'LineWidth', 4, ...

@@ -111,18 +111,6 @@ function d = segmentation_date(parameters)
     end
 end
 
-function v = get_field(s, path)
-    v = [];
-    for i = 1:numel(path)
-        if ~isstruct(s) || ~isfield(s, path{i})
-            v = [];
-            return
-        end
-        s = s(1).(path{i});
-    end
-    v = s;
-end
-
 function mp = drop_absorption_coeff(mp, parameters)
 % absorption_coeff is thermal-only and unused by tissues that set
 % absorption_fraction, as is an emptied absorption_fraction by tissues that

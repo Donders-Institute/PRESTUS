@@ -47,23 +47,23 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
 
     %% ── Gather provenance ────────────────────────────────────────────────
     meta = lib.meta;
-    created_at      = get_field(meta, 'created_at',      '—');
-    prestus_version = get_field(meta, 'prestus_version', '—');
-    tran_serial     = get_field(meta, 'tran_serial',     combo_name);
+    created_at      = field_text(meta, 'created_at',      '—');
+    prestus_version = field_text(meta, 'prestus_version', '—');
+    tran_serial     = field_text(meta, 'tran_serial',     combo_name);
 
-    cal_type  = get_field(meta, 'calibration_type', '—');
+    cal_type  = field_text(meta, 'calibration_type', '—');
     fwd_model = '—'; lambda_str = '—'; n_depths = '—';
-    lib_mode  = get_field(meta, 'library_mode', '—');
+    lib_mode  = field_text(meta, 'library_mode', '—');
     blend_str = '—';
-    if isfield(lib, 'global_model'); fwd_model = get_field(lib.global_model, 'forward_model', '—'); end
+    if isfield(lib, 'global_model'); fwd_model = field_text(lib.global_model, 'forward_model', '—'); end
     if isfield(lib, 'refinement')
         n_depths  = num2str(numel(lib.refinement.depths_ep_mm));
-        blend_str = sprintf('%s mm', get_field(lib.refinement, 'blend_mm', '—'));
+        blend_str = sprintf('%s mm', field_text(lib.refinement, 'blend_mm', '—'));
     end
     if isfield(meta, 'calibration')
         mc = meta.calibration;
-        cal_type  = get_field(mc, 'calibration_type', get_field(mc, 'phase_mode', '—'));
-        fwd_model = get_field(mc, 'forward_model', '—');
+        cal_type  = field_text(mc, 'calibration_type', field_text(mc, 'phase_mode', '—'));
+        fwd_model = field_text(mc, 'forward_model', '—');
         if isfield(mc, 'lambda')
             lambda_str = num2str(mc.lambda);
         end
@@ -109,7 +109,7 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
         for di = 1:numel(dkeys)
             entry = cal_depths.(dkeys{di});
             depth_val = str2double(strrep(strrep(dkeys{di},'f',''),'p','.'));
-            is_ref = get_field(entry, 'is_refinement', false);
+            is_ref = field_text(entry, 'is_refinement', false);
             if isfield(entry, 'amplitude_scaling')
                 ak = fieldnames(entry.amplitude_scaling);
                 for ai = 1:numel(ak)
@@ -239,7 +239,8 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
 end
 
 %% ── Helpers ──────────────────────────────────────────────────────────────
-function v = get_field(s, fname, default)
+function v = field_text(s, fname, default)
+% Field value as display text (numbers and logicals converted), or default when missing or empty
     if isfield(s, fname) && ~isempty(s.(fname))
         val = s.(fname);
         if isnumeric(val); v = num2str(val);

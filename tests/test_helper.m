@@ -4,6 +4,32 @@ classdef test_helper < matlab.unittest.TestCase
 %   Run with:   results = runtests('tests/test_helper.m');
 
     % ------------------------------------------------------------------ %
+    %% get_field / get_nonempty_field
+    % ------------------------------------------------------------------ %
+    methods (Test, TestTags = {'get_field'})
+
+        function test_get_field_paths_and_defaults(tc)
+            s = struct('a', struct('b', 3, 'e', []), 'c', 'x');
+            tc.verifyEqual(get_field(s, 'c', 'd'), 'x');
+            tc.verifyEqual(get_field(s, {'a', 'b'}, 0), 3);
+            tc.verifyEqual(get_field(s, {'a', 'z'}, 0), 0);
+            tc.verifyEqual(get_field(s, {'c', 'z'}, 0), 0, 'non-struct level');
+            tc.verifyEmpty(get_field(s, {'a', 'e'}, 0), 'empty is a value');
+            tc.verifyEmpty(get_field(s, 'z'), 'default default is []');
+            tc.verifyEqual(get_field(struct('t', {1, 2}), 't', 0), 1, 'struct array: first element');
+            tc.verifyEqual(get_field(struct('t', {}), 't', 0), 0, 'empty struct array');
+        end
+
+        function test_get_nonempty_field_treats_empty_as_missing(tc)
+            s = struct('a', struct('e', [], 'b', 2), 'c', '');
+            tc.verifyEqual(get_nonempty_field(s, {'a', 'e'}, 7), 7);
+            tc.verifyEqual(get_nonempty_field(s, 'c', 'd'), 'd');
+            tc.verifyEqual(get_nonempty_field(s, {'a', 'b'}, 7), 2);
+        end
+
+    end
+
+    % ------------------------------------------------------------------ %
     %% round_if_integer
     % ------------------------------------------------------------------ %
     methods (Test, TestTags = {'round_if_integer'})

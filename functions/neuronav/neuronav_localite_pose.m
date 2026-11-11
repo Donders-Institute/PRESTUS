@@ -49,17 +49,17 @@ function [coord_matrix, info] = neuronav_localite_pose(parameters)
     if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite')
         lc = parameters.placement.localite;
     end
-    target   = char(get_field(lc, 'target', ''));
-    position = get_field(lc, 'position', 1);
+    target   = char(get_nonempty_field(lc, 'target', ''));
+    position = get_nonempty_field(lc, 'position', 1);
 
-    file = char(get_field(lc, 'file', ''));
+    file = char(get_nonempty_field(lc, 'file', ''));
     if ~isempty(file)
         if ~isfile(file)
             error('PRESTUS:localite:fileNotFound', ...
                 'placement.localite.file does not exist: %s', file);
         end
         [coord_matrix, info] = pose_from_file(file, target, position, ...
-            get_field(lc, 'expected_segment_length', []));
+            get_nonempty_field(lc, 'expected_segment_length', []));
     else
         [coord_matrix, info] = pose_from_ingested(parameters, lc, target, position);
     end
@@ -139,7 +139,7 @@ function [M, info] = pose_from_ingested(parameters, lc, target, position)
     else
         sub_id = char(parameters.subject_id);
     end
-    ses = get_field(lc, 'session', 1);
+    ses = get_nonempty_field(lc, 'session', 1);
     if isnumeric(ses), ses = sprintf('ses-%02d', double(ses)); end
     ses = char(ses);
 
@@ -248,14 +248,6 @@ function M = matrix4d_to_full(m)
             f = sprintf('data%d%dAttribute', row, col);
             if isfield(m, f), M(row+1, col+1) = double(m.(f)); end
         end
-    end
-end
-
-function v = get_field(s, f, default)
-    if isstruct(s) && isfield(s, f) && ~isempty(s.(f))
-        v = s.(f);
-    else
-        v = default;
     end
 end
 

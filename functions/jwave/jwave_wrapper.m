@@ -817,15 +817,6 @@ function [python_bin, is_gpu] = resolve_python_env(cpu_env, gpu_env, use_gpu)
 end
 
 
-function val = get_field(s, name, default)
-if isfield(s, name)
-    val = s.(name);
-else
-    val = default;
-end
-end
-
-
 function out = ternary(cond, a, b)
 if cond
     out = a;

@@ -378,14 +378,6 @@ function jobs = recorded()
     end
 end
 
-function v = get_field(s, path, default)
-    v = default;
-    for k = 1:numel(path)
-        if ~isstruct(s) || ~isfield(s, path{k}); return; end
-        s = s.(path{k});
-    end
-    v = s;
-end
 
 function out = find_jobs(jobs, varargin)
 % Jobs whose name contains every pattern.

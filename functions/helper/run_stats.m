@@ -77,19 +77,19 @@ end
 function rec = build_record(S, parameters, total_s)
 rec = struct();
 rec.timestamp        = char(datetime('now', 'TimeZone', 'UTC', 'Format', 'yyyy-MM-dd''T''HH:mm:ss''Z'''));
-rec.platform         = char(get_field(parameters, {'platform'}, 'matlab'));
-rec.hpc_name         = char(get_field(parameters, {'hpc', 'name'}, ''));
-rec.hpc_partition    = char(get_field(parameters, {'hpc', 'partition'}, ''));
+rec.platform         = char(get_nonempty_field(parameters, {'platform'}, 'matlab'));
+rec.hpc_name         = char(get_nonempty_field(parameters, {'hpc', 'name'}, ''));
+rec.hpc_partition    = char(get_nonempty_field(parameters, {'hpc', 'partition'}, ''));
 rec.host             = host_name();
-rec.code_type        = char(get_field(parameters, {'simulation', 'code_type'}, ''));
+rec.code_type        = char(get_nonempty_field(parameters, {'simulation', 'code_type'}, ''));
 rec.gpu_model        = '';
 if contains(rec.code_type, 'gpu')
     rec.gpu_model = gpu_name();
 end
-rec.precision        = char(get_field(parameters, {'simulation', 'precision'}, ''));
-rec.acoustic_backend = char(get_field(parameters, {'acoustic_backend'}, 'kwave'));
-rec.medium           = char(get_field(parameters, {'simulation', 'medium'}, ''));
-rec.resolution_mm    = get_field(parameters, {'grid', 'resolution_mm'}, NaN);
+rec.precision        = char(get_nonempty_field(parameters, {'simulation', 'precision'}, ''));
+rec.acoustic_backend = char(get_nonempty_field(parameters, {'acoustic_backend'}, 'kwave'));
+rec.medium           = char(get_nonempty_field(parameters, {'simulation', 'medium'}, ''));
+rec.resolution_mm    = get_nonempty_field(parameters, {'grid', 'resolution_mm'}, NaN);
 fn = fieldnames(S);
 for k = 1:numel(fn)
     rec.(fn{k}) = S.(fn{k});
@@ -99,7 +99,7 @@ rec.peak_ram_gb = peak_ram_gb();
 end
 
 function append_record(rec, parameters)
-sim_dir = char(get_field(parameters, {'path', 'sim'}, ''));
+sim_dir = char(get_nonempty_field(parameters, {'path', 'sim'}, ''));
 if isempty(sim_dir) || ~isfolder(sim_dir)
     return
 end
@@ -109,18 +109,6 @@ if fid < 0
 end
 cleaner = onCleanup(@() fclose(fid));
 fprintf(fid, '%s\n', jsonencode(rec));
-end
-
-function v = get_field(s, keys, default)
-v = s;
-for i = 1:numel(keys)
-    if isstruct(v) && isfield(v, keys{i}) && ~isempty(v.(keys{i}))
-        v = v.(keys{i});
-    else
-        v = default;
-        return
-    end
-end
 end
 
 function name = host_name()

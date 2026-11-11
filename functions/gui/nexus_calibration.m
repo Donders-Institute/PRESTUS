@@ -43,7 +43,7 @@ function out = nexus_calibration(args)
     persistent sessions
     if isempty(sessions); sessions = containers.Map(); end
     action = char(args.action);
-    key = char(get_field(args, 'session', 'default'));
+    key = char(get_nonempty_field(args, 'session', 'default'));
     if strcmp(action, 'open')
         S = open_combo(args);
         sessions(key) = S;
@@ -59,7 +59,7 @@ function out = nexus_calibration(args)
             S = load_profiles(S, char(args.csv));
             out = combo_info(S);
         case 'view'
-            [S, out] = view(S, args, logical(get_field(args, 'predicted', false)));
+            [S, out] = view(S, args, logical(get_nonempty_field(args, 'predicted', false)));
         case 'fit'
             [S, out] = do_fit(S, args);
         case 'save'
@@ -83,17 +83,17 @@ end
 %% Actions ------------------------------------------------------------------
 function S = open_combo(args)
     root = get_prestus_path();
-    S.equip_path = char(get_field(args, 'equip_path', fullfile(root, 'config', 'equipment')));
+    S.equip_path = char(get_nonempty_field(args, 'equip_path', fullfile(root, 'config', 'equipment')));
     S.lib_path   = fullfile(root, 'config', 'calibration');
-    S.prof_root  = char(get_field(args, 'profile_root', fullfile(root, 'local', 'profiles')));
-    S.user_path  = char(get_field(args, 'library_path', ''));
+    S.prof_root  = char(get_nonempty_field(args, 'profile_root', fullfile(root, 'local', 'profiles')));
+    S.user_path  = char(get_nonempty_field(args, 'library_path', ''));
     S.equip = load_equipment_config(S.equip_path);
     S.serial = char(args.serial);
     if ~isfield(S.equip.trans, S.serial)
         error('nexus_calibration:serial', 'Transducer %s is not in %s.', S.serial, S.equip_path);
     end
     S.tran = S.equip.trans.(S.serial);
-    S.ds = char(get_field(args, 'driving_system', ''));
+    S.ds = char(get_nonempty_field(args, 'driving_system', ''));
     S.combo = S.serial;
     if ~isempty(S.ds); S.combo = [S.serial '_' S.ds]; end
     S.matrix = ~isfield(S.tran.transducer, 'annular') && isfield(S.tran.transducer, 'matrix');
@@ -105,7 +105,7 @@ function S = open_combo(args)
         end
     end
     S.meas = []; S.csv = ''; S.fit = []; S.prof = []; S.predicted = false;
-    csv = char(get_field(args, 'csv', ''));
+    csv = char(get_nonempty_field(args, 'csv', ''));
     if isempty(csv) && isfield(S.tran, 'combos') && isfield(S.tran.combos, S.ds) ...
             && isfield(S.tran.combos.(S.ds), 'char_data_path')
         csv = char(S.tran.combos.(S.ds).char_data_path);
@@ -131,15 +131,15 @@ function out = combo_info(S)
         out.measured_span = [min(S.meas.depths_ep_mm), max(S.meas.depths_ep_mm)];
     end
     if ~isempty(S.lib) && isfield(S.lib, 'meta')
-        out.calibration_type = char(string(get_field(S.lib.meta, 'calibration_type', '')));
-        out.last_updated = char(string(get_field(S.lib.meta, 'last_updated', '')));
-        out.fit_record = get_field(S.lib.meta, 'fit', []);
+        out.calibration_type = char(string(get_nonempty_field(S.lib.meta, 'calibration_type', '')));
+        out.last_updated = char(string(get_nonempty_field(S.lib.meta, 'last_updated', '')));
+        out.fit_record = get_nonempty_field(S.lib.meta, 'fit', []);
     end
     if ~S.matrix
         g = S.tran.transducer.annular.dist_geom_ep_mm;
         out.dist_geom_mm = g;
-        lo = 5 * ceil(get_field(S.tran, 'min_foc', 0.5 * g) / 5);
-        hi = 5 * floor(get_field(S.tran, 'max_foc', 1.2 * g) / 5);
+        lo = 5 * ceil(get_nonempty_field(S.tran, 'min_foc', 0.5 * g) / 5);
+        hi = 5 * floor(get_nonempty_field(S.tran, 'max_foc', 1.2 * g) / 5);
         if hi <= lo; hi = lo + 5; end
         out.default_depths = lo:5:hi;
     end
@@ -168,20 +168,20 @@ function [S, out] = do_fit(S, args)
     assert(~S.matrix, 'nexus_calibration:matrix', 'Fitting supports annular arrays only.');
     assert(~isempty(S.meas), 'nexus_calibration:noProfiles', 'Fitting needs measured profiles: load a CSV first.');
     st = settings(args);
-    at_desired = strcmp(char(get_field(args, 'calibrate_at', 'measured')), 'desired');
+    at_desired = strcmp(char(get_nonempty_field(args, 'calibrate_at', 'measured')), 'desired');
     if at_desired
         sel = calibration_desired_profiles(S.tran, S.meas, row(args.depths), st.profile);
     else
-        d = row(get_field(args, 'measured_depths', S.meas.depths_ep_mm));
+        d = row(get_nonempty_field(args, 'measured_depths', S.meas.depths_ep_mm));
         keep = arrayfun(@(x) any(abs(d - x) < 0.01), S.meas.depths_ep_mm);
         assert(any(keep), 'nexus_calibration:noDepths', 'Select at least one depth.');
         sel = interpolate_axial_profiles(S.meas, S.meas.depths_ep_mm(keep));
     end
-    fo = struct('Mode', char(get_field(args, 'mode', 'per_depth')), ...
-        'FreeParams', {cellstr(get_field(args, 'free_params', {'phase'; 'amp'}))'}, ...
+    fo = struct('Mode', char(get_nonempty_field(args, 'mode', 'per_depth')), ...
+        'FreeParams', {cellstr(get_nonempty_field(args, 'free_params', {'phase'; 'amp'}))'}, ...
         'FitOptions', st.fit, 'Library', S.lib, 'IsppaWcm2', st.isppa, 'TranSerial', S.serial, ...
         'DrivingSystem', S.ds, 'Source', S.csv, 'CalibrateAt', ternary(at_desired, 'desired', 'measured'), ...
-        'Tool', 'nexus', 'RingProfile', char(get_field(args, 'ring_profile', 'auto')), ...
+        'Tool', 'nexus', 'RingProfile', char(get_nonempty_field(args, 'ring_profile', 'auto')), ...
         'RingProfileOptions', st.ring, 'Measured', S.meas, ...
         'Progress', @(k, n, d, pt) nexus_progress( ...
             sprintf('Depth %.1f mm, %s profile (%d/%d)', d, pt, k, n)));
@@ -189,7 +189,7 @@ function [S, out] = do_fit(S, args)
         fo.ProfileOptions = rmfield(st.profile, 'NearFieldSkipMm');
     end
     [S.fit, msg] = calibration_fit(S.tran, sel, fo);
-    show_desired = at_desired || logical(get_field(args, 'predicted', false));
+    show_desired = at_desired || logical(get_nonempty_field(args, 'predicted', false));
     [S, out] = view(S, args, show_desired);
     out.messages = [{msg}, out.messages];
     out.fit_record = S.fit.record;
@@ -198,7 +198,7 @@ end
 function out = do_save(S, args)
     assert(~isempty(S.fit), 'nexus_calibration:noFit', 'Nothing to save: run a fit first.');
     so = struct('ShippedLibraryPath', S.lib_path, ...
-        'AllowShipped', logical(get_field(args, 'allow_shipped', false)));
+        'AllowShipped', logical(get_nonempty_field(args, 'allow_shipped', false)));
     [file, prof_csv] = calibration_save_entry(S.fit.entry, S.fit, char(args.out_dir), so);
     out = struct('file', file, 'profiles_csv', prof_csv, 'out_dir', char(args.out_dir));
 end
@@ -298,13 +298,13 @@ end
 
 %% Helpers ------------------------------------------------------------------
 function st = settings(args)
-    s = get_field(args, 'settings', struct());
-    st.fit = struct('ForwardModel', char(get_field(s, 'forward_model', 'rayleigh')), ...
-        'NearFieldSkipMm', double(get_field(s, 'near_field_skip_mm', 10)), ...
-        'HuberDelta', double(get_field(s, 'huber_delta', 0.8)), ...
-        'NStarts', double(get_field(s, 'n_starts', 16)), ...
-        'Domain', char(get_field(s, 'domain', 'intensity')));
-    adv = get_field(s, 'advanced', struct());
+    s = get_nonempty_field(args, 'settings', struct());
+    st.fit = struct('ForwardModel', char(get_nonempty_field(s, 'forward_model', 'rayleigh')), ...
+        'NearFieldSkipMm', double(get_nonempty_field(s, 'near_field_skip_mm', 10)), ...
+        'HuberDelta', double(get_nonempty_field(s, 'huber_delta', 0.8)), ...
+        'NStarts', double(get_nonempty_field(s, 'n_starts', 16)), ...
+        'Domain', char(get_nonempty_field(s, 'domain', 'intensity')));
+    adv = get_nonempty_field(s, 'advanced', struct());
     if isstruct(adv)
         for f = fieldnames(adv)'
             v = adv.(f{1});
@@ -312,11 +312,11 @@ function st = settings(args)
             st.fit.(f{1}) = v;
         end
     end
-    st.isppa = double(get_field(s, 'isppa_wcm2', 30));
-    st.profile = struct('Align', char(get_field(s, 'align', 'label')), ...
-        'MaxExtrapolationMm', double(get_field(s, 'max_extrapolation_mm', 0)), ...
-        'NearFieldSkipMm', st.fit.NearFieldSkipMm, 'Tolerance', double(get_field(s, 'tolerance', 0.01)));
-    st.ring = plain(get_field(s, 'ring_profile_options', struct()));    % FIT_RING_PROFILE options
+    st.isppa = double(get_nonempty_field(s, 'isppa_wcm2', 30));
+    st.profile = struct('Align', char(get_nonempty_field(s, 'align', 'label')), ...
+        'MaxExtrapolationMm', double(get_nonempty_field(s, 'max_extrapolation_mm', 0)), ...
+        'NearFieldSkipMm', st.fit.NearFieldSkipMm, 'Tolerance', double(get_nonempty_field(s, 'tolerance', 0.01)));
+    st.ring = plain(get_nonempty_field(s, 'ring_profile_options', struct()));    % FIT_RING_PROFILE options
 end
 
 function v = plain(v)
@@ -334,10 +334,6 @@ end
 
 function v = row(v)
     v = double(v(:)');
-end
-
-function v = get_field(s, f, d)
-    if isstruct(s) && isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
 end
 
 function out = ternary(c, a, b)

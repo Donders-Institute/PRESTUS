@@ -78,12 +78,8 @@ function opt = naming_options(parameters)
     if isfield(parameters, 'neuronav') && isstruct(parameters.neuronav)
         nv = parameters.neuronav;
     end
-    opt.suggest_names     = logical(get_field(nv, 'suggest_names', true));
-    opt.axis_tolerance_mm = get_field(nv, 'axis_tolerance_mm', 10);
-    opt.target_depth_mm   = get_field(nv, 'target_depth_mm', [0 150]);
-    opt.target_labels     = get_field(nv, 'target_labels', []);
-end
-
-function v = get_field(s, f, default)
-    if isfield(s, f) && ~isempty(s.(f)), v = s.(f); else, v = default; end
+    opt.suggest_names     = logical(get_nonempty_field(nv, 'suggest_names', true));
+    opt.axis_tolerance_mm = get_nonempty_field(nv, 'axis_tolerance_mm', 10);
+    opt.target_depth_mm   = get_nonempty_field(nv, 'target_depth_mm', [0 150]);
+    opt.target_labels     = get_nonempty_field(nv, 'target_labels', []);
 end

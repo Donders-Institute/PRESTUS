@@ -35,7 +35,7 @@ function out = nexus_neuronav(args)
         case 'detect'
             out = detect(p, char(args.sub), char(args.ses));
         case 'write'
-            out = write(p, char(args.sub), char(args.ses), get_field(args, 'target_map', []));
+            out = write(p, char(args.sub), char(args.ses), get_nonempty_field(args, 'target_map', []));
         case 'scan'
             out = scan(p);
         case 'mni'
@@ -111,7 +111,7 @@ function out = write(p, sub, ses, tm)
     for k = 1:numel(tm)
         target_map(k) = struct('series_index', double(tm(k).series_index), ...
             'transducer_id', double(tm(k).transducer_id), 'target_name', strtrim(char(tm(k).target_name)), ...
-            'color', strtrim(char(get_field(tm(k), 'color', ''))));
+            'color', strtrim(char(get_nonempty_field(tm(k), 'color', ''))));
     end
     msg = neuronav_check_target_map(target_map);
     if ~isempty(msg); error('nexus_neuronav:targetMap', '%s', msg); end
@@ -128,17 +128,17 @@ end
 
 function out = mni(p, args)
     paths = neuronav_resolve_paths(p);
-    csv = char(get_field(args, 'csv', fullfile(paths.post, 'neuronav_ingest_summary.csv')));
+    csv = char(get_nonempty_field(args, 'csv', fullfile(paths.post, 'neuronav_ingest_summary.csv')));
     assert(isfile(csv), 'nexus_neuronav:noSummary', 'No summary CSV: %s (run the batch first).', csv);
-    seg = char(get_field(args, 'seg', char(get_nested(p, {'path', 'seg'}, ''))));
+    seg = char(get_nonempty_field(args, 'seg', char(get_nested(p, {'path', 'seg'}, ''))));
     assert(isfolder(seg), 'nexus_neuronav:seg', 'Set the SimNIBS root (path.seg): %s', seg);
     p.path.seg = seg;
     T = neuronav_summary_to_mni(csv, p, 'progress', ...
         @(k, n, sub, ~) nexus_progress(sprintf('%d / %d subjects (%s)', k, n, sub)));
     T = T(~cellfun(@isempty, T.target), :);   % sessions without written targets
     out = struct('csv', csv, 'rows', {table_rows(T)}, 'template', '', 'faces', {{}}, 'vertices', {{}});
-    if logical(get_field(args, 'head', false))
-        f = char(get_field(args, 'template', neuronav_find_mni_template(p)));
+    if logical(get_nonempty_field(args, 'head', false))
+        f = char(get_nonempty_field(args, 'template', neuronav_find_mni_template(p)));
         if isempty(f)
             ok = find(cellfun(@isempty, T.mni_status), 1);
             if ~isempty(ok)
@@ -254,10 +254,6 @@ function val = get_nested(s, fields, default)
             val = default; return;
         end
     end
-end
-
-function v = get_field(s, f, d)
-    if isstruct(s) && isfield(s, f) && ~isempty(s.(f)); v = s.(f); else; v = d; end
 end
 
 function out = ternary(c, a, b)

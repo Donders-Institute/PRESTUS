@@ -259,7 +259,9 @@ The following documents the functions provided in PRESTUS.
 | `find_pseudoct_dir`                     | Folder holding this subject's existing pseudoCT.nii.gz |
 | `find_sidecar`                          | JSON sidecar of a data file: same name with .json (BIDS convention) |
 | `get_crop_dims`                         | Computes cropping dimensions for a 3D image with a margin. |
+| `get_field`                             | Value of a (nested) struct field, or a default when it is missing |
 | `get_flhm_center_position`              | Calculates the center position of the full-length half-maximum (FLHM). |
+| `get_nonempty_field`                    | Value of a (nested) struct field, or a default when it is missing or empty |
 | `get_output_dir`                        | Derive the simulation output directory from parameters |
 | `get_pct_dir`                           | Per-subject pseudo-CT folder |
 | `get_placement_dir`                     | Per-subject root of the placement outputs |
@@ -344,6 +346,7 @@ The following documents the functions provided in PRESTUS.
 
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
+| `db_cm_mhz_to_np_m`                     | Convert an attenuation or absorption coefficient to nepers per metre |
 | `fitPowerLawParamsMulti`                | Fit power law absorption parameters for highly absorbing media. |
 | `get_alpha_coeff`                       | Computes the amplitude attenuation coefficient for a given medium and frequency. |
 | `medium_absorption_layer`               | Keep one absorption field per tissue when merging a config layer |

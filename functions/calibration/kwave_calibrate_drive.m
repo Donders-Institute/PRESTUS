@@ -172,10 +172,10 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
             mat2str(gdims), sim_seconds);
     end
 
-    lib.refinement.kwave_config = struct('code_type', char(string(get_field(base, {'simulation', 'code_type'}, 'default'))), ...
-        'axisymmetric', get_field(base, {'grid', 'axisymmetric'}, 0), ...
-        'resolution_mm', get_field(base, {'grid', 'resolution_mm'}, []), ...
-        'default_dims', get_field(base, {'grid', 'default_dims'}, []), ...
+    lib.refinement.kwave_config = struct('code_type', char(string(get_nonempty_field(base, {'simulation', 'code_type'}, 'default'))), ...
+        'axisymmetric', get_nonempty_field(base, {'grid', 'axisymmetric'}, 0), ...
+        'resolution_mm', get_nonempty_field(base, {'grid', 'resolution_mm'}, []), ...
+        'default_dims', get_nonempty_field(base, {'grid', 'default_dims'}, []), ...
         'checked', datestr(now, 'yyyy-mm-dd')); %#ok<TNOW1,DATST>
     report = array2table([depths(:), rep], 'VariableNames', {'depth_ep_mm', 'isppa_ref_wcm2', ...
         'isppa_kwave_wcm2', 'amp_scale', 'r2_kwave', 'focal_err_kwave_mm'});
@@ -241,14 +241,6 @@ function tf = has_field(s, path)
     for k = 1:numel(path)
         if ~isstruct(s) || ~isfield(s, path{k}) || isempty(s.(path{k})); tf = false; return; end
         s = s.(path{k});
-    end
-end
-
-function v = get_field(s, path, d)
-    v = d;
-    if has_field(s, path)
-        for k = 1:numel(path); s = s.(path{k}); end
-        v = s;
     end
 end
 
