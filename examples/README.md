@@ -2,7 +2,7 @@
 
 This folder contains example scripts that interact with the PRESTUS pipeline
 
-- `tutorial_ernie` (with `tutorial_ernie.yaml`) runs a head simulation on SimNIBS' Ernie example: segmentation, MNI placement, acoustic and thermal simulation (draft tutorial: `doc/doc_tutorial_head.md`).
+- `tutorial_ernie` (with `tutorial_ernie.yaml`) runs a head simulation on SimNIBS' Ernie example: segmentation, MNI placement, acoustic and thermal simulation (draft tutorial: `tutorial_ernie.md`).
 - `calibration_standalone` initiates the calibration of transducer phases and amplitudes for equipment at the Donders institute.
 - `demo_transducer_refinement` refines the shipped transducer library to your own hydrophone axial profiles (one call, writes a user library entry; runs out of the box on demonstration profiles).
 - `example_uncertainty` runs the uncertainty quantification pipeline (five-variant simulation + combined report); see [Uncertainty](../doc/doc_uncertainty.md).

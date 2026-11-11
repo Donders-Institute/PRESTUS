@@ -1,7 +1,7 @@
 # Tutorial: A Head Simulation
 
 !!! warning "Draft"
-    This tutorial has not yet been run end to end on the current PRESTUS version. Runtimes and the values under *What you should see* are placeholders (marked **TODO**) until a test run fills them in. It sits outside `doc/` until then; move it back to `doc/` and add it to the nav in `mkdocs.yaml` once it has been run.
+    This tutorial has not yet been run end to end on the current PRESTUS version. Runtimes and the values under *What you should see* are placeholders (marked **TODO**) until a test run fills them in. It stays in `examples/` until then; move it to `doc/` and add it to the nav in `mkdocs.yaml` once it has been run.
 
 This tutorial runs a complete head simulation on *Ernie*, the example head that comes with SimNIBS: segmentation, placement from MNI coordinates, the acoustic simulation, the thermal simulation, and the report. It builds on [Your first simulation](doc_getting-started.md); terms are explained in the [Glossary](doc_glossary.md).
 

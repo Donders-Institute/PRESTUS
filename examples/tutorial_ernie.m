@@ -1,4 +1,4 @@
-%% TUTORIAL_ERNIE  Head simulation on SimNIBS' Ernie example (see doc/doc_tutorial_head.md)
+%% TUTORIAL_ERNIE  Head simulation on SimNIBS' Ernie example (see examples/tutorial_ernie.md)
 %
 % Run the three sections one after the other. Edit the paths in
 % tutorial_ernie.yaml first. Each section can also be submitted to a cluster
