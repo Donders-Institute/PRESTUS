@@ -223,6 +223,30 @@ classdef test_medium < matlab.unittest.TestCase
             p = use_coefficients(medium_params());
             p.medium_properties.brain.absorption_coeff = -1;
             masks = slab_masks(p);
+        function test_coefficient_without_attenuation_stays_finite(tc)
+            % alpha_coeff 0: the fraction map is 0 without absorption and 1
+            % with it (which warns), never Inf or NaN
+            p = use_coefficients(medium_params(), {'brain', 'skin'});
+            p.medium_properties.brain.alpha_coeff = 0;
+            p.medium_properties.brain.absorption_coeff = 0;
+            p.medium_properties.skin.alpha_coeff = 0;
+            [masks, tissues] = slab_masks(p);
+            [km, plus] = quiet_medium_setup(p, masks); %#ok<ASGLU>
+            tc.verifyTrue(all(isfinite(plus.absorption_fraction(:))));
+            tc.verifyEqual(unique(plus.absorption_fraction(masks == find(strcmp(tissues, 'brain')))), 0);
+            tc.verifyEqual(unique(plus.absorption_fraction(masks == find(strcmp(tissues, 'skin')))), 1);
+            a = thermal_absorption_properties(p, 'brain');
+            tc.verifyTrue(isnan(a.absorption_fraction), 'undefined fraction is reported as NaN');
+        end
+
+        function test_unit_conversion_db_to_np(tc)
+            % 1 dB/(cm MHz) at 1 MHz = 100 / 8.686 Np/m; y scales with frequency
+            tc.verifyEqual(db_cm_mhz_to_np_m(1, 1e6, 1), 100 / (20*log10(exp(1))), 'RelTol', 1e-12);
+            tc.verifyEqual(db_cm_mhz_to_np_m(0.59, 500e3, 1.2), ...
+                0.59 * 0.5^1.2 * 100 / (20*log10(exp(1))), 'RelTol', 1e-12);
+            tc.verifyEqual(db_cm_mhz_to_np_m([1 2], 2e6, [1 2]), [2 8] * 100 / (20*log10(exp(1))), 'RelTol', 1e-12);
+        end
+
             tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:badAbsorptionCoeff');
         end
 

@@ -61,6 +61,15 @@ classdef test_pct_uncertainty < matlab.unittest.TestCase
             tc.verifyEqual(s.bounds.trans_high.sound_speed, 2190);
         end
 
+        function unreadableBoundFileWarns(tc)
+            p = native_pct(tc.TmpDir);
+            p.simulation.uncertainty_trans_high = fullfile(tc.TmpDir, 'missing.yaml');
+            s = tc.verifyWarning(@() pct_predict_skull_properties(p, write=false), ...
+                'pct_predict_skull_properties:boundFile');
+            tc.verifyFalse(isfield(s.bounds, 'trans_high'));
+            tc.verifyTrue(isfield(s.bounds, 'temp_high'));
+        end
+
         function predictionErrorsWithoutPseudoCT(tc)
             p = make_minimal_parameters(fullfile(tc.TmpDir, 'sims'));
             p.subject_id = 1;

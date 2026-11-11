@@ -231,12 +231,18 @@ end
     % of attenuation, using each tissue's attenuation power law
     % (absorption_power = alpha_power): a coefficient tissue gets its fraction,
     % a fraction tissue its coefficient
-    f_mhz = parameters.transducer(1).freq_hz / 1e6;
-    db2np_f = f_mhz.^alpha_power * 100 / (20*log10(exp(1))); % [dB/(cm MHz^y)] -> [Np/m] at f
+    db2np_f = db_cm_mhz_to_np_m(1, parameters.transducer(1).freq_hz, alpha_power); % [dB/(cm MHz^y)] -> [Np/m] at f
     attenuation_np = alpha_coeff .* db2np_f;
     absorption_np = absorption_fraction .* attenuation_np;
     absorption_np(uses_absorption_coeff) = absorption_coeff(uses_absorption_coeff) .* db2np_f(uses_absorption_coeff);
-    absorption_fraction(uses_absorption_coeff) = absorption_np(uses_absorption_coeff) ./ attenuation_np(uses_absorption_coeff);
+    % fraction of a coefficient tissue; without attenuation it is 0 when nothing
+    % is absorbed and 1 otherwise (the warning below flags that case), so the
+    % map stays finite for smoothing and the NIfTI outputs
+    from_coeff = uses_absorption_coeff & attenuation_np > 0;
+    absorption_fraction(from_coeff) = absorption_np(from_coeff) ./ attenuation_np(from_coeff);
+    no_attenuation = uses_absorption_coeff & ~(attenuation_np > 0);
+    absorption_fraction(no_attenuation) = double(absorption_np(no_attenuation) > 0);
+    clear from_coeff no_attenuation
     if any(absorption_np(:) > attenuation_np(:) * (1 + 1e-9))
         warn('medium_setup:absorptionExceedsAttenuation', ...
             'absorption exceeds attenuation in %d voxels; heating then exceeds the attenuated power.', ...
@@ -245,7 +251,7 @@ end
     absorption_from_coeff = any(uses_absorption_coeff(:));
     absorption_log = absorption_summary(parameters, medium_masks, layer_labels, medium_labels, ...
         absorption_np, absorption_fraction, db2np_f);
-    clear absorption_coeff attenuation_np db2np_f f_mhz uses_absorption_coeff
+    clear absorption_coeff attenuation_np db2np_f uses_absorption_coeff
 
     %% account for k-Wave's actual attenuation behaviour
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).

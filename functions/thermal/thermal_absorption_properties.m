@@ -39,7 +39,11 @@ end
 
 if strcmp(a.model, 'coefficient') || a.forced
     a.absorption_coeff = m.absorption_coeff;
-    a.absorption_fraction = a.absorption_coeff / alpha;
+    if alpha > 0
+        a.absorption_fraction = a.absorption_coeff / alpha;
+    else
+        a.absorption_fraction = NaN;   % no attenuation: the fraction is undefined
+    end
 else
     a.absorption_fraction = 1;
     if isfield(m, 'absorption_fraction') && ~isempty(m.absorption_fraction) && ~any(isnan(m.absorption_fraction(:)))

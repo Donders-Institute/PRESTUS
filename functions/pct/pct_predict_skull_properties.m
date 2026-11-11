@@ -139,7 +139,8 @@ function name = mapping_name(parameters, key)
 end
 
 function bounds = bound_values(parameters)
-% Skull values of the uncertainty bound variants' medium files (unreadable files are skipped).
+% Skull values of the uncertainty bound variants' medium files; an unreadable
+% file is skipped with a warning, so the band it would widen is reported.
     bounds = struct();
     variants = uncertainty_variants();
     for v = variants(2:end)
@@ -148,16 +149,9 @@ function bounds = bound_values(parameters)
             s = file.medium_properties.skull;
             bounds.(v.name) = struct('label', v.label, 'density', s.density, ...
                                      'sound_speed', s.sound_speed, 'alpha_coeff', s.alpha_coeff);
-        catch
+        catch ME
+            warning('pct_predict_skull_properties:boundFile', ...
+                'Skipping the %s bound: cannot read its skull values (%s).', v.label, ME.message);
         end
     end
-end
-
-function v = get_field(s, path, default)
-    v = default;
-    for k = 1:numel(path)
-        if ~isstruct(s) || ~isfield(s, path{k}); return; end
-        s = s.(path{k});
-    end
-    v = s;
 end
