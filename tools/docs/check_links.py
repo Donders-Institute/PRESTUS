@@ -24,7 +24,7 @@ DOC = ROOT / "doc"
 LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 EXPLICIT = re.compile(r"""<a\s+(?:id|name)=["']([^"']+)["']""")
-ATTR_ID = re.compile(r"\{\s*#([\w\-]+)\s*\}\s*$")
+ATTR_LIST = re.compile(r"\{\s*([^}]*)\}\s*$")         # attr_list: { #id .class key=value }
 FENCE = re.compile(r"^\s*(```|~~~)")
 
 
@@ -52,10 +52,10 @@ def anchors(path: Path) -> set[str]:
         m = HEADING.match(line)
         if m:
             title = m.group(2)
-            attr = ATTR_ID.search(title)
+            attr = ATTR_LIST.search(title)
             if attr:
-                found.add(attr.group(1))
-                title = ATTR_ID.sub("", title)
+                found.update(t[1:] for t in attr.group(1).split() if t.startswith("#"))
+                title = ATTR_LIST.sub("", title)
             slug = slugify(title)
             if slug in seen:                       # duplicates get _1, _2, ...
                 seen[slug] += 1
