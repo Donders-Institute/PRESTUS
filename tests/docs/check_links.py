@@ -9,7 +9,7 @@ punctuation removed, spaces to hyphens) or an explicit <a id/name="..."> tag.
 External links (http, https, mailto) are not checked.
 
 Usage:
-    python tools/docs/check_links.py
+    python tests/docs/check_links.py
 """
 from __future__ import annotations
 

@@ -15,7 +15,7 @@ checked as well; there a bold-only line naming the section in backticks
 (e.g. "**`placement.manual`**") sets the section like a heading. Exit status 1 lists undocumented keys and differing defaults.
 
 Usage:
-    python tools/docs/check_param_docs.py
+    python tests/docs/check_param_docs.py
 """
 from __future__ import annotations
 

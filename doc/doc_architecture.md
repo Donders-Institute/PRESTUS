@@ -122,14 +122,14 @@ With several transducers each target is that transducer's own free-water ISPPA. 
 ## Changing PRESTUS
 
 - **New config key:** add it with a comment to `config/config_default.yaml` and a row to [Parameters](doc_parameters.md). If the code reads a key that `config_default.yaml` does not define, list it under `extra:` in `nexus/prestus_nexus/overlay.yaml`, so that neither MATLAB nor the Nexus reports it as unknown.
-- **New function:** start the file with a help line `% NAME  Short description`; `tools/docs/gen_function_index.py` adds it to [Functions](doc_functions.md).
+- **New function:** start the file with a help line `% NAME  Short description`; `tests/docs/gen_function_index.py` adds it to [Functions](doc_functions.md).
 - **New stage or behaviour:** add a test at the right level ([Testing](doc_testing.md)), and for anything that changes numbers a physics or golden-metric check.
 - Before committing, run the checks that CI runs:
 
 ```bash
-python tools/docs/gen_function_index.py --check
-python tools/docs/check_param_docs.py
-python tools/docs/check_links.py
+python tests/docs/gen_function_index.py --check
+python tests/docs/check_param_docs.py
+python tests/docs/check_links.py
 mkdocs build --strict -d /tmp/prestus-site
 (cd nexus && python -m pytest -q -m "not matlab")
 matlab -batch "cd tests; run_all_tests('unit')"

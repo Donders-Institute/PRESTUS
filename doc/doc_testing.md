@@ -15,9 +15,9 @@ PRESTUS is tested at five levels, from checks that take seconds and run on every
 ## Level 0: static checks
 
 ```bash
-python tools/docs/gen_function_index.py --check   # doc_functions.md lists every function
-python tools/docs/check_param_docs.py             # every config key documented; defaults match
-python tools/docs/check_links.py                  # relative links and anchors resolve
+python tests/docs/gen_function_index.py --check   # doc_functions.md lists every function
+python tests/docs/check_param_docs.py             # every config key documented; defaults match
+python tests/docs/check_links.py                  # relative links and anchors resolve
 mkdocs build --strict -d /tmp/prestus-site        # site builds without warnings (mkdocs < 2)
 (cd nexus && python -m pytest -q -m "not matlab")
 ```

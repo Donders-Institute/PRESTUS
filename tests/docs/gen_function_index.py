@@ -9,8 +9,8 @@ longer exist are dropped. Only the intro block (everything before the first
 '#### ' heading) is meant to be edited by hand.
 
 Usage:
-    python tools/docs/gen_function_index.py           # rewrite doc/doc_functions.md
-    python tools/docs/gen_function_index.py --check   # exit 1 if it is out of date
+    python tests/docs/gen_function_index.py           # rewrite doc/doc_functions.md
+    python tests/docs/gen_function_index.py --check   # exit 1 if it is out of date
 """
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ def main() -> int:
     new = render(intro, existing_descriptions(text))
     if args.check:
         if new != text:
-            print("doc/doc_functions.md is out of date; run: python tools/docs/gen_function_index.py")
+            print("doc/doc_functions.md is out of date; run: python tests/docs/gen_function_index.py")
             return 1
         print("doc/doc_functions.md is up to date")
         return 0

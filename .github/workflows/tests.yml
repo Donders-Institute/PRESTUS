@@ -34,11 +34,11 @@ jobs:
       - name: Install
         run: pip install "mkdocs<2" mkdocs-material pymdown-extensions pyyaml
       - name: Function index is up to date
-        run: python tools/docs/gen_function_index.py --check
+        run: python tests/docs/gen_function_index.py --check
       - name: Every config key is documented, defaults match
-        run: python tools/docs/check_param_docs.py
+        run: python tests/docs/check_param_docs.py
       - name: Relative links resolve
-        run: python tools/docs/check_links.py
+        run: python tests/docs/check_links.py
       - name: Site builds without warnings
         run: mkdocs build --strict -d "$RUNNER_TEMP/site"
 
