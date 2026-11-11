@@ -194,6 +194,42 @@ classdef test_uncertainty_nesting < matlab.unittest.TestCase
             tc.verifyEmpty(recorded(), 'nothing may be submitted before the error');
         end
 
+        function sequentialRunsChainOnReports(tc)
+            % A follow-up run submits the five variants after run 1's
+            % report, then its own report after them; only the heating
+            % variants adopt run 1's end temperature.
+            p = base_parameters(tc.TmpDir, 'slurm');
+            seq = p;
+            seq.simulation.uncertainty = false;
+            uncertainty_pipeline(p, struct('sequential_configs', struct('config_2', seq)));
+            jobs = recorded();
+            [name, affixes, heating] = variant_list(p.io.output_affix);
+            % stage 1 + 5 sims + report, then 5 sims + report
+            tc.verifyNumElements(jobs, 13);
+            verify_unique_names(tc, jobs);
+            s1 = find_jobs(jobs, 'r1-u1-preproc');
+            r1 = find_jobs(jobs, 'r1-u7-report');
+            r2 = find_jobs(jobs, 'r2-u7-report');
+            tc.assertNumElements(s1, 1); tc.assertNumElements(r1, 1); tc.assertNumElements(r2, 1);
+            run1 = []; run2 = [];
+            for v = 1:numel(name)
+                a = find_jobs(jobs, sprintf('r1-u%d-sim-%s_', v + 1, name{v}));
+                b = find_jobs(jobs, sprintf('r2-u%d-sim-%s_', v + 1, name{v}));
+                tc.assertNumElements(a, 1, name{v}); tc.assertNumElements(b, 1, name{v});
+                tc.verifyEqual(a{1}.depend, s1{1}.id, [name{v} ': run 1 waits for stage 1']);
+                tc.verifyEqual(b{1}.depend, r1{1}.id, [name{v} ': run 2 waits for run 1''s report']);
+                tc.verifyEqual(b{1}.output_affix, [affixes{v} '_seq2']);
+                handoff = get_field(b{1}.p, {'io', 'adopted_heatmap'}, '');
+                tc.verifyEqual(~isempty(handoff), heating(v), [name{v} ': heat handoff']);
+                if heating(v)
+                    tc.verifyTrue(endsWith(handoff, ['_T1w' affixes{v} '_heating_end.nii.gz']), name{v});
+                end
+                run1 = [run1, a{1}.id]; run2 = [run2, b{1}.id]; %#ok<AGROW>
+            end
+            tc.verifyEqual(r1{1}.depend, sort(run1), 'run 1 report waits for run 1 sims');
+            tc.verifyEqual(r2{1}.depend, sort(run2), 'run 2 report waits for run 2 sims');
+        end
+
         function coherentSweepErrorsBeforeSubmission(tc)
             p = base_parameters(tc.TmpDir, 'slurm');
             p.transducer(2) = p.transducer(1);

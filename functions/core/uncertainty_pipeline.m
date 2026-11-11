@@ -395,54 +395,17 @@ switch platform
         % ── Stages 2–6 ───────────────────────────────────────────────────
         % Each variant is skipped if its output CSV already exists.
         % If not skipped, it depends on stage 1 (when stage 1 was submitted).
-        job_ids_sim   = zeros(1, n_var);
-        sim_submitted = false(1, n_var);
-        for si = 1:n_var
-            variant  = variants(si).name;
-            p_sim    = p_variants{si};
-            csv_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s%s.csv', subject_id, medium, options.affixes.(variant)));
-            fprintf('[Stage %d] Submitting %s simulation    ', si + 1, variant);
-            if isfile(csv_file) && ~ow.rerun_outputs
-                fprintf('— output exists, skipping.\n');
-            else
-                p_sim.hpc.timelimit = options.sim_timelimit;
-                p_sim.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', ...
-                                              run_prefix, si + 1, variant, subj);
-                p_sim               = apply_memorylimit(p_sim, options.sim_memorylimit);
-                if ~isempty(job_id_stage1)
-                    p_sim.hpc.depend_job_id = job_id_stage1;
-                end
-                job_ids_sim(si)     = prestus_pipeline_start(p_sim);
-                sim_submitted(si)   = true;
-                fprintf('→ job %s  (mem %iG)\n', ...
-                    num2str(job_ids_sim(si)), p_sim.hpc.memorylimit);
-            end
-        end
-        fprintf('\n');
+        [job_ids_sim, sim_submitted] = submit_variant_sims(p_variants, options.affixes, ...
+            job_id_stage1, run_prefix, '[Stage %d]', parameters, subj, options, ow);
 
         % ── Stage 7 ──────────────────────────────────────────────────────
         % Skip if the report already exists.
         % Depends on whichever simulation jobs were actually submitted.
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, options.affixes.default));
-        fprintf('[Stage %d] Submitting uncertainty report      ', n_var + 2);
-        if isfile(report_file) && ~ow.rerun_outputs
-            fprintf('— report exists, skipping.\n');
-            job_id_report = [];
-        else
-            p_report.hpc.timelimit  = options.report_timelimit;
-            p_report.hpc.job_name   = sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj);
-            p_report                = apply_memorylimit(p_report, options.report_memorylimit);
-            p_report                = strip_gpu_requirements(p_report, options.report_partition);
-            pending_sim_ids = job_ids_sim(sim_submitted);
-            if ~isempty(pending_sim_ids)
-                p_report.hpc.depend_job_ids = pending_sim_ids;
-            end
-            job_id_report = prestus_pipeline_start(p_report);
-            fprintf('→ job %s  (mem %iG)\n', num2str(job_id_report), p_report.hpc.memorylimit);
-        end
-        fprintf('\n');
+        job_id_report = submit_report(p_report, report_file, job_ids_sim(sim_submitted), ...
+            sprintf('[Stage %d]', n_var + 2), ...
+            sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj), options, ow);
 
         % ── Sequential runs (HPC) ────────────────────────────────────────
         % Each sequential run submits its variants with afterok on the
@@ -647,45 +610,24 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         seq_num    = sorted_numbers(si);
         seq_aff    = make_seq_affixes(seq_num, options.affixes);
 
-        job_ids_sim   = zeros(1, n_var);
-        sim_submitted = false(1, n_var);
         seq_log_files = struct('stage1', '');
-
+        p_seq = cell(1, n_var);
         for vi = 1:n_var
             vname       = variants(vi).name;
             cur_affix   = seq_aff.(vname);
-            prior_affix = prior_affixes.(vname);
             med_cfg     = get_variant_medium_config(vname, options);
 
             p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, variants(vi).heating, ow);
             if variants(vi).heating
-                p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
+                p_v = wire_thermal_handoff(p_v, nii_dir, prior_affixes.(vname), subject_id, medium);
             end
             p_v.io.log_file = fullfile(logs_dir, ...
                 sprintf('sub-%03d_%s%s_r%d_%s.txt', subject_id, medium, cur_affix, run_idx, run_ts));
             seq_log_files.(vname) = p_v.io.log_file;
-
-            csv_file = fullfile(output_dir, ...
-                sprintf('sub-%03d_%s%s.csv', subject_id, medium, cur_affix));
-
-            stage_label = sprintf('[r%d-u%d]', run_idx, vi + 1);
-            fprintf('%s Submitting %s simulation    ', stage_label, vname);
-            if isfile(csv_file) && ~ow.rerun_outputs
-                fprintf('— output exists, skipping.\n');
-            else
-                p_v.hpc.timelimit = options.sim_timelimit;
-                p_v.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', ...
-                    run_prefix, vi + 1, vname, subj);
-                p_v = apply_memorylimit(p_v, options.sim_memorylimit);
-                if ~isempty(prior_job_id_report)
-                    p_v.hpc.depend_job_id = prior_job_id_report;
-                end
-                job_ids_sim(vi)   = prestus_pipeline_start(p_v);
-                sim_submitted(vi) = true;
-                fprintf('→ job %s  (mem %iG)\n', num2str(job_ids_sim(vi)), p_v.hpc.memorylimit);
-            end
+            p_seq{vi} = p_v;
         end
-        fprintf('\n');
+        [job_ids_sim, sim_submitted] = submit_variant_sims(p_seq, seq_aff, prior_job_id_report, ...
+            run_prefix, sprintf('[r%d-u%%d]', run_idx), base_parameters, subj, options, ow);
 
         % Report job for this sequential run
         seq_log_files.report = fullfile(logs_dir, ...
@@ -695,27 +637,71 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, seq_aff.default));
 
-        fprintf('[r%d-u%d] Submitting uncertainty report    ', run_idx, n_var + 2);
-        if isfile(report_file) && ~ow.rerun_outputs
-            fprintf('— report exists, skipping.\n');
-            prior_job_id_report = [];
-        else
-            p_rep.hpc.timelimit = options.report_timelimit;
-            p_rep.hpc.job_name  = sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj);
-            p_rep = apply_memorylimit(p_rep, options.report_memorylimit);
-            p_rep = strip_gpu_requirements(p_rep, options.report_partition);
-            pending = job_ids_sim(sim_submitted);
-            if ~isempty(pending)
-                p_rep.hpc.depend_job_ids = pending;
-            end
-            prior_job_id_report = prestus_pipeline_start(p_rep);
-            fprintf('→ job %s  (mem %iG)\n', num2str(prior_job_id_report), p_rep.hpc.memorylimit);
-        end
-        fprintf('\n');
+        prior_job_id_report = submit_report(p_rep, report_file, job_ids_sim(sim_submitted), ...
+            sprintf('[r%d-u%d]', run_idx, n_var + 2), ...
+            sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj), options, ow);
 
         all_ids = [all_ids, job_ids_sim(sim_submitted), prior_job_id_report];
         prior_affixes = seq_aff;
     end
+end
+
+% =========================================================================
+%% HPC submission helpers
+% =========================================================================
+
+function [job_ids, submitted] = submit_variant_sims(p_variants, affixes, depend_id, ...
+        run_prefix, label_fmt, base, subj, options, ow)
+% Submit one simulation job per uncertainty variant. A variant whose output
+% CSV exists is skipped unless the run re-runs outputs. label_fmt holds one
+% %d for the stage number (e.g. '[Stage %d]'). Returns the job IDs (0 where
+% skipped) and which variants were submitted.
+    variants   = uncertainty_variants();
+    n_var      = numel(variants);
+    output_dir = get_output_dir(base);
+    job_ids    = zeros(1, n_var);
+    submitted  = false(1, n_var);
+    for vi = 1:n_var
+        name     = variants(vi).name;
+        p        = p_variants{vi};
+        csv_file = fullfile(output_dir, sprintf('sub-%03d_%s%s.csv', ...
+            base.subject_id, base.simulation.medium, affixes.(name)));
+        fprintf('%s Submitting %s simulation    ', sprintf(label_fmt, vi + 1), name);
+        if isfile(csv_file) && ~ow.rerun_outputs
+            fprintf('— output exists, skipping.\n');
+            continue
+        end
+        p.hpc.timelimit = options.sim_timelimit;
+        p.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', run_prefix, vi + 1, name, subj);
+        p               = apply_memorylimit(p, options.sim_memorylimit);
+        if ~isempty(depend_id)
+            p.hpc.depend_job_id = depend_id;
+        end
+        job_ids(vi)   = prestus_pipeline_start(p);
+        submitted(vi) = true;
+        fprintf('→ job %s  (mem %iG)\n', num2str(job_ids(vi)), p.hpc.memorylimit);
+    end
+    fprintf('\n');
+end
+
+function job_id = submit_report(p, report_file, depend_ids, label, job_name, options, ow)
+% Submit the uncertainty report job after the given simulation jobs; []
+% when the report exists and the run does not re-run outputs.
+    fprintf('%s Submitting uncertainty report      ', label);
+    job_id = [];
+    if isfile(report_file) && ~ow.rerun_outputs
+        fprintf('— report exists, skipping.\n\n');
+        return
+    end
+    p.hpc.timelimit = options.report_timelimit;
+    p.hpc.job_name  = job_name;
+    p               = apply_memorylimit(p, options.report_memorylimit);
+    p               = strip_gpu_requirements(p, options.report_partition);
+    if ~isempty(depend_ids)
+        p.hpc.depend_job_ids = depend_ids;
+    end
+    job_id = prestus_pipeline_start(p);
+    fprintf('→ job %s  (mem %iG)\n\n', num2str(job_id), p.hpc.memorylimit);
 end
 
 % =========================================================================
