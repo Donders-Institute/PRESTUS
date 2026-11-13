@@ -104,6 +104,36 @@ classdef (SharedTestFixtures = {prestus_paths}) test_transducer_placement < matl
                 'Fallback must be filled after conversion to voxels');
         end
 
+        function test_focal_distance_fallback_uses_t1_voxel_size(tc)
+            % Voxel-position fallback scales each axis by the T1 voxel size
+            % (0.9 mm must not be rounded to 1 mm; anisotropy is kept)
+            vox = [0.9 0.9 1.2];
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            t1_file = fullfile(tmp, 'sub-001_T1w.nii');
+            niftiwrite(zeros(20, 20, 20, 'single'), t1_file);
+            info = niftiinfo(t1_file);
+            info.PixelDimensions = vox;
+            info.Transform = affine3d(diag([vox 1]));
+            info.TransformName = 'Sform';
+            niftiwrite(zeros(20, 20, 20, 'single'), t1_file, info);
+
+            p = make_placement_parameters();
+            p.path.anat = tmp;
+            p.path.t1_pattern = 'sub-%1$03d_T1w.nii*';
+            p.grid.resolution_mm = 0.5;
+            p.placement.manual.coordinate_space = 'voxel';
+            p.transducer(1).focal_distance_bowl   = [];
+            p.transducer(1).focal_distance_ep     = [];
+            p.transducer(1).focal_distance_offset = [];
+
+            p_out = focal_distance_calculation(p);
+            d_vox = p.transducer(1).focus_pos - p.transducer(1).trans_pos;
+            expected_bowl = norm(d_vox .* vox);
+            offset = 63.2 - 52.38;
+            tc.verifyEqual(p_out.transducer(1).focal_distance_bowl, expected_bowl, 'AbsTol', 1e-4);  % NIfTI stores voxel sizes as single
+            tc.verifyEqual(p_out.transducer(1).focal_distance_ep, expected_bowl - offset, 'AbsTol', 1e-4);
+        end
+
         function test_localite_missing_file_errors(tc)
             % Localite mode with no file and no path.localite must raise an error
             p = make_placement_parameters();

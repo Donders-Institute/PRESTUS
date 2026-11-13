@@ -74,16 +74,17 @@ for ti = 1:numel(parameters.transducer)
             % converts them to voxels and calls this function again
             disp('Positions not yet in T1 voxels; focal distance will be derived after placement.');
         else
-            focal_distance = norm(tr.focus_pos - tr.trans_pos);
-
+            % trans_pos/focus_pos are T1 voxels: scale each axis by its voxel
+            % size (non-integer and anisotropic T1 voxels)
+            d_vox = tr.focus_pos(:)' - tr.trans_pos(:)';
             try
                 t1_file = dir(fullfile(parameters.path.anat, sprintf(parameters.path.t1_pattern, parameters.subject_id)));
                 t1_header = niftiinfo(fullfile(t1_file.folder, t1_file.name));
-                t1_resolution_mm = round(mean(t1_header.PixelDimensions(1:3)));
-                tr.focal_distance_bowl = focal_distance * t1_resolution_mm;
+                voxel_mm = double(t1_header.PixelDimensions(1:numel(d_vox)));
+                tr.focal_distance_bowl = norm(d_vox .* voxel_mm);
             catch
                 warn('Could not load T1 header to determine resolution; assuming grid resolution.');
-                tr.focal_distance_bowl = focal_distance * parameters.grid.resolution_mm;
+                tr.focal_distance_bowl = norm(d_vox) * parameters.grid.resolution_mm;
             end
 
             tr.focal_distance_ep = tr.focal_distance_bowl - focal_distance_offset;

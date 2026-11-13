@@ -82,6 +82,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** 2D annular sources used the per-ring outer diameter vector instead of the full aperture; rerun 2D annular simulations
 - ⚠️ **Fixed:** in coherent multi-transducer runs, transducers 2..N were built from transducer 1's drive, phases, geometry and frequency; re-run coherent multi-transducer acoustics (single-transducer, async, sequential and BabelBrain runs are unaffected)
 - Fixed: flat matrix arrays (`is_curved: false`) failed; `extract_from_file.file_path` accepts absolute paths outside the MATLAB path
+- ⚠️ **Fixed:** without `focal_distance_ep` or `focal_distance_bowl`, the focal distance derived from voxel `trans_pos` / `focus_pos` rounded the T1 voxel size to whole mm (0.8 or 0.9 mm read as 1 mm, focal distance 11–25 % too long); rerun such runs on non-1 mm or anisotropic T1s
 - ⚠️ **Fixed:** `transducer.trans_pos_mm` / `focus_pos_mm` mapped 0 mm to the invalid voxel 0; they are now measured from the centre of voxel 1 (`round(mm / resolution_mm) + 1`). Subtract one voxel (`resolution_mm`) from configs that compensated for the old mapping
 
 #### Placement
